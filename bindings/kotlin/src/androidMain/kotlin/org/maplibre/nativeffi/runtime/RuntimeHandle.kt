@@ -84,6 +84,24 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
     )
   }
 
+  public actual fun startSetMaximumAmbientCacheSize(size: Long): OfflineOperationHandle<Unit> {
+    NativeAccess.ensureLoaded()
+    Status.requireArgument(size >= 0) { "size must be non-negative" }
+    val outOperationId = longArrayOf(0L)
+    Status.check(
+      MaplibreNativeC.mln_runtime_set_maximum_ambient_cache_size_start(
+        requireLiveHandle(),
+        size,
+        outOperationId,
+      )
+    )
+    return offlineOperation(
+      outOperationId[0],
+      OfflineOperationKind.SET_MAXIMUM_AMBIENT_CACHE_SIZE,
+      OfflineOperationResultKind.NONE,
+    )
+  }
+
   public actual fun startCreateOfflineRegion(
     definition: OfflineRegionDefinition,
     metadata: ByteArray,
@@ -931,12 +949,6 @@ private class RuntimeOptionsScope(options: RuntimeOptions) : AutoCloseable {
   init {
     this.options.asset_path(assetPath)
     this.options.cache_path(cachePath)
-    options.maximumCacheSize?.let { maximumCacheSize ->
-      this.options.flags(
-        this.options.flags() or MaplibreNativeC.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
-      )
-      this.options.maximum_cache_size(maximumCacheSize)
-    }
   }
 
   override fun close() {

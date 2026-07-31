@@ -107,7 +107,6 @@ var offline_region_list_destroy_for_testing: OfflineRegionListDestroyFn = c.mln_
 pub const RuntimeOptions = struct {
     asset_path: ?[]const u8 = null,
     cache_path: ?[]const u8 = null,
-    maximum_cache_size: ?u64 = null,
 };
 
 pub const NetworkStatus = union(enum) {
@@ -173,6 +172,7 @@ pub const OfflineOperationKind = union(enum) {
     region_set_download_state,
     region_invalidate,
     region_delete,
+    set_maximum_ambient_cache_size,
     unknown: u32,
 
     pub fn fromRaw(raw: u32) OfflineOperationKind {
@@ -188,6 +188,7 @@ pub const OfflineOperationKind = union(enum) {
             c.MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE => .region_set_download_state,
             c.MLN_OFFLINE_OPERATION_REGION_INVALIDATE => .region_invalidate,
             c.MLN_OFFLINE_OPERATION_REGION_DELETE => .region_delete,
+            c.MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE => .set_maximum_ambient_cache_size,
             else => .{ .unknown = raw },
         };
     }
@@ -205,6 +206,7 @@ pub const OfflineOperationKind = union(enum) {
             .region_set_download_state => c.MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE,
             .region_invalidate => c.MLN_OFFLINE_OPERATION_REGION_INVALIDATE,
             .region_delete => c.MLN_OFFLINE_OPERATION_REGION_DELETE,
+            .set_maximum_ambient_cache_size => c.MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE,
             .unknown => |raw| raw,
         };
     }
@@ -1083,10 +1085,6 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
             cache_path = try nulTerminated(allocator, value, diagnostic_store, "runtime cache_path contains embedded NUL");
             native_options.cache_path = cache_path.?.ptr;
         }
-        if (options.maximum_cache_size) |value| {
-            native_options.flags |= c.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE;
-            native_options.maximum_cache_size = value;
-        }
 
         return createNative(&native_options, diagnostic_store);
     }
@@ -1213,6 +1211,20 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
             runtime_lease.diagnostic_store,
         );
         return self.operationHandleWithRuntime(runtime_lease.native, operation_id, .ambient_cache, .none);
+    }
+
+    /// Starts a change to this runtime's maximum ambient cache size. MapLibre evicts ambient
+    /// resources to fit the new budget, so lowering it discards cached resources. Offline regions
+    /// are unaffected.
+    pub fn startSetMaximumAmbientCacheSize(self: *RuntimeHandle, size: u64) status.Error!OfflineOperationHandle {
+        const runtime_lease = try lease(self);
+        defer runtime_lease.release();
+        var operation_id: c.mln_offline_operation_id = 0;
+        try status.checkStatus(
+            c.mln_runtime_set_maximum_ambient_cache_size_start(runtime_lease.native, size, &operation_id),
+            runtime_lease.diagnostic_store,
+        );
+        return self.operationHandleWithRuntime(runtime_lease.native, operation_id, .set_maximum_ambient_cache_size, .none);
     }
 
     pub fn startCreateOfflineRegion(

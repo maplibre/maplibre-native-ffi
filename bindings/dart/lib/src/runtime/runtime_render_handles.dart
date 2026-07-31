@@ -323,16 +323,16 @@ final class RenderSessionHandle {
     return withNativeArena((arena) {
       final info = arena<raw.mln_texture_image_info>();
       info.ref = _c.raw.mln_texture_image_info_default();
-      final probeStatus = _c.raw.mln_texture_read_premultiplied_rgba8(
-        _handle.raw,
-        nullptr.cast<Uint8>(),
-        0,
-        info,
+      // A null buffer with zero capacity is a size probe that reports the
+      // required byte length.
+      _check(
+        _c.raw.mln_texture_read_premultiplied_rgba8(
+          _handle.raw,
+          nullptr.cast<Uint8>(),
+          0,
+          info,
+        ),
       );
-      if (_statusCode(probeStatus) != nativeStatusInvalidArgument ||
-          info.ref.byte_length == 0) {
-        _check(probeStatus);
-      }
       return TextureImageInfo._fromNative(info.ref);
     });
   }

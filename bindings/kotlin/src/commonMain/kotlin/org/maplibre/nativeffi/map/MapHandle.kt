@@ -26,12 +26,14 @@ import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
+import org.maplibre.nativeffi.style.ImageStretch
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Owned map handle. Platform actuals own the native map carrier. */
@@ -136,6 +138,12 @@ public expect class MapHandle : AutoCloseable {
 
   public fun styleImageInfo(imageId: String): StyleImageInfo?
 
+  /**
+   * Returns one runtime style image's stretchable intervals, or null when no image carries
+   * [imageId]. The pair holds the horizontal intervals first.
+   */
+  public fun styleImageStretches(imageId: String): Pair<List<ImageStretch>, List<ImageStretch>>?
+
   public fun copyStyleImagePremultipliedRgba8(imageId: String): StyleImage?
 
   public fun addImageSourceUrl(sourceId: String, coordinates: List<LatLng>, url: String)
@@ -201,6 +209,51 @@ public expect class MapHandle : AutoCloseable {
   public fun clearLayerFilter(layerId: String)
 
   public fun layerFilter(layerId: String): JsonValue?
+
+  /**
+   * Sets one layer's source-layer ID.
+   *
+   * Layer types that take no source, such as background, are rejected.
+   */
+  public fun setLayerSourceLayer(layerId: String, sourceLayer: String)
+
+  /** Returns one layer's source-layer ID, empty when the layer carries none. */
+  public fun layerSourceLayer(layerId: String): String
+
+  /**
+   * Sets one layer's source ID.
+   *
+   * Layer types that take no source, such as background, are rejected. The named source need not
+   * exist yet.
+   */
+  public fun setLayerSourceId(layerId: String, sourceId: String)
+
+  /** Returns one layer's source ID, empty when the layer carries none. */
+  public fun layerSourceId(layerId: String): String
+
+  /** Sets the lowest zoom at which one layer draws. Pass negative infinity for no lower bound. */
+  public fun setLayerMinZoom(layerId: String, minZoom: Double)
+
+  /**
+   * Returns the lowest zoom at which one layer draws. A layer with no lower bound reports negative
+   * infinity.
+   */
+  public fun layerMinZoom(layerId: String): Double
+
+  /** Sets the highest zoom at which one layer draws. Pass positive infinity for no upper bound. */
+  public fun setLayerMaxZoom(layerId: String, maxZoom: Double)
+
+  /**
+   * Returns the highest zoom at which one layer draws. A layer with no upper bound reports positive
+   * infinity.
+   */
+  public fun layerMaxZoom(layerId: String): Double
+
+  /** Sets whether one layer draws. */
+  public fun setLayerVisibility(layerId: String, visibility: StyleLayerVisibility)
+
+  /** Returns whether one layer draws. */
+  public fun layerVisibility(layerId: String): StyleLayerVisibility
 
   public fun requestRepaint()
 

@@ -36,8 +36,6 @@ pub struct RuntimeOptions {
     pub asset_path: Option<String>,
     /// Cache database path.
     pub cache_path: Option<String>,
-    /// Maximum ambient cache size in bytes.
-    pub maximum_cache_size: Option<u64>,
 }
 
 impl RuntimeOptions {}
@@ -340,7 +338,6 @@ pub unsafe fn copy_offline_region_list(
 pub struct NativeRuntimeOptions {
     asset_path: Option<CString>,
     cache_path: Option<CString>,
-    maximum_cache_size: Option<u64>,
 }
 
 impl NativeRuntimeOptions {
@@ -349,7 +346,6 @@ impl NativeRuntimeOptions {
         Ok(Self {
             asset_path: string::optional_c_string(options.asset_path.as_deref())?,
             cache_path: string::optional_c_string(options.cache_path.as_deref())?,
-            maximum_cache_size: options.maximum_cache_size,
         })
     }
 
@@ -362,10 +358,6 @@ impl NativeRuntimeOptions {
         }
         if let Some(cache_path) = &self.cache_path {
             raw.cache_path = cache_path.as_ptr();
-        }
-        if let Some(maximum_cache_size) = self.maximum_cache_size {
-            raw.flags |= sys::MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE;
-            raw.maximum_cache_size = maximum_cache_size;
         }
         raw
     }
@@ -410,7 +402,6 @@ mod tests {
         let native = runtime_options_to_native(&RuntimeOptions {
             asset_path: Some("assets".into()),
             cache_path: Some("cache.db".into()),
-            maximum_cache_size: Some(42),
         })
         .unwrap();
 
@@ -420,8 +411,7 @@ mod tests {
             raw.size,
             std::mem::size_of::<sys::mln_runtime_options>() as u32
         );
-        assert_eq!(raw.flags, sys::MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE);
-        assert_eq!(raw.maximum_cache_size, 42);
+        assert_eq!(raw.flags, 0);
         assert!(!raw.asset_path.is_null());
         assert!(!raw.cache_path.is_null());
         // SAFETY: native owns the C strings referenced by raw for this scope.
@@ -441,7 +431,7 @@ mod tests {
         let native = runtime_options_to_native(&RuntimeOptions::default()).unwrap();
         let raw = native.to_raw();
 
-        assert_eq!(raw.flags & sys::MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE, 0);
+        assert_eq!(raw.flags, 0);
         assert_eq!(raw.asset_path, ptr::null());
         assert_eq!(raw.cache_path, ptr::null());
     }

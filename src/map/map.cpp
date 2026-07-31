@@ -567,6 +567,13 @@ auto effective_geojson_source_options(const mln_geojson_source_options* options)
   if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER)) {
     result.cluster = options->cluster;
   }
+  if (
+    has_geojson_source_option(
+      *options, MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
+    )
+  ) {
+    result.synchronous_update = options->synchronous_update;
+  }
   return result;
 }
 
@@ -587,7 +594,8 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
     MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE | MLN_GEOJSON_SOURCE_OPTION_BUFFER |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
-    MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS | MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+    MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS | MLN_GEOJSON_SOURCE_OPTION_CLUSTER |
+    MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE;
   if ((options->fields & ~known_fields) != 0U) {
     mln::core::set_thread_error(
       "mln_geojson_source_options.fields contains unknown bits"
@@ -674,6 +682,7 @@ auto to_native_geojson_source_options(const mln_geojson_source_options& options)
   native.clusterRadius = static_cast<uint16_t>(options.cluster_radius);
   native.clusterMaxZoom = static_cast<uint8_t>(options.cluster_max_zoom);
   native.clusterMinPoints = options.cluster_min_points;
+  native.synchronousUpdate = options.synchronous_update;
 
   if (options.cluster_properties != nullptr) {
     constexpr auto key = std::string_view{"clusterProperties"};
@@ -1042,7 +1051,10 @@ auto validate_style_image_options(const mln_style_image_options* options)
   }
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO) |
-    MLN_STYLE_IMAGE_OPTION_SDF;
+    MLN_STYLE_IMAGE_OPTION_SDF | MLN_STYLE_IMAGE_OPTION_STRETCH_X |
+    MLN_STYLE_IMAGE_OPTION_STRETCH_Y | MLN_STYLE_IMAGE_OPTION_CONTENT |
+    MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH |
+    MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
   if ((options->fields & ~known_fields) != 0U) {
     mln::core::set_thread_error(
       "mln_style_image_options.fields contains unknown bits"
@@ -1055,6 +1067,84 @@ auto validate_style_image_options(const mln_style_image_options* options)
   ) {
     mln::core::set_thread_error("pixel_ratio must be finite and positive");
     return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  for (const auto& [field, stretches, count, name] : {
+         std::tuple{
+           uint32_t{MLN_STYLE_IMAGE_OPTION_STRETCH_X}, options->stretch_x,
+           options->stretch_x_count, "stretch_x"
+         },
+         std::tuple{
+           uint32_t{MLN_STYLE_IMAGE_OPTION_STRETCH_Y}, options->stretch_y,
+           options->stretch_y_count, "stretch_y"
+         },
+       }) {
+    if (!has_style_image_option(*options, field)) {
+      continue;
+    }
+    if (stretches == nullptr && count != 0) {
+      auto message =
+        std::string{name} + " must not be null when its count is non-zero";
+      mln::core::set_thread_error(message.c_str());
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    for (size_t index = 0; index < count; index += 1) {
+      const auto& stretch = stretches[index];
+      if (!std::isfinite(stretch.from) || !std::isfinite(stretch.to)) {
+        auto message = std::string{name} + " intervals must be finite";
+        mln::core::set_thread_error(message.c_str());
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+      if (stretch.from > stretch.to) {
+        auto message = std::string{name} + " intervals must not run backwards";
+        mln::core::set_thread_error(message.c_str());
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+      if (index != 0 && stretch.from < stretches[index - 1].to) {
+        auto message =
+          std::string{name} + " intervals must increase and must not overlap";
+        mln::core::set_thread_error(message.c_str());
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+    }
+  }
+  if (has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_CONTENT)) {
+    const auto& content = options->content;
+    if (
+      !std::isfinite(content.left) || !std::isfinite(content.top) ||
+      !std::isfinite(content.right) || !std::isfinite(content.bottom)
+    ) {
+      mln::core::set_thread_error("content insets must be finite");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (content.left > content.right || content.top > content.bottom) {
+      mln::core::set_thread_error("content insets must not run backwards");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+  }
+  for (const auto& [field, value, name] : {
+         std::tuple{
+           uint32_t{MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH},
+           options->text_fit_width, "text_fit_width"
+         },
+         std::tuple{
+           uint32_t{MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT},
+           options->text_fit_height, "text_fit_height"
+         },
+       }) {
+    if (!has_style_image_option(*options, field)) {
+      continue;
+    }
+    switch (value) {
+      case MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK:
+      case MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY:
+      case MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL:
+        break;
+      default: {
+        auto message = std::string{name} + " is invalid";
+        mln::core::set_thread_error(message.c_str());
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+    }
   }
   return MLN_STATUS_OK;
 }
@@ -1072,7 +1162,58 @@ auto effective_style_image_options(const mln_style_image_options* options)
   if (has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_SDF)) {
     result.sdf = options->sdf;
   }
+  if (has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_STRETCH_X)) {
+    result.stretch_x = options->stretch_x;
+    result.stretch_x_count = options->stretch_x_count;
+  }
+  if (has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_STRETCH_Y)) {
+    result.stretch_y = options->stretch_y;
+    result.stretch_y_count = options->stretch_y_count;
+  }
+  if (has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_CONTENT)) {
+    result.content = options->content;
+  }
+  if (has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH)) {
+    result.text_fit_width = options->text_fit_width;
+  }
+  if (
+    has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT)
+  ) {
+    result.text_fit_height = options->text_fit_height;
+  }
   return result;
+}
+
+auto to_native_image_stretches(const mln_image_stretch* stretches, size_t count)
+  -> mbgl::style::ImageStretches {
+  auto native = mbgl::style::ImageStretches{};
+  native.reserve(count);
+  for (size_t index = 0; index < count; index += 1) {
+    native.emplace_back(stretches[index].from, stretches[index].to);
+  }
+  return native;
+}
+
+auto to_native_text_fit(uint32_t value) -> mbgl::style::TextFit {
+  switch (value) {
+    case MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY:
+      return mbgl::style::TextFit::stretchOnly;
+    case MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL:
+      return mbgl::style::TextFit::proportional;
+    default:
+      return mbgl::style::TextFit::stretchOrShrink;
+  }
+}
+
+auto from_native_text_fit(mbgl::style::TextFit value) -> uint32_t {
+  switch (value) {
+    case mbgl::style::TextFit::stretchOnly:
+      return MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY;
+    case mbgl::style::TextFit::proportional:
+      return MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
+    default:
+      return MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK;
+  }
 }
 
 auto required_premultiplied_rgba8_bytes(
@@ -1177,8 +1318,30 @@ auto style_image_info_from_native(const mbgl::style::Image& image)
     .height = pixels.size.height,
     .stride = static_cast<uint32_t>(pixels.stride()),
     .byte_length = pixels.bytes(),
+    .stretch_x_count = image.getStretchX().size(),
+    .stretch_y_count = image.getStretchY().size(),
+    .content =
+      image.getContent().has_value()
+        ? mln_image_content{
+            .left = image.getContent()->left,
+            .top = image.getContent()->top,
+            .right = image.getContent()->right,
+            .bottom = image.getContent()->bottom
+          }
+        : mln_image_content{.left = 0, .top = 0, .right = 0, .bottom = 0},
+    .text_fit_width =
+      image.getTextFitWidth().has_value()
+        ? from_native_text_fit(*image.getTextFitWidth())
+        : static_cast<uint32_t>(MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK),
+    .text_fit_height =
+      image.getTextFitHeight().has_value()
+        ? from_native_text_fit(*image.getTextFitHeight())
+        : static_cast<uint32_t>(MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK),
     .pixel_ratio = image.getPixelRatio(),
-    .sdf = image.isSdf()
+    .sdf = image.isSdf(),
+    .has_content = image.getContent().has_value(),
+    .has_text_fit_width = image.getTextFitWidth().has_value(),
+    .has_text_fit_height = image.getTextFitHeight().has_value()
   };
 }
 
@@ -3169,7 +3332,8 @@ auto geojson_source_options_default() noexcept -> mln_geojson_source_options {
     .cluster_radius = defaults.clusterRadius,
     .cluster_min_points = static_cast<uint32_t>(defaults.clusterMinPoints),
     .line_metrics = defaults.lineMetrics,
-    .cluster = defaults.cluster
+    .cluster = defaults.cluster,
+    .synchronous_update = defaults.synchronousUpdate
   };
 }
 
@@ -3207,6 +3371,13 @@ auto style_image_options_default() noexcept -> mln_style_image_options {
   return mln_style_image_options{
     .size = sizeof(mln_style_image_options),
     .fields = 0,
+    .stretch_x = nullptr,
+    .stretch_x_count = 0,
+    .stretch_y = nullptr,
+    .stretch_y_count = 0,
+    .content = {.left = 0, .top = 0, .right = 0, .bottom = 0},
+    .text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
+    .text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
     .pixel_ratio = 1.0F,
     .sdf = false
   };
@@ -3219,8 +3390,16 @@ auto style_image_info_default() noexcept -> mln_style_image_info {
     .height = 0,
     .stride = 0,
     .byte_length = 0,
+    .stretch_x_count = 0,
+    .stretch_y_count = 0,
+    .content = {.left = 0, .top = 0, .right = 0, .bottom = 0},
+    .text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
+    .text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
     .pixel_ratio = 1.0F,
-    .sdf = false
+    .sdf = false,
+    .has_content = false,
+    .has_text_fit_width = false,
+    .has_text_fit_height = false
   };
 }
 
@@ -3829,6 +4008,11 @@ auto map_copy_style_source_attribution(
     return MLN_STATUS_OK;
   }
   *out_attribution_size = attribution->size();
+  // A null buffer with zero capacity is a size probe, so it reports the length
+  // and succeeds rather than sharing a status with a missing source.
+  if (out_attribution == nullptr) {
+    return MLN_STATUS_OK;
+  }
   if (attribution_capacity < attribution->size()) {
     set_thread_error("attribution_capacity is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -4479,9 +4663,39 @@ auto map_set_style_image(
   }
 
   const auto effective = effective_style_image_options(options);
+  auto content = std::optional<mbgl::style::ImageContent>{};
+  if (
+    options != nullptr &&
+    has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_CONTENT)
+  ) {
+    content = mbgl::style::ImageContent{
+      .left = effective.content.left,
+      .top = effective.content.top,
+      .right = effective.content.right,
+      .bottom = effective.content.bottom
+    };
+  }
+  auto text_fit_width = std::optional<mbgl::style::TextFit>{};
+  if (
+    options != nullptr &&
+    has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH)
+  ) {
+    text_fit_width = to_native_text_fit(effective.text_fit_width);
+  }
+  auto text_fit_height = std::optional<mbgl::style::TextFit>{};
+  if (
+    options != nullptr &&
+    has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT)
+  ) {
+    text_fit_height = to_native_text_fit(effective.text_fit_height);
+  }
+
   auto style_image = std::make_unique<mbgl::style::Image>(
     string_from_view(image_id), to_native_premultiplied_rgba8_image(*image),
-    effective.pixel_ratio, effective.sdf
+    effective.pixel_ratio, effective.sdf,
+    to_native_image_stretches(effective.stretch_x, effective.stretch_x_count),
+    to_native_image_stretches(effective.stretch_y, effective.stretch_y_count),
+    content, text_fit_width, text_fit_height
   );
   live->map->getStyle().addImage(std::move(style_image));
   return MLN_STATUS_OK;
@@ -4564,6 +4778,86 @@ auto map_get_style_image_info(
   return MLN_STATUS_OK;
 }
 
+auto map_copy_style_image_stretches(
+  mln_map map, mln_string_view image_id, mln_image_stretch* out_stretch_x,
+  size_t stretch_x_capacity, size_t* out_stretch_x_count,
+  mln_image_stretch* out_stretch_y, size_t stretch_y_capacity,
+  size_t* out_stretch_y_count, bool* out_found
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  const auto image_id_status = validate_image_id(image_id);
+  if (image_id_status != MLN_STATUS_OK) {
+    return image_id_status;
+  }
+  if (
+    (out_stretch_x == nullptr && stretch_x_capacity > 0) ||
+    (out_stretch_y == nullptr && stretch_y_capacity > 0)
+  ) {
+    set_thread_error(
+      "stretch output arrays must not be null when their capacity is non-zero"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    out_stretch_x_count == nullptr || out_stretch_y_count == nullptr ||
+    out_found == nullptr
+  ) {
+    set_thread_error("stretch output counts and out_found must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  const auto image = live->map->getStyle().getImage(string_from_view(image_id));
+  *out_found = image.has_value();
+  *out_stretch_x_count = 0;
+  *out_stretch_y_count = 0;
+  if (!image) {
+    return MLN_STATUS_OK;
+  }
+
+  const auto& stretch_x = image->getStretchX();
+  const auto& stretch_y = image->getStretchY();
+  *out_stretch_x_count = stretch_x.size();
+  *out_stretch_y_count = stretch_y.size();
+
+  // A null array with zero capacity is a size probe, so it reports the counts
+  // and succeeds rather than sharing a status with a missing image.
+  for (const auto& [out, capacity, stretches, name] : {
+         std::tuple{
+           out_stretch_x, stretch_x_capacity, &stretch_x, "stretch_x_capacity"
+         },
+         std::tuple{
+           out_stretch_y, stretch_y_capacity, &stretch_y, "stretch_y_capacity"
+         },
+       }) {
+    if (out == nullptr) {
+      continue;
+    }
+    if (capacity < stretches->size()) {
+      auto message = std::string{name} + " is too small";
+      set_thread_error(message.c_str());
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+  }
+  for (const auto& [out, stretches] : {
+         std::pair{out_stretch_x, &stretch_x},
+         std::pair{out_stretch_y, &stretch_y},
+       }) {
+    if (out == nullptr) {
+      continue;
+    }
+    for (size_t index = 0; index < stretches->size(); index += 1) {
+      out[index] = mln_image_stretch{
+        .from = (*stretches)[index].first, .to = (*stretches)[index].second
+      };
+    }
+  }
+  return MLN_STATUS_OK;
+}
+
 auto map_copy_style_image_premultiplied_rgba8(
   mln_map map, mln_string_view image_id, uint8_t* out_pixels,
   size_t pixel_capacity, size_t* out_byte_length, bool* out_found
@@ -4595,6 +4889,11 @@ auto map_copy_style_image_premultiplied_rgba8(
 
   const auto& pixels = image->getImage();
   *out_byte_length = pixels.bytes();
+  // A null buffer with zero capacity is a size probe, so it reports the length
+  // and succeeds rather than sharing a status with a missing image.
+  if (out_pixels == nullptr) {
+    return MLN_STATUS_OK;
+  }
   if (pixel_capacity < pixels.bytes()) {
     set_thread_error("pixel_capacity is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -5639,6 +5938,279 @@ auto map_get_layer_filter(
   }
 
   return json_snapshot_create(layer->getFilter().serialize(), out_filter);
+}
+
+namespace {
+
+// Resolves a live map and one of its layers, sharing the validation every typed
+// layer accessor performs before touching MapLibre state.
+auto resolve_layer_for_access(
+  mln_map map, mln_string_view layer_id, mbgl::style::Layer*& out_layer
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (!validate_string_view(layer_id, "layer_id")) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (layer_id.size == 0) {
+    set_thread_error("layer_id must not be empty");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto* layer = live->map->getStyle().getLayer(string_from_view(layer_id));
+  if (layer == nullptr) {
+    set_thread_error("layer does not exist");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  out_layer = layer;
+  return MLN_STATUS_OK;
+}
+
+// MapLibre's own setProperty path logs a warning and does nothing when a layer
+// type takes no source, so the typed setters reject that case instead.
+auto require_layer_takes_source(
+  const mbgl::style::Layer& layer, const char* field
+) -> bool {
+  if (
+    layer.getTypeInfo()->source == mbgl::style::LayerTypeInfo::Source::Required
+  ) {
+    return true;
+  }
+  auto message = std::string{"layer type does not take a "} + field +
+                 "; layer id is " + layer.getID();
+  set_thread_error(message.c_str());
+  return false;
+}
+
+auto copy_layer_text(
+  const std::string& text, char* out_text, size_t text_capacity,
+  size_t* out_text_size, const char* capacity_name
+) -> mln_status {
+  if (out_text == nullptr && text_capacity > 0) {
+    set_thread_error(
+      "output buffer must not be null when capacity is non-zero"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (out_text_size == nullptr) {
+    set_thread_error("output size pointer must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  *out_text_size = text.size();
+  // A null buffer with zero capacity is a size probe. It succeeds so a caller
+  // can distinguish the required size from the invalid-argument statuses this
+  // family also uses for a missing layer.
+  if (out_text == nullptr) {
+    return MLN_STATUS_OK;
+  }
+  if (text_capacity < text.size()) {
+    auto message = std::string{capacity_name} + " is too small";
+    set_thread_error(message.c_str());
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (!text.empty()) {
+    std::copy(text.begin(), text.end(), out_text);
+  }
+  return MLN_STATUS_OK;
+}
+
+// MapLibre stores the layer zoom range as floats, and infinities survive the
+// narrowing that bounds a layer to one end of the range.
+auto validate_layer_zoom(double zoom, const char* field) -> bool {
+  if (!std::isnan(zoom)) {
+    return true;
+  }
+  auto message = std::string{field} + " must not be NaN";
+  set_thread_error(message.c_str());
+  return false;
+}
+
+}  // namespace
+
+auto map_set_layer_source_layer(
+  mln_map map, mln_string_view layer_id, mln_string_view source_layer
+) -> mln_status {
+  mbgl::style::Layer* layer = nullptr;
+  const auto status = resolve_layer_for_access(map, layer_id, layer);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (!validate_string_view(source_layer, "source_layer")) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (!require_layer_takes_source(*layer, "source-layer")) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  layer->setSourceLayer(string_from_view(source_layer));
+  return MLN_STATUS_OK;
+}
+
+auto map_copy_layer_source_layer(
+  mln_map map, mln_string_view layer_id, char* out_source_layer,
+  size_t source_layer_capacity, size_t* out_source_layer_size
+) -> mln_status {
+  mbgl::style::Layer* layer = nullptr;
+  const auto status = resolve_layer_for_access(map, layer_id, layer);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  return copy_layer_text(
+    layer->getSourceLayer(), out_source_layer, source_layer_capacity,
+    out_source_layer_size, "source_layer_capacity"
+  );
+}
+
+auto map_set_layer_source_id(
+  mln_map map, mln_string_view layer_id, mln_string_view source_id
+) -> mln_status {
+  mbgl::style::Layer* layer = nullptr;
+  const auto status = resolve_layer_for_access(map, layer_id, layer);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (!validate_string_view(source_id, "source_id")) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (source_id.size == 0) {
+    set_thread_error("source_id must not be empty");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (!require_layer_takes_source(*layer, "source")) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  layer->setSourceID(string_from_view(source_id));
+  return MLN_STATUS_OK;
+}
+
+auto map_copy_layer_source_id(
+  mln_map map, mln_string_view layer_id, char* out_source_id,
+  size_t source_id_capacity, size_t* out_source_id_size
+) -> mln_status {
+  mbgl::style::Layer* layer = nullptr;
+  const auto status = resolve_layer_for_access(map, layer_id, layer);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  return copy_layer_text(
+    layer->getSourceID(), out_source_id, source_id_capacity, out_source_id_size,
+    "source_id_capacity"
+  );
+}
+
+auto map_set_layer_min_zoom(
+  mln_map map, mln_string_view layer_id, double min_zoom
+) -> mln_status {
+  mbgl::style::Layer* layer = nullptr;
+  const auto status = resolve_layer_for_access(map, layer_id, layer);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (!validate_layer_zoom(min_zoom, "min_zoom")) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  layer->setMinZoom(static_cast<float>(min_zoom));
+  return MLN_STATUS_OK;
+}
+
+auto map_get_layer_min_zoom(
+  mln_map map, mln_string_view layer_id, double* out_min_zoom
+) -> mln_status {
+  mbgl::style::Layer* layer = nullptr;
+  const auto status = resolve_layer_for_access(map, layer_id, layer);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (out_min_zoom == nullptr) {
+    set_thread_error("out_min_zoom must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  *out_min_zoom = static_cast<double>(layer->getMinZoom());
+  return MLN_STATUS_OK;
+}
+
+auto map_set_layer_max_zoom(
+  mln_map map, mln_string_view layer_id, double max_zoom
+) -> mln_status {
+  mbgl::style::Layer* layer = nullptr;
+  const auto status = resolve_layer_for_access(map, layer_id, layer);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (!validate_layer_zoom(max_zoom, "max_zoom")) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  layer->setMaxZoom(static_cast<float>(max_zoom));
+  return MLN_STATUS_OK;
+}
+
+auto map_get_layer_max_zoom(
+  mln_map map, mln_string_view layer_id, double* out_max_zoom
+) -> mln_status {
+  mbgl::style::Layer* layer = nullptr;
+  const auto status = resolve_layer_for_access(map, layer_id, layer);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (out_max_zoom == nullptr) {
+    set_thread_error("out_max_zoom must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  *out_max_zoom = static_cast<double>(layer->getMaxZoom());
+  return MLN_STATUS_OK;
+}
+
+auto map_set_layer_visibility(
+  mln_map map, mln_string_view layer_id, uint32_t visibility
+) -> mln_status {
+  mbgl::style::Layer* layer = nullptr;
+  const auto status = resolve_layer_for_access(map, layer_id, layer);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  auto native_visibility = mbgl::style::VisibilityType::Visible;
+  switch (visibility) {
+    case MLN_STYLE_LAYER_VISIBILITY_VISIBLE:
+      native_visibility = mbgl::style::VisibilityType::Visible;
+      break;
+    case MLN_STYLE_LAYER_VISIBILITY_NONE:
+      native_visibility = mbgl::style::VisibilityType::None;
+      break;
+    default:
+      set_thread_error("visibility is invalid");
+      return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  layer->setVisibility(native_visibility);
+  return MLN_STATUS_OK;
+}
+
+auto map_get_layer_visibility(
+  mln_map map, mln_string_view layer_id, uint32_t* out_visibility
+) -> mln_status {
+  mbgl::style::Layer* layer = nullptr;
+  const auto status = resolve_layer_for_access(map, layer_id, layer);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (out_visibility == nullptr) {
+    set_thread_error("out_visibility must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  *out_visibility = layer->getVisibility() == mbgl::style::VisibilityType::None
+                      ? MLN_STYLE_LAYER_VISIBILITY_NONE
+                      : MLN_STYLE_LAYER_VISIBILITY_VISIBLE;
+  return MLN_STATUS_OK;
 }
 
 auto map_get_camera(mln_map map, mln_camera_options* out_camera) -> mln_status {

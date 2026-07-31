@@ -91,6 +91,11 @@ public struct StyleGeoJSONSourceOptions: Equatable, Sendable {
   public var clusterMinPoints: UInt32?
   public var lineMetrics: Bool?
   public var cluster: Bool?
+  /// Applies data updates synchronously, so data set through
+  /// ``MapHandle/setGeoJSONSourceData(sourceId:data:)`` reaches the next
+  /// rendered frame instead of being tiled on a worker and shown in a later
+  /// one.
+  public var synchronousUpdate: Bool?
 
   public init(
     minZoom: Double? = nil,
@@ -103,7 +108,8 @@ public struct StyleGeoJSONSourceOptions: Equatable, Sendable {
     clusterRadius: UInt32? = nil,
     clusterMinPoints: UInt32? = nil,
     lineMetrics: Bool? = nil,
-    cluster: Bool? = nil
+    cluster: Bool? = nil,
+    synchronousUpdate: Bool? = nil
   ) {
     self.minZoom = minZoom
     self.maxZoom = maxZoom
@@ -116,6 +122,7 @@ public struct StyleGeoJSONSourceOptions: Equatable, Sendable {
     self.clusterMinPoints = clusterMinPoints
     self.lineMetrics = lineMetrics
     self.cluster = cluster
+    self.synchronousUpdate = synchronousUpdate
   }
 
   var nativeOptions: NativeGeoJSONSourceOptions {
@@ -130,8 +137,27 @@ public struct StyleGeoJSONSourceOptions: Equatable, Sendable {
       clusterRadius: clusterRadius,
       clusterMinPoints: clusterMinPoints,
       lineMetrics: lineMetrics,
-      cluster: cluster
+      cluster: cluster,
+      synchronousUpdate: synchronousUpdate
     )
+  }
+}
+
+/// Whether a style layer draws.
+///
+/// This is an open domain: MapLibre Native may report a value with no named
+/// case
+/// here, so it keeps the raw value instead of collapsing it.
+public struct StyleLayerVisibility: Equatable, Sendable, Hashable {
+  public static let visible =
+    StyleLayerVisibility(rawValue: MLN_STYLE_LAYER_VISIBILITY_VISIBLE.rawValue)
+  public static let none =
+    StyleLayerVisibility(rawValue: MLN_STYLE_LAYER_VISIBILITY_NONE.rawValue)
+
+  public let rawValue: UInt32
+
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
   }
 }
 
@@ -158,17 +184,95 @@ public struct StyleRGBA8Image: Equatable, Sendable {
   }
 }
 
+/// One stretchable interval along an image axis, in image pixels.
+public struct ImageStretch: Equatable, Sendable {
+  public var from: Float
+  public var to: Float
+
+  public init(from: Float, to: Float) {
+    self.from = from
+    self.to = to
+  }
+}
+
+/// Content-box insets in image pixels, measured from the image's top-left.
+public struct ImageContent: Equatable, Sendable {
+  public var left: Float
+  public var top: Float
+  public var right: Float
+  public var bottom: Float
+
+  public init(left: Float, top: Float, right: Float, bottom: Float) {
+    self.left = left
+    self.top = top
+    self.right = right
+    self.bottom = bottom
+  }
+}
+
+/// How a stretchable image fits text along one axis.
+///
+/// This is an open domain: MapLibre Native may report a value with no named
+/// case
+/// here, so it keeps the raw value instead of collapsing it.
+public struct StyleImageTextFit: Equatable, Sendable, Hashable {
+  public static let stretchOrShrink = StyleImageTextFit(
+    rawValue: MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK.rawValue
+  )
+  public static let stretchOnly = StyleImageTextFit(
+    rawValue: MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY.rawValue
+  )
+  public static let proportional = StyleImageTextFit(
+    rawValue: MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL.rawValue
+  )
+
+  public let rawValue: UInt32
+
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+}
+
 public struct StyleImageOptions: Equatable, Sendable {
   public var pixelRatio: Float?
   public var sdf: Bool?
+  /// Stretchable intervals along each axis. A present empty array stays
+  /// distinguishable from an absent one.
+  public var stretchX: [ImageStretch]?
+  public var stretchY: [ImageStretch]?
+  /// Content box used when `icon-text-fit` applies.
+  public var content: ImageContent?
+  public var textFitWidth: StyleImageTextFit?
+  public var textFitHeight: StyleImageTextFit?
 
-  public init(pixelRatio: Float? = nil, sdf: Bool? = nil) {
+  public init(
+    pixelRatio: Float? = nil,
+    sdf: Bool? = nil,
+    stretchX: [ImageStretch]? = nil,
+    stretchY: [ImageStretch]? = nil,
+    content: ImageContent? = nil,
+    textFitWidth: StyleImageTextFit? = nil,
+    textFitHeight: StyleImageTextFit? = nil
+  ) {
     self.pixelRatio = pixelRatio
     self.sdf = sdf
+    self.stretchX = stretchX
+    self.stretchY = stretchY
+    self.content = content
+    self.textFitWidth = textFitWidth
+    self.textFitHeight = textFitHeight
   }
 
   var nativeOptions: NativeStyleImageOptions {
-    NativeStyleImageOptions(pixelRatio: pixelRatio, sdf: sdf)
+    NativeStyleImageOptions(
+      pixelRatio: pixelRatio,
+      sdf: sdf,
+      stretchX: stretchX,
+      stretchY: stretchY,
+      content: content,
+      textFitWidth: textFitWidth,
+      textFitHeight: textFitHeight
+    )
   }
 }
 
@@ -179,6 +283,15 @@ public struct StyleImageInfo: Equatable, Sendable {
   public let byteLength: Int
   public let pixelRatio: Float
   public let sdf: Bool
+  /// Interval counts for the stretchable axes. Read the intervals themselves
+  /// with
+  /// ``MapHandle/styleImageStretches(_:)``.
+  public let stretchXCount: Int
+  public let stretchYCount: Int
+  /// Content box, absent when the image carries none.
+  public let content: ImageContent?
+  public let textFitWidth: StyleImageTextFit?
+  public let textFitHeight: StyleImageTextFit?
 
   init(native: NativeStyleImageInfo) {
     width = native.width
@@ -187,6 +300,11 @@ public struct StyleImageInfo: Equatable, Sendable {
     byteLength = native.byteLength
     pixelRatio = native.pixelRatio
     sdf = native.sdf
+    stretchXCount = native.stretchXCount
+    stretchYCount = native.stretchYCount
+    content = native.content
+    textFitWidth = native.textFitWidth
+    textFitHeight = native.textFitHeight
   }
 }
 
@@ -698,6 +816,20 @@ public extension MapHandle {
     }
   }
 
+  /// Copies one runtime style image's stretchable intervals, or nil when no
+  /// image carries `imageId`.
+  func styleImageStretches(
+    _ imageId: String
+  ) throws -> (stretchX: [ImageStretch], stretchY: [ImageStretch])? {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      return try NativeStyle.copyImageStretches(
+        requireLiveHandle(),
+        imageId: arena.view(imageId)
+      )
+    }
+  }
+
   func styleImage(_ imageId: String) throws -> StyleImage? {
     try mapNativeFailure {
       let arena = NativeInputArena()
@@ -1047,6 +1179,149 @@ public extension MapHandle {
         requireLiveHandle(),
         layerId: arena.view(layerId)
       ).map(JSONValue.init(native:))
+    }
+  }
+
+  /// Sets one layer's source-layer ID. Layer types that take no source, such as
+  /// background, are rejected.
+  func setLayerSourceLayer(layerId: String, sourceLayer: String) throws {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      try checkStatus(mln_map_set_layer_source_layer(
+        requireLiveHandle().raw,
+        arena.view(layerId),
+        arena.view(sourceLayer)
+      ))
+    }
+  }
+
+  /// Copies one layer's source-layer ID, empty when the layer carries none.
+  func layerSourceLayer(_ layerId: String) throws -> String {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      return try NativeStyle.copyLayerText(
+        requireLiveHandle(),
+        layerId: arena.view(layerId),
+        copy: mln_map_copy_layer_source_layer
+      )
+    }
+  }
+
+  /// Sets one layer's source ID. Layer types that take no source, such as
+  /// background, are rejected. The named source need not exist yet.
+  func setLayerSourceId(layerId: String, sourceId: String) throws {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      try checkStatus(mln_map_set_layer_source_id(
+        requireLiveHandle().raw,
+        arena.view(layerId),
+        arena.view(sourceId)
+      ))
+    }
+  }
+
+  /// Copies one layer's source ID, empty when the layer carries none.
+  func layerSourceId(_ layerId: String) throws -> String {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      return try NativeStyle.copyLayerText(
+        requireLiveHandle(),
+        layerId: arena.view(layerId),
+        copy: mln_map_copy_layer_source_id
+      )
+    }
+  }
+
+  /// Sets the lowest zoom at which one layer draws. Pass `-.infinity` for no
+  /// lower bound.
+  func setLayerMinZoom(layerId: String, minZoom: Double) throws {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      try checkStatus(mln_map_set_layer_min_zoom(
+        requireLiveHandle().raw,
+        arena.view(layerId),
+        minZoom
+      ))
+    }
+  }
+
+  /// Reads the lowest zoom at which one layer draws. A layer with no lower
+  /// bound
+  /// reports `-.infinity`.
+  func layerMinZoom(_ layerId: String) throws -> Double {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      let handle = try requireLiveHandle()
+      let layerView = arena.view(layerId)
+      return try NativeMemory.withTemporary(0.0) { outZoom in
+        try checkStatus(mln_map_get_layer_min_zoom(
+          handle.raw,
+          layerView,
+          outZoom
+        ))
+      }.value
+    }
+  }
+
+  /// Sets the highest zoom at which one layer draws. Pass `.infinity` for no
+  /// upper bound.
+  func setLayerMaxZoom(layerId: String, maxZoom: Double) throws {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      try checkStatus(mln_map_set_layer_max_zoom(
+        requireLiveHandle().raw,
+        arena.view(layerId),
+        maxZoom
+      ))
+    }
+  }
+
+  /// Reads the highest zoom at which one layer draws. A layer with no upper
+  /// bound reports `.infinity`.
+  func layerMaxZoom(_ layerId: String) throws -> Double {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      let handle = try requireLiveHandle()
+      let layerView = arena.view(layerId)
+      return try NativeMemory.withTemporary(0.0) { outZoom in
+        try checkStatus(mln_map_get_layer_max_zoom(
+          handle.raw,
+          layerView,
+          outZoom
+        ))
+      }.value
+    }
+  }
+
+  /// Sets whether one layer draws.
+  func setLayerVisibility(
+    layerId: String,
+    visibility: StyleLayerVisibility
+  ) throws {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      try checkStatus(mln_map_set_layer_visibility(
+        requireLiveHandle().raw,
+        arena.view(layerId),
+        visibility.rawValue
+      ))
+    }
+  }
+
+  /// Reads whether one layer draws.
+  func layerVisibility(_ layerId: String) throws -> StyleLayerVisibility {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      let handle = try requireLiveHandle()
+      let layerView = arena.view(layerId)
+      let raw = try NativeMemory.withTemporary(UInt32(0)) { outVisibility in
+        try checkStatus(mln_map_get_layer_visibility(
+          handle.raw,
+          layerView,
+          outVisibility
+        ))
+      }.value
+      return StyleLayerVisibility(rawValue: raw)
     }
   }
 }

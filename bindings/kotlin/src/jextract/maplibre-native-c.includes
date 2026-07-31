@@ -14,6 +14,8 @@
 --include-constant MLN_STATUS_OK
 --include-constant MLN_STATUS_UNSUPPORTED
 --include-constant MLN_STATUS_WRONG_THREAD
+--include-function mln_map_copy_layer_source_id
+--include-function mln_map_copy_layer_source_layer
 --include-function mln_c_version
 --include-function mln_supported_render_backend_mask
 
@@ -58,11 +60,18 @@
 --include-function mln_map_set_bounds
 --include-function mln_map_set_debug_options
 --include-function mln_map_set_free_camera_options
+--include-function mln_map_get_layer_max_zoom
+--include-function mln_map_get_layer_min_zoom
+--include-function mln_map_get_layer_visibility
 --include-function mln_map_set_projection_mode
+--include-function mln_map_copy_style_image_stretches
 --include-function mln_map_set_rendering_stats_view_enabled
 --include-function mln_map_set_tile_options
 --include-function mln_map_set_viewport_options
 --include-function mln_map_tile_options_default
+--include-function mln_map_set_layer_source_id
+--include-function mln_map_set_layer_source_layer
+--include-function mln_map_set_layer_visibility
 --include-function mln_map_viewport_options_default
 --include-function mln_projection_mode_default
 
@@ -99,6 +108,8 @@
 --include-function mln_log_set_async_severity_mask
 --include-function mln_log_set_callback
 --include-typedef mln_log_callback
+--include-function mln_map_set_layer_max_zoom
+--include-function mln_map_set_layer_min_zoom
 
 # include/maplibre_native_c/map.h
 --include-constant MLN_ANIMATION_OPTION_DURATION
@@ -229,6 +240,8 @@
 --include-struct mln_geojson
 --include-struct mln_geometry
 --include-struct mln_geometry_collection
+--include-struct mln_image_content
+--include-struct mln_image_stretch
 --include-struct mln_json_array
 --include-struct mln_json_member
 --include-struct mln_json_object
@@ -254,7 +267,17 @@
 --include-struct mln_vec3
 
 # include/maplibre_native_c/projection.h
+--include-constant MLN_STYLE_IMAGE_OPTION_CONTENT
 --include-function mln_lat_lng_for_projected_meters
+--include-constant MLN_STYLE_LAYER_VISIBILITY_NONE
+--include-constant MLN_STYLE_IMAGE_OPTION_STRETCH_X
+--include-constant MLN_STYLE_IMAGE_OPTION_STRETCH_Y
+--include-constant MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT
+--include-constant MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH
+--include-constant MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL
+--include-constant MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY
+--include-constant MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK
+--include-constant MLN_STYLE_LAYER_VISIBILITY_VISIBLE
 --include-function mln_map_projection_create
 --include-function mln_map_projection_destroy
 --include-function mln_map_projection_get_camera
@@ -338,6 +361,7 @@
 --include-constant MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE
 --include-constant MLN_OFFLINE_OPERATION_REGION_CREATE
 --include-constant MLN_OFFLINE_OPERATION_REGION_DELETE
+--include-constant MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE
 --include-constant MLN_OFFLINE_OPERATION_REGION_GET
 --include-constant MLN_OFFLINE_OPERATION_REGION_GET_STATUS
 --include-constant MLN_OFFLINE_OPERATION_REGION_INVALIDATE
@@ -417,7 +441,6 @@
 --include-constant MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION
 --include-constant MLN_RUNTIME_EVENT_SOURCE_MAP
 --include-constant MLN_RUNTIME_EVENT_SOURCE_RUNTIME
---include-constant MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
 --include-constant MLN_TILE_OPERATION_CANCELLED
 --include-constant MLN_TILE_OPERATION_END_PARSE
 --include-constant MLN_TILE_OPERATION_ERROR
@@ -441,6 +464,7 @@
 --include-function mln_runtime_options_default
 --include-function mln_runtime_poll_event
 --include-function mln_runtime_run_ambient_cache_operation_start
+--include-function mln_runtime_set_maximum_ambient_cache_size_start
 --include-function mln_runtime_set_resource_provider
 --include-function mln_runtime_set_resource_transform
 --include-function mln_runtime_pump
@@ -488,6 +512,7 @@
 --include-constant MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS
 --include-constant MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM
 --include-constant MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM
+--include-constant MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
 --include-constant MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
 --include-constant MLN_GEOJSON_SOURCE_OPTION_TOLERANCE
 --include-constant MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING

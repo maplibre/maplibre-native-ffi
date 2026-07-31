@@ -65,6 +65,45 @@ typedef enum mln_style_raster_dem_encoding : uint32_t {
   MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM = 1,
 } mln_style_raster_dem_encoding;
 
+/**
+ * One stretchable interval along an image axis, in image pixels.
+ *
+ * MapLibre scales only the stretchable intervals when it resizes the image, so
+ * the pixels outside them keep their size. An interval runs from a lower `from`
+ * to a higher `to`, and the intervals along one axis run in increasing order
+ * without overlapping. mln_map_set_style_image() rejects intervals that break
+ * that shape.
+ */
+typedef struct mln_image_stretch {
+  float from;
+  float to;
+} mln_image_stretch;
+
+/**
+ * Content-box insets in image pixels, measured from the image's top-left.
+ *
+ * MapLibre places a symbol's text inside this box when `icon-text-fit` applies.
+ */
+typedef struct mln_image_content {
+  float left;
+  float top;
+  float right;
+  float bottom;
+} mln_image_content;
+
+/** How a stretchable image fits text along one axis. */
+typedef enum mln_style_image_text_fit : uint32_t {
+  MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK = 0,
+  MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY = 1,
+  MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL = 2,
+} mln_style_image_text_fit;
+
+/** Layer visibility values used by the layer visibility accessors. */
+typedef enum mln_style_layer_visibility : uint32_t {
+  MLN_STYLE_LAYER_VISIBILITY_VISIBLE = 0,
+  MLN_STYLE_LAYER_VISIBILITY_NONE = 1,
+} mln_style_layer_visibility;
+
 /** Field mask values for mln_geojson_source_options. */
 typedef enum mln_geojson_source_option_field : uint32_t {
   MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM = 1U << 0U,
@@ -78,6 +117,7 @@ typedef enum mln_geojson_source_option_field : uint32_t {
   MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 1U << 8U,
   MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 1U << 9U,
   MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 1U << 10U,
+  MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE = 1U << 11U,
 } mln_geojson_source_option_field;
 
 /** Field mask values for mln_custom_geometry_source_options. */
@@ -95,6 +135,11 @@ typedef enum mln_custom_geometry_source_option_field : uint32_t {
 typedef enum mln_style_image_option_field : uint32_t {
   MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO = 1U << 0U,
   MLN_STYLE_IMAGE_OPTION_SDF = 1U << 1U,
+  MLN_STYLE_IMAGE_OPTION_STRETCH_X = 1U << 2U,
+  MLN_STYLE_IMAGE_OPTION_STRETCH_Y = 1U << 3U,
+  MLN_STYLE_IMAGE_OPTION_CONTENT = 1U << 4U,
+  MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH = 1U << 5U,
+  MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT = 1U << 6U,
 } mln_style_image_option_field;
 
 /** Location indicator image-name properties. */
@@ -180,6 +225,16 @@ typedef struct mln_geojson_source_options {
    * and carries nothing to cluster.
    */
   bool cluster;
+  /**
+   * Applies data updates synchronously. Defaults to false.
+   *
+   * MapLibre Native normally tiles updated GeoJSON data on a worker and shows
+   * it in a later frame. When this is set, tiling runs inline during the update
+   * pass instead, so data set through mln_map_set_geojson_source_data() reaches
+   * the next rendered frame at the cost of that work happening on the thread
+   * driving the update.
+   */
+  bool synchronous_update;
 } mln_geojson_source_options;
 
 /** Canonical tile identity used by custom geometry source callbacks. */
@@ -230,6 +285,24 @@ typedef struct mln_premultiplied_rgba8_image {
 typedef struct mln_style_image_options {
   uint32_t size;
   uint32_t fields;
+  /**
+   * Horizontally stretchable intervals. Borrowed for the call and copied before
+   * return. May be null only when stretch_x_count is 0.
+   */
+  const mln_image_stretch* stretch_x;
+  size_t stretch_x_count;
+  /**
+   * Vertically stretchable intervals. Borrowed for the call and copied before
+   * return. May be null only when stretch_y_count is 0.
+   */
+  const mln_image_stretch* stretch_y;
+  size_t stretch_y_count;
+  /** Content box used when icon-text-fit applies. */
+  mln_image_content content;
+  /** One of mln_style_image_text_fit. Defaults to STRETCH_OR_SHRINK. */
+  uint32_t text_fit_width;
+  /** One of mln_style_image_text_fit. Defaults to STRETCH_OR_SHRINK. */
+  uint32_t text_fit_height;
   /** Sprite pixel ratio. Defaults to 1. */
   float pixel_ratio;
   /** Whether the image is a signed distance field icon. Defaults to false. */
@@ -244,8 +317,23 @@ typedef struct mln_style_image_info {
   /** Native copied images are exposed as tightly packed premultiplied RGBA8. */
   uint32_t stride;
   size_t byte_length;
+  /**
+   * Interval counts for the stretchable axes. Read the intervals themselves
+   * with mln_map_copy_style_image_stretches().
+   */
+  size_t stretch_x_count;
+  size_t stretch_y_count;
+  /** Content box, meaningful only when has_content is true. */
+  mln_image_content content;
+  /** One of mln_style_image_text_fit, meaningful only when its flag is true. */
+  uint32_t text_fit_width;
+  /** One of mln_style_image_text_fit, meaningful only when its flag is true. */
+  uint32_t text_fit_height;
   float pixel_ratio;
   bool sdf;
+  bool has_content;
+  bool has_text_fit_width;
+  bool has_text_fit_height;
 } mln_style_image_info;
 
 /** Returns default tile source options. */
@@ -401,16 +489,22 @@ MLN_API mln_status mln_map_get_style_source_info(
 /**
  * Copies one style source attribution string into caller-owned memory.
  *
- * source_id is borrowed for the call. out_attribution may be null only when
- * attribution_capacity is 0. On success, out_attribution_size receives the byte
- * length of the attribution, excluding any null terminator. When out_found is
- * false or the source has no attribution, out_attribution_size receives 0.
+ * source_id is borrowed for the call. On success, out_attribution_size receives
+ * the byte length of the attribution, excluding any null terminator. When
+ * out_found is false or the source has no attribution, out_attribution_size
+ * receives 0.
+ *
+ * Passing null for out_attribution with a capacity of 0 is a size probe: it
+ * reports the required byte length and succeeds, so a caller can size a buffer
+ * without treating the result as a failure. With a non-null out_attribution, a
+ * capacity smaller than the required length still reports that length and
+ * returns MLN_STATUS_INVALID_ARGUMENT.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK on success, including a size probe.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
  *   invalid or empty, out_attribution is null with non-zero capacity,
- *   attribution_capacity is too small for a present attribution,
+ *   attribution_capacity is too small for a non-null buffer,
  *   out_attribution_size is null, or out_found is null.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
@@ -825,19 +919,21 @@ MLN_API mln_status mln_map_get_style_image_info(
 /**
  * Copies one runtime style image as tightly packed premultiplied RGBA8 pixels.
  *
- * image_id is borrowed for the call. out_pixels may be null only when
- * pixel_capacity is 0. On success, out_byte_length receives the required byte
- * length. When out_found is false, out_byte_length receives 0. If
- * pixel_capacity is too small for a present image, out_byte_length still
- * receives the required byte length and the function returns
+ * image_id is borrowed for the call. On success, out_byte_length receives the
+ * required byte length. When out_found is false, out_byte_length receives 0.
+ *
+ * Passing null for out_pixels with a capacity of 0 is a size probe: it reports
+ * the required byte length and succeeds, so a caller can size a buffer without
+ * treating the result as a failure. With a non-null out_pixels, a capacity
+ * smaller than the required length still reports that length and returns
  * MLN_STATUS_INVALID_ARGUMENT.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK on success, including a size probe.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
  *   invalid or empty, out_pixels is null with non-zero capacity, pixel_capacity
- *   is too small for a present image, out_byte_length is null, or out_found is
- *   null.
+ *   is too small for a non-null buffer, out_byte_length is null, or out_found
+ *   is null.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -845,6 +941,35 @@ MLN_API mln_status mln_map_get_style_image_info(
 MLN_API mln_status mln_map_copy_style_image_premultiplied_rgba8(
   mln_map map, mln_string_view image_id, uint8_t* out_pixels,
   size_t pixel_capacity, size_t* out_byte_length, bool* out_found
+) MLN_NOEXCEPT;
+
+/**
+ * Copies one runtime style image's stretchable intervals.
+ *
+ * image_id is borrowed for the call. Each output array may be null only when
+ * its capacity is 0. On success, out_stretch_x_count and out_stretch_y_count
+ * receive the interval counts, and both receive 0 when out_found is false.
+ *
+ * Passing null for both arrays with both capacities 0 is a size probe: it
+ * reports the required counts and succeeds. With a non-null array, a capacity
+ * smaller than that axis's count still reports the counts and returns
+ * MLN_STATUS_INVALID_ARGUMENT.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success, including a size probe.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
+ *   invalid or empty, an output array is null with non-zero capacity, a
+ * capacity is too small for a non-null array, or an output count or out_found
+ * is null.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_copy_style_image_stretches(
+  mln_map map, mln_string_view image_id, mln_image_stretch* out_stretch_x,
+  size_t stretch_x_capacity, size_t* out_stretch_x_count,
+  mln_image_stretch* out_stretch_y, size_t stretch_y_capacity,
+  size_t* out_stretch_y_count, bool* out_found
 ) MLN_NOEXCEPT;
 
 /**
@@ -1399,6 +1524,213 @@ MLN_API mln_status mln_map_set_layer_filter(
  */
 MLN_API mln_status mln_map_get_layer_filter(
   mln_map map, mln_string_view layer_id, mln_json_snapshot* out_filter
+) MLN_NOEXCEPT;
+
+/**
+ * Sets one layer's source-layer ID.
+ *
+ * layer_id and source_layer are borrowed for the call and copied into MapLibre
+ * Native's layer storage before return. Passing an empty source_layer clears
+ * it.
+ *
+ * Only layer types that require a source carry a source-layer, so this rejects
+ * layer types such as background and custom rather than silently doing nothing.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ *   invalid or empty, source_layer is invalid, the layer does not exist, or the
+ *   layer's type does not take a source.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_set_layer_source_layer(
+  mln_map map, mln_string_view layer_id, mln_string_view source_layer
+) MLN_NOEXCEPT;
+
+/**
+ * Copies one layer's source-layer ID into caller-owned memory.
+ *
+ * layer_id is borrowed for the call. On success, out_source_layer_size receives
+ * the byte length excluding any null terminator, and 0 when the layer carries
+ * no source-layer.
+ *
+ * Passing null for out_source_layer with a capacity of 0 is a size probe: it
+ * reports the required byte length and succeeds, so a caller can size a buffer
+ * without treating the result as a failure. With a non-null out_source_layer, a
+ * capacity smaller than the required length still reports that length and
+ * returns MLN_STATUS_INVALID_ARGUMENT.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success, including a size probe.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ *   invalid or empty, out_source_layer is null with non-zero capacity,
+ *   source_layer_capacity is too small for a non-null buffer,
+ *   out_source_layer_size is null, or the layer does not exist.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_copy_layer_source_layer(
+  mln_map map, mln_string_view layer_id, char* out_source_layer,
+  size_t source_layer_capacity, size_t* out_source_layer_size
+) MLN_NOEXCEPT;
+
+/**
+ * Sets one layer's source ID.
+ *
+ * layer_id and source_id are borrowed for the call and copied into MapLibre
+ * Native's layer storage before return. This does not require the named source
+ * to exist yet; MapLibre reports an unresolved source through style events.
+ *
+ * Only layer types that require a source carry a source ID, so this rejects
+ * layer types such as background and custom rather than silently doing nothing.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ *   invalid or empty, source_id is invalid or empty, the layer does not exist,
+ *   or the layer's type does not take a source.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_set_layer_source_id(
+  mln_map map, mln_string_view layer_id, mln_string_view source_id
+) MLN_NOEXCEPT;
+
+/**
+ * Copies one layer's source ID into caller-owned memory.
+ *
+ * layer_id is borrowed for the call. On success, out_source_id_size receives
+ * the byte length excluding any null terminator, and 0 when the layer carries
+ * no source.
+ *
+ * Passing null for out_source_id with a capacity of 0 is a size probe: it
+ * reports the required byte length and succeeds, so a caller can size a buffer
+ * without treating the result as a failure. With a non-null out_source_id, a
+ * capacity smaller than the required length still reports that length and
+ * returns MLN_STATUS_INVALID_ARGUMENT.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success, including a size probe.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ *   invalid or empty, out_source_id is null with non-zero capacity,
+ *   source_id_capacity is too small for a non-null buffer, out_source_id_size
+ * is null, or the layer does not exist.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_copy_layer_source_id(
+  mln_map map, mln_string_view layer_id, char* out_source_id,
+  size_t source_id_capacity, size_t* out_source_id_size
+) MLN_NOEXCEPT;
+
+/**
+ * Sets the lowest zoom at which one layer draws.
+ *
+ * Pass -INFINITY for no lower bound. MapLibre Native stores the zoom range as
+ * single-precision floats, so this narrows the value.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ *   invalid or empty, min_zoom is NaN, or the layer does not exist.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_set_layer_min_zoom(
+  mln_map map, mln_string_view layer_id, double min_zoom
+) MLN_NOEXCEPT;
+
+/**
+ * Reads the lowest zoom at which one layer draws.
+ *
+ * A layer with no lower bound reports -INFINITY.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ *   invalid or empty, out_min_zoom is null, or the layer does not exist.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_get_layer_min_zoom(
+  mln_map map, mln_string_view layer_id, double* out_min_zoom
+) MLN_NOEXCEPT;
+
+/**
+ * Sets the highest zoom at which one layer draws.
+ *
+ * Pass INFINITY for no upper bound. MapLibre Native stores the zoom range as
+ * single-precision floats, so this narrows the value.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ *   invalid or empty, max_zoom is NaN, or the layer does not exist.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_set_layer_max_zoom(
+  mln_map map, mln_string_view layer_id, double max_zoom
+) MLN_NOEXCEPT;
+
+/**
+ * Reads the highest zoom at which one layer draws.
+ *
+ * A layer with no upper bound reports INFINITY.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ *   invalid or empty, out_max_zoom is null, or the layer does not exist.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_get_layer_max_zoom(
+  mln_map map, mln_string_view layer_id, double* out_max_zoom
+) MLN_NOEXCEPT;
+
+/**
+ * Sets whether one layer draws.
+ *
+ * visibility is an mln_style_layer_visibility value.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ *   invalid or empty, visibility is not an mln_style_layer_visibility value, or
+ *   the layer does not exist.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_set_layer_visibility(
+  mln_map map, mln_string_view layer_id, uint32_t visibility
+) MLN_NOEXCEPT;
+
+/**
+ * Reads whether one layer draws.
+ *
+ * On success, *out_visibility receives an mln_style_layer_visibility value.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ *   invalid or empty, out_visibility is null, or the layer does not exist.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_get_layer_visibility(
+  mln_map map, mln_string_view layer_id, uint32_t* out_visibility
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

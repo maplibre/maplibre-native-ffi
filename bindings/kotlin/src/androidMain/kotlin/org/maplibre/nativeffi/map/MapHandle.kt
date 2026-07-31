@@ -45,12 +45,16 @@ import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
+import org.maplibre.nativeffi.style.ImageContent
+import org.maplibre.nativeffi.style.ImageStretch
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleImageTextFit
+import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Owned Android JNI map handle. */
@@ -939,6 +943,169 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     }
   }
 
+  public actual fun styleImageStretches(
+    imageId: String
+  ): Pair<List<ImageStretch>, List<ImageStretch>>? {
+    NativeAccess.ensureLoaded()
+    StringViewScope(imageId).use { nativeImageId ->
+      SizeTPointer(1).use { outXCount ->
+        SizeTPointer(1).use { outYCount ->
+          val outFound = booleanArrayOf(false)
+          Status.check(
+            MaplibreNativeC.mln_map_copy_style_image_stretches(
+              requireLiveHandle(),
+              nativeImageId.view,
+              null,
+              0L,
+              outXCount,
+              null,
+              0L,
+              outYCount,
+              outFound,
+            )
+          )
+          if (!outFound[0]) return null
+
+          val xCount = Math.toIntExact(outXCount.get())
+          val yCount = Math.toIntExact(outYCount.get())
+          val rawX = if (xCount == 0) null else MaplibreNativeC.mln_image_stretch(xCount.toLong())
+          val rawY = if (yCount == 0) null else MaplibreNativeC.mln_image_stretch(yCount.toLong())
+          try {
+            Status.check(
+              MaplibreNativeC.mln_map_copy_style_image_stretches(
+                requireLiveHandle(),
+                nativeImageId.view,
+                rawX,
+                xCount.toLong(),
+                outXCount,
+                rawY,
+                yCount.toLong(),
+                outYCount,
+                outFound,
+              )
+            )
+            return readStretches(rawX, xCount) to readStretches(rawY, yCount)
+          } finally {
+            rawX?.close()
+            rawY?.close()
+          }
+        }
+      }
+    }
+  }
+
+  public actual fun setLayerSourceLayer(layerId: String, sourceLayer: String) {
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      StringViewScope(sourceLayer).use { nativeSourceLayer ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_layer_source_layer(
+            requireLiveHandle(),
+            nativeLayerId.view,
+            nativeSourceLayer.view,
+          )
+        )
+      }
+    }
+  }
+
+  public actual fun layerSourceLayer(layerId: String): String {
+    NativeAccess.ensureLoaded()
+    return copyLayerText(requireLiveHandle(), layerId) { mapId, view, text, capacity, outSize ->
+      MaplibreNativeC.mln_map_copy_layer_source_layer(mapId, view, text, capacity, outSize)
+    }
+  }
+
+  public actual fun setLayerSourceId(layerId: String, sourceId: String) {
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      StringViewScope(sourceId).use { nativeSourceId ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_layer_source_id(
+            requireLiveHandle(),
+            nativeLayerId.view,
+            nativeSourceId.view,
+          )
+        )
+      }
+    }
+  }
+
+  public actual fun layerSourceId(layerId: String): String {
+    NativeAccess.ensureLoaded()
+    return copyLayerText(requireLiveHandle(), layerId) { mapId, view, text, capacity, outSize ->
+      MaplibreNativeC.mln_map_copy_layer_source_id(mapId, view, text, capacity, outSize)
+    }
+  }
+
+  public actual fun setLayerMinZoom(layerId: String, minZoom: Double) {
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      Status.check(
+        MaplibreNativeC.mln_map_set_layer_min_zoom(requireLiveHandle(), nativeLayerId.view, minZoom)
+      )
+    }
+  }
+
+  public actual fun layerMinZoom(layerId: String): Double {
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      val outZoom = doubleArrayOf(0.0)
+      Status.check(
+        MaplibreNativeC.mln_map_get_layer_min_zoom(requireLiveHandle(), nativeLayerId.view, outZoom)
+      )
+      return outZoom[0]
+    }
+  }
+
+  public actual fun setLayerMaxZoom(layerId: String, maxZoom: Double) {
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      Status.check(
+        MaplibreNativeC.mln_map_set_layer_max_zoom(requireLiveHandle(), nativeLayerId.view, maxZoom)
+      )
+    }
+  }
+
+  public actual fun layerMaxZoom(layerId: String): Double {
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      val outZoom = doubleArrayOf(0.0)
+      Status.check(
+        MaplibreNativeC.mln_map_get_layer_max_zoom(requireLiveHandle(), nativeLayerId.view, outZoom)
+      )
+      return outZoom[0]
+    }
+  }
+
+  public actual fun setLayerVisibility(layerId: String, visibility: StyleLayerVisibility) {
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      Status.check(
+        MaplibreNativeC.mln_map_set_layer_visibility(
+          requireLiveHandle(),
+          nativeLayerId.view,
+          visibility.nativeValue,
+        )
+      )
+    }
+  }
+
+  public actual fun layerVisibility(layerId: String): StyleLayerVisibility {
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      val outVisibility = intArrayOf(0)
+      Status.check(
+        MaplibreNativeC.mln_map_get_layer_visibility(
+          requireLiveHandle(),
+          nativeLayerId.view,
+          outVisibility,
+        )
+      )
+      return StyleLayerVisibility.fromNative(outVisibility[0])
+    }
+  }
+
   public actual fun requestRepaint() {
     NativeAccess.ensureLoaded()
     Status.check(MaplibreNativeC.mln_map_request_repaint(requireLiveHandle()))
@@ -1598,6 +1765,32 @@ private fun styleIdList(list: Long): List<String> =
     MaplibreNativeC.mln_style_id_list_destroy(list)
   }
 
+/**
+ * Probes the required length, then copies. A null buffer with zero capacity is a size probe the C
+ * API answers with OK.
+ */
+private inline fun copyLayerText(
+  mapId: Long,
+  layerId: String,
+  copy: (Long, MaplibreNativeC.mln_string_view, BytePointer?, Long, SizeTPointer) -> Int,
+): String {
+  StringViewScope(layerId).use { nativeLayerId ->
+    SizeTPointer(1).use { outSize ->
+      Status.check(copy(mapId, nativeLayerId.view, null, 0L, outSize))
+      val required = Math.toIntExact(outSize.get())
+      if (required == 0) return ""
+      BytePointer(required.toLong()).use { buffer ->
+        SizeTPointer(1).use { outCopied ->
+          Status.check(copy(mapId, nativeLayerId.view, buffer, required.toLong(), outCopied))
+          val bytes = ByteArray(Math.toIntExact(outCopied.get()))
+          buffer.get(bytes, 0, bytes.size)
+          return String(bytes, java.nio.charset.StandardCharsets.UTF_8)
+        }
+      }
+    }
+  }
+}
+
 private fun copyStyleSourceAttribution(
   mapId: Long,
   sourceId: StringViewScope,
@@ -1675,6 +1868,15 @@ private fun jsonObject(obj: MaplibreNativeC.mln_json_object): JsonValue.ObjectVa
   )
 }
 
+private fun readStretches(
+  array: MaplibreNativeC.mln_image_stretch?,
+  count: Int,
+): List<ImageStretch> =
+  List(count) { index ->
+    val element = array!!.position(index.toLong())
+    ImageStretch(element.from(), element.to())
+  }
+
 private fun styleImageInfo(info: MaplibreNativeC.mln_style_image_info): StyleImageInfo =
   StyleImageInfo(
     info.width(),
@@ -1683,6 +1885,14 @@ private fun styleImageInfo(info: MaplibreNativeC.mln_style_image_info): StyleIma
     info.byte_length(),
     info.pixel_ratio(),
     info.sdf(),
+    info.stretch_x_count(),
+    info.stretch_y_count(),
+    if (info.has_content()) {
+      val content = info.content()
+      ImageContent(content.left(), content.top(), content.right(), content.bottom())
+    } else null,
+    if (info.has_text_fit_width()) StyleImageTextFit.fromNative(info.text_fit_width()) else null,
+    if (info.has_text_fit_height()) StyleImageTextFit.fromNative(info.text_fit_height()) else null,
   )
 
 private fun debugOptionMask(options: Set<DebugOption>): Int =
@@ -2640,6 +2850,10 @@ private class GeoJsonSourceOptionsScope(value: GeoJsonSourceOptions?) : AutoClos
       fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_CLUSTER
       options.cluster(it)
     }
+    value?.synchronousUpdate?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
+      options.synchronous_update(it)
+    }
     options.fields(fields)
   }
 
@@ -2779,6 +2993,10 @@ private class StyleImageOptionsScope(value: StyleImageOptions) : AutoCloseable {
   val options: MaplibreNativeC.mln_style_image_options =
     MaplibreNativeC.mln_style_image_options_default()
 
+  // Native borrows the stretch arrays for the call, so this scope owns them.
+  private val stretchX: MaplibreNativeC.mln_image_stretch? = allocStretches(value.stretchX)
+  private val stretchY: MaplibreNativeC.mln_image_stretch? = allocStretches(value.stretchY)
+
   init {
     var fields = 0
     value.pixelRatio?.let {
@@ -2789,12 +3007,45 @@ private class StyleImageOptionsScope(value: StyleImageOptions) : AutoCloseable {
       fields = fields or MaplibreNativeC.MLN_STYLE_IMAGE_OPTION_SDF
       options.sdf(it)
     }
+    value.stretchX?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_IMAGE_OPTION_STRETCH_X
+      options.stretch_x(stretchX)
+      options.stretch_x_count(it.size.toLong())
+    }
+    value.stretchY?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_IMAGE_OPTION_STRETCH_Y
+      options.stretch_y(stretchY)
+      options.stretch_y_count(it.size.toLong())
+    }
+    value.content?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_IMAGE_OPTION_CONTENT
+      options.content().left(it.left).top(it.top).right(it.right).bottom(it.bottom)
+    }
+    value.textFitWidth?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH
+      options.text_fit_width(it.nativeValue)
+    }
+    value.textFitHeight?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT
+      options.text_fit_height(it.nativeValue)
+    }
     options.fields(fields)
   }
 
   override fun close() {
+    stretchX?.close()
+    stretchY?.close()
     options.close()
   }
+}
+
+private fun allocStretches(stretches: List<ImageStretch>?): MaplibreNativeC.mln_image_stretch? {
+  if (stretches.isNullOrEmpty()) return null
+  val array = MaplibreNativeC.mln_image_stretch(stretches.size.toLong())
+  stretches.forEachIndexed { index, stretch ->
+    array.position(index.toLong()).from(stretch.from).to(stretch.to)
+  }
+  return array.position(0)
 }
 
 private class MapOptionsScope(value: MapOptions) : AutoCloseable {

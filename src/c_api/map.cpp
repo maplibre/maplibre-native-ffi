@@ -373,6 +373,20 @@ auto mln_map_get_style_image_info(
   });
 }
 
+auto mln_map_copy_style_image_stretches(
+  mln_map map, mln_string_view image_id, mln_image_stretch* out_stretch_x,
+  size_t stretch_x_capacity, size_t* out_stretch_x_count,
+  mln_image_stretch* out_stretch_y, size_t stretch_y_capacity,
+  size_t* out_stretch_y_count, bool* out_found
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_copy_style_image_stretches(
+      map, image_id, out_stretch_x, stretch_x_capacity, out_stretch_x_count,
+      out_stretch_y, stretch_y_capacity, out_stretch_y_count, out_found
+    );
+  });
+}
+
 auto mln_map_copy_style_image_premultiplied_rgba8(
   mln_map map, mln_string_view image_id, uint8_t* out_pixels,
   size_t pixel_capacity, size_t* out_byte_length, bool* out_found
@@ -644,6 +658,93 @@ auto mln_map_get_layer_filter(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_get_layer_filter(map, layer_id, out_filter);
+  });
+}
+
+auto mln_map_set_layer_source_layer(
+  mln_map map, mln_string_view layer_id, mln_string_view source_layer
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_set_layer_source_layer(map, layer_id, source_layer);
+  });
+}
+
+auto mln_map_copy_layer_source_layer(
+  mln_map map, mln_string_view layer_id, char* out_source_layer,
+  size_t source_layer_capacity, size_t* out_source_layer_size
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_copy_layer_source_layer(
+      map, layer_id, out_source_layer, source_layer_capacity,
+      out_source_layer_size
+    );
+  });
+}
+
+auto mln_map_set_layer_source_id(
+  mln_map map, mln_string_view layer_id, mln_string_view source_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_set_layer_source_id(map, layer_id, source_id);
+  });
+}
+
+auto mln_map_copy_layer_source_id(
+  mln_map map, mln_string_view layer_id, char* out_source_id,
+  size_t source_id_capacity, size_t* out_source_id_size
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_copy_layer_source_id(
+      map, layer_id, out_source_id, source_id_capacity, out_source_id_size
+    );
+  });
+}
+
+auto mln_map_set_layer_min_zoom(
+  mln_map map, mln_string_view layer_id, double min_zoom
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_set_layer_min_zoom(map, layer_id, min_zoom);
+  });
+}
+
+auto mln_map_get_layer_min_zoom(
+  mln_map map, mln_string_view layer_id, double* out_min_zoom
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_get_layer_min_zoom(map, layer_id, out_min_zoom);
+  });
+}
+
+auto mln_map_set_layer_max_zoom(
+  mln_map map, mln_string_view layer_id, double max_zoom
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_set_layer_max_zoom(map, layer_id, max_zoom);
+  });
+}
+
+auto mln_map_get_layer_max_zoom(
+  mln_map map, mln_string_view layer_id, double* out_max_zoom
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_get_layer_max_zoom(map, layer_id, out_max_zoom);
+  });
+}
+
+auto mln_map_set_layer_visibility(
+  mln_map map, mln_string_view layer_id, uint32_t visibility
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_set_layer_visibility(map, layer_id, visibility);
+  });
+}
+
+auto mln_map_get_layer_visibility(
+  mln_map map, mln_string_view layer_id, uint32_t* out_visibility
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_get_layer_visibility(map, layer_id, out_visibility);
   });
 }
 

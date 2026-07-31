@@ -40,17 +40,18 @@ const (
 type OfflineOperationKind uint32
 
 const (
-	OfflineOperationAmbientCache           OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_AMBIENT_CACHE)
-	OfflineOperationRegionCreate           OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_CREATE)
-	OfflineOperationRegionGet              OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_GET)
-	OfflineOperationRegionsList            OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGIONS_LIST)
-	OfflineOperationRegionsMergeDatabase   OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE)
-	OfflineOperationRegionUpdateMetadata   OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA)
-	OfflineOperationRegionGetStatus        OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_GET_STATUS)
-	OfflineOperationRegionSetObserved      OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED)
-	OfflineOperationRegionSetDownloadState OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE)
-	OfflineOperationRegionInvalidate       OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_INVALIDATE)
-	OfflineOperationRegionDelete           OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_DELETE)
+	OfflineOperationAmbientCache               OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_AMBIENT_CACHE)
+	OfflineOperationRegionCreate               OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_CREATE)
+	OfflineOperationRegionGet                  OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_GET)
+	OfflineOperationRegionsList                OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGIONS_LIST)
+	OfflineOperationRegionsMergeDatabase       OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE)
+	OfflineOperationRegionUpdateMetadata       OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA)
+	OfflineOperationRegionGetStatus            OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_GET_STATUS)
+	OfflineOperationRegionSetObserved          OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED)
+	OfflineOperationRegionSetDownloadState     OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE)
+	OfflineOperationRegionInvalidate           OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_INVALIDATE)
+	OfflineOperationRegionDelete               OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_DELETE)
+	OfflineOperationSetMaximumAmbientCacheSize OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE)
 )
 
 // OfflineOperationResultKind identifies the expected result shape for an
@@ -155,25 +156,14 @@ func (operation *OfflineOperationHandle[T]) Discard() error {
 
 // RuntimeOptions configures runtime creation.
 type RuntimeOptions struct {
-	AssetPath        string
-	CachePath        string
-	MaximumCacheSize *uint64
+	AssetPath string
+	CachePath string
 }
 
-// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
-// compares the optional fields by pointer identity.
+// Equal reports whether two descriptors hold the same field values.
 func (options RuntimeOptions) Equal(other RuntimeOptions) bool {
 	return options.AssetPath == other.AssetPath &&
-		options.CachePath == other.CachePath &&
-		equalPointer(options.MaximumCacheSize, other.MaximumCacheSize)
-}
-
-// WithMaximumCacheSize returns a copy with an explicit maximum ambient cache
-// size.
-func (options RuntimeOptions) WithMaximumCacheSize(size uint64) RuntimeOptions {
-	options.MaximumCacheSize = new(uint64)
-	*options.MaximumCacheSize = size
-	return options
+		options.CachePath == other.CachePath
 }
 
 func (options RuntimeOptions) validate() error {
@@ -500,10 +490,6 @@ func NewRuntimeWithOptions(options RuntimeOptions) (*RuntimeHandle, error) {
 		defer C.free(unsafe.Pointer(cachePath))
 		rawOptions.asset_path = assetPath
 		rawOptions.cache_path = cachePath
-		if options.MaximumCacheSize != nil {
-			rawOptions.flags |= C.uint32_t(C.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE)
-			rawOptions.maximum_cache_size = C.uint64_t(*options.MaximumCacheSize)
-		}
 
 		var raw C.mln_runtime
 		status := int32(C.mln_runtime_create(&rawOptions, &raw))
@@ -910,6 +896,29 @@ func (runtime *RuntimeHandle) StartAmbientCacheOperation(operation AmbientCacheO
 		return nil, newBindingError(ErrInvalidState, "ambient cache operation did not return an ID")
 	}
 	return newOfflineOperationHandle[struct{}](runtime, uint64(id), OfflineOperationAmbientCache, OfflineOperationResultNone), nil
+}
+
+// StartSetMaximumAmbientCacheSize starts a change to this runtime's maximum
+// ambient cache size. MapLibre evicts ambient resources to fit the new budget,
+// so lowering it discards cached resources. Offline regions are unaffected.
+func (runtime *RuntimeHandle) StartSetMaximumAmbientCacheSize(size uint64) (*OfflineOperationHandle[struct{}], error) {
+	ptr, release, err := runtime.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	defer runtime.state.KeepAlive()
+
+	var id C.mln_offline_operation_id
+	if err := checkNative(func() int32 {
+		return int32(C.mln_runtime_set_maximum_ambient_cache_size_start(C.mln_runtime(ptr), C.uint64_t(size), &id))
+	}); err != nil {
+		return nil, err
+	}
+	if id == 0 {
+		return nil, newBindingError(ErrInvalidState, "maximum ambient cache size operation did not return an ID")
+	}
+	return newOfflineOperationHandle[struct{}](runtime, uint64(id), OfflineOperationSetMaximumAmbientCacheSize, OfflineOperationResultNone), nil
 }
 
 // SetResourceProvider installs or replaces the runtime-scoped network resource

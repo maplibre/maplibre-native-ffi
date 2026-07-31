@@ -59,6 +59,17 @@ public actual class RuntimeHandle private constructor(private val handle: Native
     )
   }
 
+  public actual fun startSetMaximumAmbientCacheSize(size: Long): OfflineOperationHandle<Unit> {
+    NativeAccess.ensureLoaded()
+    Status.requireArgument(size >= 0) { "size must be non-negative" }
+    val operationId = NativeAccess.startSetMaximumAmbientCacheSize(requireLiveHandle(), size)
+    return offlineOperation(
+      operationId,
+      OfflineOperationKind.SET_MAXIMUM_AMBIENT_CACHE_SIZE,
+      OfflineOperationResultKind.NONE,
+    )
+  }
+
   public actual fun startCreateOfflineRegion(
     definition: OfflineRegionDefinition,
     metadata: ByteArray,

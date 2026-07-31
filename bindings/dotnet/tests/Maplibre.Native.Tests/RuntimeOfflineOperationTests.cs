@@ -28,6 +28,21 @@ public sealed class RuntimeOfflineOperationTests
         Assert.True(operation.IsClosed);
     }
 
+    [Fact]
+    public void SetMaximumAmbientCacheSizeCanBeStartedAndDiscarded()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions { CachePath = ":memory:" });
+
+        using var operation = runtime.StartSetMaximumAmbientCacheSize(8UL << 20);
+
+        Assert.NotEqual(0u, operation.Id);
+        Assert.Equal(OfflineOperationKind.SetMaximumAmbientCacheSize, operation.Kind);
+        Assert.Equal(OfflineOperationResultKind.None, operation.ResultKind);
+
+        operation.Close();
+        Assert.True(operation.IsClosed);
+    }
+
     // Support invariant for runtime-owned offline cleanup: closing the parent
     // runtime leaves stale no-result operation tokens closed and idempotent.
     [Fact]

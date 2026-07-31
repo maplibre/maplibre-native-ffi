@@ -605,6 +605,26 @@ impl RuntimeHandle {
         )
     }
 
+    /// Starts a change to this runtime's maximum ambient cache size.
+    ///
+    /// MapLibre evicts ambient resources to fit the new budget, so lowering it
+    /// discards cached resources. Offline regions are unaffected.
+    pub fn start_set_maximum_ambient_cache_size(
+        &self,
+        size: u64,
+    ) -> Result<OfflineOperationHandle<()>> {
+        let runtime = self.inner.native()?;
+        let mut operation_id: sys::mln_offline_operation_id = 0;
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_set_maximum_ambient_cache_size_start(runtime, size, &mut operation_id)
+        })?;
+        self.start_operation(
+            operation_id,
+            maplibre_core::OfflineOperationKind::SetMaximumAmbientCacheSize,
+            maplibre_core::OfflineOperationResultKind::None,
+        )
+    }
+
     /// Starts creating an offline region.
     pub fn start_create_offline_region(
         &self,
@@ -1065,7 +1085,6 @@ mod tests {
 
         let mut options = RuntimeOptions::default();
         options.cache_path = Some(cache.to_string_lossy().into_owned());
-        options.maximum_cache_size = Some(0);
         let runtime = RuntimeHandle::with_options(&options).unwrap();
 
         for operation in [
@@ -1077,6 +1096,33 @@ mod tests {
             let operation = runtime.start_ambient_cache_operation(operation).unwrap();
             let completed =
                 wait_for_operation(&runtime, &operation, Op::AmbientCache, OpResult::None).unwrap();
+            assert_eq!(completed.operation_id, operation.operation_id);
+            operation.discard().unwrap();
+        }
+
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    // Spec coverage: BND-084.
+    fn runtime_set_maximum_ambient_cache_size_reports_completion() {
+        let base = TempDir::new("maplibre-rust-cache-size");
+        let cache = base.path().join("ambient-size.db");
+
+        let mut options = RuntimeOptions::default();
+        options.cache_path = Some(cache.to_string_lossy().into_owned());
+        let runtime = RuntimeHandle::with_options(&options).unwrap();
+
+        // Raising then lowering the budget both report through the same event.
+        for size in [8 * 1024 * 1024, 0] {
+            let operation = runtime.start_set_maximum_ambient_cache_size(size).unwrap();
+            let completed = wait_for_operation(
+                &runtime,
+                &operation,
+                Op::SetMaximumAmbientCacheSize,
+                OpResult::None,
+            )
+            .unwrap();
             assert_eq!(completed.operation_id, operation.operation_id);
             operation.discard().unwrap();
         }
@@ -1339,7 +1385,6 @@ mod tests {
         let mut options = RuntimeOptions::default();
         options.asset_path = Some(String::new());
         options.cache_path = Some(String::new());
-        options.maximum_cache_size = Some(0);
         let runtime = RuntimeHandle::with_options(&options).unwrap();
 
         runtime.pump(Some(Duration::ZERO)).unwrap();

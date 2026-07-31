@@ -20,8 +20,11 @@ raw.mln_premultiplied_rgba8_image _premultipliedRgba8ImageToNative(
   return result;
 }
 
+/// Materializes native image options. The stretch arrays live in `arena`, which
+/// native borrows for the duration of the call.
 raw.mln_style_image_options _styleImageOptionsToNative(
   StyleImageOptions options,
+  Allocator arena,
 ) {
   final result = _c.raw.mln_style_image_options_default();
   final pixelRatio = options.pixelRatio;
@@ -38,7 +41,62 @@ raw.mln_style_image_options _styleImageOptionsToNative(
         raw.mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_SDF.value;
     result.sdf = sdf;
   }
+  final stretchX = options.stretchX;
+  if (stretchX != null) {
+    result.fields |=
+        raw.mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_STRETCH_X.value;
+    result.stretch_x = _nativeStretches(stretchX, arena);
+    result.stretch_x_count = stretchX.length;
+  }
+  final stretchY = options.stretchY;
+  if (stretchY != null) {
+    result.fields |=
+        raw.mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_STRETCH_Y.value;
+    result.stretch_y = _nativeStretches(stretchY, arena);
+    result.stretch_y_count = stretchY.length;
+  }
+  final content = options.content;
+  if (content != null) {
+    result.fields |=
+        raw.mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_CONTENT.value;
+    result.content.left = content.left;
+    result.content.top = content.top;
+    result.content.right = content.right;
+    result.content.bottom = content.bottom;
+  }
+  final textFitWidth = options.textFitWidth;
+  if (textFitWidth != null) {
+    result.fields |= raw
+        .mln_style_image_option_field
+        .MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH
+        .value;
+    result.text_fit_width = textFitWidth.rawValue;
+  }
+  final textFitHeight = options.textFitHeight;
+  if (textFitHeight != null) {
+    result.fields |= raw
+        .mln_style_image_option_field
+        .MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT
+        .value;
+    result.text_fit_height = textFitHeight.rawValue;
+  }
   return result;
+}
+
+Pointer<raw.mln_image_stretch> _nativeStretches(
+  List<ImageStretch> stretches,
+  Allocator arena,
+) {
+  if (stretches.isEmpty) {
+    return nullptr;
+  }
+  final array = arena<raw.mln_image_stretch>(stretches.length);
+  for (var index = 0; index < stretches.length; index += 1) {
+    array[index]
+      ..from = stretches[index].from
+      ..to = stretches[index].to;
+  }
+  return array;
 }
 
 StyleImageInfo _styleImageInfoFromNative(raw.mln_style_image_info info) {
@@ -49,6 +107,22 @@ StyleImageInfo _styleImageInfoFromNative(raw.mln_style_image_info info) {
     byteLength: info.byte_length,
     pixelRatio: info.pixel_ratio,
     sdf: info.sdf,
+    stretchXCount: info.stretch_x_count,
+    stretchYCount: info.stretch_y_count,
+    content: info.has_content
+        ? ImageContent(
+            left: info.content.left,
+            top: info.content.top,
+            right: info.content.right,
+            bottom: info.content.bottom,
+          )
+        : null,
+    textFitWidth: info.has_text_fit_width
+        ? StyleImageTextFit.fromRawValue(info.text_fit_width)
+        : null,
+    textFitHeight: info.has_text_fit_height
+        ? StyleImageTextFit.fromRawValue(info.text_fit_height)
+        : null,
   );
 }
 
@@ -585,6 +659,14 @@ Pointer<raw.mln_geojson_source_options> _nativeGeoJsonSourceOptions(
         .value;
     nativeOptions.ref.cluster = cluster;
   }
+  final synchronousUpdate = options.synchronousUpdate;
+  if (synchronousUpdate != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_geojson_source_option_field
+        .MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
+        .value;
+    nativeOptions.ref.synchronous_update = synchronousUpdate;
+  }
   return nativeOptions;
 }
 
@@ -933,6 +1015,38 @@ Pointer<raw.mln_screen_point> _nativeScreenPoint(
   final nativePoint = allocator<raw.mln_screen_point>();
   nativePoint.ref = native_struct.screenPointToNative(point);
   return nativePoint;
+}
+
+/// Probes the required length, then copies. A null buffer with zero capacity is
+/// a size probe the C API answers with OK.
+String _copyLayerText(
+  NativeMap map,
+  String layerId,
+  raw.mln_status Function(
+    int,
+    raw.mln_string_view,
+    Pointer<Char>,
+    int,
+    Pointer<Size>,
+  )
+  copy,
+) {
+  return withNativeArena((arena) {
+    final nativeLayerId = nativeStringView(layerId, arena);
+    final outSize = arena<Size>();
+    _check(
+      copy(map.raw, nativeLayerId.value, nullptr.cast<Char>(), 0, outSize),
+    );
+    final required = outSize.value;
+    if (required == 0) {
+      return '';
+    }
+
+    final buffer = arena<Char>(required);
+    final outCopied = arena<Size>();
+    _check(copy(map.raw, nativeLayerId.value, buffer, required, outCopied));
+    return buffer.cast<Utf8>().toDartString(length: outCopied.value);
+  });
 }
 
 String? _copyStyleSourceAttribution(

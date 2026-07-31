@@ -540,6 +540,14 @@ pub struct StyleImageInfo {
     pub byte_length: usize,
     pub pixel_ratio: f32,
     pub sdf: bool,
+    /// Interval counts for the stretchable axes. Read the intervals themselves
+    /// with `MapHandle::style_image_stretches`.
+    pub stretch_x_count: usize,
+    pub stretch_y_count: usize,
+    /// Content box used when `icon-text-fit` applies.
+    pub content: Option<crate::style::ImageContent>,
+    pub text_fit_width: Option<crate::enums::StyleImageTextFit>,
+    pub text_fit_height: Option<crate::enums::StyleImageTextFit>,
 }
 
 pub fn style_image_info_from_native(raw: &sys::mln_style_image_info) -> StyleImageInfo {
@@ -550,6 +558,20 @@ pub fn style_image_info_from_native(raw: &sys::mln_style_image_info) -> StyleIma
         byte_length: raw.byte_length,
         pixel_ratio: raw.pixel_ratio,
         sdf: raw.sdf,
+        stretch_x_count: raw.stretch_x_count,
+        stretch_y_count: raw.stretch_y_count,
+        content: raw.has_content.then_some(crate::style::ImageContent {
+            left: raw.content.left,
+            top: raw.content.top,
+            right: raw.content.right,
+            bottom: raw.content.bottom,
+        }),
+        text_fit_width: raw
+            .has_text_fit_width
+            .then(|| crate::enums::StyleImageTextFit::from_raw(raw.text_fit_width)),
+        text_fit_height: raw
+            .has_text_fit_height
+            .then(|| crate::enums::StyleImageTextFit::from_raw(raw.text_fit_height)),
     }
 }
 

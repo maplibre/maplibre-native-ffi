@@ -137,7 +137,11 @@ internal constructor(private val map: MapHandle, private val handle: NativeRende
   public actual fun readPremultipliedRgba8(buffer: NativeBuffer): TextureImageInfo {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("read texture data")
-    return NativeAccess.readPremultipliedRgba8(requireLiveHandle(), buffer)
+    val info = NativeAccess.readPremultipliedRgba8(requireLiveHandle(), buffer)
+    // An empty destination reaches native code as the null pointer and zero capacity that mean a
+    // size probe, which succeeds without copying, so recheck the capacity here.
+    buffer.ensureCapacity(info.byteLength)
+    return info
   }
 
   public actual fun acquireMetalOwnedTextureFrame(): MetalOwnedTextureFrameHandle {

@@ -27,6 +27,7 @@ public enum OfflineOperationKind : uint
     RegionSetDownloadState = 9,
     RegionInvalidate = 10,
     RegionDelete = 11,
+    SetMaximumAmbientCacheSize = 12,
 }
 
 public enum OfflineOperationResultKind : uint

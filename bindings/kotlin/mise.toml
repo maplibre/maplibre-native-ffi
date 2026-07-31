@@ -162,6 +162,14 @@ fi
 ./gradlew "${gradle_args[@]}" :bindings:kotlin:androidBuild
 '''
 
+[tasks.compileAndroid]
+description = "Type-check the Android binding without a native cross-compile."
+dir = "../.."
+# androidBuild is the full Android path and needs native artifacts per ABI. This
+# compiles androidMain alone, which the JVM and native test tasks never reach,
+# so a broken androidMain shows up before CI runs androidBuild.
+run = "./gradlew :bindings:kotlin:compileAndroidMain"
+
 [tasks.check-android-api-floor]
 description = "Verify the Android binding stays on the android-minSdk floor."
 dir = "../.."

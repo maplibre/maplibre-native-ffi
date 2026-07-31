@@ -410,6 +410,110 @@ import Testing
   }
 }
 
+@Test func ninePatchStyleImageRoundTripsStretchContentAndTextFit() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 1, height: 1)
+  )
+  defer { try? map.close() }
+
+  try map.setStyleJSON("""
+  {"version":8,"sources":{},"layers":[]}
+  """)
+
+  let image = StyleRGBA8Image(
+    width: 2,
+    height: 2,
+    stride: 8,
+    pixels: [UInt8](repeating: 0, count: 16)
+  )
+  let options = StyleImageOptions(
+    stretchX: [ImageStretch(from: 0, to: 1)],
+    stretchY: [ImageStretch(from: 0, to: 1), ImageStretch(from: 1, to: 2)],
+    content: ImageContent(left: 0.5, top: 0.5, right: 1.5, bottom: 1.5),
+    textFitHeight: .proportional
+  )
+  try map.setStyleImage(imageId: "patch", image: image, options: options)
+
+  let info = try #require(try map.styleImageInfo("patch"))
+  #expect(info.stretchXCount == 1)
+  #expect(info.stretchYCount == 2)
+  #expect(info.content?.right == 1.5)
+  // An absent text fit stays distinguishable from a present default.
+  #expect(info.textFitWidth == nil)
+  #expect(info.textFitHeight == .proportional)
+
+  let stretches = try #require(try map.styleImageStretches("patch"))
+  #expect(stretches.stretchX == [ImageStretch(from: 0, to: 1)])
+  #expect(
+    stretches.stretchY == [
+      ImageStretch(from: 0, to: 1), ImageStretch(from: 1, to: 2),
+    ]
+  )
+  #expect(try map.styleImageStretches("missing") == nil)
+
+  // A backwards interval is rejected by C.
+  #expect(throws: MaplibreError.self) {
+    try map.setStyleImage(
+      imageId: "bad",
+      image: image,
+      options: StyleImageOptions(stretchX: [ImageStretch(from: 2, to: 1)])
+    )
+  }
+}
+
+@Test func layerBaseAccessorsRoundTripThroughNativeMap() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 1, height: 1)
+  )
+  defer { try? map.close() }
+
+  try map.setStyleJSON("""
+  {"version":8,"sources":{"geo":{"type":"geojson","data":  {"type":"FeatureCollection","features":[]}}},  "layers":[{"id":"bg","type":"background"},  {"id":"fill","type":"fill","source":"geo"}]}
+  """)
+
+  #expect(try map.layerSourceLayer("fill") == "")
+  try map.setLayerSourceLayer(layerId: "fill", sourceLayer: "roads")
+  #expect(try map.layerSourceLayer("fill") == "roads")
+  #expect(try map.layerSourceId("fill") == "geo")
+
+  // A layer type that takes no source is rejected rather than silently ignored.
+  #expect(throws: MaplibreError.self) {
+    try map.setLayerSourceLayer(layerId: "bg", sourceLayer: "roads")
+  }
+  #expect(try map.layerSourceId("bg") == "")
+
+  // An unset zoom range crosses the boundary as infinities.
+  #expect(try map.layerMinZoom("fill") == -Double.infinity)
+  #expect(try map.layerMaxZoom("fill") == Double.infinity)
+  try map.setLayerMinZoom(layerId: "fill", minZoom: 4)
+  try map.setLayerMaxZoom(layerId: "fill", maxZoom: 12.5)
+  #expect(try map.layerMinZoom("fill") == 4)
+  #expect(try map.layerMaxZoom("fill") == 12.5)
+
+  #expect(try map.layerVisibility("fill") == .visible)
+  try map.setLayerVisibility(layerId: "fill", visibility: .none)
+  #expect(try map.layerVisibility("fill") == StyleLayerVisibility.none)
+
+  // An unknown raw visibility passes through to C, which rejects it.
+  #expect(throws: MaplibreError.self) {
+    try map.setLayerVisibility(
+      layerId: "fill",
+      visibility: StyleLayerVisibility(rawValue: 900)
+    )
+  }
+  #expect(throws: MaplibreError.self) {
+    _ = try map.layerMinZoom("missing")
+  }
+}
+
 @Test func geoJSONSourceOptionsMaterializeFieldMaskAndClusterProperties(
 ) throws {
   let options = StyleGeoJSONSourceOptions(
@@ -423,7 +527,8 @@ import Testing
     clusterRadius: 60,
     clusterMinPoints: 3,
     lineMetrics: true,
-    cluster: true
+    cluster: true,
+    synchronousUpdate: true
   )
 
   try options.nativeOptions.withNativeOptions { native in
@@ -444,6 +549,10 @@ import Testing
     #expect(native.pointee.cluster_min_points == 3)
     #expect(native.pointee.line_metrics)
     #expect(native.pointee.cluster)
+    #expect(
+      (fields & MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE.rawValue) != 0
+    )
+    #expect(native.pointee.synchronous_update)
 
     let clusterProperties = try #require(native.pointee.cluster_properties)
     let copied = try NativeJSONValue(copying: clusterProperties.pointee)

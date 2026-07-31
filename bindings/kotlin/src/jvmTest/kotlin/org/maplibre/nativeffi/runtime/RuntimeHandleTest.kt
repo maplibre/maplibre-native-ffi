@@ -60,6 +60,20 @@ class RuntimeHandleTest {
   }
 
   @Test
+  fun setMaximumAmbientCacheSizeReachesNativeAndRejectsNegativeSize() {
+    val runtime = RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
+    val operation = runtime.startSetMaximumAmbientCacheSize(8L shl 20)
+
+    assertEquals(OfflineOperationKind.SET_MAXIMUM_AMBIENT_CACHE_SIZE, operation.kind)
+    assertFalse(operation.isClosed)
+    operation.close()
+
+    // Binding-owned validation fails before crossing into C.
+    assertFailsWith<InvalidArgumentException> { runtime.startSetMaximumAmbientCacheSize(-1L) }
+    runtime.close()
+  }
+
+  @Test
   fun offlineDownloadStateUnknownRawValueRejectsBeforeNativeCall() {
     RuntimeHandle.create(RuntimeOptions()).use { runtime ->
       assertFailsWith<InvalidArgumentException> {

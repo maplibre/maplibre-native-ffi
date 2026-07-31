@@ -215,7 +215,8 @@ enum _OfflineOperationKind {
   regionSetObserved('region set observed'),
   regionSetDownloadState('region set download state'),
   regionInvalidate('region invalidate'),
-  regionDelete('region delete');
+  regionDelete('region delete'),
+  setMaximumAmbientCacheSize('set maximum ambient cache size');
 
   const _OfflineOperationKind(this.name);
 
@@ -252,15 +253,6 @@ raw.mln_runtime_options _runtimeOptionsToNative(
       cachePath,
       allocator,
     ).pointer.cast<Char>();
-  }
-  final maximumCacheSize = options.maximumCacheSize;
-  if (maximumCacheSize != null) {
-    result.flags |=
-        raw.mln_runtime_option_flag.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE.value;
-    result.maximum_cache_size = uint64ToNative(
-      maximumCacheSize,
-      'maximum cache size',
-    );
   }
   return result;
 }

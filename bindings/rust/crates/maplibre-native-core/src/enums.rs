@@ -94,6 +94,7 @@ pub enum OfflineOperationKind {
     RegionSetDownloadState,
     RegionInvalidate,
     RegionDelete,
+    SetMaximumAmbientCacheSize,
     Unknown(u32),
 }
 
@@ -111,6 +112,9 @@ impl OfflineOperationKind {
             sys::MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE => Self::RegionSetDownloadState,
             sys::MLN_OFFLINE_OPERATION_REGION_INVALIDATE => Self::RegionInvalidate,
             sys::MLN_OFFLINE_OPERATION_REGION_DELETE => Self::RegionDelete,
+            sys::MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE => {
+                Self::SetMaximumAmbientCacheSize
+            }
             _ => Self::Unknown(raw),
         }
     }
@@ -128,6 +132,9 @@ impl OfflineOperationKind {
             Self::RegionSetDownloadState => sys::MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE,
             Self::RegionInvalidate => sys::MLN_OFFLINE_OPERATION_REGION_INVALIDATE,
             Self::RegionDelete => sys::MLN_OFFLINE_OPERATION_REGION_DELETE,
+            Self::SetMaximumAmbientCacheSize => {
+                sys::MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE
+            }
             Self::Unknown(raw) => raw,
         }
     }
@@ -233,6 +240,63 @@ impl TileScheme {
         match self {
             Self::Xyz => sys::MLN_STYLE_TILE_SCHEME_XYZ,
             Self::Tms => sys::MLN_STYLE_TILE_SCHEME_TMS,
+        }
+    }
+}
+
+/// How a stretchable style image fits text along one axis.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum StyleImageTextFit {
+    StretchOrShrink,
+    StretchOnly,
+    Proportional,
+    Unknown(u32),
+}
+
+impl StyleImageTextFit {
+    pub fn from_raw(raw: u32) -> Self {
+        match raw {
+            sys::MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK => Self::StretchOrShrink,
+            sys::MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY => Self::StretchOnly,
+            sys::MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL => Self::Proportional,
+            _ => Self::Unknown(raw),
+        }
+    }
+
+    pub fn raw_value(self) -> u32 {
+        match self {
+            Self::StretchOrShrink => sys::MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
+            Self::StretchOnly => sys::MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY,
+            Self::Proportional => sys::MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL,
+            Self::Unknown(raw) => raw,
+        }
+    }
+}
+
+/// Whether a style layer draws.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum StyleLayerVisibility {
+    Visible,
+    None,
+    Unknown(u32),
+}
+
+impl StyleLayerVisibility {
+    pub fn from_raw(raw: u32) -> Self {
+        match raw {
+            sys::MLN_STYLE_LAYER_VISIBILITY_VISIBLE => Self::Visible,
+            sys::MLN_STYLE_LAYER_VISIBILITY_NONE => Self::None,
+            _ => Self::Unknown(raw),
+        }
+    }
+
+    pub fn raw_value(self) -> u32 {
+        match self {
+            Self::Visible => sys::MLN_STYLE_LAYER_VISIBILITY_VISIBLE,
+            Self::None => sys::MLN_STYLE_LAYER_VISIBILITY_NONE,
+            Self::Unknown(raw) => raw,
         }
     }
 }

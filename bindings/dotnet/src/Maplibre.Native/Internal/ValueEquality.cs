@@ -12,6 +12,13 @@ internal static class ValueEquality
     internal static IReadOnlyList<T> Snapshot<T>(IReadOnlyList<T>? values) =>
         values is null || values.Count == 0 ? [] : Array.AsReadOnly([.. values]);
 
+    /// <summary>
+    /// Copies a caller-owned optional list, keeping a present empty list distinguishable from an
+    /// absent one.
+    /// </summary>
+    internal static IReadOnlyList<T>? SnapshotOrNull<T>(IReadOnlyList<T>? values) =>
+        values is null ? null : Array.AsReadOnly([.. values]);
+
     /// <summary>Copies a caller-owned list of lists at both levels.</summary>
     internal static IReadOnlyList<IReadOnlyList<T>> NestedSnapshot<T>(
         IReadOnlyList<IReadOnlyList<T>>? values

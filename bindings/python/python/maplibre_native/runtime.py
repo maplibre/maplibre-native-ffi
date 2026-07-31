@@ -10,6 +10,7 @@ from typing import Any
 import weakref
 
 from . import _native
+from .errors import InvalidArgumentError
 from .resource import ResourceProviderCallback, ResourceTransformCallback
 
 
@@ -318,7 +319,6 @@ class RuntimeOptions:
 
     asset_path: str | None = None
     cache_path: str | None = None
-    maximum_cache_size: int | None = None
 
 
 class WakeSource(NativeHandleMixin):
@@ -363,7 +363,6 @@ class RuntimeHandle(NativeHandleMixin):
         self._native = _native.create_runtime(
             options.asset_path,
             options.cache_path,
-            options.maximum_cache_size,
         )
         self._offline_operations: weakref.WeakSet[OfflineOperationHandle] = (
             weakref.WeakSet()
@@ -454,6 +453,24 @@ class RuntimeHandle(NativeHandleMixin):
         return self._offline_operation(
             self._native.run_ambient_cache_operation_start,
             AmbientCacheOperation(operation).native_code,
+        )
+
+    def set_maximum_ambient_cache_size(self, size: int) -> OfflineOperationHandle:
+        """Start a change to this runtime's maximum ambient cache size.
+
+        MapLibre evicts ambient resources to fit the new budget, so lowering it
+        discards cached resources. Offline regions are unaffected.
+        """
+        if not 0 <= size < 2**64:
+            # PyO3 extracts this as `u64` and raises a bare OverflowError before
+            # the binding's error conversion runs, so range-check it here to keep
+            # invalid binding-owned input on the documented error shape.
+            raise InvalidArgumentError(
+                f"maximum ambient cache size must fit in 64 unsigned bits, not {size}"
+            )
+        return self._offline_operation(
+            self._native.set_maximum_ambient_cache_size_start,
+            size,
         )
 
     def create_offline_region(

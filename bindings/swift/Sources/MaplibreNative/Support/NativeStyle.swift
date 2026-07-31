@@ -381,6 +381,88 @@ enum NativeStyle {
     return try NativeJSONSnapshot.copyValue(snapshot)
   }
 
+  /// Probes the required interval counts, then copies. Null arrays with zero
+  /// capacity are a size probe the C API answers with OK.
+  static func copyImageStretches(
+    _ map: NativeMapHandle,
+    imageId: mln_string_view
+  ) throws -> ([ImageStretch], [ImageStretch])? {
+    var xCount = 0
+    var yCount = 0
+    var found = false
+    try checkStatus(mln_map_copy_style_image_stretches(
+      map.raw, imageId, nil, 0, &xCount, nil, 0, &yCount, &found
+    ))
+    guard found else { return nil }
+
+    var rawX = [mln_image_stretch](
+      repeating: mln_image_stretch(from: 0, to: 0), count: xCount
+    )
+    var rawY = [mln_image_stretch](
+      repeating: mln_image_stretch(from: 0, to: 0), count: yCount
+    )
+    try rawX.withUnsafeMutableBufferPointer { bufferX in
+      try rawY.withUnsafeMutableBufferPointer { bufferY in
+        try checkStatus(mln_map_copy_style_image_stretches(
+          map.raw,
+          imageId,
+          bufferX.baseAddress,
+          bufferX.count,
+          &xCount,
+          bufferY.baseAddress,
+          bufferY.count,
+          &yCount,
+          &found
+        ))
+      }
+    }
+    let toPublic = { (raw: [mln_image_stretch]) -> [ImageStretch] in
+      raw.map { ImageStretch(from: $0.from, to: $0.to) }
+    }
+    return (toPublic(rawX), toPublic(rawY))
+  }
+
+  /// Probes the required byte length, then copies. A null buffer with zero
+  /// capacity is a size probe the C API answers with OK.
+  static func copyLayerText(
+    _ map: NativeMapHandle,
+    layerId: mln_string_view,
+    copy: (
+      mln_map,
+      mln_string_view,
+      UnsafeMutablePointer<CChar>?,
+      Int,
+      UnsafeMutablePointer<Int>
+    ) -> mln_status
+  ) throws -> String {
+    let required = try NativeMemory.withTemporary(0) { outSize in
+      try checkStatus(copy(map.raw, layerId, nil, 0, outSize))
+    }.value
+    guard required > 0 else { return "" }
+
+    var bytes = [CChar](repeating: 0, count: required)
+    let size = try bytes.withUnsafeMutableBufferPointer { buffer in
+      try NativeMemory.withTemporary(0) { outSize in
+        try checkStatus(copy(
+          map.raw,
+          layerId,
+          buffer.baseAddress,
+          required,
+          outSize
+        ))
+      }.value
+    }
+    guard size <= required else {
+      throw NativeStatusFailure(
+        rawStatus: MLN_STATUS_NATIVE_ERROR.rawValue,
+        diagnostic: "native layer text size exceeded caller buffer"
+      )
+    }
+    return try bytes.withUnsafeBufferPointer { buffer in
+      try NativeString.copyUTF8(data: buffer.baseAddress, size: size)
+    } ?? ""
+  }
+
   private static func copyStyleIdList(_ list: NativeStyleIdListHandle) throws
     -> [String]
   {
