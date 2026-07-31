@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
+import java.util.ArrayDeque
 import kotlin.math.max
 import kotlin.math.min
 import org.maplibre.nativeffi.camera.AnimationOptions
@@ -26,9 +27,13 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
   /** Acquires the wake source the render loop uses to release this loop's parked pump. */
   fun acquireWakeSource(): WakeSource = runtime.acquireWakeSource()
 
+  /** Reused across drains, so applying a batch allocates nothing. */
+  private var batch = ArrayDeque<CameraCommand>()
+
   /** One runtime loop iteration: apply queued commands, pump once, drain events. */
   fun step(commands: CommandQueue, renderRequest: RenderRequest) {
-    for (command in commands.drain()) {
+    batch = commands.drain(batch)
+    for (command in batch) {
       apply(command)
     }
     // This thread has no display to pace it, so it takes its cadence from the runtime's own work

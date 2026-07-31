@@ -54,10 +54,14 @@ fn runtimeLoopBody(args: RuntimeLoopArgs, state: *map_state.MapState) !void {
     const wake = try state.runtime.wakeSource();
     defer wake.release();
 
+    // Reused across drains, so applying a batch allocates nothing.
+    var batch: std.ArrayList(channel.CameraCommand) = .empty;
+    defer batch.deinit(args.allocator);
+
     args.map_channel.publish(state.map, wake);
 
     while (!args.map_channel.shutdownRequested() and args.map_channel.failureValue() == null) {
-        try state.applyCommands(args.commands);
+        try state.applyCommands(args.commands, &batch);
         // This thread has no display to pace it, so it takes its cadence from
         // the runtime's own work and parks in between. The bound is a backstop
         // for work that queues nothing on the owner thread, not the cadence.
@@ -123,7 +127,8 @@ pub fn main(init_args: std.process.Init) !void {
     // belong to this thread, which owns the window and its display callbacks.
     var target = try RenderTarget.init(allocator, window_handle, current_viewport, target_mode);
 
-    var commands = channel.CommandQueue{};
+    var commands = channel.CommandQueue.init(allocator);
+    defer commands.deinit();
     var render_request = channel.RenderRequest{};
     var map_channel = channel.MapChannel{};
 

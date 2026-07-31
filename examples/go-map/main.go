@@ -105,7 +105,7 @@ func run(mode renderTargetMode) (result error) {
 	_ = sdl.GL_SetSwapInterval(1)
 
 	shared := newSharedState()
-	commands := make(chan cameraCommand, 256)
+	commands := &commandQueue{}
 	published := make(chan runtimeLoopHandles, 1)
 	runtimeDone := make(chan struct{})
 	go func() {

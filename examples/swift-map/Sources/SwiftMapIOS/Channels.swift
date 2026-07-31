@@ -35,10 +35,6 @@ enum CameraCommand {
 /// successive blocks on different threads. A queue, an `actor`, or a `Task`
 /// here would produce nondeterministic `MLN_STATUS_WRONG_THREAD` failures.
 final class Channels: @unchecked Sendable {
-  /// Overflow drops the oldest command, because a dropped pan beats blocking
-  /// the render loop on the runtime loop.
-  private static let commandCapacity = 256
-
   private let condition = NSCondition()
   private var commands: [CameraCommand] = []
   private var renderRequested = true
@@ -52,11 +48,14 @@ final class Channels: @unchecked Sendable {
   // MARK: - Camera commands (render loop to runtime loop)
 
   /// Render loop: queues a decoded camera change and wakes the runtime loop.
+  ///
+  /// The buffer grows rather than dropping. Its commands are deltas and a
+  /// gesture bracket, and neither survives being discarded: a dropped delta is
+  /// motion the drag never gets back, and a dropped bracket leaves every delta
+  /// after it attributed to no gesture. Growing does not block the render loop
+  /// either, and only a stalled runtime loop grows it at all.
   func push(_ command: CameraCommand) {
     condition.lock()
-    if commands.count >= Self.commandCapacity {
-      commands.removeFirst()
-    }
     commands.append(command)
     let source = wake
     condition.unlock()
@@ -67,14 +66,20 @@ final class Channels: @unchecked Sendable {
     try? source?.signal()
   }
 
-  /// Runtime loop: takes every queued command so it can apply them without
-  /// holding the lock.
-  func drainCommands() -> [CameraCommand] {
+  /// Runtime loop: hands the pending commands over and takes `batch` in
+  /// exchange, so the two ping-pong and the locked section is the swap alone.
+  ///
+  /// Reading the array out and clearing it under the lock would not do: the
+  /// read leaves the buffer shared, so the clear has to allocate a fresh one
+  /// sized to the backlog, and it does that every drain.
+  func drainCommands(into batch: inout [CameraCommand]) {
+    // Clearing releases the elements of the batch just applied, so it happens
+    // before the lock is taken. Only the runtime loop holds `batch` here; the
+    // queue is still filling the other array.
+    batch.removeAll(keepingCapacity: true)
     condition.lock()
     defer { condition.unlock() }
-    let drained = commands
-    commands.removeAll(keepingCapacity: true)
-    return drained
+    swap(&commands, &batch)
   }
 
   // MARK: - Render request (runtime loop to render loop)

@@ -41,13 +41,18 @@ internal sealed interface CameraCommand {
 }
 
 /**
- * Ring of pending camera commands, filled by the render loop and drained by the runtime loop.
+ * Pending camera commands, filled by the render loop and drained by the runtime loop.
  *
- * Overflow drops the oldest command, because a dropped pan beats blocking the render loop on the
- * runtime loop.
+ * The queue grows rather than dropping. Its commands are deltas and a gesture bracket, and neither
+ * survives being discarded: a dropped delta is motion the drag never gets back, and a dropped
+ * bracket leaves every delta after it attributed to no gesture. Growing does not block the render
+ * loop either, and only a stalled runtime loop grows it at all.
  */
 internal class CommandQueue {
-  private val items = ArrayDeque<CameraCommand>(CAPACITY)
+  // The pending deque is swapped out on every drain, so the lock is its own object rather than the
+  // deque a caller happens to be holding.
+  private val lock = Any()
+  private var pending = ArrayDeque<CameraCommand>()
 
   /**
    * Released by [push] so a queued command reaches the runtime loop without waiting out its parking
@@ -57,26 +62,24 @@ internal class CommandQueue {
   @Volatile var onEnqueue: (() -> Unit)? = null
 
   fun push(command: CameraCommand) {
-    synchronized(items) {
-      if (items.size == CAPACITY) {
-        items.removeFirst()
-      }
-      items.addLast(command)
-    }
+    synchronized(lock) { pending.addLast(command) }
     onEnqueue?.invoke()
   }
 
-  fun drain(): List<CameraCommand> =
-    synchronized(items) {
-      if (items.isEmpty()) {
-        emptyList()
-      } else {
-        ArrayList(items).also { items.clear() }
-      }
+  /**
+   * Runtime loop: hands the pending deque over and takes [out] in exchange, so the two ping-pong
+   * and the locked section is the swap alone. A render loop pushing during a drain waits on that,
+   * not on the size of the backlog or of the batch just applied.
+   */
+  fun drain(out: ArrayDeque<CameraCommand>): ArrayDeque<CameraCommand> {
+    // Clearing nulls every slot of the batch just applied, so it happens before the lock is taken.
+    // Only the runtime loop holds [out] at this point; the queue is still filling the other deque.
+    out.clear()
+    return synchronized(lock) {
+      val drained = pending
+      pending = out
+      drained
     }
-
-  private companion object {
-    const val CAPACITY = 256
   }
 }
 
