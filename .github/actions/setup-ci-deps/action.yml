@@ -502,9 +502,12 @@ runs:
           ~/.cargo/bin
         key: ${{ steps.toolchain-key.outputs.key }}
 
-    # Public reads use the R2 custom domain (same defaults as mise.toml). Writes
-    # use the account S3 endpoint + key prefix so object URLs match OpenDAL's
-    # path-style public GETs: https://sccache.sargunv.dev/<bucket>/<key>
+    # The R2 backend lives here rather than in mise.toml, because its keys carry
+    # the toolchain paths of the runner that produced them; a contributor
+    # machine reads its own disk cache instead. Public reads use the R2 custom
+    # domain. Writes use the account S3 endpoint + key prefix so object URLs
+    # match OpenDAL's path-style public GETs:
+    # https://sccache.sargunv.dev/<bucket>/<key>
     - name: Wire sccache into CMake (Unix)
       if: runner.os != 'Windows'
       shell: bash
@@ -535,9 +538,6 @@ runs:
           {
             echo "SCCACHE_ENDPOINT=${write_endpoint}"
             echo "SCCACHE_S3_KEY_PREFIX=${bucket}/"
-            # mise.toml exports SCCACHE_S3_NO_CREDENTIALS=1 for public reads;
-            # clear it so authenticated writes are not rejected by sccache.
-            echo "SCCACHE_S3_NO_CREDENTIALS=0"
             echo "AWS_ACCESS_KEY_ID=${SCCACHE_ACCESS_KEY_ID}"
             echo "AWS_SECRET_ACCESS_KEY=${SCCACHE_SECRET_ACCESS_KEY}"
           } >> "$GITHUB_ENV"
@@ -589,9 +589,6 @@ runs:
           @(
             "SCCACHE_ENDPOINT=$writeEndpoint"
             "SCCACHE_S3_KEY_PREFIX=$bucket/"
-            # mise.toml exports SCCACHE_S3_NO_CREDENTIALS=1 for public reads;
-            # clear it so authenticated writes are not rejected by sccache.
-            "SCCACHE_S3_NO_CREDENTIALS=0"
             "AWS_ACCESS_KEY_ID=$env:SCCACHE_ACCESS_KEY_ID"
             "AWS_SECRET_ACCESS_KEY=$env:SCCACHE_SECRET_ACCESS_KEY"
           ) >> $env:GITHUB_ENV

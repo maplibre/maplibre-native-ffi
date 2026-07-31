@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Run a native build with sccache sharing cache entries across every checkout of
+# this repository on the machine.
+#
+# sccache keys a C/C++ compilation on the preprocessor output, which carries the
+# absolute path of every source and header the compiler read. Listing the
+# checkouts in SCCACHE_BASEDIRS strips those prefixes from the key, so a Git
+# worktree reuses what its siblings already compiled instead of building the
+# vendored MapLibre Native core again.
+#
+# The server reads SCCACHE_BASEDIRS once, when it starts, so a new worktree means
+# restarting it with the wider list. Stopping the server drains the compilations
+# already in flight, which keeps a restart safe during a concurrent build.
+
+if [[ $# -eq 0 ]]; then
+  echo "usage: ${0##*/} <command> [args...]" >&2
+  exit 2
+fi
+
+# Git hooks export GIT_DIR / GIT_INDEX_FILE; clear them so `git worktree list`
+# resolves the worktree normally when a hook runs this.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR
+
+# Windows checkouts reach sccache through a mix of path separators that the
+# basedir match leaves alone, so those keep per-checkout cache entries.
+case "$(uname -s)" in
+  MINGW* | MSYS* | CYGWIN*) exec "$@" ;;
+esac
+
+if ! command -v sccache >/dev/null 2>&1; then
+  exec "$@"
+fi
+
+basedirs="$(git worktree list --porcelain |
+  sed -n 's|^worktree ||p' | sort -u | paste -sd: -)"
+if [[ -z "$basedirs" ]]; then
+  exec "$@"
+fi
+export SCCACHE_BASEDIRS="$basedirs"
+
+# Reading the stats starts a server when none runs, so the common case already
+# picks up the list above and needs no restart.
+normalize() {
+  tr ':,' '\n\n' |
+    sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s|/*$||' |
+    sed '/^$/d' | sort -u
+}
+
+running="$(sccache --show-stats 2>/dev/null |
+  sed -n 's/^Base directories[[:space:]]*//p')"
+
+if ! diff -q \
+  <(printf '%s\n' "$running" | normalize) \
+  <(printf '%s\n' "$basedirs" | normalize) >/dev/null 2>&1; then
+  sccache --stop-server >/dev/null 2>&1 || true
+  sccache --start-server >/dev/null
+fi
+
+exec "$@"
