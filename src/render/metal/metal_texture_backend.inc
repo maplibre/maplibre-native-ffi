@@ -32,10 +32,9 @@ class MetalTextureBackend final : public mbgl::mtl::RendererBackend,
   auto metal_texture() -> MTL::Texture*;
 
   [[nodiscard]] auto has_device(const MTL::Device* other) const -> bool;
-  // Whether a replacement texture matches what this session's cached render
-  // pipeline states were built against, which is its pixel format and its
-  // sample count.
-  [[nodiscard]] auto matches_borrowed_texture(const MTL::Texture* texture) const
+  // Whether a replacement texture has the pixel format this session's cached
+  // render pipeline states were built against.
+  [[nodiscard]] auto has_borrowed_pixel_format(MTL::PixelFormat format) const
     -> bool;
   // Renders into a different caller-owned texture from here on. The caller has
   // already established that the format matches.
@@ -44,10 +43,9 @@ class MetalTextureBackend final : public mbgl::mtl::RendererBackend,
  private:
   MTL::Texture* borrowed_texture_ = nullptr;
   // Recorded when this session took borrowed_texture_, so a replacement is
-  // measured against values rather than against a texture the host may already
+  // measured against a value rather than against a texture the host may already
   // have released.
   MTL::PixelFormat borrowed_pixel_format_ = MTL::PixelFormatInvalid;
-  NS::UInteger borrowed_sample_count_ = 1;
 };
 
 }  // namespace mln::core

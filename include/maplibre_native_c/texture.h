@@ -42,9 +42,11 @@ typedef struct mln_metal_borrowed_texture_descriptor {
    * Borrowed id<MTLTexture> / MTL::Texture*. Required.
    *
    * The texture's pixel dimensions must equal physical_width and
-   * physical_height, and the texture must allow render-target usage. The
-   * session reads the texture's dimensions and rejects a mismatch. The caller
-   * owns the texture and must keep it valid until detach or destroy.
+   * physical_height, the texture must allow render-target usage, and it must be
+   * single-sample: the session builds the matching depth and stencil
+   * attachments itself and builds them single-sample. The session reads all
+   * three from the texture and rejects a mismatch. The caller owns the texture
+   * and must keep it valid until detach or destroy.
    */
   void* texture;
 } mln_metal_borrowed_texture_descriptor;
@@ -503,11 +505,13 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
  * including how the next mln_render_session_render_update() waits for the map
  * to catch up to it. A scale_factor that differs from the session's current
  * value rebuilds the renderer, whose shaders are compiled for a fixed pixel
- * ratio. The replacement's pixel format and sample count are a different
- * matter: mbgl builds its render pipeline states against both, so a texture
- * differing in either from the one this session attached with is reported as
- * MLN_STATUS_UNSUPPORTED, with the session still rendering into the texture it
- * has. Destroying the session and attaching again is what changes them.
+ * ratio. The replacement's pixel format is a different matter: mbgl reads the
+ * color format off the target when it builds a render pipeline state but does
+ * not key its cache on it, so a texture in another format would be drawn with
+ * pipelines built for the old one. One that differs from the format this
+ * session attached with is reported as MLN_STATUS_UNSUPPORTED, with the session
+ * still rendering into the texture it has. Destroying the session and attaching
+ * again is what changes the format.
  *
  * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
  * target is touched and leaves the session rendering into the one it had.
@@ -525,9 +529,9 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
  * - MLN_STATUS_UNSUPPORTED when the session does not render into a caller-owned
- *   Metal texture, when descriptor->texture has a different pixel format or
- *   sample count from the session's, or when Metal borrowed texture sessions
- *   are not supported by this build.
+ *   Metal texture, when descriptor->texture has a different pixel format from
+ *   the session's, or when Metal borrowed texture sessions are not supported by
+ *   this build.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_metal_borrowed_texture_set_target(

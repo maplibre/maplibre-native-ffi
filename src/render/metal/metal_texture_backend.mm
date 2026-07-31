@@ -221,8 +221,7 @@ MetalTextureBackend::MetalTextureBackend(
     : mbgl::mtl::RendererBackend(mbgl::gfx::ContextMode::Unique),
       mbgl::gfx::HeadlessBackend(size),
       borrowed_texture_(borrowed_texture),
-      borrowed_pixel_format_(borrowed_texture->pixelFormat()),
-      borrowed_sample_count_(borrowed_texture->sampleCount()) {
+      borrowed_pixel_format_(borrowed_texture->pixelFormat()) {
   device = NS::RetainPtr(borrowed_texture->device());
   commandQueue = NS::TransferPtr(device->newCommandQueue());
 }
@@ -268,15 +267,20 @@ auto MetalTextureBackend::has_device(const MTL::Device* other) const -> bool {
   return other == device.get();
 }
 
-auto MetalTextureBackend::matches_borrowed_texture(
-  const MTL::Texture* texture
+auto MetalTextureBackend::has_borrowed_pixel_format(
+  MTL::PixelFormat format
 ) const -> bool {
-  // Against the values recorded when this session took its texture, not against
+  // Against the format recorded when this session took its texture, not against
   // the outgoing texture itself: the session never retained that, and a host
   // replacing a texture it just released would otherwise be answered from freed
   // memory.
-  return texture->pixelFormat() == borrowed_pixel_format_ &&
-         texture->sampleCount() == borrowed_sample_count_;
+  //
+  // mbgl reads the color format off the renderable when it builds a render
+  // pipeline state, but keys its cache on the shader and color mode alone, so a
+  // replacement in another format would be drawn with a pipeline built for the
+  // old one. Sample count needs no comparison here: attach admits only
+  // single-sample textures, so both sides are always one.
+  return format == borrowed_pixel_format_;
 }
 
 void MetalTextureBackend::set_borrowed_texture(

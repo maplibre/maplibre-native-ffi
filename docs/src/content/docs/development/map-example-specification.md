@@ -612,9 +612,9 @@ that pass.
   session stays live, and so does its renderer, so the map keeps its tiles and
   atlases. A scale factor change is the exception the C API documents,
   rebuilding the renderer for the new pixel ratio.
-- Build the replacement with the format, layouts, and sample count the session
-  attached with. `set_target` reports `MLN_STATUS_UNSUPPORTED` for a target that
-  differs, leaving the session on the one it has.
+- Build the replacement with the format and layouts the session attached with.
+  `set_target` reports `MLN_STATUS_UNSUPPORTED` for a target that differs,
+  leaving the session on the one it has.
 - Reserve [reattach](#reattach) for a target the live session cannot take: a new
   graphics context or device, a target that `set_target` reports as unsupported,
   or a context that was lost.

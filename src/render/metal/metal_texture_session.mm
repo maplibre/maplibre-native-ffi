@@ -44,6 +44,15 @@ auto validate_borrowed_texture(
     mln::core::set_thread_error("Metal texture must allow render target usage");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  // The session builds the depth and stencil attachments that go alongside this
+  // texture, and builds them single-sample. Metal wants one sample count across
+  // a render pass, and mbgl leaves rasterSampleCount at its default of one for
+  // every pipeline it creates, so a multisample texture has no way to work
+  // here. Rejecting it now beats reporting it as a render failure later.
+  if (metal_texture->sampleCount() != 1) {
+    mln::core::set_thread_error("Metal texture must be single-sample");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   return MLN_STATUS_OK;
 }
 
@@ -71,11 +80,11 @@ class MetalTextureSessionBackend final
       );
       return MLN_STATUS_INVALID_ARGUMENT;
     }
-    if (!backend_.matches_borrowed_texture(texture)) {
+    if (!backend_.has_borrowed_pixel_format(texture->pixelFormat())) {
       return mln::core::unsupported_retarget(
-        "Metal texture target must have the pixel format and sample count this "
-        "session's render pipeline states were built for; destroy the session "
-        "and attach again to change either"
+        "Metal texture target must have the pixel format this session's render "
+        "pipeline states were built for; destroy the session and attach again "
+        "to change it"
       );
     }
     backend_.set_borrowed_texture(
