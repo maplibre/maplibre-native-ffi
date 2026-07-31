@@ -98,6 +98,12 @@ namespace Maplibre.Native.Internal.C
         public static extern mln_status mln_map_cancel_transitions([NativeTypeName("mln_map")] MlnMap map);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_set_gesture_in_progress([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("bool")] byte in_progress);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_is_gesture_in_progress([NativeTypeName("mln_map")] MlnMap map, bool* out_in_progress);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_camera_for_lat_lng_bounds([NativeTypeName("mln_map")] MlnMap map, mln_lat_lng_bounds bounds, [NativeTypeName("const mln_camera_fit_options *")] mln_camera_fit_options* fit_options, mln_camera_options* out_camera);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

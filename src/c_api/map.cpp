@@ -1081,6 +1081,20 @@ auto mln_map_cancel_transitions(mln_map map) noexcept -> mln_status {
   });
 }
 
+auto mln_map_set_gesture_in_progress(mln_map map, bool in_progress) noexcept
+  -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_set_gesture_in_progress(map, in_progress);
+  });
+}
+
+auto mln_map_is_gesture_in_progress(mln_map map, bool* out_in_progress) noexcept
+  -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_is_gesture_in_progress(map, out_in_progress);
+  });
+}
+
 auto mln_map_camera_for_lat_lng_bounds(
   mln_map map, mln_lat_lng_bounds bounds,
   const mln_camera_fit_options* fit_options, mln_camera_options* out_camera

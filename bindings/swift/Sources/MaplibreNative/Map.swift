@@ -356,4 +356,26 @@ public final class MapHandle {
       try checkStatus(mln_map_cancel_transitions(handle.requireLive().raw))
     }
   }
+
+  /// Marks whether a host-driven gesture is in progress.
+  ///
+  /// A host that decodes its own pointer gestures sets this to `true` when a
+  /// gesture starts and back to `false` when it ends, so the camera commands
+  /// issued in between belong to one live gesture. The flag stays set until the
+  /// host clears it, so pair every `true` with a `false`.
+  public func setGestureInProgress(_ inProgress: Bool) throws {
+    try mapNativeFailure {
+      try checkStatus(mln_map_set_gesture_in_progress(
+        handle.requireLive().raw,
+        inProgress
+      ))
+    }
+  }
+
+  /// Returns whether a host-driven gesture is currently in progress.
+  public func isGestureInProgress() throws -> Bool {
+    try mapNativeFailure {
+      try NativeMap.isGestureInProgress(handle.requireLive())
+    }
+  }
 }

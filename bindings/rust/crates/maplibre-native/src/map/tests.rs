@@ -833,6 +833,13 @@ fn camera_jump_and_coordinate_conversions_round_trip() {
         .unwrap();
     map.cancel_transitions().unwrap();
 
+    assert!(!map.is_gesture_in_progress().unwrap());
+    map.set_gesture_in_progress(true).unwrap();
+    map.move_by(8.0, -4.0).unwrap();
+    assert!(map.is_gesture_in_progress().unwrap());
+    map.set_gesture_in_progress(false).unwrap();
+    assert!(!map.is_gesture_in_progress().unwrap());
+
     let point = map.pixel_for_lat_lng(center).unwrap();
     let round_tripped = map.lat_lng_for_pixel(point).unwrap();
     assert!((round_tripped.latitude - center.latitude).abs() < 1e-7);

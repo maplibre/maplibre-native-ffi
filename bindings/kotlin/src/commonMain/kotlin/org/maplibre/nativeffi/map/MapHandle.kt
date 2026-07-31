@@ -372,6 +372,15 @@ public expect class MapHandle : AutoCloseable {
   public fun cancelTransitions()
 
   /**
+   * Whether a host-driven gesture is in progress.
+   *
+   * A host that decodes its own pointer gestures sets this to `true` when a gesture starts and back
+   * to `false` when it ends, so the camera commands issued in between belong to one live gesture.
+   * The flag stays set until the host clears it, so pair every `true` with a `false`.
+   */
+  public var isGestureInProgress: Boolean
+
+  /**
    * Computes the camera that fits [bounds].
    *
    * @see org.maplibre.nativeffi.camera.CameraFitOptions

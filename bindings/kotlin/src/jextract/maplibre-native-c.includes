@@ -42,6 +42,7 @@
 --include-function mln_map_get_tile_options
 --include-function mln_map_get_viewport_options
 --include-function mln_map_is_fully_loaded
+--include-function mln_map_is_gesture_in_progress
 --include-function mln_map_jump_to
 --include-function mln_map_lat_lng_bounds_for_camera
 --include-function mln_map_lat_lng_bounds_for_camera_unwrapped
@@ -60,6 +61,7 @@
 --include-function mln_map_set_bounds
 --include-function mln_map_set_debug_options
 --include-function mln_map_set_free_camera_options
+--include-function mln_map_set_gesture_in_progress
 --include-function mln_map_get_layer_max_zoom
 --include-function mln_map_get_layer_min_zoom
 --include-function mln_map_get_layer_visibility

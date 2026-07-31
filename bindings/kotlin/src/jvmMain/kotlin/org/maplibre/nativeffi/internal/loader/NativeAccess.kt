@@ -1687,6 +1687,23 @@ internal object NativeAccess {
     Status.check(mapStatusFunction("mln_map_cancel_transitions").invokeNative(map) as Int)
   }
 
+  internal fun setGestureInProgress(map: NativeMap, inProgress: Boolean) {
+    Status.check(
+      mapBooleanStatusFunction("mln_map_set_gesture_in_progress").invokeNative(map, inProgress)
+        as Int
+    )
+  }
+
+  internal fun isGestureInProgress(map: NativeMap): Boolean =
+    Arena.ofConfined().use { arena ->
+      val outInProgress = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        mapAddressStatusFunction("mln_map_is_gesture_in_progress").invokeNative(map, outInProgress)
+          as Int
+      )
+      outInProgress.get(ValueLayout.JAVA_BOOLEAN, 0)
+    }
+
   internal fun cameraForLatLngBounds(
     map: NativeMap,
     bounds: LatLngBounds,

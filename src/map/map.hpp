@@ -375,6 +375,9 @@ auto map_pitch_by_animated(
   mln_map map, double pitch, const mln_animation_options* animation
 ) -> mln_status;
 auto map_cancel_transitions(mln_map map) -> mln_status;
+auto map_set_gesture_in_progress(mln_map map, bool in_progress) -> mln_status;
+auto map_is_gesture_in_progress(mln_map map, bool* out_in_progress)
+  -> mln_status;
 auto map_camera_for_lat_lng_bounds(
   mln_map map, mln_lat_lng_bounds bounds,
   const mln_camera_fit_options* fit_options, mln_camera_options* out_camera

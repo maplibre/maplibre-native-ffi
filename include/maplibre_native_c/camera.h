@@ -472,6 +472,41 @@ MLN_API mln_status mln_map_pitch_by_animated(
 MLN_API mln_status mln_map_cancel_transitions(mln_map map) MLN_NOEXCEPT;
 
 /**
+ * Marks whether a host-driven gesture is in progress.
+ *
+ * A host that decodes its own pointer gestures sets this to true when a gesture
+ * starts and back to false when it ends, so the camera commands issued in
+ * between belong to one live gesture. MapLibre folds the flag into the
+ * transform's changing state.
+ *
+ * The flag stays set until the host clears it, so pair every true with a false,
+ * including on a cancelled gesture.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status
+mln_map_set_gesture_in_progress(mln_map map, bool in_progress) MLN_NOEXCEPT;
+
+/**
+ * Copies whether a host-driven gesture is currently in progress.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or
+ *   out_in_progress is null.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status
+mln_map_is_gesture_in_progress(mln_map map, bool* out_in_progress) MLN_NOEXCEPT;
+
+/**
  * Computes a camera that fits geographic bounds in the current viewport.
  *
  * Passing null fit_options uses zero padding with no bearing or pitch override.

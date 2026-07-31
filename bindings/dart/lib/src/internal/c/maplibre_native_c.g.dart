@@ -1685,6 +1685,39 @@ class MaplibreNativeC {
   late final _mln_map_cancel_transitions = _mln_map_cancel_transitionsPtr
       .asFunction<int Function(int)>();
 
+  mln_status mln_map_set_gesture_in_progress(
+    Dartmln_map map,
+    bool in_progress,
+  ) {
+    return mln_status.fromValue(
+      _mln_map_set_gesture_in_progress(map, in_progress),
+    );
+  }
+
+  late final _mln_map_set_gesture_in_progressPtr =
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_map, ffi.Bool)>>(
+        'mln_map_set_gesture_in_progress',
+      );
+  late final _mln_map_set_gesture_in_progress =
+      _mln_map_set_gesture_in_progressPtr.asFunction<int Function(int, bool)>();
+
+  mln_status mln_map_is_gesture_in_progress(
+    Dartmln_map map,
+    ffi.Pointer<ffi.Bool> out_in_progress,
+  ) {
+    return mln_status.fromValue(
+      _mln_map_is_gesture_in_progress(map, out_in_progress),
+    );
+  }
+
+  late final _mln_map_is_gesture_in_progressPtr =
+      _lookup<
+        ffi.NativeFunction<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Bool>)>
+      >('mln_map_is_gesture_in_progress');
+  late final _mln_map_is_gesture_in_progress =
+      _mln_map_is_gesture_in_progressPtr
+          .asFunction<int Function(int, ffi.Pointer<ffi.Bool>)>();
+
   mln_status mln_map_camera_for_lat_lng_bounds(
     Dartmln_map map,
     mln_lat_lng_bounds bounds,

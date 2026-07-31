@@ -325,6 +325,23 @@ public sealed class MapCameraOptionsTests
         map.CancelTransitions();
     }
 
+    [BindingSpecTest("BND-102")]
+    [Fact]
+    public void GestureInProgressBracketsHostDrivenCameraCommands()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        Assert.False(map.IsGestureInProgress());
+
+        map.SetGestureInProgress(true);
+        map.MoveBy(8, -4);
+        Assert.True(map.IsGestureInProgress());
+
+        map.SetGestureInProgress(false);
+        Assert.False(map.IsGestureInProgress());
+    }
+
     private sealed record CameraEventTally(
         List<ulong> FinishedTransitionIds,
         List<CameraChangeMode> DidChangeModes

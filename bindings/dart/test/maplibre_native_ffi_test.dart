@@ -994,6 +994,12 @@ void main() {
     map.rotateBy(const ScreenPoint(0, 0), const ScreenPoint(1, 1));
     map.pitchBy(0);
     map.cancelTransitions();
+    expect(map.isGestureInProgress(), isFalse);
+    map.setGestureInProgress(true);
+    map.moveBy(8, -4);
+    expect(map.isGestureInProgress(), isTrue);
+    map.setGestureInProgress(false);
+    expect(map.isGestureInProgress(), isFalse);
     expect(() => map.scaleBy(-1), throwsA(isA<InvalidArgumentException>()));
     final centerPixel = map.pixelForLatLng(const LatLng(0, 0));
     expect(centerPixel.x.isFinite, isTrue);

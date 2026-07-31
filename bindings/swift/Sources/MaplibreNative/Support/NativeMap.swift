@@ -32,6 +32,12 @@ enum NativeMap {
     }.value
   }
 
+  static func isGestureInProgress(_ map: NativeMapHandle) throws -> Bool {
+    try NativeMemory.withTemporary(false) { inProgress in
+      try checkStatus(mln_map_is_gesture_in_progress(map.raw, inProgress))
+    }.value
+  }
+
   static func size(_ map: NativeMapHandle) throws
     -> (width: UInt32, height: UInt32, scaleFactor: Double)
   {

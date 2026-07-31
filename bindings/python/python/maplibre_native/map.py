@@ -1332,6 +1332,21 @@ class MapHandle(NativeHandleMixin):
         """
         self._native.cancel_transitions()
 
+    def set_gesture_in_progress(self, in_progress: bool) -> None:
+        """Mark whether a host-driven gesture is in progress.
+
+        A host that decodes its own pointer gestures sets this to ``True``
+        when a gesture starts and back to ``False`` when it ends, so the
+        camera commands issued in between belong to one live gesture. The
+        flag stays set until the host clears it, so pair every ``True`` with
+        a ``False``.
+        """
+        self._native.set_gesture_in_progress(in_progress)
+
+    def is_gesture_in_progress(self) -> bool:
+        """Return whether a host-driven gesture is currently in progress."""
+        return self._native.is_gesture_in_progress()
+
     def get_free_camera_options(self) -> FreeCameraOptions:
         """Return the current free camera position and orientation."""
         from .camera import FreeCameraOptions

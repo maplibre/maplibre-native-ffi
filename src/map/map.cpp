@@ -7026,6 +7026,31 @@ auto map_cancel_transitions(mln_map map) -> mln_status {
   return MLN_STATUS_OK;
 }
 
+auto map_set_gesture_in_progress(mln_map map, bool in_progress) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  live->map->setGestureInProgress(in_progress);
+  return MLN_STATUS_OK;
+}
+
+auto map_is_gesture_in_progress(mln_map map, bool* out_in_progress)
+  -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (out_in_progress == nullptr) {
+    set_thread_error("out_in_progress must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  *out_in_progress = live->map->isGestureInProgress();
+  return MLN_STATUS_OK;
+}
+
 auto validate_camera_output(mln_camera_options* out_camera) -> mln_status {
   if (out_camera == nullptr || out_camera->size < sizeof(mln_camera_options)) {
     set_thread_error("out_camera must not be null and must have a valid size");

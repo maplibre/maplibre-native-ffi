@@ -77,6 +77,19 @@ static void camera_rejects_invalid_arguments(void) {
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_fly_to(fixture.map, &camera, &animation)
   );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_is_gesture_in_progress(fixture.map, NULL)
+  );
+  bool in_progress = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_is_gesture_in_progress(MLN_HANDLE_NULL, &in_progress)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_gesture_in_progress(MLN_HANDLE_NULL, true)
+  );
   destroy_map_fixture(fixture);
 }
 

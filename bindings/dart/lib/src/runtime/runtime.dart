@@ -1818,6 +1818,25 @@ final class MapHandle {
     _check(_c.raw.mln_map_cancel_transitions(_handle.raw));
   }
 
+  /// Marks whether a host-driven gesture is in progress.
+  ///
+  /// A host that decodes its own pointer gestures sets this to `true` when a
+  /// gesture starts and back to `false` when it ends, so the camera commands
+  /// issued in between belong to one live gesture. The flag stays set until the
+  /// host clears it, so pair every `true` with a `false`.
+  void setGestureInProgress(bool inProgress) {
+    _check(_c.raw.mln_map_set_gesture_in_progress(_handle.raw, inProgress));
+  }
+
+  /// Copies whether a host-driven gesture is currently in progress.
+  bool isGestureInProgress() {
+    return withNativeArena((arena) {
+      final outInProgress = arena<Bool>();
+      _check(_c.raw.mln_map_is_gesture_in_progress(_handle.raw, outInProgress));
+      return outInProgress.value;
+    });
+  }
+
   /// Enables or disables the rendering stats overlay.
   void setRenderingStatsViewEnabled(bool enabled) {
     _check(

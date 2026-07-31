@@ -347,6 +347,28 @@ public sealed unsafe class MapHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_map_cancel_transitions(Handle));
     }
 
+    /// <summary>Marks whether a host-driven gesture is in progress.</summary>
+    /// <remarks>
+    /// A host that decodes its own pointer gestures sets this to <see langword="true"/> when a
+    /// gesture starts and back to <see langword="false"/> when it ends, so the camera commands
+    /// issued in between belong to one live gesture. The flag stays set until the host clears it,
+    /// so pair every <see langword="true"/> with a <see langword="false"/>.
+    /// </remarks>
+    public void SetGestureInProgress(bool inProgress)
+    {
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_gesture_in_progress(Handle, inProgress ? (byte)1 : (byte)0)
+        );
+    }
+
+    /// <summary>Whether a host-driven gesture is currently in progress.</summary>
+    public bool IsGestureInProgress()
+    {
+        bool inProgress = false;
+        NativeStatus.Check(NativeMethods.mln_map_is_gesture_in_progress(Handle, &inProgress));
+        return inProgress;
+    }
+
     /// <summary>Calculates a camera that fits geographic bounds and fit options.</summary>
     public CameraOptions CameraForLatLngBounds(LatLngBounds bounds, CameraFitOptions? fitOptions)
     {
