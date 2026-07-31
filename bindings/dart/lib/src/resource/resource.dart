@@ -292,16 +292,30 @@ final class ResourceRequest {
   final Uint8List? priorData;
 }
 
-/// Exact URL route used by a queued Dart resource provider callback.
+/// URL route used by a queued Dart resource provider callback.
 final class ResourceProviderRoute {
-  /// Creates an exact URL provider route.
-  const ResourceProviderRoute({this.kind, required this.requestedUrl});
+  /// Creates a provider route.
+  const ResourceProviderRoute({
+    this.kind,
+    required this.url,
+    this.matchPrefix = false,
+    this.useRequestedUrl = false,
+  });
 
   /// Optional resource kind filter. Null matches any kind.
   final ResourceKind? kind;
 
-  /// Requested URL to match exactly.
-  final String requestedUrl;
+  /// Literal URL comparison value, compared case-sensitively with no glob
+  /// expansion, regular expressions, URL parsing, or normalization.
+  final String url;
+
+  /// Matches [url] against the start of the request URL instead of the whole
+  /// request URL. An empty [url] then matches every request URL.
+  final bool matchPrefix;
+
+  /// Compares [ResourceRequest.requestedUrl] instead of
+  /// [ResourceRequest.resolvedUrl].
+  final bool useRequestedUrl;
 }
 
 /// Exact URL provider rule used by the runtime resource provider.

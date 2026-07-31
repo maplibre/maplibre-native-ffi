@@ -8717,11 +8717,33 @@ final class mln_adapter_resource_provider_rules extends ffi.Struct {
   external int count;
 }
 
+enum mln_adapter_resource_route_flags {
+  MLN_ADAPTER_RESOURCE_ROUTE_FLAGS_NONE(0),
+  MLN_ADAPTER_RESOURCE_ROUTE_MATCH_PREFIX(1),
+  MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL(2);
+
+  final int value;
+  const mln_adapter_resource_route_flags(this.value);
+
+  static mln_adapter_resource_route_flags fromValue(int value) =>
+      switch (value) {
+        0 => MLN_ADAPTER_RESOURCE_ROUTE_FLAGS_NONE,
+        1 => MLN_ADAPTER_RESOURCE_ROUTE_MATCH_PREFIX,
+        2 => MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL,
+        _ => throw ArgumentError(
+          'Unknown value for mln_adapter_resource_route_flags: $value',
+        ),
+      };
+}
+
 final class mln_adapter_queued_resource_provider_route extends ffi.Struct {
   @ffi.Uint32()
   external int kind;
 
-  external ffi.Pointer<ffi.Char> requested_url;
+  @ffi.Uint32()
+  external int flags;
+
+  external ffi.Pointer<ffi.Char> url;
 }
 
 typedef mln_adapter_queued_resource_request_listenerFunction =

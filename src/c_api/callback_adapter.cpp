@@ -21,6 +21,7 @@
 #include <mutex>
 #include <span>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -84,13 +85,45 @@ auto string_equals(const char* left, const char* right) -> bool {
   return std::strcmp(left, right) == 0;
 }
 
+constexpr auto KnownRouteFlags =
+  static_cast<std::uint32_t>(MLN_ADAPTER_RESOURCE_ROUTE_MATCH_PREFIX) |
+  static_cast<std::uint32_t>(MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL);
+
+auto has_flag(std::uint32_t flags, mln_adapter_resource_route_flags flag)
+  -> bool {
+  return (flags & static_cast<std::uint32_t>(flag)) != 0;
+}
+
+// Compares one route's literal url against the request URL its flags select. A
+// null url or an unknown flag bit describes no URL family this version can
+// compare, so such a route claims nothing rather than everything.
+auto route_matches_url(
+  const AdapterQueuedResourceProviderRoute& route,
+  const mln_resource_request& request
+) -> bool {
+  if (route.url == nullptr || (route.flags & ~KnownRouteFlags) != 0) {
+    return false;
+  }
+  const auto* candidate =
+    has_flag(route.flags, MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL)
+      ? request.requested_url
+      : request.resolved_url;
+  if (candidate == nullptr) {
+    return false;
+  }
+  if (has_flag(route.flags, MLN_ADAPTER_RESOURCE_ROUTE_MATCH_PREFIX)) {
+    return std::string_view{candidate}.starts_with(std::string_view{route.url});
+  }
+  return string_equals(candidate, route.url);
+}
+
 auto request_matches_route(
   std::span<const AdapterQueuedResourceProviderRoute> routes,
   const mln_resource_request& request
 ) -> bool {
   return std::ranges::any_of(routes, [&request](const auto& route) -> bool {
     return matches_rule(route.kind, request.kind) &&
-           string_equals(route.requested_url, request.requested_url);
+           route_matches_url(route, request);
   });
 }
 
@@ -378,10 +411,9 @@ extern "C" MLN_API auto mln_adapter_queued_resource_provider_callback(
   void* user_data, const mln_resource_request* request,
   mln_resource_request_handle handle
 ) noexcept -> std::uint32_t {
-  if (
-    user_data == nullptr || request == nullptr ||
-    request->requested_url == nullptr || handle == MLN_HANDLE_NULL
-  ) {
+  // Each route decides which URL it compares, so an absent URL is left to route
+  // matching rather than rejected up front.
+  if (user_data == nullptr || request == nullptr || handle == MLN_HANDLE_NULL) {
     return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
   }
 
