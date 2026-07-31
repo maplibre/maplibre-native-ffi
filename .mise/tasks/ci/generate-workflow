@@ -196,6 +196,9 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         *setup(gradle=False),
         "      - run: mise run ci:generate-workflow --check",
         "      - run: mise run ci:generate-devcontainer-tools --check",
+        "      - run: mise run --force //bindings/dart:ffigen",
+        "      - run: mise run --force //bindings/dotnet:generate",
+        "      - run: mise run --force //bindings/kotlin:generate",
         "      - run: dprint output-resolved-config > /dev/null",
         # `mise run fix` provides the project-scoped formatter tools that the
         # dprint wrappers expect; calling hk directly leaves them uninstalled.

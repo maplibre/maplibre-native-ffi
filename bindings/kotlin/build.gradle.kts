@@ -30,7 +30,7 @@ val androidTargets =
   AndroidTarget.parseAbis(
     providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS)
   )
-val generatedJextractSources = layout.buildDirectory.dir("generated/sources/jextract/jvmMain/java")
+val checkedInJextractSources = layout.projectDirectory.dir("src/jvmMain/generated")
 val generatedJavaCppSources =
   layout.buildDirectory.dir("generated/sources/javacpp/androidMain/java")
 val mavenGroup = providers.gradleProperty("maplibre.maven.group").get()
@@ -174,10 +174,7 @@ extensions.extraProperties["maplibreAndroidSdkDirectory"] =
 
 apply(from = "gradle/javacpp-android.gradle.kts")
 
-tasks.named<KotlinJvmCompile>("compileKotlinJvm") {
-  dependsOn("generateJvmJextractBindings")
-  source(generatedJextractSources)
-}
+tasks.named<KotlinJvmCompile>("compileKotlinJvm") { source(checkedInJextractSources) }
 
 androidComponents {
   onVariants { variant ->

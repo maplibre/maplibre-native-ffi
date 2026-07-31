@@ -117,6 +117,10 @@ abstract class GenerateJvmJextractBindingsTask : DefaultTask() {
         "public static final ValueLayout.OfLong C_LONG = JAVA_LONG;",
       )
     )
+    output
+      .walkTopDown()
+      .filter { it.isFile && it.extension == "java" }
+      .forEach { it.writeText(it.readText().trimEnd() + "\n") }
   }
 }
 
@@ -124,7 +128,7 @@ val hostPlatform = HostPlatform.current()
 val jextractDistribution = hostPlatform.jextractDistribution
 val checkedInCHeaders = rootProject.layout.projectDirectory.dir("include")
 
-val generatedJextractSources = layout.buildDirectory.dir("generated/sources/jextract/jvmMain/java")
+val checkedInJextractSources = layout.projectDirectory.dir("src/jvmMain/generated")
 val jextractArchive = layout.buildDirectory.file("jextract/openjdk-25-jextract.tar.gz")
 val jextractInstallDir = layout.buildDirectory.dir("jextract/tool")
 val jextractExecutableFile = jextractInstallDir.map { dir ->
@@ -152,17 +156,16 @@ val extractJextract =
 val generateJvmJextractBindings =
   tasks.register<GenerateJvmJextractBindingsTask>("generateJvmJextractBindings") {
     group = "build"
-    description = "Generates JVM FFM declarations for the MapLibre Native C ABI with jextract."
+    description = "Regenerates the committed JVM FFM declarations with jextract."
     dependsOn(extractJextract)
     includes = layout.projectDirectory.file("src/jextract/maplibre-native-c.includes")
     cHeaders = checkedInCHeaders
     jextractExecutable = layout.file(provider { jextractExecutableFile.get() })
     jextractArchiveSha256 = jextractDistribution.sha256
-    outputDirectory = generatedJextractSources
+    outputDirectory = checkedInJextractSources
   }
 
 tasks.named<JavaCompile>("compileJvmMainJava") {
-  dependsOn(generateJvmJextractBindings)
-  source(generatedJextractSources)
+  source(checkedInJextractSources)
   options.release = catalogVersionInt("java-release")
 }

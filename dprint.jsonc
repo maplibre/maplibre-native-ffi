@@ -17,6 +17,7 @@
     "uv.lock",
     "Cargo.lock",
     "src/platform/rust/about.hbs",
+    "bindings/kotlin/src/jvmMain/generated/**",
     "gradlew",
     "gradlew.bat",
     "**/*.g.cs",
