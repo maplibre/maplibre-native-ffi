@@ -83,37 +83,44 @@ private fun Modifier.mapGestures(renderer: MapLibreSurfaceRenderer, scaleFactor:
       awaitPointerEventScope {
         var previous: PointerInputChange? = null
         val scale = scaleFactor.takeIf { it > 0.0 && it.isFinite() } ?: 1.0
-        while (true) {
-          val event = awaitPointerEvent()
-          val change = event.changes.firstOrNull()
-          val current = change?.takeIf { it.pressed }
-          if (current == null) {
-            // Every path that ends the drag lands here, so the mark the drag set is always
-            // paired with a clear.
-            if (previous != null) {
-              renderer.setGestureInProgress(false)
+        // `renderer` and `scaleFactor` are pointerInput keys, so a density change restarts this
+        // handler. The finally clears a drag the restart cancelled, which the loop below would
+        // never see the release for, on a map that outlives this handler.
+        try {
+          while (true) {
+            val event = awaitPointerEvent()
+            val change = event.changes.firstOrNull()
+            val current = change?.takeIf { it.pressed }
+            if (current == null) {
+              if (previous != null) {
+                renderer.setGestureInProgress(false)
+              }
+              previous = null
+              continue
             }
-            previous = null
-            continue
-          }
-          val last = previous
-          previous = current
-          if (last == null) {
-            renderer.cancelTransitions()
-            // The deltas that follow belong to one live gesture, so the map hears about the
-            // gesture rather than a stream of unrelated camera commands.
-            renderer.setGestureInProgress(true)
-            continue
-          }
+            val last = previous
+            previous = current
+            if (last == null) {
+              renderer.cancelTransitions()
+              // The deltas that follow belong to one live gesture, so the map hears about the
+              // gesture rather than a stream of unrelated camera commands.
+              renderer.setGestureInProgress(true)
+              continue
+            }
 
-          val delta = current.position - last.position
-          val rotate = event.buttons.isSecondaryPressed || event.keyboardModifiers.isCtrlPressed
-          if (rotate) {
-            renderer.rotateAndPitchBy(delta.x.toDouble() / scale, delta.y.toDouble() / scale)
-          } else {
-            renderer.moveBy(delta.x.toDouble() / scale, delta.y.toDouble() / scale)
+            val delta = current.position - last.position
+            val rotate = event.buttons.isSecondaryPressed || event.keyboardModifiers.isCtrlPressed
+            if (rotate) {
+              renderer.rotateAndPitchBy(delta.x.toDouble() / scale, delta.y.toDouble() / scale)
+            } else {
+              renderer.moveBy(delta.x.toDouble() / scale, delta.y.toDouble() / scale)
+            }
+            current.consume()
           }
-          current.consume()
+        } finally {
+          if (previous != null) {
+            renderer.setGestureInProgress(false)
+          }
         }
       }
     }

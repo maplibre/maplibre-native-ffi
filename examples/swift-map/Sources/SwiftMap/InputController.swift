@@ -23,38 +23,82 @@ final class InputController {
     case rotate
   }
 
+  /// The button that started the live drag. A drag belongs to one button, so a
+  /// second button pressed during it neither restarts it nor ends it early.
+  private enum DragButton {
+    case none
+    case left
+    case right
+  }
+
   private var dragMode = DragMode.none
+  private var dragButton = DragButton.none
   private var lastLocation = CGPoint.zero
 
   func mouseDown(_ event: NSEvent, commands: Channels) -> Bool {
-    lastLocation = event.locationInWindow
-    dragMode = event.modifierFlags.contains(.control) ? .rotate : .pan
+    beginDrag(
+      .left,
+      mode: event.modifierFlags.contains(.control) ? .rotate : .pan,
+      at: event.locationInWindow,
+      commands: commands
+    )
+    return false
+  }
+
+  func rightMouseDown(_ event: NSEvent, commands: Channels) -> Bool {
+    beginDrag(
+      .right,
+      mode: .rotate,
+      at: event.locationInWindow,
+      commands: commands
+    )
+    return false
+  }
+
+  func mouseUp(_ event: NSEvent, commands: Channels) -> Bool {
+    endDrag(.left, at: event.locationInWindow, commands: commands)
+    return false
+  }
+
+  func rightMouseUp(_ event: NSEvent, commands: Channels) -> Bool {
+    endDrag(.right, at: event.locationInWindow, commands: commands)
+    return false
+  }
+
+  private func beginDrag(
+    _ button: DragButton,
+    mode: DragMode,
+    at location: CGPoint,
+    commands: Channels
+  ) {
+    lastLocation = location
+    // A drag already owns the pointer, so a second button joins it rather than
+    // starting a drag of its own.
+    guard dragMode == .none else { return }
+    dragMode = mode
+    dragButton = button
     // Queued ahead of the drag's own commands, so the transition stops before
     // the first delta lands.
     commands.push(.cancelTransitions)
     // The deltas that follow belong to one live gesture, so the map hears
     // about the gesture rather than a stream of unrelated camera commands.
     commands.push(.setGestureInProgress(true))
-    return false
-  }
-
-  func rightMouseDown(_ event: NSEvent, commands: Channels) -> Bool {
-    lastLocation = event.locationInWindow
-    dragMode = .rotate
-    commands.push(.cancelTransitions)
-    commands.push(.setGestureInProgress(true))
-    return false
   }
 
   /// Every path that ends a drag runs through here, so the gesture mark the
-  /// drag set is always paired with a clear.
-  func mouseUp(_ event: NSEvent, commands: Channels) -> Bool {
-    lastLocation = event.locationInWindow
-    if dragMode != .none {
-      dragMode = .none
-      commands.push(.setGestureInProgress(false))
-    }
-    return false
+  /// drag set is always paired with a clear. Releasing a button that joined the
+  /// drag leaves it running, so the drag ends once, when the button that
+  /// started it comes up.
+  private func endDrag(
+    _ button: DragButton,
+    at location: CGPoint,
+    commands: Channels
+  ) {
+    lastLocation = location
+    guard dragButton == button else { return }
+    dragMode = .none
+    dragButton = .none
+    commands.push(.setGestureInProgress(false))
   }
 
   func mouseDragged(_ event: NSEvent, commands: Channels) -> Bool {

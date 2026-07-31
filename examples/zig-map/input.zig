@@ -28,6 +28,9 @@ pub const Result = struct {
 /// coordinates here, where the viewport lives.
 pub const Controller = struct {
     drag_mode: DragMode = .none,
+    /// The button that started the live drag. A drag belongs to one button, so
+    /// a second button pressed during it neither restarts it nor ends it early.
+    drag_button: u8 = 0,
     last_x: f64 = 0,
     last_y: f64 = 0,
 
@@ -57,6 +60,10 @@ pub const Controller = struct {
         self.last_x = cursor.x;
         self.last_y = cursor.y;
 
+        // A drag already owns the pointer, so a second button joins it rather
+        // than starting a drag of its own.
+        if (self.drag_mode != .none) return .{ .handled = true };
+
         const mode = dragModeForButton(button.button);
         if (mode == .none) return .{};
 
@@ -67,6 +74,7 @@ pub const Controller = struct {
         // about the gesture rather than a stream of unrelated camera commands.
         commands.push(.{ .set_gesture_in_progress = .{ .in_progress = true } });
         self.drag_mode = mode;
+        self.drag_button = button.button;
         return .{ .handled = true };
     }
 
@@ -78,6 +86,9 @@ pub const Controller = struct {
         if (button.button != c.SDL_BUTTON_LEFT and button.button != c.SDL_BUTTON_RIGHT) {
             return .{};
         }
+        // Releasing a button that joined the drag leaves the drag running, so
+        // the drag ends once, when the button that started it comes up.
+        if (button.button != self.drag_button) return .{ .handled = true };
         self.endDrag(commands);
         self.last_x = button.x;
         self.last_y = button.y;
@@ -89,6 +100,7 @@ pub const Controller = struct {
     fn endDrag(self: *Controller, commands: *channel.CommandQueue) void {
         if (self.drag_mode == .none) return;
         self.drag_mode = .none;
+        self.drag_button = 0;
         commands.push(.{ .set_gesture_in_progress = .{ .in_progress = false } });
     }
 

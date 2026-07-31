@@ -123,7 +123,7 @@ final class MetalMapView: NSView {
   }
 
   override func rightMouseUp(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.mouseUp(event, commands: channels))
+    requestRenderIfCameraChanged(input.rightMouseUp(event, commands: channels))
   }
 
   override func mouseDragged(with event: NSEvent) {
