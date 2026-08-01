@@ -24,18 +24,26 @@
 
 // A fixture renders into its own texture and never presents, so it needs a GL
 // context but no on-page canvas. Each one gets a private OffscreenCanvas on
-// whichever thread asked for it: an OffscreenCanvas belongs to a single thread,
-// and the suite attaches sessions from more than one.
+// whichever thread asked for it, because an OffscreenCanvas belongs to a single
+// thread and the suite attaches sessions from more than one.
+//
+// The registry is GL.offscreenCanvases rather than specialHTMLTargets:
+// findCanvasEventTarget(), which is what resolves the selector under
+// -sOFFSCREENCANVAS_SUPPORT, searches the former and never consults the latter.
 EM_JS(
   void, mln_test_register_offscreen_canvas,
   (const char* name, int width, int height), {
-    Module["specialHTMLTargets"][UTF8ToString(name)] =
-      new OffscreenCanvas(width, height);
+    const id = UTF8ToString(name);
+    Module["GL"].offscreenCanvases[id] = {
+      canvas : new OffscreenCanvas(width, height),
+      id : id,
+    };
   }
 );
 EM_JS(void, mln_test_unregister_offscreen_canvas, (const char* name), {
-  delete Module["specialHTMLTargets"][UTF8ToString(name)];
+  delete Module["GL"].offscreenCanvases[UTF8ToString(name)];
 });
+
 #endif
 
 #if defined(MLN_TEST_BACKEND_OPENGL) && defined(MLN_TEST_OPENGL_EGL)
@@ -475,10 +483,10 @@ static void destroy_backend_state(void* opaque_state) {
 
 typedef struct webgl_state {
   EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
-  char target[32];
+  char id[32];
 } webgl_state;
 
-static atomic_uint webgl_target_counter;
+static atomic_uint webgl_canvas_counter;
 
 // The browser owns the context a session renders into, so the fixture creates a
 // real WebGL2 context on the page's canvas and hands it over, the way a browser
@@ -500,26 +508,36 @@ static bool create_backend_state(void** out_state, void* out_context) {
   // The suite renders into its own texture rather than presenting, so the
   // context needs no drawing buffer preservation.
   attributes.preserveDrawingBuffer = EM_FALSE;
-  // An OffscreenCanvas has no implicit presentation, so a context on one must
-  // take over swap control or creation fails.
-  attributes.explicitSwapControl = EM_TRUE;
+  // The context stays on the thread that created it; nothing renders to the
+  // page, so there is no swap to take over and nothing to proxy.
+  attributes.explicitSwapControl = EM_FALSE;
+  attributes.proxyContextToMainThread = EMSCRIPTEN_WEBGL_CONTEXT_PROXY_DISALLOW;
 
-  const unsigned int id = atomic_fetch_add(&webgl_target_counter, 1U) + 1U;
-  (void)snprintf(state->target, sizeof(state->target), "!mln-test-%u", id);
-  mln_test_register_offscreen_canvas(state->target, 64, 64);
+  const unsigned int serial = atomic_fetch_add(&webgl_canvas_counter, 1U) + 1U;
+  (void)snprintf(state->id, sizeof(state->id), "mln-test-%u", serial);
+  mln_test_register_offscreen_canvas(state->id, 64, 64);
 
-  state->context = emscripten_webgl_create_context(state->target, &attributes);
+  char target[sizeof(state->id) + 1];
+  (void)snprintf(target, sizeof(target), "#%s", state->id);
+  state->context = emscripten_webgl_create_context(target, &attributes);
   if (state->context <= 0) {
-    mln_test_unregister_offscreen_canvas(state->target);
+    fprintf(
+      stderr, "creating the fixture's WebGL context failed: %ld\n",
+      (long)state->context
+    );
+    mln_test_unregister_offscreen_canvas(state->id);
     free(state);
     return false;
   }
-  if (
-    emscripten_webgl_make_context_current(state->context) !=
-    EMSCRIPTEN_RESULT_SUCCESS
-  ) {
+  const EMSCRIPTEN_RESULT current_result =
+    emscripten_webgl_make_context_current(state->context);
+  if (current_result != EMSCRIPTEN_RESULT_SUCCESS) {
+    fprintf(
+      stderr, "making the fixture's WebGL context current failed: %d\n",
+      current_result
+    );
     emscripten_webgl_destroy_context(state->context);
-    mln_test_unregister_offscreen_canvas(state->target);
+    mln_test_unregister_offscreen_canvas(state->id);
     free(state);
     return false;
   }
@@ -545,7 +563,7 @@ static void destroy_backend_state(void* opaque_state) {
     return;
   }
   emscripten_webgl_destroy_context(state->context);
-  mln_test_unregister_offscreen_canvas(state->target);
+  mln_test_unregister_offscreen_canvas(state->id);
   free(state);
 }
 

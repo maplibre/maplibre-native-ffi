@@ -428,7 +428,7 @@ jobs:
           save-toolchains: true
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-      - run: mise run build:emscripten emscripten-wasm32-webgl
+      - run: mise run test:emscripten emscripten-wasm32-webgl
 
   target-macos-arm64-metal:
     name: target / macos-arm64-metal

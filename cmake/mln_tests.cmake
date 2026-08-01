@@ -37,25 +37,29 @@ function(mln_configure_browser_c_api_test)
       # waitForEmpty() and during teardown, which the browser main thread
       # forbids, so this is what lets the suite run as written.
       "-sPROXY_TO_PTHREAD"
-      # Fixtures create their WebGL2 contexts on whichever worker attaches the
-      # session, each on a private OffscreenCanvas of its own.
+      # Fixtures create a private OffscreenCanvas per session, on whichever
+      # worker attaches it, and register it in GL.offscreenCanvases -- which is
+      # what resolves the selector, so that table has to be reachable from JS.
       "-sOFFSCREENCANVAS_SUPPORT=1"
-      # emscripten_webgl_create_context() resolves its target through this
-      # table,
-      # so registering a canvas in it needs the table reachable from JS.
-      "-sEXPORTED_RUNTIME_METHODS=specialHTMLTargets"
+      "-sEXPORTED_RUNTIME_METHODS=GL"
       "SHELL:--shell-file ${PROJECT_SOURCE_DIR}/src/c_api/tests/browser_shell.html"
       # Unity reports through stdout and the process exit status, so the runner
       # needs the module to exit rather than keep its runtime alive.
       "-sEXIT_RUNTIME=1"
       ${embed_options})
+  # Below the CTest timeout the browser test presets inherit, so a run that
+  # hangs ends at the runner rather than at CTest. The runner reports how far
+  # the suite got, kills the browser, and removes its profile, so letting CTest
+  # kill it first costs the diagnosis and leaves the profile behind.
+  set(runner_timeout_seconds 240)
   find_program(MLN_FFI_NODE_EXECUTABLE node REQUIRED)
   add_test(
     NAME c-api
     COMMAND
       "${MLN_FFI_NODE_EXECUTABLE}"
       "${PROJECT_SOURCE_DIR}/scripts/run-browser-test.mjs"
-      "$<TARGET_FILE:mln_c_api_tests>")
+      "$<TARGET_FILE:mln_c_api_tests>" --timeout-seconds
+      ${runner_timeout_seconds})
 endfunction()
 
 function(mln_add_c_api_test)

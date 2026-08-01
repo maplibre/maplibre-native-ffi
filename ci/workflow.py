@@ -94,10 +94,12 @@ def native_commands(preset: str, tested: set[str]) -> list[str]:
     target_platform = platform(preset)
     if target_platform == "ohos":
         return [f"mise run //bindings/rust:build:ohos {preset}"]
-    # The Emscripten SDK is scoped to the task that declares it, so Emscripten
-    # presets go through that task rather than the shared `build` task.
+    # The Emscripten toolchain is a task-scoped tool, so Emscripten presets go
+    # through the task that declares it rather than the shared `build` task.
     if target_platform == "emscripten":
-        return [f"mise run build:emscripten {preset}"]
+        return [
+            f"mise run {'test:emscripten' if preset in tested else 'build:emscripten'} {preset}"
+        ]
     commands = [f"mise run {'test' if preset in tested else 'build'} {preset}"]
     if target_platform == "linux":
         commands.append(f"mise run check-glibc-floor {preset}")
