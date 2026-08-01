@@ -20,6 +20,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     union {
  *         mln_wgl_context_descriptor wgl;
  *         mln_egl_context_descriptor egl;
+ *         mln_webgl_context_descriptor webgl;
  *     } data;
  * }
  * }
@@ -136,6 +137,7 @@ public class mln_opengl_context_descriptor {
      * union {
      *     mln_wgl_context_descriptor wgl;
      *     mln_egl_context_descriptor egl;
+     *     mln_webgl_context_descriptor webgl;
      * }
      * }
      */
@@ -147,8 +149,9 @@ public class mln_opengl_context_descriptor {
 
         private static final GroupLayout $LAYOUT = MemoryLayout.unionLayout(
             mln_wgl_context_descriptor.layout().withName("wgl"),
-            mln_egl_context_descriptor.layout().withName("egl")
-        ).withName("$anon$104:3");
+            mln_egl_context_descriptor.layout().withName("egl"),
+            mln_webgl_context_descriptor.layout().withName("webgl")
+        ).withName("$anon$120:3");
 
         /**
          * The layout of this union
@@ -245,6 +248,50 @@ public class mln_opengl_context_descriptor {
             MemorySegment.copy(fieldValue, 0L, union, egl$OFFSET, egl$LAYOUT.byteSize());
         }
 
+        private static final GroupLayout webgl$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("webgl"));
+
+        /**
+         * Layout for field:
+         * {@snippet lang=c :
+         * mln_webgl_context_descriptor webgl
+         * }
+         */
+        public static final GroupLayout webgl$layout() {
+            return webgl$LAYOUT;
+        }
+
+        private static final long webgl$OFFSET = $LAYOUT.byteOffset(groupElement("webgl"));
+
+        /**
+         * Offset for field:
+         * {@snippet lang=c :
+         * mln_webgl_context_descriptor webgl
+         * }
+         */
+        public static final long webgl$offset() {
+            return webgl$OFFSET;
+        }
+
+        /**
+         * Getter for field:
+         * {@snippet lang=c :
+         * mln_webgl_context_descriptor webgl
+         * }
+         */
+        public static MemorySegment webgl(MemorySegment union) {
+            return union.asSlice(webgl$OFFSET, webgl$LAYOUT.byteSize());
+        }
+
+        /**
+         * Setter for field:
+         * {@snippet lang=c :
+         * mln_webgl_context_descriptor webgl
+         * }
+         */
+        public static void webgl(MemorySegment union, MemorySegment fieldValue) {
+            MemorySegment.copy(fieldValue, 0L, union, webgl$OFFSET, webgl$LAYOUT.byteSize());
+        }
+
         /**
          * Obtains a slice of {@code arrayParam} which selects the array element at {@code index}.
          * The returned segment has address {@code arrayParam.address() + index * layout().byteSize()}
@@ -298,6 +345,7 @@ public class mln_opengl_context_descriptor {
      * union {
      *     mln_wgl_context_descriptor wgl;
      *     mln_egl_context_descriptor egl;
+     *     mln_webgl_context_descriptor webgl;
      * } data
      * }
      */
@@ -313,6 +361,7 @@ public class mln_opengl_context_descriptor {
      * union {
      *     mln_wgl_context_descriptor wgl;
      *     mln_egl_context_descriptor egl;
+     *     mln_webgl_context_descriptor webgl;
      * } data
      * }
      */
@@ -326,6 +375,7 @@ public class mln_opengl_context_descriptor {
      * union {
      *     mln_wgl_context_descriptor wgl;
      *     mln_egl_context_descriptor egl;
+     *     mln_webgl_context_descriptor webgl;
      * } data
      * }
      */
@@ -339,6 +389,7 @@ public class mln_opengl_context_descriptor {
      * union {
      *     mln_wgl_context_descriptor wgl;
      *     mln_egl_context_descriptor egl;
+     *     mln_webgl_context_descriptor webgl;
      * } data
      * }
      */

@@ -528,12 +528,13 @@ dispatch and does not invoke a destination transform. Native range and
 conditional headers retain their platform transport behavior independently of
 the transformed collection.
 
-#### OpenHarmony
+#### OpenHarmony and the browser
 
-HTTP header transform registration reports unsupported on OpenHarmony while its
-platform HTTP client lacks a redirect-decision hook. This keeps transformed
-credentials out of cross-origin redirects rather than enabling a transport that
-cannot satisfy the redirect contract.
+HTTP header transform registration reports unsupported on OpenHarmony, whose
+platform HTTP client lacks a redirect-decision hook, and in the browser, whose
+fetch transport follows redirects itself. This keeps transformed credentials out
+of cross-origin redirects rather than enabling a transport that cannot satisfy
+the redirect contract. A resource provider serves those requests instead.
 
 ### Resource providers
 

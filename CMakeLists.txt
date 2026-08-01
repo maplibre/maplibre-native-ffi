@@ -48,6 +48,7 @@ include(mln_c_api)
 include(mln_licenses)
 include(mln_install)
 
+include(emscripten)
 mln_configure_options()
 mln_validate_platform()
 mln_add_maplibre_native()

@@ -363,7 +363,10 @@ auto vulkan_surface_set_target(
 
 #endif
 
-#if !defined(MLN_RENDER_BACKEND_OPENGL)
+// A WebGL build carries OpenGL texture sessions but not surface sessions, so
+// the two are guarded apart. See the note in cmake/render/opengl.cmake.
+#if !defined(MLN_RENDER_BACKEND_OPENGL) || \
+  defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
 
 auto opengl_surface_attach(
   mln_map map, const mln_opengl_surface_descriptor* descriptor,
@@ -389,6 +392,29 @@ auto opengl_surface_attach(
   set_thread_error("OpenGL surface sessions are not supported by this build");
   return MLN_STATUS_UNSUPPORTED;
 }
+
+auto opengl_surface_set_target(
+  mln_render_session session, const mln_opengl_surface_descriptor* descriptor
+) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto session_status = validate_render_session_retarget(
+    session, RetargetTargetKind::Surface, live
+  );
+  if (session_status != MLN_STATUS_OK) {
+    return session_status;
+  }
+  const auto descriptor_status =
+    validate_opengl_surface_descriptor(descriptor, false);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  set_thread_error("OpenGL surface sessions are not supported by this build");
+  return MLN_STATUS_UNSUPPORTED;
+}
+
+#endif
+
+#if !defined(MLN_RENDER_BACKEND_OPENGL)
 
 auto opengl_owned_texture_attach(
   mln_map map, const mln_opengl_owned_texture_descriptor* descriptor,
@@ -485,25 +511,6 @@ auto opengl_borrowed_texture_set_target(
     return descriptor_status;
   }
   set_thread_error("OpenGL texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
-}
-
-auto opengl_surface_set_target(
-  mln_render_session session, const mln_opengl_surface_descriptor* descriptor
-) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::Surface, live
-  );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
-  }
-  const auto descriptor_status =
-    validate_opengl_surface_descriptor(descriptor, false);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  set_thread_error("OpenGL surface sessions are not supported by this build");
   return MLN_STATUS_UNSUPPORTED;
 }
 

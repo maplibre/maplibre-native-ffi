@@ -42,8 +42,8 @@ jobs:
           git diff --exit-code -- . ':(exclude)mise.lock'
           git diff --cached --exit-code -- . ':(exclude)mise.lock'
 
-  browser-rust:
-    name: browser / rust
+  emscripten-rust:
+    name: emscripten / rust
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
@@ -56,7 +56,7 @@ jobs:
           gradle: false
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-      - run: mise run build:rust-browser
+      - run: mise run build:rust-emscripten
 
   docs:
     name: docs
@@ -412,6 +412,24 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-linux-arm64-vulkan.tar.gz
           if-no-files-found: error
 
+  target-emscripten-wasm32-webgl:
+    name: target / emscripten-wasm32-webgl
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: emscripten-wasm32-webgl
+          gradle: false
+          save-toolchains: true
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run build:emscripten emscripten-wasm32-webgl
+
   target-macos-arm64-metal:
     name: target / macos-arm64-metal
     runs-on: macos-26
@@ -748,7 +766,6 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: android-arm64-egl
-          save-toolchains: true
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run build android-arm64-egl
@@ -1192,12 +1209,13 @@ jobs:
     if: ${{ always() }}
     needs:
       - hygiene
-      - browser-rust
+      - emscripten-rust
       - docs
       - target-linux-x64-egl
       - target-linux-x64-vulkan
       - target-linux-arm64-egl
       - target-linux-arm64-vulkan
+      - target-emscripten-wasm32-webgl
       - target-macos-arm64-metal
       - target-macos-arm64-vulkan
       - target-macos-arm64-egl

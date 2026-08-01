@@ -25,7 +25,7 @@ def platform(preset: str) -> str:
 
 def architecture(preset: str) -> str:
     parts = preset.split("-")
-    for candidate in ("x64", "arm64"):
+    for candidate in ("x64", "arm64", "wasm32"):
         if candidate in parts:
             return candidate
     raise SystemExit(f"error: cannot determine architecture from preset {preset!r}")
@@ -33,7 +33,7 @@ def architecture(preset: str) -> str:
 
 def backend(preset: str) -> str:
     value = preset.rsplit("-", 1)[-1]
-    if value not in {"egl", "metal", "vulkan", "wgl"}:
+    if value not in {"egl", "metal", "vulkan", "webgl", "wgl"}:
         raise SystemExit(f"error: cannot determine backend from preset {preset!r}")
     return value
 
@@ -50,7 +50,7 @@ def runner(preset: str) -> str:
         return "macos-26"
     if target_platform == "windows":
         return "windows-11-arm" if target_architecture == "arm64" else "windows-2022"
-    if target_platform in {"android", "ohos"}:
+    if target_platform in {"android", "emscripten", "ohos"}:
         return "ubuntu-latest"
     raise SystemExit(f"error: cannot determine runner from preset {preset!r}")
 
@@ -94,6 +94,10 @@ def native_commands(preset: str, tested: set[str]) -> list[str]:
     target_platform = platform(preset)
     if target_platform == "ohos":
         return [f"mise run //bindings/rust:build:ohos {preset}"]
+    # The Emscripten SDK is scoped to the task that declares it, so Emscripten
+    # presets go through that task rather than the shared `build` task.
+    if target_platform == "emscripten":
+        return [f"mise run build:emscripten {preset}"]
     commands = [f"mise run {'test' if preset in tested else 'build'} {preset}"]
     if target_platform == "linux":
         commands.append(f"mise run check-glibc-floor {preset}")

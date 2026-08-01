@@ -21,6 +21,7 @@
 #include <mbgl/util/string.hpp>
 #include <mbgl/util/url.hpp>
 
+#include "../offline_url.hpp"
 #include "maplibre_native_c.h"
 #include "runtime/runtime.hpp"
 
@@ -70,10 +71,6 @@ auto optionalCString(char* value) -> std::optional<std::string> {
   return std::string{value};
 }
 
-auto hasSuffix(const std::string& value, const std::string& suffix) -> bool {
-  return value.ends_with(suffix);
-}
-
 auto isHTTPURL(const std::string& url) -> bool {
   const auto parsed = mbgl::util::URL{url};
   const auto scheme =
@@ -90,35 +87,6 @@ auto isHTTPURL(const std::string& url) -> bool {
     return true;
   };
   return equalsIgnoringASCIICase("http") || equalsIgnoringASCIICase("https");
-}
-
-auto isValidMapboxEndpoint(const std::string& url) -> bool {
-  const auto parsed = mbgl::util::URL{url};
-  const auto host = url.substr(parsed.domain.first, parsed.domain.second);
-  return host == "mapbox.com" || host == "mapbox.cn" ||
-         hasSuffix(host, ".mapbox.com") || hasSuffix(host, ".mapbox.cn");
-}
-
-auto offlineURL(const mbgl::Resource& resource) -> std::string {
-  auto url = resource.url;
-  if (
-    resource.usage != mbgl::Resource::Usage::Offline ||
-    !isValidMapboxEndpoint(url)
-  ) {
-    return url;
-  }
-
-  const auto fragment = url.find('#');
-  const auto query = url.find('?');
-  const auto separator = query == std::string::npos ||
-                             (fragment != std::string::npos && fragment < query)
-                           ? '?'
-                           : '&';
-  url.insert(
-    fragment == std::string::npos ? url.size() : fragment,
-    std::string{separator} + "offline=true"
-  );
-  return url;
 }
 
 auto resourceKindToAbi(mbgl::Resource::Kind kind) -> std::uint32_t {
@@ -373,7 +341,7 @@ class HTTPRequest : public AsyncRequest {
         ) {
     state->startAsyncTask();
 
-    auto url = offlineURL(resource);
+    auto url = mln::platform::offline_url(resource);
     auto headers = makeHeaders(resource, url, platformContext);
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     auto* stateForCallback = new std::shared_ptr<HTTPRequestState>{state};

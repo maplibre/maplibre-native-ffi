@@ -4581,7 +4581,8 @@ final class mln_vulkan_context_descriptor extends ffi.Struct {
 
 enum mln_opengl_context_provider_flag {
   MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL(1),
-  MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL(2);
+  MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL(2),
+  MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL(4);
 
   final int value;
   const mln_opengl_context_provider_flag(this.value);
@@ -4590,6 +4591,7 @@ enum mln_opengl_context_provider_flag {
       switch (value) {
         1 => MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL,
         2 => MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL,
+        4 => MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL,
         _ => throw ArgumentError(
           'Unknown value for mln_opengl_context_provider_flag: $value',
         ),
@@ -4599,7 +4601,8 @@ enum mln_opengl_context_provider_flag {
 enum mln_opengl_context_platform {
   MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED(0),
   MLN_OPENGL_CONTEXT_PLATFORM_WGL(1),
-  MLN_OPENGL_CONTEXT_PLATFORM_EGL(2);
+  MLN_OPENGL_CONTEXT_PLATFORM_EGL(2),
+  MLN_OPENGL_CONTEXT_PLATFORM_WEBGL(3);
 
   final int value;
   const mln_opengl_context_platform(this.value);
@@ -4608,6 +4611,7 @@ enum mln_opengl_context_platform {
     0 => MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED,
     1 => MLN_OPENGL_CONTEXT_PLATFORM_WGL,
     2 => MLN_OPENGL_CONTEXT_PLATFORM_EGL,
+    3 => MLN_OPENGL_CONTEXT_PLATFORM_WEBGL,
     _ => throw ArgumentError(
       'Unknown value for mln_opengl_context_platform: $value',
     ),
@@ -4638,10 +4642,20 @@ final class mln_egl_context_descriptor extends ffi.Struct {
   external ffi.Pointer<ffi.Void> get_proc_address;
 }
 
+final class mln_webgl_context_descriptor extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Int32()
+  external int context;
+}
+
 final class UnnamedUnion$6 extends ffi.Union {
   external mln_wgl_context_descriptor wgl;
 
   external mln_egl_context_descriptor egl;
+
+  external mln_webgl_context_descriptor webgl;
 }
 
 final class mln_opengl_context_descriptor extends ffi.Struct {

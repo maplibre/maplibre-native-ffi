@@ -50,6 +50,7 @@ dart_version = "3.12.2"
 dotnet_version = "10.0.203"
 doxygen_version = "1.13.2"
 dprint_version = "0.53.2"
+emsdk_version = "4.0.10"
 go_version = "1.26.3"
 doc2go_version = "0.12.2"
 gofumpt_version = "0.10.0"
@@ -99,7 +100,7 @@ sccache = "{{vars.sccache_version}}"
 swiftformat = { version = "{{vars.swiftformat_version}}", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
 
 # The native CMake build compiles the Rust platform support library, so Rust is
-# part of the repository-wide native toolchain. `rust-src` is for the browser
+# part of the repository-wide native toolchain. `rust-src` is for the Emscripten
 # target alone: rustup ships no `std` for `wasm32-unknown-emscripten` built with
 # atomics, so that target rebuilds `std` from source. See cmake/mln_rust.cmake.
 "core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy,rust-src", targets = "aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc,wasm32-unknown-emscripten" }
@@ -186,8 +187,20 @@ sources = [
 outputs = { auto = true }
 run = '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"'
 
-[tasks."build:rust-browser"]
-description = "Build the Rust platform support library for the browser target."
+[tasks."build:emscripten"]
+description = "Configure, build, and install an Emscripten native CMake preset."
+usage = 'arg "[preset]" default="emscripten-wasm32-webgl"'
+# mise scopes a tool to a task rather than to a task's arguments, so the shared
+# `build` task cannot ask for the Emscripten SDK only when it is handed an
+# Emscripten preset. Declaring it here keeps every other native build from
+# installing an SDK it never uses. Android and OpenHarmony need no equivalent
+# task, because their SDKs are located through the environment rather than
+# installed by mise.
+tools = { emsdk = "{{vars.emsdk_version}}" }
+run = '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"'
+
+[tasks."build:rust-emscripten"]
+description = "Build the Rust platform support library for the Emscripten target."
 # Emscripten rejects mixing objects that carry atomics with objects that do not
 # under shared memory, and rustup ships no `wasm32-unknown-emscripten` `std`
 # built with atomics, so `std` is rebuilt from source here. `-Zbuild-std` is
@@ -196,7 +209,7 @@ description = "Build the Rust platform support library for the browser target."
 # keeps the rest of the workspace, and every artifact we ship, on stable.
 #
 # Building the staticlib needs no linker, so this runs without emsdk. The
-# browser CMake target links it, and will reach cargo the same way every other
+# Emscripten CMake target links it, and will reach cargo the same way every other
 # target does.
 sources = ["Cargo.lock", "Cargo.toml", "src/platform/rust/**/*"]
 outputs = { auto = true }

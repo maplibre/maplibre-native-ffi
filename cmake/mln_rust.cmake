@@ -2,7 +2,9 @@ function(mln_link_rust_platform target)
   find_program(CARGO_EXECUTABLE cargo REQUIRED)
   find_program(CARGO_ABOUT_EXECUTABLE cargo-about REQUIRED)
 
-  if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+  if(EMSCRIPTEN)
+    set(rust_target "wasm32-unknown-emscripten")
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
     if(ANDROID_ABI STREQUAL "arm64-v8a")
       set(rust_target "aarch64-linux-android")
     elseif(ANDROID_ABI STREQUAL "x86_64")
@@ -112,6 +114,18 @@ function(mln_link_rust_platform target)
     list(APPEND rust_environment
          "CARGO_TARGET_${rust_target_env}_RUSTFLAGS=-Ctarget-feature=+crt-static")
   endif()
+  # Emscripten rejects mixing objects that carry atomics with objects that do
+  # not under shared memory, and rustup ships no wasm32-unknown-emscripten std
+  # built with atomics, so std is rebuilt from source. -Zbuild-std is
+  # nightly-only; RUSTC_BOOTSTRAP unlocks it on the pinned stable toolchain,
+  # which keeps every artifact we ship on stable. Mirrors the standalone
+  # `build:rust-emscripten` task.
+  set(rust_extra_args)
+  if(EMSCRIPTEN)
+    list(APPEND rust_environment "RUSTC_BOOTSTRAP=1"
+         "RUSTFLAGS=-C target-feature=+atomics,+bulk-memory -C panic=abort")
+    list(APPEND rust_extra_args -Z build-std=std,panic_abort)
+  endif()
 
   add_custom_command(
     OUTPUT "${rust_library}"
@@ -129,6 +143,7 @@ function(mln_link_rust_platform target)
       --target
       "${rust_target}"
       --release
+      ${rust_extra_args}
     DEPENDS
       "${rust_manifest}" ${rust_sources} ${rust_dependency_sources}
       ${rust_dependency_manifests} "${PROJECT_SOURCE_DIR}/Cargo.toml"

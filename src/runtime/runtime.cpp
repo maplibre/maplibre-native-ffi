@@ -1247,6 +1247,20 @@ auto set_http_header_transform(
     "client cannot prevent transformed headers from crossing origins"
   );
   return MLN_STATUS_UNSUPPORTED;
+#elif defined(__EMSCRIPTEN__)
+  // emscripten_fetch is XHR-backed and follows redirects itself, so a
+  // transformed header has no point at which it can be dropped when the origin
+  // changes. Reaching for fetch() with redirect: "manual" does not help either,
+  // because a cross-origin manual redirect is an opaque response whose Location
+  // cannot be read. A resource provider serves these requests instead, and the
+  // host that owns the credential then owns the redirect policy.
+  set_thread_error(
+    "HTTP header transforms are unsupported in the browser because "
+    "emscripten_fetch follows redirects itself and cannot drop transformed "
+    "headers when the origin changes; serve the request with "
+    "mln_runtime_set_resource_provider() instead"
+  );
+  return MLN_STATUS_UNSUPPORTED;
 #endif
 
   auto& state = *live->http_header_transform_state;

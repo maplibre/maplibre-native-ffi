@@ -50,6 +50,7 @@ namespace Maplibre.Native.Internal.C
     {
         MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL = 1U << 0,
         MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL = 1U << 1,
+        MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL = 1U << 2,
     }
 
     [NativeTypeName("uint32_t")]
@@ -58,6 +59,7 @@ namespace Maplibre.Native.Internal.C
         MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED = 0U,
         MLN_OPENGL_CONTEXT_PLATFORM_WGL = 1U,
         MLN_OPENGL_CONTEXT_PLATFORM_EGL = 2U,
+        MLN_OPENGL_CONTEXT_PLATFORM_WEBGL = 3U,
     }
 
     internal unsafe partial struct mln_wgl_context_descriptor
@@ -86,6 +88,15 @@ namespace Maplibre.Native.Internal.C
         public void* get_proc_address;
     }
 
+    internal partial struct mln_webgl_context_descriptor
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        [NativeTypeName("int32_t")]
+        public int context;
+    }
+
     internal partial struct mln_opengl_context_descriptor
     {
         [NativeTypeName("uint32_t")]
@@ -93,7 +104,7 @@ namespace Maplibre.Native.Internal.C
 
         public mln_opengl_context_platform platform;
 
-        [NativeTypeName("__AnonymousRecord_render_target_L104_C3")]
+        [NativeTypeName("__AnonymousRecord_render_target_L120_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -104,6 +115,9 @@ namespace Maplibre.Native.Internal.C
 
             [FieldOffset(0)]
             public mln_egl_context_descriptor egl;
+
+            [FieldOffset(0)]
+            public mln_webgl_context_descriptor webgl;
         }
     }
 

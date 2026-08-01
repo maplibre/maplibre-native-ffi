@@ -26,6 +26,7 @@ from ci.workflow import (  # noqa: E402
 
 PLATFORM_LABELS = {
     "android": "Android",
+    "emscripten": "Emscripten",
     "ios": "iOS",
     "linux": "Linux",
     "macos": "macOS",
@@ -40,6 +41,7 @@ ENVIRONMENT_ORDER = [
     "macos-arm64",
     "windows-x64",
     "windows-arm64",
+    "emscripten-wasm32",
     "android-arm64",
     "android-x64",
     "ios-arm64",
@@ -75,7 +77,7 @@ def coverage_from_preset(preset: str, status: str) -> Coverage:
     return Coverage(
         platform="ios" if target_platform == "ios-simulator" else target_platform,
         arch=architecture(preset),
-        backend={"egl": "opengl", "wgl": "opengl"}.get(
+        backend={"egl": "opengl", "wgl": "opengl", "webgl": "opengl"}.get(
             backend(preset), backend(preset)
         ),
         status=status,

@@ -10978,6 +10978,15 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     public static int MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL() {
         return MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL;
     }
+    private static final int MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL = (int)4L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_opengl_context_provider_flag.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL = 4
+     * }
+     */
+    public static int MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL() {
+        return MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL;
+    }
     private static final int MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED = (int)0L;
     /**
      * {@snippet lang=c :
@@ -11004,6 +11013,15 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
      */
     public static int MLN_OPENGL_CONTEXT_PLATFORM_EGL() {
         return MLN_OPENGL_CONTEXT_PLATFORM_EGL;
+    }
+    private static final int MLN_OPENGL_CONTEXT_PLATFORM_WEBGL = (int)3L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL = 3
+     * }
+     */
+    public static int MLN_OPENGL_CONTEXT_PLATFORM_WEBGL() {
+        return MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
     }
 
     private static class mln_render_target_extent_physical_size {

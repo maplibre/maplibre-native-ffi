@@ -852,8 +852,9 @@ mln_runtime_clear_resource_transform(mln_runtime runtime) MLN_NOEXCEPT;
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, transform is
  *   null, transform->size is too small, or callback is null.
- * - MLN_STATUS_UNSUPPORTED on OpenHarmony, whose platform HTTP client cannot
- *   prevent transformed headers from following a cross-origin redirect.
+ * - MLN_STATUS_UNSUPPORTED on OpenHarmony and in the browser, whose HTTP
+ *   clients cannot prevent transformed headers from following a cross-origin
+ *   redirect. A resource provider serves those requests instead.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
