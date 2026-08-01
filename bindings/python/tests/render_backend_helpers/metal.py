@@ -156,6 +156,16 @@ class MetalBorrowedTexture:
         if texture is None:
             msg = "MTLDevice.newTextureWithDescriptor returned nil"
             raise MetalUnavailableError(msg)
+        # A new MTLTexture's contents are undefined, so clear it: a test that
+        # reads this back to prove a session rendered into it needs a known
+        # starting value.
+        blank = bytes(width * height * 4)
+        texture.replaceRegion_mipmapLevel_withBytes_bytesPerRow_(
+            Metal.MTLRegionMake2D(0, 0, width, height),
+            0,
+            blank,
+            width * 4,
+        )
         return cls(context, texture, width, height, scale_factor)
 
     def descriptor(self) -> render.MetalBorrowedTextureDescriptor:

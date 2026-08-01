@@ -460,6 +460,13 @@ class RenderSessionHandle(NativeHandleMixin):
         :class:`UnsupportedFeatureError`: allocate a texture at the new size and
         hand it over with the ``set_*_borrowed_texture_target`` method for the
         backend, which keeps this session.
+
+        This session keeps its renderer across a resize, so renderer-held state
+        such as feature state carries over. A scale factor that differs from
+        this session's current one is the exception: a renderer compiles its
+        shaders for one pixel ratio, so that resize starts a new one with
+        renderer-held state empty. The same exception applies to every
+        ``set_*_target`` method, which otherwise keeps the renderer.
         """
         self._native.resize(width, height, scale_factor)
 
@@ -483,11 +490,11 @@ class RenderSessionHandle(NativeHandleMixin):
         placement, and feature state.
 
         The descriptor names the same graphics context this session attached
-        with, and its extent applies as a resize does. A layer on a different
-        device raises :class:`InvalidArgumentError` and leaves this session
-        rendering into the surface it has, so close it and attach again to take
-        that one. The session sets the layer's pixel format itself, so there is
-        nothing else here for a replacement to mismatch.
+        with, and its extent applies as a resize does. A descriptor whose
+        ``context.device`` is neither null nor this session's device raises
+        :class:`InvalidArgumentError` and leaves this session rendering into the
+        surface it has. The session assigns the layer its own device and pixel
+        format, so the layer itself carries nothing that has to match.
         """
         self._set_target(
             self._native.set_metal_surface_target,

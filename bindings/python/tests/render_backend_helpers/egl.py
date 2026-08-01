@@ -266,6 +266,9 @@ class EglBorrowedTexture:
                 GL.GL_TEXTURE_WRAP_T,
                 GL.GL_CLAMP_TO_EDGE,
             )
+            # Zeroed rather than left undefined: a test that reads this back
+            # to prove a session rendered into it needs a known starting value.
+            blank = (ctypes.c_ubyte * (width * height * 4))()
             GL.glTexImage2D(
                 GL.GL_TEXTURE_2D,
                 0,
@@ -275,7 +278,7 @@ class EglBorrowedTexture:
                 0,
                 GL.GL_RGBA,
                 GL.GL_UNSIGNED_BYTE,
-                None,
+                blank,
             )
             GL.glBindTexture(GL.GL_TEXTURE_2D, 0)
         except BaseException:

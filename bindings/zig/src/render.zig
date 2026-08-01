@@ -465,10 +465,10 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
     /// The descriptor names the graphics context this session attached with,
     /// and its extent applies exactly as `resize` applies one, so the map
     /// publishes an update matching the new size only once pumped. A descriptor
-    /// naming another device returns `error.InvalidArgument` and leaves the
-    /// session rendering into the surface it has, so closing it and attaching
-    /// again is what takes that one. The session sets the layer's pixel format
-    /// itself, so there is nothing else here for a replacement to mismatch.
+    /// whose `context.device` is neither null nor this session's device returns
+    /// `error.InvalidArgument` and leaves the session rendering into the surface
+    /// it has. The session assigns the layer its own device and pixel format, so
+    /// the layer itself carries nothing that has to match.
     pub fn setMetalSurfaceTarget(self: *RenderSessionHandle, descriptor: MetalSurfaceDescriptor) status.Error!void {
         var raw = metalSurfaceDescriptorToNative(descriptor);
         return try setTarget(self.*, c.mln_metal_surface_set_target, &raw);

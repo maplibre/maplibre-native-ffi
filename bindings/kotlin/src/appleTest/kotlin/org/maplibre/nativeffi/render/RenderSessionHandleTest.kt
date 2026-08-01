@@ -803,7 +803,20 @@ class RenderSessionHandleTest {
         false,
       )
     descriptor.usage = MTLTextureUsageRenderTarget or MTLTextureUsageShaderRead
-    return device.newTextureWithDescriptor(descriptor) ?: error("Metal texture creation failed")
+    val texture =
+      device.newTextureWithDescriptor(descriptor) ?: error("Metal texture creation failed")
+    // A new MTLTexture's contents are undefined, so clear it: a test that reads
+    // this back to prove a session rendered into it needs a known start value.
+    val blank = ByteArray(width * height * 4)
+    blank.usePinned { pinned ->
+      texture.replaceRegion(
+        MTLRegionMake2D(0u, 0u, width.toULong(), height.toULong()),
+        0u,
+        pinned.addressOf(0),
+        (width * 4).toULong(),
+      )
+    }
+    return texture
   }
 
   // Reads a borrowed texture back to the CPU. A texture created without an

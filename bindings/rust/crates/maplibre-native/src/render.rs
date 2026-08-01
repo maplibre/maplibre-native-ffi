@@ -1281,11 +1281,11 @@ impl RenderSessionHandle {
     /// and feature state.
     ///
     /// The descriptor names the same graphics context this session attached
-    /// with, and its extent applies as a resize does. A layer on a different
-    /// device reports an invalid-argument error and leaves this session
-    /// rendering into the surface it has; close it and attach again to take
-    /// that one. The session sets the layer's pixel format itself, so there is
-    /// nothing else here for a replacement to mismatch.
+    /// with, and its extent applies as a resize does. A descriptor whose
+    /// `context.device` is neither null nor this session's device reports an
+    /// invalid-argument error and leaves this session rendering into the
+    /// surface it has. The session assigns the layer its own device and pixel
+    /// format, so the layer itself carries nothing that has to match.
     pub fn set_metal_surface_target(&self, descriptor: &MetalSurfaceDescriptor) -> Result<()> {
         self.set_target(descriptor.to_native(), |session, raw| {
             // SAFETY: session is a live render session handle owned by this

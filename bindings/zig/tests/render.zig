@@ -671,6 +671,11 @@ const EglAttachContext = if (supports_egl) struct {
         self.procs.BindTexture(gl.TEXTURE_2D, texture);
         self.procs.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
         self.procs.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        // Zeroed rather than left undefined: a test that reads this back to
+        // prove a session rendered into it needs a known starting value.
+        const blank = testing.allocator.alloc(u8, width * height * 4) catch @panic("oom");
+        defer testing.allocator.free(blank);
+        @memset(blank, 0);
         self.procs.TexImage2D(
             gl.TEXTURE_2D,
             0,
@@ -680,7 +685,7 @@ const EglAttachContext = if (supports_egl) struct {
             0,
             gl.RGBA,
             gl.UNSIGNED_BYTE,
-            null,
+            blank.ptr,
         );
         self.procs.BindTexture(gl.TEXTURE_2D, 0);
         try testing.expectEqual(@as(gl.@"enum", gl.NO_ERROR), self.procs.GetError());

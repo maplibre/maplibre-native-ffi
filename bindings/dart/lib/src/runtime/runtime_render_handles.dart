@@ -146,6 +146,13 @@ final class RenderSessionHandle {
   /// texture is sized by its owner and is rejected here: allocate one at the
   /// new size and hand it over with [setMetalBorrowedTextureTarget] or its
   /// Vulkan or OpenGL counterpart, which keeps this session.
+  ///
+  /// This session keeps its renderer across a resize, so renderer-held state
+  /// such as feature state carries over. A scale factor that differs from this
+  /// session's current one is the exception: a renderer compiles its shaders
+  /// for one pixel ratio, so that resize starts a new one with renderer-held
+  /// state empty. The same exception applies to every `setTarget` method, which
+  /// otherwise keeps the renderer.
   void resize(int width, int height, {double scaleFactor = 1}) {
     _checkNoActiveTextureFrame('resize render session');
     _check(
@@ -163,11 +170,11 @@ final class RenderSessionHandle {
   /// feature state.
   ///
   /// [descriptor] names the same graphics context this session attached with,
-  /// and its extent applies as [resize] applies one. A layer on a different
-  /// device throws an [InvalidArgumentException] and leaves this session
-  /// rendering into the surface it has, so [close] it and attach again to take
-  /// that one. The session sets the layer's pixel format itself, so there is
-  /// nothing else here for a replacement to mismatch.
+  /// and its extent applies as [resize] applies one. A descriptor whose
+  /// context device is neither null nor this session's device throws an
+  /// [InvalidArgumentException] and leaves this session rendering into the
+  /// surface it has. The session assigns the layer its own device and pixel
+  /// format, so the layer itself carries nothing that has to match.
   void setMetalSurfaceTarget(MetalSurfaceDescriptor descriptor) {
     _checkNoActiveTextureFrame('set Metal surface target');
     withNativeArena((arena) {
