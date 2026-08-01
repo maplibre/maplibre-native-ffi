@@ -10,6 +10,8 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.tasks.CInteropProcess
 import org.maplibre.nativeffi.gradle.AndroidTarget
+import org.maplibre.nativeffi.gradle.CargoPackage
+import org.maplibre.nativeffi.gradle.ExtractAarClassesJar
 import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 import org.maplibre.nativeffi.gradle.MaplibreRuntimeBackend
@@ -185,7 +187,47 @@ fun configureJvmRuntimeArtifacts(
   }
 }
 
+// The Rustls platform verifier reaches the JVM trust policy that Android TLS
+// needs. The native library calls it over JNI under a name the Rust JNI
+// descriptors hard-code, and nothing in this module references it, so it travels
+// with the library it serves rather than with any one language binding.
+fun embedRustlsPlatformVerifier() {
+  val verifierAar =
+    project(":bindings:rustls-platform-verifier-android")
+      .layout
+      .buildDirectory
+      .file("outputs/aar/rustls-platform-verifier-android-release.aar")
+  val verifierJar =
+    layout.buildDirectory.file(
+      "generated/dependencies/rustlsPlatformVerifierAndroid/rustls-platform-verifier-android.jar"
+    )
+  val extractVerifierJar =
+    tasks.register<ExtractAarClassesJar>("extractRustlsPlatformVerifierAndroidJar") {
+      dependsOn(":bindings:rustls-platform-verifier-android:bundleReleaseAar")
+      aarFile.set(verifierAar)
+      outputJar.set(verifierJar)
+    }
+
+  extensions.configure<KotlinMultiplatformExtension> {
+    sourceSets.getByName("androidMain") {
+      dependencies { implementation(files(verifierJar).builtBy(extractVerifierJar)) }
+    }
+  }
+
+  val verifierPackage = CargoPackage.directory(project, "rustls-platform-verifier")
+  tasks.withType<Zip>().configureEach {
+    if (name == "bundleAndroidMainAar") {
+      val licenseDirectory = "META-INF/licenses/rustls-platform-verifier"
+      from(verifierPackage.map { it.resolve("LICENSE-APACHE") }) { into(licenseDirectory) }
+      from(verifierPackage.map { it.resolve("LICENSE-MIT") }) { into(licenseDirectory) }
+      from(rootProject.file("patches/rustls-platform-verifier/NOTICE")) { into(licenseDirectory) }
+    }
+  }
+}
+
 fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
+  embedRustlsPlatformVerifier()
+
   val selectedBackend =
     providers.gradleProperty("maplibre.android.backend").orElse(AndroidTarget.DEFAULT_BACKEND)
   val verifyBackend =
@@ -196,7 +238,7 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
 
   tasks.configureEach {
     if (name == "preAndroidMainBuild" || name == "mergeAndroidMainJniLibFolders") {
-      dependsOn(verifyBackend, ":bindings:kotlin:packageAndroidNativeLibraries")
+      dependsOn(verifyBackend, ":bindings:kotlin:packageAndroidRuntimeLibraries")
     }
   }
 
@@ -240,8 +282,8 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
   }
 
   val licenseInstall = selectedInstalls.first()
-  // Resolve the NOTICE from the SDK Gradle selected, which is the same SDK the
-  // redistributed libc++_shared.so is taken from. Reading ANDROID_HOME directly
+  // Resolve the NOTICE from the SDK Gradle selected, which is the same SDK whose
+  // NDK supplies the statically linked libc++. Reading ANDROID_HOME directly
   // would pair the library with a notice from a different NDK whenever
   // local.properties or ANDROID_SDK_ROOT selects another SDK.
   val androidNdkVersion = requiredEnvironmentVariable("MLN_FFI_ANDROID_NDK_VERSION")
@@ -298,7 +340,6 @@ val configuredJvmTargetPlatforms =
 extensions.configure<KotlinMultiplatformExtension> {
   sourceSets.getByName("commonMain") {
     kotlin.srcDir(rootProject.file("bindings/kotlin-runtime-common/src/commonMain/kotlin"))
-    dependencies { api(project(":bindings:kotlin")) }
   }
 
   targets.withType<KotlinNativeTarget>().configureEach {

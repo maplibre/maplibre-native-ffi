@@ -56,6 +56,48 @@ mise run build linux-x64-vulkan # a specific preset
 
 The install tree lands in `build/<preset>/install` with the archive's layout.
 
+## Package an Android app
+
+Every Android app needs two things from this project, whatever language it is
+written in: the C library, and the TLS component that reaches the platform trust
+policy. The runtime AARs carry both, so one Gradle coordinate covers the
+packaging.
+
+```kotlin
+repositories {
+  maven {
+    url = uri("https://central.sonatype.com/repository/maven-snapshots/")
+    content { includeGroup("org.maplibre.nativeffi") }
+  }
+  mavenCentral()
+}
+
+dependencies {
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:$version")
+}
+```
+
+A runtime AAR holds `libmaplibre-native-c.so` for each ABI, the patched
+[`rustls-platform-verifier`](https://github.com/rustls/rustls-platform-verifier)
+helper that the native TLS stack calls over JNI, and the R8 keep rule that helper
+depends on. The library links libc++ statically, so this is the whole native
+payload. Pick the runtime matching your backend; an app packages one of them.
+
+Kotlin apps add `org.maplibre.nativeffi:maplibre-native-ffi` for the API on top.
+Hosts in other languages depend on the runtime alone and reach the library
+through their own FFI. Native code is the only caller of the TLS helper, so
+these hosts bind nothing in it: the class needs to be in the APK, and the keep
+rule arrives with it.
+
+Call `mln_android_init` once from any language with a `JNIEnv*` and an
+`android.content.Context` before creating a runtime. Android HTTP requests
+validate TLS against the app's platform trust policy from that point on.
+
+The CPack `android-*` archives hold the same library with the public headers,
+for a host that assembles its own AAR or builds the library into one. They carry
+no Java classes, so such a host also packages the helper AAR built by
+`mise run //bindings/rustls-platform-verifier-android:build`.
+
 ## Point a C project at it
 
 The public headers target C23, and the archive ships pkg-config in place of a
