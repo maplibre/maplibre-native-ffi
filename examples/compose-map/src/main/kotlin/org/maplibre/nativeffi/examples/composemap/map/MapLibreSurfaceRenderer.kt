@@ -120,6 +120,10 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
 
   fun requestRender() {
     renderRequest.set()
+    // A session applies its extent on the map's owner thread, so a resize renders nothing here
+    // until that thread picks it up. Release its parked pump rather than let the new size wait out
+    // the parking bound, which is long enough to see as a gap in the map while a window is dragged.
+    commands.wake()
     surfaceSession?.requestFrame()
   }
 
@@ -226,7 +230,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
         }
         val retargeted = existing.copy(targetKey = borrowed.targetKey)
         renderSession = retargeted
-        renderRequest.set()
+        requestRender()
         return retargeted
       }
     }
@@ -235,7 +239,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     val attached =
       AttachedRenderSession(borrowed.sessionKey, borrowed.targetKey, borrowed.attach(map))
     renderSession = attached
-    renderRequest.set()
+    requestRender()
     return attached
   }
 
