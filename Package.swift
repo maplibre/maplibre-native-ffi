@@ -1,5 +1,10 @@
 // swift-tools-version: 6.0
 
+// This manifest sits at the repository root rather than beside the sources it
+// describes, because SwiftPM resolves a package from the repository root and
+// offers no way to point at a manifest in a subdirectory. Every target names an
+// explicit path under bindings/swift/ in return.
+
 import PackageDescription
 
 let testDependencies: [Target.Dependency] = [
@@ -37,11 +42,13 @@ let products: [Product] = [
 let targets: [Target] = [
   .systemLibrary(
     name: "CMaplibreNativeC",
+    path: "bindings/swift/Sources/CMaplibreNativeC",
     pkgConfig: "maplibre-native-c"
   ),
   .target(
     name: "MaplibreNative",
     dependencies: ["CMaplibreNativeC"],
+    path: "bindings/swift/Sources/MaplibreNative",
     linkerSettings: [
       .linkedLibrary("c++", .when(platforms: [.iOS])),
       .linkedLibrary("objc", .when(platforms: [.iOS])),
@@ -60,7 +67,7 @@ let targets: [Target] = [
   .target(
     name: "MaplibreNativeTestCases",
     dependencies: testDependencies,
-    path: "Tests",
+    path: "bindings/swift/Tests",
     exclude: [
       "MaplibreNativeIOSSimulatorTests",
       "MaplibreNativeTestsHost",
@@ -70,12 +77,12 @@ let targets: [Target] = [
   .testTarget(
     name: "MaplibreNativeTests",
     dependencies: ["MaplibreNativeTestCases"],
-    path: "Tests/MaplibreNativeTestsHost"
+    path: "bindings/swift/Tests/MaplibreNativeTestsHost"
   ),
   .executableTarget(
     name: "MaplibreNativeIOSSimulatorTests",
     dependencies: ["MaplibreNativeTestCases"],
-    path: "Tests/MaplibreNativeIOSSimulatorTests"
+    path: "bindings/swift/Tests/MaplibreNativeIOSSimulatorTests"
   ),
 ]
 

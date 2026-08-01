@@ -34,7 +34,7 @@ let package = Package(
       : .executable(name: "swift-map-ios", targets: ["SwiftMapIOS"]),
   ],
   dependencies: [
-    .package(name: "maplibre-native-swift", path: "../../bindings/swift"),
+    .package(name: "maplibre-native-swift", path: "../.."),
   ],
   targets: [
     .executableTarget(
