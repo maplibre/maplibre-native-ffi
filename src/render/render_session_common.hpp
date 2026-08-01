@@ -24,12 +24,19 @@ struct mln_render_session_object;
 namespace mln::core {
 
 enum class RenderSessionKind : uint8_t { Surface, Texture };
-enum class TextureSessionApi : uint8_t { Generic, Metal, OpenGL, Vulkan };
+enum class TextureSessionApi : uint8_t {
+  Generic,
+  Metal,
+  OpenGL,
+  Vulkan,
+  WebGPU
+};
 enum class TextureSessionFrameKind : uint8_t {
   None,
   MetalOwned,
   OpenGLOwned,
-  VulkanOwned
+  VulkanOwned,
+  WebGPUOwned
 };
 enum class TextureSessionMode : uint8_t { Owned, Borrowed };
 
@@ -151,6 +158,11 @@ class TextureSessionBackend {
     );
   }
 
+  // Whether headless_backend().readStillImage() produces an image. A backend
+  // that cannot read pixels back says so here, so the C API answers
+  // UNSUPPORTED rather than reporting an empty image as a native error.
+  [[nodiscard]] virtual auto supports_readback() const -> bool { return true; }
+
   virtual void prepare_render_resources() {}
   virtual auto after_render(
     mln_render_session_object& session, bool& out_rendered
@@ -170,6 +182,14 @@ class TextureSessionBackend {
   virtual auto acquire_opengl_owned_frame(
     const mln_render_session_object& session,
     mln_opengl_owned_texture_frame& out_frame
+  ) -> mln_status {
+    (void)session;
+    (void)out_frame;
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  virtual auto acquire_webgpu_owned_frame(
+    const mln_render_session_object& session,
+    mln_webgpu_owned_texture_frame& out_frame
   ) -> mln_status {
     (void)session;
     (void)out_frame;

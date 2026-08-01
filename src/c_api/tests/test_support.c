@@ -55,6 +55,10 @@ EM_JS(void, mln_test_unregister_offscreen_canvas, (const char* name), {
 #include <vulkan/vulkan.h>
 #endif
 
+#if defined(MLN_TEST_BACKEND_WEBGPU)
+#include <webgpu/webgpu.h>
+#endif
+
 // Per-thread record of the handles these helpers created. A failing assertion
 // longjmps out of the test body, so the test's own teardown never runs and the
 // handles it holds would otherwise stay live: the next test on this thread
@@ -479,6 +483,125 @@ static void destroy_backend_state(void* opaque_state) {
   free(state);
 }
 
+#elif defined(MLN_TEST_BACKEND_WEBGPU)
+
+typedef struct webgpu_state {
+  WGPUInstance instance;
+  WGPUAdapter adapter;
+  WGPUDevice device;
+} webgpu_state;
+
+// A host owns the WebGPU device, so the suite stands in for one and requests
+// its own. Adapter and device requests are futures; the suite runs on a worker,
+// where waiting on them is legal, so this blocks rather than unwinding the test
+// into a callback.
+static bool await_future(WGPUInstance instance, WGPUFuture future) {
+  // Bounded, so a browser without a WebGPU adapter fails the fixture rather
+  // than hanging the suite until the runner's timeout.
+  const uint64_t timeout_ns = UINT64_C(30) * 1000U * 1000U * 1000U;
+  WGPUFutureWaitInfo wait = {.future = future, .completed = false};
+  return wgpuInstanceWaitAny(instance, 1, &wait, timeout_ns) ==
+           WGPUWaitStatus_Success &&
+         wait.completed;
+}
+
+static void on_adapter(
+  WGPURequestAdapterStatus status, WGPUAdapter adapter, WGPUStringView message,
+  void* user_data, void* unused
+) {
+  (void)message;
+  (void)unused;
+  if (status == WGPURequestAdapterStatus_Success) {
+    *(WGPUAdapter*)user_data = adapter;
+  }
+}
+
+static void on_device(
+  WGPURequestDeviceStatus status, WGPUDevice device, WGPUStringView message,
+  void* user_data, void* unused
+) {
+  (void)message;
+  (void)unused;
+  if (status == WGPURequestDeviceStatus_Success) {
+    *(WGPUDevice*)user_data = device;
+  }
+}
+
+static bool create_backend_state(void** out_state, void* out_context) {
+  webgpu_state* state = calloc(1, sizeof(*state));
+  if (state == NULL) {
+    return false;
+  }
+
+  WGPUInstanceDescriptor instance_descriptor = {0};
+  state->instance = wgpuCreateInstance(&instance_descriptor);
+  if (state->instance == NULL) {
+    free(state);
+    return false;
+  }
+
+  WGPURequestAdapterOptions adapter_options = {0};
+  WGPURequestAdapterCallbackInfo adapter_info = {
+    .mode = WGPUCallbackMode_AllowProcessEvents,
+    .callback = on_adapter,
+    .userdata1 = &state->adapter,
+  };
+  if (
+    !await_future(
+      state->instance, wgpuInstanceRequestAdapter(
+                         state->instance, &adapter_options, adapter_info
+                       )
+    ) ||
+    state->adapter == NULL
+  ) {
+    fprintf(stderr, "requesting a WebGPU adapter failed\n");
+    wgpuInstanceRelease(state->instance);
+    free(state);
+    return false;
+  }
+
+  WGPUDeviceDescriptor device_descriptor = {0};
+  WGPURequestDeviceCallbackInfo device_info = {
+    .mode = WGPUCallbackMode_AllowProcessEvents,
+    .callback = on_device,
+    .userdata1 = &state->device,
+  };
+  if (
+    !await_future(
+      state->instance,
+      wgpuAdapterRequestDevice(state->adapter, &device_descriptor, device_info)
+    ) ||
+    state->device == NULL
+  ) {
+    fprintf(stderr, "requesting a WebGPU device failed\n");
+    wgpuAdapterRelease(state->adapter);
+    wgpuInstanceRelease(state->instance);
+    free(state);
+    return false;
+  }
+
+  *(mln_webgpu_context_descriptor*)out_context =
+    (mln_webgpu_context_descriptor){
+      .size = sizeof(mln_webgpu_context_descriptor),
+      .instance = state->instance,
+      .device = state->device,
+      .queue = NULL,
+    };
+  *out_state = state;
+  return true;
+}
+
+static void destroy_backend_state(void* opaque_state) {
+  webgpu_state* state = opaque_state;
+  if (state == NULL) {
+    return;
+  }
+  wgpuDeviceRelease(state->device);
+  wgpuAdapterRelease(state->adapter);
+  wgpuInstanceRelease(state->instance);
+  free(state);
+}
+
 #elif defined(MLN_TEST_BACKEND_OPENGL) && defined(MLN_TEST_OPENGL_WEBGL)
 
 typedef struct webgl_state {
@@ -879,6 +1002,13 @@ bool mln_test_render_fixture_create(
   }
   mln_vulkan_owned_texture_descriptor descriptor =
     mln_vulkan_owned_texture_descriptor_default();
+#elif defined(MLN_TEST_BACKEND_WEBGPU)
+  mln_webgpu_context_descriptor context = {0};
+  if (!create_backend_state(&fixture->backend_state, &context)) {
+    return false;
+  }
+  mln_webgpu_owned_texture_descriptor descriptor =
+    mln_webgpu_owned_texture_descriptor_default();
 #endif
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
@@ -892,6 +1022,9 @@ bool mln_test_render_fixture_create(
 #elif defined(MLN_TEST_BACKEND_VULKAN)
   const mln_status status =
     mln_vulkan_owned_texture_attach(map, &descriptor, &fixture->session);
+#elif defined(MLN_TEST_BACKEND_WEBGPU)
+  const mln_status status =
+    mln_webgpu_owned_texture_attach(map, &descriptor, &fixture->session);
 #endif
   if (status != MLN_STATUS_OK || fixture->session == MLN_HANDLE_NULL) {
     destroy_backend_state(fixture->backend_state);

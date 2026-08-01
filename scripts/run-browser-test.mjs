@@ -145,6 +145,10 @@ const child = spawn(
     // The suite renders through WebGL2, which a runner without a GPU can only
     // provide in software.
     "--enable-unsafe-swiftshader",
+    // WebGPU needs its adapter chosen separately; SwiftShader is the software
+    // one, and it is behind the unsafe-webgpu flag on a runner with no GPU.
+    "--enable-unsafe-webgpu",
+    "--use-webgpu-adapter=swiftshader",
     // Chromium's own logging carries the page console, so a run that hangs
     // still shows how far the suite got instead of only reporting the timeout.
     "--enable-logging=stderr",

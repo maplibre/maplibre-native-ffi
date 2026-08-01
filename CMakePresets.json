@@ -155,6 +155,11 @@
       "cacheVariables": { "MLN_FFI_RENDER_BACKEND": "vulkan" }
     },
     {
+      "name": "_webgpu",
+      "hidden": true,
+      "cacheVariables": { "MLN_FFI_RENDER_BACKEND": "webgpu" }
+    },
+    {
       "name": "_webgl",
       "hidden": true,
       "cacheVariables": {
@@ -186,6 +191,11 @@
       "name": "emscripten-wasm32-webgl",
       "displayName": "Browser WASM32 WebGL",
       "inherits": ["_emscripten-wasm32", "_webgl"]
+    },
+    {
+      "name": "browser-wasm32-webgpu",
+      "displayName": "Browser WASM32 WebGPU",
+      "inherits": ["_browser-wasm32", "_webgpu"]
     },
     {
       "name": "macos-arm64-metal",
@@ -269,6 +279,11 @@
     {
       "name": "emscripten-wasm32-webgl",
       "configurePreset": "emscripten-wasm32-webgl",
+      "jobs": 0
+    },
+    {
+      "name": "browser-wasm32-webgpu",
+      "configurePreset": "browser-wasm32-webgpu",
       "jobs": 0
     },
     {
@@ -403,6 +418,11 @@
     {
       "name": "emscripten-wasm32-webgl",
       "configurePreset": "emscripten-wasm32-webgl",
+      "inherits": "_test-base"
+    },
+    {
+      "name": "browser-wasm32-webgpu",
+      "configurePreset": "browser-wasm32-webgpu",
       "inherits": "_test-base"
     },
     {
@@ -580,6 +600,13 @@
       "steps": [
         { "type": "configure", "name": "emscripten-wasm32-webgl" },
         { "type": "build", "name": "emscripten-wasm32-webgl" }
+      ]
+    },
+    {
+      "name": "browser-wasm32-webgpu",
+      "steps": [
+        { "type": "configure", "name": "browser-wasm32-webgpu" },
+        { "type": "build", "name": "browser-wasm32-webgpu" }
       ]
     },
     {

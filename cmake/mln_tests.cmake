@@ -197,6 +197,10 @@ function(mln_add_c_api_test)
     target_compile_definitions(
       mln_c_api_tests
       PRIVATE MLN_TEST_BACKEND_VULKAN=1)
+  elseif(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
+    target_compile_definitions(
+      mln_c_api_tests
+      PRIVATE MLN_TEST_BACKEND_WEBGPU=1)
   endif()
 
   if(NOT WIN32)
