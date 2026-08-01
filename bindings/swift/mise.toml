@@ -5,8 +5,10 @@
 # explains why; the tasks below source it.
 "conda:libxml2" = { version = "{{vars.libxml2_version}}", os = ["linux/x64"] }
 
+# The manifest lives at the repository root, so SwiftPM runs from there.
 [tasks.api]
 description = "Generate DocC HTML API reference for the Swift binding."
+dir = "../.."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
@@ -25,6 +27,7 @@ swift package --scratch-path ".build/$usage_preset" \
 '''
 
 [tasks.build]
+dir = "../.."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
@@ -37,6 +40,7 @@ swift build --target MaplibreNative "${swift_args[@]}"
 '''
 
 [tasks.test]
+dir = "../.."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 run = '''
@@ -51,6 +55,7 @@ swift package describe --type json >/dev/null
 '''
 
 [tasks."build:ios-simulator"]
+dir = "../.."
 depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/ios-simulator-arm64-metal/install"
@@ -69,6 +74,7 @@ PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CO
 '''
 
 [tasks."build:ios"]
+dir = "../.."
 depends = [{ task = "//:build", args = ["ios-arm64-metal"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/ios-arm64-metal/install"

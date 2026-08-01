@@ -74,7 +74,7 @@ depends = ["//bindings/swift:api"]
 run = '''
 rm -rf public/reference/swift
 mkdir -p public/reference
-cp -a ../bindings/swift/build/docc/. public/reference/swift/
+cp -a ../build/docc/. public/reference/swift/
 '''
 
 [tasks.api]
