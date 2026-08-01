@@ -137,6 +137,8 @@ struct RuntimeObject {
   // This runtime's own handle, so internal helpers holding the object can
   // reach the id without a reverse lookup.
   mln_runtime self = MLN_HANDLE_NULL;
+  // The token this runtime hands to mbgl as its opaque platform context.
+  void* platform_context = nullptr;
   std::thread::id owner_thread;
   std::unique_ptr<mbgl::util::RunLoop> run_loop;
   std::string asset_path;
