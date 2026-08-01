@@ -47,6 +47,37 @@ auto validate_borrowed_texture(
   return MLN_STATUS_OK;
 }
 
+class MetalTextureSessionBackend final
+    : public mln::core::TextureSessionBackend {
+ public:
+  MetalTextureSessionBackend(MTL::Device* host_device, mbgl::Size size)
+      : backend_(host_device, size) {}
+
+  MetalTextureSessionBackend(MTL::Texture* borrowed_texture, mbgl::Size size)
+      : backend_(borrowed_texture, size) {}
+
+  auto headless_backend() -> mbgl::gfx::HeadlessBackend& override {
+    return backend_;
+  }
+
+  auto after_render(mln_render_session_object& texture, bool& out_rendered)
+    -> mln_status override {
+    auto* rendered_texture = backend_.metal_texture();
+    if (rendered_texture == nullptr) {
+      // The Metal backend creates its texture on the first real draw; a
+      // renderer pass can complete without one before content is ready.
+      out_rendered = false;
+      return MLN_STATUS_OK;
+    }
+    texture.texture.rendered_native_texture = rendered_texture;
+    out_rendered = true;
+    return MLN_STATUS_OK;
+  }
+
+ private:
+  mln::core::MetalTextureBackend backend_;
+};
+
 auto fill_frame(
   mln_render_session_object* texture, mln_metal_owned_texture_frame* out_frame
 ) -> mln_status {
