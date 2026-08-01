@@ -3,3 +3,10 @@
 	url = https://github.com/maplibre/maplibre-native.git
 	shallow = true
 	ignore = dirty
+	# Cargo and SwiftPM fetch a git dependency's submodules recursively and
+	# without the path filtering .mise/bin/sync-submodules applies, so a git
+	# dependency on this repository would pull the whole MapLibre Native tree.
+	# Both honour this key and skip the submodule instead. Nothing reaches the
+	# nested vendor submodules once the top level is skipped, so this one entry
+	# covers them. sync-submodules passes --checkout to opt back in.
+	update = none
