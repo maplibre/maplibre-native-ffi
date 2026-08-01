@@ -28,6 +28,7 @@ int main(void) {
   run_map_options_abi_tests();
   run_render_backend_abi_tests();
   run_owned_texture_abi_tests();
+  run_render_target_lifecycle_abi_tests();
   run_render_thread_abi_tests();
   run_query_abi_tests();
   run_mlt_decode_abi_tests();

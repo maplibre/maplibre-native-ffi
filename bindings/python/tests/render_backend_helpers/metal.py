@@ -156,6 +156,16 @@ class MetalBorrowedTexture:
         if texture is None:
             msg = "MTLDevice.newTextureWithDescriptor returned nil"
             raise MetalUnavailableError(msg)
+        # A new MTLTexture's contents are undefined, so clear it: a test that
+        # reads this back to prove a session rendered into it needs a known
+        # starting value.
+        blank = bytes(width * height * 4)
+        texture.replaceRegion_mipmapLevel_withBytes_bytesPerRow_(
+            Metal.MTLRegionMake2D(0, 0, width, height),
+            0,
+            blank,
+            width * 4,
+        )
         return cls(context, texture, width, height, scale_factor)
 
     def descriptor(self) -> render.MetalBorrowedTextureDescriptor:
@@ -169,6 +179,28 @@ class MetalBorrowedTexture:
             physical_height=self.height,
             texture=_pointer(self.texture, "MTLTexture"),
         )
+
+    def read_rgba(self) -> bytes:
+        queue = self.context.device.newCommandQueue()
+        if queue is None:
+            msg = "MTLDevice.newCommandQueue returned nil"
+            raise MetalUnavailableError(msg)
+        command_buffer = queue.commandBuffer()
+        encoder = command_buffer.blitCommandEncoder()
+        # A texture created without an explicit storage mode is managed on
+        # macOS, so its CPU copy stays stale until a blit synchronizes it.
+        encoder.synchronizeResource_(self.texture)
+        encoder.endEncoding()
+        command_buffer.commit()
+        command_buffer.waitUntilCompleted()
+        pixels = bytearray(self.width * self.height * 4)
+        self.texture.getBytes_bytesPerRow_fromRegion_mipmapLevel_(
+            pixels,
+            self.width * 4,
+            Metal.MTLRegionMake2D(0, 0, self.width, self.height),
+            0,
+        )
+        return bytes(pixels)
 
     def exists(self) -> bool:
         return not self._closed and self.texture is not None

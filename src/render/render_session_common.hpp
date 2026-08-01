@@ -14,6 +14,7 @@
 #include <mbgl/gfx/headless_backend.hpp>
 #include <mbgl/gfx/renderer_backend.hpp>
 #include <mbgl/renderer/renderer.hpp>
+#include <mbgl/util/size.hpp>
 
 #include "diagnostics/diagnostics.hpp"
 #include "maplibre_native_c.h"
@@ -32,6 +33,25 @@ enum class TextureSessionFrameKind : uint8_t {
 };
 enum class TextureSessionMode : uint8_t { Owned, Borrowed };
 
+// A replacement target that the session's compiled GPU state cannot serve is
+// refused rather than accepted with a rebuild.
+//
+// The state in question is not all owned by the renderer. mbgl's Vulkan
+// pipeline cache lives in the renderer's shader registry, but the Metal context
+// caches a clip-mask pipeline keyed only on the renderable's address, and both
+// backends compile shader variants against properties of the target. Retiring
+// the renderer would leave the context's share of that behind, so a target that
+// does not match what is already compiled is reported as unsupported and the
+// host destroys the session and attaches again, which rebuilds all of it.
+//
+// Backends check this before they touch anything, so a refusal leaves the
+// session rendering into the target it already had.
+
+// Reports a target replacement the backend does not implement. Every backend
+// serves exactly one descriptor kind, and the session checks that before
+// dispatching, so reaching a default is a mismatch the caller can fix.
+auto unsupported_retarget(const char* message) -> mln_status;
+
 class SurfaceSessionBackend {
  public:
   SurfaceSessionBackend() = default;
@@ -44,6 +64,34 @@ class SurfaceSessionBackend {
 
   virtual auto renderer_backend() -> mbgl::gfx::RendererBackend& = 0;
   virtual void resize(uint32_t physical_width, uint32_t physical_height) = 0;
+
+  // Presents through a new host surface, keeping the graphics context and every
+  // resource the renderer holds against it. The descriptor names the same
+  // context as the one this session attached with; a backend rejects anything
+  // else, because a context change is what destroy-and-attach is for.
+  virtual auto set_metal_target(const mln_metal_surface_descriptor& descriptor)
+    -> mln_status {
+    (void)descriptor;
+    return unsupported_retarget(
+      "session does not render through a Metal surface"
+    );
+  }
+  virtual auto set_vulkan_target(
+    const mln_vulkan_surface_descriptor& descriptor
+  ) -> mln_status {
+    (void)descriptor;
+    return unsupported_retarget(
+      "session does not render through a Vulkan surface"
+    );
+  }
+  virtual auto set_opengl_target(
+    const mln_opengl_surface_descriptor& descriptor
+  ) -> mln_status {
+    (void)descriptor;
+    return unsupported_retarget(
+      "session does not render through an OpenGL surface"
+    );
+  }
 };
 
 class TextureSessionBackend {
@@ -60,6 +108,41 @@ class TextureSessionBackend {
   virtual auto renderer_backend() -> mbgl::gfx::RendererBackend* {
     return headless_backend().getRendererBackend();
   }
+  // Follows a new physical size. The default drops the renderable resource and
+  // rebuilds it lazily, which suits backends that cache nothing across it. A
+  // backend whose renderer keys cached GPU state on part of that resource
+  // overrides this to rebuild only what the size actually changed.
+  virtual void resize(mbgl::Size size) { headless_backend().setSize(size); }
+
+  // Renders into a new caller-owned texture, keeping the graphics context and
+  // every resource the renderer holds against it. The descriptor names the same
+  // context as the one this session attached with; a backend rejects anything
+  // else, because a context change is what destroy-and-attach is for.
+  virtual auto set_metal_borrowed_target(
+    const mln_metal_borrowed_texture_descriptor& descriptor
+  ) -> mln_status {
+    (void)descriptor;
+    return unsupported_retarget(
+      "session does not render into a caller-owned Metal texture"
+    );
+  }
+  virtual auto set_vulkan_borrowed_target(
+    const mln_vulkan_borrowed_texture_descriptor& descriptor
+  ) -> mln_status {
+    (void)descriptor;
+    return unsupported_retarget(
+      "session does not render into a caller-owned Vulkan image"
+    );
+  }
+  virtual auto set_opengl_borrowed_target(
+    const mln_opengl_borrowed_texture_descriptor& descriptor
+  ) -> mln_status {
+    (void)descriptor;
+    return unsupported_retarget(
+      "session does not render into a caller-owned OpenGL texture"
+    );
+  }
+
   virtual void prepare_render_resources() {}
   virtual auto after_render(
     mln_render_session_object& session, bool& out_rendered
@@ -349,6 +432,33 @@ auto validate_opengl_context(
   const mln_opengl_context_descriptor& context, bool require_supported_provider
 ) -> mln_status;
 
+// Whether two Vulkan context descriptors name the same device and queue, which
+// is what lets a session keep every resource the renderer allocated on it
+// across a target replacement.
+auto vulkan_context_matches(
+  const mln_vulkan_context_descriptor& lhs,
+  const mln_vulkan_context_descriptor& rhs
+) -> bool;
+
+// How strictly two OpenGL context descriptors have to agree for a session to
+// keep its own context — and every object the renderer holds in it — across a
+// target replacement.
+//
+// A surface target carries its own drawable, so only the share group has to
+// match: WGL makes the session's context current against whichever HDC the
+// target names, and a recreated window brings a new one. A texture target
+// carries no drawable, so the session keeps making its context current against
+// the handles it attached with, and those have to be the same ones.
+enum class OpenGLContextMatch : uint8_t { ShareGroup, Exact };
+
+// Whether two OpenGL context descriptors name the same host context. The
+// proc-address loader is left out either way: it is a way to reach a context,
+// not part of its identity.
+auto opengl_context_matches(
+  const mln_opengl_context_descriptor& lhs,
+  const mln_opengl_context_descriptor& rhs, OpenGLContextMatch strictness
+) -> bool;
+
 inline auto set_session_extent(
   mln_render_session_object& session, const mln_render_target_extent& extent
 ) -> void {
@@ -410,6 +520,48 @@ auto attach_render_session(
 auto render_session_resize(
   mln_render_session session, uint32_t width, uint32_t height,
   double scale_factor
+) -> mln_status;
+
+enum class RetargetTargetKind : uint8_t { Surface, BorrowedTexture };
+
+// Checks that a session can take a replacement target of this kind, before any
+// descriptor is looked at.
+//
+// Entry points call this first so a retired handle, a foreign thread, or a
+// session of the wrong kind reports what it is, rather than whatever the
+// descriptor happened to be missing. This runs even in builds whose answer is
+// "that backend is not compiled in", so the status a caller gets does not
+// depend on which failure the build happens to notice first.
+auto validate_render_session_retarget(
+  mln_render_session session, RetargetTargetKind kind,
+  mln_render_session_object*& out_session
+) -> mln_status;
+
+// Hands a validated descriptor to the session's backend.
+using RenderTargetReplacer =
+  std::function<mln_status(mln_render_session_object&)>;
+
+// Shared body behind every set-target entry point.
+//
+// Checks that the session is live, attached, owned by this thread, and of the
+// kind the descriptor targets, then calls `replace` to hand the descriptor to
+// the backend. On success the session takes the new extent, the map is resized
+// to match, and the renderer is kept unless the scale factor changed or the
+// backend reported that it rebuilt state the renderer caches against.
+//
+// The per-backend entry point validates its own descriptor first, including
+// that the graphics context is the one the session attached with.
+auto render_session_set_target(
+  mln_render_session session, RetargetTargetKind kind,
+  const mln_render_target_extent& extent, uint32_t physical_width,
+  uint32_t physical_height, const RenderTargetReplacer& replace
+) -> mln_status;
+
+// render_session_set_target() for a surface, whose physical size follows from
+// its logical extent rather than being stated by the caller.
+auto surface_session_set_target(
+  mln_render_session session, const mln_render_target_extent& extent,
+  const RenderTargetReplacer& replace
 ) -> mln_status;
 auto render_session_render_update(
   mln_render_session session, bool* out_rendered

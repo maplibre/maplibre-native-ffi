@@ -25,17 +25,19 @@ extern "C" {
  *
  * Surface and session-owned texture sessions resize in place. Caller-owned
  * borrowed texture targets return MLN_STATUS_UNSUPPORTED because the texture is
- * sized by its owner; follow a host whose target changed by destroying the
- * session with mln_render_session_destroy() (or releasing the map slot with
- * mln_render_session_detach()), recreating the texture, and attaching a new
- * session. A map holds at most one attached session, so detach or destroy the
- * old session before attaching the replacement.
+ * sized by its owner; a host that reallocates one hands the replacement over
+ * with the mln_*_borrowed_texture_set_target() function for its backend, which
+ * keeps the session alive and, under the conditions stated there, its renderer.
+ * See texture.h.
  *
- * Resizing discards the session renderer, which is rebuilt on the next
- * mln_render_session_render_update(). Renderer-held state, including feature
- * state set through mln_render_session_set_feature_state(), does not survive.
- * Map state such as camera, style, and sources lives on the map and survives
- * both resize and reattach.
+ * The session renderer survives a resize, carrying the tile pyramid, glyph and
+ * image atlases, symbol placement, and feature state set through
+ * mln_render_session_set_feature_state() across to the new size. A scale_factor
+ * that differs from the session's current value is the exception: a renderer
+ * compiles its shaders for a fixed pixel ratio, so that resize retires the
+ * renderer, the next mln_render_session_render_update() builds a replacement,
+ * and renderer-held state starts empty. Map state such as camera, style, and
+ * sources lives on the map and survives either way.
  *
  * Passing a scale_factor that differs from the map's mln_map_options
  * scale_factor logs a warning; see mln_map_options.

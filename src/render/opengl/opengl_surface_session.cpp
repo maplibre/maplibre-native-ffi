@@ -78,13 +78,19 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   }
 
   void destroy_backend() {
-    auto cleanup = [this] {
-      resource.reset();
-      context.reset();
-    };
     if (has_native_context()) {
-      auto guard = mbgl::gfx::BackendScope{*this};
-      cleanup();
+      // Making the surface current can fail, and set_target lets a host install
+      // a surface that only turns out to be unusable later, so this is
+      // reachable. Run the GL teardown against whatever can be made current,
+      // but release the context itself either way: skipping it would leak the
+      // HGLRC or EGLContext for a session the host has already destroyed.
+      try {
+        cleanup_while_current();
+      } catch (...) {
+        getThreadPool().runRenderJobs(true);
+        destroy_native_context();
+        throw;
+      }
     } else {
       cleanup();
     }
@@ -92,11 +98,72 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
     destroy_native_context();
   }
 
+  void cleanup() {
+    resource.reset();
+    context.reset();
+  }
+
+  // Runs GL teardown with this session's context current, through the surface
+  // it presents to or, when that cannot be made current, through the drawable
+  // the context itself was created from. The second try is what keeps the
+  // deletes reachable: this context is created in the host's share group, so
+  // the textures, buffers, and programs the renderer built there outlive it and
+  // stay allocated until something in the group deletes them.
+  void cleanup_while_current() {
+    try {
+      auto guard = mbgl::gfx::BackendScope{*this};
+      cleanup();
+      return;
+    } catch (...) {  // NOLINT(bugprone-empty-catch)
+      // Fall through to the drawable the context was created from.
+    }
+    fallback_drawable_ = true;
+    try {
+      auto guard = mbgl::gfx::BackendScope{*this};
+      cleanup();
+    } catch (...) {
+      // Nothing can be made current, so no GL call is safe from here. Give up
+      // the renderable resource and the mbgl context without running their
+      // teardown: destroying either issues the deletes it has queued, and after
+      // destroy_native_context() those land on whatever context is current
+      // instead. What they name is left to the host's share group.
+      static_cast<void>(resource.release());
+      static_cast<void>(context.release());
+      throw;
+    }
+  }
+
   auto getDefaultRenderable() -> mbgl::gfx::Renderable& override {
     return *this;
   }
 
   void resize(mbgl::Size size_) { size = size_; }
+
+  // Presents through a different host surface from here on. Nothing is touched
+  // now: the session's own context stays as it is, holding every object the
+  // renderer built in it, and activate() makes the new surface current on the
+  // next render. That deliberately never reaches for the outgoing surface,
+  // which a host may already have destroyed — the case this exists for.
+  void set_surface(const mln_opengl_surface_descriptor& descriptor) {
+    // The surface alone. The context descriptor stays as it was at attach: this
+    // session's own GL context was created from it, WGL context creation still
+    // reads its device_context, and context identity is what the caller was
+    // told cannot change here.
+    descriptor_.surface = descriptor.surface;
+    size = mbgl::Size{
+      mln::core::physical_dimension(
+        descriptor.extent.width, descriptor.extent.scale_factor
+      ),
+      mln::core::physical_dimension(
+        descriptor.extent.height, descriptor.extent.scale_factor
+      )
+    };
+  }
+
+  [[nodiscard]] auto context_descriptor() const
+    -> const mln_opengl_context_descriptor& {
+    return descriptor_.context;
+  }
 
   void updateAssumedState() override {
     assumeFramebufferBinding(0);
@@ -175,11 +242,12 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
       if (render_context_ == nullptr) {
         create_wgl_context();
       }
+      auto* const draw_surface =
+        fallback_drawable_
+          ? static_cast<HDC>(descriptor_.context.data.wgl.device_context)
+          : static_cast<HDC>(descriptor_.surface);
       if (
-        wglMakeCurrent(
-          static_cast<HDC>(descriptor_.surface),
-          static_cast<HGLRC>(render_context_)
-        ) == 0
+        wglMakeCurrent(draw_surface, static_cast<HGLRC>(render_context_)) == 0
       ) {
         throw std::runtime_error("Switching OpenGL WGL context failed");
       }
@@ -197,9 +265,13 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
     if (!egl_context_) {
       egl_context_.emplace(descriptor_.context.data.egl);
     }
-    egl_context_->activate_surface(
-      static_cast<EGLSurface>(descriptor_.surface)
-    );
+    if (fallback_drawable_) {
+      egl_context_->activate_pbuffer();
+    } else {
+      egl_context_->activate_surface(
+        static_cast<EGLSurface>(descriptor_.surface)
+      );
+    }
 #else
     throw std::runtime_error("OpenGL context provider is unsupported");
 #endif
@@ -253,6 +325,9 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
 #endif
 
   mln_opengl_surface_descriptor descriptor_{};
+  // Set once teardown has found the session's surface unusable, so activate()
+  // reaches for the drawable the context was created from instead.
+  bool fallback_drawable_ = false;
 
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
   void* render_context_ = nullptr;
@@ -277,6 +352,21 @@ class OpenGLSurfaceSessionBackend final
 
   void resize(uint32_t physical_width, uint32_t physical_height) override {
     backend_.resize(mbgl::Size{physical_width, physical_height});
+  }
+
+  auto set_opengl_target(const mln_opengl_surface_descriptor& descriptor)
+    -> mln_status override {
+    if (!mln::core::opengl_context_matches(
+          backend_.context_descriptor(), descriptor.context,
+          mln::core::OpenGLContextMatch::ShareGroup
+        )) {
+      mln::core::set_thread_error(
+        "OpenGL surface target must name the context this session attached with"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    backend_.set_surface(descriptor);
+    return MLN_STATUS_OK;
   }
 
  private:
@@ -328,6 +418,29 @@ auto opengl_surface_attach(
       .null_session = "surface session must not be null",
       .null_output = "out_session must not be null",
       .non_null_output = "out_session must point to a null handle"
+    }
+  );
+}
+
+auto opengl_surface_set_target(
+  mln_render_session session, const mln_opengl_surface_descriptor* descriptor
+) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto session_status = validate_render_session_retarget(
+    session, RetargetTargetKind::Surface, live
+  );
+  if (session_status != MLN_STATUS_OK) {
+    return session_status;
+  }
+  const auto descriptor_status =
+    validate_opengl_surface_descriptor(descriptor, true);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  return surface_session_set_target(
+    session, descriptor->extent,
+    [descriptor](mln_render_session_object& target_session) -> mln_status {
+      return target_session.surface.backend->set_opengl_target(*descriptor);
     }
   );
 }

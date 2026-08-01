@@ -121,6 +121,33 @@ auto mln_opengl_borrowed_texture_attach(
   });
 }
 
+auto mln_metal_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_metal_borrowed_texture_descriptor* descriptor
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::metal_borrowed_texture_set_target(session, descriptor);
+  });
+}
+
+auto mln_vulkan_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_vulkan_borrowed_texture_descriptor* descriptor
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::vulkan_borrowed_texture_set_target(session, descriptor);
+  });
+}
+
+auto mln_opengl_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_opengl_borrowed_texture_descriptor* descriptor
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::opengl_borrowed_texture_set_target(session, descriptor);
+  });
+}
+
 auto mln_texture_read_premultiplied_rgba8(
   mln_render_session session, uint8_t* out_data, size_t out_data_capacity,
   mln_texture_image_info* out_info

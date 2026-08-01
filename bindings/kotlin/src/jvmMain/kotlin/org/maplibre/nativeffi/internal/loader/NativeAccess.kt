@@ -2014,6 +2014,72 @@ internal object NativeAccess {
     )
   }
 
+  internal fun setMetalSurfaceTarget(
+    session: NativeRenderSession,
+    descriptor: MetalSurfaceDescriptor,
+  ) {
+    setRenderSessionTarget(
+      session,
+      "mln_metal_surface_set_target",
+      metalSurfaceDescriptor(descriptor),
+    )
+  }
+
+  internal fun setVulkanSurfaceTarget(
+    session: NativeRenderSession,
+    descriptor: VulkanSurfaceDescriptor,
+  ) {
+    setRenderSessionTarget(
+      session,
+      "mln_vulkan_surface_set_target",
+      vulkanSurfaceDescriptor(descriptor),
+    )
+  }
+
+  internal fun setOpenGLSurfaceTarget(
+    session: NativeRenderSession,
+    descriptor: OpenGLSurfaceDescriptor,
+  ) {
+    setRenderSessionTarget(
+      session,
+      "mln_opengl_surface_set_target",
+      openglSurfaceDescriptor(descriptor),
+    )
+  }
+
+  internal fun setMetalBorrowedTextureTarget(
+    session: NativeRenderSession,
+    descriptor: MetalBorrowedTextureDescriptor,
+  ) {
+    setRenderSessionTarget(
+      session,
+      "mln_metal_borrowed_texture_set_target",
+      metalBorrowedTextureDescriptor(descriptor),
+    )
+  }
+
+  internal fun setVulkanBorrowedTextureTarget(
+    session: NativeRenderSession,
+    descriptor: VulkanBorrowedTextureDescriptor,
+  ) {
+    setRenderSessionTarget(
+      session,
+      "mln_vulkan_borrowed_texture_set_target",
+      vulkanBorrowedTextureDescriptor(descriptor),
+    )
+  }
+
+  internal fun setOpenGLBorrowedTextureTarget(
+    session: NativeRenderSession,
+    descriptor: OpenGLBorrowedTextureDescriptor,
+  ) {
+    setRenderSessionTarget(
+      session,
+      "mln_opengl_borrowed_texture_set_target",
+      openglBorrowedTextureDescriptor(descriptor),
+    )
+  }
+
   internal fun renderUpdate(session: NativeRenderSession): Boolean =
     Arena.ofConfined().use { arena ->
       val outRendered = arena.allocate(ValueLayout.JAVA_BOOLEAN)
@@ -2472,6 +2538,21 @@ internal object NativeAccess {
         require(!session.isNull) { "render session attach returned the null handle" }
       }
     }
+
+  // The C API borrows the replacement descriptor for the call alone, so the
+  // confined arena that materialized it closes once the call returns.
+  private fun setRenderSessionTarget(
+    session: NativeRenderSession,
+    functionName: String,
+    descriptor: (Arena) -> MemorySegment,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        renderSessionAddressStatusFunction(functionName).invokeNative(session, descriptor(arena))
+          as Int
+      )
+    }
+  }
 
   private fun metalOwnedTextureDescriptor(
     descriptor: MetalOwnedTextureDescriptor

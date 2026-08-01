@@ -17,17 +17,21 @@ import kotlinx.cinterop.toLong
 import kotlinx.cinterop.value
 import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.internal.c.mln_metal_borrowed_texture_attach
+import org.maplibre.nativeffi.internal.c.mln_metal_borrowed_texture_set_target
 import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_acquire_frame
 import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_attach
 import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_frame
 import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_release_frame
 import org.maplibre.nativeffi.internal.c.mln_metal_surface_attach
+import org.maplibre.nativeffi.internal.c.mln_metal_surface_set_target
 import org.maplibre.nativeffi.internal.c.mln_opengl_borrowed_texture_attach
+import org.maplibre.nativeffi.internal.c.mln_opengl_borrowed_texture_set_target
 import org.maplibre.nativeffi.internal.c.mln_opengl_owned_texture_acquire_frame
 import org.maplibre.nativeffi.internal.c.mln_opengl_owned_texture_attach
 import org.maplibre.nativeffi.internal.c.mln_opengl_owned_texture_frame
 import org.maplibre.nativeffi.internal.c.mln_opengl_owned_texture_release_frame
 import org.maplibre.nativeffi.internal.c.mln_opengl_surface_attach
+import org.maplibre.nativeffi.internal.c.mln_opengl_surface_set_target
 import org.maplibre.nativeffi.internal.c.mln_render_session_clear_data
 import org.maplibre.nativeffi.internal.c.mln_render_session_destroy
 import org.maplibre.nativeffi.internal.c.mln_render_session_detach
@@ -44,11 +48,13 @@ import org.maplibre.nativeffi.internal.c.mln_render_session_set_feature_state
 import org.maplibre.nativeffi.internal.c.mln_texture_image_info_default
 import org.maplibre.nativeffi.internal.c.mln_texture_read_premultiplied_rgba8
 import org.maplibre.nativeffi.internal.c.mln_vulkan_borrowed_texture_attach
+import org.maplibre.nativeffi.internal.c.mln_vulkan_borrowed_texture_set_target
 import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_acquire_frame
 import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_attach
 import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_frame
 import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_release_frame
 import org.maplibre.nativeffi.internal.c.mln_vulkan_surface_attach
+import org.maplibre.nativeffi.internal.c.mln_vulkan_surface_set_target
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
 import org.maplibre.nativeffi.internal.lifecycle.asHandle
@@ -91,6 +97,78 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         scaleFactor,
       )
     )
+  }
+
+  public actual fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor) {
+    activeFrame.ensureInactive("set target")
+    memScoped {
+      Status.check(
+        mln_metal_surface_set_target(
+          state.requireLive().rawHandleValue,
+          RenderStructs.metalSurfaceDescriptor(descriptor, this),
+        )
+      )
+    }
+  }
+
+  public actual fun setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor) {
+    activeFrame.ensureInactive("set target")
+    memScoped {
+      Status.check(
+        mln_vulkan_surface_set_target(
+          state.requireLive().rawHandleValue,
+          RenderStructs.vulkanSurfaceDescriptor(descriptor, this),
+        )
+      )
+    }
+  }
+
+  public actual fun setOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor) {
+    activeFrame.ensureInactive("set target")
+    memScoped {
+      Status.check(
+        mln_opengl_surface_set_target(
+          state.requireLive().rawHandleValue,
+          RenderStructs.openglSurfaceDescriptor(descriptor, this),
+        )
+      )
+    }
+  }
+
+  public actual fun setMetalBorrowedTextureTarget(descriptor: MetalBorrowedTextureDescriptor) {
+    activeFrame.ensureInactive("set target")
+    memScoped {
+      Status.check(
+        mln_metal_borrowed_texture_set_target(
+          state.requireLive().rawHandleValue,
+          RenderStructs.metalBorrowedTextureDescriptor(descriptor, this),
+        )
+      )
+    }
+  }
+
+  public actual fun setVulkanBorrowedTextureTarget(descriptor: VulkanBorrowedTextureDescriptor) {
+    activeFrame.ensureInactive("set target")
+    memScoped {
+      Status.check(
+        mln_vulkan_borrowed_texture_set_target(
+          state.requireLive().rawHandleValue,
+          RenderStructs.vulkanBorrowedTextureDescriptor(descriptor, this),
+        )
+      )
+    }
+  }
+
+  public actual fun setOpenGLBorrowedTextureTarget(descriptor: OpenGLBorrowedTextureDescriptor) {
+    activeFrame.ensureInactive("set target")
+    memScoped {
+      Status.check(
+        mln_opengl_borrowed_texture_set_target(
+          state.requireLive().rawHandleValue,
+          RenderStructs.openglBorrowedTextureDescriptor(descriptor, this),
+        )
+      )
+    }
   }
 
   public actual fun renderUpdate(): Boolean = memScoped {

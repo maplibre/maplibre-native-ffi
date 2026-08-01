@@ -710,13 +710,16 @@ func (session *RenderSessionHandle) markFrameReleased() {
 // Resize changes the render session target extent.
 //
 // Surface and owned-texture sessions resize in place. Borrowed texture targets
-// are sized by their owner and report an unsupported-feature error: close this
-// session, recreate the texture, and attach a new session. A map holds at most
-// one attached session, so close before attaching the replacement.
+// are sized by their owner and report an unsupported-feature error: allocate a
+// texture at the new size and hand it over with SetMetalBorrowedTextureTarget,
+// SetVulkanBorrowedTextureTarget, or SetOpenGLBorrowedTextureTarget, which keeps
+// this session.
 //
-// Resizing discards the session renderer, so renderer-held state such as
-// feature state does not survive. Map state such as camera, style, and sources
-// lives on the map and survives both resize and reattach.
+// The session keeps its renderer across a resize, so renderer-held state such
+// as feature state carries over. A scale factor change is the exception: a
+// renderer compiles its shaders for one pixel ratio, so that resize starts a new
+// one with renderer-held state empty. Map state such as camera, style, and
+// sources lives on the map and survives either way.
 func (session *RenderSessionHandle) Resize(extent RenderTargetExtent) error {
 	if err := extent.validate(); err != nil {
 		return err
@@ -732,6 +735,154 @@ func (session *RenderSessionHandle) Resize(extent RenderTargetExtent) error {
 		return checkNative(func() int32 {
 			return int32(C.mln_render_session_resize(C.mln_render_session(ptr), C.uint32_t(extent.Width), C.uint32_t(extent.Height), C.double(extent.ScaleFactor)))
 		})
+	})
+}
+
+// SetMetalSurfaceTarget presents this attached surface session through a new
+// Metal surface.
+//
+// A host surface can be destroyed and recreated while the map goes on living,
+// which is what Android rotation, a Flutter SurfaceProducer lifecycle change,
+// and a window resize that reallocates all look like from here. Replacing the
+// surface in place keeps this session's renderer, and with it the tile pyramid,
+// glyph and image atlases, symbol placement, and feature state.
+//
+// The descriptor names the same graphics context this session attached with,
+// and its extent applies exactly as Resize applies one, scale factor change
+// included. A descriptor whose Context.Device is neither zero nor this
+// session's device reports an invalid-argument error and leaves this session
+// rendering into the surface it has. The session assigns the layer its own
+// device and pixel format, so the layer itself carries nothing that has to
+// match.
+func (session *RenderSessionHandle) SetMetalSurfaceTarget(descriptor MetalSurfaceDescriptor) error {
+	if err := descriptor.Extent.validate(); err != nil {
+		return err
+	}
+	rawDescriptor := descriptor.toC()
+	return session.setTarget(func(ptr nativeRenderSession) int32 {
+		return int32(C.mln_metal_surface_set_target(C.mln_render_session(ptr), &rawDescriptor))
+	})
+}
+
+// SetVulkanSurfaceTarget presents this attached surface session through a new
+// Vulkan surface.
+//
+// See SetMetalSurfaceTarget for what replacing a surface preserves. The
+// outgoing VkSurfaceKHR must still be valid: this session holds a swapchain
+// built from it, and Vulkan destroys every swapchain before its surface. A host
+// that has to release its surface first closes this session and attaches again
+// afterward.
+//
+// The replacement reports the color format and surface-transform support this
+// session already compiled a render pass and shaders for; one that does not
+// reports an unsupported-feature error with this session still rendering into
+// the surface it has.
+func (session *RenderSessionHandle) SetVulkanSurfaceTarget(descriptor VulkanSurfaceDescriptor) error {
+	if err := descriptor.Extent.validate(); err != nil {
+		return err
+	}
+	rawDescriptor := descriptor.toC()
+	return session.setTarget(func(ptr nativeRenderSession) int32 {
+		return int32(C.mln_vulkan_surface_set_target(C.mln_render_session(ptr), &rawDescriptor))
+	})
+}
+
+// SetOpenGLSurfaceTarget presents this attached surface session through a new
+// OpenGL surface.
+//
+// See SetMetalSurfaceTarget for what replacing a surface preserves. The new
+// surface is made current on the next render, so a host may hand over a
+// replacement for one it has already destroyed. A surface accepted here can
+// still turn out to be unusable, which the next RenderUpdate reports as a
+// native error rather than this call.
+func (session *RenderSessionHandle) SetOpenGLSurfaceTarget(descriptor OpenGLSurfaceDescriptor) error {
+	if err := descriptor.Extent.validate(); err != nil {
+		return err
+	}
+	if err := descriptor.Context.validate(); err != nil {
+		return err
+	}
+	rawDescriptor := descriptor.toC()
+	return session.setTarget(func(ptr nativeRenderSession) int32 {
+		return int32(C.mln_opengl_surface_set_target(C.mln_render_session(ptr), &rawDescriptor))
+	})
+}
+
+// SetMetalBorrowedTextureTarget renders this attached texture session into a new
+// caller-owned Metal texture.
+//
+// A caller-owned texture is sized by its owner, so a host that follows a resize
+// reallocates rather than resizing and Resize reports an unsupported-feature
+// error. Handing the replacement over here keeps this session's renderer
+// instead, so the map does not go cold on every resize, unless the scale factor
+// changes, which starts a new renderer for the new pixel ratio just as Resize
+// does.
+//
+// The replacement belongs to the device this session attached with, which
+// reports an invalid-argument error otherwise, and carries the pixel format it
+// attached with, which reports an unsupported-feature error otherwise. Both
+// leave this session rendering into the texture it has. The caller owns the replacement and keeps it valid until the next
+// replacement, detach, or session close. This session never retained the
+// outgoing texture, never releases it, and never reads it here, so a host that
+// already released it hands over the replacement all the same.
+func (session *RenderSessionHandle) SetMetalBorrowedTextureTarget(descriptor MetalBorrowedTextureDescriptor) error {
+	if err := descriptor.Extent.validate(); err != nil {
+		return err
+	}
+	rawDescriptor := descriptor.toC()
+	return session.setTarget(func(ptr nativeRenderSession) int32 {
+		return int32(C.mln_metal_borrowed_texture_set_target(C.mln_render_session(ptr), &rawDescriptor))
+	})
+}
+
+// SetVulkanBorrowedTextureTarget renders this attached texture session into a
+// new caller-owned Vulkan image.
+//
+// See SetMetalBorrowedTextureTarget for what replacing a target preserves. The
+// replacement carries the format and both layouts this session attached with,
+// since its render pass was built around them.
+func (session *RenderSessionHandle) SetVulkanBorrowedTextureTarget(descriptor VulkanBorrowedTextureDescriptor) error {
+	if err := descriptor.Extent.validate(); err != nil {
+		return err
+	}
+	rawDescriptor := descriptor.toC()
+	return session.setTarget(func(ptr nativeRenderSession) int32 {
+		return int32(C.mln_vulkan_borrowed_texture_set_target(C.mln_render_session(ptr), &rawDescriptor))
+	})
+}
+
+// SetOpenGLBorrowedTextureTarget renders this attached texture session into a
+// new caller-owned OpenGL texture.
+//
+// See SetMetalBorrowedTextureTarget for what replacing a target preserves. The
+// replacement belongs to the context this session attached with, or one in its
+// share group, and the host context must be current on the calling thread.
+func (session *RenderSessionHandle) SetOpenGLBorrowedTextureTarget(descriptor OpenGLBorrowedTextureDescriptor) error {
+	if err := descriptor.Extent.validate(); err != nil {
+		return err
+	}
+	if err := descriptor.Context.validate(); err != nil {
+		return err
+	}
+	rawDescriptor := descriptor.toC()
+	return session.setTarget(func(ptr nativeRenderSession) int32 {
+		return int32(C.mln_opengl_borrowed_texture_set_target(C.mln_render_session(ptr), &rawDescriptor))
+	})
+}
+
+// setTarget runs the shared body of the target replacement methods. The
+// materialized descriptor the caller closes over stays alive for the native
+// call, which is all the C API borrows it for.
+func (session *RenderSessionHandle) setTarget(call func(nativeRenderSession) int32) error {
+	ptr, release, err := session.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer session.state.KeepAlive()
+	defer session.parent.state.KeepAlive()
+	return session.withNoAcquiredFrame(func() error {
+		return checkNative(func() int32 { return call(ptr) })
 	})
 }
 

@@ -157,6 +157,44 @@ def wait_for_metal_frame(
     raise AssertionError(f"matching Metal frame was not observed; last={last_frame!r}")
 
 
+def set_target_calls(
+    session: render.RenderSessionHandle,
+) -> tuple[Callable[[], object], ...]:
+    """Return one `set_*_target` call per backend and target kind.
+
+    Every descriptor here names null backend handles, which is all these tests
+    need: the acquired-frame guard and the session's owner thread are both
+    checked before any handle is read.
+    """
+    extent = render.RenderTargetExtent(16, 16, 1.0)
+    return (
+        lambda: session.set_metal_surface_target(
+            render.MetalSurfaceDescriptor(extent=extent)
+        ),
+        lambda: session.set_vulkan_surface_target(
+            render.VulkanSurfaceDescriptor(extent=extent)
+        ),
+        lambda: session.set_opengl_surface_target(
+            render.OpenGLSurfaceDescriptor(extent=extent)
+        ),
+        lambda: session.set_metal_borrowed_texture_target(
+            render.MetalBorrowedTextureDescriptor(
+                extent=extent, physical_width=16, physical_height=16
+            )
+        ),
+        lambda: session.set_vulkan_borrowed_texture_target(
+            render.VulkanBorrowedTextureDescriptor(
+                extent=extent, physical_width=16, physical_height=16
+            )
+        ),
+        lambda: session.set_opengl_borrowed_texture_target(
+            render.OpenGLBorrowedTextureDescriptor(
+                extent=extent, physical_width=16, physical_height=16
+            )
+        ),
+    )
+
+
 def assert_invalid_state(call: Callable[[], object]) -> None:
     with pytest.raises(mln.InvalidStateError) as raised:
         call()
@@ -360,6 +398,7 @@ def test_active_metal_frame_rejects_nested_acquire_and_session_operations(
         lambda: metal_owned_session.session.get_feature_state(selector),
         lambda: metal_owned_session.session.remove_feature_state(selector),
         metal_owned_session.session.close,
+        *set_target_calls(metal_owned_session.session),
     )
     try:
         for call in calls:
@@ -401,6 +440,7 @@ def test_real_metal_render_session_reports_wrong_thread_errors(
         metal_owned_session.session.render_update,
         metal_owned_session.session.acquire_metal_owned_texture_frame,
         metal_owned_session.session.close,
+        *set_target_calls(metal_owned_session.session),
     )
 
     for call in calls:
@@ -420,6 +460,30 @@ def test_real_metal_render_session_reports_wrong_thread_errors(
         assert isinstance(observed[0], mln.WrongThreadError)
         assert observed[0].status == mln.MaplibreStatus.WRONG_THREAD
         assert not metal_owned_session.session.closed
+
+
+def test_set_target_reports_unsupported_for_a_session_owned_texture(
+    metal_owned_session: MetalOwnedSession,
+) -> None:
+    """Spec coverage: BND-176.
+
+    A session-owned texture is sized and replaced by its session, so it takes a
+    resize rather than a replacement. The session's target kind is checked
+    before the descriptor, so the null texture below is never read.
+    """
+    with pytest.raises(mln.UnsupportedFeatureError) as raised:
+        metal_owned_session.session.set_metal_borrowed_texture_target(
+            render.MetalBorrowedTextureDescriptor(
+                extent=render.RenderTargetExtent(32, 16, 1.0),
+                physical_width=32,
+                physical_height=16,
+            )
+        )
+    assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
+
+    # The rejection left the session rendering into the texture it owns.
+    metal_owned_session.session.resize(32, 16, 1.0)
+    metal_owned_session.render_once()
 
 
 def test_cluster_feature_extension_queries_resolve_unsigned_cluster_id_and_limit(

@@ -68,7 +68,9 @@ change while the style stays put.
 
 State lives on the session's renderer, which has two consequences. The renderer
 has to exist first, so render once after the style loads before you set state.
-State also does not survive a resize or a reattach, so reapply it after either.
+State rides along with the renderer, so it survives a resize and a target
+replacement. It starts empty again whenever the renderer does: after a scale
+factor change, and after a reattach.
 Setting or removing state requests a repaint.
 
 The selector picks the target. `source_id` is required, `source_layer_id`

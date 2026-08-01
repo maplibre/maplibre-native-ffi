@@ -3673,6 +3673,25 @@ impl MapProjectionHandle {
     }
 }
 
+impl RenderSessionHandle {
+    /// Shared body for the `set_*_target` methods.
+    ///
+    /// The native descriptor is materialized by the caller and lives for the
+    /// duration of this call, which is all the C API borrows it for.
+    fn set_target<D>(
+        &self,
+        raw: D,
+        set_target: impl FnOnce(sys::mln_render_session, &D) -> sys::mln_status,
+    ) -> PyResult<()> {
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        state.ensure_no_frame_acquired()?;
+        maplibre_core::check(set_target(state.native(), &raw)).map_err(map_error)
+    }
+}
+
 #[pymethods]
 impl RenderSessionHandle {
     fn close(&self) -> PyResult<()> {
@@ -3701,6 +3720,236 @@ impl RenderSessionHandle {
             sys::mln_render_session_resize(state.native(), width, height, scale_factor)
         })
         .map_err(map_error)
+    }
+
+    fn set_metal_surface_target(
+        &self,
+        width: u32,
+        height: u32,
+        scale_factor: f64,
+        device_address: usize,
+        layer_address: usize,
+    ) -> PyResult<()> {
+        let descriptor = maplibre_core::render::metal_surface_descriptor_to_native(
+            maplibre_core::render::MetalSurfaceDescriptorFields {
+                extent: maplibre_core::render::RenderTargetExtentFields {
+                    width,
+                    height,
+                    scale_factor,
+                },
+                context: maplibre_core::render::MetalContextDescriptorFields {
+                    device: device_address as *mut c_void,
+                },
+                layer: layer_address as *mut c_void,
+            },
+        );
+        self.set_target(descriptor, |session, raw| {
+            // SAFETY: raw is fully initialized and lives for this call. The C
+            // API validates the session pointer, state, and descriptor fields.
+            unsafe { sys::mln_metal_surface_set_target(session, raw) }
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn set_vulkan_surface_target(
+        &self,
+        width: u32,
+        height: u32,
+        scale_factor: f64,
+        instance_address: usize,
+        physical_device_address: usize,
+        device_address: usize,
+        graphics_queue_address: usize,
+        graphics_queue_family_index: u32,
+        get_instance_proc_addr: usize,
+        get_device_proc_addr: usize,
+        surface_address: usize,
+    ) -> PyResult<()> {
+        let descriptor = maplibre_core::render::vulkan_surface_descriptor_to_native(
+            maplibre_core::render::VulkanSurfaceDescriptorFields {
+                extent: maplibre_core::render::RenderTargetExtentFields {
+                    width,
+                    height,
+                    scale_factor,
+                },
+                context: vulkan_context_fields(
+                    instance_address,
+                    physical_device_address,
+                    device_address,
+                    graphics_queue_address,
+                    graphics_queue_family_index,
+                    get_instance_proc_addr,
+                    get_device_proc_addr,
+                ),
+                surface: surface_address as *mut c_void,
+            },
+        );
+        self.set_target(descriptor, |session, raw| {
+            // SAFETY: raw is fully initialized and lives for this call. The C
+            // API validates the session pointer, state, and descriptor fields.
+            unsafe { sys::mln_vulkan_surface_set_target(session, raw) }
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn set_opengl_surface_target(
+        &self,
+        width: u32,
+        height: u32,
+        scale_factor: f64,
+        context_platform: u32,
+        context_address_1: usize,
+        context_address_2: usize,
+        share_context_address: usize,
+        get_proc_address: usize,
+        surface_address: usize,
+    ) -> PyResult<()> {
+        let descriptor = maplibre_core::render::opengl_surface_descriptor_to_native(
+            maplibre_core::render::OpenGLSurfaceDescriptorFields {
+                extent: maplibre_core::render::RenderTargetExtentFields {
+                    width,
+                    height,
+                    scale_factor,
+                },
+                context: opengl_context_fields(
+                    context_platform,
+                    context_address_1,
+                    context_address_2,
+                    share_context_address,
+                    get_proc_address,
+                )?,
+                surface: surface_address as *mut c_void,
+            },
+        );
+        self.set_target(descriptor, |session, raw| {
+            // SAFETY: raw is fully initialized and lives for this call. The C
+            // API validates the session pointer, state, and descriptor fields.
+            unsafe { sys::mln_opengl_surface_set_target(session, raw) }
+        })
+    }
+
+    fn set_metal_borrowed_texture_target(
+        &self,
+        width: u32,
+        height: u32,
+        scale_factor: f64,
+        physical_width: u32,
+        physical_height: u32,
+        texture_address: usize,
+    ) -> PyResult<()> {
+        let descriptor = maplibre_core::render::metal_borrowed_texture_descriptor_to_native(
+            maplibre_core::render::MetalBorrowedTextureDescriptorFields {
+                extent: maplibre_core::render::RenderTargetExtentFields {
+                    width,
+                    height,
+                    scale_factor,
+                },
+                physical_width,
+                physical_height,
+                texture: texture_address as *mut c_void,
+            },
+        );
+        self.set_target(descriptor, |session, raw| {
+            // SAFETY: raw is fully initialized and lives for this call. The C
+            // API validates the session pointer, state, and descriptor fields.
+            unsafe { sys::mln_metal_borrowed_texture_set_target(session, raw) }
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn set_vulkan_borrowed_texture_target(
+        &self,
+        width: u32,
+        height: u32,
+        scale_factor: f64,
+        physical_width: u32,
+        physical_height: u32,
+        instance_address: usize,
+        physical_device_address: usize,
+        device_address: usize,
+        graphics_queue_address: usize,
+        graphics_queue_family_index: u32,
+        get_instance_proc_addr: usize,
+        get_device_proc_addr: usize,
+        image_address: usize,
+        image_view_address: usize,
+        format: u32,
+        initial_layout: u32,
+        final_layout: u32,
+    ) -> PyResult<()> {
+        let descriptor = maplibre_core::render::vulkan_borrowed_texture_descriptor_to_native(
+            maplibre_core::render::VulkanBorrowedTextureDescriptorFields {
+                extent: maplibre_core::render::RenderTargetExtentFields {
+                    width,
+                    height,
+                    scale_factor,
+                },
+                physical_width,
+                physical_height,
+                context: vulkan_context_fields(
+                    instance_address,
+                    physical_device_address,
+                    device_address,
+                    graphics_queue_address,
+                    graphics_queue_family_index,
+                    get_instance_proc_addr,
+                    get_device_proc_addr,
+                ),
+                image: image_address as *mut c_void,
+                image_view: image_view_address as *mut c_void,
+                format,
+                initial_layout,
+                final_layout,
+            },
+        );
+        self.set_target(descriptor, |session, raw| {
+            // SAFETY: raw is fully initialized and lives for this call. The C
+            // API validates the session pointer, state, and descriptor fields.
+            unsafe { sys::mln_vulkan_borrowed_texture_set_target(session, raw) }
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn set_opengl_borrowed_texture_target(
+        &self,
+        width: u32,
+        height: u32,
+        scale_factor: f64,
+        physical_width: u32,
+        physical_height: u32,
+        context_platform: u32,
+        context_address_1: usize,
+        context_address_2: usize,
+        share_context_address: usize,
+        get_proc_address: usize,
+        texture: u32,
+        target: u32,
+    ) -> PyResult<()> {
+        let descriptor = maplibre_core::render::opengl_borrowed_texture_descriptor_to_native(
+            maplibre_core::render::OpenGLBorrowedTextureDescriptorFields {
+                extent: maplibre_core::render::RenderTargetExtentFields {
+                    width,
+                    height,
+                    scale_factor,
+                },
+                physical_width,
+                physical_height,
+                context: opengl_context_fields(
+                    context_platform,
+                    context_address_1,
+                    context_address_2,
+                    share_context_address,
+                    get_proc_address,
+                )?,
+                texture,
+                target,
+            },
+        );
+        self.set_target(descriptor, |session, raw| {
+            // SAFETY: raw is fully initialized and lives for this call. The C
+            // API validates the session pointer, state, and descriptor fields.
+            unsafe { sys::mln_opengl_borrowed_texture_set_target(session, raw) }
+        })
     }
 
     fn render_update(&self) -> PyResult<bool> {

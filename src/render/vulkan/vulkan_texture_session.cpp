@@ -125,6 +125,31 @@ class VulkanTextureSessionBackend final
     return backend_;
   }
 
+  void resize(mbgl::Size size) override { backend_.resize(size); }
+
+  auto set_vulkan_borrowed_target(
+    const mln_vulkan_borrowed_texture_descriptor& descriptor
+  ) -> mln_status override {
+    if (!mln::core::vulkan_context_matches(
+          backend_.context_descriptor(), descriptor.context
+        )) {
+      mln::core::set_thread_error(
+        "Vulkan texture target must name the instance, physical device, "
+        "device, and graphics queue this session attached with"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (!backend_.matches_borrowed_target(descriptor)) {
+      return mln::core::unsupported_retarget(
+        "Vulkan image target must have the format and layouts this session's "
+        "render pass was built for; destroy the session and attach again to "
+        "change them"
+      );
+    }
+    backend_.set_borrowed_target(descriptor);
+    return MLN_STATUS_OK;
+  }
+
   void prepare_render_resources() override {
     // Renderer::render creates the Vulkan context before requesting the default
     // renderable, so shared-device resources must be ready first.
@@ -349,6 +374,39 @@ auto vulkan_owned_texture_release_frame(
   live->texture.acquired_frame_id = 0;
   live->texture.acquired_frame_kind = TextureSessionFrameKind::None;
   return MLN_STATUS_OK;
+}
+
+auto vulkan_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_vulkan_borrowed_texture_descriptor* descriptor
+) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto session_status = validate_render_session_retarget(
+    session, RetargetTargetKind::BorrowedTexture, live
+  );
+  if (session_status != MLN_STATUS_OK) {
+    return session_status;
+  }
+  const auto descriptor_status =
+    validate_vulkan_borrowed_texture_descriptor(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  const auto physical_status = validate_borrowed_physical_size(
+    descriptor->physical_width, descriptor->physical_height
+  );
+  if (physical_status != MLN_STATUS_OK) {
+    return physical_status;
+  }
+  return render_session_set_target(
+    session, RetargetTargetKind::BorrowedTexture, descriptor->extent,
+    descriptor->physical_width, descriptor->physical_height,
+    [descriptor](mln_render_session_object& target_session) -> mln_status {
+      return target_session.texture.backend->set_vulkan_borrowed_target(
+        *descriptor
+      );
+    }
+  );
 }
 
 }  // namespace mln::core

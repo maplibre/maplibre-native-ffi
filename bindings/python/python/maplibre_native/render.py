@@ -453,8 +453,183 @@ class RenderSessionHandle(NativeHandleMixin):
         return bool(self._native.detached)
 
     def resize(self, width: int, height: int, scale_factor: float) -> None:
-        """Resize this attached render session."""
+        """Resize this attached render session.
+
+        Surface and session-owned texture targets resize in place. A
+        caller-owned texture target is sized by its owner and reports
+        :class:`UnsupportedFeatureError`: allocate a texture at the new size and
+        hand it over with the ``set_*_borrowed_texture_target`` method for the
+        backend, which keeps this session.
+
+        This session keeps its renderer across a resize, so renderer-held state
+        such as feature state carries over. A scale factor that differs from
+        this session's current one is the exception: a renderer compiles its
+        shaders for one pixel ratio, so that resize starts a new one with
+        renderer-held state empty. The same exception applies to every
+        ``set_*_target`` method, which otherwise keeps the renderer.
+        """
         self._native.resize(width, height, scale_factor)
+
+    def _set_target(
+        self,
+        set_target: Callable[..., None],
+        descriptor: Any,
+        *args: object,
+    ) -> None:
+        extent = descriptor.extent
+        set_target(extent.width, extent.height, extent.scale_factor, *args)
+
+    def set_metal_surface_target(self, descriptor: MetalSurfaceDescriptor) -> None:
+        """Present this attached surface session through a new surface.
+
+        A host surface can be destroyed and recreated while the map goes on
+        living, which is what Android rotation, a Flutter ``SurfaceProducer``
+        lifecycle change, and a window resize that reallocates all look like
+        from here. Replacing the surface in place keeps this session's
+        renderer, and with it the tile pyramid, glyph and image atlases, symbol
+        placement, and feature state.
+
+        The descriptor names the same graphics context this session attached
+        with, and its extent applies as a resize does. A descriptor whose
+        ``context.device`` is neither null nor this session's device raises
+        :class:`InvalidArgumentError` and leaves this session rendering into the
+        surface it has. The session assigns the layer its own device and pixel
+        format, so the layer itself carries nothing that has to match.
+        """
+        self._set_target(
+            self._native.set_metal_surface_target,
+            descriptor,
+            descriptor.context.device.address,
+            descriptor.layer.address,
+        )
+
+    def set_vulkan_surface_target(self, descriptor: VulkanSurfaceDescriptor) -> None:
+        """Present this attached surface session through a new surface.
+
+        See :meth:`set_metal_surface_target` for what replacing a surface
+        preserves. The outgoing ``VkSurfaceKHR`` must still be valid: this
+        session holds a swapchain built from it, and Vulkan destroys every
+        swapchain before its surface.
+        """
+        self._set_target(
+            self._native.set_vulkan_surface_target,
+            descriptor,
+            descriptor.context.instance.address,
+            descriptor.context.physical_device.address,
+            descriptor.context.device.address,
+            descriptor.context.graphics_queue.address,
+            descriptor.context.graphics_queue_family_index,
+            descriptor.context.get_instance_proc_addr.address,
+            descriptor.context.get_device_proc_addr.address,
+            descriptor.surface.address,
+        )
+
+    def set_opengl_surface_target(self, descriptor: OpenGLSurfaceDescriptor) -> None:
+        """Present this attached surface session through a new surface.
+
+        See :meth:`set_metal_surface_target` for what replacing a surface
+        preserves. The new surface is made current on the next render, so a
+        host may hand over a replacement for one it has already destroyed. A
+        surface accepted here can still prove unusable, which the next
+        :meth:`render_update` reports rather than this call.
+        """
+        platform, first, second, share, get_proc = _opengl_context_parts(
+            descriptor.context
+        )
+        self._set_target(
+            self._native.set_opengl_surface_target,
+            descriptor,
+            platform,
+            first,
+            second,
+            share,
+            get_proc,
+            descriptor.surface.address,
+        )
+
+    def set_metal_borrowed_texture_target(
+        self, descriptor: MetalBorrowedTextureDescriptor
+    ) -> None:
+        """Render this attached texture session into a new caller-owned texture.
+
+        A caller-owned texture is sized by its owner, so a host that follows a
+        resize reallocates rather than resizing and :meth:`resize` reports
+        :class:`UnsupportedFeatureError`. Handing the replacement over here
+        keeps this session's renderer instead, so the map does not go cold on
+        every resize.
+
+        The replacement belongs to the device this session attached with, which
+        raises :class:`InvalidArgumentError` otherwise, and carries the pixel
+        format it attached with, which raises :class:`UnsupportedFeatureError`
+        otherwise. Both leave this session rendering into the texture it has. The
+        caller owns the replacement and keeps it valid until the next
+        replacement, detach, or close. This session never retained the outgoing
+        texture, never releases it, and never reads it here, so a host that
+        already released it hands over the replacement all the same.
+        """
+        self._set_target(
+            self._native.set_metal_borrowed_texture_target,
+            descriptor,
+            descriptor.physical_width,
+            descriptor.physical_height,
+            descriptor.texture.address,
+        )
+
+    def set_vulkan_borrowed_texture_target(
+        self, descriptor: VulkanBorrowedTextureDescriptor
+    ) -> None:
+        """Render this attached texture session into a new caller-owned image.
+
+        See :meth:`set_metal_borrowed_texture_target` for what replacing a
+        target preserves. The replacement carries the format and both layouts
+        this session attached with, since its render pass was built around
+        them.
+        """
+        self._set_target(
+            self._native.set_vulkan_borrowed_texture_target,
+            descriptor,
+            descriptor.physical_width,
+            descriptor.physical_height,
+            descriptor.context.instance.address,
+            descriptor.context.physical_device.address,
+            descriptor.context.device.address,
+            descriptor.context.graphics_queue.address,
+            descriptor.context.graphics_queue_family_index,
+            descriptor.context.get_instance_proc_addr.address,
+            descriptor.context.get_device_proc_addr.address,
+            descriptor.image.address,
+            descriptor.image_view.address,
+            descriptor.format,
+            descriptor.initial_layout,
+            descriptor.final_layout,
+        )
+
+    def set_opengl_borrowed_texture_target(
+        self, descriptor: OpenGLBorrowedTextureDescriptor
+    ) -> None:
+        """Render this attached texture session into a new caller-owned texture.
+
+        See :meth:`set_metal_borrowed_texture_target` for what replacing a
+        target preserves. The replacement belongs to the context this session
+        attached with, or one in its share group, and the host context must be
+        current on this thread.
+        """
+        platform, first, second, share, get_proc = _opengl_context_parts(
+            descriptor.context
+        )
+        self._set_target(
+            self._native.set_opengl_borrowed_texture_target,
+            descriptor,
+            descriptor.physical_width,
+            descriptor.physical_height,
+            platform,
+            first,
+            second,
+            share,
+            get_proc,
+            descriptor.texture,
+            descriptor.target,
+        )
 
     def render_update(self) -> bool:
         """Process the latest map render update for this target.
@@ -737,6 +912,29 @@ class OpenGLOwnedTextureFrameHandle(NativeHandleMixin):
             int(self._native.texture()),
             _is_live=lambda: not self.closed,
         )
+
+
+def _opengl_context_parts(
+    context: EglContextDescriptor | WglContextDescriptor,
+) -> tuple[int, int, int, int, int]:
+    if isinstance(context, WglContextDescriptor):
+        return (
+            1,
+            context.device_context.address,
+            0,
+            context.share_context.address,
+            context.get_proc_address.address,
+        )
+    if isinstance(context, EglContextDescriptor):
+        return (
+            2,
+            context.display.address,
+            context.config.address,
+            context.share_context.address,
+            context.get_proc_address.address,
+        )
+    msg = f"unsupported OpenGL context descriptor: {type(context)!r}"
+    raise TypeError(msg)
 
 
 __all__ = [

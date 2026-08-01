@@ -193,23 +193,20 @@ final class MetalMapView: NSView {
 
     do {
       graphics.resize(viewport)
-      if let renderTarget {
-        if renderTarget.needsReattachOnResize {
-          // The host texture is fixed to the viewport size, so close the
-          // session and let the next tick attach a replacement against a fresh
-          // texture. Both halves run here, on the thread that owns the session
-          // either way.
-          try renderTarget.close()
-          self.renderTarget = nil
-        } else {
-          try renderTarget.resize(viewport)
-        }
-      }
+      // Every mode follows a resize without losing its session: the ones the
+      // session sizes resize in place, and the caller-owned texture allocates a
+      // replacement and hands it over.
+      try renderTarget?.resize(graphics: graphics, viewport: viewport)
       currentViewport = viewport
       channels.setRenderRequest()
       startRuntimeLoopIfNeeded(viewport: viewport)
     } catch {
+      // A failed resize leaves the render target detached, so stop driving it
+      // rather than letting the next tick render through a session that is no
+      // longer attached to anything.
       print(error)
+      timer?.invalidate()
+      timer = nil
       showError(String(describing: error))
     }
   }

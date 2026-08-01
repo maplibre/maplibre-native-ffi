@@ -5,11 +5,20 @@ import android.opengl.EGLConfig
 import android.opengl.EGLContext
 import android.opengl.EGLDisplay
 import android.opengl.EGLSurface
+import android.util.Log
 import android.view.Surface
 import org.maplibre.nativeffi.render.EglContextDescriptor
 import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.OpenGLContextDescriptor
 
+/**
+ * The EGL context.
+ *
+ * The display, the config, and the share context are independent of any one host surface: EGL keeps
+ * them across a window that is destroyed and recreated, which is what a rotation and a trip to the
+ * background look like from here. Only the window surface is rebuilt, so a session attached against
+ * this context is pointed at the replacement rather than closed.
+ */
 internal class EglGraphicsContext
 private constructor(
   private val display: EGLDisplay,
@@ -18,6 +27,18 @@ private constructor(
   private var windowSurface: EGLSurface,
 ) : GraphicsContext {
   override val backendName: String = "opengl-egl"
+
+  /**
+   * Where a parked session presents while the platform has taken the window away.
+   *
+   * An EGL surface session always names a surface, and this one stays valid with no window behind
+   * it, so the session survives the gap holding something it can still make current when it closes.
+   * Nothing renders into it: the view stops scheduling frames while [hasSurface] is false.
+   */
+  private var parkedSurface: EGLSurface = EGL14.EGL_NO_SURFACE
+
+  override val hasSurface: Boolean
+    get() = windowSurface != EGL14.EGL_NO_SURFACE
 
   val descriptor: OpenGLContextDescriptor
     get() =
@@ -28,13 +49,51 @@ private constructor(
         NativePointer.NULL,
       )
 
+  /** The EGL surface a session presents through: the host window, or the parking surface. */
   val surfacePointer: NativePointer
-    get() = NativePointer.ofAddress(windowSurface.nativeHandle)
+    get() = NativePointer.ofAddress((if (hasSurface) windowSurface else parkedSurface).nativeHandle)
+
+  override fun setSurface(surface: Surface): Boolean {
+    if (hasSurface) {
+      // The window this context already presents through, handed back after a size or format
+      // change. An EGL window surface follows its window's size, so there is nothing to rebuild;
+      // the session takes the new extent through the descriptor it is handed.
+      return true
+    }
+    val next = EGL14.eglCreateWindowSurface(display, config, surface, WINDOW_ATTRIBUTES, 0)
+    if (next == EGL14.EGL_NO_SURFACE) {
+      // Reported rather than thrown. A display or context that can no longer serve a window
+      // surface is what a lost EGL context looks like from here, and the caller answers that by
+      // building this context and its session again.
+      Log.w(TAG, eglFailure("creating an EGL window surface"))
+      return false
+    }
+    windowSurface = next
+    return true
+  }
+
+  override fun releaseSurface(): Boolean {
+    if (!hasSurface) {
+      return true
+    }
+    if (!ensureParkedSurface()) {
+      // Nowhere for a session to park, so this context cannot outlive the window after all. The
+      // caller closes the session before the window surface goes with this context.
+      return false
+    }
+    EGL14.eglDestroySurface(display, windowSurface)
+    windowSurface = EGL14.EGL_NO_SURFACE
+    return true
+  }
 
   override fun close() {
     if (windowSurface != EGL14.EGL_NO_SURFACE) {
       EGL14.eglDestroySurface(display, windowSurface)
       windowSurface = EGL14.EGL_NO_SURFACE
+    }
+    if (parkedSurface != EGL14.EGL_NO_SURFACE) {
+      EGL14.eglDestroySurface(display, parkedSurface)
+      parkedSurface = EGL14.EGL_NO_SURFACE
     }
     if (shareContext != EGL14.EGL_NO_CONTEXT) {
       EGL14.eglDestroyContext(display, shareContext)
@@ -44,7 +103,22 @@ private constructor(
     EGL14.eglReleaseThread()
   }
 
+  private fun ensureParkedSurface(): Boolean {
+    if (parkedSurface != EGL14.EGL_NO_SURFACE) {
+      return true
+    }
+    val attributes = intArrayOf(EGL14.EGL_WIDTH, 1, EGL14.EGL_HEIGHT, 1, EGL14.EGL_NONE)
+    parkedSurface = EGL14.eglCreatePbufferSurface(display, config, attributes, 0)
+    if (parkedSurface == EGL14.EGL_NO_SURFACE) {
+      Log.w(TAG, eglFailure("creating the EGL parking surface"))
+      return false
+    }
+    return true
+  }
+
   companion object {
+    private const val TAG = "MapLibreAndroidMap"
+
     fun create(surface: Surface): EglGraphicsContext {
       val display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
       check(display != EGL14.EGL_NO_DISPLAY) { "EGL display is unavailable" }
@@ -58,9 +132,8 @@ private constructor(
         EGL14.eglCreateContext(display, config, EGL14.EGL_NO_CONTEXT, contextAttributes, 0)
       check(context != EGL14.EGL_NO_CONTEXT) { "creating EGL share context failed" }
 
-      val surfaceAttributes = intArrayOf(EGL14.EGL_NONE)
       val windowSurface =
-        EGL14.eglCreateWindowSurface(display, config, surface, surfaceAttributes, 0)
+        EGL14.eglCreateWindowSurface(display, config, surface, WINDOW_ATTRIBUTES, 0)
       check(windowSurface != EGL14.EGL_NO_SURFACE) { "creating EGL window surface failed" }
       return EglGraphicsContext(display, config, context, windowSurface)
     }
@@ -71,7 +144,9 @@ private constructor(
           EGL14.EGL_RENDERABLE_TYPE,
           EGL_OPENGL_ES3_BIT,
           EGL14.EGL_SURFACE_TYPE,
-          EGL14.EGL_WINDOW_BIT,
+          // The parking surface is a pbuffer, and a session makes it current with the context it
+          // was given at attach, so one config has to serve both kinds of surface.
+          EGL14.EGL_WINDOW_BIT or EGL14.EGL_PBUFFER_BIT,
           EGL14.EGL_RED_SIZE,
           8,
           EGL14.EGL_GREEN_SIZE,
@@ -93,16 +168,21 @@ private constructor(
         "choose EGL config",
       )
       check(count[0] > 0 && configs[0] != null) {
-        "no EGL config supports OpenGL ES 3 window rendering"
+        "no EGL config supports OpenGL ES 3 window and pbuffer rendering"
       }
       return configs[0]!!
     }
 
     private fun eglCheck(ok: Boolean, operation: String) {
       if (!ok) {
-        error("$operation failed with EGL error 0x${EGL14.eglGetError().toString(16)}")
+        error(eglFailure(operation))
       }
     }
+
+    private fun eglFailure(operation: String): String =
+      "$operation failed with EGL error 0x${EGL14.eglGetError().toString(16)}"
+
+    private val WINDOW_ATTRIBUTES = intArrayOf(EGL14.EGL_NONE)
 
     private const val EGL_OPENGL_ES3_BIT = 0x00000040
   }

@@ -13,12 +13,12 @@ the pixels back to the CPU, or use the texture in your own rendering.
 
 ## Who owns the texture
 
-|                 | Session-owned ("owned")                  | Caller-owned ("borrowed")            |
-| --------------- | ---------------------------------------- | ------------------------------------ |
-| Created by      | The session, on your device or context   | You                                  |
-| Resizing        | `mln_render_session_resize()` in place   | Recreate the texture and the session |
-| Using the frame | Acquire it, use it, release it           | It is already yours                  |
-| CPU readback    | `mln_texture_read_premultiplied_rgba8()` | Read it back yourself                |
+|                 | Session-owned ("owned")                  | Caller-owned ("borrowed")               |
+| --------------- | ---------------------------------------- | --------------------------------------- |
+| Created by      | The session, on your device or context   | You                                     |
+| Resizing        | `mln_render_session_resize()` in place   | Recreate the texture, then `set_target` |
+| Using the frame | Acquire it, use it, release it           | It is already yours                     |
+| CPU readback    | `mln_texture_read_premultiplied_rgba8()` | Read it back yourself                   |
 
 Both modes attach through a backend-specific function,
 `mln_<backend>_owned_texture_attach()` or
@@ -62,9 +62,21 @@ resizing, detaching, destroying, and a second acquire all return
 
 A borrowed texture skips all of that, since the texture was yours to begin with.
 You allocate it and keep it valid until the session detaches. The session
-renders into it when you call `render_update()`, and offers no acquire,
-readback, or resize. To follow a resize, destroy the session, make a new
-texture, and attach again.
+renders into it when you call `render_update()`, and offers acquire, readback,
+and resize only for the session-owned mode. You own the texture's size, so to
+follow a resize you allocate a new texture and hand it over with
+`mln_<backend>_borrowed_texture_set_target()`. The session keeps its renderer
+across that, so the map keeps its tiles and atlases every time the window
+changes size. A scale factor change is the exception, starting a new renderer
+for the new pixel ratio.
+
+Hand over a replacement that matches what the session attached with. What has to
+match is per backend, because each builds its pipelines against something
+different: a Metal texture's pixel format, a Vulkan image's format and layouts.
+The [C API reference](/maplibre-native-ffi/reference/c/) states it per function.
+A target that differs comes back as `MLN_STATUS_UNSUPPORTED`, with the session
+still rendering into the texture it has. Destroying and re-attaching is what
+changes it, and what a new graphics context needs.
 
 How much synchronization you owe depends on the backend. An OpenGL session
 finishes its render before `render_update()` returns, so you can sample the
@@ -77,5 +89,5 @@ function, along with the state each backend requires of the texture itself.
 
 <Aside type="tip">
   `compose-map` is a complete borrowed-texture integration, including
-  reattach-on-resize.
+  set-target-on-resize.
 </Aside>

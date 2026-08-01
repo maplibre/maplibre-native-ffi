@@ -75,6 +75,61 @@ test "Metal surface render acquires one drawable per frame through public bindin
     try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(window_layer.layer.?));
 }
 
+test "Metal surface set target presents through a replacement layer" {
+    if (!build_options.supports_metal) return error.SkipZigTest;
+
+    const pool = try metal_support.AutoreleasePool.init();
+    defer pool.deinit();
+
+    var window_layer = try metal_support.createCountingWindowLayer(64, 64);
+    defer window_layer.deinit();
+    var replacement_layer = try metal_support.createCountingWindowLayer(48, 32);
+    defer replacement_layer.deinit();
+
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    var surface = try maplibre.attachMetalSurface(&map, .{
+        .extent = .{ .width = 64, .height = 64 },
+        .layer = nativePointer(window_layer.layer.?),
+    });
+    defer surface.close() catch {};
+
+    try map.setStyleJson(testing.allocator, support.style_json);
+    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
+    try testing.expect(try surface.renderUpdate());
+    try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(window_layer.layer.?));
+
+    // A host surface can be destroyed and recreated while the map goes on
+    // living, and the session presents through the replacement it is handed.
+    try surface.setMetalSurfaceTarget(.{
+        .extent = .{ .width = 48, .height = 32 },
+        .layer = nativePointer(replacement_layer.layer.?),
+    });
+
+    // A caller-owned texture descriptor names a target this session does not
+    // have, and the rejection leaves it presenting through the new layer.
+    try testing.expectError(error.Unsupported, surface.setMetalBorrowedTextureTarget(.{
+        .extent = .{ .width = 48, .height = 32 },
+        .physical_width = 48,
+        .physical_height = 32,
+        .texture = nativePointer(@ptrFromInt(1)),
+    }));
+
+    // Replacing the surface hands the new size to the map's owner thread, as a
+    // resize does, so the map publishes a matching update only once pumped.
+    try testing.expect(!try surface.renderUpdate());
+    try runtime.pump(0);
+    const resized = try map.getSize();
+    try testing.expectEqual(@as(u32, 48), resized.width);
+    try testing.expectEqual(@as(u32, 32), resized.height);
+    try testing.expect(try surface.renderUpdate());
+    try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(replacement_layer.layer.?));
+    try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(window_layer.layer.?));
+}
+
 test "surface public descriptors report invalid native arguments" {
     if (!build_options.supports_metal and !build_options.supports_vulkan) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);

@@ -239,6 +239,10 @@ func newActiveFrameTestSession(t *testing.T) *RenderSessionHandle {
 	return session
 }
 
+// activeFrameTestExtent is a valid extent, so the active-frame guard is what
+// rejects each operation rather than descriptor validation ahead of it.
+var activeFrameTestExtent = RenderTargetExtent{Width: 1, Height: 1, ScaleFactor: 1}
+
 func TestRenderSessionOperationsRejectActiveFrame(t *testing.T) {
 	session := newActiveFrameTestSession(t)
 
@@ -247,6 +251,40 @@ func TestRenderSessionOperationsRejectActiveFrame(t *testing.T) {
 		call func() error
 	}{
 		{name: "Resize", call: func() error { return session.Resize(RenderTargetExtent{Width: 1, Height: 1, ScaleFactor: 1}) }},
+		{name: "SetMetalSurfaceTarget", call: func() error {
+			return session.SetMetalSurfaceTarget(MetalSurfaceDescriptor{Extent: activeFrameTestExtent})
+		}},
+		{name: "SetVulkanSurfaceTarget", call: func() error {
+			return session.SetVulkanSurfaceTarget(VulkanSurfaceDescriptor{Extent: activeFrameTestExtent})
+		}},
+		{name: "SetOpenGLSurfaceTarget", call: func() error {
+			return session.SetOpenGLSurfaceTarget(OpenGLSurfaceDescriptor{
+				Extent:  activeFrameTestExtent,
+				Context: OpenGLContextDescriptor{EGL: &EGLContextDescriptor{}},
+			})
+		}},
+		{name: "SetMetalBorrowedTextureTarget", call: func() error {
+			return session.SetMetalBorrowedTextureTarget(MetalBorrowedTextureDescriptor{
+				Extent:         activeFrameTestExtent,
+				PhysicalWidth:  1,
+				PhysicalHeight: 1,
+			})
+		}},
+		{name: "SetVulkanBorrowedTextureTarget", call: func() error {
+			return session.SetVulkanBorrowedTextureTarget(VulkanBorrowedTextureDescriptor{
+				Extent:         activeFrameTestExtent,
+				PhysicalWidth:  1,
+				PhysicalHeight: 1,
+			})
+		}},
+		{name: "SetOpenGLBorrowedTextureTarget", call: func() error {
+			return session.SetOpenGLBorrowedTextureTarget(OpenGLBorrowedTextureDescriptor{
+				Extent:         activeFrameTestExtent,
+				PhysicalWidth:  1,
+				PhysicalHeight: 1,
+				Context:        OpenGLContextDescriptor{EGL: &EGLContextDescriptor{}},
+			})
+		}},
 		{name: "RenderUpdate", call: func() error {
 			_, err := session.RenderUpdate()
 			return err

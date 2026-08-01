@@ -262,13 +262,6 @@ const PlatformOpenGLRenderTarget = union(enum) {
         }
     }
 
-    pub fn needsReattachOnResize(self: *const PlatformOpenGLRenderTarget) bool {
-        return switch (self.*) {
-            .owned_texture, .native_surface => false,
-            .borrowed_texture => true,
-        };
-    }
-
     pub fn finishFrame(self: *PlatformOpenGLRenderTarget) !void {
         switch (self.*) {
             .owned_texture => |*backend| try backend.finishFrame(),
@@ -358,6 +351,17 @@ const OpenGLContext = struct {
                 .get_proc_address = null,
             } },
         };
+    }
+
+    /// Re-reads the platform surface for this window.
+    ///
+    /// SDL can hand back a different EGL window surface once the window has
+    /// been resized, and a session still presenting through the old one draws
+    /// nowhere. Returns whether the handle changed.
+    fn refreshPlatformSurface(self: *OpenGLContext) !bool {
+        const previous = self.surface();
+        self.platform = try platformContext(self.window);
+        return !std.meta.eql(self.surface(), previous);
     }
 
     fn surface(self: *const OpenGLContext) maplibre.NativePointer {
@@ -633,8 +637,42 @@ const OpenGLBorrowedTextureBackend = struct {
         self.compositor.deinit();
     }
 
-    fn resize(_: *OpenGLBorrowedTextureBackend, _: types.Viewport) !void {
-        return types.AppError.TextureResizeFailed;
+    /// Follows a resized window.
+    ///
+    /// This example sizes the borrowed texture, not the session, so following a
+    /// resize means allocating one at the new size and handing it to the live
+    /// session. The session stays live, which is what keeps the map from going
+    /// cold on every resize.
+    fn resize(self: *OpenGLBorrowedTextureBackend, viewport: types.Viewport) !void {
+        const session = try self.session.textureHandle();
+        try self.compositor.resize(viewport);
+
+        var replacement = try BorrowedTexture.init(
+            &self.compositor.context,
+            self.compositor.procs,
+            viewport,
+        );
+        errdefer replacement.deinit(&self.compositor.context, self.compositor.procs);
+        session.setOpenGLBorrowedTextureTarget(.{
+            .extent = render_target.extent(viewport),
+            .physical_width = viewport.physical_width,
+            .physical_height = viewport.physical_height,
+            .context = self.compositor.context.descriptor(),
+            .texture = replacement.texture,
+            .target = gl_texture_target,
+        }) catch |err| {
+            // A native error may mean the session took the replacement
+            // before failing, and nothing here can tell that apart from a
+            // rejection that came first, so detach before either target is
+            // released; errdefer releases the replacement next.
+            session.detach() catch {};
+            diagnostics.logError("OpenGL borrowed texture set target failed", err, null);
+            return types.AppError.TextureResizeFailed;
+        };
+        // Only once the session has taken the replacement, so a rejected one
+        // leaves this target on the texture it already had.
+        self.borrowed_texture.deinit(&self.compositor.context, self.compositor.procs);
+        self.borrowed_texture = replacement;
     }
 
     fn finishFrame(self: *OpenGLBorrowedTextureBackend) !void {
@@ -702,8 +740,46 @@ const OpenGLSurfaceBackend = struct {
         self.context.deinit();
     }
 
+    /// Follows a resized window.
+    ///
+    /// SDL can hand back a different EGL window surface for the resized window.
+    /// The live session takes that replacement rather than being closed and
+    /// attached again, so it keeps its renderer either way.
     fn resize(self: *OpenGLSurfaceBackend, viewport: types.Viewport) !void {
-        try self.session.resize(viewport, null);
+        const replaced = self.context.refreshPlatformSurface() catch |err| {
+            // SDL owns the surfaces and may already have dropped the one the
+            // session presents through, so detach rather than leave it naming
+            // a surface that is gone.
+            self.detachSuppressed();
+            diagnostics.logError("OpenGL surface refresh failed", err, null);
+            return types.AppError.SurfaceAttachFailed;
+        };
+        if (!replaced) {
+            try self.session.resize(viewport, null);
+            return;
+        }
+        const handle = try self.session.surfaceHandle();
+        handle.setOpenGLSurfaceTarget(.{
+            .extent = render_target.extent(viewport),
+            .context = self.context.descriptor(),
+            .surface = self.context.surface(),
+        }) catch |err| {
+            // A native error may mean the session took the replacement before
+            // failing, and nothing here can tell that apart from a rejection
+            // that came first. SDL owns both surfaces and already dropped the
+            // outgoing one, so detaching is the only way to stop the session
+            // naming either.
+            handle.detach() catch {};
+            diagnostics.logError("OpenGL surface set target failed", err, null);
+            return types.AppError.SurfaceAttachFailed;
+        };
+    }
+
+    /// Detaches the session, for a failure path that has nothing better to
+    /// report than the failure it is already returning.
+    fn detachSuppressed(self: *OpenGLSurfaceBackend) void {
+        const handle = self.session.surfaceHandle() catch return;
+        handle.detach() catch {};
     }
 
     fn finishFrame(self: *OpenGLSurfaceBackend) !void {

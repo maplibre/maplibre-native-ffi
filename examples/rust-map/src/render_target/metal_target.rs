@@ -37,15 +37,43 @@ impl RenderTarget {
         }
     }
 
-    pub fn needs_reattach_on_resize(&self) -> bool {
-        matches!(self, Self::BorrowedTexture { .. })
-    }
-
-    pub fn resize(&mut self, viewport: Viewport) -> maplibre_native::Result<()> {
+    /// Follows a resized host.
+    ///
+    /// A caller-owned texture is sized by this example, not by the session, so
+    /// following a resize means allocating one at the new size and handing it
+    /// over. The session stays live either way, which is what keeps the map
+    /// from going cold every time the window changes size.
+    pub fn resize(
+        &mut self,
+        graphics: &GraphicsContext,
+        viewport: Viewport,
+    ) -> maplibre_native::Result<()> {
         match self {
-            Self::BorrowedTexture { .. } => Err(compositor_error(
-                "borrowed texture resize requires render target reattachment",
-            )),
+            Self::BorrowedTexture {
+                session, texture, ..
+            } => {
+                let replacement = MetalBorrowedTexture::new(graphics.metal(), viewport)?;
+                let descriptor = maplibre_native::MetalBorrowedTextureDescriptor::new(
+                    extent(viewport),
+                    viewport.physical_width,
+                    viewport.physical_height,
+                    replacement.pointer(),
+                );
+                if let Err(error) = session.set_metal_borrowed_texture_target(&descriptor) {
+                    // A native error may mean the session took the replacement
+                    // before failing, and nothing here can tell that apart from
+                    // a rejection that came first. Rust's detach consumes the
+                    // handle, which this borrow cannot do, so keep the
+                    // replacement alive instead: releasing it is the only way
+                    // to hand the session a dangling texture.
+                    std::mem::forget(replacement);
+                    return Err(error);
+                }
+                // Only once the session has taken it, so a rejected replacement
+                // leaves this target on the texture it already had.
+                **texture = replacement;
+                Ok(())
+            }
             Self::OwnedTexture { session, .. } | Self::Surface { session } => session.resize(
                 viewport.logical_width,
                 viewport.logical_height,

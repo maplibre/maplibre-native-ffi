@@ -30,7 +30,7 @@ import org.maplibre.nativeffi.runtime.WakeSource
 internal class MapRuntimeLoop(
   private val initialExtent: SurfaceExtent,
   private val commands: CameraCommandQueue,
-  private val renderRequest: RenderRequest,
+  private val requestRender: () -> Unit,
 ) : AutoCloseable {
   /** The map's scale factor is fixed at creation, so a density change restarts the whole loop. */
   val scaleFactor: Double
@@ -136,7 +136,10 @@ internal class MapRuntimeLoop(
       // backstop rather than the cadence.
       runtime.pump(PARK_TIMEOUT_MS)
       if (drainEvents(runtime, map)) {
-        renderRequest.set()
+        // Compose draws on demand, so a map update is worth a frame only if something asks for
+        // one. Tiles, style loads, and animation ticks all arrive here with no host input behind
+        // them, and the frame after a resize is one of them.
+        requestRender()
       }
     }
   }

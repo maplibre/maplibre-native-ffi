@@ -42,9 +42,11 @@ typedef struct mln_metal_borrowed_texture_descriptor {
    * Borrowed id<MTLTexture> / MTL::Texture*. Required.
    *
    * The texture's pixel dimensions must equal physical_width and
-   * physical_height, and the texture must allow render-target usage. The
-   * session reads the texture's dimensions and rejects a mismatch. The caller
-   * owns the texture and must keep it valid until detach or destroy.
+   * physical_height, the texture must allow render-target usage, and it must be
+   * single-sample: the session builds the matching depth and stencil
+   * attachments itself and builds them single-sample. The session reads all
+   * three from the texture and rejects a mismatch. The caller owns the texture
+   * and must keep it valid until detach or destroy.
    */
   void* texture;
 } mln_metal_borrowed_texture_descriptor;
@@ -324,9 +326,10 @@ MLN_API mln_status mln_metal_owned_texture_attach(
  * *out_session receives a handle the caller destroys with
  * mln_render_session_destroy().
  *
- * mln_render_session_resize() returns MLN_STATUS_UNSUPPORTED for this target.
- * Follow a resized host by destroying the session, recreating the texture at
- * the new extent, and attaching again; see mln_render_session_resize().
+ * mln_render_session_resize() returns MLN_STATUS_UNSUPPORTED for this target,
+ * which the host owns and sizes. Follow a resized host by allocating a texture
+ * at the new size and handing it over with
+ * mln_metal_borrowed_texture_set_target(), which keeps the session.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -392,10 +395,10 @@ MLN_API mln_status mln_vulkan_owned_texture_attach(
  * the submitted work to finish, and leaves the image in
  * descriptor->final_layout before mln_render_session_render_update() returns.
  *
- * mln_render_session_resize() returns MLN_STATUS_UNSUPPORTED for this target.
- * Follow a resized host by destroying the session, recreating the image and
- * view at the new extent, and attaching again; see
- * mln_render_session_resize().
+ * mln_render_session_resize() returns MLN_STATUS_UNSUPPORTED for this target,
+ * which the host owns and sizes. Follow a resized host by allocating an image
+ * and view at the new size and handing them over with
+ * mln_vulkan_borrowed_texture_set_target(), which keeps the session.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -458,9 +461,10 @@ MLN_API mln_status mln_opengl_owned_texture_attach(
  * *out_session receives a handle the caller destroys with
  * mln_render_session_destroy().
  *
- * mln_render_session_resize() returns MLN_STATUS_UNSUPPORTED for this target.
- * Follow a resized host by destroying the session, recreating the texture at
- * the new extent, and attaching again; see mln_render_session_resize().
+ * mln_render_session_resize() returns MLN_STATUS_UNSUPPORTED for this target,
+ * which the host owns and sizes. Follow a resized host by allocating a texture
+ * at the new size and handing it over with
+ * mln_opengl_borrowed_texture_set_target(), which keeps the session.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -474,6 +478,142 @@ MLN_API mln_status mln_opengl_owned_texture_attach(
 MLN_API mln_status mln_opengl_borrowed_texture_attach(
   mln_map map, const mln_opengl_borrowed_texture_descriptor* descriptor,
   mln_render_session* out_session
+) MLN_NOEXCEPT;
+
+/**
+ * Renders an attached Metal texture session into a new caller-owned texture.
+ *
+ * A caller-owned texture is sized by its owner, so a host that follows a resize
+ * reallocates rather than resizing, and
+ * mln_render_session_resize() reports MLN_STATUS_UNSUPPORTED for these targets.
+ * This replaces the texture in place instead, so the session keeps its renderer
+ * along with the tile pyramid, glyph and image atlases, symbol placement, and
+ * feature state set through mln_render_session_set_feature_state().
+ *
+ * descriptor->texture must belong to the device the session attached with. A
+ * texture on a different device is a different session: destroy this one with
+ * mln_render_session_destroy() and attach again, accepting a cold renderer.
+ *
+ * The caller owns the replacement, keeps it valid until the next replacement,
+ * detach, or destroy, and synchronizes any use outside this session, exactly as
+ * for mln_metal_borrowed_texture_attach(). The session never retained the
+ * outgoing texture, never releases it, and never reads it here: the pixel
+ * format it checks was recorded when it took that texture. A caller that
+ * already released the outgoing texture, which a host reallocating on resize
+ * often has, hands over the replacement all the same.
+ *
+ * The new extent applies exactly as mln_render_session_resize() applies one,
+ * including how the next mln_render_session_render_update() waits for the map
+ * to catch up to it. A scale_factor that differs from the session's current
+ * value rebuilds the renderer, whose shaders are compiled for a fixed pixel
+ * ratio. The replacement's pixel format is a different matter: mbgl reads the
+ * color format off the target when it builds a render pipeline state but does
+ * not key its cache on it, so a texture in another format would be drawn with
+ * pipelines built for the old one. One that differs from the format this
+ * session attached with is reported as MLN_STATUS_UNSUPPORTED, with the session
+ * still rendering into the texture it has. Destroying the session and attaching
+ * again is what changes the format.
+ *
+ * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
+ * target is touched and leaves the session rendering into the one it had.
+ * MLN_STATUS_NATIVE_ERROR is the only one that can mean a replacement was
+ * already under way, which cannot be unwound; it can also come from a check
+ * made before anything was touched, and the two do not read differently here.
+ * Treat it as a session to destroy with mln_render_session_destroy().
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
+ *   null or invalid, or descriptor->texture belongs to another device.
+ * - MLN_STATUS_INVALID_STATE when the session is detached or a texture frame is
+ *   currently acquired.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
+ *   owner thread.
+ * - MLN_STATUS_UNSUPPORTED when the session does not render into a caller-owned
+ *   Metal texture, when descriptor->texture has a different pixel format from
+ *   the session's, or when Metal borrowed texture sessions are not supported by
+ *   this build.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_metal_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_metal_borrowed_texture_descriptor* descriptor
+) MLN_NOEXCEPT;
+
+/**
+ * Renders an attached Vulkan texture session into a new caller-owned image.
+ *
+ * See mln_metal_borrowed_texture_set_target() for what replacing a target
+ * preserves and when a host reaches for it. descriptor->context must name the
+ * same instance, physical device, device, and graphics queue the session
+ * attached with.
+ *
+ * The replacement must carry the format and both layouts this session built
+ * its render pass around. MLN_STATUS_UNSUPPORTED reports one that does not,
+ * with the session still rendering into the image it has, and destroying the
+ * session and attaching again is what changes them.
+ *
+ * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
+ * target is touched and leaves the session rendering into the one it had.
+ * MLN_STATUS_NATIVE_ERROR is the only one that can mean a replacement was
+ * already under way, which cannot be unwound; it can also come from a check
+ * made before anything was touched, and the two do not read differently here.
+ * Treat it as a session to destroy with mln_render_session_destroy().
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
+ *   null or invalid, or descriptor->context names handles other than the
+ *   session's.
+ * - MLN_STATUS_INVALID_STATE when the session is detached or a texture frame is
+ *   currently acquired.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
+ *   owner thread.
+ * - MLN_STATUS_UNSUPPORTED when the session does not render into a caller-owned
+ *   Vulkan image, when descriptor->format, descriptor->initial_layout, or
+ *   descriptor->final_layout differs from the session's, or when Vulkan
+ *   borrowed texture sessions are not supported by this build.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_vulkan_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_vulkan_borrowed_texture_descriptor* descriptor
+) MLN_NOEXCEPT;
+
+/**
+ * Renders an attached OpenGL texture session into a new caller-owned texture.
+ *
+ * See mln_metal_borrowed_texture_set_target() for what replacing a target
+ * preserves and when a host reaches for it. descriptor->context must name the
+ * context provider data the session attached with, so the session's own context
+ * and every object the renderer holds in it, stays current across the
+ * change. The replacement belongs to that context or one in the same share
+ * group, and the host context must be current on the calling thread.
+ *
+ * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
+ * target is touched and leaves the session rendering into the one it had.
+ * MLN_STATUS_NATIVE_ERROR is the only one that can mean a replacement was
+ * already under way, which cannot be unwound; it can also come from a check
+ * made before anything was touched, and the two do not read differently here.
+ * Treat it as a session to destroy with mln_render_session_destroy().
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
+ *   null or invalid, or descriptor->context names context provider data other
+ *   than the session's.
+ * - MLN_STATUS_INVALID_STATE when the session is detached or a texture frame is
+ *   currently acquired.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
+ *   owner thread.
+ * - MLN_STATUS_UNSUPPORTED when the session does not render into a caller-owned
+ *   OpenGL texture, or when OpenGL borrowed texture sessions are not supported
+ *   by this build.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_opengl_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_opengl_borrowed_texture_descriptor* descriptor
 ) MLN_NOEXCEPT;
 
 /**

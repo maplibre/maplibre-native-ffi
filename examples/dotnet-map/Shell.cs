@@ -144,20 +144,11 @@ internal static class Shell
                     if (!viewport.IsEmpty)
                     {
                         graphics.Resize(viewport);
-                        if (target.NeedsReattachOnResize)
-                        {
-                            // Reattach is local to this thread now: close the session, rebuild the
-                            // target, attach again.
-                            var previous = target;
-                            target = null;
-                            previous.Dispose();
-                            target = RenderTargetFactory.Attach(graphics, map, mode);
-                        }
-                        else
-                        {
-                            target.Resize(viewport);
-                        }
-
+                        // Every mode follows a resize without losing its session: the ones the
+                        // session sizes resize in place, and a caller-owned texture hands the
+                        // session a replacement. Closing and attaching again is reserved for a
+                        // target the live session cannot take at all.
+                        target.Resize(viewport);
                         renderRequest.Set();
                     }
                 }

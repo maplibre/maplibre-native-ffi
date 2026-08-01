@@ -226,9 +226,9 @@ current on another thread. Attaching where the host context is already current
 avoids both failure modes. Vulkan and Metal have no thread-current context and
 are unaffected.
 
-Reattaching, which the borrowed-texture mode requires on resize, is entirely
-local to the render loop thread: close the session, rebuild the mode-specific
-resources, attach again.
+Reattaching, which a graphics context change requires, is entirely local to the
+render loop thread: close the session, rebuild the mode-specific resources,
+attach again.
 
 ##### Thread identity on Apple platforms and managed runtimes
 
@@ -359,7 +359,7 @@ polling.
    and enqueue them for the runtime loop; signal the runtime loop's wake source;
    set the render request.
 2. Apply pending viewport changes to graphics resources and to the render
-   session, or run the [reattach](#reattach).
+   target, which follows them without losing its session.
 3. Consume the render request; when it was set, call `render_update`.
 4. Run `finishFrame()`.
 
@@ -521,10 +521,10 @@ map-specific setup.
 
 #### Resize API
 
-Expose `resize(viewport)` for the active render target. Resize API-level
-resources separately when the graphics context requires it. When the active
-render target reports `needsReattachOnResize`, destroy it and attach a
-replacement for the same graphics context, map, and mode.
+Expose `resize(viewport)` for the active render target, and resize API-level
+resources separately when the graphics context requires it. The render target
+decides for itself how to follow the new viewport, so a host resizes every mode
+through the same call.
 
 ### Render-target modes
 
@@ -567,9 +567,9 @@ table:
 - Attach with the borrowed-texture descriptor referencing host-owned handles.
 - On `render_update`, sample that texture through the same compositor path as
   `owned-texture`.
-- On resize, recreate the host texture and re-attach the session (see
-  [Resize mechanics](#resize-mechanics); `needsReattachOnResize` is `true` for
-  this mode).
+- On resize, allocate a host texture at the new size and hand it to the live
+  session with `set_target`, which the render target does inside its own
+  `resize` (see [Resize mechanics](#resize-mechanics)).
 
 #### `native-surface`
 
@@ -577,8 +577,10 @@ table:
   [Graphics API](#graphics-api)).
 - `render_update` presents through the surface render target directly.
 - `drawTexture` MUST NOT be called for this mode.
-- On resize, call session `resize` and rebuild host presentation; reattach when
-  the host toolkit supplies a new surface handle.
+- On resize, call session `resize` and rebuild host presentation. When the host
+  toolkit supplies a new surface handle for the same graphics context, call
+  `set_target` with it; reattach only when the context itself changed or was
+  lost.
 
 ### Compositor shaders
 
@@ -598,14 +600,40 @@ that pass.
 
 - Recompute viewport on host size or scale changes; skip rendering if extent is
   empty.
-- `needsReattachOnResize()` is a render-target method. It returns `true` for
-  `borrowed-texture` because the host-owned exportable texture is fixed to the
-  viewport size: resize destroys the render target, recreates the texture, and
-  attaches again. It returns `false` for `owned-texture` and `native-surface`,
-  where resize updates graphics-context resources, compositor resources for
-  texture modes, and session extent in place.
-- When it returns `true`, use the [reattach](#reattach); otherwise resize the
-  graphics context and active render target in place.
+- `resize(viewport)` is a render-target method, and each mode follows the new
+  viewport its own way. `owned-texture` and `native-surface` resize
+  graphics-context resources, compositor resources for texture modes, and
+  session extent in place. `borrowed-texture` cannot: the host-owned exportable
+  texture is fixed to the viewport size, so it allocates one at the new size and
+  hands it to the live session with `set_target`. A host calls `resize` for
+  every mode and branches on none of them.
+- The session stays live either way, and so does its renderer, so the map keeps
+  its tiles and atlases across a resize. A scale factor change is the exception
+  the C API documents, rebuilding the renderer for the new pixel ratio.
+- Pick an ownership strategy for the handover and follow the C API's rules for
+  it. An example that keeps the outgoing target until the call returns can roll
+  back: a rejected replacement leaves the session on the target it had, so it
+  releases the replacement and keeps rendering. An example whose graphics layer
+  frees the outgoing target first cannot roll back, and treats a rejected
+  handover as a session to close and attach again. Caller-owned textures allow
+  either, because no backend reads the outgoing texture.
+- A Vulkan surface is the exception, and requires the retaining strategy: its
+  outgoing `VkSurfaceKHR` must still be valid when `set_target` is called,
+  because the session destroys the swapchain built from it first.
+- `MLN_STATUS_NATIVE_ERROR` may mean the replacement was already under way, and
+  a caller cannot tell it apart from a failure that came earlier. The session
+  may therefore hold either target. Detach or close it before releasing either
+  one, and attach again rather than reusing it; stopping before the next frame
+  is not enough on its own, because the release still happens while the session
+  holds the target. Every other status is reported before the target changes,
+  which is what makes rolling back to the outgoing target safe.
+- Build the replacement to match what the session attached with, which the C API
+  states per backend and per function. `set_target` reports
+  `MLN_STATUS_UNSUPPORTED` for a target that differs, leaving the session on the
+  one it has.
+- Reserve [reattach](#reattach) for a target the live session cannot take: a new
+  graphics context or device, a target that `set_target` reports as unsupported,
+  or a context that was lost.
 - Set the render request after any resize.
 - The render loop owns the session, so an in-place resize is a local call. The
   map applies the new logical size on the runtime loop's next `pump`, so
@@ -613,11 +641,11 @@ that pass.
 
 #### Reattach
 
-Reattaching happens entirely on the render loop thread, which owns both the
-session and the graphics resources. The sequence MUST be:
+Reattaching is for a target the live session cannot take, not for a resize. It
+happens entirely on the render loop thread, which owns both the session and the
+graphics resources. The sequence MUST be:
 
-1. Close the session, then destroy and recreate the host texture or surface at
-   the new size.
+1. Close the session, then destroy and recreate the host texture or surface.
 2. Attach the render target again against the published map.
 3. Set the render request.
 
@@ -800,18 +828,24 @@ render loop only while the view is visible and the app is in the foreground. The
 runtime loop keeps running across these transitions, so loading continues while
 the view is off screen.
 
-When the host toolkit destroys or invalidates the presentation surface, close
-the render target on the render loop thread, which is the thread that attached
-it. Keep runtime and map handles alive. Attach again on that same thread when a
-fresh surface is available, per [Reattach](#reattach).
+When the host toolkit supplies a fresh presentation surface on the graphics
+context the session attached with, hand it over with `set_target` on the render
+loop thread, which is the thread that attached the session. The session keeps
+its renderer, so the map returns warm rather than rebuilding its tiles and
+atlases.
 
-| Transition                       | Behavior                                                                                                                                                           |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| View will appear                 | Mark the view visible. If the app is in the foreground, start the render loop, refresh viewport, attach or reattach the render target, and set the render request. |
-| View did disappear               | Mark the view not visible. Stop the render loop. Close the render target when the presentation surface is destroyed or invalidated.                                |
-| App foreground                   | Mark the app foreground. If the view is visible, start the render loop, refresh viewport, attach or reattach the render target, and set the render request.        |
-| App background                   | Mark the app background. Stop the render loop. Close the render target when the presentation surface is destroyed or invalidated.                                  |
-| View destroyed / app termination | Run [Shared shutdown](#shutdown).                                                                                                                                  |
+Close the render target only when the graphics context itself is gone, on that
+same render loop thread. Keep runtime and map handles alive either way, and
+attach again on that thread once a context and surface exist, per
+[Reattach](#reattach).
+
+| Transition                       | Behavior                                                                                                                                                                                             |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| View will appear                 | Mark the view visible. If the app is in the foreground, start the render loop, refresh viewport, hand a parked session its surface or attach the render target, and set the render request.          |
+| View did disappear               | Mark the view not visible. Stop the render loop. Park the session when the presentation surface goes away and the graphics context survives; close the render target only when that context is gone. |
+| App foreground                   | Mark the app foreground. If the view is visible, start the render loop, refresh viewport, hand a parked session its surface or attach the render target, and set the render request.                 |
+| App background                   | Mark the app background. Stop the render loop. Park the session when the presentation surface goes away and the graphics context survives; close the render target only when that context is gone.   |
+| View destroyed / app termination | Run [Shared shutdown](#shutdown).                                                                                                                                                                    |
 
 ### Entry and shell
 

@@ -64,16 +64,9 @@ internal object MetalRenderTarget {
     var compositor: MetalTextureCompositor? = null
     try {
       texture = MetalBorrowedTexture(context, viewport)
-      val descriptor =
-        MetalBorrowedTextureDescriptor(
-          RenderTarget.extent(viewport),
-          viewport.framebufferWidth(),
-          viewport.framebufferHeight(),
-          NativePointer.ofAddress(texture.texture()),
-        )
-      session = map.attachMetalBorrowedTexture(descriptor)
+      session = map.attachMetalBorrowedTexture(borrowedDescriptor(viewport, texture))
       compositor = MetalTextureCompositor(context)
-      return BorrowedTexture(context, map, session, compositor, texture)
+      return BorrowedTexture(context, session, compositor, texture)
     } catch (error: RuntimeException) {
       RenderTarget.closeSuppressed(error, compositor)
       RenderTarget.closeSuppressed(error, session)
@@ -81,6 +74,17 @@ internal object MetalRenderTarget {
       throw error
     }
   }
+
+  private fun borrowedDescriptor(
+    viewport: Viewport,
+    texture: MetalBorrowedTexture,
+  ): MetalBorrowedTextureDescriptor =
+    MetalBorrowedTextureDescriptor(
+      RenderTarget.extent(viewport),
+      viewport.framebufferWidth(),
+      viewport.framebufferHeight(),
+      NativePointer.ofAddress(texture.texture()),
+    )
 
   private fun descriptor(context: MetalContext): MetalContextDescriptor =
     MetalContextDescriptor(NativePointer.ofAddress(context.deviceAddress()))
@@ -134,58 +138,47 @@ internal object MetalRenderTarget {
 
   private class BorrowedTexture(
     private val context: MetalContext,
-    private val map: MapHandle,
-    private var session: RenderSessionHandle?,
-    private var compositor: MetalTextureCompositor?,
-    private var texture: MetalBorrowedTexture?,
+    private val session: RenderSessionHandle,
+    private val compositor: MetalTextureCompositor,
+    private var texture: MetalBorrowedTexture,
   ) : RenderTarget {
     override fun needsMetalAutoreleasePool(): Boolean = true
 
-    override fun needsReattachOnResize(): Boolean = true
-
-    /** Local to the render loop thread: close the session, rebuild the texture, attach again. */
-    override fun reattach(viewport: Viewport) {
-      close()
-      val replacement = attachBorrowedTexture(context, map, viewport)
-      check(replacement is BorrowedTexture) { "unexpected borrowed texture replacement" }
-      session = replacement.session
-      compositor = replacement.compositor
-      texture = replacement.texture
-      replacement.session = null
-      replacement.compositor = null
-      replacement.texture = null
-    }
-
+    /** Local to the render loop thread: allocate a texture at the new size and hand it over. */
     override fun resize(viewport: Viewport) {
-      error("borrowed texture resize requires render target reattachment")
+      val replacement = MetalBorrowedTexture(context, viewport)
+      try {
+        session.setMetalBorrowedTextureTarget(borrowedDescriptor(viewport, replacement))
+      } catch (error: RuntimeException) {
+        // A native error may mean the session took the replacement before failing, and nothing here
+        // can tell that apart from a rejection that came first, so detach before either texture is
+        // released.
+        RenderTarget.detachSuppressed(error, session)
+        RenderTarget.closeSuppressed(error, replacement)
+        throw error
+      }
+      // Only once the session has taken the replacement, so a rejected one leaves this target on
+      // the texture it already had.
+      texture.close()
+      texture = replacement
     }
 
     override fun renderUpdate(): Boolean {
-      val currentSession = checkNotNull(session) { "Metal borrowed texture session is detached" }
-      val currentCompositor =
-        checkNotNull(compositor) { "Metal borrowed texture compositor is detached" }
-      val currentTexture = checkNotNull(texture) { "Metal borrowed texture is detached" }
-      if (!currentSession.renderUpdate()) {
+      if (!session.renderUpdate()) {
         return false
       }
-      currentCompositor.drawTexture(currentTexture.texture())
+      compositor.drawTexture(texture.texture())
       return true
     }
 
     override fun close() {
-      val closingCompositor = compositor
-      val closingSession = session
-      val closingTexture = texture
-      compositor = null
-      session = null
-      texture = null
       try {
-        closingCompositor?.close()
+        compositor.close()
       } finally {
         try {
-          closingSession?.close()
+          session.close()
         } finally {
-          closingTexture?.close()
+          texture.close()
         }
       }
     }

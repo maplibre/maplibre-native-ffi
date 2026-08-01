@@ -272,6 +272,25 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
 
   void finish_rendering() { getContext<mbgl::gl::Context>().finish(); }
 
+  // Renders into a different caller-owned texture from here on. The session's
+  // context is untouched, so every object the renderer built in it survives;
+  // only the framebuffer that named the outgoing texture is rebuilt, which
+  // getDefaultRenderable() does once the resource is gone.
+  void set_borrowed_texture(uint32_t texture, mbgl::Size new_size) {
+    borrowed_texture_ = texture;
+    // setSize() drops the renderable unconditionally, which is what rebuilds
+    // the framebuffer against the new texture even when the size is unchanged.
+    // No context is made current for it: the framebuffer and renderbuffer names
+    // it owns go to the context's abandoned lists and are deleted on the next
+    // render, the same way an owned-texture resize releases them.
+    setSize(new_size);
+  }
+
+  [[nodiscard]] auto context_descriptor() const
+    -> const mln_opengl_context_descriptor& {
+    return context_;
+  }
+
  private:
   [[nodiscard]] auto has_native_context() const -> bool {
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
@@ -429,6 +448,25 @@ class OpenGLTextureSessionBackend final
     return backend_;
   }
 
+  auto set_opengl_borrowed_target(
+    const mln_opengl_borrowed_texture_descriptor& descriptor
+  ) -> mln_status override {
+    if (!mln::core::opengl_context_matches(
+          backend_.context_descriptor(), descriptor.context,
+          mln::core::OpenGLContextMatch::Exact
+        )) {
+      mln::core::set_thread_error(
+        "OpenGL texture target must name the context this session attached with"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    backend_.set_borrowed_texture(
+      descriptor.texture,
+      mbgl::Size{descriptor.physical_width, descriptor.physical_height}
+    );
+    return MLN_STATUS_OK;
+  }
+
   auto after_render(mln_render_session_object& texture, bool& out_rendered)
     -> mln_status override {
     texture.texture.rendered_native_texture =
@@ -579,6 +617,47 @@ auto opengl_borrowed_texture_attach(
       .null_session = "texture session must not be null",
       .null_output = "out_session must not be null",
       .non_null_output = "out_session must point to a null handle"
+    }
+  );
+}
+
+auto opengl_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_opengl_borrowed_texture_descriptor* descriptor
+) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto session_status = validate_render_session_retarget(
+    session, RetargetTargetKind::BorrowedTexture, live
+  );
+  if (session_status != MLN_STATUS_OK) {
+    return session_status;
+  }
+  const auto descriptor_status =
+    validate_opengl_borrowed_texture_descriptor(descriptor, true);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  // The same check attach makes: the shared validator accepts any nonzero
+  // target, and the backend attaches whatever name it is given as
+  // GL_TEXTURE_2D. Without this a cube-map target is taken here and only fails
+  // on the next render, with the old target already discarded.
+  if (descriptor->target != opengl_texture_target) {
+    set_thread_error("OpenGL texture target must be GL_TEXTURE_2D");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto physical_status = validate_borrowed_physical_size(
+    descriptor->physical_width, descriptor->physical_height
+  );
+  if (physical_status != MLN_STATUS_OK) {
+    return physical_status;
+  }
+  return render_session_set_target(
+    session, RetargetTargetKind::BorrowedTexture, descriptor->extent,
+    descriptor->physical_width, descriptor->physical_height,
+    [descriptor](mln_render_session_object& target_session) -> mln_status {
+      return target_session.texture.backend->set_opengl_borrowed_target(
+        *descriptor
+      );
     }
   );
 }

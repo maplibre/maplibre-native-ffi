@@ -79,8 +79,10 @@ sleep, which is simple and burns CPU.
 
 When the window changes size, call `mln_render_session_resize()` with the new
 logical size and scale factor, then render again. Camera, style, and sources
-live on the map and survive the resize. Renderer-held state such as feature
-state does not, so reapply it afterward.
+live on the map, and the session keeps its renderer, so tiles, atlases, and
+renderer-held state such as feature state carry over. Changing the scale factor
+is the exception: a renderer compiles its shaders for one pixel ratio, so that
+resize starts a new one and renderer-held state starts empty.
 
 A scale factor that disagrees with the map's own logs a warning, and MapLibre
 renders imagery chosen for the map's density. Choose the map's `scale_factor`
@@ -88,15 +90,22 @@ for the displays you target.
 
 ## Follow the surface's life
 
-Surfaces come and go as windows close and views detach. When the surface goes
-away:
+Surfaces come and go as windows close, views detach, and devices rotate. When a
+new surface arrives on the same graphics context, hand it to the live session
+with `mln_<backend>_surface_set_target()`. The session keeps its renderer, so
+the map comes back with the tiles and atlases it already had instead of
+rebuilding them. This is the path for Android rotation, a Flutter
+`SurfaceProducer` lifecycle change, and any window resize that reallocates.
+
+Tear the session down when the graphics context itself goes away, or when the
+replacement belongs to a different one:
 
 1. Call `mln_render_session_destroy()` on the thread that attached the session.
    To release the map's slot first, call `mln_render_session_detach()` and
    destroy the handle afterward. A detached handle can only be destroyed.
 2. Release your surface and context.
 3. When a new surface arrives, attach a fresh session. The map keeps its camera
-   and style throughout.
+   and style throughout, and the new session starts with a cold renderer.
 
 Complete working loops for each backend live in the example apps: `zig-map`,
 `rust-map`, `lwjgl-map`, `swift-map`, `dotnet-map`, and `android-map`.

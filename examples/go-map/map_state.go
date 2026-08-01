@@ -227,12 +227,10 @@ func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapID maplibre.MapID) (b
 	}
 }
 
-// renderMapState owns the graphics context and render target on the SDL render
-// loop thread. It uses the published map only for attach and reattach.
+// renderMapState owns the render target on the SDL render loop thread. It uses
+// the published map only to attach that target.
 type renderMapState struct {
-	mapRef   *maplibre.MapHandle
-	graphics *openGLContext
-	target   renderTarget
+	target renderTarget
 }
 
 func newRenderMapState(graphics *openGLContext, mapRef *maplibre.MapHandle, v viewport, mode renderTargetMode) (*renderMapState, error) {
@@ -240,7 +238,7 @@ func newRenderMapState(graphics *openGLContext, mapRef *maplibre.MapHandle, v vi
 	if err != nil {
 		return nil, err
 	}
-	return &renderMapState{mapRef: mapRef, graphics: graphics, target: target}, nil
+	return &renderMapState{target: target}, nil
 }
 
 func (state *renderMapState) closeTarget() error {
@@ -252,24 +250,11 @@ func (state *renderMapState) closeTarget() error {
 	return err
 }
 
-func (state *renderMapState) resize(v viewport, mode renderTargetMode) error {
+// resize follows the resized host without losing the session: the render target
+// either resizes in place or hands the live session a replacement of its own.
+func (state *renderMapState) resize(v viewport) error {
 	if state.target == nil {
 		return errors.New("render target is not attached")
-	}
-	reattach, err := state.target.NeedsReattachOnResize()
-	if err != nil {
-		return err
-	}
-	if reattach {
-		if err := state.closeTarget(); err != nil {
-			return err
-		}
-		target, err := newOpenGLRenderTarget(state.graphics, v, mode, state.mapRef)
-		if err != nil {
-			return err
-		}
-		state.target = target
-		return nil
 	}
 	return state.target.Resize(v)
 }

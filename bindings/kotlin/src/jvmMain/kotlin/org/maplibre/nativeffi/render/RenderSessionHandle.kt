@@ -42,6 +42,42 @@ internal constructor(private val map: MapHandle, private val handle: NativeRende
     NativeAccess.resizeRenderSession(requireLiveHandle(), width, height, scaleFactor)
   }
 
+  public actual fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor) {
+    NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("set target")
+    NativeAccess.setMetalSurfaceTarget(requireLiveHandle(), descriptor)
+  }
+
+  public actual fun setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor) {
+    NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("set target")
+    NativeAccess.setVulkanSurfaceTarget(requireLiveHandle(), descriptor)
+  }
+
+  public actual fun setOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor) {
+    NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("set target")
+    NativeAccess.setOpenGLSurfaceTarget(requireLiveHandle(), descriptor)
+  }
+
+  public actual fun setMetalBorrowedTextureTarget(descriptor: MetalBorrowedTextureDescriptor) {
+    NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("set target")
+    NativeAccess.setMetalBorrowedTextureTarget(requireLiveHandle(), descriptor)
+  }
+
+  public actual fun setVulkanBorrowedTextureTarget(descriptor: VulkanBorrowedTextureDescriptor) {
+    NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("set target")
+    NativeAccess.setVulkanBorrowedTextureTarget(requireLiveHandle(), descriptor)
+  }
+
+  public actual fun setOpenGLBorrowedTextureTarget(descriptor: OpenGLBorrowedTextureDescriptor) {
+    NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("set target")
+    NativeAccess.setOpenGLBorrowedTextureTarget(requireLiveHandle(), descriptor)
+  }
+
   public actual fun renderUpdate(): Boolean {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("render")

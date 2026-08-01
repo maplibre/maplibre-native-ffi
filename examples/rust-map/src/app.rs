@@ -10,7 +10,6 @@ use std::sync::Arc;
 use std::sync::mpsc::{self, Sender};
 use std::thread::{self, JoinHandle};
 
-use maplibre_native::MapAttachRef;
 use winit::event::WindowEvent;
 use winit::window::{Window, WindowId};
 
@@ -23,7 +22,6 @@ use crate::viewport::Viewport;
 
 pub struct App {
     target: Option<RenderTarget>,
-    attach_ref: MapAttachRef,
     /// Releases the runtime loop's parked pump, so a queued camera command is
     /// applied now rather than after its parking bound.
     wake: Arc<maplibre_native::WakeSource>,
@@ -86,7 +84,6 @@ impl App {
 
         Ok(Self {
             target: Some(target),
-            attach_ref: handles.attach_ref,
             wake: handles.wake,
             runtime_thread: Some(runtime_thread),
             commands,
@@ -162,28 +159,14 @@ impl App {
             return Ok(());
         }
         self.graphics.resize(next)?;
-        if self
-            .target
-            .as_ref()
+        // Every mode follows a resize without losing its session: the ones the
+        // session sizes resize in place, and a caller-owned target allocates a
+        // replacement and hands it over. Closing and attaching again is
+        // reserved for a target the live session cannot take at all.
+        self.target
+            .as_mut()
             .expect("render target is open")
-            .needs_reattach_on_resize()
-        {
-            // Reattach is entirely local: close the session, rebuild the
-            // target, attach again, all on this thread.
-            let old_target = self.target.take().expect("render target is open");
-            old_target.close(&self.graphics)?;
-            self.target = Some(RenderTarget::attach(
-                self.mode,
-                &self.attach_ref,
-                &self.graphics,
-                next,
-            )?);
-        } else {
-            self.target
-                .as_mut()
-                .expect("render target is open")
-                .resize(next)?;
-        }
+            .resize(&self.graphics, next)?;
         self.shared.request_render();
         Ok(())
     }

@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.RenderTargetExtent
 
 /**
@@ -10,14 +11,16 @@ import org.maplibre.nativeffi.render.RenderTargetExtent
  * driven, and closed on the render loop thread, where the host graphics context lives.
  */
 internal interface RenderTarget : AutoCloseable {
-  fun needsReattachOnResize(): Boolean = false
-
   fun needsMetalAutoreleasePool(): Boolean = false
 
-  fun reattach(viewport: Viewport) {
-    throw IllegalStateException("render target does not support reattachment")
-  }
-
+  /**
+   * Follows a resized host, keeping the session attached.
+   *
+   * Surface and owned-texture targets are sized by the session, so they resize in place. A
+   * caller-owned texture is sized by this example instead, so it allocates one at the new size and
+   * hands it to the live session. Either way the session keeps its renderer, which is what keeps
+   * the map from going cold on every window resize.
+   */
   fun resize(viewport: Viewport)
 
   /** Renders the latest map update. Returns false when no update is available yet. */
@@ -42,6 +45,21 @@ internal interface RenderTarget : AutoCloseable {
 
     fun extent(viewport: Viewport): RenderTargetExtent =
       RenderTargetExtent(viewport.width(), viewport.height(), viewport.scaleFactor())
+
+    /**
+     * Detaches a session whose handover failed, before the targets it may hold are released.
+     *
+     * A native error may mean the session took the replacement before failing, and a caller cannot
+     * tell that apart from a rejection that came first, so neither target is safe to release while
+     * the session is still attached to one of them.
+     */
+    fun detachSuppressed(error: RuntimeException, session: RenderSessionHandle) {
+      try {
+        session.detach()
+      } catch (cleanupError: Exception) {
+        error.addSuppressed(cleanupError)
+      }
+    }
 
     fun closeSuppressed(error: RuntimeException, closeable: AutoCloseable?) {
       if (closeable == null) {

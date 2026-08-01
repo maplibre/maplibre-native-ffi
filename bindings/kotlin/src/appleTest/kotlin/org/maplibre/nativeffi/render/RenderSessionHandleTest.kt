@@ -14,6 +14,7 @@ import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCObject
 import kotlinx.cinterop.StableRef
+import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.asStableRef
 import kotlinx.cinterop.get
@@ -23,6 +24,7 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.rawValue
 import kotlinx.cinterop.staticCFunction
 import kotlinx.cinterop.toLong
+import kotlinx.cinterop.usePinned
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.error.InvalidArgumentException
@@ -56,7 +58,9 @@ import platform.Metal.MTLCreateSystemDefaultDevice
 import platform.Metal.MTLDeviceProtocol
 import platform.Metal.MTLPixelFormatBGRA8Unorm
 import platform.Metal.MTLPixelFormatRGBA8Unorm
+import platform.Metal.MTLRegionMake2D
 import platform.Metal.MTLTextureDescriptor
+import platform.Metal.MTLTextureProtocol
 import platform.Metal.MTLTextureUsageRenderTarget
 import platform.Metal.MTLTextureUsageShaderRead
 import platform.QuartzCore.CAMetalLayer
@@ -279,6 +283,16 @@ class RenderSessionHandleTest {
             assertFalse(frameHandle.isClosed)
             assertFailsWith<InvalidStateException> { session.renderUpdate() }
             assertFailsWith<InvalidStateException> { session.resize(16, 8, 2.0) }
+            assertFailsWith<InvalidStateException> {
+              session.setMetalBorrowedTextureTarget(
+                MetalBorrowedTextureDescriptor(
+                  extent = RenderTargetExtent(16, 8, 1.0),
+                  physicalWidth = 16,
+                  physicalHeight = 8,
+                  texture = NativePointer.ofAddress(frame.texture().address),
+                )
+              )
+            }
             assertFailsWith<InvalidStateException> { session.detach() }
             assertFailsWith<InvalidStateException> { session.reduceMemoryUse() }
             assertFailsWith<InvalidStateException> { session.clearData() }
@@ -438,6 +452,223 @@ class RenderSessionHandleTest {
     }
   }
 
+  // BND-175: replacing a host-owned target keeps the session and hands it the
+  // replacement's extent, which the map catches up to on its next pump.
+
+  @Test
+  fun metalSetTargetReplacesBorrowedTextureAndSurfaceTargets() {
+    if (!metalSupportedOrInapplicable()) return
+    val device =
+      MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
+    Maplibre.setLogCallback(LogCallback { true })
+    Maplibre.setAsyncLogSeverities(emptySet())
+    try {
+      val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+      try {
+        val borrowedTexture = createMetalTexture(device, 32, 16)
+        val borrowedMap =
+          MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 64
+              height = 64
+            },
+          )
+        try {
+          val borrowedTextureAddress = borrowedTexture.address()
+          val session =
+            borrowedMap.attachMetalBorrowedTexture(
+              MetalBorrowedTextureDescriptor(
+                extent = RenderTargetExtent(32, 16, 1.0),
+                physicalWidth = 32,
+                physicalHeight = 16,
+                texture = NativePointer.ofAddress(borrowedTextureAddress),
+              )
+            )
+          try {
+            borrowedMap.setStyleJson(QUERY_STYLE_JSON)
+            assertTrue(
+              waitForMapEvent(runtime, borrowedMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
+            )
+            assertTrue(session.renderUpdate())
+
+            // A caller-owned texture is sized by its owner, so the host
+            // reallocates and hands the replacement over instead of resizing.
+            assertFailsWith<UnsupportedFeatureException> { session.resize(16, 8, 1.0) }
+            val replacementTexture = createMetalTexture(device, 16, 8)
+            val replacement =
+              MetalBorrowedTextureDescriptor(
+                extent = RenderTargetExtent(16, 8, 1.0),
+                physicalWidth = 16,
+                physicalHeight = 8,
+                texture = NativePointer.ofAddress(replacementTexture.address()),
+              )
+            // Freshly allocated, so anything non-zero later came from this
+            // session rendering into it after the handoff.
+            assertTrue(
+              readMetalTextureRgba(device, replacementTexture, 16, 8).all { it == 0.toByte() },
+              "a freshly allocated replacement should start blank",
+            )
+            session.setMetalBorrowedTextureTarget(replacement)
+            assertSame(borrowedMap, session.map())
+            assertFalse(session.renderUpdate())
+            runtime.pump(0)
+            assertTrue(session.renderUpdate())
+            // The session paints the texture it was handed, not the one it had.
+            assertTrue(
+              readMetalTextureRgba(device, replacementTexture, 16, 8).any { it != 0.toByte() },
+              "the replacement texture should have been rendered into",
+            )
+            assertEquals(replacementTexture.address(), replacement.texture.address)
+            // The session never retained the outgoing texture, so the host
+            // still owns the one it attached with.
+            assertEquals(borrowedTextureAddress, borrowedTexture.address())
+          } finally {
+            session.close()
+          }
+        } finally {
+          borrowedMap.close()
+        }
+
+        val layer = createMetalLayer(device, 32, 16)
+        val replacementLayer = createMetalLayer(device, 16, 8)
+        val surfaceMap =
+          MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 64
+              height = 64
+            },
+          )
+        try {
+          val session =
+            surfaceMap.attachMetalSurface(
+              MetalSurfaceDescriptor(
+                extent = RenderTargetExtent(32, 16, 1.0),
+                context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
+                layer = NativePointer.ofAddress(layer.address()),
+              )
+            )
+          try {
+            surfaceMap.setStyleJson(QUERY_STYLE_JSON)
+            assertTrue(
+              waitForMapEvent(runtime, surfaceMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
+            )
+            assertTrue(session.renderUpdate())
+
+            // A recreated host surface replaces the presentation target while
+            // the session and its renderer go on living.
+            session.setMetalSurfaceTarget(
+              MetalSurfaceDescriptor(
+                extent = RenderTargetExtent(16, 8, 1.0),
+                context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
+                layer = NativePointer.ofAddress(replacementLayer.address()),
+              )
+            )
+            assertSame(surfaceMap, session.map())
+            assertFalse(session.renderUpdate())
+            runtime.pump(0)
+            assertTrue(session.renderUpdate())
+          } finally {
+            session.close()
+          }
+        } finally {
+          surfaceMap.close()
+        }
+      } finally {
+        runtime.close()
+      }
+    } finally {
+      Maplibre.clearLogCallback()
+      Maplibre.restoreDefaultAsyncLogSeverities()
+    }
+  }
+
+  // BND-176: set_target reports unsupported for a target kind the session does
+  // not have, covering a session-owned texture and a swapped surface/texture
+  // pairing.
+
+  @Test
+  fun metalSetTargetReportsUnsupportedForOtherTargetKinds() {
+    if (!metalSupportedOrInapplicable()) return
+    val device =
+      MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
+    val metalContext = MetalContextDescriptor(NativePointer.ofAddress(device.address()))
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+    try {
+      val texture = createMetalTexture(device, 32, 16)
+      val textureTarget =
+        MetalBorrowedTextureDescriptor(
+          extent = RenderTargetExtent(32, 16, 1.0),
+          physicalWidth = 32,
+          physicalHeight = 16,
+          texture = NativePointer.ofAddress(texture.address()),
+        )
+      val layer = createMetalLayer(device, 32, 16)
+      val surfaceTarget =
+        MetalSurfaceDescriptor(
+          extent = RenderTargetExtent(32, 16, 1.0),
+          context = metalContext,
+          layer = NativePointer.ofAddress(layer.address()),
+        )
+
+      val ownedMap = createStaticMap(runtime)
+      try {
+        val session =
+          ownedMap.attachMetalOwnedTexture(
+            MetalOwnedTextureDescriptor(
+              extent = RenderTargetExtent(32, 16, 1.0),
+              context = metalContext,
+            )
+          )
+        try {
+          val error =
+            assertFailsWith<UnsupportedFeatureException> {
+              session.setMetalBorrowedTextureTarget(textureTarget)
+            }
+          assertEquals(MaplibreStatus.UNSUPPORTED, error.status)
+          assertFailsWith<UnsupportedFeatureException> {
+            session.setMetalSurfaceTarget(surfaceTarget)
+          }
+        } finally {
+          session.close()
+        }
+      } finally {
+        ownedMap.close()
+      }
+
+      val borrowedMap = createStaticMap(runtime)
+      try {
+        val session = borrowedMap.attachMetalBorrowedTexture(textureTarget)
+        try {
+          assertFailsWith<UnsupportedFeatureException> {
+            session.setMetalSurfaceTarget(surfaceTarget)
+          }
+        } finally {
+          session.close()
+        }
+      } finally {
+        borrowedMap.close()
+      }
+
+      val surfaceMap = createStaticMap(runtime)
+      try {
+        val session = surfaceMap.attachMetalSurface(surfaceTarget)
+        try {
+          assertFailsWith<UnsupportedFeatureException> {
+            session.setMetalBorrowedTextureTarget(textureTarget)
+          }
+        } finally {
+          session.close()
+        }
+      } finally {
+        surfaceMap.close()
+      }
+    } finally {
+      runtime.close()
+    }
+  }
+
   // BND-107: an unsigned cluster_id survives the query round trip, and an
   // unsigned leaves limit bounds the returned features.
   @Test
@@ -553,6 +784,16 @@ class RenderSessionHandleTest {
     return RenderBackend.METAL in Maplibre.supportedRenderBackends()
   }
 
+  private fun createStaticMap(runtime: RuntimeHandle): MapHandle =
+    MapHandle.create(
+      runtime,
+      MapOptions().apply {
+        width = 64
+        height = 64
+        mapMode = MapMode.STATIC
+      },
+    )
+
   private fun createMetalTexture(device: MTLDeviceProtocol, width: Int, height: Int): ObjCObject {
     val descriptor =
       MTLTextureDescriptor.texture2DDescriptorWithPixelFormat(
@@ -562,7 +803,52 @@ class RenderSessionHandleTest {
         false,
       )
     descriptor.usage = MTLTextureUsageRenderTarget or MTLTextureUsageShaderRead
-    return device.newTextureWithDescriptor(descriptor) ?: error("Metal texture creation failed")
+    val texture =
+      device.newTextureWithDescriptor(descriptor) ?: error("Metal texture creation failed")
+    // A new MTLTexture's contents are undefined, so clear it: a test that reads
+    // this back to prove a session rendered into it needs a known start value.
+    val blank = ByteArray(width * height * 4)
+    blank.usePinned { pinned ->
+      texture.replaceRegion(
+        MTLRegionMake2D(0u, 0u, width.toULong(), height.toULong()),
+        0u,
+        pinned.addressOf(0),
+        (width * 4).toULong(),
+      )
+    }
+    return texture
+  }
+
+  // Reads a borrowed texture back to the CPU. A texture created without an
+  // explicit storage mode is managed on macOS, so its CPU copy stays stale
+  // until a blit synchronizes it.
+  private fun readMetalTextureRgba(
+    device: MTLDeviceProtocol,
+    texture: ObjCObject,
+    width: Int,
+    height: Int,
+  ): ByteArray {
+    val metalTexture = texture as MTLTextureProtocol
+    val queue = device.newCommandQueue() ?: error("MTLDevice.newCommandQueue returned nil")
+    val commandBuffer = queue.commandBuffer() ?: error("MTLCommandQueue.commandBuffer returned nil")
+    val encoder =
+      commandBuffer.blitCommandEncoder()
+        ?: error("MTLCommandBuffer.blitCommandEncoder returned nil")
+    encoder.synchronizeResource(metalTexture)
+    encoder.endEncoding()
+    commandBuffer.commit()
+    commandBuffer.waitUntilCompleted()
+
+    val pixels = ByteArray(width * height * 4)
+    pixels.usePinned { pinned ->
+      metalTexture.getBytes(
+        pinned.addressOf(0),
+        (width * 4).toULong(),
+        MTLRegionMake2D(0u, 0u, width.toULong(), height.toULong()),
+        0u,
+      )
+    }
+    return pixels
   }
 
   private fun createMetalLayer(device: MTLDeviceProtocol, width: Int, height: Int): CAMetalLayer {

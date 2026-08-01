@@ -66,21 +66,9 @@ internal object VulkanRenderTarget {
     var compositor: VulkanTextureCompositor? = null
     try {
       image = VulkanBorrowedImage.create(context, viewport)
-      val descriptor =
-        VulkanBorrowedTextureDescriptor(
-            RenderTarget.extent(viewport),
-            viewport.framebufferWidth(),
-            viewport.framebufferHeight(),
-            descriptor(context),
-            NativePointer.ofAddress(image.imageAddress()),
-            NativePointer.ofAddress(image.viewAddress()),
-            VK10.VK_FORMAT_R8G8B8A8_UNORM,
-            VK10.VK_IMAGE_LAYOUT_UNDEFINED,
-          )
-          .apply { finalLayout = VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL }
-      session = map.attachVulkanBorrowedTexture(descriptor)
+      session = map.attachVulkanBorrowedTexture(borrowedDescriptor(context, viewport, image))
       compositor = VulkanTextureCompositor(context, viewport)
-      return BorrowedTexture(context, map, session, compositor, image)
+      return BorrowedTexture(context, session, compositor, image)
     } catch (error: RuntimeException) {
       RenderTarget.closeSuppressed(error, compositor)
       RenderTarget.closeSuppressed(error, session)
@@ -88,6 +76,23 @@ internal object VulkanRenderTarget {
       throw error
     }
   }
+
+  private fun borrowedDescriptor(
+    context: VulkanContext,
+    viewport: Viewport,
+    image: VulkanBorrowedImage,
+  ): VulkanBorrowedTextureDescriptor =
+    VulkanBorrowedTextureDescriptor(
+        RenderTarget.extent(viewport),
+        viewport.framebufferWidth(),
+        viewport.framebufferHeight(),
+        descriptor(context),
+        NativePointer.ofAddress(image.imageAddress()),
+        NativePointer.ofAddress(image.viewAddress()),
+        VK10.VK_FORMAT_R8G8B8A8_UNORM,
+        VK10.VK_IMAGE_LAYOUT_UNDEFINED,
+      )
+      .apply { finalLayout = VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL }
 
   private fun descriptor(context: VulkanContext): VulkanContextDescriptor =
     VulkanContextDescriptor(
@@ -149,56 +154,46 @@ internal object VulkanRenderTarget {
 
   private class BorrowedTexture(
     private val context: VulkanContext,
-    private val map: MapHandle,
-    private var session: RenderSessionHandle?,
-    private var compositor: VulkanTextureCompositor?,
-    private var image: VulkanBorrowedImage?,
+    private val session: RenderSessionHandle,
+    private val compositor: VulkanTextureCompositor,
+    private var image: VulkanBorrowedImage,
   ) : RenderTarget {
-    override fun needsReattachOnResize(): Boolean = true
-
-    /** Local to the render loop thread: close the session, rebuild the image, attach again. */
-    override fun reattach(viewport: Viewport) {
-      close()
-      val replacement = attachBorrowedTexture(context, map, viewport)
-      check(replacement is BorrowedTexture) { "unexpected borrowed texture replacement" }
-      session = replacement.session
-      compositor = replacement.compositor
-      image = replacement.image
-      replacement.session = null
-      replacement.compositor = null
-      replacement.image = null
-    }
-
+    /** Local to the render loop thread: allocate an image at the new size and hand it over. */
     override fun resize(viewport: Viewport) {
-      error("borrowed texture resize requires render target reattachment")
+      compositor.resize(viewport)
+      val replacement = VulkanBorrowedImage.create(context, viewport)
+      try {
+        session.setVulkanBorrowedTextureTarget(borrowedDescriptor(context, viewport, replacement))
+      } catch (error: RuntimeException) {
+        // A native error may mean the session took the replacement before failing, and nothing here
+        // can tell that apart from a rejection that came first, so detach before either target is
+        // released.
+        RenderTarget.detachSuppressed(error, session)
+        RenderTarget.closeSuppressed(error, replacement)
+        throw error
+      }
+      // Only once the session has taken the replacement, so a rejected one leaves this target on
+      // the image it already had.
+      image.close()
+      image = replacement
     }
 
     override fun renderUpdate(): Boolean {
-      val currentSession = checkNotNull(session) { "Vulkan borrowed texture session is detached" }
-      val currentCompositor =
-        checkNotNull(compositor) { "Vulkan borrowed texture compositor is detached" }
-      val currentImage = checkNotNull(image) { "Vulkan borrowed image is detached" }
-      if (!currentSession.renderUpdate()) {
+      if (!session.renderUpdate()) {
         return false
       }
-      currentCompositor.drawImageView(currentImage.view())
+      compositor.drawImageView(image.view())
       return true
     }
 
     override fun close() {
-      val closingCompositor = compositor
-      val closingSession = session
-      val closingImage = image
-      compositor = null
-      session = null
-      image = null
       try {
-        closingCompositor?.close()
+        compositor.close()
       } finally {
         try {
-          closingSession?.close()
+          session.close()
         } finally {
-          closingImage?.close()
+          image.close()
         }
       }
     }

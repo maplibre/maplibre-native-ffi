@@ -14,8 +14,9 @@ const glTexture2D = 0x0DE1
 
 type renderTarget interface {
 	Close() error
+	// Resize follows a resized host without losing the session: every mode
+	// either resizes in place or hands the live session a replacement target.
 	Resize(viewport) error
-	NeedsReattachOnResize() (bool, error)
 	FinishFrame() error
 	RenderUpdate() (bool, error)
 }
@@ -328,10 +329,6 @@ func (target *openGLOwnedTextureTarget) Resize(v viewport) error {
 	return target.session.Resize(v.extent())
 }
 
-func (*openGLOwnedTextureTarget) NeedsReattachOnResize() (bool, error) {
-	return false, nil
-}
-
 func (target *openGLOwnedTextureTarget) FinishFrame() error { return target.compositor.FinishFrame() }
 
 func (target *openGLOwnedTextureTarget) RenderUpdate() (bool, error) {
@@ -418,12 +415,43 @@ func (target *openGLBorrowedTextureTarget) Close() error {
 	return result
 }
 
-func (*openGLBorrowedTextureTarget) Resize(viewport) error {
-	return errors.New("borrowed texture resize requires reattach")
-}
-
-func (*openGLBorrowedTextureTarget) NeedsReattachOnResize() (bool, error) {
-	return true, nil
+// Resize follows a resized host. A host-owned texture is sized by this example
+// rather than by the session, so following a resize means creating one at the
+// new size and handing it to the live session. The session keeps its renderer
+// across the handover, which is what keeps the map from going cold every time
+// the window changes size.
+func (target *openGLBorrowedTextureTarget) Resize(v viewport) error {
+	descriptor, err := target.compositor.context.descriptor(true)
+	if err != nil {
+		return err
+	}
+	replacement, err := createBorrowedTexture(target.compositor.context, v)
+	if err != nil {
+		return err
+	}
+	if err := target.session.SetOpenGLBorrowedTextureTarget(maplibre.OpenGLBorrowedTextureDescriptor{
+		Extent:         v.extent(),
+		PhysicalWidth:  v.physicalWidth,
+		PhysicalHeight: v.physicalHeight,
+		Context:        descriptor,
+		Texture:        replacement,
+		Target:         glTexture2D,
+	}); err != nil {
+		// A native error may mean the session took the replacement before
+		// failing, and nothing here can tell that apart from a rejection that
+		// came first, so detach before either texture is deleted.
+		_ = target.session.Detach()
+		glDeleteTexture(replacement)
+		return fmt.Errorf("OpenGL borrowed texture set target failed: %w", err)
+	}
+	// Only once the session has taken the replacement, so a rejected one leaves
+	// this target on the texture it already had.
+	outgoing := target.texture
+	target.texture = replacement
+	if outgoing != 0 {
+		glDeleteTexture(outgoing)
+	}
+	return target.compositor.Resize(v)
 }
 
 func (target *openGLBorrowedTextureTarget) FinishFrame() error {
@@ -492,17 +520,37 @@ func (target *openGLSurfaceTarget) Close() error {
 	return result
 }
 
-func (target *openGLSurfaceTarget) Resize(v viewport) error { return target.session.Resize(v.extent()) }
-
-func (target *openGLSurfaceTarget) NeedsReattachOnResize() (bool, error) {
-	if target.context.platform.egl == nil {
-		return false, nil
-	}
-	surface := target.context.surface()
+// Resize follows a resized host. SDL can hand back a different EGL window
+// surface for the resized window, and the live session takes that replacement
+// rather than being closed and attached again, so the map keeps its renderer.
+func (target *openGLSurfaceTarget) Resize(v viewport) error {
+	outgoing := target.context.surface()
 	if err := target.context.refreshPlatformSurface(); err != nil {
-		return false, err
+		// SDL owns the surfaces and may already have dropped the one the
+		// session presents through, so detach rather than leave it naming a
+		// surface that is gone.
+		_ = target.session.Detach()
+		return err
 	}
-	return target.context.surface() != surface, nil
+	if target.context.surface() == outgoing {
+		return target.session.Resize(v.extent())
+	}
+	descriptor, err := target.context.descriptor(false)
+	if err != nil {
+		return err
+	}
+	if err := target.session.SetOpenGLSurfaceTarget(maplibre.OpenGLSurfaceDescriptor{
+		Extent:  v.extent(),
+		Context: descriptor,
+		Surface: target.context.surface(),
+	}); err != nil {
+		// SDL owns both surfaces and already dropped the outgoing one, so on a
+		// native error the session may be holding a surface that is gone.
+		// Detaching is the only way to stop it naming either.
+		_ = target.session.Detach()
+		return fmt.Errorf("OpenGL surface set target failed: %w", err)
+	}
+	return nil
 }
 
 func (target *openGLSurfaceTarget) FinishFrame() error {

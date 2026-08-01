@@ -220,7 +220,8 @@ MetalTextureBackend::MetalTextureBackend(
 )
     : mbgl::mtl::RendererBackend(mbgl::gfx::ContextMode::Unique),
       mbgl::gfx::HeadlessBackend(size),
-      borrowed_texture_(borrowed_texture) {
+      borrowed_texture_(borrowed_texture),
+      borrowed_pixel_format_(borrowed_texture->pixelFormat()) {
   device = NS::RetainPtr(borrowed_texture->device());
   commandQueue = NS::TransferPtr(device->newCommandQueue());
 }
@@ -260,6 +261,42 @@ void MetalTextureBackend::updateAssumedState() {}
 auto MetalTextureBackend::metal_texture() -> MTL::Texture* {
   getDefaultRenderable();
   return getResource<MetalTextureRenderableResource>().metal_texture();
+}
+
+auto MetalTextureBackend::has_device(const MTL::Device* other) const -> bool {
+  return other == device.get();
+}
+
+auto MetalTextureBackend::has_borrowed_pixel_format(
+  MTL::PixelFormat format
+) const -> bool {
+  // Against the format recorded when this session took its texture, not against
+  // the outgoing texture itself: the session never retained that, and a host
+  // replacing a texture it just released would otherwise be answered from freed
+  // memory.
+  //
+  // mbgl reads the color format off the renderable when it builds a render
+  // pipeline state, then caches that state per shader program under a key of
+  // color mode and vertex layout, with the format itself absent from it. A
+  // replacement in another format would be drawn with a pipeline built for the
+  // old one. Sample count needs no comparison here: attach admits only
+  // single-sample textures, so both sides are always one.
+  return format == borrowed_pixel_format_;
+}
+
+void MetalTextureBackend::set_borrowed_texture(
+  MTL::Texture* texture, mbgl::Size new_size
+) {
+  borrowed_texture_ = texture;
+  size = new_size;
+  // Drop the renderable rather than patch it: its depth and stencil textures
+  // are sized with the color attachment, and any command buffer in hand was
+  // opened against the texture being replaced. bind() builds a matching set
+  // from the new one on the next frame.
+  {
+    auto guard = mbgl::gfx::BackendScope{*this};
+    resource.reset();
+  }
 }
 
 }  // namespace mln::core

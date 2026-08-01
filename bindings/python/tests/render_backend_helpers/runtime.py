@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 import time
 
 import pytest
@@ -8,6 +9,15 @@ import maplibre_native as mln
 from maplibre_native import camera, geo, json, query, render, style
 
 EMPTY_STYLE_JSON = '{"version":8,"sources":{},"layers":[]}'
+
+RED_BACKGROUND_STYLE_JSON = (
+    '{"version":8,"sources":{},"layers":['
+    '{"id":"background","type":"background",'
+    '"paint":{"background-color":"#ff0000"}}]}'
+)
+"""A style that paints every pixel, for tests that read a target back."""
+
+RED_PIXEL = b"\xff\x00\x00\xff"
 
 CLUSTER_POINTS = geo.FeatureCollection(
     tuple(
@@ -105,6 +115,26 @@ def render_until_update(
     )
     assert event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE
     assert session.render_update()
+
+
+def render_until(
+    runtime: mln.RuntimeHandle,
+    session: render.RenderSessionHandle,
+    condition: Callable[[], bool],
+    description: str,
+    *,
+    iterations: int = 5000,
+) -> None:
+    """Pump and render until `condition` holds, failing with `description`."""
+    for _ in range(iterations):
+        runtime.pump()
+        while event := runtime.poll_event():
+            if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
+                session.render_update()
+        if condition():
+            return
+        time.sleep(0.001)
+    raise AssertionError(description)
 
 
 def request_still_image_if_needed(map_handle: mln.MapHandle) -> None:

@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.skiaCanvas
 import java.awt.Component
 import java.awt.Container
 import java.awt.Window
+import java.lang.ref.WeakReference
 import javax.swing.SwingUtilities
 import org.jetbrains.skia.BackendRenderTarget
 import org.jetbrains.skia.ContentChangeMode
@@ -46,6 +47,7 @@ internal object SkikoHost {
   private val metalPresenters = mutableMapOf<Long, MetalTexturePresenter>()
   private val direct3DPresenters = mutableMapOf<Long, Direct3DTexturePresenter>()
   private val openGlPresenters = mutableMapOf<Int, OpenGlTexturePresenter>()
+  private var cachedSkiaLayer: Component? = null
 
   fun requireMetalDevice(): SkikoMetalDevice = onEdt {
     val layer =
@@ -128,11 +130,18 @@ internal object SkikoHost {
   fun drawOpenGlTexture(scope: DrawScope, target: OpenGlTextureTarget): Boolean {
     var drew = false
     scope.drawIntoCanvas { composeCanvas ->
-      val context = findLinuxOpenGlContext() ?: return@drawIntoCanvas
+      val contexts = findLinuxOpenGlContexts() ?: return@drawIntoCanvas
       ensureOpenGlCapabilities()
       val presenter =
         openGlPresenters.getOrPut(target.textureName) { OpenGlTexturePresenter(target.textureName) }
-      presenter.draw(composeCanvas.skiaCanvas, context, target, scope.size.width, scope.size.height)
+      presenter.draw(
+        composeCanvas.skiaCanvas,
+        contexts.skia,
+        contexts.gl,
+        target,
+        scope.size.width,
+        scope.size.height,
+      )
       drew = true
     }
     return drew
@@ -140,6 +149,30 @@ internal object SkikoHost {
 
   fun forgetOpenGlTexture(textureName: Int) {
     openGlPresenters.remove(textureName)?.close()
+  }
+
+  /**
+   * Drops the presenter for [textureName] without deleting the OpenGL objects it built, for when
+   * the context that issued them is gone. Its framebuffer name belongs to that context and names
+   * something else in the replacement.
+   */
+  fun abandonOpenGlTexture(textureName: Int) {
+    openGlPresenters.remove(textureName)?.abandon()
+  }
+
+  /**
+   * The OpenGL context Skiko's Linux redrawer currently owns.
+   *
+   * Skiko destroys this context along with the redrawer and builds a new one for the replacement,
+   * so anything holding a GL name has to record which context issued it.
+   */
+  fun requireLinuxOpenGlContext(): SkikoOpenGlContext = onEdt {
+    val layer =
+      findSkiaLayer()
+        ?: throw NativeSurfaceBridgeException(
+          "SkikoHost could not find a live $SKIA_LAYER_CLASS. ${describeWindows()}"
+        )
+    readLinuxOpenGlContext(requireLinuxOpenGlRedrawer(layer))
   }
 
   fun <T> withLinuxOpenGlContext(action: () -> T): T = onEdt {
@@ -176,6 +209,7 @@ internal object SkikoHost {
     val glPresenters = openGlPresenters.values.toList()
     openGlPresenters.clear()
     glPresenters.forEach { it.close() }
+    cachedSkiaLayer = null
   }
 
   private fun findMetalContext(): DirectContext? = onEdt {
@@ -232,24 +266,39 @@ internal object SkikoHost {
     return redrawer
   }
 
-  private fun findLinuxOpenGlContext(): DirectContext? = onEdt {
+  // Resolves both contexts from one redrawer lookup: the drawing path needs the
+  // Skia context to render and the GL context to tell whether the names it is
+  // about to use still belong to the context that issued them.
+  private fun findLinuxOpenGlContexts(): LinuxOpenGlContexts? = onEdt {
     val layer =
       findSkiaLayer()
         ?: throw NativeSurfaceBridgeException("SkikoHost could not find a live $SKIA_LAYER_CLASS")
-    val contextHandler = requireLinuxOpenGlContextHandler(layer)
-    (contextHandler.getField("context") as? DirectContext)
-      ?: run {
-        contextHandler.invokeDeclaredNoArg("initContext")
-        (contextHandler.getField("context") as? DirectContext)
-          ?: contextHandler.invokeDeclaredNoArg("getContext") as? DirectContext
-      }
+    val redrawer = requireLinuxOpenGlRedrawer(layer)
+    val gl = readLinuxOpenGlContext(redrawer)
+    val contextHandler =
+      redrawer.getField("contextHandler")
+        ?: throw NativeSurfaceBridgeException(
+          "$LINUX_OPENGL_REDRAWER_CLASS.contextHandler was null"
+        )
+    val skia =
+      (contextHandler.getField("context") as? DirectContext)
+        ?: run {
+          contextHandler.invokeDeclaredNoArg("initContext")
+          (contextHandler.getField("context") as? DirectContext)
+            ?: contextHandler.invokeDeclaredNoArg("getContext") as? DirectContext
+        }
+    skia?.let { LinuxOpenGlContexts(skia = it, gl = gl) }
   }
 
-  private fun requireLinuxOpenGlContextHandler(layer: Any): Any {
-    val redrawer = requireLinuxOpenGlRedrawer(layer)
-    return redrawer.getField("contextHandler")
-      ?: throw NativeSurfaceBridgeException("$LINUX_OPENGL_REDRAWER_CLASS.contextHandler was null")
+  private fun readLinuxOpenGlContext(redrawer: Any): SkikoOpenGlContext {
+    val handle =
+      redrawer.getField("context") as? Long
+        ?: throw NativeSurfaceBridgeException("$LINUX_OPENGL_REDRAWER_CLASS.context was null")
+    check(handle != 0L) { "$LINUX_OPENGL_REDRAWER_CLASS.context was zero" }
+    return SkikoOpenGlContext(redrawer, handle)
   }
+
+  private class LinuxOpenGlContexts(val skia: DirectContext, val gl: SkikoOpenGlContext)
 
   private fun requireLinuxOpenGlRedrawer(layer: Any): Any {
     val redrawer =
@@ -259,7 +308,20 @@ internal object SkikoHost {
     return redrawer
   }
 
-  private fun findSkiaLayer(): Any? = findSkiaLayerComponent() ?: findComposeWindowSkiaLayer()
+  // Walking every window's component tree is far too expensive to repeat per
+  // frame, so the layer is remembered until AWT takes its peer away. A layer
+  // that loses its peer is the one case that hands the work to a different
+  // layer, and it is also what drops the redrawer that owns the GL context.
+  private fun findSkiaLayer(): Any? {
+    cachedSkiaLayer?.let { cached ->
+      if (cached.isDisplayable) {
+        return cached
+      }
+    }
+    val layer = (findSkiaLayerComponent() ?: findComposeWindowSkiaLayer()) as Component?
+    cachedSkiaLayer = layer
+    return layer
+  }
 
   private fun findSkiaLayerComponent(): Any? =
     Window.getWindows()
@@ -577,6 +639,8 @@ internal object SkikoHost {
 
   private class OpenGlTexturePresenter(private val textureName: Int) : AutoCloseable {
     private var contextIdentity = 0
+    // The GL context that issued [framebuffer].
+    private var issuingGlContext: SkikoOpenGlContext? = null
     private var extent = SurfaceExtent.Empty
     private var origin = TextureOrigin.TOP_LEFT
     private var framebuffer = 0
@@ -587,11 +651,12 @@ internal object SkikoHost {
     fun draw(
       canvas: org.jetbrains.skia.Canvas,
       context: DirectContext,
+      glContext: SkikoOpenGlContext,
       target: OpenGlTextureTarget,
       destinationWidth: Float,
       destinationHeight: Float,
     ) {
-      ensureSurface(context, target)
+      ensureSurface(context, glContext, target)
       val currentSurface =
         surface
           ?: throw NativeSurfaceBridgeException(
@@ -611,21 +676,32 @@ internal object SkikoHost {
       )
     }
 
-    private fun ensureSurface(context: DirectContext, target: OpenGlTextureTarget) {
+    private fun ensureSurface(
+      context: DirectContext,
+      glContext: SkikoOpenGlContext,
+      target: OpenGlTextureTarget,
+    ) {
       val nextContextIdentity = System.identityHashCode(context)
+      val heldGlContext = issuingGlContext
       if (
         surface != null &&
           renderTarget != null &&
           framebuffer != 0 &&
           contextIdentity == nextContextIdentity &&
+          heldGlContext != null &&
+          heldGlContext.matches(glContext) &&
           extent == target.extent &&
           origin == target.origin
       ) {
         return
       }
 
+      if (heldGlContext != null && !heldGlContext.matches(glContext)) {
+        strandGpuResources()
+      }
       closeGpuResources()
       contextIdentity = nextContextIdentity
+      issuingGlContext = glContext
       extent = target.extent
       origin = target.origin
       framebuffer = createFramebuffer(target)
@@ -655,8 +731,38 @@ internal object SkikoHost {
     override fun close() {
       closeGpuResources()
       contextIdentity = 0
+      issuingGlContext = null
       extent = SurfaceExtent.Empty
       origin = TextureOrigin.TOP_LEFT
+    }
+
+    /** Gives up everything built for a context Skiko has destroyed. */
+    fun abandon() {
+      strandGpuResources()
+      closeGpuResources()
+      contextIdentity = 0
+      issuingGlContext = null
+      extent = SurfaceExtent.Empty
+      origin = TextureOrigin.TOP_LEFT
+    }
+
+    /**
+     * Gives up what belongs to a destroyed OpenGL context instead of releasing it.
+     *
+     * The framebuffer name is the replacement context's to hand out, so deleting it there takes out
+     * whatever now answers to it. The Skia objects are the same hazard one level up: freeing them
+     * runs Skia's GPU teardown for a context that is gone, and Skia issues that against the
+     * replacement. Both are handed to [strandedSkiaObjects] to hold rather than released.
+     */
+    private fun strandGpuResources() {
+      framebuffer = 0
+      strandSkiaObject(surface)
+      surface = null
+      strandSkiaObject(renderTarget)
+      renderTarget = null
+      while (retainedImages.isNotEmpty()) {
+        strandSkiaObject(retainedImages.removeFirst())
+      }
     }
 
     private fun createFramebuffer(target: OpenGlTextureTarget): Int {
@@ -712,6 +818,24 @@ internal object SkikoHost {
   }
 }
 
+/**
+ * Identity of an OpenGL context owned by a Skiko Linux redrawer.
+ *
+ * Skiko creates the context with the redrawer and destroys it with the redrawer, so the redrawer is
+ * what a context is known by. The redrawer is held weakly: a caller comparing against a context
+ * Skiko has dropped is asking about one that no longer exists, and the answer it needs is that the
+ * context is gone, not a reference that keeps the layer and its window alive.
+ */
+internal class SkikoOpenGlContext(redrawer: Any, private val handle: Long) {
+  private val redrawer = WeakReference(redrawer)
+
+  /** True when [other] names the same live context this one does. */
+  fun matches(other: SkikoOpenGlContext): Boolean {
+    val held = redrawer.get() ?: return false
+    return held === other.redrawer.get() && handle == other.handle
+  }
+}
+
 internal data class SkikoMetalDevice(val ptr: Long)
 
 internal data class SkikoDirect3DDevice(val ptr: Long)
@@ -733,6 +857,26 @@ private fun TextureOrigin.toSkiaOrigin(): SurfaceOrigin =
     TextureOrigin.TOP_LEFT -> SurfaceOrigin.TOP_LEFT
     TextureOrigin.BOTTOM_LEFT -> SurfaceOrigin.BOTTOM_LEFT
   }
+
+/**
+ * Skia objects whose OpenGL context Skiko has destroyed.
+ *
+ * Releasing one runs its GPU teardown through a context that no longer exists, and Skia issues that
+ * teardown against whatever context is current instead — deleting names that belong to Skiko's
+ * replacement. Skija frees a Managed object from a cleaner keyed on reachability, so holding the
+ * reference is what keeps that teardown from ever running; closing them is the thing to avoid, and
+ * dropping them only defers it to a garbage collection.
+ *
+ * The GPU memory went with the context the driver tore down. What accumulates here is host-side
+ * bookkeeping, bounded by how often Skiko replaces its context over a run.
+ */
+private val strandedSkiaObjects = mutableListOf<AutoCloseable>()
+
+private fun strandSkiaObject(value: AutoCloseable?) {
+  if (value != null) {
+    strandedSkiaObjects.add(value)
+  }
+}
 
 private fun ensureOpenGlCapabilities() {
   runCatching { GL.getCapabilities() }.getOrNull() ?: GL.createCapabilities()

@@ -456,13 +456,15 @@ public final class RenderSessionHandle {
   ///
   /// Surface and owned-texture sessions resize in place. Borrowed texture
   /// targets are sized by their owner and throw an unsupported-feature error:
-  /// close this session, recreate the texture, and attach a new session. A map
-  /// holds at most one attached session, so close before attaching the
-  /// replacement.
+  /// allocate a texture at the new size and hand it over with the backend's
+  /// borrowed-texture target setter, such as
+  /// ``setMetalBorrowedTextureTarget(_:)``, which keeps this session.
   ///
-  /// Resizing discards the session renderer, so renderer-held state such as
-  /// feature state does not survive. Map state such as camera, style, and
-  /// sources lives on the map and survives both resize and reattach.
+  /// The session keeps its renderer across a resize, so renderer-held state
+  /// such as feature state carries over. A scale factor change is the
+  /// exception: a renderer compiles its shaders for one pixel ratio, so that
+  /// resize starts a new one with renderer-held state empty. Map state such as
+  /// camera, style, and sources lives on the map and survives either way.
   public func resize(width: UInt32, height: UInt32,
                      scaleFactor: Double) throws
   {
@@ -473,6 +475,141 @@ public final class RenderSessionHandle {
         height,
         scaleFactor
       ))
+    }
+  }
+
+  /// Presents this attached surface session through a new surface.
+  ///
+  /// A host surface can be destroyed and recreated while the map goes on
+  /// living, which is what Android rotation, a Flutter `SurfaceProducer`
+  /// lifecycle change, and a window resize that reallocates all look like from
+  /// here. Replacing the surface in place keeps this session's renderer, and
+  /// with it the tile pyramid, glyph and image atlases, symbol placement, and
+  /// feature state.
+  ///
+  /// The descriptor names the same graphics context this session attached
+  /// with, and its extent applies as a resize does. A descriptor whose
+  /// `context.device` is neither nil nor this session's device throws an
+  /// invalid-argument error and leaves this session rendering into the surface
+  /// it has. The session assigns the layer its own device and pixel format, so
+  /// the layer itself carries nothing that has to match.
+  public func setMetalSurfaceTarget(
+    _ descriptor: MetalSurfaceDescriptor
+  ) throws {
+    try mapNativeFailure {
+      try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+        try checkStatus(mln_metal_surface_set_target(
+          handle.requireLive().raw,
+          nativeDescriptor
+        ))
+      }
+    }
+  }
+
+  /// Presents this attached surface session through a new surface.
+  ///
+  /// See ``setMetalSurfaceTarget(_:)`` for what replacing a surface preserves.
+  /// The outgoing `VkSurfaceKHR` must still be valid: this session holds a
+  /// swapchain built from it, and Vulkan destroys every swapchain before its
+  /// surface.
+  public func setVulkanSurfaceTarget(
+    _ descriptor: VulkanSurfaceDescriptor
+  ) throws {
+    try mapNativeFailure {
+      try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+        try checkStatus(mln_vulkan_surface_set_target(
+          handle.requireLive().raw,
+          nativeDescriptor
+        ))
+      }
+    }
+  }
+
+  /// Presents this attached surface session through a new surface.
+  ///
+  /// See ``setMetalSurfaceTarget(_:)`` for what replacing a surface preserves.
+  /// The new surface is made current on the next render, so a host may hand
+  /// over a replacement for one it has already destroyed. A surface accepted
+  /// here can still prove unusable, which the next ``renderUpdate()`` reports
+  /// rather than this call.
+  public func setOpenGLSurfaceTarget(
+    _ descriptor: OpenGLSurfaceDescriptor
+  ) throws {
+    try mapNativeFailure {
+      try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+        try checkStatus(mln_opengl_surface_set_target(
+          handle.requireLive().raw,
+          nativeDescriptor
+        ))
+      }
+    }
+  }
+
+  /// Renders this attached texture session into a new caller-owned texture.
+  ///
+  /// A caller-owned texture is sized by its owner, so a host that follows a
+  /// resize reallocates rather than resizing and
+  /// ``resize(width:height:scaleFactor:)`` throws an unsupported-feature error.
+  /// Handing the replacement over here keeps this session's renderer instead,
+  /// so the map does not go cold on every resize, unless the scale factor
+  /// changes, which starts a new renderer for the new pixel ratio just as
+  /// ``resize(width:height:scaleFactor:)`` does.
+  ///
+  /// The replacement belongs to the device this session attached with, which
+  /// throws an invalid-argument error otherwise, and carries the pixel format
+  /// it attached with, which throws an unsupported-feature error otherwise.
+  /// Both leave this session rendering into the texture it has. The caller owns
+  /// the replacement and keeps it valid until the next replacement, detach, or
+  /// close. This session never retained the outgoing texture, never releases
+  /// it, and never reads it here, so a host that already released it hands over
+  /// the replacement all the same.
+  public func setMetalBorrowedTextureTarget(
+    _ descriptor: MetalBorrowedTextureDescriptor
+  ) throws {
+    try mapNativeFailure {
+      try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+        try checkStatus(mln_metal_borrowed_texture_set_target(
+          handle.requireLive().raw,
+          nativeDescriptor
+        ))
+      }
+    }
+  }
+
+  /// Renders this attached texture session into a new caller-owned image.
+  ///
+  /// See ``setMetalBorrowedTextureTarget(_:)`` for what replacing a target
+  /// preserves. The replacement carries the format and both layouts this
+  /// session attached with, since its render pass was built around them.
+  public func setVulkanBorrowedTextureTarget(
+    _ descriptor: VulkanBorrowedTextureDescriptor
+  ) throws {
+    try mapNativeFailure {
+      try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+        try checkStatus(mln_vulkan_borrowed_texture_set_target(
+          handle.requireLive().raw,
+          nativeDescriptor
+        ))
+      }
+    }
+  }
+
+  /// Renders this attached texture session into a new caller-owned texture.
+  ///
+  /// See ``setMetalBorrowedTextureTarget(_:)`` for what replacing a target
+  /// preserves. The replacement belongs to the context this session attached
+  /// with, or one in its share group, and the host context must be current on
+  /// this thread.
+  public func setOpenGLBorrowedTextureTarget(
+    _ descriptor: OpenGLBorrowedTextureDescriptor
+  ) throws {
+    try mapNativeFailure {
+      try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+        try checkStatus(mln_opengl_borrowed_texture_set_target(
+          handle.requireLive().raw,
+          nativeDescriptor
+        ))
+      }
     }
   }
 

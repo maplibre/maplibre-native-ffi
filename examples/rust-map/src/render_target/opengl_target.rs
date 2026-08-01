@@ -127,11 +127,17 @@ impl RenderTarget {
         })
     }
 
-    pub fn needs_reattach_on_resize(&self) -> bool {
-        matches!(self, Self::BorrowedTexture { .. })
-    }
-
-    pub fn resize(&mut self, viewport: Viewport) -> maplibre_native::Result<()> {
+    /// Follows a resized host.
+    ///
+    /// A caller-owned texture is sized by this example, not by the session, so
+    /// following a resize means allocating one at the new size and handing it
+    /// over. The session stays live either way, which is what keeps the map
+    /// from going cold every time the window changes size.
+    pub fn resize(
+        &mut self,
+        graphics: &GraphicsContext,
+        viewport: Viewport,
+    ) -> maplibre_native::Result<()> {
         match self {
             Self::OwnedTexture {
                 session,
@@ -144,9 +150,42 @@ impl RenderTarget {
                     viewport.scale_factor,
                 )
             }
-            Self::BorrowedTexture { .. } => Err(compositor_error(
-                "borrowed texture resize requires render target reattachment",
-            )),
+            Self::BorrowedTexture {
+                session,
+                compositor,
+                texture,
+            } => {
+                let opengl = graphics.opengl();
+                let replacement =
+                    OpenGLBorrowedTexture::new(opengl, viewport).map_err(|error| {
+                        compositor_error(format!(
+                            "OpenGL borrowed texture creation failed: {error}"
+                        ))
+                    })?;
+                let context = opengl.descriptor().map_err(|error| {
+                    compositor_error(format!("OpenGL context descriptor failed: {error}"))
+                })?;
+                let descriptor = OpenGLBorrowedTextureDescriptor::new(
+                    extent(viewport),
+                    viewport.physical_width,
+                    viewport.physical_height,
+                    context,
+                    replacement.texture(),
+                    replacement.target(),
+                );
+                // A native error may mean the session took the replacement before
+                // failing, and nothing here can tell that apart from a rejection
+                // that came first. Rust's detach consumes the handle, which this
+                // borrow cannot do, so leave the replacement alone: deleting it is
+                // the only way to hand the session a dangling texture.
+                session.set_opengl_borrowed_texture_target(&descriptor)?;
+                compositor.resize(viewport);
+                // Only once the session has taken the replacement, so a rejected
+                // one leaves this target on the texture it already had.
+                let outgoing = std::mem::replace(&mut **texture, replacement);
+                outgoing.close(Some(opengl));
+                Ok(())
+            }
             Self::Surface { session } => session.resize(
                 viewport.logical_width,
                 viewport.logical_height,

@@ -44,6 +44,15 @@ auto validate_borrowed_texture(
     mln::core::set_thread_error("Metal texture must allow render target usage");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  // The session builds the depth and stencil attachments that go alongside this
+  // texture, and builds them single-sample. Metal wants one sample count across
+  // a render pass, and mbgl leaves rasterSampleCount at its default of one for
+  // every pipeline it creates, so a multisample texture has no way to work
+  // here. Rejecting it now beats reporting it as a render failure later.
+  if (metal_texture->sampleCount() != 1) {
+    mln::core::set_thread_error("Metal texture must be single-sample");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   return MLN_STATUS_OK;
 }
 
@@ -58,6 +67,30 @@ class MetalTextureSessionBackend final
 
   auto headless_backend() -> mbgl::gfx::HeadlessBackend& override {
     return backend_;
+  }
+
+  auto set_metal_borrowed_target(
+    const mln_metal_borrowed_texture_descriptor& descriptor
+  ) -> mln_status override {
+    auto* texture = static_cast<MTL::Texture*>(descriptor.texture);
+    if (!backend_.has_device(texture->device())) {
+      mln::core::set_thread_error(
+        "Metal texture target must belong to the device this session attached "
+        "with"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (!backend_.has_borrowed_pixel_format(texture->pixelFormat())) {
+      return mln::core::unsupported_retarget(
+        "Metal texture target must have the pixel format this session's render "
+        "pipeline states were built for; destroy the session and attach again "
+        "to change it"
+      );
+    }
+    backend_.set_borrowed_texture(
+      texture, mbgl::Size{descriptor.physical_width, descriptor.physical_height}
+    );
+    return MLN_STATUS_OK;
   }
 
   auto after_render(mln_render_session_object& texture, bool& out_rendered)
@@ -275,6 +308,36 @@ auto metal_owned_texture_release_frame(
   live->texture.acquired_frame_kind = TextureSessionFrameKind::None;
   live->texture.acquired_native_texture = nullptr;
   return MLN_STATUS_OK;
+}
+
+auto metal_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_metal_borrowed_texture_descriptor* descriptor
+) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto session_status = validate_render_session_retarget(
+    session, RetargetTargetKind::BorrowedTexture, live
+  );
+  if (session_status != MLN_STATUS_OK) {
+    return session_status;
+  }
+  // The same validator attach uses. The shape-only shared one would let a
+  // texture through that attachment rejects — mismatched dimensions, no render
+  // target usage, multisampled — and the old target is discarded by then, so
+  // the next render is where it would surface.
+  const auto descriptor_status = validate_borrowed_texture(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  return render_session_set_target(
+    session, RetargetTargetKind::BorrowedTexture, descriptor->extent,
+    descriptor->physical_width, descriptor->physical_height,
+    [descriptor](mln_render_session_object& target_session) -> mln_status {
+      return target_session.texture.backend->set_metal_borrowed_target(
+        *descriptor
+      );
+    }
+  );
 }
 
 }  // namespace mln::core

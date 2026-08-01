@@ -43,5 +43,14 @@ auto opengl_surface_attach(
   mln_map map, const mln_opengl_surface_descriptor* descriptor,
   mln_render_session* out_session
 ) -> mln_status;
+auto metal_surface_set_target(
+  mln_render_session session, const mln_metal_surface_descriptor* descriptor
+) -> mln_status;
+auto vulkan_surface_set_target(
+  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor
+) -> mln_status;
+auto opengl_surface_set_target(
+  mln_render_session session, const mln_opengl_surface_descriptor* descriptor
+) -> mln_status;
 
 }  // namespace mln::core

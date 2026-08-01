@@ -41,6 +41,22 @@ class VulkanTextureBackend final : public mbgl::vulkan::RendererBackend,
   ~VulkanTextureBackend() override;
 
   auto getDefaultRenderable() -> mbgl::gfx::Renderable& override;
+  // Follows a new physical size while preserving the render pass, so the
+  // renderer's Vulkan pipeline cache survives the resize.
+  void resize(mbgl::Size new_size);
+  // Whether a replacement image can use the render pass already in hand.
+  [[nodiscard]] auto matches_borrowed_target(
+    const mln_vulkan_borrowed_texture_descriptor& descriptor
+  ) const -> bool;
+  // Renders into a different caller-owned image from here on. The caller has
+  // already established that it matches the live render pass.
+  void set_borrowed_target(
+    const mln_vulkan_borrowed_texture_descriptor& descriptor
+  );
+  [[nodiscard]] auto context_descriptor() const
+    -> const mln_vulkan_context_descriptor& {
+    return descriptor_.context;
+  }
   auto readStillImage() -> mbgl::PremultipliedImage override;
   auto getRendererBackend() -> mbgl::gfx::RendererBackend* override;
   void activate() override;

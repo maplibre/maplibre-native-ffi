@@ -48,6 +48,10 @@ public fun ComposeNativeSurface(
   DisposableEffect(renderer, bridgeSelection, bridge, session, activeController) {
     when (bridgeSelection) {
       is NativeSurfaceBridgeSelection.Failed -> {
+        // Also to the console, because a bridge that never initializes is the
+        // one failure whose only other report is a window that may not be
+        // showing anything else worth reading.
+        bridgeSelection.error.printStackTrace()
         activeController.setState(
           NativeSurfaceState.Failed(
             message = "Native surface bridge initialization failed: ${bridgeSelection.message}",
@@ -98,7 +102,6 @@ public fun ComposeNativeSurface(
       try {
         extent.log("compose viewport")
         bridge.resize(extent)
-        drawState.resetForExtent(extent)
         renderer.onSurfaceChanged(extent)
         session?.requestFrame()
       } catch (error: Throwable) {
@@ -167,17 +170,17 @@ public fun ComposeNativeSurface(
 }
 
 private class NativeSurfaceDrawState {
-  private var extent = SurfaceExtent.Empty
   private var nextFrameId = 1L
 
+  /**
+   * The target a frame last rendered into, drawn again whenever a frame has nothing new.
+   *
+   * A resize keeps it rather than clearing it: the bridge holds that target until one lands in the
+   * texture it allocated for the new size, and drawing the old one stretched over the new bounds is
+   * what a resized window shows before its next frame. A bridge that no longer holds the target
+   * refuses to draw it, which falls back to the placeholder.
+   */
   var lastRenderedTarget: NativeSurfaceTarget? = null
-
-  fun resetForExtent(next: SurfaceExtent) {
-    if (next != extent) {
-      extent = next
-      lastRenderedTarget = null
-    }
-  }
 
   fun nextFrameId(): Long = nextFrameId++
 }

@@ -355,15 +355,111 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     /// <summary>
     /// Resizes this attached render session. Surface and owned-texture sessions resize in place.
     /// Borrowed texture targets are sized by their owner and throw an unsupported-feature error:
-    /// dispose this session, recreate the texture, and attach a new session. A map holds at most
-    /// one attached session, so dispose before attaching the replacement. Resizing discards the
-    /// session renderer, so renderer-held state such as feature state does not survive; map state
-    /// such as camera, style, and sources survives both resize and reattach.
+    /// allocate a texture at the new size and hand it over with the set-target method for the
+    /// backend, such as <see cref="SetOpenGLBorrowedTextureTarget"/>, which keeps this session. The
+    /// session keeps its renderer across a resize, so renderer-held state such as feature state
+    /// carries over; a scale factor change is the exception, starting a new renderer with that state
+    /// empty. Map state such as camera, style, and sources survives either way.
     /// </summary>
     public void Resize(uint width, uint height, double scaleFactor)
     {
         ThrowIfTextureFrameActive(nameof(Resize));
         NativeStatus.Check(ResizeNative(Handle, width, height, scaleFactor));
+    }
+
+    /// <summary>
+    /// Presents this attached surface session through a new surface. A host surface can be destroyed
+    /// and recreated while the map goes on living, which is what Android rotation, a Flutter surface
+    /// producer lifecycle change, and a window resize that reallocates all look like from here.
+    /// Replacing the surface in place keeps this session's renderer, and with it the tile pyramid,
+    /// glyph and image atlases, symbol placement, and feature state. The descriptor names the same
+    /// graphics context this session attached with, and its extent applies as <see cref="Resize"/>
+    /// applies one. A descriptor whose context device is neither null nor this session's device
+    /// throws an invalid-argument error and leaves this session rendering into the surface it has.
+    /// The session assigns the layer its own device and pixel format, so the layer itself carries
+    /// nothing that has to match.
+    /// </summary>
+    public void SetMetalSurfaceTarget(MetalSurfaceDescriptor descriptor)
+    {
+        ThrowIfTextureFrameActive(nameof(SetMetalSurfaceTarget));
+        var native = RenderStructs.ToNative(descriptor);
+        NativeStatus.Check(NativeMethods.mln_metal_surface_set_target(Handle, &native));
+    }
+
+    /// <summary>
+    /// Presents this attached surface session through a new surface. See
+    /// <see cref="SetMetalSurfaceTarget"/> for what replacing a surface preserves. The outgoing
+    /// VkSurfaceKHR must still be valid: this session holds a swapchain built from it, and Vulkan
+    /// destroys every swapchain before its surface. The replacement reports the color format and
+    /// surface-transform support this session compiled a render pass and shaders for; one that does
+    /// not throws an unsupported-feature error.
+    /// </summary>
+    public void SetVulkanSurfaceTarget(VulkanSurfaceDescriptor descriptor)
+    {
+        ThrowIfTextureFrameActive(nameof(SetVulkanSurfaceTarget));
+        var native = RenderStructs.ToNative(descriptor);
+        NativeStatus.Check(NativeMethods.mln_vulkan_surface_set_target(Handle, &native));
+    }
+
+    /// <summary>
+    /// Presents this attached surface session through a new surface. See
+    /// <see cref="SetMetalSurfaceTarget"/> for what replacing a surface preserves. The new surface is
+    /// made current on the next render, so a host may hand over a replacement for one it has already
+    /// destroyed. A surface accepted here can still prove unusable, which the next
+    /// <see cref="RenderUpdate"/> reports rather than this call.
+    /// </summary>
+    public void SetOpenGLSurfaceTarget(OpenGLSurfaceDescriptor descriptor)
+    {
+        ThrowIfTextureFrameActive(nameof(SetOpenGLSurfaceTarget));
+        var native = RenderStructs.ToNative(descriptor);
+        NativeStatus.Check(NativeMethods.mln_opengl_surface_set_target(Handle, &native));
+    }
+
+    /// <summary>
+    /// Renders this attached texture session into a new caller-owned texture. A caller-owned texture
+    /// is sized by its owner, so a host that follows a resize reallocates rather than resizing and
+    /// <see cref="Resize"/> throws an unsupported-feature error. Handing the replacement over here
+    /// keeps this session's renderer instead, so the map does not go cold on every resize, unless
+    /// the scale factor changes, which starts a new renderer for the new pixel ratio. The
+    /// replacement belongs to the device this session attached with, which throws an
+    /// invalid-argument error otherwise, and carries the pixel format it attached with, which throws
+    /// an unsupported-feature error otherwise. Both leave this session rendering into the texture it
+    /// has. The caller owns the replacement and keeps it valid until
+    /// the next replacement, detach, or dispose. This session never retained the outgoing texture,
+    /// never releases it, and never reads it here, so a host that already released it hands over the
+    /// replacement all the same.
+    /// </summary>
+    public void SetMetalBorrowedTextureTarget(MetalBorrowedTextureDescriptor descriptor)
+    {
+        ThrowIfTextureFrameActive(nameof(SetMetalBorrowedTextureTarget));
+        var native = RenderStructs.ToNative(descriptor);
+        NativeStatus.Check(NativeMethods.mln_metal_borrowed_texture_set_target(Handle, &native));
+    }
+
+    /// <summary>
+    /// Renders this attached texture session into a new caller-owned image. See
+    /// <see cref="SetMetalBorrowedTextureTarget"/> for what replacing a target preserves. The
+    /// replacement carries the format and both layouts this session attached with, since its render
+    /// pass was built around them.
+    /// </summary>
+    public void SetVulkanBorrowedTextureTarget(VulkanBorrowedTextureDescriptor descriptor)
+    {
+        ThrowIfTextureFrameActive(nameof(SetVulkanBorrowedTextureTarget));
+        var native = RenderStructs.ToNative(descriptor);
+        NativeStatus.Check(NativeMethods.mln_vulkan_borrowed_texture_set_target(Handle, &native));
+    }
+
+    /// <summary>
+    /// Renders this attached texture session into a new caller-owned texture. See
+    /// <see cref="SetMetalBorrowedTextureTarget"/> for what replacing a target preserves. The
+    /// replacement belongs to the context this session attached with, or one in its share group, and
+    /// the host context must be current on this thread.
+    /// </summary>
+    public void SetOpenGLBorrowedTextureTarget(OpenGLBorrowedTextureDescriptor descriptor)
+    {
+        ThrowIfTextureFrameActive(nameof(SetOpenGLBorrowedTextureTarget));
+        var native = RenderStructs.ToNative(descriptor);
+        NativeStatus.Check(NativeMethods.mln_opengl_borrowed_texture_set_target(Handle, &native));
     }
 
     /// <summary>

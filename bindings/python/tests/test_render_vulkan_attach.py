@@ -10,6 +10,7 @@ from maplibre_native import render
 
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
+    render_until,
     render_until_update,
     skip_or_fail_fixture_setup,
 )
@@ -55,9 +56,14 @@ def _vulkan_context() -> Iterator[VulkanContext]:
 
 
 @contextmanager
-def _vulkan_borrowed_image(context: VulkanContext) -> Iterator[VulkanBorrowedImage]:
+def _vulkan_borrowed_image(
+    context: VulkanContext,
+    *,
+    width: int = 64,
+    height: int = 64,
+) -> Iterator[VulkanBorrowedImage]:
     try:
-        image = context.borrowed_image(width=64, height=64)
+        image = context.borrowed_image(width=width, height=height)
     except VulkanUnavailableError as error:
         skip_or_fail_fixture_setup(
             f"Vulkan borrowed-image fixture creation is unavailable: {error}",
@@ -168,3 +174,77 @@ def test_vulkan_borrowed_texture_session_close_preserves_caller_resources() -> N
 
             replacement_descriptor = image.descriptor()
             assert _descriptor_snapshot(replacement_descriptor) == before_descriptor
+
+
+def test_vulkan_borrowed_texture_set_target_hands_over_a_replacement() -> None:
+    """Spec coverage: BND-175, BND-176.
+
+    A caller-owned image is sized by its owner, so a host that follows a resize
+    allocates an image at the new size and hands it over instead of resizing
+    this session.
+
+    This verifies that the handoff is accepted, that the map takes the extent
+    handed with it, and that the session stays usable. It does not read the
+    replacement back — the Vulkan helper has no staging-buffer readback — so
+    nothing here proves pixels land in the replacement image. No binding covers
+    that for Vulkan yet; the Metal and OpenGL replacement tests do cover it for
+    their backends.
+    """
+    _require_native_vulkan_support()
+
+    with _vulkan_context() as context:
+        with _vulkan_borrowed_image(context) as image:
+            descriptor = image.descriptor()
+
+            with mln.RuntimeHandle() as runtime:
+                with runtime.create_map(
+                    mln.MapOptions(
+                        width=descriptor.extent.width,
+                        height=descriptor.extent.height,
+                    )
+                ) as map_handle:
+                    session = map_handle.attach_vulkan_borrowed_texture(descriptor)
+                    try:
+                        map_handle.set_style_json(EMPTY_STYLE_JSON)
+                        render_until_update(runtime, session)
+
+                        with pytest.raises(mln.UnsupportedFeatureError) as raised:
+                            session.resize(48, 24, 1.0)
+                        assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
+
+                        with _vulkan_borrowed_image(
+                            context, width=48, height=24
+                        ) as replacement:
+                            replacement_descriptor = replacement.descriptor()
+                            session.set_vulkan_borrowed_texture_target(
+                                replacement_descriptor
+                            )
+
+                            # The session kept its renderer and renders at the
+                            # extent it was handed, once the map catches up.
+                            render_until(
+                                runtime,
+                                session,
+                                lambda: (
+                                    map_handle.get_size()
+                                    == (48, 24, pytest.approx(1.0))
+                                ),
+                                "the map never took the replacement image extent",
+                            )
+                            assert session.render_update()
+
+                            # A surface descriptor names a target this session
+                            # does not have.
+                            with pytest.raises(mln.UnsupportedFeatureError) as raised:
+                                session.set_vulkan_surface_target(
+                                    render.VulkanSurfaceDescriptor(
+                                        extent=replacement_descriptor.extent,
+                                        context=context.descriptor(),
+                                        surface=render.NativePointer(0x1),
+                                    )
+                                )
+                            assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
+                            # The rejection left the session usable.
+                            session.render_update()
+                    finally:
+                        session.close()
