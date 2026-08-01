@@ -37,15 +37,34 @@ impl RenderTarget {
         }
     }
 
-    pub fn needs_reattach_on_resize(&self) -> bool {
-        matches!(self, Self::BorrowedTexture { .. })
-    }
-
-    pub fn resize(&mut self, viewport: Viewport) -> maplibre_native::Result<()> {
+    /// Follows a resized host.
+    ///
+    /// A caller-owned texture is sized by this example, not by the session, so
+    /// following a resize means allocating one at the new size and handing it
+    /// over. The session stays live either way, which is what keeps the map
+    /// from going cold every time the window changes size.
+    pub fn resize(
+        &mut self,
+        graphics: &GraphicsContext,
+        viewport: Viewport,
+    ) -> maplibre_native::Result<()> {
         match self {
-            Self::BorrowedTexture { .. } => Err(compositor_error(
-                "borrowed texture resize requires render target reattachment",
-            )),
+            Self::BorrowedTexture {
+                session, texture, ..
+            } => {
+                let replacement = MetalBorrowedTexture::new(graphics.metal(), viewport)?;
+                let descriptor = maplibre_native::MetalBorrowedTextureDescriptor::new(
+                    extent(viewport),
+                    viewport.physical_width,
+                    viewport.physical_height,
+                    replacement.pointer(),
+                );
+                session.set_metal_borrowed_texture_target(&descriptor)?;
+                // Only once the session has taken it: the outgoing texture has
+                // to stay alive for the duration of that call.
+                **texture = replacement;
+                Ok(())
+            }
             Self::OwnedTexture { session, .. } | Self::Surface { session } => session.resize(
                 viewport.logical_width,
                 viewport.logical_height,

@@ -41,11 +41,17 @@ impl RenderTarget {
         }
     }
 
-    pub fn needs_reattach_on_resize(&self) -> bool {
-        matches!(self, Self::BorrowedTexture { .. })
-    }
-
-    pub fn resize(&mut self, viewport: Viewport) -> maplibre_native::Result<()> {
+    /// Follows a resized host.
+    ///
+    /// A caller-owned image is sized by this example, not by the session, so
+    /// following a resize means allocating one at the new size and handing it
+    /// over. The session stays live either way, which is what keeps the map
+    /// from going cold every time the window changes size.
+    pub fn resize(
+        &mut self,
+        graphics: &GraphicsContext,
+        viewport: Viewport,
+    ) -> maplibre_native::Result<()> {
         match self {
             Self::OwnedTexture {
                 session,
@@ -62,9 +68,37 @@ impl RenderTarget {
                     viewport.scale_factor,
                 )
             }
-            Self::BorrowedTexture { .. } => Err(compositor_error(
-                "borrowed texture resize requires render target reattachment",
-            )),
+            Self::BorrowedTexture {
+                session,
+                compositor,
+                image,
+            } => {
+                let vulkan = graphics.vulkan();
+                let replacement = BorrowedImage::new(vulkan, viewport).map_err(|error| {
+                    compositor_error(format!("Vulkan borrowed image creation failed: {error:?}"))
+                })?;
+                let descriptor = VulkanBorrowedTextureDescriptor::new(
+                    extent(viewport),
+                    viewport.physical_width,
+                    viewport.physical_height,
+                    context_descriptor(vulkan),
+                    replacement.image_pointer(),
+                    replacement.view_pointer(),
+                    ash::vk::Format::R8G8B8A8_UNORM.as_raw() as u32,
+                    ash::vk::ImageLayout::UNDEFINED.as_raw() as u32,
+                    ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL.as_raw() as u32,
+                );
+                session.set_vulkan_borrowed_texture_target(&descriptor)?;
+                compositor.resize(viewport).map_err(|error| {
+                    compositor_error(format!(
+                        "Vulkan texture compositor resize failed: {error:?}"
+                    ))
+                })?;
+                // Only once the session has taken the replacement: dropping the
+                // outgoing image destroys it, and it has to outlive that call.
+                **image = replacement;
+                Ok(())
+            }
             Self::Surface { session } => session.resize(
                 viewport.logical_width,
                 viewport.logical_height,
