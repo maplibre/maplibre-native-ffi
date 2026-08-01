@@ -4,7 +4,7 @@ raw.mln_premultiplied_rgba8_image _premultipliedRgba8ImageToNative(
   PremultipliedRgba8Image image,
   Allocator allocator,
 ) {
-  final result = _c.raw.mln_premultiplied_rgba8_image_default();
+  final result = raw.mln_premultiplied_rgba8_image_default();
   result.width = image.width;
   result.height = image.height;
   result.stride = image.stride;
@@ -26,7 +26,7 @@ raw.mln_style_image_options _styleImageOptionsToNative(
   StyleImageOptions options,
   Allocator arena,
 ) {
-  final result = _c.raw.mln_style_image_options_default();
+  final result = raw.mln_style_image_options_default();
   final pixelRatio = options.pixelRatio;
   if (pixelRatio != null) {
     result.fields |= raw
@@ -102,7 +102,7 @@ Pointer<raw.mln_image_stretch> _nativeStretches(
 raw.mln_style_transition_options _styleTransitionOptionsToNative(
   StyleTransitionOptions options,
 ) {
-  final result = _c.raw.mln_style_transition_options_default();
+  final result = raw.mln_style_transition_options_default();
   final enablePlacementTransitions = options.enablePlacementTransitions;
   if (enablePlacementTransitions != null) {
     result.fields |= raw
@@ -234,7 +234,7 @@ final class _CustomGeometryCallbackState extends RetainedCallbackState {
     }
     _retirementQueued = true;
     _retirementSignals = cancelTile == null ? 1 : 2;
-    _c.raw.mln_adapter_custom_geometry_callbacks_retire(
+    raw.mln_adapter_custom_geometry_callbacks_retire(
       fetchTile.nativeFunction,
       cancelTile?.nativeFunction ??
           nullptr
@@ -280,7 +280,7 @@ raw.mln_custom_geometry_source_options _customGeometrySourceOptionsToNative(
   CustomGeometrySourceOptions options,
   _CustomGeometryCallbackState callbackState,
 ) {
-  final result = _c.raw.mln_custom_geometry_source_options_default();
+  final result = raw.mln_custom_geometry_source_options_default();
   result.fetch_tile = callbackState.fetchTile.nativeFunction;
   result.cancel_tile =
       callbackState.cancelTile?.nativeFunction ??
@@ -424,14 +424,14 @@ raw.mln_rendered_query_geometry _renderedQueryGeometryToNative(
 ) {
   switch (geometry) {
     case RenderedQueryPoint(:final point):
-      return _c.raw.mln_rendered_query_geometry_point(
+      return raw.mln_rendered_query_geometry_point(
         native_struct.screenPointToNative(point),
       );
     case RenderedQueryBox(:final box):
       final nativeBox = Struct.create<raw.mln_screen_box>();
       nativeBox.min = native_struct.screenPointToNative(box.min);
       nativeBox.max = native_struct.screenPointToNative(box.max);
-      return _c.raw.mln_rendered_query_geometry_box(nativeBox);
+      return raw.mln_rendered_query_geometry_box(nativeBox);
     case RenderedQueryLineString(:final points):
       final nativePoints = points.isEmpty
           ? nullptr.cast<raw.mln_screen_point>()
@@ -439,7 +439,7 @@ raw.mln_rendered_query_geometry _renderedQueryGeometryToNative(
       for (var index = 0; index < points.length; index += 1) {
         nativePoints[index] = native_struct.screenPointToNative(points[index]);
       }
-      return _c.raw.mln_rendered_query_geometry_line_string(
+      return raw.mln_rendered_query_geometry_line_string(
         nativePoints,
         points.length,
       );
@@ -495,7 +495,7 @@ _renderedFeatureQueryOptionsToNative(
   Allocator allocator,
 ) {
   final nativeOptions = allocator<raw.mln_rendered_feature_query_options>();
-  nativeOptions.ref = _c.raw.mln_rendered_feature_query_options_default();
+  nativeOptions.ref = raw.mln_rendered_feature_query_options_default();
   final layerIds = options.layerIds;
   if (layerIds != null) {
     nativeOptions.ref.fields |= raw
@@ -520,7 +520,7 @@ _sourceFeatureQueryOptionsToNative(
   Allocator allocator,
 ) {
   final nativeOptions = allocator<raw.mln_source_feature_query_options>();
-  nativeOptions.ref = _c.raw.mln_source_feature_query_options_default();
+  nativeOptions.ref = raw.mln_source_feature_query_options_default();
   final sourceLayerIds = options.sourceLayerIds;
   if (sourceLayerIds != null) {
     nativeOptions.ref.fields |= raw
@@ -547,7 +547,7 @@ Pointer<raw.mln_style_tile_source_options> _nativeTileSourceOptions(
   Allocator allocator,
 ) {
   final nativeOptions = allocator<raw.mln_style_tile_source_options>();
-  nativeOptions.ref = _c.raw.mln_style_tile_source_options_default();
+  nativeOptions.ref = raw.mln_style_tile_source_options_default();
   final minZoom = options.minZoom;
   if (minZoom != null) {
     nativeOptions.ref.fields |= raw
@@ -626,7 +626,7 @@ Pointer<raw.mln_geojson_source_options> _nativeGeoJsonSourceOptions(
   Allocator allocator,
 ) {
   final nativeOptions = allocator<raw.mln_geojson_source_options>();
-  nativeOptions.ref = _c.raw.mln_geojson_source_options_default();
+  nativeOptions.ref = raw.mln_geojson_source_options_default();
   final minZoom = options.minZoom;
   if (minZoom != null) {
     nativeOptions.ref.fields |= raw
@@ -766,14 +766,14 @@ List<QueriedFeature> _copyFeatureQueryResult(NativeFeatureQueryResult result) {
   try {
     return withNativeArena((arena) {
       final outCount = arena<Size>();
-      _check(_c.raw.mln_feature_query_result_count(result.raw, outCount));
+      _check(raw.mln_feature_query_result_count(result.raw, outCount));
       return [
         for (var index = 0; index < outCount.value; index += 1)
           _copyQueriedFeature(result, index, arena),
       ];
     });
   } finally {
-    _c.raw.mln_feature_query_result_destroy(result.raw);
+    raw.mln_feature_query_result_destroy(result.raw);
   }
 }
 
@@ -784,7 +784,7 @@ QueriedFeature _copyQueriedFeature(
 ) {
   final outFeature = allocator<raw.mln_queried_feature>();
   outFeature.ref.size = sizeOf<raw.mln_queried_feature>();
-  _check(_c.raw.mln_feature_query_result_get(result.raw, index, outFeature));
+  _check(raw.mln_feature_query_result_get(result.raw, index, outFeature));
   final feature = outFeature.ref;
   final state =
       (feature.fields &
@@ -827,7 +827,7 @@ FeatureExtensionResult _copyFeatureExtensionResult(
     return withNativeArena((arena) {
       final outInfo = arena<raw.mln_feature_extension_result_info>();
       outInfo.ref.size = sizeOf<raw.mln_feature_extension_result_info>();
-      _check(_c.raw.mln_feature_extension_result_get(result.raw, outInfo));
+      _check(raw.mln_feature_extension_result_get(result.raw, outInfo));
       final info = outInfo.ref;
       return switch (info.type) {
         1 => FeatureExtensionValue(
@@ -842,7 +842,7 @@ FeatureExtensionResult _copyFeatureExtensionResult(
       };
     });
   } finally {
-    _c.raw.mln_feature_extension_result_destroy(result.raw);
+    raw.mln_feature_extension_result_destroy(result.raw);
   }
 }
 
@@ -929,7 +929,7 @@ raw.mln_opengl_context_descriptor _openglContextDescriptorToNative(
 raw.mln_metal_surface_descriptor _metalSurfaceDescriptorToNative(
   MetalSurfaceDescriptor value,
 ) {
-  final result = _c.raw.mln_metal_surface_descriptor_default();
+  final result = raw.mln_metal_surface_descriptor_default();
   result.extent = _renderTargetExtentToNative(value.extent);
   result.context = _metalContextDescriptorToNative(value.context);
   result.layer = Pointer<Void>.fromAddress(value.layer.address);
@@ -939,7 +939,7 @@ raw.mln_metal_surface_descriptor _metalSurfaceDescriptorToNative(
 raw.mln_vulkan_surface_descriptor _vulkanSurfaceDescriptorToNative(
   VulkanSurfaceDescriptor value,
 ) {
-  final result = _c.raw.mln_vulkan_surface_descriptor_default();
+  final result = raw.mln_vulkan_surface_descriptor_default();
   result.extent = _renderTargetExtentToNative(value.extent);
   result.context = _vulkanContextDescriptorToNative(value.context);
   result.surface = Pointer<Void>.fromAddress(value.surface.address);
@@ -949,7 +949,7 @@ raw.mln_vulkan_surface_descriptor _vulkanSurfaceDescriptorToNative(
 raw.mln_opengl_surface_descriptor _openglSurfaceDescriptorToNative(
   OpenGLSurfaceDescriptor value,
 ) {
-  final result = _c.raw.mln_opengl_surface_descriptor_default();
+  final result = raw.mln_opengl_surface_descriptor_default();
   result.extent = _renderTargetExtentToNative(value.extent);
   result.context = _openglContextDescriptorToNative(value.context);
   result.surface = Pointer<Void>.fromAddress(value.surface.address);
@@ -959,7 +959,7 @@ raw.mln_opengl_surface_descriptor _openglSurfaceDescriptorToNative(
 raw.mln_metal_owned_texture_descriptor _metalOwnedTextureDescriptorToNative(
   MetalOwnedTextureDescriptor value,
 ) {
-  final result = _c.raw.mln_metal_owned_texture_descriptor_default();
+  final result = raw.mln_metal_owned_texture_descriptor_default();
   result.extent = _renderTargetExtentToNative(value.extent);
   result.context = _metalContextDescriptorToNative(value.context);
   return result;
@@ -967,7 +967,7 @@ raw.mln_metal_owned_texture_descriptor _metalOwnedTextureDescriptorToNative(
 
 raw.mln_metal_borrowed_texture_descriptor
 _metalBorrowedTextureDescriptorToNative(MetalBorrowedTextureDescriptor value) {
-  final result = _c.raw.mln_metal_borrowed_texture_descriptor_default();
+  final result = raw.mln_metal_borrowed_texture_descriptor_default();
   result.extent = _renderTargetExtentToNative(value.extent);
   result.physical_width = _positiveUint32(
     value.physicalWidth,
@@ -984,7 +984,7 @@ _metalBorrowedTextureDescriptorToNative(MetalBorrowedTextureDescriptor value) {
 raw.mln_vulkan_owned_texture_descriptor _vulkanOwnedTextureDescriptorToNative(
   VulkanOwnedTextureDescriptor value,
 ) {
-  final result = _c.raw.mln_vulkan_owned_texture_descriptor_default();
+  final result = raw.mln_vulkan_owned_texture_descriptor_default();
   result.extent = _renderTargetExtentToNative(value.extent);
   result.context = _vulkanContextDescriptorToNative(value.context);
   return result;
@@ -994,7 +994,7 @@ raw.mln_vulkan_borrowed_texture_descriptor
 _vulkanBorrowedTextureDescriptorToNative(
   VulkanBorrowedTextureDescriptor value,
 ) {
-  final result = _c.raw.mln_vulkan_borrowed_texture_descriptor_default();
+  final result = raw.mln_vulkan_borrowed_texture_descriptor_default();
   result.extent = _renderTargetExtentToNative(value.extent);
   result.physical_width = _positiveUint32(
     value.physicalWidth,
@@ -1016,7 +1016,7 @@ _vulkanBorrowedTextureDescriptorToNative(
 raw.mln_opengl_owned_texture_descriptor _openglOwnedTextureDescriptorToNative(
   OpenGLOwnedTextureDescriptor value,
 ) {
-  final result = _c.raw.mln_opengl_owned_texture_descriptor_default();
+  final result = raw.mln_opengl_owned_texture_descriptor_default();
   result.extent = _renderTargetExtentToNative(value.extent);
   result.context = _openglContextDescriptorToNative(value.context);
   return result;
@@ -1026,7 +1026,7 @@ raw.mln_opengl_borrowed_texture_descriptor
 _openglBorrowedTextureDescriptorToNative(
   OpenGLBorrowedTextureDescriptor value,
 ) {
-  final result = _c.raw.mln_opengl_borrowed_texture_descriptor_default();
+  final result = raw.mln_opengl_borrowed_texture_descriptor_default();
   result.extent = _renderTargetExtentToNative(value.extent);
   result.physical_width = _positiveUint32(
     value.physicalWidth,
@@ -1049,7 +1049,7 @@ Pointer<raw.mln_camera_options> _nativeCamera(
   final nativeCamera = allocator<raw.mln_camera_options>();
   nativeCamera.ref = native_struct.cameraOptionsToNative(
     camera,
-    _c.raw.mln_camera_options_default(),
+    raw.mln_camera_options_default(),
   );
   return nativeCamera;
 }
@@ -1064,7 +1064,7 @@ Pointer<raw.mln_animation_options> _nativeAnimation(
   final nativeAnimation = allocator<raw.mln_animation_options>();
   nativeAnimation.ref = native_struct.animationOptionsToNative(
     animation,
-    _c.raw.mln_animation_options_default(),
+    raw.mln_animation_options_default(),
   );
   return nativeAnimation;
 }
@@ -1085,7 +1085,7 @@ Pointer<raw.mln_screen_point> _nativeScreenPoint(
 /// a size probe the C API answers with OK.
 String _copyMapText(
   NativeMap map,
-  raw.mln_status Function(int, Pointer<Char>, int, Pointer<Size>) copy,
+  int Function(int, Pointer<Char>, int, Pointer<Size>) copy,
 ) {
   return withNativeArena((arena) {
     final outSize = arena<Size>();
@@ -1105,13 +1105,7 @@ String _copyMapText(
 String _copyLayerText(
   NativeMap map,
   String layerId,
-  raw.mln_status Function(
-    int,
-    raw.mln_string_view,
-    Pointer<Char>,
-    int,
-    Pointer<Size>,
-  )
+  int Function(int, raw.mln_string_view, Pointer<Char>, int, Pointer<Size>)
   copy,
 ) {
   return withNativeArena((arena) {
@@ -1148,7 +1142,7 @@ String? _copyStyleSourceAttribution(
   final outSize = allocator<Size>();
   final outFound = allocator<Bool>();
   _check(
-    _c.raw.mln_map_copy_style_source_attribution(
+    raw.mln_map_copy_style_source_attribution(
       map.raw,
       sourceId,
       buffer,
@@ -1176,14 +1170,14 @@ JsonValue? _copyJsonSnapshot(NativeJsonSnapshot snapshot) {
     return withNativeArena((arena) {
       final outValue = arena<Pointer<raw.mln_json_value>>();
       outValue.value = nullptr;
-      _check(_c.raw.mln_json_snapshot_get(snapshot.raw, outValue));
+      _check(raw.mln_json_snapshot_get(snapshot.raw, outValue));
       if (outValue.value == nullptr) {
         return null;
       }
       return native_json.jsonValueFromNative(outValue.value.ref);
     });
   } finally {
-    _c.raw.mln_json_snapshot_destroy(snapshot.raw);
+    raw.mln_json_snapshot_destroy(snapshot.raw);
   }
 }
 
@@ -1191,17 +1185,17 @@ List<String> _copyStyleIdList(NativeStyleIdList list) {
   try {
     return withNativeArena((arena) {
       final outCount = arena<Size>();
-      _check(_c.raw.mln_style_id_list_count(list.raw, outCount));
+      _check(raw.mln_style_id_list_count(list.raw, outCount));
       final ids = <String>[];
       for (var index = 0; index < outCount.value; index += 1) {
         final outId = arena<raw.mln_string_view>();
-        _check(_c.raw.mln_style_id_list_get(list.raw, index, outId));
+        _check(raw.mln_style_id_list_get(list.raw, index, outId));
         ids.add(_copyStringView(outId.ref) ?? '');
       }
       return ids;
     });
   } finally {
-    _c.raw.mln_style_id_list_destroy(list.raw);
+    raw.mln_style_id_list_destroy(list.raw);
   }
 }
 
@@ -1215,8 +1209,7 @@ String? _copyNativeString(Pointer<Char> pointer, int byteLength) {
   return pointer.cast<Utf8>().toDartString(length: byteLength);
 }
 
-int _statusCode(raw.mln_status status) => status.value;
-
-void _check(raw.mln_status status) {
-  checkNativeStatus(_statusCode(status), _c.threadLastErrorMessage);
+void _check(int status) {
+  ensureAbiVersion();
+  checkNativeStatus(status, _c.threadLastErrorMessage);
 }

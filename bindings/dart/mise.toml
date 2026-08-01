@@ -28,6 +28,8 @@ run = "dart format"
 run = "dart run tool/ffigen.dart"
 sources = [
   "tool/ffigen.dart",
+  "hook/build.dart",
+  "lib/src/internal/c/native_asset.dart",
   "pubspec.yaml",
   "pubspec.lock",
   "../../include/maplibre_native_c.h",
@@ -52,23 +54,29 @@ run = "dart analyze"
 [tasks.build]
 depends = [":analyze"]
 
+# Build hooks run in a semi-hermetic environment that strips arbitrary
+# environment variables, so hook/build.dart takes the install prefix from a file
+# rather than from MLN_FFI_NATIVE_LIBRARY like the other bindings do.
+[tasks._native-prefix]
+description = "Point the Dart build hook at a locally built native library."
+hide = true
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+run = '''
+mkdir -p .dart_tool
+printf '%s\n' "$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  >.dart_tool/maplibre_native_install_dir
+'''
+
 [tasks.test]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [
   { task = "//:build", args = ["{{usage.preset}}"] },
+  { task = ":_native-prefix", args = ["{{usage.preset}}"] },
   ":analyze",
 ]
-run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-if [[ "$(uname -s)" == "Darwin" ]]; then
-  native_library="$native_install_dir/lib/libmaplibre-native-c.dylib"
-else
-  native_library="$native_install_dir/lib/libmaplibre-native-c.so"
-fi
-MLN_FFI_NATIVE_LIBRARY="$native_library" dart test
-'''
+run = "dart test"
 run_windows = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
-MLN_FFI_NATIVE_LIBRARY="$native_install_dir/bin/maplibre-native-c.dll" dart test
+# The DLL loads its own dependencies from the prefix it was installed into.
+export PATH="$(cygpath -u "$MISE_MONOREPO_ROOT/build/$usage_preset/install/bin")${PATH:+:${PATH}}"
+dart test
 '''

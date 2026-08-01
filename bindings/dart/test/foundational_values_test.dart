@@ -2,7 +2,6 @@ import 'dart:ffi';
 import 'dart:typed_data';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
-import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
 import 'package:maplibre_native_ffi/src/internal/memory/memory.dart';
@@ -74,7 +73,7 @@ void main() {
         padding: EdgeInsets(top: 4, left: 5, bottom: 6, right: 7),
         fieldOfView: 8,
       ),
-      MaplibreNativeCApi.open().raw.mln_camera_options_default(),
+      raw.mln_camera_options_default(),
     );
 
     expect(
@@ -172,7 +171,7 @@ void main() {
     final unknown = NorthOrientation.fromRawValue(100);
     final native = mapViewportOptionsToNative(
       MapViewportOptions(northOrientation: unknown),
-      MaplibreNativeCApi.open().raw.mln_map_viewport_options_default(),
+      raw.mln_map_viewport_options_default(),
     );
     final copied = mapViewportOptionsFromNative(native);
 
@@ -189,7 +188,7 @@ void main() {
         easing: const UnitBezier(0, 0.25, 0.75, 1),
         transitionId: maximum,
       ),
-      MaplibreNativeCApi.open().raw.mln_animation_options_default(),
+      raw.mln_animation_options_default(),
     );
 
     expect(
@@ -216,18 +215,17 @@ void main() {
   });
 
   test('bounds constraints distinguish bounded and unbounded states', () {
-    final c = MaplibreNativeCApi.open();
     final bounded = boundOptionsToNative(
       const BoundOptions(
         bounds: BoundsConstraint.bounded(
           LatLngBounds(southwest: LatLng(-1, -2), northeast: LatLng(3, 4)),
         ),
       ),
-      c.raw.mln_bound_options_default(),
+      raw.mln_bound_options_default(),
     );
     final unbounded = boundOptionsToNative(
       const BoundOptions(bounds: BoundsConstraint.unbounded()),
-      c.raw.mln_bound_options_default(),
+      raw.mln_bound_options_default(),
     );
 
     expect(

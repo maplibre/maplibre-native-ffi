@@ -146,7 +146,7 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
       return;
     }
     _retirementQueued = true;
-    _c.raw.mln_adapter_queued_resource_provider_retire(pointer);
+    raw.mln_adapter_queued_resource_provider_retire(pointer);
   }
 
   @override
