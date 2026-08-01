@@ -98,6 +98,8 @@ function(mln_configure_render_dependencies target)
 endfunction()
 
 function(mln_configure_renderer target)
+  target_compile_definitions(${target} PRIVATE MLN_RENDER_BACKEND_VULKAN=1)
+
   set(MLN_FFI_VENDOR_VULKAN_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/vulkan/headless_backend.cpp)
   set(MLN_FFI_VULKAN_SOURCES

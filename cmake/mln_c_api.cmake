@@ -107,6 +107,7 @@ function(mln_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/render/render_session_common.cpp
       ${PROJECT_SOURCE_DIR}/src/render/surface_session.cpp
       ${PROJECT_SOURCE_DIR}/src/render/texture_session.cpp
+      ${PROJECT_SOURCE_DIR}/src/render/unsupported_sessions.cpp
       ${PROJECT_SOURCE_DIR}/src/resources/custom_resource_provider.cpp
       ${PROJECT_SOURCE_DIR}/src/resources/file_source_manager.cpp
       ${PROJECT_SOURCE_DIR}/src/resources/network_status.cpp
