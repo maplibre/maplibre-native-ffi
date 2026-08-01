@@ -169,7 +169,7 @@ Future<Uri> _installPrefix(BuildInput input, BuildOutputBuilder output) async {
   final preset = _resolvePreset(input);
   final prefix = await _downloadPrefix(input, preset);
   _verifyDescriptor(prefix, preset);
-  _warnOnHeaderSkew(input, prefix, preset);
+  _warnOnHeaderSkew(input, output, prefix, preset);
   return prefix;
 }
 
@@ -244,7 +244,24 @@ _Preset _resolvePreset(BuildInput input) {
 /// The snapshot release is floating: its asset URLs never change, so a cache
 /// keyed on the URL would serve stale bytes forever. `SHA256SUMS` changing is
 /// the exact signal that the artifacts moved, so its digest is the cache key.
-Future<Uri> _downloadPrefix(BuildInput input, _Preset preset) async {
+///
+/// A publish replaces `SHA256SUMS` and the archives as separate assets, so a
+/// build that starts mid-publish can pair one generation's checksum with the
+/// other's bytes. That reads as a mismatch without either file being corrupt,
+/// so a mismatch is retried once against a freshly fetched checksum file. A
+/// mismatch that survives an unchanged checksum stays fatal, which is what
+/// keeps a genuinely corrupt download out of the cache.
+///
+/// The retry gives up every cached answer with it — the offline fallback and
+/// the cache hit alike. Once bytes have failed verification the release is no
+/// longer trustworthy for this build, and answering that from disk, whether on
+/// a later timeout or on a digest already present, would hide an unverified
+/// download behind an older artifact.
+Future<Uri> _downloadPrefix(
+  BuildInput input,
+  _Preset preset, {
+  bool afterMismatch = false,
+}) async {
   final cacheDirectory = Directory.fromUri(
     input.outputDirectoryShared.resolve('${preset.name}/'),
   )..createSync(recursive: true);
@@ -255,13 +272,20 @@ Future<Uri> _downloadPrefix(BuildInput input, _Preset preset) async {
       await _fetch('$_releaseBaseUrl/$_snapshotTag/SHA256SUMS'),
     );
   } on Object catch (error) {
+    if (afterMismatch) {
+      rethrow;
+    }
     return _reuseCached(cacheDirectory, preset, error);
   }
 
   final prefix = Directory.fromUri(
     cacheDirectory.uri.resolve('${sha256.convert(utf8.encode(checksums))}/'),
   );
-  if (prefix.existsSync()) {
+  // A retry after a mismatch takes no cache hit either. A checksum file that
+  // crossed back to an older generation resolves to a digest already on disk,
+  // which would answer the failed verification from the cache without proving
+  // any fresh bytes.
+  if (prefix.existsSync() && !afterMismatch) {
     return prefix.uri;
   }
 
@@ -275,11 +299,21 @@ Future<Uri> _downloadPrefix(BuildInput input, _Preset preset) async {
     // A publish race can list an archive in SHA256SUMS before uploading it.
     // Only the fetch falls back; the checksum check below stays fatal, so a
     // corrupt download is never papered over with a stale artifact.
+    if (afterMismatch) {
+      rethrow;
+    }
     return _reuseCached(cacheDirectory, preset, error);
   }
 
   final actual = sha256.convert(archive).toString();
   if (actual != expected) {
+    if (!afterMismatch) {
+      stderr.writeln(
+        'Checksum mismatch for $archiveName; the $_snapshotTag release may '
+        'have been republished mid-download. Retrying once.',
+      );
+      return _downloadPrefix(input, preset, afterMismatch: true);
+    }
     throw StateError(
       'Checksum mismatch for $archiveName: expected $expected, got $actual.',
     );
@@ -460,13 +494,25 @@ Map<String, Object?> _descriptor(Uri prefix) {
 /// currently holds, which is built from another. Comparing commits would warn
 /// constantly, because the publish is gated on input digests and the artifact's
 /// commit lags by design. Differing headers are the condition that matters.
-void _warnOnHeaderSkew(BuildInput input, Uri prefix, _Preset preset) {
+void _warnOnHeaderSkew(
+  BuildInput input,
+  BuildOutputBuilder output,
+  Uri prefix,
+  _Preset preset,
+) {
   // The package sits at bindings/dart, and both git and path dependencies carry
   // the whole checkout.
-  final checkout = _publicHeaders(input.packageRoot.resolve('../../include/'));
+  final checkoutInclude = input.packageRoot.resolve('../../include/');
+  final checkout = _publicHeaders(checkoutInclude);
   final artifact = _publicHeaders(prefix.resolve('include/'));
   if (checkout == null || artifact == null) {
     return;
+  }
+
+  // Editing a public header in a path dependency has to rerun this hook, or
+  // the warning it produces goes stale against the declarations it describes.
+  for (final name in checkout.keys) {
+    output.dependencies.add(checkoutInclude.resolve(name));
   }
 
   final differing = {
