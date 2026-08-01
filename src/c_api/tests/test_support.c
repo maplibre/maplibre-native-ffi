@@ -497,8 +497,11 @@ typedef struct webgpu_state {
 // into a callback.
 static bool await_future(WGPUInstance instance, WGPUFuture future) {
   // Bounded, so a browser without a WebGPU adapter fails the fixture rather
-  // than hanging the suite until the runner's timeout.
-  const uint64_t timeout_ns = UINT64_C(30) * 1000U * 1000U * 1000U;
+  // than hanging the suite until the runner's timeout. Software adapter and
+  // device creation is well under a second even on a contended runner, so this
+  // is generous rather than a performance assertion -- and it is paid once per
+  // thread, not once per fixture.
+  const uint64_t timeout_ns = UINT64_C(5) * 1000U * 1000U * 1000U;
   WGPUFutureWaitInfo wait = {.future = future, .completed = false};
   return wgpuInstanceWaitAny(instance, 1, &wait, timeout_ns) ==
            WGPUWaitStatus_Success &&
@@ -527,16 +530,21 @@ static void on_device(
   }
 }
 
-static bool create_backend_state(void** out_state, void* out_context) {
-  webgpu_state* state = calloc(1, sizeof(*state));
-  if (state == NULL) {
-    return false;
-  }
+// A host owns one device and hands it to every session it attaches, so the
+// suite holds one per thread rather than building a fresh software device for
+// each fixture. Per thread rather than per process because emdawnwebgpu keeps
+// WebGPU objects in the JS realm of the worker that created them, and the suite
+// attaches sessions from more than one thread.
+//
+// The device outlives every fixture on its thread and goes away with the
+// process, which is why destroy_backend_state() releases nothing.
+static _Thread_local webgpu_state thread_webgpu_state;
+static _Thread_local bool thread_webgpu_attempted;
 
+static bool create_webgpu_device(webgpu_state* state) {
   WGPUInstanceDescriptor instance_descriptor = {0};
   state->instance = wgpuCreateInstance(&instance_descriptor);
   if (state->instance == NULL) {
-    free(state);
     return false;
   }
 
@@ -576,31 +584,36 @@ static bool create_backend_state(void** out_state, void* out_context) {
     fprintf(stderr, "requesting a WebGPU device failed\n");
     wgpuAdapterRelease(state->adapter);
     wgpuInstanceRelease(state->instance);
-    free(state);
+    return false;
+  }
+
+  return true;
+}
+
+static bool create_backend_state(void** out_state, void* out_context) {
+  if (!thread_webgpu_attempted) {
+    thread_webgpu_attempted = true;
+    if (!create_webgpu_device(&thread_webgpu_state)) {
+      thread_webgpu_state = (webgpu_state){0};
+    }
+  }
+  if (thread_webgpu_state.device == NULL) {
     return false;
   }
 
   *(mln_webgpu_context_descriptor*)out_context =
     (mln_webgpu_context_descriptor){
       .size = sizeof(mln_webgpu_context_descriptor),
-      .instance = state->instance,
-      .device = state->device,
+      .instance = thread_webgpu_state.instance,
+      .device = thread_webgpu_state.device,
       .queue = NULL,
     };
-  *out_state = state;
+  // Borrowed from the thread's cache, so it outlives the fixture.
+  *out_state = &thread_webgpu_state;
   return true;
 }
 
-static void destroy_backend_state(void* opaque_state) {
-  webgpu_state* state = opaque_state;
-  if (state == NULL) {
-    return;
-  }
-  wgpuDeviceRelease(state->device);
-  wgpuAdapterRelease(state->adapter);
-  wgpuInstanceRelease(state->instance);
-  free(state);
-}
+static void destroy_backend_state(void* opaque_state) { (void)opaque_state; }
 
 #elif defined(MLN_TEST_BACKEND_OPENGL) && defined(MLN_TEST_OPENGL_WEBGL)
 
