@@ -28,7 +28,7 @@ int _dispatchLogRecord(
 }) {
   final nativeMessage = message.toNativeUtf8();
   try {
-    return c.raw.mln_adapter_log_callback(
+    return raw.mln_adapter_log_callback(
       logCallbackStateForTesting().cast<Void>(),
       severity,
       event,
