@@ -5,30 +5,34 @@
 # examples are skipped there; the C API tests are plain C and do not need Zig.
 "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] }
 
+# The manifest is at the repository root, so every command below runs from
+# there. They `cd` rather than setting `dir`, because mise resolves a task's
+# tools against the directory it runs in: the root declares `core:zig` for Linux
+# alone, where the native build uses `zig cc`, and this file is what widens it to
+# the platforms the binding supports.
 [deps.zig]
 auto = true
 description = "Fetch Zig package dependencies."
-dir = "../.."
-sources = ["build.zig", "build.zig.zon"]
-outputs = ["zig-pkg"]
+sources = ["../../build.zig", "../../build.zig.zon"]
+outputs = ["../../zig-pkg"]
 timeout = "10m"
-run = "zig build --fetch=needed"
+run = 'cd "$MISE_MONOREPO_ROOT" && zig build --fetch=needed'
 
 [tasks.build]
-dir = "../.."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
+cd "$MISE_MONOREPO_ROOT"
 zig build \
   -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 '''
 
 [tasks.test]
-dir = "../.."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 run = '''
+cd "$MISE_MONOREPO_ROOT"
 zig build test \
   -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
@@ -37,6 +41,7 @@ zig build test \
   --verbose
 '''
 run_windows = '''
+cd "$MISE_MONOREPO_ROOT"
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 zig build test \
@@ -48,9 +53,9 @@ zig build test \
 '''
 
 [tasks."test:ios-simulator"]
-dir = "../.."
 depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
 run = '''
+cd "$MISE_MONOREPO_ROOT"
 native_install_dir="$MISE_MONOREPO_ROOT/build/ios-simulator-arm64-metal/install"
 zig build test \
   -Dtarget=aarch64-ios-simulator \
