@@ -775,6 +775,13 @@ auto metal_owned_texture_attach(
   if (output_status != MLN_STATUS_OK) {
     return output_status;
   }
+  const auto physical_status = validate_physical_size(
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
+  );
+  if (physical_status != MLN_STATUS_OK) {
+    return physical_status;
+  }
   set_thread_error("Metal texture sessions are not supported by this build");
   return MLN_STATUS_UNSUPPORTED;
 }
@@ -828,6 +835,13 @@ auto vulkan_owned_texture_attach(
   );
   if (output_status != MLN_STATUS_OK) {
     return output_status;
+  }
+  const auto physical_status = validate_physical_size(
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
+  );
+  if (physical_status != MLN_STATUS_OK) {
+    return physical_status;
   }
   set_thread_error("Vulkan texture sessions are not supported by this build");
   return MLN_STATUS_UNSUPPORTED;

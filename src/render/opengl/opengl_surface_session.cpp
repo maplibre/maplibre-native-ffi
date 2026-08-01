@@ -50,7 +50,16 @@ auto validate_metal_surface_descriptor(
   if (extent_status != MLN_STATUS_OK) {
     return extent_status;
   }
-  return mln::core::validate_metal_context(descriptor->context, false);
+  const auto context_status =
+    mln::core::validate_metal_context(descriptor->context, false);
+  if (context_status != MLN_STATUS_OK) {
+    return context_status;
+  }
+  if (descriptor->layer == nullptr) {
+    mln::core::set_thread_error("Metal surface layer must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
 }
 
 auto validate_vulkan_surface_descriptor(
@@ -72,9 +81,17 @@ auto validate_vulkan_surface_descriptor(
   if (extent_status != MLN_STATUS_OK) {
     return extent_status;
   }
-  return mln::core::validate_vulkan_context(
-    descriptor->context, "Vulkan handles must not be null"
+  const auto context_status = mln::core::validate_vulkan_context(
+    descriptor->context, "Vulkan surface handles must not be null"
   );
+  if (context_status != MLN_STATUS_OK) {
+    return context_status;
+  }
+  if (descriptor->surface == nullptr) {
+    mln::core::set_thread_error("Vulkan surface handles must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
 }
 
 auto validate_opengl_surface_descriptor(
@@ -384,6 +401,13 @@ auto metal_surface_attach(
   if (output_status != MLN_STATUS_OK) {
     return output_status;
   }
+  const auto physical_status = validate_physical_size(
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled surface dimensions are too large"
+  );
+  if (physical_status != MLN_STATUS_OK) {
+    return physical_status;
+  }
   set_thread_error("Metal surface sessions are not supported by this build");
   return MLN_STATUS_UNSUPPORTED;
 }
@@ -407,6 +431,13 @@ auto vulkan_surface_attach(
   );
   if (output_status != MLN_STATUS_OK) {
     return output_status;
+  }
+  const auto physical_status = validate_physical_size(
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled surface dimensions are too large"
+  );
+  if (physical_status != MLN_STATUS_OK) {
+    return physical_status;
   }
   set_thread_error("Vulkan surface sessions are not supported by this build");
   return MLN_STATUS_UNSUPPORTED;
