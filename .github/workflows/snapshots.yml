@@ -373,12 +373,16 @@ jobs:
     needs:
       - plan
       - publish-kotlin-roots
-    # Ordered after the Kotlin uploads, but a Kotlin gate that skipped is not a
-    # reason to hold the native release back.
+    # Ordered after the Kotlin uploads. A Kotlin gate that skipped because
+    # nothing changed is no reason to hold the native release back, but a
+    # planned Kotlin publish that did not finish is: `publish-kotlin-roots`
+    # reports `skipped`, not `failure`, when an earlier Kotlin job fails, so
+    # the plan decides which of the two this is.
     if: >-
       ${{ !cancelled()
       && needs.plan.outputs.publish_native == 'true'
-      && needs.publish-kotlin-roots.result != 'failure' }}
+      && (needs.plan.outputs.publish_kotlin != 'true'
+      || needs.publish-kotlin-roots.result == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
