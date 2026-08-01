@@ -7,8 +7,8 @@ description = "Fetch Zig package dependencies."
 sources = [
   "build.zig",
   "build.zig.zon",
-  "../../bindings/zig/build.zig",
-  "../../bindings/zig/build.zig.zon",
+  "../../build.zig",
+  "../../build.zig.zon",
 ]
 outputs = ["zig-pkg"]
 timeout = "10m"

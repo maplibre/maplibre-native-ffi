@@ -304,11 +304,12 @@ resolves to the `android-*` archive, which the hook bundles as the code asset â€
 such an app still packages the TLS helper and calls `mln_android_init`, as
 [Package an Android app](#package-an-android-app) describes.
 
-The two below take the native library by hand, from the archive above. That is
-the native idiom in each: Swift's `systemLibrary` target is built around
-pkg-config finding a system library, and Go has no hook that runs during a
-consumer's build. It is also the same mechanism this repository's own builds
-use, so it costs no machinery.
+The three below take the native library by hand, from the archive above. That
+is the native idiom in each: Swift's `systemLibrary` target is built around
+pkg-config finding a system library, Go has no hook that runs during a
+consumer's build, and Zig organizes around content-addressed packages a floating
+release cannot supply. It is also the same mechanism this repository's own
+builds use, so it costs no machinery.
 
 Each example takes `main`, which is the newest binding source rather than the
 one the archive above was built from: the snapshot republishes on its own
@@ -340,6 +341,32 @@ go get github.com/maplibre/maplibre-native-ffi/bindings/go@main
 That resolves to a pseudo-version such as
 `v0.0.0-20260801064622-5eebd921a263`. The module zip holds only `bindings/go/**`
 â€” no clone and no submodules. cgo reads the same `PKG_CONFIG_PATH`.
+
+### Zig
+
+```bash
+zig fetch --save=maplibre_native_ffi \
+  "git+https://github.com/maplibre/maplibre-native-ffi.git#main"
+```
+
+Import the binding module from the dependency in `build.zig`. The native prefix
+is a dependency option rather than a flag on your own build, because the binding
+links against it while building the module:
+
+```zig
+const maplibre_native = b.dependency("maplibre_native_ffi", .{
+    .target = target,
+    .optimize = optimize,
+    .@"native-install-dir" = std.Build.LazyPath{
+        .cwd_relative = "/opt/maplibre-native-c",
+    },
+}).module("maplibre_native");
+```
+
+The prefix is an install tree outside your package, so it arrives as
+`cwd_relative`; `b.path` is for paths under your own source root and panics on
+an absolute one. The binding reads that prefix's `artifact.json` to learn the
+backend and target it was built for, so nothing else needs configuring.
 
 Each binding wraps the runtime, map, and render session model these guides
 describe. Read on in C, then consult the

@@ -75,6 +75,8 @@ shared = [
   "!.config/dotnet-tools.json",
   "!Package.swift",
   "!Package.resolved",
+  "!build.zig",
+  "!build.zig.zon",
 
   # Not inputs to any published artifact. The example apps, development
   # tooling, editor and service configuration.
@@ -161,6 +163,8 @@ paths = [
   ".config/dotnet-tools.json",
   "Package.swift",
   "Package.resolved",
+  "build.zig",
+  "build.zig.zon",
   "docs/**",
   "*.md",
 ]
