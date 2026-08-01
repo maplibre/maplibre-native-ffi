@@ -71,7 +71,10 @@ if [[ "$top_status" == " "* ]]; then
 fi
 
 git -c submodule.recurse=false submodule sync "$mln_path"
-git -c submodule.recurse=false submodule update --init --depth 1 "$mln_path"
+# .gitmodules marks this submodule `update = none` so that Cargo and SwiftPM
+# skip it when resolving a git dependency on this repository. --checkout is the
+# opt back in for the builds that do need the source.
+git -c submodule.recurse=false submodule update --init --checkout --depth 1 "$mln_path"
 
 git -C "$mln_path" -c submodule.recurse=false submodule sync "${vendor_paths[@]}"
 git -C "$mln_path" -c submodule.recurse=false submodule update --init --depth 1 "${vendor_paths[@]}"
