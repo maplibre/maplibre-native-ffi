@@ -163,11 +163,11 @@ final class RenderSessionHandle {
   /// feature state.
   ///
   /// [descriptor] names the same graphics context this session attached with,
-  /// and its extent applies as [resize] applies one. A target on a different
-  /// context throws an [InvalidArgumentException], and one this session's
-  /// compiled state cannot serve throws an [UnsupportedFeatureException]. Both leave
-  /// this session rendering into the surface it has; [close] it and attach
-  /// again to take that target.
+  /// and its extent applies as [resize] applies one. A layer on a different
+  /// device throws an [InvalidArgumentException] and leaves this session
+  /// rendering into the surface it has, so [close] it and attach again to take
+  /// that one. The session sets the layer's pixel format itself, so there is
+  /// nothing else here for a replacement to mismatch.
   void setMetalSurfaceTarget(MetalSurfaceDescriptor descriptor) {
     _checkNoActiveTextureFrame('set Metal surface target');
     withNativeArena((arena) {

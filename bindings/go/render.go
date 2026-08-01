@@ -749,10 +749,10 @@ func (session *RenderSessionHandle) Resize(extent RenderTargetExtent) error {
 //
 // The descriptor names the same graphics context this session attached with,
 // and its extent applies exactly as Resize applies one, scale factor change
-// included. A target on a different context reports an invalid-argument error,
-// and one this session's compiled state cannot serve reports an
-// unsupported-feature error. Both leave this session rendering into the surface
-// it has; close it and attach again to take that target.
+// included. A layer on a different device reports an invalid-argument error and
+// leaves this session rendering into the surface it has, so closing it and
+// attaching again is what takes that one. The session sets the layer's pixel
+// format itself, so there is nothing else here for a replacement to mismatch.
 func (session *RenderSessionHandle) SetMetalSurfaceTarget(descriptor MetalSurfaceDescriptor) error {
 	if err := descriptor.Extent.validate(); err != nil {
 		return err

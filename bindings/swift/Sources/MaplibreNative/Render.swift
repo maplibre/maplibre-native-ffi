@@ -488,11 +488,11 @@ public final class RenderSessionHandle {
   /// feature state.
   ///
   /// The descriptor names the same graphics context this session attached
-  /// with, and its extent applies as a resize does. A target on a different
-  /// context throws an invalid-argument error, and one this session's compiled
-  /// state cannot serve throws an unsupported-feature error. Both leave this
-  /// session rendering into the surface it has; close it and attach again to
-  /// take that target.
+  /// with, and its extent applies as a resize does. A layer on a different
+  /// device throws an invalid-argument error and leaves this session rendering
+  /// into the surface it has, so close it and attach again to take that one.
+  /// The session sets the layer's pixel format itself, so there is nothing else
+  /// here for a replacement to mismatch.
   public func setMetalSurfaceTarget(
     _ descriptor: MetalSurfaceDescriptor
   ) throws {

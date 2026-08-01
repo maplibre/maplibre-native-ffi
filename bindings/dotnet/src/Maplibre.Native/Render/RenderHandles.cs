@@ -374,9 +374,10 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     /// Replacing the surface in place keeps this session's renderer, and with it the tile pyramid,
     /// glyph and image atlases, symbol placement, and feature state. The descriptor names the same
     /// graphics context this session attached with, and its extent applies as <see cref="Resize"/>
-    /// applies one. A target on a different context throws an invalid-argument error, and one this
-    /// session's compiled state cannot serve throws an unsupported-feature error. Both leave this
-    /// session rendering into the surface it has; dispose it and attach again to take that target.
+    /// applies one. A layer on a different device throws an invalid-argument error and leaves this
+    /// session rendering into the surface it has, so disposing it and attaching again is what takes
+    /// that one. The session sets the layer's pixel format itself, so there is nothing else here for
+    /// a replacement to mismatch.
     /// </summary>
     public void SetMetalSurfaceTarget(MetalSurfaceDescriptor descriptor)
     {

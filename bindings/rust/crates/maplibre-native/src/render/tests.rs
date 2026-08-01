@@ -961,6 +961,10 @@ impl OpenGLBorrowedTexture {
                 glow::TEXTURE_MAG_FILTER,
                 glow::NEAREST as i32,
             );
+            // Zeroed rather than left undefined: a test that reads this back
+            // to prove the session rendered into it needs a known starting
+            // value, or undefined contents could pass for a rendered frame.
+            let blank = vec![0_u8; (width as usize) * (height as usize) * 4];
             context.gl.tex_image_2d(
                 glow::TEXTURE_2D,
                 0,
@@ -970,7 +974,7 @@ impl OpenGLBorrowedTexture {
                 0,
                 glow::RGBA,
                 glow::UNSIGNED_BYTE,
-                glow::PixelUnpackData::Slice(None),
+                glow::PixelUnpackData::Slice(Some(&blank)),
             );
             context.gl.bind_texture(glow::TEXTURE_2D, None);
             texture
@@ -1705,13 +1709,25 @@ fn set_target_hands_a_live_session_a_new_borrowed_texture() {
 
     // The session stayed live across the replacement and renders into the
     // texture it was just given, once the map has caught up to the new size.
+    // QUERY_STYLE_JSON paints this background over every pixel it covers, so
+    // finding it in a texture that started zeroed means this session rendered
+    // into the one it was handed.
+    const QUERY_STYLE_BACKGROUND_RGBA: [u8; 4] = [0xd8, 0xf1, 0xff, 0xff];
+    assert!(
+        texture.read_rgba().unwrap().iter().all(|byte| *byte == 0),
+        "a freshly allocated replacement should start blank"
+    );
     let deadline = Instant::now() + Duration::from_secs(5);
     let mut rendered_into_replacement = false;
     while Instant::now() < deadline && !rendered_into_replacement {
         let _ = runtime.pump(Some(Duration::ZERO));
         while let Ok(Some(_)) = runtime.poll_event() {}
         if session.render_update().unwrap() {
-            rendered_into_replacement = texture.read_rgba().unwrap().iter().any(|byte| *byte != 0);
+            rendered_into_replacement = texture
+                .read_rgba()
+                .unwrap()
+                .chunks_exact(4)
+                .any(|pixel| pixel == QUERY_STYLE_BACKGROUND_RGBA);
         }
         std::thread::sleep(Duration::from_millis(1));
     }
@@ -1743,6 +1759,43 @@ fn set_target_reports_unsupported_for_a_session_owned_texture() {
     // would answer in place of the target-kind rejection under test.
     let error = context
         .set_placeholder_borrowed_target(&session, &extent)
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Unsupported);
+
+    // The rejection left the session usable.
+    assert!(session.render_update().is_ok());
+
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-176.
+fn set_target_reports_unsupported_for_a_session_owned_opengl_texture() {
+    // The Metal and Vulkan case is covered by the test above, whose owned
+    // texture fixture supports only those two backends. OpenGL has its own
+    // owned texture fixture, so an OpenGL-only build covers the same rejection
+    // here rather than skipping it.
+    if !has_opengl_test_context_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let extent = RenderTargetExtent::new(64, 64, 1.0);
+    let (context, session) =
+        create_opengl_owned_texture_session(&map.attach_ref().unwrap(), extent.clone())
+            .expect("OpenGL owned texture test session should attach when OpenGL is supported");
+
+    let error = session
+        .set_opengl_borrowed_texture_target(&OpenGLBorrowedTextureDescriptor::new(
+            extent,
+            64,
+            64,
+            context.descriptor(),
+            1,
+            glow::TEXTURE_2D,
+        ))
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::Unsupported);
 

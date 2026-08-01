@@ -186,8 +186,9 @@ def test_vulkan_borrowed_texture_set_target_hands_over_a_replacement() -> None:
     This verifies that the handoff is accepted, that the map takes the extent
     handed with it, and that the session stays usable. It does not read the
     replacement back — the Vulkan helper has no staging-buffer readback — so
-    the proof that pixels land in the replacement image is the Zig binding's
-    equivalent test, which does.
+    nothing here proves pixels land in the replacement image. No binding covers
+    that for Vulkan yet; the Metal and OpenGL replacement tests do cover it for
+    their backends.
     """
     _require_native_vulkan_support()
 

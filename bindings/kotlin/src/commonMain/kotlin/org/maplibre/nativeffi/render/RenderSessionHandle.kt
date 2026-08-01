@@ -41,10 +41,10 @@ public expect class RenderSessionHandle : AutoCloseable {
    * state.
    *
    * [descriptor] names the graphics context this session attached with, and its extent applies as
-   * [resize] applies one, including a scale factor change starting a new renderer. One naming
-   * another context throws `InvalidArgumentException`, and one this session's compiled state cannot
-   * serve throws `UnsupportedFeatureException`; both leave this session rendering into the surface
-   * it has, so [close] it and attach again to take that target.
+   * [resize] applies one, including a scale factor change starting a new renderer. A layer on
+   * another device throws `InvalidArgumentException` and leaves this session rendering into the
+   * surface it has, so [close] it and attach again to take that one. The session sets the layer's
+   * pixel format itself, so there is nothing else here for a replacement to mismatch.
    */
   public fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor)
 
