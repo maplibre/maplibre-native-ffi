@@ -3,6 +3,7 @@ import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.Sync
+import org.gradle.api.tasks.bundling.Zip
 import org.gradle.api.tasks.compile.JavaCompile
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
@@ -27,6 +28,11 @@ val androidSdkDirectory =
 val androidNdkPrebuilt = androidSdkDirectory.map {
   it.dir("ndk/$androidNdkVersion/toolchains/llvm/prebuilt/${hostPlatform.androidNdkPrebuiltTag}")
 }
+// Resolve the NOTICE from the SDK Gradle selected, which is the same SDK whose
+// NDK supplies the statically linked libc++. Reading ANDROID_HOME directly would
+// pair the bridge with a notice from a different NDK whenever local.properties
+// or ANDROID_SDK_ROOT selects another SDK.
+val androidNdkNotice = androidSdkDirectory.map { it.file("ndk/$androidNdkVersion/NOTICE") }
 val repositoryRoot = rootProject.layout.projectDirectory.asFile
 
 val javaCppConfigSources =
@@ -122,6 +128,15 @@ val packageAndroidNativeLibraries =
     description = "Packages every Android native library this repository publishes."
     dependsOn(packageAndroidRuntimeLibraries, packageAndroidBindingLibraries)
   }
+
+// The bridge links the NDK C++ runtime statically, so this AAR redistributes
+// NDK-licensed code on its own and carries the notice with it rather than
+// leaning on a runtime AAR that a consumer resolves separately.
+tasks.withType<Zip>().configureEach {
+  if (name == "bundleAndroidMainAar") {
+    from(androidNdkNotice) { into("META-INF/licenses/android-ndk") }
+  }
+}
 
 androidTargets.forEach { target ->
   val targetRoot = layout.buildDirectory.dir("android-native/$androidBackend/${target.cargoTarget}")

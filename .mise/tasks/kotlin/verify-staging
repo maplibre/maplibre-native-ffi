@@ -227,6 +227,12 @@ def verify_android(root: pathlib.Path) -> None:
             raise SystemExit(
                 f"the core Android AAR contains runtime native libraries: {unexpected}"
             )
+        # The bridge links the NDK C++ runtime statically, so this AAR
+        # redistributes NDK-licensed code and carries its own notice.
+        if "META-INF/licenses/android-ndk/NOTICE" not in names:
+            raise SystemExit(
+                "the core Android AAR is missing META-INF/licenses/android-ndk/NOTICE"
+            )
         if any("rustls" in name for name in names):
             raise SystemExit("the core Android AAR still carries the Rustls helper")
         if "org.bytedeco.javacpp" not in aar_keep_rules(aar):
