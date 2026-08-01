@@ -88,7 +88,16 @@ impl RenderTarget {
                     ash::vk::ImageLayout::UNDEFINED.as_raw() as u32,
                     ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL.as_raw() as u32,
                 );
-                session.set_vulkan_borrowed_texture_target(&descriptor)?;
+                if let Err(error) = session.set_vulkan_borrowed_texture_target(&descriptor) {
+                    // A native error may mean the session took the replacement
+                    // before failing, and nothing here can tell that apart from
+                    // a rejection that came first. Rust's detach consumes the
+                    // handle, which this borrow cannot do, so keep the
+                    // replacement alive instead: dropping it destroys the image
+                    // and would hand the session a dangling one.
+                    std::mem::forget(replacement);
+                    return Err(error);
+                }
                 // Adopted the moment the session takes it, and before anything
                 // else that can fail: the session renders into this image now,
                 // so dropping the local would pull it out from under it. A

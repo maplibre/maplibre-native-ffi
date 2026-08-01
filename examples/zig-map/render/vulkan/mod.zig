@@ -435,6 +435,11 @@ const VulkanBorrowedTextureBackend = struct {
             .initial_layout = c.VK_IMAGE_LAYOUT_UNDEFINED,
             .final_layout = c.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         }) catch |err| {
+            // A native error may mean the session took the replacement
+            // before failing, and nothing here can tell that apart from a
+            // rejection that came first, so detach before either target is
+            // released; errdefer releases the replacement next.
+            session.detach() catch {};
             diagnostics.logError("Vulkan borrowed texture set target failed", err, null);
             return types.AppError.TextureResizeFailed;
         };

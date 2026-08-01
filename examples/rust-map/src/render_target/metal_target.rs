@@ -59,7 +59,16 @@ impl RenderTarget {
                     viewport.physical_height,
                     replacement.pointer(),
                 );
-                session.set_metal_borrowed_texture_target(&descriptor)?;
+                if let Err(error) = session.set_metal_borrowed_texture_target(&descriptor) {
+                    // A native error may mean the session took the replacement
+                    // before failing, and nothing here can tell that apart from
+                    // a rejection that came first. Rust's detach consumes the
+                    // handle, which this borrow cannot do, so keep the
+                    // replacement alive instead: releasing it is the only way
+                    // to hand the session a dangling texture.
+                    std::mem::forget(replacement);
+                    return Err(error);
+                }
                 // Only once the session has taken it, so a rejected replacement
                 // leaves this target on the texture it already had.
                 **texture = replacement;

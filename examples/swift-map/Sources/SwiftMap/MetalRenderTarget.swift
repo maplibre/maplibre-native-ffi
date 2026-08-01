@@ -115,13 +115,23 @@ enum MetalRenderTarget {
         graphics: graphics,
         viewport: viewport
       )
-      try session
-        .setMetalBorrowedTextureTarget(MetalBorrowedTextureDescriptor(
-          extent: viewport.extent,
-          physicalWidth: viewport.physicalWidth,
-          physicalHeight: viewport.physicalHeight,
-          texture: replacement.pointer
-        ))
+      do {
+        try session
+          .setMetalBorrowedTextureTarget(MetalBorrowedTextureDescriptor(
+            extent: viewport.extent,
+            physicalWidth: viewport.physicalWidth,
+            physicalHeight: viewport.physicalHeight,
+            texture: replacement.pointer
+          ))
+      } catch {
+        // A native error may mean the session took the replacement before
+        // failing, and nothing here can tell that apart from a rejection that
+        // came first, so the session may be holding either texture. Detach
+        // before either one is released, which is what happens next as this
+        // scope unwinds.
+        try? session.detach()
+        throw error
+      }
       compositor.resize(viewport)
       // Only once the session has taken the replacement: a throw above leaves
       // the session on the texture this case still holds, and releases the

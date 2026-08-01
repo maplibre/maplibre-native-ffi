@@ -317,6 +317,11 @@ const MetalBorrowedTextureBackend = struct {
             .physical_height = viewport.physical_height,
             .texture = maplibre.NativePointer.fromPtr(replacement.value.?),
         }) catch |err| {
+            // A native error may mean the session took the replacement
+            // before failing, and nothing here can tell that apart from a
+            // rejection that came first, so detach before either target is
+            // released; errdefer releases the replacement next.
+            session.detach() catch {};
             diagnostics.logError("Metal borrowed texture set target failed", err, null);
             return types.AppError.TextureResizeFailed;
         };

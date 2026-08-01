@@ -150,6 +150,10 @@ internal object MetalRenderTarget {
       try {
         session.setMetalBorrowedTextureTarget(borrowedDescriptor(viewport, replacement))
       } catch (error: RuntimeException) {
+        // A native error may mean the session took the replacement before failing, and nothing here
+        // can tell that apart from a rejection that came first, so detach before either texture is
+        // released.
+        RenderTarget.detachSuppressed(error, session)
         RenderTarget.closeSuppressed(error, replacement)
         throw error
       }

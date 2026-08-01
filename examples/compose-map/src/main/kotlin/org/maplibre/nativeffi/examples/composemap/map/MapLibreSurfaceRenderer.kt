@@ -210,7 +210,20 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
         if (existing.targetKey == borrowed.targetKey) {
           return existing
         }
-        borrowed.setTarget(existing.session)
+        try {
+          borrowed.setTarget(existing.session)
+        } catch (error: RuntimeException) {
+          // A native error may mean the session took the replacement before failing, and nothing
+          // here can tell that apart from a rejection that came first. Skiko owns both textures and
+          // frees the outgoing one as soon as it moves on, so closing the session is the only way
+          // to be sure it is holding neither by the time that happens.
+          try {
+            closeRenderSession()
+          } catch (cleanupError: Exception) {
+            error.addSuppressed(cleanupError)
+          }
+          throw error
+        }
         val retargeted = existing.copy(targetKey = borrowed.targetKey)
         renderSession = retargeted
         renderRequest.set()

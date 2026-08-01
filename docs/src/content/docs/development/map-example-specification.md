@@ -622,11 +622,11 @@ that pass.
   because the session destroys the swapchain built from it first.
 - `MLN_STATUS_NATIVE_ERROR` may mean the replacement was already under way, and
   a caller cannot tell it apart from a failure that came earlier. The session
-  may therefore hold either target, so close it before releasing either one, and
-  attach again rather than reusing it. An example that treats the failure as
-  fatal satisfies this by stopping before the next frame. Every other status is
-  reported before the target changes, which is what makes rolling back to the
-  outgoing target safe.
+  may therefore hold either target. Detach or close it before releasing either
+  one, and attach again rather than reusing it; stopping before the next frame
+  is not enough on its own, because the release still happens while the session
+  holds the target. Every other status is reported before the target changes,
+  which is what makes rolling back to the outgoing target safe.
 - Build the replacement to match what the session attached with, which the C API
   states per backend and per function. `set_target` reports
   `MLN_STATUS_UNSUPPORTED` for a target that differs, leaving the session on the

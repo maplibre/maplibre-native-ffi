@@ -343,7 +343,9 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
     /// <summary>
     /// Hands the live session a replacement texture, then retires the outgoing one. Order matters:
     /// a rejected replacement is released rather than leaked and the session keeps the texture it
-    /// already had.
+    /// already had. A native error may instead mean the session took the replacement before
+    /// failing, and nothing here can tell that apart, so the session is detached before either
+    /// texture is released.
     /// </summary>
     private void HandOver(IDisposable replacement, Action setTarget, Viewport viewport)
     {
@@ -353,6 +355,14 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
         }
         catch
         {
+            try
+            {
+                session.Detach();
+            }
+            catch
+            {
+                // Preserve the handover failure that triggered cleanup.
+            }
             DisposeAfterFailure(replacement);
             throw;
         }

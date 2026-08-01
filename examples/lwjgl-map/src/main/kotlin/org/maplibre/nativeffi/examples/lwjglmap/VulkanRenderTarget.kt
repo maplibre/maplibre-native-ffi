@@ -165,6 +165,10 @@ internal object VulkanRenderTarget {
       try {
         session.setVulkanBorrowedTextureTarget(borrowedDescriptor(context, viewport, replacement))
       } catch (error: RuntimeException) {
+        // A native error may mean the session took the replacement before failing, and nothing here
+        // can tell that apart from a rejection that came first, so detach before either target is
+        // released.
+        RenderTarget.detachSuppressed(error, session)
         RenderTarget.closeSuppressed(error, replacement)
         throw error
       }

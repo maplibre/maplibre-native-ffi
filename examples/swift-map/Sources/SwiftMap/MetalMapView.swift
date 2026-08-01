@@ -201,7 +201,12 @@ final class MetalMapView: NSView {
       channels.setRenderRequest()
       startRuntimeLoopIfNeeded(viewport: viewport)
     } catch {
+      // A failed resize leaves the render target detached, so stop driving it
+      // rather than letting the next tick render through a session that is no
+      // longer attached to anything.
       print(error)
+      timer?.invalidate()
+      timer = nil
       showError(String(describing: error))
     }
   }

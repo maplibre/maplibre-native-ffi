@@ -661,6 +661,11 @@ const OpenGLBorrowedTextureBackend = struct {
             .texture = replacement.texture,
             .target = gl_texture_target,
         }) catch |err| {
+            // A native error may mean the session took the replacement
+            // before failing, and nothing here can tell that apart from a
+            // rejection that came first, so detach before either target is
+            // released; errdefer releases the replacement next.
+            session.detach() catch {};
             diagnostics.logError("OpenGL borrowed texture set target failed", err, null);
             return types.AppError.TextureResizeFailed;
         };
@@ -742,6 +747,10 @@ const OpenGLSurfaceBackend = struct {
     /// attached again, so it keeps its renderer either way.
     fn resize(self: *OpenGLSurfaceBackend, viewport: types.Viewport) !void {
         const replaced = self.context.refreshPlatformSurface() catch |err| {
+            // SDL owns the surfaces and may already have dropped the one the
+            // session presents through, so detach rather than leave it naming
+            // a surface that is gone.
+            self.detachSuppressed();
             diagnostics.logError("OpenGL surface refresh failed", err, null);
             return types.AppError.SurfaceAttachFailed;
         };
@@ -755,9 +764,22 @@ const OpenGLSurfaceBackend = struct {
             .context = self.context.descriptor(),
             .surface = self.context.surface(),
         }) catch |err| {
+            // A native error may mean the session took the replacement before
+            // failing, and nothing here can tell that apart from a rejection
+            // that came first. SDL owns both surfaces and already dropped the
+            // outgoing one, so detaching is the only way to stop the session
+            // naming either.
+            handle.detach() catch {};
             diagnostics.logError("OpenGL surface set target failed", err, null);
             return types.AppError.SurfaceAttachFailed;
         };
+    }
+
+    /// Detaches the session, for a failure path that has nothing better to
+    /// report than the failure it is already returning.
+    fn detachSuppressed(self: *OpenGLSurfaceBackend) void {
+        const handle = self.session.surfaceHandle() catch return;
+        handle.detach() catch {};
     }
 
     fn finishFrame(self: *OpenGLSurfaceBackend) !void {

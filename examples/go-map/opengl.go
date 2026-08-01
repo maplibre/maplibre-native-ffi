@@ -437,6 +437,10 @@ func (target *openGLBorrowedTextureTarget) Resize(v viewport) error {
 		Texture:        replacement,
 		Target:         glTexture2D,
 	}); err != nil {
+		// A native error may mean the session took the replacement before
+		// failing, and nothing here can tell that apart from a rejection that
+		// came first, so detach before either texture is deleted.
+		_ = target.session.Detach()
 		glDeleteTexture(replacement)
 		return fmt.Errorf("OpenGL borrowed texture set target failed: %w", err)
 	}
@@ -522,6 +526,10 @@ func (target *openGLSurfaceTarget) Close() error {
 func (target *openGLSurfaceTarget) Resize(v viewport) error {
 	outgoing := target.context.surface()
 	if err := target.context.refreshPlatformSurface(); err != nil {
+		// SDL owns the surfaces and may already have dropped the one the
+		// session presents through, so detach rather than leave it naming a
+		// surface that is gone.
+		_ = target.session.Detach()
 		return err
 	}
 	if target.context.surface() == outgoing {
@@ -536,6 +544,10 @@ func (target *openGLSurfaceTarget) Resize(v viewport) error {
 		Context: descriptor,
 		Surface: target.context.surface(),
 	}); err != nil {
+		// SDL owns both surfaces and already dropped the outgoing one, so on a
+		// native error the session may be holding a surface that is gone.
+		// Detaching is the only way to stop it naming either.
+		_ = target.session.Detach()
 		return fmt.Errorf("OpenGL surface set target failed: %w", err)
 	}
 	return nil

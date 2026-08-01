@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.RenderTargetExtent
 
 /**
@@ -44,6 +45,21 @@ internal interface RenderTarget : AutoCloseable {
 
     fun extent(viewport: Viewport): RenderTargetExtent =
       RenderTargetExtent(viewport.width(), viewport.height(), viewport.scaleFactor())
+
+    /**
+     * Detaches a session whose handover failed, before the targets it may hold are released.
+     *
+     * A native error may mean the session took the replacement before failing, and a caller cannot
+     * tell that apart from a rejection that came first, so neither target is safe to release while
+     * the session is still attached to one of them.
+     */
+    fun detachSuppressed(error: RuntimeException, session: RenderSessionHandle) {
+      try {
+        session.detach()
+      } catch (cleanupError: Exception) {
+        error.addSuppressed(cleanupError)
+      }
+    }
 
     fun closeSuppressed(error: RuntimeException, closeable: AutoCloseable?) {
       if (closeable == null) {
