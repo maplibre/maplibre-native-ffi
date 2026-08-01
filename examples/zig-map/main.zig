@@ -141,14 +141,11 @@ pub fn main(init_args: std.process.Init) !void {
         .map_channel = &map_channel,
     }});
 
-    var target_live = true;
     const result = renderLoop(
         init_args.io,
-        allocator,
         window_handle,
         target_mode,
         &target,
-        &target_live,
         &current_viewport,
         &commands,
         &render_request,
@@ -156,9 +153,8 @@ pub fn main(init_args: std.process.Init) !void {
     );
 
     // Destroy the session before the runtime loop destroys the map: a map with
-    // an attached session cannot be destroyed. A reattach that failed partway
-    // already destroyed it and left the slot dead.
-    if (target_live) target.deinit();
+    // an attached session cannot be destroyed.
+    target.deinit();
     map_channel.requestShutdown();
     runtime_thread.join();
 
@@ -170,11 +166,9 @@ pub fn main(init_args: std.process.Init) !void {
 /// session once it adopts it.
 fn renderLoop(
     io: std.Io,
-    allocator: std.mem.Allocator,
     window_handle: *c.SDL_Window,
     target_mode: types.RenderTargetMode,
     target: *RenderTarget,
-    target_live: *bool,
     current_viewport: *types.Viewport,
     commands: *channel.CommandQueue,
     render_request: *channel.RenderRequest,
@@ -211,25 +205,11 @@ fn renderLoop(
                 => {
                     current_viewport.* = viewport.get(window_handle);
                     viewport.log("resized viewport", current_viewport.*);
-                    if (target.needsReattachOnResize()) {
-                        // Reattach is entirely local now: close the session,
-                        // rebuild the target, attach again, all on this thread.
-                        // The slot holds a destroyed target between the two, so
-                        // mark it dead: a failure here returns and the caller
-                        // must not deinit it a second time.
-                        target.deinit();
-                        target_live.* = false;
-                        target.* = try RenderTarget.init(
-                            allocator,
-                            window_handle,
-                            current_viewport.*,
-                            target_mode,
-                        );
-                        target_live.* = true;
-                        try target.attach(&map, current_viewport.*);
-                    } else {
-                        try target.resize(current_viewport.*);
-                    }
+                    // Every mode follows a resize without losing its session:
+                    // the ones the session sizes resize in place, and a
+                    // caller-owned target allocates a replacement and hands it
+                    // over.
+                    try target.resize(current_viewport.*);
                     render_request.set();
                 },
                 else => {

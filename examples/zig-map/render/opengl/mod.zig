@@ -262,13 +262,6 @@ const PlatformOpenGLRenderTarget = union(enum) {
         }
     }
 
-    pub fn needsReattachOnResize(self: *const PlatformOpenGLRenderTarget) bool {
-        return switch (self.*) {
-            .owned_texture, .native_surface => false,
-            .borrowed_texture => true,
-        };
-    }
-
     pub fn finishFrame(self: *PlatformOpenGLRenderTarget) !void {
         switch (self.*) {
             .owned_texture => |*backend| try backend.finishFrame(),
@@ -633,8 +626,37 @@ const OpenGLBorrowedTextureBackend = struct {
         self.compositor.deinit();
     }
 
-    fn resize(_: *OpenGLBorrowedTextureBackend, _: types.Viewport) !void {
-        return types.AppError.TextureResizeFailed;
+    /// Follows a resized window.
+    ///
+    /// This example sizes the borrowed texture, not the session, so following a
+    /// resize means allocating one at the new size and handing it to the live
+    /// session. The session stays live, which is what keeps the map from going
+    /// cold on every resize.
+    fn resize(self: *OpenGLBorrowedTextureBackend, viewport: types.Viewport) !void {
+        const session = try self.session.textureHandle();
+        try self.compositor.resize(viewport);
+
+        var replacement = try BorrowedTexture.init(
+            &self.compositor.context,
+            self.compositor.procs,
+            viewport,
+        );
+        errdefer replacement.deinit(&self.compositor.context, self.compositor.procs);
+        session.setOpenGLBorrowedTextureTarget(.{
+            .extent = render_target.extent(viewport),
+            .physical_width = viewport.physical_width,
+            .physical_height = viewport.physical_height,
+            .context = self.compositor.context.descriptor(),
+            .texture = replacement.texture,
+            .target = gl_texture_target,
+        }) catch |err| {
+            diagnostics.logError("OpenGL borrowed texture set target failed", err, null);
+            return types.AppError.TextureResizeFailed;
+        };
+        // Only once the session has taken the replacement: it renders into the
+        // outgoing texture until that call returns, so delete it after.
+        self.borrowed_texture.deinit(&self.compositor.context, self.compositor.procs);
+        self.borrowed_texture = replacement;
     }
 
     fn finishFrame(self: *OpenGLBorrowedTextureBackend) !void {

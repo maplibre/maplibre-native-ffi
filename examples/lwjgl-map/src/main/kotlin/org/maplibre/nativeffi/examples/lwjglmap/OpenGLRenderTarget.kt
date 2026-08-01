@@ -67,18 +67,9 @@ internal object OpenGLRenderTarget {
     var compositor: OpenGLTextureCompositor? = null
     try {
       texture = OpenGLBorrowedTexture(context, viewport)
-      val descriptor =
-        OpenGLBorrowedTextureDescriptor(
-          RenderTarget.extent(viewport),
-          viewport.framebufferWidth(),
-          viewport.framebufferHeight(),
-          descriptor(context),
-          texture.texture(),
-          texture.target(),
-        )
-      session = map.attachOpenGLBorrowedTexture(descriptor)
+      session = map.attachOpenGLBorrowedTexture(borrowedDescriptor(context, viewport, texture))
       compositor = OpenGLTextureCompositor(context, viewport)
-      return BorrowedTexture(context, map, session, compositor, texture)
+      return BorrowedTexture(context, session, compositor, texture)
     } catch (error: RuntimeException) {
       RenderTarget.closeSuppressed(error, compositor)
       RenderTarget.closeSuppressed(error, session)
@@ -86,6 +77,20 @@ internal object OpenGLRenderTarget {
       throw error
     }
   }
+
+  private fun borrowedDescriptor(
+    context: OpenGLContext,
+    viewport: Viewport,
+    texture: OpenGLBorrowedTexture,
+  ): OpenGLBorrowedTextureDescriptor =
+    OpenGLBorrowedTextureDescriptor(
+      RenderTarget.extent(viewport),
+      viewport.framebufferWidth(),
+      viewport.framebufferHeight(),
+      descriptor(context),
+      texture.texture(),
+      texture.target(),
+    )
 
   private fun descriptor(context: OpenGLContext): OpenGLContextDescriptor =
     if (context.isGles) {
@@ -152,56 +157,42 @@ internal object OpenGLRenderTarget {
 
   private class BorrowedTexture(
     private val context: OpenGLContext,
-    private val map: MapHandle,
-    private var session: RenderSessionHandle?,
-    private var compositor: OpenGLTextureCompositor?,
-    private var texture: OpenGLBorrowedTexture?,
+    private val session: RenderSessionHandle,
+    private val compositor: OpenGLTextureCompositor,
+    private var texture: OpenGLBorrowedTexture,
   ) : RenderTarget {
-    override fun needsReattachOnResize(): Boolean = true
-
-    /** Local to the render loop thread: close the session, rebuild the texture, attach again. */
-    override fun reattach(viewport: Viewport) {
-      close()
-      val replacement = attachBorrowedTexture(context, map, viewport)
-      check(replacement is BorrowedTexture) { "unexpected borrowed texture replacement" }
-      session = replacement.session
-      compositor = replacement.compositor
-      texture = replacement.texture
-      replacement.session = null
-      replacement.compositor = null
-      replacement.texture = null
-    }
-
+    /** Local to the render loop thread: allocate a texture at the new size and hand it over. */
     override fun resize(viewport: Viewport) {
-      error("borrowed texture resize requires render target reattachment")
+      compositor.resize(viewport)
+      val replacement = OpenGLBorrowedTexture(context, viewport)
+      try {
+        session.setOpenGLBorrowedTextureTarget(borrowedDescriptor(context, viewport, replacement))
+      } catch (error: RuntimeException) {
+        RenderTarget.closeSuppressed(error, replacement)
+        throw error
+      }
+      // Only once the session has taken the replacement: deleting the outgoing texture before that
+      // call returns would pull it out from under the session.
+      texture.close()
+      texture = replacement
     }
 
     override fun renderUpdate(): Boolean {
-      val currentSession = checkNotNull(session) { "OpenGL borrowed texture session is detached" }
-      val currentCompositor =
-        checkNotNull(compositor) { "OpenGL borrowed texture compositor is detached" }
-      val currentTexture = checkNotNull(texture) { "OpenGL borrowed texture is detached" }
-      if (!currentSession.renderUpdate()) {
+      if (!session.renderUpdate()) {
         return false
       }
-      currentCompositor.drawTexture(currentTexture.texture())
+      compositor.drawTexture(texture.texture())
       return true
     }
 
     override fun close() {
-      val closingCompositor = compositor
-      val closingSession = session
-      val closingTexture = texture
-      compositor = null
-      session = null
-      texture = null
       try {
-        closingCompositor?.close()
+        compositor.close()
       } finally {
         try {
-          closingSession?.close()
+          session.close()
         } finally {
-          closingTexture?.close()
+          texture.close()
         }
       }
     }

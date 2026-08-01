@@ -60,8 +60,8 @@ impl RenderTarget {
                     replacement.pointer(),
                 );
                 session.set_metal_borrowed_texture_target(&descriptor)?;
-                // Only once the session has taken it: the outgoing texture has
-                // to stay alive for the duration of that call.
+                // Only once the session has taken it, so a rejected replacement
+                // leaves this target on the texture it already had.
                 **texture = replacement;
                 Ok(())
             }

@@ -92,16 +92,16 @@ enum MetalRenderTarget {
     }
   }
 
-  var needsReattachOnResize: Bool {
-    switch self {
-    case .borrowedTexture:
-      true
-    case .nativeSurface, .ownedTexture:
-      false
-    }
-  }
-
-  func resize(_ viewport: Viewport) throws {
+  /// Follows a resized host.
+  ///
+  /// A caller-owned texture is sized by this example rather than by the
+  /// session, so following a resize means allocating one at the new size and
+  /// handing it over. The session stays live either way, which is what keeps
+  /// the map from going cold every time the window changes size.
+  mutating func resize(
+    graphics: MetalGraphicsContext,
+    viewport: Viewport
+  ) throws {
     switch self {
     case let .ownedTexture(session, compositor):
       compositor.resize(viewport)
@@ -110,9 +110,26 @@ enum MetalRenderTarget {
         height: viewport.logicalHeight,
         scaleFactor: viewport.scaleFactor
       )
-    case .borrowedTexture:
-      throw metalError(
-        "borrowed texture resize requires render target reattachment"
+    case let .borrowedTexture(session, compositor, _):
+      let replacement = try MetalBorrowedTexture(
+        graphics: graphics,
+        viewport: viewport
+      )
+      try session
+        .setMetalBorrowedTextureTarget(MetalBorrowedTextureDescriptor(
+          extent: viewport.extent,
+          physicalWidth: viewport.physicalWidth,
+          physicalHeight: viewport.physicalHeight,
+          texture: replacement.pointer
+        ))
+      compositor.resize(viewport)
+      // Only once the session has taken the replacement: a throw above leaves
+      // the session on the texture this case still holds, and releases the
+      // replacement instead.
+      self = .borrowedTexture(
+        session: session,
+        compositor: compositor,
+        texture: replacement
       )
     case let .nativeSurface(session):
       try session.resize(

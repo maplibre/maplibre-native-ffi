@@ -157,7 +157,7 @@ func run(mode renderTargetMode) (result error) {
 			if view.empty() {
 				return nil
 			}
-			if err := state.resize(view, mode); err != nil {
+			if err := state.resize(view); err != nil {
 				return err
 			}
 			shared.requestRender()

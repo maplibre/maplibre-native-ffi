@@ -497,9 +497,10 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
  * The caller owns the replacement, keeps it valid until the next replacement,
  * detach, or destroy, and synchronizes any use outside this session, exactly as
  * for mln_metal_borrowed_texture_attach(). The session never retained the
- * outgoing texture and never releases it. Keep that texture valid for the
- * duration of this call, after which the session holds no reference to it and
- * the caller is free to release it.
+ * outgoing texture, never releases it, and never reads it here: the pixel
+ * format it checks was recorded when it took that texture. A caller that
+ * already released the outgoing texture, which a host reallocating on resize
+ * often has, hands over the replacement all the same.
  *
  * The new extent applies exactly as mln_render_session_resize() applies one,
  * including how the next mln_render_session_render_update() waits for the map

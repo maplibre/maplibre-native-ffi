@@ -514,7 +514,8 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
     /// leave this session rendering into the texture it has. The caller owns the replacement and
     /// keeps it valid until the next replacement, detach, or close. This
     /// session never retained the outgoing texture and never releases it, but
-    /// reads from it during this call, so keep it valid until the call returns.
+    /// never reads it here, so a host that already released it hands over the
+    /// replacement all the same.
     pub fn setMetalBorrowedTextureTarget(self: *RenderSessionHandle, descriptor: MetalBorrowedTextureDescriptor) status.Error!void {
         var raw = metalBorrowedTextureDescriptorToNative(descriptor);
         return try setTarget(self.*, c.mln_metal_borrowed_texture_set_target, &raw);

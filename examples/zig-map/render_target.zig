@@ -34,6 +34,15 @@ pub const Session = union(enum) {
         }
     }
 
+    /// The handle behind an attached texture session, which a caller-owned
+    /// target needs so it can hand a replacement texture to the live session.
+    pub fn textureHandle(self: *Session) !*maplibre.RenderSessionHandle {
+        return switch (self.*) {
+            .texture => |*texture| texture,
+            .none, .surface => types.AppError.TextureResizeFailed,
+        };
+    }
+
     pub fn renderUpdate(
         self: *Session,
         diagnostic_store: ?*const maplibre.DiagnosticStore,

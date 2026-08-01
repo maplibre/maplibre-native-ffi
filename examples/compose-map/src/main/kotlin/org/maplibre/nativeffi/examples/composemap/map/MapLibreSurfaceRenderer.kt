@@ -15,8 +15,9 @@ import org.maplibre.nativeffi.render.RenderSessionHandle
  * The render loop.
  *
  * [render] runs on the bridge's producer thread, which owns the host graphics context and the
- * borrowed texture, so that thread attaches the render session, renders through it, reattaches it
- * on resize, and closes it. It touches the map only to attach, which native serves from any thread.
+ * borrowed texture, so that thread attaches the render session, renders through it, hands it each
+ * texture the bridge allocates for a resize, and closes it. It touches the map only to attach,
+ * which native serves from any thread.
  *
  * Input decoding runs on the Compose thread and only enqueues camera commands; [MapRuntimeLoop]
  * applies them on the thread that owns the map.
@@ -189,19 +190,37 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     stopping?.close()
   }
 
+  /**
+   * Renders through a session that is already attached to the texture this frame carries.
+   *
+   * Skiko reallocates its texture on every resize, so the frame arrives with a new one whenever the
+   * window changes size. That is not a new session: as long as the texture belongs to the same
+   * graphics context the session attached with, handing it over keeps the session's renderer, and
+   * with it the tile pyramid, glyph and image atlases, and symbol placement, so the map stays warm
+   * across the resize. Closing and attaching again is reserved for the context itself changing,
+   * which is a session this one's renderer holds nothing usable for.
+   */
   private fun ensureAttachedRenderSession(
     map: MapHandle,
     frame: NativeSurfaceFrame,
   ): AttachedRenderSession {
-    val descriptor = MapLibreNativeSurfaceAdapter.descriptor(frame.target, frame.extent)
+    val borrowed = MapLibreNativeSurfaceAdapter.borrowedTarget(frame.target, frame.extent)
     renderSession?.let { existing ->
-      if (existing.key == descriptor.key) {
-        return existing
+      if (existing.sessionKey == borrowed.sessionKey) {
+        if (existing.targetKey == borrowed.targetKey) {
+          return existing
+        }
+        borrowed.setTarget(existing.session)
+        val retargeted = existing.copy(targetKey = borrowed.targetKey)
+        renderSession = retargeted
+        renderRequest.set()
+        return retargeted
       }
     }
 
     closeRenderSession()
-    val attached = AttachedRenderSession(descriptor.key, descriptor.attach(map))
+    val attached =
+      AttachedRenderSession(borrowed.sessionKey, borrowed.targetKey, borrowed.attach(map))
     renderSession = attached
     renderRequest.set()
     return attached
@@ -219,7 +238,8 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
   }
 
   private data class AttachedRenderSession(
-    val key: MapLibreNativeSurfaceAdapter.TargetKey,
+    val sessionKey: MapLibreNativeSurfaceAdapter.SessionKey,
+    val targetKey: MapLibreNativeSurfaceAdapter.TargetKey,
     val session: RenderSessionHandle,
   )
 

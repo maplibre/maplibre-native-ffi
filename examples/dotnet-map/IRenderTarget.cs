@@ -5,10 +5,12 @@ namespace Maplibre.Native.Examples.DotnetMap;
 
 internal interface IRenderTarget : IDisposable
 {
-    bool NeedsReattachOnResize { get; }
-
     bool Render();
 
+    /// <summary>
+    /// Follows a resized host without losing the session: a target the session sizes resizes in
+    /// place, and a caller-owned one hands the live session a replacement at the new size.
+    /// </summary>
     void Resize(Viewport viewport);
 }
 
@@ -67,8 +69,6 @@ internal sealed class OwnedTextureRenderTarget : IRenderTarget
         this.compositor = compositor;
         this.session = session;
     }
-
-    public bool NeedsReattachOnResize => false;
 
     public static OwnedTextureRenderTarget Attach(
         IGraphicsContext graphics,
@@ -226,8 +226,8 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
 {
     private readonly IGraphicsContext graphics;
     private readonly ITextureCompositor compositor;
-    private readonly IDisposable texture;
     private readonly RenderSessionHandle session;
+    private IDisposable texture;
 
     private BorrowedTextureRenderTarget(
         IGraphicsContext graphics,
@@ -241,8 +241,6 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
         this.texture = texture;
         this.session = session;
     }
-
-    public bool NeedsReattachOnResize => true;
 
     public static BorrowedTextureRenderTarget Attach(
         IGraphicsContext graphics,
@@ -294,12 +292,81 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
         return presented;
     }
 
+    /// <summary>
+    /// Follows a resized host. A caller-owned texture is sized by this example rather than by the
+    /// session, so following a resize means allocating one at the new size and handing it over. The
+    /// session keeps its renderer across the handover, which is what keeps the map from going cold
+    /// every time the window changes size.
+    /// </summary>
     public void Resize(Viewport viewport)
     {
-        _ = viewport;
-        throw new InvalidOperationException(
-            "Borrowed textures are reattached instead of resized in place."
-        );
+        switch (graphics)
+        {
+            case MetalContext metal:
+                var metalReplacement = new MetalBorrowedTexture(metal, viewport);
+                HandOver(
+                    metalReplacement,
+                    () =>
+                        session.SetMetalBorrowedTextureTarget(Describe(metalReplacement, viewport)),
+                    viewport
+                );
+                break;
+            case VulkanContext vulkan:
+                var vulkanReplacement = new VulkanBorrowedImage(vulkan, viewport);
+                HandOver(
+                    vulkanReplacement,
+                    () =>
+                        session.SetVulkanBorrowedTextureTarget(
+                            Describe(vulkan, vulkanReplacement, viewport)
+                        ),
+                    viewport
+                );
+                break;
+            case OpenGLContext openGl:
+                var openGlReplacement = new OpenGLBorrowedTexture(openGl, viewport);
+                HandOver(
+                    openGlReplacement,
+                    () =>
+                        session.SetOpenGLBorrowedTextureTarget(
+                            Describe(openGl, openGlReplacement, viewport)
+                        ),
+                    viewport
+                );
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"Borrowed textures are not implemented for {graphics.Backend}."
+                );
+        }
+    }
+
+    /// <summary>
+    /// Hands the live session a replacement texture, then retires the outgoing one. Order matters:
+    /// a rejected replacement is released rather than leaked and the session keeps the texture it
+    /// already had.
+    /// </summary>
+    private void HandOver(IDisposable replacement, Action setTarget, Viewport viewport)
+    {
+        try
+        {
+            setTarget();
+        }
+        catch
+        {
+            DisposeAfterFailure(replacement);
+            throw;
+        }
+
+        var outgoing = texture;
+        texture = replacement;
+        try
+        {
+            compositor.Resize(viewport);
+        }
+        finally
+        {
+            outgoing.Dispose();
+        }
     }
 
     public void Dispose()
@@ -336,18 +403,7 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
             compositor = new VulkanTextureCompositor(vulkan, viewport);
             session = RenderSessionHandle.AttachVulkanBorrowedTexture(
                 map,
-                new VulkanBorrowedTextureDescriptor
-                {
-                    Extent = viewport.RenderTargetExtent,
-                    PhysicalWidth = viewport.PhysicalWidth,
-                    PhysicalHeight = viewport.PhysicalHeight,
-                    Context = vulkan.Descriptor(),
-                    Image = texture.ImagePointer,
-                    ImageView = texture.ViewPointer,
-                    Format = (uint)VulkanBorrowedImage.ImageFormat,
-                    InitialLayout = (uint)VulkanBorrowedImage.InitialLayout,
-                    FinalLayout = (uint)VulkanBorrowedImage.FinalLayout,
-                }
+                Describe(vulkan, texture, viewport)
             );
             return new BorrowedTextureRenderTarget(vulkan, compositor, texture, session);
         }
@@ -375,13 +431,7 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
             compositor = new MetalTextureCompositor(metal);
             session = RenderSessionHandle.AttachMetalBorrowedTexture(
                 map,
-                new MetalBorrowedTextureDescriptor
-                {
-                    Extent = viewport.RenderTargetExtent,
-                    PhysicalWidth = viewport.PhysicalWidth,
-                    PhysicalHeight = viewport.PhysicalHeight,
-                    Texture = texture.Pointer,
-                }
+                Describe(texture, viewport)
             );
             return new BorrowedTextureRenderTarget(metal, compositor, texture, session);
         }
@@ -409,15 +459,7 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
             compositor = new OpenGLTextureCompositor(openGl, viewport);
             session = RenderSessionHandle.AttachOpenGLBorrowedTexture(
                 map,
-                new OpenGLBorrowedTextureDescriptor
-                {
-                    Extent = viewport.RenderTargetExtent,
-                    PhysicalWidth = viewport.PhysicalWidth,
-                    PhysicalHeight = viewport.PhysicalHeight,
-                    Context = openGl.Descriptor(requirePbufferConfig: true),
-                    Texture = texture.Texture,
-                    Target = texture.Target,
-                }
+                Describe(openGl, texture, viewport)
             );
             return new BorrowedTextureRenderTarget(openGl, compositor, texture, session);
         }
@@ -428,6 +470,59 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
             DisposeAfterFailure(texture);
             throw;
         }
+    }
+
+    // Attach and set-target describe the same texture the same way: the replacement a resize hands
+    // over has to match what the session attached with.
+    private static MetalBorrowedTextureDescriptor Describe(
+        MetalBorrowedTexture texture,
+        Viewport viewport
+    )
+    {
+        return new MetalBorrowedTextureDescriptor
+        {
+            Extent = viewport.RenderTargetExtent,
+            PhysicalWidth = viewport.PhysicalWidth,
+            PhysicalHeight = viewport.PhysicalHeight,
+            Texture = texture.Pointer,
+        };
+    }
+
+    private static VulkanBorrowedTextureDescriptor Describe(
+        VulkanContext vulkan,
+        VulkanBorrowedImage image,
+        Viewport viewport
+    )
+    {
+        return new VulkanBorrowedTextureDescriptor
+        {
+            Extent = viewport.RenderTargetExtent,
+            PhysicalWidth = viewport.PhysicalWidth,
+            PhysicalHeight = viewport.PhysicalHeight,
+            Context = vulkan.Descriptor(),
+            Image = image.ImagePointer,
+            ImageView = image.ViewPointer,
+            Format = (uint)VulkanBorrowedImage.ImageFormat,
+            InitialLayout = (uint)VulkanBorrowedImage.InitialLayout,
+            FinalLayout = (uint)VulkanBorrowedImage.FinalLayout,
+        };
+    }
+
+    private static OpenGLBorrowedTextureDescriptor Describe(
+        OpenGLContext openGl,
+        OpenGLBorrowedTexture texture,
+        Viewport viewport
+    )
+    {
+        return new OpenGLBorrowedTextureDescriptor
+        {
+            Extent = viewport.RenderTargetExtent,
+            PhysicalWidth = viewport.PhysicalWidth,
+            PhysicalHeight = viewport.PhysicalHeight,
+            Context = openGl.Descriptor(requirePbufferConfig: true),
+            Texture = texture.Texture,
+            Target = texture.Target,
+        };
     }
 
     private static void DisposeAfterFailure(IDisposable? disposable)
@@ -456,8 +551,6 @@ internal sealed class NativeSurfaceRenderTarget : IRenderTarget
     {
         this.session = session;
     }
-
-    public bool NeedsReattachOnResize => false;
 
     public static NativeSurfaceRenderTarget Attach(
         IGraphicsContext graphics,

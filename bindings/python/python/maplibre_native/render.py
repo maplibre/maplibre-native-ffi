@@ -564,8 +564,8 @@ class RenderSessionHandle(NativeHandleMixin):
         otherwise. Both leave this session rendering into the texture it has. The
         caller owns the replacement and keeps it valid until the next
         replacement, detach, or close. This session never retained the outgoing
-        texture and never releases it, but reads from it during this call, so
-        keep it valid until the call returns.
+        texture, never releases it, and never reads it here, so a host that
+        already released it hands over the replacement all the same.
         """
         self._set_target(
             self._native.set_metal_borrowed_texture_target,

@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 internal class MacMetalBridge : NativeSurfaceBridge {
   private val rendererDispatcher = NativeSurfaceRendererDispatcher("compose-map-mac-metal-renderer")
   private var texture = NativeHandle(0)
+  private var metalDevice = NativeHandle(0)
   private var pixelFormat = 0L
   private var generation = 0L
   private var currentExtent = SurfaceExtent.Empty
@@ -22,15 +23,15 @@ internal class MacMetalBridge : NativeSurfaceBridge {
     )
 
   override fun resize(extent: SurfaceExtent) {
-    val metalDevice = if (extent.isEmpty) null else SkikoHost.requireMetalDevice()
-    rendererDispatcher.run { resizeOnRendererThread(extent, metalDevice) }
+    val skikoDevice = if (extent.isEmpty) null else SkikoHost.requireMetalDevice()
+    rendererDispatcher.run { resizeOnRendererThread(extent, skikoDevice) }
   }
 
-  private fun resizeOnRendererThread(extent: SurfaceExtent, metalDevice: SkikoMetalDevice? = null) {
+  private fun resizeOnRendererThread(extent: SurfaceExtent, skikoDevice: SkikoMetalDevice? = null) {
     if (extent == currentExtent && texture.address != 0L) {
       return
     }
-    recreateTexture(extent, metalDevice)
+    recreateTexture(extent, skikoDevice)
     currentExtent = extent
     generation += 1
   }
@@ -56,6 +57,7 @@ internal class MacMetalBridge : NativeSurfaceBridge {
       texture =
         texture.takeIf { it.address != 0L }
           ?: throw NativeSurfaceBridgeException("Skiko Metal texture allocation returned null"),
+      device = metalDevice,
       pixelFormat = pixelFormat,
       extent = extent,
       generation = generation,
@@ -83,16 +85,21 @@ internal class MacMetalBridge : NativeSurfaceBridge {
     }
   }
 
-  private fun recreateTexture(extent: SurfaceExtent, metalDevice: SkikoMetalDevice? = null) {
+  private fun recreateTexture(extent: SurfaceExtent, skikoDevice: SkikoMetalDevice? = null) {
     if (extent.isEmpty) {
       disposeTexture()
       return
     }
     val oldTexture = texture
+    val requiredMetalDevice = skikoDevice ?: SkikoHost.requireMetalDevice()
+    // Only the device that allocated it can take it back, so a Skiko device change allocates
+    // rather than reusing and this bridge never names one device while holding the other's texture.
+    val reusableTexture =
+      if (metalDevice.address == requiredMetalDevice.ptr) oldTexture.address else 0L
     val textureAddress =
       MacMetalBridgeNative.createMetalTexture(
-        metalDevice = (metalDevice ?: SkikoHost.requireMetalDevice()).ptr,
-        oldTexture = oldTexture.address,
+        metalDevice = requiredMetalDevice.ptr,
+        oldTexture = reusableTexture,
         width = extent.physicalWidth,
         height = extent.physicalHeight,
       )
@@ -100,12 +107,14 @@ internal class MacMetalBridge : NativeSurfaceBridge {
       releaseMetalTexture(oldTexture)
     }
     texture = NativeHandle(textureAddress)
+    metalDevice = NativeHandle(requiredMetalDevice.ptr)
     pixelFormat = MacMetalBridgeNative.texturePixelFormat(textureAddress)
   }
 
   private fun disposeTexture() {
     releaseMetalTexture(texture)
     texture = NativeHandle(0)
+    metalDevice = NativeHandle(0)
     pixelFormat = 0
   }
 

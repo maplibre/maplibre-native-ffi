@@ -71,13 +71,6 @@ pub const MetalRenderTarget = union(enum) {
         }
     }
 
-    pub fn needsReattachOnResize(self: *const MetalRenderTarget) bool {
-        return switch (self.*) {
-            .owned_texture, .native_surface => false,
-            .borrowed_texture => true,
-        };
-    }
-
     pub fn finishFrame(_: *MetalRenderTarget) !void {}
 
     pub fn renderUpdate(
@@ -306,8 +299,31 @@ const MetalBorrowedTextureBackend = struct {
         self.compositor.deinit();
     }
 
-    fn resize(_: *MetalBorrowedTextureBackend, _: types.Viewport) !void {
-        return types.AppError.TextureResizeFailed;
+    /// Follows a resized window.
+    ///
+    /// This example sizes the borrowed texture, not the session, so following a
+    /// resize means allocating one at the new size and handing it to the live
+    /// session. The session stays live, which is what keeps the map from going
+    /// cold on every resize.
+    fn resize(self: *MetalBorrowedTextureBackend, viewport: types.Viewport) !void {
+        const session = try self.session.textureHandle();
+        self.compositor.resize(viewport);
+
+        const replacement = try createBorrowedTexture(self.compositor.view.device, viewport);
+        errdefer replacement.release();
+        session.setMetalBorrowedTextureTarget(.{
+            .extent = render_target.extent(viewport),
+            .physical_width = viewport.physical_width,
+            .physical_height = viewport.physical_height,
+            .texture = maplibre.NativePointer.fromPtr(replacement.value.?),
+        }) catch |err| {
+            diagnostics.logError("Metal borrowed texture set target failed", err, null);
+            return types.AppError.TextureResizeFailed;
+        };
+        // Only once the session has taken the replacement, so a rejected one
+        // leaves this target on the texture it already had.
+        self.borrowed_texture.release();
+        self.borrowed_texture = replacement;
     }
 
     fn attachRenderTarget(

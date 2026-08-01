@@ -202,8 +202,16 @@ public sealed interface NativeSurfaceTarget {
   public val generation: Long
 }
 
+/**
+ * A Metal texture and the device it belongs to.
+ *
+ * [device] is the Skiko device the texture was allocated on. A consumer draws from the texture
+ * alone, while a producer that keeps state per device compares this across frames: Skiko allocates
+ * a new texture on every resize, and only a device change means it is a new device's texture.
+ */
 public data class MetalTextureTarget(
   public val texture: NativeHandle,
+  public val device: NativeHandle,
   public val pixelFormat: Long,
   public val origin: TextureOrigin = TextureOrigin.TOP_LEFT,
   override val extent: SurfaceExtent,

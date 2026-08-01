@@ -823,8 +823,8 @@ func (session *RenderSessionHandle) SetOpenGLSurfaceTarget(descriptor OpenGLSurf
 // attached with, which reports an unsupported-feature error otherwise. Both
 // leave this session rendering into the texture it has. The caller owns the replacement and keeps it valid until the next
 // replacement, detach, or session close. This session never retained the
-// outgoing texture and never releases it, but reads from it during this call,
-// so keep that texture valid until the call returns.
+// outgoing texture, never releases it, and never reads it here, so a host that
+// already released it hands over the replacement all the same.
 func (session *RenderSessionHandle) SetMetalBorrowedTextureTarget(descriptor MetalBorrowedTextureDescriptor) error {
 	if err := descriptor.Extent.validate(); err != nil {
 		return err

@@ -116,11 +116,9 @@ internal object Shell {
               viewport.value.log("resized viewport")
               if (!viewport.value.empty()) {
                 graphics.resize(viewport.value)
-                if (target.needsReattachOnResize()) {
-                  target.reattach(viewport.value)
-                } else {
-                  target.resize(viewport.value)
-                }
+                // Every mode follows a resize with its session still attached, so the map stays
+                // warm across the change.
+                target.resize(viewport.value)
                 renderRequest.set()
               }
             }

@@ -78,6 +78,7 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
       throw error
     }
   private var metalTexture = NativeHandle(0)
+  private var metalDevice = NativeHandle(0)
   private var pixelFormat = 0L
   private var importedTexture: MacAngleImportedTexture? = null
   private var generation = 0L
@@ -96,15 +97,15 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
     )
 
   override fun resize(extent: SurfaceExtent) {
-    val metalDevice = if (extent.isEmpty) null else SkikoHost.requireMetalDevice()
-    rendererDispatcher.run { resizeOnRendererThread(extent, metalDevice) }
+    val skikoDevice = if (extent.isEmpty) null else SkikoHost.requireMetalDevice()
+    rendererDispatcher.run { resizeOnRendererThread(extent, skikoDevice) }
   }
 
-  private fun resizeOnRendererThread(extent: SurfaceExtent, metalDevice: SkikoMetalDevice? = null) {
+  private fun resizeOnRendererThread(extent: SurfaceExtent, skikoDevice: SkikoMetalDevice? = null) {
     if (extent == currentExtent && importedTexture != null) {
       return
     }
-    recreateTexture(extent, metalDevice)
+    recreateTexture(extent, skikoDevice)
     currentExtent = extent
     generation += 1
   }
@@ -137,6 +138,7 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
       scope,
       MetalTextureTarget(
         texture = metalTexture,
+        device = metalDevice,
         pixelFormat = pixelFormat,
         origin = TextureOrigin.BOTTOM_LEFT,
         extent = target.extent,
@@ -166,17 +168,22 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
   private fun target(generation: Long): NativeSurfaceTarget =
     checkNotNull(importedTexture) { "ANGLE texture is not initialized" }.target(generation)
 
-  private fun recreateTexture(extent: SurfaceExtent, metalDevice: SkikoMetalDevice? = null) {
+  private fun recreateTexture(extent: SurfaceExtent, skikoDevice: SkikoMetalDevice? = null) {
     if (extent.isEmpty) {
       disposeTexture()
       return
     }
 
     val oldTexture = metalTexture
+    val requiredMetalDevice = skikoDevice ?: SkikoHost.requireMetalDevice()
+    // Only the device that allocated it can take it back, so a Skiko device change allocates
+    // rather than reusing and this bridge never names one device while holding the other's texture.
+    val reusableTexture =
+      if (metalDevice.address == requiredMetalDevice.ptr) oldTexture.address else 0L
     val newTextureAddress =
       MacMetalBridgeNative.createMetalTexture(
-        metalDevice = (metalDevice ?: SkikoHost.requireMetalDevice()).ptr,
-        oldTexture = oldTexture.address,
+        metalDevice = requiredMetalDevice.ptr,
+        oldTexture = reusableTexture,
         width = extent.physicalWidth,
         height = extent.physicalHeight,
       )
@@ -191,6 +198,7 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
       releaseMetalTexture(oldTexture)
     }
     metalTexture = newTexture
+    metalDevice = NativeHandle(requiredMetalDevice.ptr)
     pixelFormat = MacMetalBridgeNative.texturePixelFormat(newTexture.address)
     try {
       importedTexture = egl.createImportedTexture(newTexture, extent)
@@ -205,6 +213,7 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
     importedTexture = null
     releaseMetalTexture(metalTexture)
     metalTexture = NativeHandle(0)
+    metalDevice = NativeHandle(0)
     pixelFormat = 0
   }
 

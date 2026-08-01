@@ -425,9 +425,9 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     /// invalid-argument error otherwise, and carries the pixel format it attached with, which throws
     /// an unsupported-feature error otherwise. Both leave this session rendering into the texture it
     /// has. The caller owns the replacement and keeps it valid until
-    /// the next replacement, detach, or dispose. This session never retained the outgoing texture and
-    /// never releases it, but reads from it during this call, so keep that texture valid until the
-    /// call returns.
+    /// the next replacement, detach, or dispose. This session never retained the outgoing texture,
+    /// never releases it, and never reads it here, so a host that already released it hands over the
+    /// replacement all the same.
     /// </summary>
     public void SetMetalBorrowedTextureTarget(MetalBorrowedTextureDescriptor descriptor)
     {

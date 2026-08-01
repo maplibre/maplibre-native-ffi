@@ -56,13 +56,6 @@ pub const VulkanRenderTarget = union(enum) {
         }
     }
 
-    pub fn needsReattachOnResize(self: *const VulkanRenderTarget) bool {
-        return switch (self.*) {
-            .owned_texture, .native_surface => false,
-            .borrowed_texture => true,
-        };
-    }
-
     pub fn finishFrame(self: *VulkanRenderTarget) !void {
         switch (self.*) {
             .owned_texture => |*backend| try backend.finishFrame(),
@@ -418,8 +411,37 @@ const VulkanBorrowedTextureBackend = struct {
         self.compositor.deinit();
     }
 
-    fn resize(_: *VulkanBorrowedTextureBackend, _: types.Viewport) !void {
-        return types.AppError.TextureResizeFailed;
+    /// Follows a resized window.
+    ///
+    /// This example sizes the borrowed image, not the session, so following a
+    /// resize means allocating one at the new size and handing it to the live
+    /// session. The session stays live, which is what keeps the map from going
+    /// cold on every resize.
+    fn resize(self: *VulkanBorrowedTextureBackend, viewport: types.Viewport) !void {
+        const session = try self.session.textureHandle();
+        self.compositor.waitIdle();
+        try self.compositor.resize(viewport);
+
+        var replacement = try BorrowedImage.init(&self.compositor.context, viewport);
+        errdefer replacement.deinit(self.compositor.context.device);
+        session.setVulkanBorrowedTextureTarget(.{
+            .extent = render_target.extent(viewport),
+            .physical_width = viewport.physical_width,
+            .physical_height = viewport.physical_height,
+            .context = vulkanContextDescriptor(&self.compositor.context),
+            .image = maplibre.NativePointer.fromPtr(@ptrCast(replacement.image.?)),
+            .image_view = maplibre.NativePointer.fromPtr(@ptrCast(replacement.view.?)),
+            .format = c.VK_FORMAT_R8G8B8A8_UNORM,
+            .initial_layout = c.VK_IMAGE_LAYOUT_UNDEFINED,
+            .final_layout = c.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        }) catch |err| {
+            diagnostics.logError("Vulkan borrowed texture set target failed", err, null);
+            return types.AppError.TextureResizeFailed;
+        };
+        // Only once the session has taken the replacement: it renders into the
+        // outgoing image until that call returns, so destroy it after.
+        self.borrowed_image.deinit(self.compositor.context.device);
+        self.borrowed_image = replacement;
     }
 
     fn finishFrame(self: *VulkanBorrowedTextureBackend) !void {

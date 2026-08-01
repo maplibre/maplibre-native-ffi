@@ -359,7 +359,7 @@ polling.
    and enqueue them for the runtime loop; signal the runtime loop's wake source;
    set the render request.
 2. Apply pending viewport changes to graphics resources and to the render
-   session, or run the [reattach](#reattach).
+   target, which follows them without losing its session.
 3. Consume the render request; when it was set, call `render_update`.
 4. Run `finishFrame()`.
 
@@ -521,11 +521,10 @@ map-specific setup.
 
 #### Resize API
 
-Expose `resize(viewport)` for the active render target. Resize API-level
-resources separately when the graphics context requires it. When the active
-render target reports `needsSetTargetOnResize`, rebuild the mode-specific
-resources for the new viewport and hand them to the live session with
-`set_target`.
+Expose `resize(viewport)` for the active render target, and resize API-level
+resources separately when the graphics context requires it. The render target
+decides for itself how to follow the new viewport, so a host resizes every mode
+through the same call.
 
 ### Render-target modes
 
@@ -568,9 +567,9 @@ table:
 - Attach with the borrowed-texture descriptor referencing host-owned handles.
 - On `render_update`, sample that texture through the same compositor path as
   `owned-texture`.
-- On resize, recreate the host texture and hand it to the live session with
-  `set_target` (see [Resize mechanics](#resize-mechanics);
-  `needsSetTargetOnResize` is `true` for this mode).
+- On resize, allocate a host texture at the new size and hand it to the live
+  session with `set_target`, which the render target does inside its own
+  `resize` (see [Resize mechanics](#resize-mechanics)).
 
 #### `native-surface`
 
@@ -601,17 +600,20 @@ that pass.
 
 - Recompute viewport on host size or scale changes; skip rendering if extent is
   empty.
-- `needsSetTargetOnResize()` is a render-target method. It returns `true` for
-  `borrowed-texture` because the host-owned exportable texture is fixed to the
-  viewport size: resize recreates the texture and hands it to the live session
-  through `set_target`. It returns `false` for `owned-texture` and
-  `native-surface`, where resize updates graphics-context resources, compositor
-  resources for texture modes, and session extent in place.
-- When it returns `true`, recreate the texture and call `set_target`; otherwise
-  resize the graphics context and active render target in place. Either way the
-  session stays live, and so does its renderer, so the map keeps its tiles and
-  atlases. A scale factor change is the exception the C API documents,
-  rebuilding the renderer for the new pixel ratio.
+- `resize(viewport)` is a render-target method, and each mode follows the new
+  viewport its own way. `owned-texture` and `native-surface` resize
+  graphics-context resources, compositor resources for texture modes, and
+  session extent in place. `borrowed-texture` cannot: the host-owned exportable
+  texture is fixed to the viewport size, so it allocates one at the new size and
+  hands it to the live session with `set_target`. A host calls `resize` for
+  every mode and branches on none of them.
+- The session stays live either way, and so does its renderer, so the map keeps
+  its tiles and atlases across a resize. A scale factor change is the exception
+  the C API documents, rebuilding the renderer for the new pixel ratio.
+- A `set_target` that fails leaves the session on the target it already had, so
+  keep that one and release the replacement rather than the reverse. The session
+  never reads the outgoing target, so an example whose graphics layer frees it
+  before handing over the replacement is conformant.
 - Build the replacement to match what the session attached with, which the C API
   states per backend and per function. `set_target` reports
   `MLN_STATUS_UNSUPPORTED` for a target that differs, leaving the session on the
@@ -626,11 +628,11 @@ that pass.
 
 #### Reattach
 
-Reattaching happens entirely on the render loop thread, which owns both the
-session and the graphics resources. The sequence MUST be:
+Reattaching is for a target the live session cannot take, not for a resize. It
+happens entirely on the render loop thread, which owns both the session and the
+graphics resources. The sequence MUST be:
 
-1. Close the session, then destroy and recreate the host texture or surface at
-   the new size.
+1. Close the session, then destroy and recreate the host texture or surface.
 2. Attach the render target again against the published map.
 3. Set the render request.
 
@@ -813,10 +815,16 @@ render loop only while the view is visible and the app is in the foreground. The
 runtime loop keeps running across these transitions, so loading continues while
 the view is off screen.
 
-When the host toolkit destroys or invalidates the presentation surface, close
-the render target on the render loop thread, which is the thread that attached
-it. Keep runtime and map handles alive. Attach again on that same thread when a
-fresh surface is available, per [Reattach](#reattach).
+When the host toolkit supplies a fresh presentation surface on the graphics
+context the session attached with, hand it over with `set_target` on the render
+loop thread, which is the thread that attached the session. The session keeps
+its renderer, so the map returns warm rather than rebuilding its tiles and
+atlases.
+
+Close the render target only when the graphics context itself is gone, on that
+same render loop thread. Keep runtime and map handles alive either way, and
+attach again on that thread once a context and surface exist, per
+[Reattach](#reattach).
 
 | Transition                       | Behavior                                                                                                                                                           |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

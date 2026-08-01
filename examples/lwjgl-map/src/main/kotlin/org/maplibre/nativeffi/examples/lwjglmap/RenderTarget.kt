@@ -10,14 +10,16 @@ import org.maplibre.nativeffi.render.RenderTargetExtent
  * driven, and closed on the render loop thread, where the host graphics context lives.
  */
 internal interface RenderTarget : AutoCloseable {
-  fun needsReattachOnResize(): Boolean = false
-
   fun needsMetalAutoreleasePool(): Boolean = false
 
-  fun reattach(viewport: Viewport) {
-    throw IllegalStateException("render target does not support reattachment")
-  }
-
+  /**
+   * Follows a resized host, keeping the session attached.
+   *
+   * Surface and owned-texture targets are sized by the session, so they resize in place. A
+   * caller-owned texture is sized by this example instead, so it allocates one at the new size and
+   * hands it to the live session. Either way the session keeps its renderer, which is what keeps
+   * the map from going cold on every window resize.
+   */
   fun resize(viewport: Viewport)
 
   /** Renders the latest map update. Returns false when no update is available yet. */
