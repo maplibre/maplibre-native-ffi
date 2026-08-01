@@ -297,12 +297,17 @@ otherwise, and the hook fails on that ABI rather than substituting another;
 `flutter build apk --target-platform android-arm64,android-x64` names the two
 that are served.
 
-A pinned revision keeps whichever artifact its first build cached, so the
-library under a given rev never moves; `dart pub upgrade` resolves a new
-revision and the hook fetches the current snapshot for it. An Android target
-resolves to the `android-*` archive, which the hook bundles as the code asset —
-such an app still packages the TLS helper and calls `mln_android_init`, as
-[Package an Android app](#package-an-android-app) describes.
+A pinned revision holds whichever artifact its first build cached for as long as
+that cache lives, and `dart pub upgrade` resolves a new revision and fetches the
+current snapshot for it. The cache is local and disposable, though: a fresh
+machine, or a cleared `.dart_tool`, takes whatever the floating release holds at
+that moment. Pinning a revision does not pin the native library, so build from
+source and point the hook at that prefix when you need one that does not move.
+
+An Android target resolves to the `android-*` archive, which the hook bundles as
+the code asset. Such an app still packages the TLS helper and calls
+`mln_android_init`, as [Package an Android app](#package-an-android-app)
+describes.
 
 The three below take the native library by hand, from the archive above. That
 is the native idiom in each: Swift's `systemLibrary` target is built around

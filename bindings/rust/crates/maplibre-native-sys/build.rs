@@ -271,12 +271,37 @@ mod download {
         // Only an unreachable release falls back to the cache. A checksum or
         // extraction failure is a real defect and stays fatal, so a corrupt
         // download can never be papered over with a stale artifact.
-        let prefix = match fetch_checksums()
-            .and_then(|checksums| acquire(&preset, &cache_dir, &checksums))
-        {
-            Ok(prefix) => prefix,
-            Err(Unreachable(error)) => reuse_cached(&preset, &cache_dir, &error)?,
-            Err(Fatal(error)) => return Err(error),
+        //
+        // A publish replaces `SHA256SUMS` and the archives as separate assets,
+        // so a build starting mid-publish can pair one generation's checksum
+        // with the other's bytes. That reads as a mismatch without either file
+        // being corrupt, so the whole acquisition is retried once against a
+        // freshly fetched checksum file; a mismatch that survives is fatal.
+        //
+        // The retry gives up every cached answer with it — the offline fallback
+        // and the cache hit alike. Once bytes have failed verification the
+        // release is no longer trustworthy for this build, and answering that
+        // from disk, whether on a later timeout or on a digest already present,
+        // would hide an unverified download behind an older artifact.
+        let mut after_mismatch = false;
+        let prefix = loop {
+            match fetch_checksums()
+                .and_then(|checksums| acquire(&preset, &cache_dir, &checksums, after_mismatch))
+            {
+                Ok(prefix) => break prefix,
+                Err(Unreachable(error)) if after_mismatch => return Err(error),
+                Err(Unreachable(error)) => {
+                    break reuse_cached(&preset, &cache_dir, &error)?;
+                }
+                Err(Mismatch(error)) if !after_mismatch => {
+                    after_mismatch = true;
+                    println!(
+                        "cargo:warning={error}; the {SNAPSHOT_TAG} release may have been \
+                         republished mid-download. Retrying once."
+                    );
+                }
+                Err(Mismatch(error)) | Err(Fatal(error)) => return Err(error),
+            }
         };
 
         let descriptor = read_descriptor(&prefix)?;
@@ -290,9 +315,12 @@ mod download {
     /// which should fall back to the cache; a checksum mismatch should not.
     enum Failure {
         Unreachable(Box<dyn Error>),
+        /// A checksum that did not match its archive, which a publish crossing
+        /// generations produces without either file being corrupt.
+        Mismatch(Box<dyn Error>),
         Fatal(Box<dyn Error>),
     }
-    use Failure::{Fatal, Unreachable};
+    use Failure::{Fatal, Mismatch, Unreachable};
 
     impl From<io::Error> for Failure {
         fn from(error: io::Error) -> Self {
@@ -301,9 +329,19 @@ mod download {
     }
 
     /// Downloads and extracts the archive unless the digest is already cached.
-    fn acquire(preset: &Preset, cache_dir: &Path, checksums: &str) -> Result<PathBuf, Failure> {
+    ///
+    /// `after_mismatch` suppresses the cache hit. A checksum file that crossed
+    /// back to an older generation resolves to a digest already on disk, which
+    /// would answer a failed verification from the cache without proving any
+    /// fresh bytes.
+    fn acquire(
+        preset: &Preset,
+        cache_dir: &Path,
+        checksums: &str,
+        after_mismatch: bool,
+    ) -> Result<PathBuf, Failure> {
         let prefix = cache_dir.join(hex(&Sha256::digest(checksums.as_bytes())));
-        if prefix.is_dir() {
+        if prefix.is_dir() && !after_mismatch {
             return Ok(prefix);
         }
 
@@ -322,9 +360,9 @@ mod download {
         let _ = fs::remove_dir_all(&scratch);
         fs::create_dir_all(&scratch)?;
         let result = extract(response, &scratch, &expected, &archive_name);
-        if let Err(error) = result {
+        if let Err(failure) = result {
             let _ = fs::remove_dir_all(&scratch);
-            return Err(Fatal(error));
+            return Err(failure);
         }
 
         // Losing the rename means another build extracted the same digest
@@ -351,7 +389,7 @@ mod download {
         scratch: &Path,
         expected: &str,
         archive_name: &str,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<(), Failure> {
         let reader = response.into_body().into_reader();
         let mut digest = DigestReader {
             inner: reader,
@@ -364,10 +402,10 @@ mod download {
 
         let actual = hex(&digest.hasher.finalize());
         if actual != expected {
-            return Err(format!(
-                "checksum mismatch for {archive_name}: expected {expected}, got {actual}"
-            )
-            .into());
+            return Err(Mismatch(
+                format!("checksum mismatch for {archive_name}: expected {expected}, got {actual}")
+                    .into(),
+            ));
         }
         Ok(())
     }

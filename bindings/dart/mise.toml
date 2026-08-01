@@ -85,8 +85,14 @@ dart test
 description = "Test the build hook against a downloaded native snapshot archive."
 # Runs one file rather than the suite: the rest holds native handles across
 # isolate boundaries, which is what keeps `test` out of CI until #412 is fixed.
-# Removing the pointer is what forces the download, and `test` writes it back.
+# Removing the pointer is what forces the download; it goes back afterwards so a
+# developer who had one keeps building against their local prefix.
 run = '''
-rm -f .dart_tool/maplibre_native_install_dir
+pointer=.dart_tool/maplibre_native_install_dir
+saved="$(mktemp)"
+trap 'if [[ -s "$saved" ]]; then mv "$saved" "$pointer"; else rm -f "$saved"; fi' EXIT
+if [[ -f "$pointer" ]]; then
+  mv "$pointer" "$saved"
+fi
 dart test test/native_library_test.dart
 '''

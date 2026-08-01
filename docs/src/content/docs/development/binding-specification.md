@@ -118,6 +118,13 @@ Requirements for a binding that acquires the library:
 - An unreachable release MUST reuse a cached prefix when one exists, warning
   that it may be out of date, and MUST otherwise fail naming the
   local-development pointer. Offline builds stay possible either way.
+- A checksum mismatch MAY be retried once against a freshly fetched
+  `SHA256SUMS`, because a publish replaces the checksum file and the archives
+  separately and a build spanning that moment can pair one generation with the
+  other. A binding that retries MUST stop reusing a cached prefix for the rest
+  of that acquisition — neither as an offline fallback nor as a cache hit on the
+  retried digest. Once bytes have failed verification, answering from disk hides
+  an unverified download behind an older artifact.
 - The extracted prefix's descriptor MUST be checked against the requested
   preset. A binding whose local-development pointer is written by tooling rather
   than named by the consumer MUST check that prefix against the build's target
