@@ -63,7 +63,7 @@
       "toolchainFile": "$env{ANDROID_HOME}/ndk/$env{MLN_FFI_ANDROID_NDK_VERSION}/build/cmake/android.toolchain.cmake",
       "cacheVariables": {
         "ANDROID_PLATFORM": "android-24",
-        "ANDROID_STL": "c++_shared",
+        "ANDROID_STL": "c++_static",
         "MLN_FFI_CARGO_TARGET_DIR": "${sourceDir}/build/${presetName}/cargo"
       }
     },

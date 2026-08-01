@@ -33,10 +33,13 @@ repositories {
 | `maplibre-native-ffi-runtime-vulkan` | Vulkan native runtime                         |
 | `maplibre-native-ffi-runtime-metal`  | Metal native runtime                          |
 
-Each runtime publication depends on `maplibre-native-ffi`. Applications whose
-targets are all supported by one backend may depend on that runtime from
+Applications declare the binding and a runtime separately: the binding carries
+the API, and a runtime carries the native payload for one backend. Applications
+whose targets are all supported by one backend may declare that runtime in
 `commonMain`. Applications using different backends select runtime publications
-from their platform source sets.
+from their platform source sets. The runtimes depend on nothing of ours, which
+keeps the Android runtime AARs consumable by hosts that are not written in
+Kotlin.
 
 Every `maplibre-native-ffi` module attaches Dokka-generated API documentation as
 its Maven javadoc artifact. The generated site covers the common API and each
@@ -106,23 +109,35 @@ frameworks supplied by the Apple SDK.
 
 ### Android
 
-Each Android runtime AAR contains its backend-specific JNI libraries under
-`jni/<abi>`. OpenGL and Vulkan use separate runtime publications because the
-native library is compiled for one render backend. Runtime AARs include the
-native dependency notices and the Android NDK notice under `META-INF/licenses`.
+Each Android runtime AAR contains `jni/<abi>/libmaplibre-native-c.so` for its
+backend. OpenGL and Vulkan use separate runtime publications because the native
+library is compiled for one render backend, and both AARs name the library
+identically, so an app packages one of them. The Android presets link libc++
+statically and the C API library exports only its `mln_*` entry points, so the
+AAR carries that one library per ABI and redistributes no `libc++_shared.so`.
+Runtime AARs include the native dependency notices and the Android NDK notice
+under `META-INF/licenses`.
 
-The Android target of `maplibre-native-ffi` directly includes the JVM helper
-built from the pinned, patched `rustls-platform-verifier` checkout acquired by
-mise. The helper and Rust JNI descriptors use the
+Each Android runtime AAR also contains the JVM helper built from the pinned,
+patched `rustls-platform-verifier` checkout acquired by mise, its consumer R8
+rule, and the upstream licenses. The helper and Rust JNI descriptors use the
 `org.maplibre.nativeffi.internal.rustlsplatformverifier` package so an app may
-also consume the upstream helper without duplicate classes. The target includes
-the helper's consumer R8 rule and upstream licenses. Consumers of the Kotlin
-publication do not add a Rustls-specific Maven dependency.
+also consume the upstream helper without duplicate classes. Consumers add no
+Rustls-specific Maven dependency.
 
-The Android target also publishes a consumer R8 rule for JavaCPP. JavaCPP reads
-the generated presets class reflectively and derives the JNI library name from a
+The helper travels with the native library rather than with the Kotlin binding
+because the native TLS stack is its only caller. An Android host written in
+another language depends on a runtime publication alone and gets a complete,
+packageable native payload; it binds nothing in the helper and adds no keep rule
+of its own. Such a host still calls `mln_android_init` before creating a
+runtime.
+
+The Android target of `maplibre-native-ffi` carries the Kotlin API, the JavaCPP
+bridge classes, and `jni/<abi>/libjniMaplibreNativeC.so`, which is private to
+this binding. It publishes a consumer R8 rule for JavaCPP, which reads the
+generated presets class reflectively and derives the JNI library name from a
 live stack trace, so both survive minification only when R8 leaves the presets
-package and the JavaCPP runtime package alone. Apps that minify get these rules
+package and the JavaCPP runtime package alone. Apps that minify get that rule
 from the publication and add none of their own.
 
 ### JVM
@@ -188,7 +203,8 @@ The initial snapshot workflow validates:
 
 - Maven and Gradle module metadata for every publication;
 - native archive presence in published KLIBs;
-- JNI library and Rustls helper presence in Android AARs;
+- JNI library placement and Rustls helper presence in Android AARs;
+- Android runtime publications resolving without the Kotlin binding;
 - native resource presence in JVM classifier JARs;
 - Dokka-generated API pages in every API-bearing javadoc JAR;
 - published JVM consumption through the Compose and LWJGL examples;

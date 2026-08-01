@@ -28,36 +28,42 @@ dynamic-library search path.
 
 ## Android host integration
 
-The Dart package does not yet publish Android artifacts. An Android application
-that embeds this repository builds the native package and the local Rustls
-platform-verifier helper:
-
-```bash
-mise run //bindings/rustls-platform-verifier-android:build
-```
+The Dart package does not yet publish Android artifacts, and an Android
+application takes its native payload from a runtime AAR. That AAR holds
+`libmaplibre-native-c.so` for each ABI and the patched Rustls platform-verifier
+helper that the native TLS stack calls over JNI, so one dependency covers the
+packaging:
 
 ```kotlin
 // app/build.gradle.kts
-val maplibreNativeFfi = file("../maplibre-native-ffi")
+repositories {
+  maven {
+    url = uri("https://central.sonatype.com/repository/maven-snapshots/")
+    content { includeGroup("org.maplibre.nativeffi") }
+  }
+}
 
 dependencies {
-  implementation(
-    files(
-      maplibreNativeFfi.resolve(
-        "bindings/rustls-platform-verifier-android/build/outputs/aar/" +
-          "rustls-platform-verifier-android-release.aar"
-      )
-    )
-  )
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:$version")
 }
 ```
 
-The helper build runs the repository's mise dependency acquisition first. Mise
-pins, acquires, and patches the verifier source used by both Cargo and Gradle.
-The helper uses a MapLibre FFI-private Java package, so it can coexist with
-another library that packages the upstream Rustls helper. The host must also
-call `mln_android_init` with its JNI environment, class, and application context
-before creating a runtime.
+An application that embeds this repository publishes the same AAR from its
+checkout instead, after building the native package for each ABI it ships:
+
+```bash
+mise run build android-arm64-vulkan
+./gradlew -Pmaplibre.android.backend=vulkan -Pmaplibre.android.abis=arm64-v8a \
+  -Pmaplibre.android.prebuiltBuildRoot=build \
+  :bindings:kotlin-runtime-vulkan:publishAndroidPublicationToMavenLocal
+```
+
+Either way the application binds nothing in the helper, which uses a MapLibre
+FFI-private Java package so it can coexist with another library that packages
+the upstream Rustls helper. The AAR carries the R8 keep rule the helper needs.
+The host loads the library under its platform name and calls `mln_android_init`
+with its JNI environment, class, and application context before creating a
+runtime.
 
 ## Ownership and execution
 

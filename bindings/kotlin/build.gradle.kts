@@ -1,11 +1,8 @@
-import org.gradle.api.tasks.bundling.Zip
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 import org.maplibre.nativeffi.gradle.AndroidTarget
-import org.maplibre.nativeffi.gradle.CargoPackage
-import org.maplibre.nativeffi.gradle.ExtractAarClassesJar
 import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 import org.maplibre.nativeffi.gradle.canonicalizeKmpRootMetadata
@@ -31,27 +28,12 @@ val androidTargets =
     providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS)
   )
 val checkedInJextractSources = layout.projectDirectory.dir("src/jvmMain/generated")
+val packagedAndroidBindingLibs = layout.buildDirectory.dir("generated/jniLibs/androidMain")
 val generatedJavaCppSources =
   layout.buildDirectory.dir("generated/sources/javacpp/androidMain/java")
 val mavenGroup = providers.gradleProperty("maplibre.maven.group").get()
 val mavenVersion = providers.gradleProperty("maplibre.maven.version").get()
 val mavenArtifact = "maplibre-native-ffi"
-val rustlsPlatformVerifierPackage = CargoPackage.directory(project, "rustls-platform-verifier")
-val rustlsPlatformVerifierAndroidAar =
-  project(":bindings:rustls-platform-verifier-android")
-    .layout
-    .buildDirectory
-    .file("outputs/aar/rustls-platform-verifier-android-release.aar")
-val rustlsPlatformVerifierAndroidJar =
-  layout.buildDirectory.file(
-    "generated/dependencies/rustlsPlatformVerifierAndroid/rustls-platform-verifier-android.jar"
-  )
-val extractRustlsPlatformVerifierAndroidJar =
-  tasks.register<ExtractAarClassesJar>("extractRustlsPlatformVerifierAndroidJar") {
-    dependsOn(":bindings:rustls-platform-verifier-android:bundleReleaseAar")
-    aarFile.set(rustlsPlatformVerifierAndroidAar)
-    outputJar.set(rustlsPlatformVerifierAndroidJar)
-  }
 
 kotlin {
   iosArm64()
@@ -73,9 +55,6 @@ kotlin {
     withJava()
 
     optimization {
-      consumerKeepRules.file(
-        "src/androidMain/resources/META-INF/proguard/maplibre-native-ffi-rustls.pro"
-      )
       consumerKeepRules.file(
         "src/androidMain/resources/META-INF/proguard/maplibre-native-ffi-javacpp.pro"
       )
@@ -111,27 +90,9 @@ kotlin {
   }
 
   sourceSets {
-    androidMain {
-      dependencies {
-        implementation(libs.javacpp)
-        implementation(
-          files(rustlsPlatformVerifierAndroidJar).builtBy(extractRustlsPlatformVerifierAndroidJar)
-        )
-      }
-    }
+    androidMain { dependencies { implementation(libs.javacpp) } }
 
     commonTest.dependencies { implementation(kotlin("test")) }
-  }
-}
-
-tasks.withType<Zip>().configureEach {
-  if (name == "bundleAndroidMainAar") {
-    val licenseDirectory = "META-INF/licenses/rustls-platform-verifier"
-    from(rustlsPlatformVerifierPackage.map { it.resolve("LICENSE-APACHE") }) {
-      into(licenseDirectory)
-    }
-    from(rustlsPlatformVerifierPackage.map { it.resolve("LICENSE-MIT") }) { into(licenseDirectory) }
-    from(rootProject.file("patches/rustls-platform-verifier/NOTICE")) { into(licenseDirectory) }
   }
 }
 
@@ -172,6 +133,8 @@ apply(from = "gradle/jextract-jvm.gradle.kts")
 extensions.extraProperties["maplibreAndroidSdkDirectory"] =
   androidComponents.sdkComponents.sdkDirectory
 
+extensions.extraProperties["maplibreAndroidBindingLibsDirectory"] = packagedAndroidBindingLibs
+
 apply(from = "gradle/javacpp-android.gradle.kts")
 
 tasks.named<KotlinJvmCompile>("compileKotlinJvm") { source(checkedInJextractSources) }
@@ -183,6 +146,13 @@ androidComponents {
     variant.sources.java?.addStaticSourceDirectory(
       generatedJavaCppSources.get().asFile.absolutePath
     )
+    // The JavaCPP bridge is this binding's own JNI library, so it ships here
+    // rather than in the runtime AARs an Android host of any language consumes.
+    androidTargets.forEach { target ->
+      variant.sources.jniLibs?.addStaticSourceDirectory(
+        packagedAndroidBindingLibs.get().dir(target.cargoTarget).asFile.absolutePath
+      )
+    }
   }
 }
 
@@ -192,6 +162,7 @@ tasks.configureEach {
     "compileAndroidMainJavaWithJavac",
     "compileAndroidMain",
     "extractAndroidMainAnnotations" -> dependsOn("generateAndroidJavaCppBindings")
+    "mergeAndroidMainJniLibFolders" -> dependsOn("packageAndroidBindingLibraries")
   }
 }
 

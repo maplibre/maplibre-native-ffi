@@ -14,8 +14,8 @@ val androidTargets =
   AndroidTarget.parseAbis(
     providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS)
   )
-val packagedAndroidNativeLibs =
-  project(":bindings:kotlin").layout.buildDirectory.dir("generated/jniLibs/androidMain")
+val packagedAndroidRuntimeLibs =
+  project(":bindings:kotlin").layout.buildDirectory.dir("generated/jniLibs/runtime")
 
 kotlin {
   jvm { compilerOptions { jvmTarget.set(JvmTarget.fromTarget(libs.versions.java.release.get())) } }
@@ -26,6 +26,16 @@ kotlin {
     namespace = "org.maplibre.nativeffi.runtime.vulkan"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()
+
+    // The AAR carries the Rustls platform verifier that the native TLS stack
+    // calls over JNI. Nothing on a JVM classpath references it, so an app that
+    // minifies keeps it only through this rule.
+    optimization {
+      consumerKeepRules.file(
+        rootProject.file("bindings/rustls-platform-verifier-android/consumer-rules.pro")
+      )
+      consumerKeepRules.publish = true
+    }
   }
 }
 
@@ -33,7 +43,7 @@ androidComponents {
   onVariants { variant ->
     androidTargets.forEach { target ->
       variant.sources.jniLibs?.addStaticSourceDirectory(
-        packagedAndroidNativeLibs.get().dir("vulkan/${target.cargoTarget}").asFile.absolutePath
+        packagedAndroidRuntimeLibs.get().dir("vulkan/${target.cargoTarget}").asFile.absolutePath
       )
     }
   }

@@ -187,27 +187,52 @@ def verify_javadoc(root: pathlib.Path) -> None:
                 )
 
 
+RUSTLS_VERIFIER_PACKAGE = "org.maplibre.nativeffi.internal.rustlsplatformverifier"
+
+
+def aar_keep_rules(aar: zipfile.ZipFile) -> str:
+    names = [
+        name
+        for name in aar.namelist()
+        if name.endswith((".pro", "proguard.txt"))
+    ]
+    return "\n".join(aar.read(name).decode("utf-8") for name in names)
+
+
 def verify_android(root: pathlib.Path) -> None:
+    # The binding AAR carries the Kotlin API and its private JavaCPP bridge. An
+    # Android host of any language takes the C library and the TLS component from
+    # a runtime AAR alone, so neither may appear here.
     core = one(
         module_files(root, "maplibre-native-ffi-android", ".aar"),
         "core Android AAR",
     )
     with zipfile.ZipFile(core) as aar:
         names = set(aar.namelist())
-        if any(name.startswith("jni/") for name in names):
-            raise SystemExit("the core Android AAR contains backend native libraries")
-        rustls_jar = "libs/rustls-platform-verifier-android.jar"
-        if rustls_jar not in names:
-            raise SystemExit(f"the core Android AAR is missing {rustls_jar}")
-        rules = [name for name in names if name.endswith((".pro", "proguard.txt"))]
-        if not any(b"org.rustls.platformverifier" in aar.read(name) for name in rules):
-            raise SystemExit(
-                "the core Android AAR is missing the Rustls consumer keep rule"
-            )
-        for license_name in ("LICENSE-APACHE", "LICENSE-MIT"):
-            expected = "META-INF/licenses/rustls-platform-verifier/" + license_name
+        for abi in ("arm64-v8a", "x86_64"):
+            expected = f"jni/{abi}/libjniMaplibreNativeC.so"
             if expected not in names:
                 raise SystemExit(f"the core Android AAR is missing {expected}")
+            if not aar.read(expected).startswith(b"\x7fELF"):
+                raise SystemExit(
+                    f"the core Android AAR {expected} is not an ELF shared library"
+                )
+        unexpected = [
+            name
+            for name in names
+            if name.startswith("jni/")
+            and not name.endswith(("/", "libjniMaplibreNativeC.so"))
+        ]
+        if unexpected:
+            raise SystemExit(
+                f"the core Android AAR contains runtime native libraries: {unexpected}"
+            )
+        if any("rustls" in name for name in names):
+            raise SystemExit("the core Android AAR still carries the Rustls helper")
+        if "org.bytedeco.javacpp" not in aar_keep_rules(aar):
+            raise SystemExit(
+                "the core Android AAR is missing the JavaCPP consumer keep rule"
+            )
 
     for backend in ("opengl", "vulkan"):
         runtime = one(
@@ -226,22 +251,54 @@ def verify_android(root: pathlib.Path) -> None:
                 raise SystemExit(
                     f"{runtime} is missing META-INF/licenses/android-ndk/NOTICE"
                 )
+            rustls_jar = "libs/rustls-platform-verifier-android.jar"
+            if rustls_jar not in names:
+                raise SystemExit(f"{runtime} is missing {rustls_jar}")
+            if RUSTLS_VERIFIER_PACKAGE not in aar_keep_rules(aar):
+                raise SystemExit(f"{runtime} is missing the Rustls consumer keep rule")
+            for license_name in ("LICENSE-APACHE", "LICENSE-MIT", "NOTICE"):
+                expected = (
+                    "META-INF/licenses/rustls-platform-verifier/" + license_name
+                )
+                if expected not in names:
+                    raise SystemExit(f"{runtime} is missing {expected}")
             for abi in ("arm64-v8a", "x86_64"):
-                for library in (
-                    "libmaplibre-native-c.so",
-                    "libjniMaplibreNativeC.so",
-                    "libc++_shared.so",
-                ):
-                    expected = f"jni/{abi}/{library}"
-                    if expected not in names:
-                        raise SystemExit(f"{runtime} is missing {expected}")
-                    payload = aar.read(expected)
-                    if not payload.startswith(b"\x7fELF"):
-                        raise SystemExit(f"{runtime} {expected} is not an ELF shared library")
-                    if library == "libc++_shared.so" and b".debug_info" in payload:
-                        raise SystemExit(
-                            f"{runtime} packages unstripped {expected}"
-                        )
+                expected = f"jni/{abi}/libmaplibre-native-c.so"
+                if expected not in names:
+                    raise SystemExit(f"{runtime} is missing {expected}")
+                payload = aar.read(expected)
+                if not payload.startswith(b"\x7fELF"):
+                    raise SystemExit(f"{runtime} {expected} is not an ELF shared library")
+                # The Android presets link libc++ statically, so a host packages
+                # this library alone.
+                if b"libc++_shared.so" in payload:
+                    raise SystemExit(f"{runtime} {expected} needs libc++_shared.so")
+            unexpected = [
+                name
+                for name in names
+                if name.startswith("jni/")
+                and not name.endswith(("/", "libmaplibre-native-c.so"))
+            ]
+            if unexpected:
+                raise SystemExit(f"{runtime} contains unexpected libraries: {unexpected}")
+
+
+def verify_android_runtime_independence(root: pathlib.Path) -> None:
+    """A non-Kotlin Android host depends on a runtime module alone, so the
+    published Android runtime variants must not pull the Kotlin binding in."""
+    for backend in ("opengl", "vulkan"):
+        module = f"maplibre-native-ffi-runtime-{backend}-android"
+        metadata_path = one(
+            module_files(root, module, ".module"), f"{module} Gradle metadata"
+        )
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        for variant in metadata["variants"]:
+            for dependency in variant.get("dependencies", []):
+                if dependency.get("module") == "maplibre-native-ffi":
+                    raise SystemExit(
+                        f"{metadata_path} variant {variant['name']} depends on "
+                        "maplibre-native-ffi"
+                    )
 
 
 def verify_jvm(root: pathlib.Path) -> None:
@@ -329,6 +386,7 @@ def main() -> int:
     verify_metadata(root)
     verify_javadoc(root)
     verify_android(root)
+    verify_android_runtime_independence(root)
     verify_jvm(root)
     verify_native(root)
     return 0

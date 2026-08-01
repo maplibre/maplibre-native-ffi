@@ -41,7 +41,13 @@ val generatedJavaCppClasses = layout.buildDirectory.dir("classes/javacppGenerate
 val javaCppConfigClasses = layout.buildDirectory.dir("classes/javacppConfig")
 val javaCppAndroidIncludes = layout.projectDirectory.dir("src/androidMain/javacpp")
 val javaCppAndroidCompatHeader = javaCppAndroidIncludes.file("javacpp_android_compat.h")
-val packagedAndroidNativeLibs = layout.buildDirectory.dir("generated/jniLibs/androidMain")
+// The C API library is the backend-specific payload of the runtime AARs, and any
+// Android host packages it. The JavaCPP bridge is private to this binding, so it
+// travels in this module's own AAR and stays out of a non-Kotlin host's APK.
+val packagedAndroidRuntimeLibs = layout.buildDirectory.dir("generated/jniLibs/runtime")
+@Suppress("UNCHECKED_CAST")
+val packagedAndroidBindingLibs =
+  extensions.extraProperties["maplibreAndroidBindingLibsDirectory"] as Provider<Directory>
 // Snapshot publishing extracts the Android CMake packages produced by target CI here,
 // allowing the publication job to reuse them instead of rebuilding MapLibre Native.
 val prebuiltAndroidInstallRoot =
@@ -98,10 +104,23 @@ val compileGeneratedJavaCppBindings =
     options.release = catalogVersionInt("java-android-release")
   }
 
+val packageAndroidRuntimeLibraries =
+  tasks.register("packageAndroidRuntimeLibraries") {
+    group = "build"
+    description = "Packages the MapLibre C library for the Android runtime AARs."
+  }
+
+val packageAndroidBindingLibraries =
+  tasks.register("packageAndroidBindingLibraries") {
+    group = "build"
+    description = "Packages the JavaCPP JNI bridge for the Android binding AAR."
+  }
+
 val packageAndroidNativeLibraries =
   tasks.register("packageAndroidNativeLibraries") {
     group = "build"
-    description = "Packages MapLibre C, JavaCPP JNI, and stripped libc++ libraries for Android."
+    description = "Packages every Android native library this repository publishes."
+    dependsOn(packageAndroidRuntimeLibraries, packageAndroidBindingLibraries)
   }
 
 androidTargets.forEach { target ->
@@ -117,19 +136,15 @@ androidTargets.forEach { target ->
       .orElse(rootProject.layout.projectDirectory.dir("build/$cmakePreset/install"))
       .get()
   val javaCppNativeBuild = targetRoot.map { it.dir("javacpp") }
-  val packageDir = packagedAndroidNativeLibs.map { it.dir("$androidBackend/${target.cargoTarget}") }
+  val runtimePackageDir = packagedAndroidRuntimeLibs.map {
+    it.dir("$androidBackend/${target.cargoTarget}")
+  }
+  val bindingPackageDir = packagedAndroidBindingLibs.map { it.dir(target.cargoTarget) }
   val nativeLibrary = installDir.file("lib/libmaplibre-native-c.so")
   val javaCppNativeLibrary = javaCppNativeBuild.map { it.file("libjniMaplibreNativeC.so") }
   val ndkCompiler = androidNdkPrebuilt.map {
     it.file("bin/${target.ndkCompilerName(androidApiLevel)}${hostPlatform.androidNdkCommandSuffix}")
   }
-  val llvmStrip = androidNdkPrebuilt.map {
-    it.file("bin/llvm-strip${hostPlatform.executableSuffix}")
-  }
-  val libcxxShared = androidNdkPrebuilt.map {
-    it.file("sysroot/usr/lib/${target.ndkTargetTriple}/libc++_shared.so")
-  }
-  val strippedLibcxxShared = targetRoot.map { it.file("stripped/libc++_shared.so") }
 
   val buildNative =
     tasks.register<Exec>("buildMaplibreNativeCAndroid${target.taskSuffix}") {
@@ -166,6 +181,14 @@ androidTargets.forEach { target ->
         "-include",
         "-Xcompiler",
         javaCppAndroidCompatHeader.asFile.absolutePath,
+        // The C API library links libc++ statically, so the bridge does too and
+        // the AARs redistribute no libc++_shared.so. --exclude-libs keeps the
+        // static runtime's symbols out of the dynamic table, which leaves the
+        // JNI entry points as the only symbols an app can bind to.
+        "-Xcompiler",
+        "-static-libstdc++",
+        "-Xcompiler",
+        "-Wl,--exclude-libs,ALL",
         "org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC",
         "org.maplibre.nativeffi.internal.javacpp.AndroidNativeBridge",
       )
@@ -175,43 +198,39 @@ androidTargets.forEach { target ->
       inputs.file(nativeLibrary).withPropertyName("maplibreNativeCLibrary")
       inputs.file(ndkCompiler).withPropertyName("androidNdkCompiler")
       outputs.file(javaCppNativeLibrary)
-    }
-
-  val stripLibcxxShared =
-    tasks.register<Exec>("stripAndroidLibcxxShared${target.taskSuffix}") {
-      group = "build"
-      description = "Strips NDK libc++_shared.so for Android ${target.ndkAbi}."
-      inputs.file(libcxxShared).withPropertyName("libcxxShared")
-      inputs.file(llvmStrip).withPropertyName("llvmStrip")
-      outputs.file(strippedLibcxxShared)
-      doFirst { strippedLibcxxShared.get().asFile.parentFile.mkdirs() }
-      executable(llvmStrip.get().asFile.absolutePath)
-      args(
-        "--strip-unneeded",
-        "-o",
-        strippedLibcxxShared.get().asFile.absolutePath,
-        libcxxShared.get().asFile.absolutePath,
-      )
       doLast {
-        val asLatin1 = strippedLibcxxShared.get().asFile.readBytes().toString(Charsets.ISO_8859_1)
-        check(asLatin1.startsWith("\u007fELF")) {
-          "Stripped libc++_shared.so for ${target.ndkAbi} is not a valid ELF shared library"
-        }
-        check(".debug_info" !in asLatin1) {
-          "Stripped libc++_shared.so for ${target.ndkAbi} still contains .debug_info"
+        val asLatin1 = javaCppNativeLibrary.get().asFile.readBytes().toString(Charsets.ISO_8859_1)
+        check("libc++_shared.so" !in asLatin1) {
+          "The Android ${target.ndkAbi} JavaCPP bridge depends on libc++_shared.so; it links " +
+            "libc++ statically so that every packaged library stands on its own"
         }
       }
     }
 
-  val packageTarget =
-    tasks.register<Sync>("packageAndroidNativeLibraries${target.taskSuffix}") {
-      description = "Packages Android ${target.ndkAbi} native libraries."
-      dependsOn(generateJavaCppNativeLibrary, stripLibcxxShared)
-      into(packageDir)
+  val packageRuntimeTarget =
+    tasks.register<Sync>("packageAndroidRuntimeLibraries${target.taskSuffix}") {
+      description = "Packages the Android ${target.ndkAbi} MapLibre C library."
+      dependsOn(buildNative)
+      into(runtimePackageDir)
       from(nativeLibrary) { into(target.ndkAbi) }
-      from(javaCppNativeLibrary) { into(target.ndkAbi) }
-      from(strippedLibcxxShared) { into(target.ndkAbi) }
+      doLast {
+        val packaged = runtimePackageDir.get().file("${target.ndkAbi}/libmaplibre-native-c.so")
+        val asLatin1 = packaged.asFile.readBytes().toString(Charsets.ISO_8859_1)
+        check("libc++_shared.so" !in asLatin1) {
+          "The Android ${target.ndkAbi} MapLibre C library depends on libc++_shared.so; the " +
+            "Android presets set ANDROID_STL=c++_static so the AAR carries one library per ABI"
+        }
+      }
     }
 
-  packageAndroidNativeLibraries.configure { dependsOn(packageTarget) }
+  val packageBindingTarget =
+    tasks.register<Sync>("packageAndroidBindingLibraries${target.taskSuffix}") {
+      description = "Packages the Android ${target.ndkAbi} JavaCPP JNI bridge."
+      dependsOn(generateJavaCppNativeLibrary)
+      into(bindingPackageDir)
+      from(javaCppNativeLibrary) { into(target.ndkAbi) }
+    }
+
+  packageAndroidRuntimeLibraries.configure { dependsOn(packageRuntimeTarget) }
+  packageAndroidBindingLibraries.configure { dependsOn(packageBindingTarget) }
 }
