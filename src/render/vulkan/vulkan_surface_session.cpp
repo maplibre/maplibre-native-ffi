@@ -388,12 +388,12 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
   // pre-rotated display, and mbgl::Renderer reads its viewport and scissor from
   // the renderable's size. mbgl::vulkan::RendererBackend::initSwapchain() does
   // the same after building a swapchain of its own.
+  // Only the width and height swap is tied to surface transform support. A
+  // fixed currentExtent and the min/max clamp apply to every surface, so the
+  // extent is taken whatever the transform support is.
   void adopt_swapchain_extent() {
     const auto& renderable_resource =
       getResource<VulkanSurfaceRenderableResource>();
-    if (!renderable_resource.hasSurfaceTransformSupport()) {
-      return;
-    }
     const auto& extent = renderable_resource.getExtent();
     mbgl::vulkan::Renderable::setSize({extent.width, extent.height});
   }

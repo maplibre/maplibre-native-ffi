@@ -190,7 +190,8 @@ auto metal_borrowed_texture_set_target(
   if (session_status != MLN_STATUS_OK) {
     return session_status;
   }
-  const auto descriptor_status = validate_metal_borrowed_texture_descriptor(descriptor);
+  const auto descriptor_status =
+    validate_metal_borrowed_texture_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }

@@ -124,6 +124,11 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
   private var retiredExportedTexture: LinuxExportedVulkanTexture? = null
   @Volatile private var retiredGeneration = 0L
 
+  // The Skiko OpenGL context both imports were made in. Skiko destroys this
+  // context with the redrawer it belongs to and builds a new one for the
+  // replacement, and a GL name means nothing in a context that did not issue it.
+  private var consumerContext: SkikoOpenGlContext? = null
+
   override val backend: ProducerBackend = ProducerBackend.VULKAN
 
   override val consumerBackend: ConsumerBackend = ConsumerBackend.OPENGL
@@ -146,6 +151,7 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
     extent: SurfaceExtent,
     presentationTimeNanos: Long?,
   ): NativeSurfaceFrame {
+    abandonTexturesIfConsumerContextChanged()
     // Runs a frame after the replacement first rendered, so the consumer's last
     // recorded frame from the retired texture has been flushed by then. The
     // consumer context is current here, which is what closing it needs.
@@ -190,8 +196,15 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
 
   override fun close() {
     try {
-      disposeTexture(consumerContextCurrent = false)
-      disposeRetiredTexture(consumerContextCurrent = false)
+      // Skiko may have replaced or torn down the context these were imported
+      // into before the bridge is closed, and a name deleted there is an
+      // unrelated object in whatever context is current now.
+      if (consumerContextStillCurrent()) {
+        disposeTexture(consumerContextCurrent = false)
+        disposeRetiredTexture(consumerContextCurrent = false)
+      } else {
+        abandonTextures()
+      }
     } finally {
       val closingVulkan = vulkan
       vulkan = null
@@ -223,12 +236,54 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
         LinuxOpenGlImportedTexture.create(exported.exportFd(), exported.memorySize(), extent)
       exportedTexture = exported
       importedTexture = imported
+      consumerContext = SkikoHost.requireLinuxOpenGlContext()
       currentExtent = extent
       generation += 1
     } catch (error: RuntimeException) {
       exported.close()
       throw error
     }
+  }
+
+  // Skiko destroys its OpenGL context along with the redrawer that owns it and
+  // builds a new one for the replacement, which happens while this bridge is
+  // running: the layer recreates its redrawer whenever AWT hands the component
+  // a new peer, and again whenever a draw fails and it falls back to another
+  // render API. Names from the old context cannot be drawn, and deleting them
+  // in the new one takes out whatever now answers to them, so both the current
+  // import and the retired one behind it are given up untouched.
+  private fun abandonTexturesIfConsumerContextChanged() {
+    val recorded = consumerContext ?: return
+    if (recorded.matches(SkikoHost.requireLinuxOpenGlContext())) {
+      return
+    }
+    abandonTextures()
+  }
+
+  // Answers false when Skiko has no OpenGL context to ask about at all, which
+  // is what a torn-down window looks like and is reason enough to delete
+  // nothing.
+  private fun consumerContextStillCurrent(): Boolean {
+    val recorded = consumerContext ?: return false
+    val current = runCatching { SkikoHost.requireLinuxOpenGlContext() }.getOrNull() ?: return false
+    return recorded.matches(current)
+  }
+
+  private fun abandonTextures() {
+    importedTexture?.abandon()
+    importedTexture = null
+    retiredImportedTexture?.abandon()
+    retiredImportedTexture = null
+    retiredGeneration = 0
+    consumerContext = null
+    // The images belong to this bridge's own Vulkan device, which Skiko's
+    // context change leaves alone, so they are released rather than given up.
+    exportedTexture?.close()
+    exportedTexture = null
+    retiredExportedTexture?.close()
+    retiredExportedTexture = null
+    currentExtent = SurfaceExtent.Empty
+    generation += 1
   }
 
   // Holds the outgoing consumer texture for drawing while the replacement is
@@ -707,6 +762,23 @@ private constructor(
         memoryObject = 0
       }
     }
+  }
+
+  /**
+   * Gives up the texture and memory object without deleting them, for when the context that issued
+   * them is gone.
+   *
+   * GL names are per context. Once Skiko destroys the context these came from, the names are the
+   * replacement's to hand out, and deleting them there takes out whatever now answers to them —
+   * Skiko's own objects among the candidates. The imported device memory goes with the context that
+   * held it, so what is given up here is the name, not the allocation.
+   */
+  fun abandon() {
+    if (textureName != 0) {
+      SkikoHost.abandonOpenGlTexture(textureName)
+      textureName = 0
+    }
+    memoryObject = 0
   }
 
   companion object {

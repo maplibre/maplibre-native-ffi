@@ -173,15 +173,12 @@ impl RenderTarget {
                     replacement.texture(),
                     replacement.target(),
                 );
-                if let Err(error) = session.set_opengl_borrowed_texture_target(&descriptor) {
-                    // A native error may mean the session took the replacement
-                    // before failing, and nothing here can tell that apart from
-                    // a rejection that came first. Rust's detach consumes the
-                    // handle, which this borrow cannot do, so leave the
-                    // replacement alone: deleting it is the only way to hand
-                    // the session a dangling texture.
-                    return Err(error);
-                }
+                // A native error may mean the session took the replacement before
+                // failing, and nothing here can tell that apart from a rejection
+                // that came first. Rust's detach consumes the handle, which this
+                // borrow cannot do, so leave the replacement alone: deleting it is
+                // the only way to hand the session a dangling texture.
+                session.set_opengl_borrowed_texture_target(&descriptor)?;
                 compositor.resize(viewport);
                 // Only once the session has taken the replacement, so a rejected
                 // one leaves this target on the texture it already had.

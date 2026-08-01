@@ -321,8 +321,11 @@ auto metal_borrowed_texture_set_target(
   if (session_status != MLN_STATUS_OK) {
     return session_status;
   }
-  const auto descriptor_status =
-    validate_metal_borrowed_texture_descriptor(descriptor);
+  // The same validator attach uses. The shape-only shared one would let a
+  // texture through that attachment rejects — mismatched dimensions, no render
+  // target usage, multisampled — and the old target is discarded by then, so
+  // the next render is where it would surface.
+  const auto descriptor_status = validate_borrowed_texture(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }

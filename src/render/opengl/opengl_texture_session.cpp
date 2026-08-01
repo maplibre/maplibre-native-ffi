@@ -637,6 +637,14 @@ auto opengl_borrowed_texture_set_target(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
+  // The same check attach makes: the shared validator accepts any nonzero
+  // target, and the backend attaches whatever name it is given as
+  // GL_TEXTURE_2D. Without this a cube-map target is taken here and only fails
+  // on the next render, with the old target already discarded.
+  if (descriptor->target != opengl_texture_target) {
+    set_thread_error("OpenGL texture target must be GL_TEXTURE_2D");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   const auto physical_status = validate_borrowed_physical_size(
     descriptor->physical_width, descriptor->physical_height
   );

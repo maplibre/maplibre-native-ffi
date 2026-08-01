@@ -16555,6 +16555,189 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
+    private static class mln_metal_surface_set_target {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_metal_surface_set_target");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_metal_surface_set_target(mln_render_session session, const mln_metal_surface_descriptor *descriptor)
+     * }
+     */
+    public static FunctionDescriptor mln_metal_surface_set_target$descriptor() {
+        return mln_metal_surface_set_target.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_metal_surface_set_target(mln_render_session session, const mln_metal_surface_descriptor *descriptor)
+     * }
+     */
+    public static MethodHandle mln_metal_surface_set_target$handle() {
+        return mln_metal_surface_set_target.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_metal_surface_set_target(mln_render_session session, const mln_metal_surface_descriptor *descriptor)
+     * }
+     */
+    public static MemorySegment mln_metal_surface_set_target$address() {
+        return mln_metal_surface_set_target.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_metal_surface_set_target(mln_render_session session, const mln_metal_surface_descriptor *descriptor)
+     * }
+     */
+    public static int mln_metal_surface_set_target(long session, MemorySegment descriptor) {
+        var mh$ = mln_metal_surface_set_target.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_metal_surface_set_target", session, descriptor);
+            }
+            return (int)mh$.invokeExact(session, descriptor);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_vulkan_surface_set_target {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_vulkan_surface_set_target");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_vulkan_surface_set_target(mln_render_session session, const mln_vulkan_surface_descriptor *descriptor)
+     * }
+     */
+    public static FunctionDescriptor mln_vulkan_surface_set_target$descriptor() {
+        return mln_vulkan_surface_set_target.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_vulkan_surface_set_target(mln_render_session session, const mln_vulkan_surface_descriptor *descriptor)
+     * }
+     */
+    public static MethodHandle mln_vulkan_surface_set_target$handle() {
+        return mln_vulkan_surface_set_target.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_vulkan_surface_set_target(mln_render_session session, const mln_vulkan_surface_descriptor *descriptor)
+     * }
+     */
+    public static MemorySegment mln_vulkan_surface_set_target$address() {
+        return mln_vulkan_surface_set_target.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_vulkan_surface_set_target(mln_render_session session, const mln_vulkan_surface_descriptor *descriptor)
+     * }
+     */
+    public static int mln_vulkan_surface_set_target(long session, MemorySegment descriptor) {
+        var mh$ = mln_vulkan_surface_set_target.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_vulkan_surface_set_target", session, descriptor);
+            }
+            return (int)mh$.invokeExact(session, descriptor);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_opengl_surface_set_target {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_opengl_surface_set_target");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_opengl_surface_set_target(mln_render_session session, const mln_opengl_surface_descriptor *descriptor)
+     * }
+     */
+    public static FunctionDescriptor mln_opengl_surface_set_target$descriptor() {
+        return mln_opengl_surface_set_target.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_opengl_surface_set_target(mln_render_session session, const mln_opengl_surface_descriptor *descriptor)
+     * }
+     */
+    public static MethodHandle mln_opengl_surface_set_target$handle() {
+        return mln_opengl_surface_set_target.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_opengl_surface_set_target(mln_render_session session, const mln_opengl_surface_descriptor *descriptor)
+     * }
+     */
+    public static MemorySegment mln_opengl_surface_set_target$address() {
+        return mln_opengl_surface_set_target.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_opengl_surface_set_target(mln_render_session session, const mln_opengl_surface_descriptor *descriptor)
+     * }
+     */
+    public static int mln_opengl_surface_set_target(long session, MemorySegment descriptor) {
+        var mh$ = mln_opengl_surface_set_target.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_opengl_surface_set_target", session, descriptor);
+            }
+            return (int)mh$.invokeExact(session, descriptor);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mln_metal_owned_texture_descriptor_default {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mln_metal_owned_texture_descriptor.layout()    );
@@ -17326,6 +17509,189 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
                 traceDowncall("mln_opengl_borrowed_texture_attach", map, descriptor, out_session);
             }
             return (int)mh$.invokeExact(map, descriptor, out_session);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_metal_borrowed_texture_set_target {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_metal_borrowed_texture_set_target");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_metal_borrowed_texture_set_target(mln_render_session session, const mln_metal_borrowed_texture_descriptor *descriptor)
+     * }
+     */
+    public static FunctionDescriptor mln_metal_borrowed_texture_set_target$descriptor() {
+        return mln_metal_borrowed_texture_set_target.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_metal_borrowed_texture_set_target(mln_render_session session, const mln_metal_borrowed_texture_descriptor *descriptor)
+     * }
+     */
+    public static MethodHandle mln_metal_borrowed_texture_set_target$handle() {
+        return mln_metal_borrowed_texture_set_target.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_metal_borrowed_texture_set_target(mln_render_session session, const mln_metal_borrowed_texture_descriptor *descriptor)
+     * }
+     */
+    public static MemorySegment mln_metal_borrowed_texture_set_target$address() {
+        return mln_metal_borrowed_texture_set_target.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_metal_borrowed_texture_set_target(mln_render_session session, const mln_metal_borrowed_texture_descriptor *descriptor)
+     * }
+     */
+    public static int mln_metal_borrowed_texture_set_target(long session, MemorySegment descriptor) {
+        var mh$ = mln_metal_borrowed_texture_set_target.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_metal_borrowed_texture_set_target", session, descriptor);
+            }
+            return (int)mh$.invokeExact(session, descriptor);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_vulkan_borrowed_texture_set_target {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_vulkan_borrowed_texture_set_target");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_vulkan_borrowed_texture_set_target(mln_render_session session, const mln_vulkan_borrowed_texture_descriptor *descriptor)
+     * }
+     */
+    public static FunctionDescriptor mln_vulkan_borrowed_texture_set_target$descriptor() {
+        return mln_vulkan_borrowed_texture_set_target.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_vulkan_borrowed_texture_set_target(mln_render_session session, const mln_vulkan_borrowed_texture_descriptor *descriptor)
+     * }
+     */
+    public static MethodHandle mln_vulkan_borrowed_texture_set_target$handle() {
+        return mln_vulkan_borrowed_texture_set_target.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_vulkan_borrowed_texture_set_target(mln_render_session session, const mln_vulkan_borrowed_texture_descriptor *descriptor)
+     * }
+     */
+    public static MemorySegment mln_vulkan_borrowed_texture_set_target$address() {
+        return mln_vulkan_borrowed_texture_set_target.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_vulkan_borrowed_texture_set_target(mln_render_session session, const mln_vulkan_borrowed_texture_descriptor *descriptor)
+     * }
+     */
+    public static int mln_vulkan_borrowed_texture_set_target(long session, MemorySegment descriptor) {
+        var mh$ = mln_vulkan_borrowed_texture_set_target.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_vulkan_borrowed_texture_set_target", session, descriptor);
+            }
+            return (int)mh$.invokeExact(session, descriptor);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_opengl_borrowed_texture_set_target {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_opengl_borrowed_texture_set_target");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_opengl_borrowed_texture_set_target(mln_render_session session, const mln_opengl_borrowed_texture_descriptor *descriptor)
+     * }
+     */
+    public static FunctionDescriptor mln_opengl_borrowed_texture_set_target$descriptor() {
+        return mln_opengl_borrowed_texture_set_target.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_opengl_borrowed_texture_set_target(mln_render_session session, const mln_opengl_borrowed_texture_descriptor *descriptor)
+     * }
+     */
+    public static MethodHandle mln_opengl_borrowed_texture_set_target$handle() {
+        return mln_opengl_borrowed_texture_set_target.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_opengl_borrowed_texture_set_target(mln_render_session session, const mln_opengl_borrowed_texture_descriptor *descriptor)
+     * }
+     */
+    public static MemorySegment mln_opengl_borrowed_texture_set_target$address() {
+        return mln_opengl_borrowed_texture_set_target.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_opengl_borrowed_texture_set_target(mln_render_session session, const mln_opengl_borrowed_texture_descriptor *descriptor)
+     * }
+     */
+    public static int mln_opengl_borrowed_texture_set_target(long session, MemorySegment descriptor) {
+        var mh$ = mln_opengl_borrowed_texture_set_target.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_opengl_borrowed_texture_set_target", session, descriptor);
+            }
+            return (int)mh$.invokeExact(session, descriptor);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

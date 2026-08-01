@@ -92,6 +92,14 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
         auto guard = mbgl::gfx::BackendScope{*this};
         cleanup();
       } catch (...) {
+        // Nothing can be made current, so no GL call is safe from here. Give up
+        // the renderable resource and the mbgl context without running their
+        // teardown: destroying either issues the deletes it has queued, and
+        // after destroy_native_context() those land on whatever context is
+        // current instead. The objects they name go when the driver tears the
+        // native context down, so this leaks bookkeeping, not GPU memory.
+        static_cast<void>(resource.release());
+        static_cast<void>(context.release());
         getThreadPool().runRenderJobs(true);
         destroy_native_context();
         throw;
