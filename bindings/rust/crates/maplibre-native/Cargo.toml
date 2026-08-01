@@ -10,6 +10,14 @@ bitflags = "2.10.0"
 maplibre-native-core = { path = "../maplibre-native-core" }
 maplibre-native-sys = { path = "../maplibre-native-sys" }
 
+# Cargo enables a dependency's features only where that dependency is declared,
+# so the render backend has to be selectable from here for anyone depending on
+# this crate alone. See maplibre-native-sys for why at most one applies.
+[features]
+metal = ["maplibre-native-sys/metal"]
+opengl = ["maplibre-native-sys/opengl"]
+vulkan = ["maplibre-native-sys/vulkan"]
+
 [dev-dependencies]
 ash = "0.38.0"
 glow = "0.16.0"

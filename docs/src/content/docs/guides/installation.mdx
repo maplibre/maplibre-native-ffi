@@ -129,6 +129,61 @@ and Dart. Only the Kotlin artifacts are published anywhere today, as
 For the rest, depend on the binding by path or git from a checkout and point its
 build at a native install prefix.
 
+### Rust
+
+The Rust binding fetches the native library itself, so a git dependency needs no
+separate install:
+
+```toml
+[dependencies]
+maplibre-native = { git = "https://github.com/maplibre/maplibre-native-ffi" }
+```
+
+The build script downloads the archive matching your target from the snapshot
+release, verifying it against the release's `SHA256SUMS` and caching it under
+your user cache directory. Pick a render backend with a feature — `vulkan`,
+`opengl`, or `metal`, at most one — or take the platform default (`vulkan` on
+Linux and Windows, `metal` on macOS). Device iOS is the one published preset
+this cannot serve, because `ios-arm64-metal` ships only a static archive; take
+the tarball by hand for that target.
+
+Setting `MAPLIBRE_NATIVE_C_INSTALL_DIR` to a local install prefix skips the
+download entirely, which is what `mise run //bindings/rust:test` does.
+
+The download covers building, not running. The library is dynamic, and Cargo
+applies a dependency's link arguments to that dependency alone, so your own
+binaries and tests need the loader pointed at the prefix. The crate publishes it
+as `DEP_MAPLIBRE_NATIVE_C_RUNTIME_DIR`. On Linux and macOS a build script of your
+own turns that into an rpath:
+
+```rust
+// build.rs
+fn main() {
+    let dir = std::env::var("DEP_MAPLIBRE_NATIVE_C_RUNTIME_DIR").unwrap();
+    println!("cargo:rustc-link-arg=-Wl,-rpath,{dir}");
+}
+```
+
+That needs a direct `maplibre-native-sys` dependency, since Cargo passes `DEP_*`
+to immediate dependents only. Setting `LD_LIBRARY_PATH` or `DYLD_LIBRARY_PATH`
+to that directory works too, and is what the repository's own test tasks do.
+Windows has no rpath: there the variable names the `bin/` holding
+`maplibre-native-c.dll`, and the executable needs that directory on `PATH` or a
+copy of the DLL beside it.
+
+An Android target resolves to the `android-*` archive, which carries the library
+alone. Such an app still packages the TLS helper and calls `mln_android_init`,
+as [Package an Android app](#package-an-android-app) describes; the sys crate
+exposes that entry point along with the rest of the C API.
+
+Because the snapshot release republishes on its own schedule, its C headers can
+lag the commit you pinned. The generated declarations follow the artifact rather
+than the checkout, so a lagging snapshot shows up as missing `mln_*` items while
+compiling `maplibre-native-core`. The build script names the differing headers
+when that happens, though Cargo prints build script warnings for git
+dependencies only under `cargo build -vv`. Build the native library from source
+and set `MAPLIBRE_NATIVE_C_INSTALL_DIR` when you need a specific commit.
+
 Each binding wraps the runtime, map, and render session model these guides
 describe. Read on in C, then consult the
 [Rust](/maplibre-native-ffi/reference/rust/maplibre_native/),

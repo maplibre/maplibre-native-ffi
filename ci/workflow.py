@@ -72,7 +72,12 @@ def suite_commands(source: dict[str, object], preset: str) -> list[str]:
                 continue
             if preset in command.get("exclude", []):
                 continue
-            commands.append(f"mise run {command['task']} {preset}")
+            # A command with `preset = false` runs once for the job it lands in
+            # rather than against the job's build tree.
+            if command.get("preset", True):
+                commands.append(f"mise run {command['task']} {preset}")
+            else:
+                commands.append(f"mise run {command['task']}")
     return commands
 
 

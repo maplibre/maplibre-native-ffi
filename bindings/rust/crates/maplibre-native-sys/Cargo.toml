@@ -7,5 +7,24 @@ license.workspace = true
 links = "maplibre-native-c"
 repository.workspace = true
 
+# MapLibre Native compiles exactly one renderer per build, so the render backend
+# is a packaging axis rather than a runtime choice. Enable at most one; the build
+# script picks a platform default when none is set. Features unify across a
+# dependency graph, so two crates asking for different backends fails loudly,
+# which is the correct outcome for a choice that cannot be satisfied twice.
+[features]
+metal = []
+opengl = []
+vulkan = []
+
 [build-dependencies]
 bindgen = "0.72.1"
+flate2 = "1.1.9"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+sha2 = "0.10.9"
+tar = "0.4.44"
+# The workspace patches rustls-platform-verifier for the runtime HTTP stack in
+# src/platform/rust. A build script has no such requirement, so take rustls with
+# its bundled roots and stay out of that graph.
+ureq = { version = "3.3.0", default-features = false, features = ["rustls"] }
