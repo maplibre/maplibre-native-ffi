@@ -1175,6 +1175,66 @@ class MaplibreNativeC {
   late final _mln_map_set_style_json = _mln_map_set_style_jsonPtr
       .asFunction<int Function(int, ffi.Pointer<ffi.Char>)>();
 
+  mln_status mln_map_copy_loaded_style_json(
+    Dartmln_map map,
+    ffi.Pointer<ffi.Char> out_json,
+    int json_capacity,
+    ffi.Pointer<ffi.Size> out_json_size,
+  ) {
+    return mln_status.fromValue(
+      _mln_map_copy_loaded_style_json(
+        map,
+        out_json,
+        json_capacity,
+        out_json_size,
+      ),
+    );
+  }
+
+  late final _mln_map_copy_loaded_style_jsonPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(
+            mln_map,
+            ffi.Pointer<ffi.Char>,
+            ffi.Size,
+            ffi.Pointer<ffi.Size>,
+          )
+        >
+      >('mln_map_copy_loaded_style_json');
+  late final _mln_map_copy_loaded_style_json =
+      _mln_map_copy_loaded_style_jsonPtr
+          .asFunction<
+            int Function(int, ffi.Pointer<ffi.Char>, int, ffi.Pointer<ffi.Size>)
+          >();
+
+  mln_status mln_map_copy_style_url(
+    Dartmln_map map,
+    ffi.Pointer<ffi.Char> out_url,
+    int url_capacity,
+    ffi.Pointer<ffi.Size> out_url_size,
+  ) {
+    return mln_status.fromValue(
+      _mln_map_copy_style_url(map, out_url, url_capacity, out_url_size),
+    );
+  }
+
+  late final _mln_map_copy_style_urlPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(
+            mln_map,
+            ffi.Pointer<ffi.Char>,
+            ffi.Size,
+            ffi.Pointer<ffi.Size>,
+          )
+        >
+      >('mln_map_copy_style_url');
+  late final _mln_map_copy_style_url = _mln_map_copy_style_urlPtr
+      .asFunction<
+        int Function(int, ffi.Pointer<ffi.Char>, int, ffi.Pointer<ffi.Size>)
+      >();
+
   mln_camera_options mln_camera_options_default() {
     return _mln_camera_options_default();
   }

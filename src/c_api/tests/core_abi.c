@@ -158,6 +158,28 @@ static void style_functions_reject_null_inputs(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_map_set_style_url(map, NULL)
   );
+
+  // The copy entry points treat a null buffer as a probe only at zero capacity,
+  // and always need somewhere to report the required size.
+  size_t size = 0;
+  char buffer[8] = {0};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_copy_loaded_style_json(map, NULL, sizeof(buffer), &size)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_copy_loaded_style_json(map, buffer, sizeof(buffer), NULL)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_copy_style_url(map, NULL, sizeof(buffer), &size)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_copy_style_url(map, buffer, sizeof(buffer), NULL)
+  );
+
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }

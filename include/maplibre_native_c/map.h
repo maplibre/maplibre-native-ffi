@@ -1236,6 +1236,76 @@ mln_map_set_style_url(mln_map map, const char* url) MLN_NOEXCEPT;
 MLN_API mln_status
 mln_map_set_style_json(mln_map map, const char* json) MLN_NOEXCEPT;
 
+/**
+ * Copies the style document this map's style was last parsed from.
+ *
+ * This is a state snapshot of the loaded document, not a serialization of the
+ * live style. The bytes are the document the style loader last parsed
+ * successfully: the string passed to mln_map_set_style_json(), or the response
+ * body fetched for mln_map_set_style_url(). Runtime mutations through the
+ * style APIs, such as adding a layer or setting a paint property, do not change
+ * it, and a failed parse leaves the previously parsed document in place.
+ *
+ * A copy of the document is byte-for-byte identical to the string that was
+ * passed to mln_map_set_style_json(), so a host may hand it back to that
+ * function unchanged.
+ *
+ * out_json may be null only when json_capacity is 0, which is a size probe that
+ * reports the required length and succeeds. *out_json_size receives the byte
+ * length before the capacity is checked, so a caller learns the size from a
+ * call that could not fit the document. The bytes are not null-terminated, so
+ * an exact-length buffer is sufficient.
+ *
+ * A reported size of 0 means no document has been parsed: no style has been
+ * loaded yet, or every load so far failed to parse. A parsed document is never
+ * empty.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success, including a size probe.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_json is null
+ *   with non-zero capacity, json_capacity is too small for a non-null buffer,
+ *   or out_json_size is null.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_copy_loaded_style_json(
+  mln_map map, char* out_json, size_t json_capacity, size_t* out_json_size
+) MLN_NOEXCEPT;
+
+/**
+ * Copies the URL this map's style was last requested from.
+ *
+ * Unlike mln_map_copy_loaded_style_json(), this is live rather than load-time
+ * state: mln_map_set_style_url() records the URL when the request is made,
+ * before the response arrives or the document parses, and
+ * mln_map_set_style_json() clears it. The document reports what was last parsed
+ * while the URL reports what was last requested, so the two can disagree while
+ * a load is in flight or after one fails.
+ *
+ * out_url may be null only when url_capacity is 0, which is a size probe that
+ * reports the required length and succeeds. *out_url_size receives the byte
+ * length before the capacity is checked. The bytes are not null-terminated, so
+ * an exact-length buffer is sufficient.
+ *
+ * A reported size of 0 means no URL bytes are available. That covers a style
+ * loaded from inline JSON, a map that has loaded no style, and a URL load
+ * requested with an empty string, which mln_map_set_style_url() accepts. These
+ * cases are not distinguishable through this entry point.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success, including a size probe.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_url is null
+ *   with non-zero capacity, url_capacity is too small for a non-null buffer, or
+ *   out_url_size is null.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_copy_style_url(
+  mln_map map, char* out_url, size_t url_capacity, size_t* out_url_size
+) MLN_NOEXCEPT;
+
 #ifdef __cplusplus
 }
 #endif

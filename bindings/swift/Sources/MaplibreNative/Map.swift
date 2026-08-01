@@ -239,6 +239,47 @@ public final class MapHandle {
     }
   }
 
+  /// Copies the style document this map's style was last parsed from.
+  ///
+  /// This is the loaded document, not a serialization of the live style: the
+  /// string passed to ``setStyleJSON(_:)``, or the response body fetched for
+  /// ``setStyleURL(_:)``. Runtime mutations such as adding a layer do not
+  /// change
+  /// it, and a failed parse leaves the previously parsed document in place. The
+  /// result is byte-for-byte the string given to ``setStyleJSON(_:)``, so it
+  /// can
+  /// be handed back unchanged.
+  ///
+  /// The result is empty when no document has been parsed. A parsed document is
+  /// never empty.
+  public func loadedStyleJSON() throws -> String {
+    try mapNativeFailure {
+      try NativeStyle
+        .copyMapText(handle.requireLive()) { map, text, capacity, size in
+          mln_map_copy_loaded_style_json(map, text, capacity, size)
+        }
+    }
+  }
+
+  /// Copies the URL this map's style was last requested from.
+  ///
+  /// Unlike ``loadedStyleJSON()``, this is live rather than load-time state:
+  /// ``setStyleURL(_:)`` records the URL when the request is made, before the
+  /// response arrives or the document parses, and ``setStyleJSON(_:)`` clears
+  /// it. The two can disagree while a load is in flight or after one fails.
+  ///
+  /// The result is empty when no URL bytes are available, which covers a style
+  /// loaded from inline JSON, a map that has loaded no style, and a URL load
+  /// requested with an empty string. These cases are not distinguishable here.
+  public func styleURL() throws -> String {
+    try mapNativeFailure {
+      try NativeStyle
+        .copyMapText(handle.requireLive()) { map, text, capacity, size in
+          mln_map_copy_style_url(map, text, capacity, size)
+        }
+    }
+  }
+
   public func requestRepaint() throws {
     try mapNativeFailure {
       try checkStatus(mln_map_request_repaint(handle.requireLive().raw))

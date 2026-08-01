@@ -5035,6 +5035,132 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
+    private static class mln_map_copy_loaded_style_json {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_copy_loaded_style_json");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_copy_loaded_style_json(mln_map map, char *out_json, size_t json_capacity, size_t *out_json_size)
+     * }
+     */
+    public static FunctionDescriptor mln_map_copy_loaded_style_json$descriptor() {
+        return mln_map_copy_loaded_style_json.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_copy_loaded_style_json(mln_map map, char *out_json, size_t json_capacity, size_t *out_json_size)
+     * }
+     */
+    public static MethodHandle mln_map_copy_loaded_style_json$handle() {
+        return mln_map_copy_loaded_style_json.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_copy_loaded_style_json(mln_map map, char *out_json, size_t json_capacity, size_t *out_json_size)
+     * }
+     */
+    public static MemorySegment mln_map_copy_loaded_style_json$address() {
+        return mln_map_copy_loaded_style_json.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_copy_loaded_style_json(mln_map map, char *out_json, size_t json_capacity, size_t *out_json_size)
+     * }
+     */
+    public static int mln_map_copy_loaded_style_json(long map, MemorySegment out_json, long json_capacity, MemorySegment out_json_size) {
+        var mh$ = mln_map_copy_loaded_style_json.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_copy_loaded_style_json", map, out_json, json_capacity, out_json_size);
+            }
+            return (int)mh$.invokeExact(map, out_json, json_capacity, out_json_size);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_copy_style_url {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_copy_style_url");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_copy_style_url(mln_map map, char *out_url, size_t url_capacity, size_t *out_url_size)
+     * }
+     */
+    public static FunctionDescriptor mln_map_copy_style_url$descriptor() {
+        return mln_map_copy_style_url.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_copy_style_url(mln_map map, char *out_url, size_t url_capacity, size_t *out_url_size)
+     * }
+     */
+    public static MethodHandle mln_map_copy_style_url$handle() {
+        return mln_map_copy_style_url.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_copy_style_url(mln_map map, char *out_url, size_t url_capacity, size_t *out_url_size)
+     * }
+     */
+    public static MemorySegment mln_map_copy_style_url$address() {
+        return mln_map_copy_style_url.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_copy_style_url(mln_map map, char *out_url, size_t url_capacity, size_t *out_url_size)
+     * }
+     */
+    public static int mln_map_copy_style_url(long map, MemorySegment out_url, long url_capacity, MemorySegment out_url_size) {
+        var mh$ = mln_map_copy_style_url.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_copy_style_url", map, out_url, url_capacity, out_url_size);
+            }
+            return (int)mh$.invokeExact(map, out_url, url_capacity, out_url_size);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mln_camera_options_default {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mln_camera_options.layout()    );

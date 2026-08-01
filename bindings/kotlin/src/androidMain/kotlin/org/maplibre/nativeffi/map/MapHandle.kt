@@ -91,6 +91,20 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     clearCustomGeometrySources()
   }
 
+  public actual fun loadedStyleJson(): String {
+    NativeAccess.ensureLoaded()
+    return copyMapText(requireLiveHandle()) { mapId, text, capacity, outSize ->
+      MaplibreNativeC.mln_map_copy_loaded_style_json(mapId, text, capacity, outSize)
+    }
+  }
+
+  public actual fun styleUrl(): String {
+    NativeAccess.ensureLoaded()
+    return copyMapText(requireLiveHandle()) { mapId, text, capacity, outSize ->
+      MaplibreNativeC.mln_map_copy_style_url(mapId, text, capacity, outSize)
+    }
+  }
+
   public actual fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue) {
     NativeAccess.ensureLoaded()
     StringViewScope(sourceId).use { nativeSourceId ->
@@ -1806,6 +1820,25 @@ private fun styleIdList(list: Long): List<String> =
  * Probes the required length, then copies. A null buffer with zero capacity is a size probe the C
  * API answers with OK.
  */
+private inline fun copyMapText(
+  mapId: Long,
+  copy: (Long, BytePointer?, Long, SizeTPointer) -> Int,
+): String {
+  SizeTPointer(1).use { outSize ->
+    Status.check(copy(mapId, null, 0L, outSize))
+    val required = Math.toIntExact(outSize.get())
+    if (required == 0) return ""
+    BytePointer(required.toLong()).use { buffer ->
+      SizeTPointer(1).use { outCopied ->
+        Status.check(copy(mapId, buffer, required.toLong(), outCopied))
+        val bytes = ByteArray(Math.toIntExact(outCopied.get()))
+        buffer.get(bytes, 0, bytes.size)
+        return String(bytes, java.nio.charset.StandardCharsets.UTF_8)
+      }
+    }
+  }
+}
+
 private inline fun copyLayerText(
   mapId: Long,
   layerId: String,

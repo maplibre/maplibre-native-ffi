@@ -56,6 +56,41 @@ test "runtime and map vertical slice" {
     try projection.close();
 }
 
+test "loaded style document and URL read back what was loaded" {
+    var handles = try createRuntimeAndMap();
+    defer handles.runtime.close() catch @panic("runtime close failed");
+    defer handles.map.close() catch @panic("map close failed");
+
+    // Nothing parsed and nothing requested yet.
+    var empty_json = try handles.map.copyLoadedStyleJson(testing.allocator);
+    defer empty_json.deinit();
+    try testing.expectEqualStrings("", empty_json.value);
+    var empty_url = try handles.map.copyStyleUrl(testing.allocator);
+    defer empty_url.deinit();
+    try testing.expectEqualStrings("", empty_url.value);
+
+    // The document reads back byte-for-byte, so it can be reloaded unchanged.
+    try handles.map.setStyleJson(testing.allocator, support.style_json);
+    var loaded = try handles.map.copyLoadedStyleJson(testing.allocator);
+    defer loaded.deinit();
+    try testing.expectEqualStrings(support.style_json, loaded.value);
+
+    // Inline JSON clears the URL.
+    var cleared_url = try handles.map.copyStyleUrl(testing.allocator);
+    defer cleared_url.deinit();
+    try testing.expectEqualStrings("", cleared_url.value);
+
+    // The URL is request state, recorded before the load can succeed, while the
+    // document still reports the style that last parsed.
+    try handles.map.setStyleUrl(testing.allocator, "https://example.com/style.json");
+    var requested_url = try handles.map.copyStyleUrl(testing.allocator);
+    defer requested_url.deinit();
+    try testing.expectEqualStrings("https://example.com/style.json", requested_url.value);
+    var still_loaded = try handles.map.copyLoadedStyleJson(testing.allocator);
+    defer still_loaded.deinit();
+    try testing.expectEqualStrings(support.style_json, still_loaded.value);
+}
+
 test "map can close after moving with its runtime" {
     var handles = try createRuntimeAndMap();
     try handles.map.close();

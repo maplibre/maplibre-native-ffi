@@ -202,6 +202,32 @@ fn style_setters_accept_valid_input_and_reject_embedded_nul() {
 }
 
 #[test]
+// Spec coverage: BND-101.
+fn loaded_style_document_and_url_read_back_what_was_loaded() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+
+    // Nothing parsed and nothing requested yet.
+    assert_eq!(map.loaded_style_json().unwrap(), "");
+    assert_eq!(map.style_url().unwrap(), "");
+
+    // The document reads back byte-for-byte, so it can be reloaded unchanged.
+    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    assert_eq!(map.loaded_style_json().unwrap(), VALID_STYLE_JSON);
+    // Inline JSON clears the URL.
+    assert_eq!(map.style_url().unwrap(), "");
+
+    // The URL is request state, recorded before the load can succeed, while the
+    // document still reports the style that last parsed.
+    map.set_style_url("https://example.com/style.json").unwrap();
+    assert_eq!(map.style_url().unwrap(), "https://example.com/style.json");
+    assert_eq!(map.loaded_style_json().unwrap(), VALID_STYLE_JSON);
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
 // Spec coverage: BND-105.
 fn style_source_exists_and_remove_call_real_c_api() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();

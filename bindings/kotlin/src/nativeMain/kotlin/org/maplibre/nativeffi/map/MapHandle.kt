@@ -59,9 +59,11 @@ import org.maplibre.nativeffi.internal.c.mln_map_camera_for_lat_lngs
 import org.maplibre.nativeffi.internal.c.mln_map_cancel_transitions
 import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_id
 import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_layer
+import org.maplibre.nativeffi.internal.c.mln_map_copy_loaded_style_json
 import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_premultiplied_rgba8
 import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_stretches
 import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_attribution
+import org.maplibre.nativeffi.internal.c.mln_map_copy_style_url
 import org.maplibre.nativeffi.internal.c.mln_map_create
 import org.maplibre.nativeffi.internal.c.mln_map_destroy
 import org.maplibre.nativeffi.internal.c.mln_map_dump_debug_logs
@@ -219,6 +221,14 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     MemoryUtil.requireValidCString(json)
     Status.check(mln_map_set_style_json(state.requireLive().rawHandleValue, json))
     clearCustomGeometrySources()
+  }
+
+  public actual fun loadedStyleJson(): String = copyMapText { handle, text, capacity, outSize ->
+    mln_map_copy_loaded_style_json(handle, text, capacity, outSize)
+  }
+
+  public actual fun styleUrl(): String = copyMapText { handle, text, capacity, outSize ->
+    mln_map_copy_style_url(handle, text, capacity, outSize)
   }
 
   public actual fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue) {
@@ -1140,6 +1150,21 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
    * Probes the required length, then copies. A null buffer with zero capacity is a size probe the C
    * API answers with OK.
    */
+  private fun copyMapText(
+    copy: (ULong, CPointer<ByteVar>?, ULong, CPointer<ULongVar>) -> Int
+  ): String = memScoped {
+    val handle = state.requireLive().rawHandleValue
+    val outSize = alloc<ULongVar>()
+    Status.check(copy(handle, null, 0UL, outSize.ptr))
+    val required = checkedInt(outSize.value, "map text size")
+    if (required == 0) return@memScoped ""
+
+    val buffer = allocArray<ByteVar>(required)
+    val outCopied = alloc<ULongVar>()
+    Status.check(copy(handle, buffer, required.toULong(), outCopied.ptr))
+    buffer.readBytes(checkedInt(outCopied.value, "map copied text size")).decodeToString()
+  }
+
   private fun copyLayerText(
     layerId: String,
     copy: (ULong, CValue<mln_string_view>, CPointer<ByteVar>?, ULong, CPointer<ULongVar>) -> Int,

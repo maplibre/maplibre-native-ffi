@@ -341,6 +341,34 @@ import Testing
   #expect(map.retainsCustomGeometrySourceCallbacks(sourceId: "custom"))
 }
 
+@Test func loadedStyleDocumentAndURLReadBackWhatWasLoaded() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 1, height: 1)
+  )
+  defer { try? map.close() }
+
+  // Nothing parsed and nothing requested yet.
+  #expect(try map.loadedStyleJSON() == "")
+  #expect(try map.styleURL() == "")
+
+  // The document reads back byte-for-byte, so it can be reloaded unchanged.
+  let styleJSON = #"{"version":8,"sources":{},"layers":[]}"#
+  try map.setStyleJSON(styleJSON)
+  #expect(try map.loadedStyleJSON() == styleJSON)
+  // Inline JSON clears the URL.
+  #expect(try map.styleURL() == "")
+
+  // The URL is request state, recorded before the load can succeed, while the
+  // document still reports the style that last parsed.
+  try map.setStyleURL("https://example.com/style.json")
+  #expect(try map.styleURL() == "https://example.com/style.json")
+  #expect(try map.loadedStyleJSON() == styleJSON)
+}
+
 @Test func staleStyleLoadedEventReleasesOnlyCallbacksForMissingSources() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))

@@ -130,6 +130,31 @@ public sealed unsafe class StyleJsonTests
         Assert.Equal("Vector attribution", map.StyleSourceInfo("vector-tiles")?.Attribution);
     }
 
+    [BindingSpecTest("BND-101")]
+    [Fact]
+    public void LoadedStyleDocumentAndUrlReadBackWhatWasLoaded()
+    {
+        const string styleJson = "{\"version\":8,\"sources\":{},\"layers\":[]}";
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        // Nothing parsed and nothing requested yet.
+        Assert.Equal(string.Empty, map.GetLoadedStyleJson());
+        Assert.Equal(string.Empty, map.GetStyleUrl());
+
+        // The document reads back byte-for-byte, so it can be reloaded unchanged.
+        map.SetStyleJson(styleJson);
+        Assert.Equal(styleJson, map.GetLoadedStyleJson());
+        // Inline JSON clears the URL.
+        Assert.Equal(string.Empty, map.GetStyleUrl());
+
+        // The URL is request state, recorded before the load can succeed, while the
+        // document still reports the style that last parsed.
+        map.SetStyleUrl("https://example.test/style.json");
+        Assert.Equal("https://example.test/style.json", map.GetStyleUrl());
+        Assert.Equal(styleJson, map.GetLoadedStyleJson());
+    }
+
     [BindingSpecTest("BND-081", "BND-101")]
     [Fact]
     public void SetStyleJsonReturnsCopiedStyleLoadedEventWithMapIdentity()

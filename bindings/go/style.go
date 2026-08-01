@@ -2138,6 +2138,34 @@ func (m *MapHandle) setLayerText(layerID string, text string, set func(C.mln_map
 
 // copyLayerText probes the required length, then copies. A null buffer with zero
 // capacity is a size probe the C API answers with OK.
+func (m *MapHandle) copyMapText(copy func(C.mln_map, *C.char, C.size_t, *C.size_t) int32) (string, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return "", err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+
+	var required C.size_t
+	if err := checkNative(func() int32 {
+		return copy(C.mln_map(ptr), nil, 0, &required)
+	}); err != nil {
+		return "", err
+	}
+	if required == 0 {
+		return "", nil
+	}
+
+	buffer := make([]byte, int(required))
+	var size C.size_t
+	if err := checkNative(func() int32 {
+		return copy(C.mln_map(ptr), (*C.char)(unsafe.Pointer(&buffer[0])), C.size_t(len(buffer)), &size)
+	}); err != nil {
+		return "", err
+	}
+	return string(buffer[:int(size)]), nil
+}
+
 func (m *MapHandle) copyLayerText(layerID string, copy func(C.mln_map, C.mln_string_view, *C.char, C.size_t, *C.size_t) int32) (string, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {

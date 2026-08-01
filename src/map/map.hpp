@@ -45,6 +45,12 @@ auto map_request_repaint(mln_map map) -> mln_status;
 auto map_request_still_image(mln_map map) -> mln_status;
 auto map_set_style_url(mln_map map, const char* url) -> mln_status;
 auto map_set_style_json(mln_map map, const char* json) -> mln_status;
+auto map_copy_loaded_style_json(
+  mln_map map, char* out_json, size_t json_capacity, size_t* out_json_size
+) -> mln_status;
+auto map_copy_style_url(
+  mln_map map, char* out_url, size_t url_capacity, size_t* out_url_size
+) -> mln_status;
 auto style_id_list_count(mln_style_id_list list, size_t* out_count)
   -> mln_status;
 auto style_id_list_get(

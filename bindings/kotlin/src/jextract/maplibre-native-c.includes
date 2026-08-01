@@ -201,6 +201,8 @@
 --include-constant MLN_TILE_LOD_MODE_DISTANCE
 --include-constant MLN_VIEWPORT_MODE_DEFAULT
 --include-constant MLN_VIEWPORT_MODE_FLIPPED_Y
+--include-function mln_map_copy_loaded_style_json
+--include-function mln_map_copy_style_url
 --include-function mln_map_create
 --include-function mln_map_destroy
 --include-function mln_map_options_default

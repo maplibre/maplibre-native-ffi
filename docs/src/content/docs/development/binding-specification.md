@@ -317,7 +317,9 @@ Structured JSON and GeoJSON models MUST preserve MapLibre value semantics:
 object member order, repeated member names, signed and unsigned integer width,
 floating-point values, booleans, nulls, strings, arrays, and nested objects. Raw
 JSON or GeoJSON text inputs MUST pass through as text without reparsing or
-reformatting unless the public API is explicitly a structured-value API.
+reformatting unless the public API is explicitly a structured-value API. Raw
+JSON text outputs MUST pass through the same way, so a document a binding reads
+back is byte-for-byte the document that crossed the C boundary.
 
 Bindings MUST preserve the full unsigned 64-bit domain for unsigned JSON and
 GeoJSON integer values. Languages without a native unsigned 64-bit integer type
@@ -785,15 +787,16 @@ the other isolate, which makes its id stale rather than live.
 
 ### Map, camera, projection, style, and query
 
-| ID      | Test                                                                                                                                                         |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| BND-100 | Map creation applies public map options, extent, and mode, then releases through the runtime parent relationship.                                            |
-| BND-101 | Style URL and style JSON loading succeed through public map APIs and return copied style-loaded events through polling.                                      |
-| BND-102 | Camera set/get, animated camera commands, transition cancellation, and gesture-in-progress bracketing produce the expected native camera state and statuses. |
-| BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance.                          |
-| BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.                               |
-| BND-105 | Style source, layer, image, and feature-state workflows add, update, query/list, and remove public input values and copied IDs.                              |
-| BND-106 | Query workflows return copied feature geometry, properties, feature identifiers, feature state, and optional source/layer identifiers.                       |
+| ID      | Test                                                                                                                                                            |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-100 | Map creation applies public map options, extent, and mode, then releases through the runtime parent relationship.                                               |
+| BND-101 | Style URL and style JSON loading succeed through public map APIs and return copied style-loaded events through polling.                                         |
+| BND-102 | Camera set/get, animated camera commands, transition cancellation, and gesture-in-progress bracketing produce the expected native camera state and statuses.    |
+| BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance.                             |
+| BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.                                  |
+| BND-105 | Style source, layer, image, and feature-state workflows add, update, query/list, and remove public input values and copied IDs.                                 |
+| BND-106 | Query workflows return copied feature geometry, properties, feature identifiers, feature state, and optional source/layer identifiers.                          |
+| BND-108 | The loaded style document reads back byte-for-byte through public map APIs, the style URL reads back the last requested URL, and both report empty when absent. |
 
 ### Logging and callbacks
 

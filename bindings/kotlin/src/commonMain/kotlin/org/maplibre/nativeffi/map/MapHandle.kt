@@ -71,6 +71,32 @@ public expect class MapHandle : AutoCloseable {
    */
   public fun setStyleJson(json: String)
 
+  /**
+   * Returns the style document this map's style was last parsed from.
+   *
+   * This is the loaded document, not a serialization of the live style: the string passed to
+   * [setStyleJson], or the response body fetched for [setStyleUrl]. Runtime mutations such as
+   * adding a layer do not change it, and a failed parse leaves the previously parsed document in
+   * place. The result is byte-for-byte the string given to [setStyleJson], so it can be handed back
+   * unchanged.
+   *
+   * The result is empty when no document has been parsed. A parsed document is never empty.
+   */
+  public fun loadedStyleJson(): String
+
+  /**
+   * Returns the URL this map's style was last requested from.
+   *
+   * Unlike [loadedStyleJson], this is live rather than load-time state: [setStyleUrl] records the
+   * URL when the request is made, before the response arrives or the document parses, and
+   * [setStyleJson] clears it. The two can disagree while a load is in flight or after one fails.
+   *
+   * The result is empty when no URL bytes are available, which covers a style loaded from inline
+   * JSON, a map that has loaded no style, and a URL load requested with an empty string. These
+   * cases are not distinguishable here.
+   */
+  public fun styleUrl(): String
+
   public fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue)
 
   public fun removeStyleSource(sourceId: String): Boolean

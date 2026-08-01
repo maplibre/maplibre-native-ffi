@@ -67,6 +67,54 @@ impl super::MapHandle {
         Ok(())
     }
 
+    /// Copies the style document this map's style was last parsed from.
+    ///
+    /// This is the loaded document, not a serialization of the live style: the
+    /// string passed to [`Self::set_style_json`], or the response body fetched
+    /// for [`Self::set_style_url`]. Runtime mutations such as adding a layer or
+    /// setting a paint property do not change it, and a failed parse leaves the
+    /// previously parsed document in place.
+    ///
+    /// The result is byte-for-byte the string given to [`Self::set_style_json`],
+    /// so it can be handed back to that method unchanged.
+    ///
+    /// An empty string means no document has been parsed: no style has loaded
+    /// yet, or every load so far failed to parse. A parsed document is never
+    /// empty.
+    pub fn loaded_style_json(&self) -> Result<String> {
+        let map = self.inner.native()?;
+        // SAFETY: map is live, and each call writes only through the pointers
+        // it is given.
+        unsafe {
+            copy_text(|text, capacity, out_size| {
+                sys::mln_map_copy_loaded_style_json(map, text, capacity, out_size)
+            })
+        }
+    }
+
+    /// Copies the URL this map's style was last requested from.
+    ///
+    /// Unlike [`Self::loaded_style_json`], this is live rather than load-time
+    /// state: [`Self::set_style_url`] records the URL when the request is made,
+    /// before the response arrives or the document parses, and
+    /// [`Self::set_style_json`] clears it. The two can disagree while a load is
+    /// in flight or after one fails.
+    ///
+    /// An empty string means no URL bytes are available. That covers a style
+    /// loaded from inline JSON, a map that has loaded no style, and a URL load
+    /// requested with an empty string, which the C API accepts. These cases are
+    /// not distinguishable here.
+    pub fn style_url(&self) -> Result<String> {
+        let map = self.inner.native()?;
+        // SAFETY: map is live, and each call writes only through the pointers
+        // it is given.
+        unsafe {
+            copy_text(|url, capacity, out_size| {
+                sys::mln_map_copy_style_url(map, url, capacity, out_size)
+            })
+        }
+    }
+
     /// Adds a custom geometry source to the current style.
     ///
     /// The callback state is scoped to this map's current style. It is released
@@ -1184,7 +1232,7 @@ impl super::MapHandle {
         // SAFETY: map is live, layer_id stays valid for both calls, and each
         // call writes only through the pointers it is given.
         unsafe {
-            copy_layer_text(|text, capacity, out_size| {
+            copy_text(|text, capacity, out_size| {
                 sys::mln_map_copy_layer_source_layer(map, layer_id.raw(), text, capacity, out_size)
             })
         }
@@ -1211,7 +1259,7 @@ impl super::MapHandle {
         // SAFETY: map is live, layer_id stays valid for both calls, and each
         // call writes only through the pointers it is given.
         unsafe {
-            copy_layer_text(|text, capacity, out_size| {
+            copy_text(|text, capacity, out_size| {
                 sys::mln_map_copy_layer_source_id(map, layer_id.raw(), text, capacity, out_size)
             })
         }
@@ -1332,7 +1380,7 @@ impl super::MapHandle {
 /// `copy` must forward its arguments to a C entry point that writes at most
 /// `capacity` bytes through the text pointer and the required length through the
 /// size pointer.
-unsafe fn copy_layer_text(
+unsafe fn copy_text(
     copy: impl Fn(*mut std::os::raw::c_char, usize, *mut usize) -> sys::mln_status,
 ) -> Result<String> {
     let mut required = 0;
@@ -1348,7 +1396,7 @@ unsafe fn copy_layer_text(
         return Err(Error::new(
             ErrorKind::NativeError,
             None,
-            "native layer text size exceeded caller buffer",
+            "native text size exceeded caller buffer",
         ));
     }
     buffer.truncate(copied);
@@ -1356,7 +1404,7 @@ unsafe fn copy_layer_text(
         Error::new(
             ErrorKind::NativeError,
             None,
-            "native layer text was not valid UTF-8",
+            "native text was not valid UTF-8",
         )
     })
 }

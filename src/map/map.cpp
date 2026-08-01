@@ -3225,6 +3225,40 @@ auto validate_map_locked(mln_map map, MapObject*& out_map) -> mln_status {
   return MLN_STATUS_OK;
 }
 
+// Shared body for the copy-out entry points that hand back native text.
+auto copy_text(
+  const std::string& text, char* out_text, size_t text_capacity,
+  size_t* out_text_size, const char* capacity_name
+) -> mln_status {
+  if (out_text == nullptr && text_capacity > 0) {
+    set_thread_error(
+      "output buffer must not be null when capacity is non-zero"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (out_text_size == nullptr) {
+    set_thread_error("output size pointer must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  *out_text_size = text.size();
+  // A null buffer with zero capacity is a size probe. It succeeds so a caller
+  // can distinguish the required size from the invalid-argument statuses this
+  // family also uses for a missing object.
+  if (out_text == nullptr) {
+    return MLN_STATUS_OK;
+  }
+  if (text_capacity < text.size()) {
+    auto message = std::string{capacity_name} + " is too small";
+    set_thread_error(message.c_str());
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (!text.empty()) {
+    std::copy(text.begin(), text.end(), out_text);
+  }
+  return MLN_STATUS_OK;
+}
+
 }  // namespace
 
 auto map_options_default() noexcept -> mln_map_options {
@@ -3783,6 +3817,40 @@ auto map_set_style_json(mln_map map, const char* json) -> mln_status {
     return MLN_STATUS_NATIVE_ERROR;
   }
   return MLN_STATUS_OK;
+}
+
+// MapLibre keeps the document the style loader last parsed rather than
+// re-serializing the live style, so this reports load-time state. Runtime style
+// mutations never reach it.
+auto map_copy_loaded_style_json(
+  mln_map map, char* out_json, size_t json_capacity, size_t* out_json_size
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  return copy_text(
+    live->map->getStyle().getJSON(), out_json, json_capacity, out_json_size,
+    "json_capacity"
+  );
+}
+
+// MapLibre records the style URL when the request is made and clears it when a
+// JSON style replaces it, so this reports live state rather than the load-time
+// state map_copy_loaded_style_json() reports.
+auto map_copy_style_url(
+  mln_map map, char* out_url, size_t url_capacity, size_t* out_url_size
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  return copy_text(
+    live->map->getStyle().getURL(), out_url, url_capacity, out_url_size,
+    "url_capacity"
+  );
 }
 
 auto style_id_list_count(mln_style_id_list list, size_t* out_count)
@@ -6123,39 +6191,6 @@ auto require_layer_takes_source(
   return false;
 }
 
-auto copy_layer_text(
-  const std::string& text, char* out_text, size_t text_capacity,
-  size_t* out_text_size, const char* capacity_name
-) -> mln_status {
-  if (out_text == nullptr && text_capacity > 0) {
-    set_thread_error(
-      "output buffer must not be null when capacity is non-zero"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_text_size == nullptr) {
-    set_thread_error("output size pointer must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_text_size = text.size();
-  // A null buffer with zero capacity is a size probe. It succeeds so a caller
-  // can distinguish the required size from the invalid-argument statuses this
-  // family also uses for a missing layer.
-  if (out_text == nullptr) {
-    return MLN_STATUS_OK;
-  }
-  if (text_capacity < text.size()) {
-    auto message = std::string{capacity_name} + " is too small";
-    set_thread_error(message.c_str());
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (!text.empty()) {
-    std::copy(text.begin(), text.end(), out_text);
-  }
-  return MLN_STATUS_OK;
-}
-
 // MapLibre stores the layer zoom range as floats, and infinities survive the
 // narrowing that bounds a layer to one end of the range.
 auto validate_layer_zoom(double zoom, const char* field) -> bool {
@@ -6197,7 +6232,7 @@ auto map_copy_layer_source_layer(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  return copy_layer_text(
+  return copy_text(
     layer->getSourceLayer(), out_source_layer, source_layer_capacity,
     out_source_layer_size, "source_layer_capacity"
   );
@@ -6235,7 +6270,7 @@ auto map_copy_layer_source_id(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  return copy_layer_text(
+  return copy_text(
     layer->getSourceID(), out_source_id, source_id_capacity, out_source_id_size,
     "source_id_capacity"
   );
