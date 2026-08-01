@@ -372,17 +372,11 @@ jobs:
     name: native package
     needs:
       - plan
-      - publish-kotlin-roots
-    # Ordered after the Kotlin uploads. A Kotlin gate that skipped because
-    # nothing changed is no reason to hold the native release back, but a
-    # planned Kotlin publish that did not finish is: `publish-kotlin-roots`
-    # reports `skipped`, not `failure`, when an earlier Kotlin job fails, so
-    # the plan decides which of the two this is.
-    if: >-
-      ${{ !cancelled()
-      && needs.plan.outputs.publish_native == 'true'
-      && (needs.plan.outputs.publish_kotlin != 'true'
-      || needs.publish-kotlin-roots.result == 'success') }}
+    # Every component reads the same CI artifacts and none consumes another's
+    # output, so each publishes on its own gate. One failing never holds
+    # another back, and the gate already lets them sit at different commits
+    # whenever their inputs diverge.
+    if: ${{ needs.plan.outputs.publish_native == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
