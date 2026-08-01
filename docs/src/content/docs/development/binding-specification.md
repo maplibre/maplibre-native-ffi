@@ -80,6 +80,51 @@ Requirements:
 
 ---
 
+## Native Artifact Acquisition
+
+A binding gets its C declarations from the checkout and its native library from
+somewhere else. Bindings whose ecosystem runs binding-supplied code during a
+consumer's build MAY acquire that library themselves from the published snapshot
+release. Bindings whose ecosystem does not MUST document the manual install
+instead; Go has no such hook by design, and SwiftPM sandboxes plugins away from
+the network.
+
+Rust implements this in `bindings/rust/crates/maplibre-native-sys/build.rs`.
+
+Requirements for a binding that acquires the library:
+
+- The binding's existing local-development variable MUST take precedence and
+  MUST skip all network access when set. One variable serves local development
+  and consumer opt-out; a binding MUST NOT add a second discovery mechanism
+  beside it.
+- The target platform and the selected render backend together MUST resolve to
+  exactly one published preset. A target with no published artifact MUST fail
+  with a message naming the local-development variable. MapLibre Native compiles
+  one renderer per build, so the backend selector MUST reject a request for more
+  than one backend rather than choosing between them.
+- The backend selector MUST use the target language's own configuration idiom,
+  and MUST default to the same backend `host_native_preset` selects for that
+  platform.
+- `SHA256SUMS` MUST be fetched before any archive, and its digest MUST be the
+  cache key. Snapshot asset URLs are stable while their contents are not, so a
+  cache keyed on the URL serves stale bytes indefinitely.
+- A downloaded archive MUST be verified against its `SHA256SUMS` entry before it
+  is installed into the cache, and MUST be extracted somewhere else and moved
+  into place afterward, so that a failed download leaves no usable cache entry
+  and concurrent builds cannot observe a partial one.
+- An unreachable release MUST reuse a cached prefix when one exists, warning
+  that it may be out of date, and MUST otherwise fail naming the
+  local-development variable. Offline builds stay possible either way.
+- The extracted prefix's descriptor MUST be checked against the requested
+  preset.
+- The binding MUST warn when the checkout's public headers differ from the
+  artifact's. The snapshot release publishes on its own schedule and its commit
+  lags the checkout by design, so the commits themselves are not the signal; the
+  headers are. `artifact.json` records `gitSha` for the warning to cite, and a
+  binding MUST tolerate its absence.
+
+---
+
 ## Naming
 
 This specification uses generic concept names. Bindings apply target-language

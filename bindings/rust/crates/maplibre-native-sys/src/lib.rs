@@ -15,3 +15,19 @@ mod bindings {
 }
 
 pub use bindings::*;
+
+#[cfg(test)]
+mod tests {
+    /// Calls into the native library so that the test binary links and loads
+    /// it. Nothing else in this crate references a symbol, so without this the
+    /// linker drops the dependency and an unusable install prefix — a
+    /// half-extracted download, a mismatched architecture — still builds
+    /// clean. Every artifact compiles exactly one renderer, so the mask is
+    /// never empty.
+    #[test]
+    fn loads_the_native_library() {
+        // SAFETY: mln_supported_render_backend_mask takes no arguments and
+        // returns a process-global constant.
+        assert_ne!(unsafe { super::mln_supported_render_backend_mask() }, 0);
+    }
+}

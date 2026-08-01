@@ -6,6 +6,16 @@ commands = [
   { task = "//examples/rust-map:check", exclude = ["macos-arm64-egl"] },
 ]
 
+# Acquiring the native library from the snapshot release is not exercised
+# anywhere else: every other binding step is handed a local install prefix. One
+# platform is enough, since the download path differs only in which preset it
+# resolves.
+[[suites]]
+platforms = ["linux"]
+commands = [
+  { task = "//bindings/rust:test:download", include = ["linux-x64-vulkan"], preset = false },
+]
+
 # Zig is unavailable on Windows ARM64; see the `core:zig` note in bindings/zig/mise.toml.
 [[suites]]
 platforms = ["linux", "macos", "windows"]

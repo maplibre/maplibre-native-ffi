@@ -177,6 +177,9 @@ jobs:
       - run: mise run //examples/rust-map:check linux-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/rust:test:download
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/zig:test linux-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"

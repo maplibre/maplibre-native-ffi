@@ -1,5 +1,28 @@
 include(GNUInstallDirs)
 
+# Records the commit an artifact was built from, so a downloaded prefix can name
+# its provenance. Set MLN_FFI_GIT_SHA to skip discovery when building outside a
+# checkout. This resolves at configure time, so a build tree that predates the
+# current commit keeps the older value until it is reconfigured.
+function(mln_resolve_git_sha)
+  if(MLN_FFI_GIT_SHA)
+    return()
+  endif()
+  find_package(Git QUIET)
+  if(GIT_FOUND)
+    execute_process(
+      COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD
+      WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+      OUTPUT_VARIABLE git_sha OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET
+      RESULT_VARIABLE git_result)
+    if(git_result EQUAL 0 AND git_sha)
+      set(MLN_FFI_GIT_SHA "${git_sha}" PARENT_SCOPE)
+      return()
+    endif()
+  endif()
+  set(MLN_FFI_GIT_SHA "unknown" PARENT_SCOPE)
+endfunction()
+
 function(mln_install_zig_libc)
   get_target_property(MLN_FFI_ZIG_LIBC_SYSROOT mln_ffi_platform_dependencies
                       MLN_FFI_ZIG_LIBC_SYSROOT)
@@ -72,6 +95,7 @@ function(mln_install_c_api_library target)
                       MLN_FFI_ZIG_TARGET)
   get_target_property(MLN_FFI_TARGET_PLATFORM mln_ffi_platform_dependencies
                       MLN_FFI_TARGET_PLATFORM)
+  mln_resolve_git_sha()
 
   set(pc_file "${CMAKE_CURRENT_BINARY_DIR}/maplibre-native-c.pc")
   set(artifact_file

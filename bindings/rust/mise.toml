@@ -64,6 +64,15 @@ cargo clippy \
   --all-targets -- -D warnings
 '''
 
+[tasks."test:download"]
+description = "Test the sys crate against a downloaded native snapshot archive."
+dir = "../.."
+# Stops at maplibre-native-sys on purpose. Only the build script's acquisition
+# path is under test, and the crates above it track the C API at this commit
+# while the snapshot release publishes on its own schedule, so they stop
+# compiling whenever it lags a header change.
+run = 'env -u MAPLIBRE_NATIVE_C_INSTALL_DIR cargo test -p maplibre-native-sys'
+
 [tasks."build:ohos"]
 usage = '''
 arg "<preset>" {
