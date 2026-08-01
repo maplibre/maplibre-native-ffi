@@ -659,6 +659,30 @@ void main() {
     callback.close();
   });
 
+  test('loaded style document and URL read back what was loaded', () {
+    final runtime = RuntimeHandle.create();
+    final map = runtime.createMap();
+
+    // Nothing parsed and nothing requested yet.
+    expect(map.getLoadedStyleJson(), '');
+    expect(map.getStyleUrl(), '');
+
+    // The document reads back byte-for-byte, so it can be reloaded unchanged.
+    map.setStyleJson(_emptyStyleJson);
+    expect(map.getLoadedStyleJson(), _emptyStyleJson);
+    // Inline JSON clears the URL.
+    expect(map.getStyleUrl(), '');
+
+    // The URL is request state, recorded before the load can succeed, while the
+    // document still reports the style that last parsed.
+    map.setStyleUrl('https://example.com/style.json');
+    expect(map.getStyleUrl(), 'https://example.com/style.json');
+    expect(map.getLoadedStyleJson(), _emptyStyleJson);
+
+    map.close();
+    runtime.close();
+  });
+
   test(
     'custom geometry callback roots retire at lifecycle boundaries',
     () async {

@@ -236,6 +236,69 @@ func TestMapCommandsAndStyleLoadingUseNativeABI(t *testing.T) {
 	}
 }
 
+func TestMapReportsLoadedStyleDocumentAndURL(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	// Nothing parsed and nothing requested yet.
+	if document, err := m.LoadedStyleJSON(); err != nil || document != "" {
+		t.Fatalf("LoadedStyleJSON() before load = %q, %v, want \"\", nil", document, err)
+	}
+	if url, err := m.StyleURL(); err != nil || url != "" {
+		t.Fatalf("StyleURL() before load = %q, %v, want \"\", nil", url, err)
+	}
+
+	// The document reads back byte-for-byte, so it can be reloaded unchanged.
+	if err := m.SetStyleJSON(minimalStyleJSON); err != nil {
+		t.Fatalf("SetStyleJSON(): %v", err)
+	}
+	document, err := m.LoadedStyleJSON()
+	if err != nil {
+		t.Fatalf("LoadedStyleJSON(): %v", err)
+	}
+	if document != minimalStyleJSON {
+		t.Fatalf("LoadedStyleJSON() = %q, want %q", document, minimalStyleJSON)
+	}
+	// Inline JSON clears the URL.
+	if url, err := m.StyleURL(); err != nil || url != "" {
+		t.Fatalf("StyleURL() after inline JSON = %q, %v, want \"\", nil", url, err)
+	}
+
+	// The URL is request state, recorded before the load can succeed, while the
+	// document still reports the style that last parsed.
+	const styleURL = "http://example.com/style.json"
+	if err := m.SetStyleURL(styleURL); err != nil {
+		t.Fatalf("SetStyleURL(): %v", err)
+	}
+	url, err := m.StyleURL()
+	if err != nil {
+		t.Fatalf("StyleURL(): %v", err)
+	}
+	if url != styleURL {
+		t.Fatalf("StyleURL() = %q, want %q", url, styleURL)
+	}
+	if document, err := m.LoadedStyleJSON(); err != nil || document != minimalStyleJSON {
+		t.Fatalf("LoadedStyleJSON() after URL request = %q, %v, want the previously parsed document", document, err)
+	}
+}
+
 func TestMapDebugAndStatusHelpersUseNativeABI(t *testing.T) {
 	lockOSThreadForTest(t)
 

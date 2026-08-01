@@ -198,6 +198,38 @@ pub const MapHandle = enum(c.mln_map) {
         try status.checkStatus(c.mln_map_set_style_url(native_map, url_z.ptr), diagnosticStore(self));
     }
 
+    /// Copies the style document this map's style was last parsed from.
+    ///
+    /// This is the loaded document, not a serialization of the live style: the bytes passed to
+    /// `setStyleJson`, or the response body fetched for `setStyleUrl`. Runtime mutations such as
+    /// adding a layer do not change it, and a failed parse leaves the previously parsed document
+    /// in place. The copy is byte-for-byte the value given to `setStyleJson`, so it can be handed
+    /// back unchanged.
+    ///
+    /// The value is empty when no document has been parsed. A parsed document is never empty.
+    pub fn copyLoadedStyleJson(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+    ) status.Error!values.OwnedString {
+        return self.copyMapText(allocator, c.mln_map_copy_loaded_style_json);
+    }
+
+    /// Copies the URL this map's style was last requested from.
+    ///
+    /// Unlike `copyLoadedStyleJson`, this is live rather than load-time state: `setStyleUrl`
+    /// records the URL when the request is made, before the response arrives or the document
+    /// parses, and `setStyleJson` clears it. The two can disagree while a load is in flight.
+    ///
+    /// The value is empty when no URL bytes are available, which covers a style loaded from inline
+    /// JSON, a map that has loaded no style, and a URL load requested with an empty string. These
+    /// cases are not distinguishable here.
+    pub fn copyStyleUrl(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+    ) status.Error!values.OwnedString {
+        return self.copyMapText(allocator, c.mln_map_copy_style_url);
+    }
+
     pub fn setLayerProperty(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -331,6 +363,35 @@ pub const MapHandle = enum(c.mln_map) {
 
     /// Probes the required length, then copies. A null buffer with zero capacity is a size probe
     /// the C API answers with OK.
+    fn copyMapText(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        copy: *const fn (c.mln_map, ?[*]u8, usize, *usize) callconv(.c) c.mln_status,
+    ) status.Error!values.OwnedString {
+        var required: usize = 0;
+        try status.checkStatus(
+            copy(try native(self), null, 0, &required),
+            diagnosticStore(self),
+        );
+        if (required == 0) {
+            return .{ .allocator = allocator, .value = try allocator.dupe(u8, "") };
+        }
+
+        const buffer = try allocator.alloc(u8, required);
+        errdefer allocator.free(buffer);
+        var copied: usize = 0;
+        try status.checkStatus(
+            copy(try native(self), buffer.ptr, buffer.len, &copied),
+            diagnosticStore(self),
+        );
+        if (copied != buffer.len) {
+            const exact = try allocator.dupe(u8, buffer[0..copied]);
+            allocator.free(buffer);
+            return .{ .allocator = allocator, .value = exact };
+        }
+        return .{ .allocator = allocator, .value = buffer };
+    }
+
     fn copyLayerText(
         self: *MapHandle,
         allocator: std.mem.Allocator,

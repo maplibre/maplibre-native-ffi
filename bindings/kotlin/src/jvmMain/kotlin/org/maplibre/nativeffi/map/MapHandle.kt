@@ -70,6 +70,16 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     clearCustomGeometrySources()
   }
 
+  public actual fun loadedStyleJson(): String {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.loadedStyleJson(requireLiveHandle())
+  }
+
+  public actual fun styleUrl(): String {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleUrl(requireLiveHandle())
+  }
+
   public actual fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue) {
     NativeAccess.ensureLoaded()
     NativeAccess.addStyleSourceJson(requireLiveHandle(), sourceId, sourceJson)

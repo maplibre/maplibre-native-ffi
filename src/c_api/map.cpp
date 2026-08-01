@@ -118,6 +118,26 @@ auto mln_map_set_style_json(mln_map map, const char* json) noexcept
   });
 }
 
+auto mln_map_copy_loaded_style_json(
+  mln_map map, char* out_json, size_t json_capacity, size_t* out_json_size
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_copy_loaded_style_json(
+      map, out_json, json_capacity, out_json_size
+    );
+  });
+}
+
+auto mln_map_copy_style_url(
+  mln_map map, char* out_url, size_t url_capacity, size_t* out_url_size
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_copy_style_url(
+      map, out_url, url_capacity, out_url_size
+    );
+  });
+}
+
 auto mln_style_id_list_count(mln_style_id_list list, size_t* out_count) noexcept
   -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {

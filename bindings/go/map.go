@@ -200,6 +200,36 @@ func (m *MapHandle) SetStyleJSON(json string) error {
 	return nil
 }
 
+// LoadedStyleJSON returns the style document this map's style was last parsed
+// from. This is the loaded document, not a serialization of the live style: the
+// string passed to SetStyleJSON, or the response body fetched for SetStyleURL.
+// Runtime mutations such as adding a layer do not change it, and a failed parse
+// leaves the previously parsed document in place. The result is byte-for-byte
+// the string given to SetStyleJSON, so it can be handed back unchanged.
+//
+// The result is empty when no document has been parsed. A parsed document is
+// never empty.
+func (m *MapHandle) LoadedStyleJSON() (string, error) {
+	return m.copyMapText(func(rawMap C.mln_map, text *C.char, capacity C.size_t, size *C.size_t) int32 {
+		return int32(C.mln_map_copy_loaded_style_json(rawMap, text, capacity, size))
+	})
+}
+
+// StyleURL returns the URL this map's style was last requested from. Unlike
+// LoadedStyleJSON, this is live rather than load-time state: SetStyleURL records
+// the URL when the request is made, before the response arrives or the document
+// parses, and SetStyleJSON clears it. The two can disagree while a load is in
+// flight or after one fails.
+//
+// The result is empty when no URL bytes are available, which covers a style
+// loaded from inline JSON, a map that has loaded no style, and a URL load
+// requested with an empty string. These cases are not distinguishable here.
+func (m *MapHandle) StyleURL() (string, error) {
+	return m.copyMapText(func(rawMap C.mln_map, text *C.char, capacity C.size_t, size *C.size_t) int32 {
+		return int32(C.mln_map_copy_style_url(rawMap, text, capacity, size))
+	})
+}
+
 // SetDebugOptions applies MapLibre debug overlay mask bits to a map.
 func (m *MapHandle) SetDebugOptions(options MapDebugOptions) error {
 	ptr, release, err := m.ptr()

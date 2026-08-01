@@ -1576,6 +1576,28 @@ impl MapHandle {
         Ok(())
     }
 
+    fn copy_loaded_style_json(&self) -> PyResult<String> {
+        let state = self.state();
+        // SAFETY: The C API validates the map pointer and each buffer and out
+        // pointer it is given.
+        unsafe {
+            copy_text(|text, capacity, out_size| {
+                sys::mln_map_copy_loaded_style_json(state.handle(), text, capacity, out_size)
+            })
+        }
+    }
+
+    fn copy_style_url(&self) -> PyResult<String> {
+        let state = self.state();
+        // SAFETY: The C API validates the map pointer and each buffer and out
+        // pointer it is given.
+        unsafe {
+            copy_text(|text, capacity, out_size| {
+                sys::mln_map_copy_style_url(state.handle(), text, capacity, out_size)
+            })
+        }
+    }
+
     fn get_camera(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let state = self.state();
         // SAFETY: Default constructor takes no arguments and initializes size.
@@ -2877,7 +2899,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, layer ID, and each buffer
         // and out pointer it is given.
         unsafe {
-            copy_layer_text(|text, capacity, out_size| {
+            copy_text(|text, capacity, out_size| {
                 sys::mln_map_copy_layer_source_layer(
                     state.handle(),
                     layer_id.raw(),
@@ -2906,7 +2928,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, layer ID, and each buffer
         // and out pointer it is given.
         unsafe {
-            copy_layer_text(|text, capacity, out_size| {
+            copy_text(|text, capacity, out_size| {
                 sys::mln_map_copy_layer_source_id(
                     state.handle(),
                     layer_id.raw(),
@@ -7445,7 +7467,7 @@ fn camera_transition_finished_event_for_test(
 /// `copy` must forward its arguments to a C entry point that writes at most
 /// `capacity` bytes through the text pointer and the required length through the
 /// size pointer.
-unsafe fn copy_layer_text(
+unsafe fn copy_text(
     copy: impl Fn(*mut c_char, usize, *mut usize) -> sys::mln_status,
 ) -> PyResult<String> {
     let mut required = 0;
@@ -7464,7 +7486,7 @@ unsafe fn copy_layer_text(
     .map_err(map_error)?;
     bytes.truncate(copied.min(bytes.len()));
     String::from_utf8(bytes)
-        .map_err(|error| invalid_argument_error(format!("native layer text is not UTF-8: {error}")))
+        .map_err(|error| invalid_argument_error(format!("native text is not UTF-8: {error}")))
 }
 
 /// Creates a runtime handle on the current thread.

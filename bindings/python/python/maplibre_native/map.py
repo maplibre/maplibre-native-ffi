@@ -666,6 +666,36 @@ class MapHandle(NativeHandleMixin):
         """
         self._native.set_style_json(json)
 
+    def get_loaded_style_json(self) -> str:
+        """Return the style document this map's style was last parsed from.
+
+        This is the loaded document, not a serialization of the live style: the
+        string passed to set_style_json(), or the response body fetched for
+        set_style_url(). Runtime mutations such as adding a layer do not change
+        it, and a failed parse leaves the previously parsed document in place.
+        The result is byte-for-byte the string given to set_style_json(), so it
+        can be handed back unchanged.
+
+        The result is empty when no document has been parsed. A parsed document
+        is never empty.
+        """
+        return self._native.copy_loaded_style_json()
+
+    def get_style_url(self) -> str:
+        """Return the URL this map's style was last requested from.
+
+        Unlike get_loaded_style_json(), this is live rather than load-time
+        state: set_style_url() records the URL when the request is made, before
+        the response arrives or the document parses, and set_style_json() clears
+        it. The two can disagree while a load is in flight or after one fails.
+
+        The result is empty when no URL bytes are available, which covers a
+        style loaded from inline JSON, a map that has loaded no style, and a URL
+        load requested with an empty string. These cases are not distinguishable
+        here.
+        """
+        return self._native.copy_style_url()
+
     def add_style_source_json(self, source_id: str, source_json: JsonObject) -> None:
         """Add one style source from a style-spec source JSON object."""
         self._native.add_style_source_json(source_id, source_json)

@@ -846,5 +846,11 @@ namespace Maplibre.Native.Internal.C
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_set_style_json([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const char *")] sbyte* json);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_copy_loaded_style_json([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("char *")] sbyte* out_json, [NativeTypeName("size_t")] nuint json_capacity, [NativeTypeName("size_t *")] nuint* out_json_size);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_copy_style_url([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("char *")] sbyte* out_url, [NativeTypeName("size_t")] nuint url_capacity, [NativeTypeName("size_t *")] nuint* out_url_size);
     }
 }

@@ -441,6 +441,37 @@ enum NativeStyle {
 
   /// Probes the required byte length, then copies. A null buffer with zero
   /// capacity is a size probe the C API answers with OK.
+  static func copyMapText(
+    _ map: NativeMapHandle,
+    copy: (
+      mln_map,
+      UnsafeMutablePointer<CChar>?,
+      Int,
+      UnsafeMutablePointer<Int>
+    ) -> mln_status
+  ) throws -> String {
+    let required = try NativeMemory.withTemporary(0) { outSize in
+      try checkStatus(copy(map.raw, nil, 0, outSize))
+    }.value
+    guard required > 0 else { return "" }
+
+    var bytes = [CChar](repeating: 0, count: required)
+    let size = try bytes.withUnsafeMutableBufferPointer { buffer in
+      try NativeMemory.withTemporary(0) { outSize in
+        try checkStatus(copy(map.raw, buffer.baseAddress, required, outSize))
+      }.value
+    }
+    guard size <= required else {
+      throw NativeStatusFailure(
+        rawStatus: MLN_STATUS_NATIVE_ERROR.rawValue,
+        diagnostic: "native text size exceeded caller buffer"
+      )
+    }
+    return try bytes.withUnsafeBufferPointer { buffer in
+      try NativeString.copyUTF8(data: buffer.baseAddress, size: size)
+    } ?? ""
+  }
+
   static func copyLayerText(
     _ map: NativeMapHandle,
     layerId: mln_string_view,

@@ -641,6 +641,39 @@ public sealed unsafe class MapHandle : IDisposable
         ClearCustomGeometrySources();
     }
 
+    /// <summary>Gets the style document this map's style was last parsed from.</summary>
+    /// <remarks>
+    /// This is the loaded document, not a serialization of the live style: the
+    /// string passed to <see cref="SetStyleJson" />, or the response body fetched
+    /// for <see cref="SetStyleUrl" />. Runtime mutations such as adding a layer do
+    /// not change it, and a failed parse leaves the previously parsed document in
+    /// place. The result is byte-for-byte the string given to
+    /// <see cref="SetStyleJson" />, so it can be handed back unchanged. The result
+    /// is empty when no document has been parsed; a parsed document is never empty.
+    /// </remarks>
+    public string GetLoadedStyleJson() =>
+        CopyMapText(
+            (map, text, capacity, size) =>
+                NativeMethods.mln_map_copy_loaded_style_json(map, text, capacity, size)
+        );
+
+    /// <summary>Gets the URL this map's style was last requested from.</summary>
+    /// <remarks>
+    /// Unlike <see cref="GetLoadedStyleJson" />, this is live rather than load-time
+    /// state: <see cref="SetStyleUrl" /> records the URL when the request is made,
+    /// before the response arrives or the document parses, and
+    /// <see cref="SetStyleJson" /> clears it. The two can disagree while a load is
+    /// in flight or after one fails. The result is empty when no URL bytes are
+    /// available, which covers a style loaded from inline JSON, a map that has
+    /// loaded no style, and a URL load requested with an empty string. These cases
+    /// are not distinguishable here.
+    /// </remarks>
+    public string GetStyleUrl() =>
+        CopyMapText(
+            (map, text, capacity, size) =>
+                NativeMethods.mln_map_copy_style_url(map, text, capacity, size)
+        );
+
     /// <summary>Adds a style source from a JSON-like value.</summary>
     public void AddStyleSourceJson(string sourceId, JsonValue sourceJson)
     {
@@ -1688,6 +1721,31 @@ public sealed unsafe class MapHandle : IDisposable
     /// Probes the required length, then copies. A null buffer with zero capacity is a size probe
     /// the C API answers with OK.
     /// </summary>
+    private delegate mln_status CopyMapTextCall(
+        MlnMap map,
+        sbyte* text,
+        nuint capacity,
+        nuint* size
+    );
+
+    private string CopyMapText(CopyMapTextCall copy)
+    {
+        nuint required = 0;
+        NativeStatus.Check(copy(Handle, null, 0, &required));
+        if (required == 0)
+        {
+            return string.Empty;
+        }
+
+        var buffer = new byte[checked((int)required)];
+        nuint copied = 0;
+        fixed (byte* bufferPointer = buffer)
+        {
+            NativeStatus.Check(copy(Handle, (sbyte*)bufferPointer, required, &copied));
+            return RuntimeStructs.CopyUtf8((sbyte*)bufferPointer, copied) ?? string.Empty;
+        }
+    }
+
     private string CopyLayerText(string layerId, bool sourceLayer)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));

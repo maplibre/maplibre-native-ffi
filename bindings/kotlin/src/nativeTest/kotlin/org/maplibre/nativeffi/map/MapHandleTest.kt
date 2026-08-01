@@ -361,4 +361,35 @@ private fun closeMapOnNativeThread(raw: COpaquePointer?): COpaquePointer? {
     selfRef.dispose()
   }
   return null
+
+  @Test
+  fun loadedStyleDocumentAndUrlReadBackWhatWasLoaded() {
+    val styleJson = "{\"version\":8,\"sources\":{},\"layers\":[]}"
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+          },
+        )
+        .use { map ->
+          // Nothing parsed and nothing requested yet.
+          assertEquals("", map.loadedStyleJson())
+          assertEquals("", map.styleUrl())
+
+          // The document reads back byte-for-byte, so it can be reloaded unchanged.
+          map.setStyleJson(styleJson)
+          assertEquals(styleJson, map.loadedStyleJson())
+          // Inline JSON clears the URL.
+          assertEquals("", map.styleUrl())
+
+          // The URL is request state, recorded before the load can succeed, while
+          // the document still reports the style that last parsed.
+          map.setStyleUrl("https://example.com/style.json")
+          assertEquals("https://example.com/style.json", map.styleUrl())
+          assertEquals(styleJson, map.loadedStyleJson())
+        }
+    }
+  }
 }

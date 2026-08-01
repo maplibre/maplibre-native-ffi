@@ -65,6 +65,16 @@ whose capacity is too small still reports the required length and returns
 `MLN_STATUS_INVALID_ARGUMENT`. Entry points whose output length is a documented
 constant need no probe.
 
+JSON crosses the boundary in the representation MapLibre itself holds. A
+structured value crosses as `mln_json_value` going in and an `mln_json_snapshot`
+coming out, because native holds those as value trees and building the text
+would be a conversion no caller asked for. A whole document crosses as copied
+text, because native holds the document as the bytes it parsed, and rebuilding
+it from a tree would lose formatting, number spelling, and escaping that a
+caller may need to reproduce. The distinction is document versus value, which is
+why `mln_map_copy_loaded_style_json()` hands back bytes while
+`mln_map_get_style_layer_json()` hands back a snapshot.
+
 ## Handles
 
 Every MapLibre handle type is `typedef uint64_t`, an opaque id. Each id packs

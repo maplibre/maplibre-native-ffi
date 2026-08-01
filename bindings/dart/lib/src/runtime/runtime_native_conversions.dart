@@ -1083,6 +1083,25 @@ Pointer<raw.mln_screen_point> _nativeScreenPoint(
 
 /// Probes the required length, then copies. A null buffer with zero capacity is
 /// a size probe the C API answers with OK.
+String _copyMapText(
+  NativeMap map,
+  raw.mln_status Function(int, Pointer<Char>, int, Pointer<Size>) copy,
+) {
+  return withNativeArena((arena) {
+    final outSize = arena<Size>();
+    _check(copy(map.raw, nullptr.cast<Char>(), 0, outSize));
+    final required = outSize.value;
+    if (required == 0) {
+      return '';
+    }
+
+    final buffer = arena<Char>(required);
+    final outCopied = arena<Size>();
+    _check(copy(map.raw, buffer, required, outCopied));
+    return buffer.cast<Utf8>().toDartString(length: outCopied.value);
+  });
+}
+
 String _copyLayerText(
   NativeMap map,
   String layerId,

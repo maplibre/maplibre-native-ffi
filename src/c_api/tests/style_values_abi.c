@@ -757,6 +757,195 @@ static void copy_entry_points_answer_a_null_buffer_as_a_size_probe(void) {
   );
   TEST_ASSERT_EQUAL_size_t(4, byte_length);
 
+  // The map-level copy entry points answer a probe the same way, with no id to
+  // resolve first.
+  size_t document_size = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_copy_loaded_style_json(map, NULL, 0, &document_size)
+  );
+  TEST_ASSERT_TRUE(document_size > 0);
+
+  char small_document[2] = {0};
+  size_t reported = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_copy_loaded_style_json(
+      map, small_document, sizeof(small_document), &reported
+    )
+  );
+  TEST_ASSERT_EQUAL_size_t(document_size, reported);
+
+  size_t url_size = 123;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_copy_style_url(map, NULL, 0, &url_size)
+  );
+  TEST_ASSERT_EQUAL_size_t(0, url_size);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// The loaded document is what the style loader last parsed, not a serialization
+// of the live style, so this pins both the verbatim round trip and the fact
+// that later mutations never reach it.
+static void loaded_style_document_reports_the_parsed_bytes(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+
+  // A map that has parsed no style reports no document and no URL.
+  size_t size = 123;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_copy_loaded_style_json(map, NULL, 0, &size)
+  );
+  TEST_ASSERT_EQUAL_size_t(0, size);
+  size = 123;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_copy_style_url(map, NULL, 0, &size)
+  );
+  TEST_ASSERT_EQUAL_size_t(0, size);
+
+  static const char style_json[] =
+    "{\"version\":8,\"name\":\"probe\",\"sources\":{},\"layers\":[]}";
+  const size_t style_json_length = sizeof(style_json) - 1;
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_set_style_json(map, style_json));
+
+  // The copy is byte-for-byte the string that was loaded, so a host can hand it
+  // straight back to mln_map_set_style_json().
+  size = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_copy_loaded_style_json(map, NULL, 0, &size)
+  );
+  TEST_ASSERT_EQUAL_size_t(style_json_length, size);
+
+  char document[sizeof(style_json)] = {0};
+  size = 0;
+  // An exact-length buffer is enough because the copy carries no terminator.
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_copy_loaded_style_json(map, document, style_json_length, &size)
+  );
+  TEST_ASSERT_EQUAL_size_t(style_json_length, size);
+  TEST_ASSERT_EQUAL_INT(0, memcmp(document, style_json, style_json_length));
+
+  // Loading inline JSON clears the style URL.
+  size = 123;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_copy_style_url(map, NULL, 0, &size)
+  );
+  TEST_ASSERT_EQUAL_size_t(0, size);
+
+  // Mutating the live style does not rewrite the parsed document. This negative
+  // assertion is the point of the entry point's contract: hosts that expect
+  // getStyle()-style serialization would otherwise read staleness as a bug.
+  const mln_json_value layer_id = {
+    .size = sizeof(mln_json_value),
+    .type = MLN_JSON_VALUE_TYPE_STRING,
+    .data = {.string_value = MLN_STRING_LITERAL("stale-background")}
+  };
+  const mln_json_value layer_type = {
+    .size = sizeof(mln_json_value),
+    .type = MLN_JSON_VALUE_TYPE_STRING,
+    .data = {.string_value = MLN_STRING_LITERAL("background")}
+  };
+  const mln_json_member layer_members[] = {
+    {.key = MLN_STRING_LITERAL("id"), .value = &layer_id},
+    {.key = MLN_STRING_LITERAL("type"), .value = &layer_type},
+  };
+  const mln_json_value layer = {
+    .size = sizeof(mln_json_value),
+    .type = MLN_JSON_VALUE_TYPE_OBJECT,
+    .data = {.object_value = {.members = layer_members, .member_count = 2}}
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_add_style_layer_json(map, &layer, (mln_string_view){NULL, 0})
+  );
+
+  char after[sizeof(style_json)] = {0};
+  size = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_copy_loaded_style_json(map, after, sizeof(after), &size)
+  );
+  TEST_ASSERT_EQUAL_size_t(style_json_length, size);
+  TEST_ASSERT_EQUAL_INT(0, memcmp(after, style_json, style_json_length));
+
+  // A failed parse leaves the previously parsed document in place, bytes and
+  // all, rather than a same-length document the loader half-applied.
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_NATIVE_ERROR, mln_map_set_style_json(map, "{\"version\":")
+  );
+  char retained[sizeof(style_json)] = {0};
+  size = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_copy_loaded_style_json(map, retained, sizeof(retained), &size)
+  );
+  TEST_ASSERT_EQUAL_size_t(style_json_length, size);
+  TEST_ASSERT_EQUAL_INT(0, memcmp(retained, style_json, style_json_length));
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// The style URL is recorded when the request is made, so it reports live state
+// while the document reports what last parsed.
+static void style_url_reports_the_requested_url(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+
+  // An unreachable URL is still recorded: the URL is request state, not a
+  // result. The load fails later through the event stream.
+  static const char style_url[] = "custom://style.json";
+  const size_t style_url_length = sizeof(style_url) - 1;
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_set_style_url(map, style_url));
+
+  size_t size = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_copy_style_url(map, NULL, 0, &size)
+  );
+  TEST_ASSERT_EQUAL_size_t(style_url_length, size);
+
+  char url[sizeof(style_url)] = {0};
+  size = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_copy_style_url(map, url, style_url_length, &size)
+  );
+  TEST_ASSERT_EQUAL_size_t(style_url_length, size);
+  TEST_ASSERT_EQUAL_INT(0, memcmp(url, style_url, style_url_length));
+
+  char too_small[4] = {0};
+  size = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_copy_style_url(map, too_small, sizeof(too_small), &size)
+  );
+  TEST_ASSERT_EQUAL_size_t(style_url_length, size);
+
+  // Nothing parsed yet, so the document stays empty while the URL is set. The
+  // two answer different questions.
+  size = 123;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_copy_loaded_style_json(map, NULL, 0, &size)
+  );
+  TEST_ASSERT_EQUAL_size_t(0, size);
+
+  // An empty URL is accepted by the setter and reads back as zero bytes, which
+  // is why the header documents a zero length as "no URL bytes are available"
+  // rather than "no URL was requested". This entry point cannot tell the two
+  // apart, and a presence flag could not either.
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_set_style_url(map, ""));
+  size = 123;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_copy_style_url(map, NULL, 0, &size)
+  );
+  TEST_ASSERT_EQUAL_size_t(0, size);
+  size = 123;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_copy_style_url(map, url, sizeof(url), &size)
+  );
+  TEST_ASSERT_EQUAL_size_t(0, size);
+
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -939,5 +1128,7 @@ void run_style_values_abi_tests(void) {
   RUN_TEST(layer_zoom_and_visibility_accessors_carry_raw_domains);
   RUN_TEST(style_image_stretch_descriptors_reject_unsafe_raw_values);
   RUN_TEST(copy_entry_points_answer_a_null_buffer_as_a_size_probe);
+  RUN_TEST(loaded_style_document_reports_the_parsed_bytes);
+  RUN_TEST(style_url_reports_the_requested_url);
   RUN_TEST(style_transition_options_reject_unsafe_raw_headers);
 }

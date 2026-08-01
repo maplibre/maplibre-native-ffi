@@ -1390,6 +1390,28 @@ internal object NativeAccess {
    * Probes the required length, then copies. A null buffer with zero capacity is a size probe the C
    * API answers with OK.
    */
+  internal fun loadedStyleJson(map: NativeMap): String =
+    copyMapText(map, "mln_map_copy_loaded_style_json")
+
+  internal fun styleUrl(map: NativeMap): String = copyMapText(map, "mln_map_copy_style_url")
+
+  private fun copyMapText(map: NativeMap, name: String): String =
+    Arena.ofConfined().use { arena ->
+      val function = downcall(name)
+      val outSize = arena.allocate(ValueLayout.JAVA_LONG)
+      Status.check(function.invokeNative(map, MemorySegment.NULL, 0L, outSize) as Int)
+      val required = outSize.get(ValueLayout.JAVA_LONG, 0)
+      if (required == 0L) {
+        ""
+      } else {
+        val buffer = arena.allocate(required)
+        val outCopied = arena.allocate(ValueLayout.JAVA_LONG)
+        Status.check(function.invokeNative(map, buffer, required, outCopied) as Int)
+        val copied = outCopied.get(ValueLayout.JAVA_LONG, 0)
+        buffer.asSlice(0, copied).toArray(ValueLayout.JAVA_BYTE).decodeToString()
+      }
+    }
+
   private fun copyLayerText(map: NativeMap, layerId: String, name: String): String =
     Arena.ofConfined().use { arena ->
       val function = mapStringViewAddressLongAddressStatusFunction(name)

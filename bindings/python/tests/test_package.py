@@ -974,6 +974,28 @@ def test_geojson_source_options_reject_negative_unsigned_fields(field: str) -> N
     assert field in raised.value.diagnostic
 
 
+def test_loaded_style_document_and_url_read_back_what_was_loaded() -> None:
+    style_json = '{"version":8,"sources":{},"layers":[]}'
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            # Nothing parsed and nothing requested yet.
+            assert map_handle.get_loaded_style_json() == ""
+            assert map_handle.get_style_url() == ""
+
+            # The document reads back byte-for-byte, so it can be reloaded
+            # unchanged.
+            map_handle.set_style_json(style_json)
+            assert map_handle.get_loaded_style_json() == style_json
+            # Inline JSON clears the URL.
+            assert map_handle.get_style_url() == ""
+
+            # The URL is request state, recorded before the load can succeed,
+            # while the document still reports the style that last parsed.
+            map_handle.set_style_url("https://example.test/style.json")
+            assert map_handle.get_style_url() == "https://example.test/style.json"
+            assert map_handle.get_loaded_style_json() == style_json
+
+
 def test_style_source_url_metadata_and_removal_public_api() -> None:
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:
