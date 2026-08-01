@@ -419,7 +419,8 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     /// Renders this attached texture session into a new caller-owned texture. A caller-owned texture
     /// is sized by its owner, so a host that follows a resize reallocates rather than resizing and
     /// <see cref="Resize"/> throws an unsupported-feature error. Handing the replacement over here
-    /// keeps this session's renderer instead, so the map does not go cold on every resize. The
+    /// keeps this session's renderer instead, so the map does not go cold on every resize, unless
+    /// the scale factor changes, which starts a new renderer for the new pixel ratio. The
     /// replacement belongs to the device this session attached with, which throws an
     /// invalid-argument error otherwise, and carries the pixel format it attached with, which throws
     /// an unsupported-feature error otherwise. Both leave this session rendering into the texture it

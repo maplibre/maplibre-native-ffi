@@ -551,7 +551,9 @@ public final class RenderSessionHandle {
   /// resize reallocates rather than resizing and
   /// ``resize(width:height:scaleFactor:)`` throws an unsupported-feature error.
   /// Handing the replacement over here keeps this session's renderer instead,
-  /// so the map does not go cold on every resize.
+  /// so the map does not go cold on every resize, unless the scale factor
+  /// changes, which starts a new renderer for the new pixel ratio just as
+  /// ``resize(width:height:scaleFactor:)`` does.
   ///
   /// The replacement belongs to the device this session attached with, which
   /// throws an invalid-argument error otherwise, and carries the pixel format

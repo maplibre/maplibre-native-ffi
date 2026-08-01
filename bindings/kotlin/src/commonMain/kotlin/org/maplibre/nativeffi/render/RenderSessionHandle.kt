@@ -41,8 +41,8 @@ public expect class RenderSessionHandle : AutoCloseable {
    * state.
    *
    * [descriptor] names the graphics context this session attached with, and its extent applies as
-   * [resize] applies one, including a scale factor change starting a new renderer. A layer on a
-   * `context.device` that is neither null nor this session's device throws
+   * [resize] applies one, including a scale factor change starting a new renderer. A descriptor
+   * whose `context.device` is neither null nor this session's device throws
    * `InvalidArgumentException` and leaves this session rendering into the surface it has. The
    * session assigns the layer its own device and pixel format, so the layer itself carries nothing
    * that has to match.
@@ -78,7 +78,8 @@ public expect class RenderSessionHandle : AutoCloseable {
    * A caller-owned texture is sized by its owner, so a host that follows a resize reallocates
    * rather than resizing and [resize] throws `UnsupportedFeatureException`. Handing the replacement
    * over here keeps this session's renderer instead, and with it the tile pyramid, glyph and image
-   * atlases, symbol placement, and feature state.
+   * atlases, symbol placement, and feature state. A scale factor change is the exception, starting
+   * a new renderer for the new pixel ratio just as [resize] does.
    *
    * The replacement belongs to the device this session attached with and carries the pixel format
    * it attached with; another device throws `InvalidArgumentException` and another pixel format

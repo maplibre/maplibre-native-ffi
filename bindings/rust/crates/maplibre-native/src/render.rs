@@ -1329,7 +1329,9 @@ impl RenderSessionHandle {
     /// resize reallocates rather than resizing and [`RenderSessionHandle::resize`]
     /// reports an unsupported-feature error. Handing the replacement over here
     /// keeps this session's renderer instead, so the map does not go cold on
-    /// every resize.
+    /// every resize — unless the scale factor changes, which starts a new
+    /// renderer for the new pixel ratio, as [`RenderSessionHandle::resize`]
+    /// does.
     ///
     /// The replacement belongs to the device this session attached with, which
     /// reports an invalid-argument error otherwise, and carries the pixel

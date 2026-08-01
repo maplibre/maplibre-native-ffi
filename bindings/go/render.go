@@ -814,7 +814,9 @@ func (session *RenderSessionHandle) SetOpenGLSurfaceTarget(descriptor OpenGLSurf
 // A caller-owned texture is sized by its owner, so a host that follows a resize
 // reallocates rather than resizing and Resize reports an unsupported-feature
 // error. Handing the replacement over here keeps this session's renderer
-// instead, so the map does not go cold on every resize.
+// instead, so the map does not go cold on every resize, unless the scale factor
+// changes, which starts a new renderer for the new pixel ratio just as Resize
+// does.
 //
 // The replacement belongs to the device this session attached with, which
 // reports an invalid-argument error otherwise, and carries the pixel format it

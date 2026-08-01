@@ -505,7 +505,8 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
     /// resize reallocates rather than resizing and `resize` returns
     /// `error.Unsupported`. Handing the replacement over here keeps this
     /// session's renderer instead, so the map does not go cold on every resize,
-    /// and the new extent applies exactly as `resize` applies one.
+    /// and the new extent applies exactly as `resize` applies one — including a
+    /// scale factor change starting a new renderer for the new pixel ratio.
     ///
     /// The replacement belongs to the device this session attached with, which
     /// returns `error.InvalidArgument` otherwise, and carries the pixel format
