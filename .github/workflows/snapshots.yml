@@ -48,6 +48,12 @@ jobs:
     steps:
       # The artifacts every publish job downloads come from one CI run, so that
       # run's commit is what this workflow publishes and hashes.
+      #
+      # CI also runs on pull requests, where the run's head branch is the pull
+      # request's own branch. A branch filter alone would therefore match a run
+      # from an unmerged branch named `main`, and the jobs below would check
+      # that code out holding the publishing credentials. Only pushes reach
+      # `main`, so the event filter is what keeps this to merged commits.
       - name: Resolve the source CI run
         id: source
         env:
@@ -59,6 +65,7 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --workflow CI \
             --branch main \
+            --event push \
             --status success \
             --limit 1 \
             --json databaseId,headSha,url)"
@@ -80,6 +87,20 @@ jobs:
           ref: ${{ steps.source.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
+      # Assert the property the event filter above is chosen for, rather than
+      # trusting the filter. Every later job checks this commit out with
+      # publishing credentials in scope, so it has to be one that reached main.
+      - name: Verify the source commit reached main
+        env:
+          SNAPSHOT_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          set -euo pipefail
+
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor "$SNAPSHOT_SHA" origin/main; then
+            echo "$SNAPSHOT_SHA is not an ancestor of main; refusing to publish" >&2
+            exit 1
+          fi
       # The gate reads Git history and the scope config, so it needs Python
       # rather than the native toolchain the publish jobs use. `--no-deps` on
       # the task keeps mise from preparing the submodule and package
