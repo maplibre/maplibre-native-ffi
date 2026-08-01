@@ -7,6 +7,11 @@
     <IsAotCompatible>true</IsAotCompatible>
     <IsTrimmable>true</IsTrimmable>
     <PackageId>Maplibre.Native</PackageId>
+    <Description>Low-level .NET bindings for the MapLibre Native C API.</Description>
+    <PackageLicenseExpression>BSD-2-Clause</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/maplibre/maplibre-native-ffi</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/maplibre/maplibre-native-ffi</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
     <NoWarn>$(NoWarn);0649</NoWarn>
     <RootNamespace>Maplibre.Native</RootNamespace>
     <AssemblyName>Maplibre.Native</AssemblyName>

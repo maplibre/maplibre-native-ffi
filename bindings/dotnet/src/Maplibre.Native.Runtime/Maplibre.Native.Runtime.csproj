@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PackageId>Maplibre.Native.Runtime.$(RenderBackend)</PackageId>
+    <Description>$(RenderBackend) native runtime assets for MapLibre Native .NET.</Description>
+    <PackageLicenseExpression>BSD-2-Clause</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/maplibre/maplibre-native-ffi</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/maplibre/maplibre-native-ffi</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>false</SuppressDependenciesWhenPacking>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Maplibre.Native/Maplibre.Native.csproj" />
+    <None Include="_._" Pack="true" PackagePath="lib/$(TargetFramework)/" />
+    <None Include="$(NativeAssetsDir)/**" Pack="true" PackagePath="runtimes/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>
