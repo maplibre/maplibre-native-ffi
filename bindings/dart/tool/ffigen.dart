@@ -2,13 +2,13 @@
 //
 // Run with `mise run //bindings/dart:ffigen` from the repository root.
 //
-// Pass `--output <path>` to write the bindings elsewhere; `ffigen-check` uses
-// this to regenerate into a scratch file and compare it against the committed
-// one.
+// Pass `--output <path>` to write the bindings somewhere other than the
+// committed file.
 
 import 'dart:io';
 
 import 'package:ffigen/ffigen.dart';
+import 'package:maplibre_native_ffi/src/internal/c/native_asset.dart';
 
 void main(List<String> args) {
   final packageRoot = Platform.script.resolve('../');
@@ -25,11 +25,11 @@ void main(List<String> args) {
     output: Output(
       dartFile: _outputFile(args, packageRoot),
       commentType: const CommentType.none(),
-      style: const DynamicLibraryBindings(
-        wrapperName: 'MaplibreNativeC',
-        wrapperDocComment:
-            'Private generated declarations for the MapLibre Native C API.',
-      ),
+      // The native library arrives as a code asset from `hook/build.dart`,
+      // which the Dart runtime resolves by asset id. That is only reachable
+      // through `@Native`, so the declarations are static rather than a wrapper
+      // class over a DynamicLibrary.
+      style: const NativeExternalBindings(assetId: nativeAssetId),
       preamble: '''
 // ignore_for_file: always_specify_types
 // ignore_for_file: camel_case_types
@@ -54,7 +54,19 @@ void main(List<String> args) {
         '${_clangResourceDir()}/include',
       ],
     ),
-    enums: const Enums(include: Declarations.includeAll, silenceWarning: true),
+    enums: Enums(
+      include: Declarations.includeAll,
+      silenceWarning: true,
+      // Status is an integer in the C API, and every binding's raw layer
+      // mirrors it as one: `i32` in Rust, `c.mln_status` in Zig. A Dart enum
+      // here would also force ffigen to wrap each status-returning function in
+      // a converting call, which hides the `@Native` declaration behind a
+      // private name and puts the function's address out of reach.
+      style: (declaration, suggested) =>
+          declaration.originalName == 'mln_status'
+          ? EnumStyle.intConstants
+          : (suggested ?? EnumStyle.dartEnum),
+    ),
     functions: Functions.includeAll,
     globals: Globals.includeAll,
     macros: Macros.includeAll,

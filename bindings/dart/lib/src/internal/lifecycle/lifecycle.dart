@@ -3,31 +3,20 @@ import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
 
-import '../loader/native_library.dart';
+import '../c/maplibre_native_c.g.dart' as raw;
 import '../status/status.dart';
 import 'native_handles.dart';
 
-final DynamicLibrary _library = openMaplibreNativeCLibrary();
-
 final NativeFinalizer _leakReporter = NativeFinalizer(
-  _library.lookup<NativeFinalizerFunction>('mln_adapter_handle_leak_report'),
+  Native.addressOf<NativeFinalizerFunction>(raw.mln_adapter_handle_leak_report),
 );
 
-final Pointer<Void> Function(Pointer<Char>, int) _createLeakToken = _library
-    .lookupFunction<
-      Pointer<Void> Function(Pointer<Char>, Uint64),
-      Pointer<Void> Function(Pointer<Char>, int)
-    >('mln_adapter_handle_leak_token_create');
+const _createLeakToken = raw.mln_adapter_handle_leak_token_create;
 
-/// Opaque token for the calling native thread, stable for its life. Looked up
-/// here rather than through the generated API so this module stays free of it.
-final int Function() _threadToken = _library
-    .lookupFunction<Uint64 Function(), int Function()>('mln_thread_token');
+/// Opaque token for the calling native thread, stable for its life.
+const _threadToken = raw.mln_thread_token;
 
-final void Function(Pointer<Void>) _destroyLeakToken = _library
-    .lookupFunction<Void Function(Pointer<Void>), void Function(Pointer<Void>)>(
-      'mln_adapter_handle_leak_token_destroy',
-    );
+const _destroyLeakToken = raw.mln_adapter_handle_leak_token_destroy;
 
 /// Attaches the binding's non-owning native-handle leak diagnostic to [owner].
 final class NativeLeakReporter {

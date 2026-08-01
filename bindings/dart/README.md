@@ -13,57 +13,44 @@ toolchain. From the repository root:
 ```bash
 mise run //bindings/dart:test
 mise run //bindings/dart:test linux-x64-vulkan
-mise run //bindings/dart:ffigen-check
+mise run --force //bindings/dart:ffigen
 ```
 
-The test task builds the selected CMake preset, loads the installed native
-library, analyzes the package, and runs the Dart tests. The private raw
-declarations are checked in so Git and pub package consumers receive a complete
-library; `ffigen-check` regenerates them separately and verifies that the
-committed file is current. Generation is configured in `tool/ffigen.dart`.
+The test task builds the selected CMake preset, points the build hook at the
+resulting install prefix, analyzes the package, and runs the Dart tests. The
+private raw declarations are checked in so Git and pub package consumers receive
+a complete library; CI regenerates them and fails on any diff. Generation is
+configured in `tool/ffigen.dart`.
 
-Applications may set `MLN_FFI_NATIVE_LIBRARY` to an absolute library path.
-Otherwise the loader uses the platform library name and the host's normal
-dynamic-library search path.
+The native library reaches Dart as a code asset that `hook/build.dart` declares,
+which is how the generated `@Native` declarations resolve it. Build hooks run in
+a semi-hermetic environment that strips arbitrary environment variables, so the
+hook reads the install prefix from `.dart_tool/maplibre_native_install_dir`
+rather than from an environment variable; the mise tasks write it.
 
 ## Android host integration
 
-The Dart package does not yet publish Android artifacts, and an Android
-application takes its native payload from a runtime AAR. That AAR holds
-`libmaplibre-native-c.so` for each ABI and the patched Rustls platform-verifier
-helper that the native TLS stack calls over JNI, so one dependency covers the
-packaging:
-
-```kotlin
-// app/build.gradle.kts
-repositories {
-  maven {
-    url = uri("https://central.sonatype.com/repository/maven-snapshots/")
-    content { includeGroup("org.maplibre.nativeffi") }
-  }
-}
-
-dependencies {
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:$version")
-}
-```
-
-An application that embeds this repository publishes the same AAR from its
-checkout instead, after building the native package for each ABI it ships:
+The code asset carries the library on Android as it does everywhere else, so an
+Android application packages the ABI it points the hook at and the platform
+loader is never asked for one by name. What Android needs on top of the library
+is the patched Rustls platform-verifier helper that the native TLS stack calls
+over JNI, without which HTTPS requests cannot validate against the platform
+trust policy:
 
 ```bash
-mise run build android-arm64-vulkan
-./gradlew -Pmaplibre.android.backend=vulkan -Pmaplibre.android.abis=arm64-v8a \
-  -Pmaplibre.android.prebuiltBuildRoot=build \
-  :bindings:kotlin-runtime-vulkan:publishAndroidPublicationToMavenLocal
+mise run //bindings/rustls-platform-verifier-android:build
 ```
 
-Either way the application binds nothing in the helper, which uses a MapLibre
-FFI-private Java package so it can coexist with another library that packages
-the upstream Rustls helper. The AAR carries the R8 keep rule the helper needs.
-The host loads the library under its platform name and calls `mln_android_init`
-with its JNI environment, class, and application context before creating a
-runtime.
+The application binds nothing in the helper, which uses a MapLibre FFI-private
+Java package so it can coexist with another library that packages the upstream
+Rustls helper, and the AAR carries the R8 keep rule the helper needs. The host
+calls `mln_android_init` with its JNI environment, class, and application
+context before creating a runtime.
+
+The Kotlin runtime AARs bundle that helper together with
+`libmaplibre-native-c.so` for each ABI. A Dart host packages the library itself,
+so it takes the helper AAR alone rather than a runtime AAR carrying a second
+copy of the same library.
 
 ## Ownership and execution
 

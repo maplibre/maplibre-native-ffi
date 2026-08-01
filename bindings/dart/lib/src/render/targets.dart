@@ -54,13 +54,13 @@ final class RenderTargetExtent {
         ..scale_factor = scaleFactor;
       final physicalWidth = arena<Uint32>();
       final physicalHeight = arena<Uint32>();
-      final status = _renderTargetApi.raw
-          .mln_render_target_extent_physical_size(
-            nativeExtent,
-            physicalWidth,
-            physicalHeight,
-          );
-      checkNativeStatus(status.value, _renderTargetApi.threadLastErrorMessage);
+      ensureAbiVersion();
+      final status = raw.mln_render_target_extent_physical_size(
+        nativeExtent,
+        physicalWidth,
+        physicalHeight,
+      );
+      checkNativeStatus(status, _renderTargetApi.threadLastErrorMessage);
       return PhysicalRenderTargetSize(
         width: physicalWidth.value,
         height: physicalHeight.value,

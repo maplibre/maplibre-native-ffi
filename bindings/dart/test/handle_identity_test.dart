@@ -5,6 +5,8 @@ import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:maplibre_native_ffi/src/runtime/runtime.dart'
     show mapAttachRefIdForTesting;
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart';
+import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
+    as raw;
 import 'package:maplibre_native_ffi/src/internal/lifecycle/native_handles.dart';
 import 'package:maplibre_native_ffi/src/internal/status/status.dart';
 import 'package:test/test.dart';
@@ -20,7 +22,7 @@ void _mapSizeById(NativeMap map) {
     final height = arena<Uint32>();
     final scaleFactor = arena<Double>();
     checkNativeStatus(
-      _c.raw.mln_map_get_size(map.raw, width, height, scaleFactor).value,
+      raw.mln_map_get_size(map.raw, width, height, scaleFactor),
       _c.threadLastErrorMessage,
     );
   } finally {
@@ -70,9 +72,7 @@ void main() {
     // id; the C API rejects it on its kind tag.
     expect(
       () => checkNativeStatus(
-        _c.raw
-            .mln_runtime_pump(mapAttachRefIdForTesting(map.attachRef()), 0)
-            .value,
+        raw.mln_runtime_pump(mapAttachRefIdForTesting(map.attachRef()), 0),
         _c.threadLastErrorMessage,
       ),
       throwsA(
