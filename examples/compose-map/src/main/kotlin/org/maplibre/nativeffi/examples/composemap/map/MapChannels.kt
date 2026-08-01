@@ -43,17 +43,9 @@ internal sealed interface CameraCommand {
  */
 internal class CameraCommandQueue {
   private val queue = ConcurrentLinkedQueue<CameraCommand>()
-  private val wakeLock = Any()
-  private var wakeAction: (() -> Unit)? = null
 
-  /**
-   * Set once the runtime loop has acquired its wake source, and cleared before it closes that
-   * source. Reads and writes take the same lock as [wake], so the loop cannot close the source out
-   * from under a signal already on its way.
-   */
-  var onEnqueue: (() -> Unit)?
-    get() = synchronized(wakeLock) { wakeAction }
-    set(value) = synchronized(wakeLock) { wakeAction = value }
+  /** Set once the runtime loop has acquired its wake source. */
+  @Volatile var onEnqueue: (() -> Unit)? = null
 
   fun enqueue(command: CameraCommand) {
     queue.add(command)
@@ -68,7 +60,7 @@ internal class CameraCommandQueue {
   }
 
   fun wake() {
-    synchronized(wakeLock) { wakeAction?.invoke() }
+    onEnqueue?.invoke()
   }
 }
 
