@@ -138,7 +138,9 @@ this binding. It publishes a consumer R8 rule for JavaCPP, which reads the
 generated presets class reflectively and derives the JNI library name from a
 live stack trace, so both survive minification only when R8 leaves the presets
 package and the JavaCPP runtime package alone. Apps that minify get that rule
-from the publication and add none of their own.
+from the publication and add none of their own. The bridge links the NDK C++
+runtime statically, so this AAR carries the Android NDK notice under
+`META-INF/licenses` alongside the binary that embeds it.
 
 ### JVM
 
