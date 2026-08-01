@@ -256,3 +256,23 @@ public struct ResourceTransformRequest: Equatable, Sendable {
     url = native.url
   }
 }
+
+public struct HttpHeaderTransformRequest: Equatable, Sendable {
+  public let kind: ResourceKind
+  public let url: String
+
+  init(kind: UInt32, url: String) {
+    self.kind = ResourceKind.fromNative(kind)
+    self.url = url
+  }
+}
+
+public struct HttpHeader: Equatable, Sendable {
+  public let name: String
+  public let value: String
+
+  public init(name: String, value: String) {
+    self.name = name
+    self.value = value
+  }
+}

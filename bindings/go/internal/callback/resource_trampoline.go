@@ -9,6 +9,7 @@ import "C"
 import (
 	stdruntime "runtime"
 	"runtime/cgo"
+	"strings"
 	"unsafe"
 )
 
@@ -47,6 +48,54 @@ func goMaplibreResourceTransform(userData unsafe.Pointer, kind C.uint32_t, url *
 	)
 	stdruntime.KeepAlive(bytes)
 	return status
+}
+
+//export goMaplibreHttpHeaderTransform
+func goMaplibreHttpHeaderTransform(userData unsafe.Pointer, kind C.uint32_t, url *C.char, outResponse *C.mln_http_header_transform_response) (status C.mln_status) {
+	defer func() {
+		if recover() != nil {
+			status = C.mln_status(C.MLN_STATUS_NATIVE_ERROR)
+		}
+	}()
+	if userData == nil || outResponse == nil || url == nil {
+		return C.mln_status(C.MLN_STATUS_INVALID_ARGUMENT)
+	}
+	outResponse.size = C.uint32_t(unsafe.Sizeof(C.mln_http_header_transform_response{}))
+	handle := cgo.Handle(uintptr(userData))
+	state, ok := handle.Value().(*HttpHeaderTransformState)
+	if !ok || state == nil || state.callback == nil {
+		return C.mln_status(C.MLN_STATUS_INVALID_ARGUMENT)
+	}
+	headers := state.callback(uint32(kind), C.GoString(url))
+	names := make([]string, 0, len(headers))
+	for _, header := range headers {
+		for _, name := range names {
+			if strings.EqualFold(name, header.Name) {
+				return C.mln_status(C.MLN_STATUS_INVALID_ARGUMENT)
+			}
+		}
+		names = append(names, header.Name)
+		nameBytes := []byte(header.Name)
+		valueBytes := []byte(header.Value)
+		var namePointer *C.char
+		var valuePointer *C.char
+		if len(nameBytes) > 0 {
+			namePointer = (*C.char)(unsafe.Pointer(&nameBytes[0]))
+		}
+		if len(valueBytes) > 0 {
+			valuePointer = (*C.char)(unsafe.Pointer(&valueBytes[0]))
+		}
+		status = C.mln_http_header_transform_response_set(
+			outResponse, namePointer, C.size_t(len(nameBytes)),
+			valuePointer, C.size_t(len(valueBytes)),
+		)
+		stdruntime.KeepAlive(nameBytes)
+		stdruntime.KeepAlive(valueBytes)
+		if status != C.mln_status(C.MLN_STATUS_OK) {
+			return status
+		}
+	}
+	return C.mln_status(C.MLN_STATUS_OK)
 }
 
 //export goMaplibreResourceProvider

@@ -460,6 +460,8 @@
 --include-function mln_resource_request_complete
 --include-function mln_resource_request_release
 --include-function mln_resource_transform_response_set_url
+--include-function mln_http_header_transform_response_set
+--include-function mln_runtime_clear_http_header_transform
 --include-function mln_runtime_clear_resource_provider
 --include-function mln_runtime_clear_resource_transform
 --include-function mln_runtime_create
@@ -471,6 +473,7 @@
 --include-function mln_runtime_set_maximum_ambient_cache_size_start
 --include-function mln_runtime_set_resource_provider
 --include-function mln_runtime_set_resource_transform
+--include-function mln_runtime_set_http_header_transform
 --include-function mln_runtime_pump
 --include-function mln_runtime_wake_source_acquire
 --include-function mln_wake_source_destroy
@@ -482,6 +485,8 @@
 --include-struct mln_resource_response
 --include-struct mln_resource_transform
 --include-struct mln_resource_transform_response
+--include-struct mln_http_header_transform
+--include-struct mln_http_header_transform_response
 --include-struct mln_runtime_event
 --include-struct mln_runtime_event_camera_transition_finished
 --include-struct mln_runtime_event_offline_operation_completed
@@ -498,6 +503,7 @@
 --include-typedef mln_offline_region_id
 --include-typedef mln_resource_provider_callback
 --include-typedef mln_resource_transform_callback
+--include-typedef mln_http_header_transform_callback
 
 # include/maplibre_native_c/style.h
 --include-constant MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER

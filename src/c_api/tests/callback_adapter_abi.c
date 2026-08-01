@@ -153,8 +153,67 @@ static void queued_provider_routes_tolerate_raw_absent_request_urls(void) {
   );
 }
 
+static mln_status header_route_status(
+  const mln_adapter_http_header_transform_rule* rules, size_t count,
+  uint32_t kind, const char* url
+) {
+  mln_adapter_http_header_transform_rules table = {
+    .rules = rules,
+    .count = count,
+  };
+  mln_http_header_transform_response response = {
+    .size = sizeof(mln_http_header_transform_response),
+  };
+  return mln_adapter_http_header_transform_callback(
+    &table, kind, url, &response
+  );
+}
+
+static void http_header_routes_match_exact_prefix_kind_and_order(void) {
+  const mln_adapter_http_header invalid[] = {{.name = "Host", .value = "bad"}};
+  const mln_adapter_http_header_transform_rule rules[] = {
+    {
+      .kind = MLN_RESOURCE_KIND_TILE,
+      .flags = MLN_ADAPTER_HTTP_HEADER_ROUTE_FLAGS_NONE,
+      .url = "https://tiles.test/exact",
+      .headers = invalid,
+      .header_count = 1,
+    },
+    {
+      .kind = MLN_ADAPTER_RESOURCE_KIND_ANY,
+      .flags = MLN_ADAPTER_HTTP_HEADER_ROUTE_MATCH_PREFIX,
+      .url = "https://tiles.test/",
+      .headers = NULL,
+      .header_count = 0,
+    },
+  };
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    header_route_status(
+      rules, 2, MLN_RESOURCE_KIND_TILE, "https://tiles.test/exact"
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    header_route_status(
+      rules, 2, MLN_RESOURCE_KIND_STYLE, "https://tiles.test/exact"
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, header_route_status(
+                     rules, 2, MLN_RESOURCE_KIND_TILE, "https://elsewhere.test/"
+                   )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    header_route_status(NULL, 1, MLN_RESOURCE_KIND_TILE, "https://tiles.test/")
+  );
+}
+
 void run_callback_adapter_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(queued_provider_routes_reject_raw_invalid_route_descriptors);
   RUN_TEST(queued_provider_routes_tolerate_raw_absent_request_urls);
+  RUN_TEST(http_header_routes_match_exact_prefix_kind_and_order);
 }

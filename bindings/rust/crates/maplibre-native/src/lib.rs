@@ -74,8 +74,8 @@ pub use render::{
     VulkanSurfaceDescriptor, WglContextDescriptor,
 };
 pub use resource::{
-    ByteRange, ResourceProviderDecision, ResourceRequest, ResourceRequestHandle, ResourceResponse,
-    ResourceTransformRequest,
+    ByteRange, HttpHeader, HttpHeaderTransformRequest, ResourceProviderDecision, ResourceRequest,
+    ResourceRequestHandle, ResourceResponse, ResourceTransformRequest,
 };
 pub use runtime::{
     OfflineOperationHandle, OfflineRegionDefinition, OfflineRegionInfo, RuntimeHandle,

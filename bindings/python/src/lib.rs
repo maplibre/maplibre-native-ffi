@@ -44,6 +44,7 @@ struct RuntimeHandle {
     operation_gate: RuntimeOperationGate,
     resource_provider: Mutex<Option<Box<PyResourceProviderState>>>,
     resource_transform: Mutex<Option<Box<PyResourceTransformState>>>,
+    http_header_transform: Mutex<Option<Box<PyHttpHeaderTransformState>>>,
 }
 
 #[derive(Debug)]
@@ -69,6 +70,12 @@ struct PyResourceProviderState {
 }
 
 struct PyResourceTransformState {
+    callback: Py<PyAny>,
+    pending_callbacks: AtomicUsize,
+    max_pending_callbacks: usize,
+}
+
+struct PyHttpHeaderTransformState {
     callback: Py<PyAny>,
     pending_callbacks: AtomicUsize,
     max_pending_callbacks: usize,
@@ -413,6 +420,7 @@ impl Drop for RuntimeHandle {
         if native_live {
             leak_optional_box(&self.resource_provider);
             leak_optional_box(&self.resource_transform);
+            leak_optional_box(&self.http_header_transform);
         }
     }
 }
@@ -861,6 +869,10 @@ impl RuntimeHandle {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .take();
         self.resource_transform
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take();
+        self.http_header_transform
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .take();
@@ -1326,6 +1338,65 @@ impl RuntimeHandle {
             py.detach(move || unsafe { sys::mln_runtime_clear_resource_transform(runtime_handle) });
         maplibre_core::check(status).map_err(map_error)?;
         self.resource_transform
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take();
+        Ok(())
+    }
+
+    fn set_http_header_transform(
+        &self,
+        py: Python<'_>,
+        callback: Py<PyAny>,
+        max_pending_callbacks: usize,
+    ) -> PyResult<()> {
+        if max_pending_callbacks == 0 {
+            return Err(invalid_argument_error(
+                "max_pending_callbacks must be greater than zero",
+            ));
+        }
+        let replacement = Box::new(PyHttpHeaderTransformState::new(
+            callback,
+            max_pending_callbacks,
+        ));
+        let descriptor = replacement.descriptor();
+        let _operation = self.operation_gate.begin_detached_operation()?;
+        let runtime_handle = self
+            .state_for_operation()?
+            .live_handle()
+            .ok_or_else(|| invalid_state_error("runtime handle is closed"))?;
+        let callback = descriptor.callback;
+        let user_data_address = descriptor.user_data as usize;
+        let size = descriptor.size;
+        let status = py.detach(move || {
+            let descriptor = sys::mln_http_header_transform {
+                size,
+                callback,
+                user_data: user_data_address as *mut c_void,
+            };
+            // SAFETY: runtime is live and replacement remains retained on success.
+            unsafe { sys::mln_runtime_set_http_header_transform(runtime_handle, &descriptor) }
+        });
+        maplibre_core::check(status).map_err(map_error)?;
+        self.http_header_transform
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .replace(replacement);
+        Ok(())
+    }
+
+    fn clear_http_header_transform(&self, py: Python<'_>) -> PyResult<()> {
+        let _operation = self.operation_gate.begin_detached_operation()?;
+        let runtime_handle = self
+            .state_for_operation()?
+            .live_handle()
+            .ok_or_else(|| invalid_state_error("runtime handle is closed"))?;
+        let status = py.detach(move || {
+            // SAFETY: runtime is live; native waits for callback retirement.
+            unsafe { sys::mln_runtime_clear_http_header_transform(runtime_handle) }
+        });
+        maplibre_core::check(status).map_err(map_error)?;
+        self.http_header_transform
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .take();
@@ -4781,6 +4852,106 @@ unsafe extern "C" fn resource_transform_trampoline(
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
+impl PyHttpHeaderTransformState {
+    fn new(callback: Py<PyAny>, max_pending_callbacks: usize) -> Self {
+        Self {
+            callback,
+            pending_callbacks: AtomicUsize::new(0),
+            max_pending_callbacks,
+        }
+    }
+
+    fn descriptor(&self) -> sys::mln_http_header_transform {
+        maplibre_core::resource::http_header_transform_descriptor(
+            Some(http_header_transform_trampoline),
+            ptr::from_ref(self).cast_mut().cast::<c_void>(),
+        )
+    }
+
+    fn invoke(
+        &self,
+        raw_kind: u32,
+        url: *const c_char,
+        out_response: *mut sys::mln_http_header_transform_response,
+    ) -> sys::mln_status {
+        // SAFETY: native supplies callback-duration writable response storage.
+        let status = unsafe {
+            maplibre_core::resource::initialize_http_header_transform_response(out_response)
+        };
+        if status != sys::MLN_STATUS_OK {
+            return status;
+        }
+        let Some(_permit) =
+            try_acquire_callback_permit(&self.pending_callbacks, self.max_pending_callbacks)
+        else {
+            return sys::MLN_STATUS_OK;
+        };
+        // SAFETY: url is borrowed for the callback duration.
+        let request = match unsafe {
+            maplibre_core::resource::copy_http_header_transform_request(raw_kind, url)
+        } {
+            Ok(request) => request,
+            Err(error) => return maplibre_core::resource::status_for_error(&error),
+        };
+        let headers = Python::attach(|py| -> PyResult<Vec<(String, String)>> {
+            let py_request = http_header_transform_request_to_py(py, request)?;
+            let returned = self.callback.bind(py).call1((py_request,))?;
+            let mut headers = Vec::new();
+            for item in returned.try_iter()? {
+                let item = item?;
+                headers.push((
+                    item.get_item("name")?.extract()?,
+                    item.get_item("value")?.extract()?,
+                ));
+            }
+            Ok(headers)
+        });
+        let Ok(headers) = headers else {
+            return sys::MLN_STATUS_NATIVE_ERROR;
+        };
+        let mut names = Vec::<String>::with_capacity(headers.len());
+        for (name, value) in headers {
+            if names
+                .iter()
+                .any(|existing| existing.eq_ignore_ascii_case(&name))
+            {
+                return sys::MLN_STATUS_INVALID_ARGUMENT;
+            }
+            names.push(name.clone());
+            // SAFETY: native copies both strings during the call.
+            let status = unsafe {
+                sys::mln_http_header_transform_response_set(
+                    out_response,
+                    name.as_ptr().cast(),
+                    name.len(),
+                    value.as_ptr().cast(),
+                    value.len(),
+                )
+            };
+            if status != sys::MLN_STATUS_OK {
+                return status;
+            }
+        }
+        sys::MLN_STATUS_OK
+    }
+}
+
+unsafe extern "C" fn http_header_transform_trampoline(
+    user_data: *mut c_void,
+    kind: u32,
+    url: *const c_char,
+    out_response: *mut sys::mln_http_header_transform_response,
+) -> sys::mln_status {
+    catch_unwind(AssertUnwindSafe(|| {
+        let Some(state) = ptr::NonNull::new(user_data.cast::<PyHttpHeaderTransformState>()) else {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        };
+        // SAFETY: RuntimeHandle retains state until native retires it.
+        unsafe { state.as_ref() }.invoke(kind, url, out_response)
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
 fn event_to_py(py: Python<'_>, event: maplibre_core::CopiedRuntimeEvent) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("event_type", event_type_raw(event.event_type))?;
@@ -6716,6 +6887,16 @@ fn resource_transform_request_to_py(
     Ok(dict.into_any().unbind())
 }
 
+fn http_header_transform_request_to_py(
+    py: Python<'_>,
+    request: maplibre_core::HttpHeaderTransformRequest,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("kind", request.raw_kind)?;
+    dict.set_item("url", request.url)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn resource_response_from_py(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::ResourceResponse> {
     let mut response = maplibre_core::ResourceResponse::default();
     response.status = resource_response_status_from_raw(raw.get_item("status")?.extract::<u32>()?)?;
@@ -7772,6 +7953,7 @@ fn create_runtime(
         operation_gate: RuntimeOperationGate::new(),
         resource_provider: Mutex::new(None),
         resource_transform: Mutex::new(None),
+        http_header_transform: Mutex::new(None),
     })
 }
 

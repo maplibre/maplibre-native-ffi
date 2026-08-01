@@ -487,6 +487,39 @@ Resource transform invocation follows this operation:
    callback boundary. If the public handler returns a recoverable host failure,
    convert the failure to the C callback's documented behavior.
 
+### HTTP header transforms
+
+Direct-callback bindings copy the resource kind and transformed URL into a
+language-owned request and accept a language-owned collection of header names
+and values. They reject duplicate names case-insensitively and contain every
+host exception, panic, or callback error so that a failed invocation returns no
+transformed headers. Header field-name, field-value, and transport-managed-name
+validation produces the C API's invalid-argument behavior without exposing a
+header value in diagnostics.
+
+The callback runs after resource URL transformation and before an HTTP attempt
+is dispatched. The URL presented to the callback is the transformed URL.
+Cache-only loads, non-HTTP resources, and requests handled by a resource
+provider produce no header-transform invocation.
+
+Registration remains replaceable for the lifetime of a runtime, including while
+maps are live. A binding installs a replacement before releasing the previous
+callback state. Replacement, clear, and runtime close release the old state only
+after the native registration call has retired every in-flight callback.
+
+Bindings that cannot answer a synchronous callback expose native rule tables. An
+exact rule matches the complete transformed URL, a prefix rule performs a
+literal case-sensitive prefix match, and the first matching rule supplies its
+complete header collection. Unknown flags, null match operands, and requests
+outside the matched URL family pass through without transformed headers.
+
+Every transformed header is redirect-sensitive. A same-origin redirect, with the
+same scheme, host, and effective port, preserves transformed headers. A redirect
+that changes any origin component removes every transformed header before
+dispatch and does not invoke a destination transform. Native range and
+conditional headers retain their platform transport behavior independently of
+the transformed collection.
+
 ### Resource providers
 
 Resource providers decide whether a request passes through to the native
@@ -872,24 +905,26 @@ the other isolate, which makes its id stale rather than live.
 
 ### Resources
 
-| ID      | Test                                                                                                                                                |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-140 | Resource transform can rewrite a URL and can be cleared after registration.                                                                         |
-| BND-141 | Resource transform request data is copied into language-owned values before user code receives it.                                                  |
-| BND-142 | Resource provider pass-through delegates to native loading without retaining a request handle.                                                      |
-| BND-143 | Resource provider handled request can complete inline and load a style.                                                                             |
-| BND-144 | Resource provider handled request can complete later and load a style.                                                                              |
-| BND-145 | Handled request can complete from another thread.                                                                                                   |
-| BND-146 | Completing a handled request twice reports the binding's already-completed error before crossing into C.                                            |
-| BND-147 | Releasing a handled request makes later completion and cancellation checks fail as closed.                                                          |
-| BND-148 | Request cancellation is observable before a late completion, and late completion maps native status.                                                |
-| BND-149 | Resource error responses become copied runtime loading-failure or offline-error events.                                                             |
-| BND-150 | Inline completion during the provider callback finalizes handled ownership even when the callback's later return path would otherwise pass through. |
-| BND-151 | Stale request handles cannot complete, cancel, or release later native requests.                                                                    |
-| BND-152 | Completion that reaches C is terminal even when native completion returns a non-OK status.                                                          |
-| BND-153 | Releasing a request waits for in-flight completion or cancellation checks before native release.                                                    |
-| BND-154 | Resource provider can be replaced while maps are live and can be cleared, and a cleared provider stops receiving requests.                          |
-| BND-155 | A request for a configured URI-scheme alias exposes the alias as the requested URL and the tile-server-normalized URL as the resolved URL.          |
+| ID      | Test                                                                                                                                                                                                  |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-140 | Resource transform can rewrite a URL and can be cleared after registration.                                                                                                                           |
+| BND-141 | Resource transform request data is copied into language-owned values before user code receives it.                                                                                                    |
+| BND-142 | Resource provider pass-through delegates to native loading without retaining a request handle.                                                                                                        |
+| BND-143 | Resource provider handled request can complete inline and load a style.                                                                                                                               |
+| BND-144 | Resource provider handled request can complete later and load a style.                                                                                                                                |
+| BND-145 | Handled request can complete from another thread.                                                                                                                                                     |
+| BND-146 | Completing a handled request twice reports the binding's already-completed error before crossing into C.                                                                                              |
+| BND-147 | Releasing a handled request makes later completion and cancellation checks fail as closed.                                                                                                            |
+| BND-148 | Request cancellation is observable before a late completion, and late completion maps native status.                                                                                                  |
+| BND-149 | Resource error responses become copied runtime loading-failure or offline-error events.                                                                                                               |
+| BND-150 | Inline completion during the provider callback finalizes handled ownership even when the callback's later return path would otherwise pass through.                                                   |
+| BND-151 | Stale request handles cannot complete, cancel, or release later native requests.                                                                                                                      |
+| BND-152 | Completion that reaches C is terminal even when native completion returns a non-OK status.                                                                                                            |
+| BND-153 | Releasing a request waits for in-flight completion or cancellation checks before native release.                                                                                                      |
+| BND-154 | Resource provider can be replaced while maps are live and can be cleared, and a cleared provider stops receiving requests.                                                                            |
+| BND-155 | A request for a configured URI-scheme alias exposes the alias as the requested URL and the tile-server-normalized URL as the resolved URL.                                                            |
+| BND-158 | HTTP header transform requests and returned headers cross the callback boundary as copied language-owned values, reject duplicate field names case-insensitively, and contain host-language failures. |
+| BND-159 | HTTP header transforms can be installed, replaced, and cleared while maps are live; transformed headers reach matching requests and no request after clear.                                           |
 
 #### Queued provider routes
 

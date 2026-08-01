@@ -513,6 +513,12 @@ internal object NativeAccess {
   internal fun clearResourceTransform(runtime: NativeRuntime): Int =
     runtimeClearResourceTransformFunction().invokeNative(runtime) as Int
 
+  internal fun setHttpHeaderTransform(runtime: NativeRuntime, descriptor: MemorySegment): Int =
+    runtimeSetHttpHeaderTransformFunction().invokeNative(runtime, descriptor) as Int
+
+  internal fun clearHttpHeaderTransform(runtime: NativeRuntime): Int =
+    runtimeClearHttpHeaderTransformFunction().invokeNative(runtime) as Int
+
   internal fun completeResourceRequest(
     handle: NativeResourceRequest,
     response: ResourceResponse,
@@ -2455,6 +2461,24 @@ internal object NativeAccess {
         .invokeNative(response, nativeBytes(arena, bytes), bytes.size.toLong()) as Int
     }
 
+  internal fun setHttpHeaderTransformResponse(
+    response: MemorySegment,
+    name: String,
+    value: String,
+  ): Int =
+    Arena.ofConfined().use { arena ->
+      val nameBytes = name.toByteArray(StandardCharsets.UTF_8)
+      val valueBytes = value.toByteArray(StandardCharsets.UTF_8)
+      httpHeaderTransformResponseSetFunction()
+        .invokeNative(
+          response,
+          nativeBytes(arena, nameBytes),
+          nameBytes.size.toLong(),
+          nativeBytes(arena, valueBytes),
+          valueBytes.size.toLong(),
+        ) as Int
+    }
+
   internal fun customGeometrySourceOptions(
     arena: Arena,
     value: CustomGeometrySourceOptions,
@@ -3080,8 +3104,17 @@ internal object NativeAccess {
   private fun runtimeClearResourceTransformFunction(): MethodHandle =
     downcall("mln_runtime_clear_resource_transform")
 
+  private fun runtimeSetHttpHeaderTransformFunction(): MethodHandle =
+    downcall("mln_runtime_set_http_header_transform")
+
+  private fun runtimeClearHttpHeaderTransformFunction(): MethodHandle =
+    downcall("mln_runtime_clear_http_header_transform")
+
   private fun resourceTransformResponseSetUrlFunction(): MethodHandle =
     downcall("mln_resource_transform_response_set_url")
+
+  private fun httpHeaderTransformResponseSetFunction(): MethodHandle =
+    downcall("mln_http_header_transform_response_set")
 
   private fun resourceRequestCompleteFunction(): MethodHandle =
     downcall("mln_resource_request_complete")

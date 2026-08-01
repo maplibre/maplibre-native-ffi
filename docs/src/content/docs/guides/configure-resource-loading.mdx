@@ -7,6 +7,7 @@ sidebar:
 
 import { Aside, Code } from "@astrojs/starlight/components";
 import resourceTransform from "../../../../snippets/c/resource-transform.c?raw";
+import httpHeaderTransform from "../../../../snippets/c/http-header-transform.c?raw";
 
 By default the map fetches what its style names over the network and caches the
 results. You can rewrite those URLs, answer the requests yourself, or move the
@@ -42,6 +43,28 @@ a credential to it.
 Transforms apply to MapLibre's online file source, including nested PMTiles
 range requests. They skip `file`, `asset`, and `mbtiles` URLs, along with
 requests a provider already intercepted.
+
+## Adding HTTP headers
+
+An HTTP header transform adds runtime-scoped headers after URL transformation and before the
+built-in HTTP client sends a request. Match the final URL before returning credentials because the
+callback runs for every network resource. The request and every returned name and value are copied,
+and the callback may run concurrently on network threads.
+
+<Code code={httpHeaderTransform} lang="c" title="http-header-transform.c" />
+
+Header names are case-insensitive and each callback result contains at most one value per name.
+MapLibre validates field syntax and reserves transport-managed fields such as `Host`, `Range`,
+`Accept-Encoding`, and `User-Agent`. A non-OK callback result sends the request without any headers
+collected by that invocation. Same-origin redirects preserve transformed headers; a redirect whose
+scheme, host, or effective port changes strips all of them and does not invoke the transform again.
+
+Use `mln_runtime_clear_http_header_transform()` to stop adding headers. The runtime can replace or
+clear the transform while maps are live and waits for earlier callback invocations before returning.
+
+For data-driven hosts, `mln_adapter_http_header_transform_callback()` applies the first matching
+exact or prefix rule. Dart uses this native rule table so no Dart closure runs on a native network
+thread.
 
 ## Serving requests yourself
 

@@ -403,11 +403,13 @@ type RuntimeEventUnknownPayload struct {
 type RuntimeHandle struct {
 	state *handle.State[nativeRuntime]
 
-	resourceTransformMu sync.Mutex
-	resourceTransform   *callback.ResourceTransformState
-	resourceProviderMu  sync.Mutex
-	resourceProvider    *callback.ResourceProviderState
-	mapsMu              sync.Mutex
+	resourceTransformMu   sync.Mutex
+	resourceTransform     *callback.ResourceTransformState
+	httpHeaderTransformMu sync.Mutex
+	httpHeaderTransform   *callback.HttpHeaderTransformState
+	resourceProviderMu    sync.Mutex
+	resourceProvider      *callback.ResourceProviderState
+	mapsMu                sync.Mutex
 	// Resolves an event's source id to the public wrapper, which the C API has
 	// no way to hand back.
 	maps map[MapID]*MapHandle
@@ -1061,6 +1063,65 @@ func (runtime *RuntimeHandle) releaseResourceTransform() {
 	previous.Release()
 }
 
+// SetHttpHeaderTransform installs or replaces the runtime-scoped outgoing HTTP
+// header transform.
+func (runtime *RuntimeHandle) SetHttpHeaderTransform(transform HttpHeaderTransformCallback) error {
+	if transform == nil {
+		return newBindingError(ErrInvalidArgument, "HttpHeaderTransformCallback is nil")
+	}
+	ptr, release, err := runtime.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer runtime.state.KeepAlive()
+
+	var replacement *callback.HttpHeaderTransformState
+	if err := checkNative(func() int32 {
+		state, status := callback.SetHttpHeaderTransform(uint64(ptr), func(kind uint32, url string) []callback.HttpHeader {
+			provided := transform(HttpHeaderTransformRequest{Kind: ResourceKind(kind), RawKind: kind, URL: url})
+			headers := make([]callback.HttpHeader, len(provided))
+			for index, header := range provided {
+				headers[index] = callback.HttpHeader{Name: header.Name, Value: header.Value}
+			}
+			return headers
+		})
+		replacement = state
+		return status
+	}); err != nil {
+		return err
+	}
+	runtime.httpHeaderTransformMu.Lock()
+	previous := runtime.httpHeaderTransform
+	runtime.httpHeaderTransform = replacement
+	runtime.httpHeaderTransformMu.Unlock()
+	previous.Release()
+	return nil
+}
+
+// ClearHttpHeaderTransform clears the runtime-scoped outgoing HTTP header transform.
+func (runtime *RuntimeHandle) ClearHttpHeaderTransform() error {
+	ptr, release, err := runtime.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer runtime.state.KeepAlive()
+	if err := checkNative(func() int32 { return callback.ClearHttpHeaderTransform(uint64(ptr)) }); err != nil {
+		return err
+	}
+	runtime.releaseHttpHeaderTransform()
+	return nil
+}
+
+func (runtime *RuntimeHandle) releaseHttpHeaderTransform() {
+	runtime.httpHeaderTransformMu.Lock()
+	previous := runtime.httpHeaderTransform
+	runtime.httpHeaderTransform = nil
+	runtime.httpHeaderTransformMu.Unlock()
+	previous.Release()
+}
+
 // NewMap creates a map owned by this runtime with native default options.
 func (runtime *RuntimeHandle) NewMap() (*MapHandle, error) {
 	return runtime.createMap(func(ptr nativeRuntime, out *nativeMap) int32 {
@@ -1141,6 +1202,7 @@ func (runtime *RuntimeHandle) Close() error {
 		return bindingErr
 	}
 	runtime.releaseResourceTransform()
+	runtime.releaseHttpHeaderTransform()
 	runtime.releaseResourceProvider()
 	runtime.mapsMu.Lock()
 	runtime.maps = nil

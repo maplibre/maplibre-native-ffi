@@ -37,6 +37,128 @@ final class _ResourceTransformState {
   }
 }
 
+final class _HttpHeaderTransformState {
+  _HttpHeaderTransformState(List<HttpHeaderTransformRule> rules) {
+    for (final rule in rules) {
+      _checkNativeCString(rule.url);
+      final names = <String>{};
+      for (final header in rule.headers) {
+        _validateHttpHeader(header);
+        final folded = header.name.toLowerCase();
+        if (!names.add(folded)) {
+          throwInvalidArgument(
+            'HTTP header names must be unique ignoring case: ${header.name}',
+          );
+        }
+      }
+    }
+    pointer = calloc<raw.mln_adapter_http_header_transform_rules>();
+    pointer.ref.count = rules.length;
+    pointer.ref.rules = rules.isEmpty
+        ? nullptr.cast<raw.mln_adapter_http_header_transform_rule>()
+        : calloc<raw.mln_adapter_http_header_transform_rule>(rules.length);
+    for (var ruleIndex = 0; ruleIndex < rules.length; ruleIndex += 1) {
+      final rule = rules[ruleIndex];
+      final nativeRule = pointer.ref.rules[ruleIndex];
+      nativeRule.kind = rule.kind?.rawValue ?? _resourceKindWildcard;
+      nativeRule.flags = rule.matchPrefix
+          ? raw
+                .mln_adapter_http_header_route_flags
+                .MLN_ADAPTER_HTTP_HEADER_ROUTE_MATCH_PREFIX
+                .value
+          : raw
+                .mln_adapter_http_header_route_flags
+                .MLN_ADAPTER_HTTP_HEADER_ROUTE_FLAGS_NONE
+                .value;
+      nativeRule.url = _nativeOwnedCString(rule.url);
+      nativeRule.header_count = rule.headers.length;
+      nativeRule.headers = rule.headers.isEmpty
+          ? nullptr.cast<raw.mln_adapter_http_header>()
+          : calloc<raw.mln_adapter_http_header>(rule.headers.length);
+      for (
+        var headerIndex = 0;
+        headerIndex < rule.headers.length;
+        headerIndex += 1
+      ) {
+        final header = rule.headers[headerIndex];
+        nativeRule.headers[headerIndex].name = _nativeOwnedCString(header.name);
+        nativeRule.headers[headerIndex].value = _nativeOwnedCString(
+          header.value,
+        );
+      }
+    }
+  }
+
+  late final Pointer<raw.mln_adapter_http_header_transform_rules> pointer;
+
+  void close() {
+    final rules = pointer.ref.rules;
+    for (var ruleIndex = 0; ruleIndex < pointer.ref.count; ruleIndex += 1) {
+      final rule = rules[ruleIndex];
+      for (
+        var headerIndex = 0;
+        headerIndex < rule.header_count;
+        headerIndex += 1
+      ) {
+        calloc.free(rule.headers[headerIndex].name);
+        calloc.free(rule.headers[headerIndex].value);
+      }
+      if (rule.headers != nullptr) {
+        calloc.free(rule.headers);
+      }
+      calloc.free(rule.url);
+    }
+    if (rules != nullptr) {
+      calloc.free(rules);
+    }
+    calloc.free(pointer);
+  }
+}
+
+const _transportManagedHeaderNames = <String>{
+  'host',
+  'content-length',
+  'transfer-encoding',
+  'connection',
+  'proxy-connection',
+  'proxy-authorization',
+  'keep-alive',
+  'te',
+  'trailer',
+  'upgrade',
+  'range',
+  'if-none-match',
+  'if-modified-since',
+  'accept-encoding',
+  'user-agent',
+};
+
+void _validateHttpHeader(HttpHeader header) {
+  _checkNativeCString(header.name);
+  _checkNativeCString(header.value);
+  const tokenPunctuation = "!#\$%&'*+-.^_`|~";
+  if (header.name.isEmpty ||
+      header.name.codeUnits.any(
+        (unit) =>
+            !((unit >= 0x30 && unit <= 0x39) ||
+                (unit >= 0x41 && unit <= 0x5a) ||
+                (unit >= 0x61 && unit <= 0x7a) ||
+                tokenPunctuation.codeUnits.contains(unit)),
+      )) {
+    throwInvalidArgument('Invalid HTTP header name: ${header.name}');
+  }
+  if (header.value.codeUnits.any(
+    (unit) => unit != 0x09 && (unit < 0x20 || unit == 0x7f),
+  )) {
+    throwInvalidArgument('HTTP header value contains a control character');
+  }
+  if (_transportManagedHeaderNames.contains(header.name.toLowerCase())) {
+    throwInvalidArgument(
+      'HTTP header is managed by MapLibre or the transport: ${header.name}',
+    );
+  }
+}
+
 final class _ResourceProviderRulesState {
   _ResourceProviderRulesState(List<ResourceProviderRule> rules) {
     for (final rule in rules) {

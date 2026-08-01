@@ -24,6 +24,7 @@ const HTTP_MAX_REDIRECTS: u32 = 30;
 pub struct MlnRustHttpHeader {
     pub name: *const c_char,
     pub value: *const c_char,
+    pub sensitive: bool,
 }
 
 #[repr(C)]
@@ -149,7 +150,13 @@ pub unsafe extern "C" fn mlnffi_rust_http_response_free(response: MlnRustHttpRes
 
 struct HttpRequest {
     url: String,
-    headers: Vec<(String, String)>,
+    headers: Vec<HttpHeader>,
+}
+
+struct HttpHeader {
+    name: String,
+    value: String,
+    sensitive: bool,
 }
 
 fn copy_http_request(
@@ -169,10 +176,11 @@ fn copy_http_request(
         let headers = unsafe { slice::from_raw_parts(headers, header_count) };
         let mut copied = Vec::with_capacity(headers.len());
         for header in headers {
-            copied.push((
-                unsafe_c_string_to_string(header.name)?,
-                unsafe_c_string_to_string(header.value)?,
-            ));
+            copied.push(HttpHeader {
+                name: unsafe_c_string_to_string(header.name)?,
+                value: unsafe_c_string_to_string(header.value)?,
+                sensitive: header.sensitive,
+            });
         }
         copied
     };
@@ -182,6 +190,7 @@ fn copy_http_request(
 
 fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
     let mut url = request.url;
+    let mut headers = request.headers;
 
     for _ in 0..=HTTP_MAX_REDIRECTS {
         if is_https_url(&url) && !crate::android::tls_verifier_initialized() {
@@ -193,16 +202,14 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
 
         let agent = http_agent();
         let mut builder = agent.get(&url);
-        let has_accept_encoding = request
-            .headers
+        let has_accept_encoding = headers
             .iter()
-            .any(|(name, _)| name.eq_ignore_ascii_case("accept-encoding"));
-        let has_range = request
-            .headers
+            .any(|header| header.name.eq_ignore_ascii_case("accept-encoding"));
+        let has_range = headers
             .iter()
-            .any(|(name, _)| name.eq_ignore_ascii_case("range"));
-        for (name, value) in &request.headers {
-            builder = builder.header(name, value);
+            .any(|header| header.name.eq_ignore_ascii_case("range"));
+        for header in &headers {
+            builder = builder.header(&header.name, &header.value);
         }
         if !has_accept_encoding && has_range {
             builder = builder.header("Accept-Encoding", "identity");
@@ -224,12 +231,16 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
                             "HTTP redirect Location header is empty",
                         );
                     }
-                    url = match redirect_url(&url, &location) {
+                    let next_url = match redirect_url(&url, &location) {
                         Some(url) => url,
                         None => {
                             return http_error(HTTP_ERROR_OTHER, "unsupported HTTP redirect URL");
                         }
                     };
+                    if !same_origin(&url, &next_url) {
+                        headers.retain(|header| !header.sensitive);
+                    }
+                    url = next_url;
                     continue;
                 }
                 return http_response(&mut response, has_range);
@@ -239,6 +250,70 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
     }
 
     http_error(HTTP_ERROR_OTHER, "too many HTTP redirects")
+}
+
+fn same_origin(left: &str, right: &str) -> bool {
+    let Ok(left) = left.parse::<http::Uri>() else {
+        return false;
+    };
+    let Ok(right) = right.parse::<http::Uri>() else {
+        return false;
+    };
+    let Some(left_scheme) = left.scheme_str() else {
+        return false;
+    };
+    let Some(right_scheme) = right.scheme_str() else {
+        return false;
+    };
+    let Some(left_authority) = left.authority() else {
+        return false;
+    };
+    let Some(right_authority) = right.authority() else {
+        return false;
+    };
+    left_scheme.eq_ignore_ascii_case(right_scheme)
+        && left_authority
+            .host()
+            .eq_ignore_ascii_case(right_authority.host())
+        && effective_port(left_scheme, left_authority.port_u16())
+            == effective_port(right_scheme, right_authority.port_u16())
+}
+
+fn effective_port(scheme: &str, explicit: Option<u16>) -> Option<u16> {
+    explicit.or_else(|| {
+        if scheme.eq_ignore_ascii_case("http") {
+            Some(80)
+        } else if scheme.eq_ignore_ascii_case("https") {
+            Some(443)
+        } else {
+            None
+        }
+    })
+}
+
+#[cfg(test)]
+mod origin_tests {
+    use super::same_origin;
+
+    #[test]
+    fn origin_includes_scheme_host_and_effective_port() {
+        assert!(same_origin(
+            "https://EXAMPLE.test/a",
+            "https://example.test:443/b"
+        ));
+        assert!(!same_origin(
+            "http://example.test/a",
+            "https://example.test/b"
+        ));
+        assert!(!same_origin(
+            "https://example.test/a",
+            "https://other.test/b"
+        ));
+        assert!(!same_origin(
+            "https://example.test:444/a",
+            "https://example.test/b"
+        ));
+    }
 }
 
 fn http_response(

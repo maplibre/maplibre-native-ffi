@@ -144,6 +144,25 @@ type ResourceTransformRequest struct {
 // and replacement URLs containing embedded NUL are rejected.
 type ResourceTransformCallback func(ResourceTransformRequest) (replacementURL string, replace bool)
 
+// HttpHeaderTransformRequest describes an outgoing HTTP attempt after URL
+// transformation. Its fields are copied before the callback runs.
+type HttpHeaderTransformRequest struct {
+	Kind    ResourceKind
+	RawKind uint32
+	URL     string
+}
+
+// HttpHeader is one owned outgoing HTTP request header.
+type HttpHeader struct {
+	Name  string
+	Value string
+}
+
+// HttpHeaderTransformCallback supplies end-to-end headers for one native HTTP
+// attempt. Panics and invalid or case-insensitively duplicated names leave the
+// request unchanged.
+type HttpHeaderTransformCallback func(HttpHeaderTransformRequest) []HttpHeader
+
 // ResourceProviderCallback intercepts network resource requests. Native code may
 // invoke it on worker or network threads. The request data is copied for Go; do
 // not call MapLibre map/runtime APIs from the callback. If it returns

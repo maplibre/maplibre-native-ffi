@@ -1377,6 +1377,70 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
+    private static class mln_http_header_transform_response_set {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_LONG
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_http_header_transform_response_set");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_http_header_transform_response_set(mln_http_header_transform_response *response, const char *name, size_t name_size, const char *value, size_t value_size)
+     * }
+     */
+    public static FunctionDescriptor mln_http_header_transform_response_set$descriptor() {
+        return mln_http_header_transform_response_set.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_http_header_transform_response_set(mln_http_header_transform_response *response, const char *name, size_t name_size, const char *value, size_t value_size)
+     * }
+     */
+    public static MethodHandle mln_http_header_transform_response_set$handle() {
+        return mln_http_header_transform_response_set.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_http_header_transform_response_set(mln_http_header_transform_response *response, const char *name, size_t name_size, const char *value, size_t value_size)
+     * }
+     */
+    public static MemorySegment mln_http_header_transform_response_set$address() {
+        return mln_http_header_transform_response_set.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_http_header_transform_response_set(mln_http_header_transform_response *response, const char *name, size_t name_size, const char *value, size_t value_size)
+     * }
+     */
+    public static int mln_http_header_transform_response_set(MemorySegment response, MemorySegment name, long name_size, MemorySegment value, long value_size) {
+        var mh$ = mln_http_header_transform_response_set.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_http_header_transform_response_set", response, name, name_size, value, value_size);
+            }
+            return (int)mh$.invokeExact(response, name, name_size, value, value_size);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mln_runtime_options_default {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mln_runtime_options.layout()    );
@@ -1910,6 +1974,127 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         try {
             if (TRACE_DOWNCALLS) {
                 traceDowncall("mln_runtime_clear_resource_transform", runtime);
+            }
+            return (int)mh$.invokeExact(runtime);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_runtime_set_http_header_transform {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_runtime_set_http_header_transform");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_runtime_set_http_header_transform(mln_runtime runtime, const mln_http_header_transform *transform)
+     * }
+     */
+    public static FunctionDescriptor mln_runtime_set_http_header_transform$descriptor() {
+        return mln_runtime_set_http_header_transform.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_runtime_set_http_header_transform(mln_runtime runtime, const mln_http_header_transform *transform)
+     * }
+     */
+    public static MethodHandle mln_runtime_set_http_header_transform$handle() {
+        return mln_runtime_set_http_header_transform.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_runtime_set_http_header_transform(mln_runtime runtime, const mln_http_header_transform *transform)
+     * }
+     */
+    public static MemorySegment mln_runtime_set_http_header_transform$address() {
+        return mln_runtime_set_http_header_transform.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_runtime_set_http_header_transform(mln_runtime runtime, const mln_http_header_transform *transform)
+     * }
+     */
+    public static int mln_runtime_set_http_header_transform(long runtime, MemorySegment transform) {
+        var mh$ = mln_runtime_set_http_header_transform.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_runtime_set_http_header_transform", runtime, transform);
+            }
+            return (int)mh$.invokeExact(runtime, transform);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_runtime_clear_http_header_transform {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_runtime_clear_http_header_transform");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_runtime_clear_http_header_transform(mln_runtime runtime)
+     * }
+     */
+    public static FunctionDescriptor mln_runtime_clear_http_header_transform$descriptor() {
+        return mln_runtime_clear_http_header_transform.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_runtime_clear_http_header_transform(mln_runtime runtime)
+     * }
+     */
+    public static MethodHandle mln_runtime_clear_http_header_transform$handle() {
+        return mln_runtime_clear_http_header_transform.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_runtime_clear_http_header_transform(mln_runtime runtime)
+     * }
+     */
+    public static MemorySegment mln_runtime_clear_http_header_transform$address() {
+        return mln_runtime_clear_http_header_transform.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_runtime_clear_http_header_transform(mln_runtime runtime)
+     * }
+     */
+    public static int mln_runtime_clear_http_header_transform(long runtime) {
+        var mh$ = mln_runtime_clear_http_header_transform.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_runtime_clear_http_header_transform", runtime);
             }
             return (int)mh$.invokeExact(runtime);
         } catch (Error | RuntimeException ex) {

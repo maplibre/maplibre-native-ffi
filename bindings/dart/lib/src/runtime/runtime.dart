@@ -94,6 +94,7 @@ final class RuntimeHandle {
   final _maps = <int, WeakReference<MapHandle>>{};
   final _offlineOperations = <int, WeakReference<OfflineOperationHandle>>{};
   _ResourceTransformState? _resourceTransformState;
+  _HttpHeaderTransformState? _httpHeaderTransformState;
   _ResourceProviderRulesState? _resourceProviderRulesState;
   _ResourceProviderCallbackState? _resourceProviderCallbackState;
 
@@ -215,6 +216,34 @@ final class RuntimeHandle {
     _check(raw.mln_runtime_clear_resource_transform(_handle.raw));
     _resourceTransformState?.close();
     _resourceTransformState = null;
+  }
+
+  /// Registers native-owned HTTP header routes evaluated on network threads.
+  void setHttpHeaderTransformRules(List<HttpHeaderTransformRule> rules) {
+    final state = _HttpHeaderTransformState(rules);
+    try {
+      withNativeArena((arena) {
+        final transform = arena<raw.mln_http_header_transform>();
+        transform.ref.size = sizeOf<raw.mln_http_header_transform>();
+        transform.ref.callback = _c.adapterHttpHeaderTransformCallback();
+        transform.ref.user_data = state.pointer.cast<Void>();
+        _check(
+          raw.mln_runtime_set_http_header_transform(_handle.raw, transform),
+        );
+      });
+      _httpHeaderTransformState?.close();
+      _httpHeaderTransformState = state;
+    } catch (_) {
+      state.close();
+      rethrow;
+    }
+  }
+
+  /// Clears native-owned HTTP header transform routes.
+  void clearHttpHeaderTransform() {
+    _check(raw.mln_runtime_clear_http_header_transform(_handle.raw));
+    _httpHeaderTransformState?.close();
+    _httpHeaderTransformState = null;
   }
 
   /// Registers or replaces exact native-owned response rules.
@@ -586,6 +615,8 @@ final class RuntimeHandle {
     );
     _resourceTransformState?.close();
     _resourceTransformState = null;
+    _httpHeaderTransformState?.close();
+    _httpHeaderTransformState = null;
     _resourceProviderRulesState?.close();
     _resourceProviderRulesState = null;
     _resourceProviderCallbackState?.retire();

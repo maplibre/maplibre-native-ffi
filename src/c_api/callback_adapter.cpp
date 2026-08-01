@@ -33,6 +33,8 @@ namespace {
 
 using AdapterResourceRewriteRule = mln_adapter_resource_rewrite_rule;
 using AdapterResourceRewriteRules = mln_adapter_resource_rewrite_rules;
+using AdapterHttpHeaderTransformRule = mln_adapter_http_header_transform_rule;
+using AdapterHttpHeaderTransformRules = mln_adapter_http_header_transform_rules;
 using AdapterResourceProviderRule = mln_adapter_resource_provider_rule;
 using AdapterResourceProviderRules = mln_adapter_resource_provider_rules;
 using AdapterQueuedResourceProviderRoute =
@@ -83,6 +85,30 @@ auto string_equals(const char* left, const char* right) -> bool {
     return false;
   }
   return std::strcmp(left, right) == 0;
+}
+
+constexpr auto KnownHttpHeaderRouteFlags =
+  static_cast<std::uint32_t>(MLN_ADAPTER_HTTP_HEADER_ROUTE_MATCH_PREFIX);
+
+auto http_header_rule_matches_url(
+  const AdapterHttpHeaderTransformRule& rule, const char* url
+) -> bool {
+  if (
+    rule.url == nullptr || url == nullptr ||
+    (rule.flags & ~KnownHttpHeaderRouteFlags) != 0
+  ) {
+    return false;
+  }
+  const auto expected = std::string_view{rule.url};
+  const auto candidate = std::string_view{url};
+  if (
+    (rule.flags &
+     static_cast<std::uint32_t>(MLN_ADAPTER_HTTP_HEADER_ROUTE_MATCH_PREFIX)) !=
+    0
+  ) {
+    return candidate.starts_with(expected);
+  }
+  return candidate == expected;
 }
 
 constexpr auto KnownRouteFlags =
@@ -377,6 +403,45 @@ extern "C" MLN_API auto mln_adapter_resource_transform_rewrite_callback(
         out_response, rule.replacement_url, std::strlen(rule.replacement_url)
       );
     }
+  }
+  return MLN_STATUS_OK;
+}
+
+extern "C" MLN_API auto mln_adapter_http_header_transform_callback(
+  void* user_data, std::uint32_t kind, const char* url,
+  mln_http_header_transform_response* out_response
+) noexcept -> mln_status {
+  if (user_data == nullptr || url == nullptr || out_response == nullptr) {
+    return MLN_STATUS_OK;
+  }
+
+  const auto& table =
+    *static_cast<const AdapterHttpHeaderTransformRules*>(user_data);
+  if (table.rules == nullptr && table.count != 0) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  for (const auto& rule : std::span{table.rules, table.count}) {
+    if (
+      !matches_rule(rule.kind, kind) || !http_header_rule_matches_url(rule, url)
+    ) {
+      continue;
+    }
+    if (rule.headers == nullptr && rule.header_count != 0) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    for (const auto& header : std::span{rule.headers, rule.header_count}) {
+      const auto name_size =
+        header.name == nullptr ? 0 : std::strlen(header.name);
+      const auto value_size =
+        header.value == nullptr ? 0 : std::strlen(header.value);
+      const auto status = mln_http_header_transform_response_set(
+        out_response, header.name, name_size, header.value, value_size
+      );
+      if (status != MLN_STATUS_OK) {
+        return status;
+      }
+    }
+    return MLN_STATUS_OK;
   }
   return MLN_STATUS_OK;
 }

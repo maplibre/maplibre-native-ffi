@@ -396,6 +396,7 @@ public struct RuntimeEvent: Equatable, Sendable {
 public final class RuntimeHandle {
   private let handle: NativeHandleBox<NativeRuntimeHandle>
   private var resourceTransform: NativeResourceTransformState?
+  private var httpHeaderTransform: NativeHttpHeaderTransformState?
   private var resourceProvider: NativeResourceProviderState?
 
   public init(options: RuntimeOptions = RuntimeOptions()) throws {
@@ -416,6 +417,7 @@ public final class RuntimeHandle {
       try checkStatus(mln_runtime_destroy(handle.raw))
     }
     resourceTransform = nil
+    httpHeaderTransform = nil
     resourceProvider = nil
   }
 
@@ -523,6 +525,29 @@ public final class RuntimeHandle {
           .requireLive().raw))
     }
     resourceTransform = nil
+  }
+
+  public func setHttpHeaderTransform(
+    _ callback: @escaping @Sendable (HttpHeaderTransformRequest) -> [HttpHeader]
+  ) throws {
+    let replacement = NativeHttpHeaderTransformState(callback)
+    try mapNativeFailure {
+      try replacement.withDescriptor { descriptor in
+        try checkStatus(mln_runtime_set_http_header_transform(
+          handle.requireLive().raw,
+          descriptor
+        ))
+      }
+    }
+    httpHeaderTransform = replacement
+  }
+
+  public func clearHttpHeaderTransform() throws {
+    try mapNativeFailure {
+      try checkStatus(mln_runtime_clear_http_header_transform(handle
+          .requireLive().raw))
+    }
+    httpHeaderTransform = nil
   }
 
   public func setResourceProvider(

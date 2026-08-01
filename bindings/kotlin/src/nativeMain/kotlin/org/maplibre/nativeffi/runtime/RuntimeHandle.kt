@@ -15,6 +15,7 @@ import kotlinx.cinterop.value
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.internal.c.mln_offline_region_status
+import org.maplibre.nativeffi.internal.c.mln_runtime_clear_http_header_transform
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_provider
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_transform
 import org.maplibre.nativeffi.internal.c.mln_runtime_create
@@ -42,10 +43,12 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_options_default
 import org.maplibre.nativeffi.internal.c.mln_runtime_poll_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_pump
 import org.maplibre.nativeffi.internal.c.mln_runtime_run_ambient_cache_operation_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_set_http_header_transform
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_maximum_ambient_cache_size_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_resource_provider
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_resource_transform
 import org.maplibre.nativeffi.internal.c.mln_runtime_wake_source_acquire
+import org.maplibre.nativeffi.internal.callback.HttpHeaderTransformState
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
@@ -65,6 +68,7 @@ import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
+import org.maplibre.nativeffi.resource.HttpHeaderTransformCallback
 import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
@@ -78,6 +82,7 @@ internal constructor(
   private val state = HandleState("RuntimeHandle", handle)
   private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
   private var resourceTransformState: ResourceTransformState? = null
+  private var httpHeaderTransformState: HttpHeaderTransformState? = null
   private var resourceProviderState: ResourceProviderState? = null
 
   public actual fun pump(timeoutMillis: Long) {
@@ -565,6 +570,33 @@ internal constructor(
     previous?.close()
   }
 
+  public actual fun setHttpHeaderTransform(callback: HttpHeaderTransformCallback) {
+    httpHeaderTransformState?.checkCanClose()
+    val replacement = HttpHeaderTransformState(callback)
+    try {
+      Status.check(
+        mln_runtime_set_http_header_transform(
+          state.requireLive().rawHandleValue,
+          replacement.descriptor(),
+        )
+      )
+    } catch (error: Throwable) {
+      replacement.close()
+      throw error
+    }
+    val previous = httpHeaderTransformState
+    httpHeaderTransformState = replacement
+    previous?.close()
+  }
+
+  public actual fun clearHttpHeaderTransform() {
+    httpHeaderTransformState?.checkCanClose()
+    Status.check(mln_runtime_clear_http_header_transform(state.requireLive().rawHandleValue))
+    val previous = httpHeaderTransformState
+    httpHeaderTransformState = null
+    previous?.close()
+  }
+
   public actual fun pollEvent(): RuntimeEvent? = memScoped {
     val event = alloc<mln_runtime_event>()
     event.size = sizeOf<mln_runtime_event>().toUInt()
@@ -583,11 +615,14 @@ internal constructor(
   public actual override fun close() {
     resourceProviderState?.checkCanClose()
     resourceTransformState?.checkCanClose()
+    httpHeaderTransformState?.checkCanClose()
     state.closeOnce({ runtime -> destroyer(runtime.rawHandleValue) }) {
       resourceProviderState?.close()
       resourceTransformState?.close()
+      httpHeaderTransformState?.close()
       resourceProviderState = null
       resourceTransformState = null
+      httpHeaderTransformState = null
     }
   }
 

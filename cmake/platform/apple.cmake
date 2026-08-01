@@ -97,7 +97,7 @@ function(mln_configure_platform target)
       ${MLN_SOURCE_DIR}/platform/qt/src/mbgl/bidi.cpp
       ${MLN_SOURCE_DIR}/platform/darwin/core/async_task.cpp
       ${MLN_SOURCE_DIR}/platform/darwin/core/collator.mm
-      ${MLN_SOURCE_DIR}/platform/darwin/core/http_file_source.mm
+      ${CMAKE_CURRENT_LIST_DIR}/../../src/platform/apple/http_file_source.mm
       ${MLN_SOURCE_DIR}/platform/darwin/core/image.mm
       ${MLN_SOURCE_DIR}/platform/darwin/core/local_glyph_rasterizer.mm
       ${MLN_SOURCE_DIR}/platform/darwin/core/native_apple_interface.m

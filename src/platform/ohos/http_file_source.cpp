@@ -24,6 +24,8 @@
 #include <network/netstack/net_http.h>
 
 #include "http_user_agent.hpp"
+#include "maplibre_native_c.h"
+#include "runtime/runtime.hpp"
 
 namespace mbgl {
 namespace {
@@ -280,6 +282,28 @@ Response makeResponse(
   return response;
 }
 
+uint32_t resourceKindToAbi(Resource::Kind kind) {
+  switch (kind) {
+    case Resource::Kind::Style:
+      return MLN_RESOURCE_KIND_STYLE;
+    case Resource::Kind::Source:
+      return MLN_RESOURCE_KIND_SOURCE;
+    case Resource::Kind::Tile:
+      return MLN_RESOURCE_KIND_TILE;
+    case Resource::Kind::Glyphs:
+      return MLN_RESOURCE_KIND_GLYPHS;
+    case Resource::Kind::SpriteImage:
+      return MLN_RESOURCE_KIND_SPRITE_IMAGE;
+    case Resource::Kind::SpriteJSON:
+      return MLN_RESOURCE_KIND_SPRITE_JSON;
+    case Resource::Kind::Image:
+      return MLN_RESOURCE_KIND_IMAGE;
+    case Resource::Kind::Unknown:
+    default:
+      return MLN_RESOURCE_KIND_UNKNOWN;
+  }
+}
+
 class SlotPool {
  public:
   static void enqueueOrStart(const std::shared_ptr<RequestState>& state);
@@ -342,11 +366,12 @@ class RequestState : public std::enable_shared_from_this<RequestState> {
  public:
   RequestState(
     util::RunLoop& runLoop_, Resource resource_, std::string userAgent_,
-    FileSource::Callback callback_
+    void* platformContext_, FileSource::Callback callback_
   )
       : runLoop(runLoop_),
         resource(std::move(resource_)),
         userAgent(std::move(userAgent_)),
+        platformContext(platformContext_),
         callback(std::move(callback_)) {}
 
   void begin() {
@@ -435,6 +460,18 @@ class RequestState : public std::enable_shared_from_this<RequestState> {
     } else if (resource.priorModified) {
       const auto modified = util::rfc1123(*resource.priorModified);
       if (!setHeader(newHeaders, "If-Modified-Since", modified.c_str())) {
+        OH_Http_DestroyHeaders(&newHeaders);
+        OH_Http_Destroy(&newRequest);
+        complete(nullptr, OH_HTTP_OUT_OF_MEMORY);
+        return;
+      }
+    }
+
+    const auto transformedHeaders = mln::core::invoke_http_header_transform(
+      platformContext, resourceKindToAbi(resource.kind), resource.url.c_str()
+    );
+    for (const auto& [name, value] : transformedHeaders) {
+      if (!setHeader(newHeaders, name.c_str(), value.c_str())) {
         OH_Http_DestroyHeaders(&newHeaders);
         OH_Http_Destroy(&newRequest);
         complete(nullptr, OH_HTTP_OUT_OF_MEMORY);
@@ -669,6 +706,7 @@ class RequestState : public std::enable_shared_from_this<RequestState> {
   util::RunLoop& runLoop;
   Resource resource;
   std::string userAgent;
+  void* platformContext = nullptr;
   FileSource::Callback callback;
 
   mutable std::mutex mutex;
@@ -811,12 +849,13 @@ Http_OnVoidCallback SlotPool::canceledCallback(std::size_t token) {
 class HTTPRequest final : public AsyncRequest {
  public:
   HTTPRequest(
-    Resource resource, std::string userAgent, FileSource::Callback callback
+    Resource resource, std::string userAgent, void* platformContext,
+    FileSource::Callback callback
   )
       : state(
           std::make_shared<RequestState>(
             *util::RunLoop::Get(), std::move(resource), std::move(userAgent),
-            std::move(callback)
+            platformContext, std::move(callback)
           )
         ) {
     state->begin();
@@ -880,7 +919,8 @@ std::unique_ptr<AsyncRequest> HTTPFileSource::request(
   const Resource& resource, Callback callback
 ) {
   return std::make_unique<HTTPRequest>(
-    resource, impl->getUserAgent(), std::move(callback)
+    resource, impl->getUserAgent(),
+    impl->getResourceOptions().platformContext(), std::move(callback)
   );
 }
 

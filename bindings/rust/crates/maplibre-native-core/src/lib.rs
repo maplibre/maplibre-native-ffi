@@ -64,8 +64,8 @@ pub use query::{
     SourceFeatureQueryOptions,
 };
 pub use resource::{
-    ByteRange, ResourceProviderDecision, ResourceRequest, ResourceResponse,
-    ResourceTransformRequest,
+    ByteRange, HttpHeader, HttpHeaderTransformRequest, ResourceProviderDecision, ResourceRequest,
+    ResourceResponse, ResourceTransformRequest,
 };
 pub use runtime::{
     OfflineRegionDefinition, OfflineRegionInfo, RuntimeOptions, network_status, set_network_status,

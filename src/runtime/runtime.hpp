@@ -54,6 +54,15 @@ struct ResourceTransformState {
   void* user_data = nullptr;
 };
 
+struct HttpHeaderTransformState {
+  std::shared_mutex mutex;
+  mln_http_header_transform_callback callback = nullptr;
+  void* user_data = nullptr;
+};
+
+using HttpHeader = std::pair<std::string, std::string>;
+using HttpHeaders = std::vector<HttpHeader>;
+
 // Holds the resource provider registration in its own reference-counted object,
 // mirroring `ResourceTransformState`.
 //
@@ -149,6 +158,8 @@ struct RuntimeObject {
   std::shared_ptr<mln::core::OfflineOperationEventState>
     offline_operation_state;
   std::shared_ptr<mln::core::ResourceTransformState> resource_transform_state;
+  std::shared_ptr<mln::core::HttpHeaderTransformState>
+    http_header_transform_state;
   std::shared_ptr<mln::core::WakeState> wake_state;
   std::size_t live_maps = 0;
   mutable std::mutex event_mutex;
@@ -196,6 +207,17 @@ auto resource_transform_response_set_url(
   mln_resource_transform_response* response, const char* url, size_t url_size
 ) -> mln_status;
 auto clear_resource_transform(mln_runtime runtime) -> mln_status;
+auto set_http_header_transform(
+  mln_runtime runtime, const mln_http_header_transform* transform
+) -> mln_status;
+auto http_header_transform_response_set(
+  mln_http_header_transform_response* response, const char* name,
+  size_t name_size, const char* value, size_t value_size
+) -> mln_status;
+auto clear_http_header_transform(mln_runtime runtime) -> mln_status;
+auto invoke_http_header_transform(
+  void* platform_context, uint32_t kind, const char* url
+) noexcept -> HttpHeaders;
 auto invoke_resource_transform(
   void* platform_context, uint32_t kind, const char* url,
   std::string& out_replacement_url

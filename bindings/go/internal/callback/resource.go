@@ -8,6 +8,7 @@ package callback
 #include "../cgo_shim.h"
 
 extern mln_status goMaplibreResourceTransform(void* user_data, uint32_t kind, const char* url, mln_resource_transform_response* out_response);
+extern mln_status goMaplibreHttpHeaderTransform(void* user_data, uint32_t kind, const char* url, mln_http_header_transform_response* out_response);
 extern uint32_t goMaplibreResourceProvider(void* user_data, const mln_resource_request* request, mln_resource_request_handle* handle);
 */
 import "C"
@@ -113,6 +114,53 @@ func invokeResourceTransformTrampolineReplacementForTest(state *ResourceTransfor
 		return "", false, status
 	}
 	return C.GoString(response.url), true, status
+}
+
+type HttpHeader struct {
+	Name  string
+	Value string
+}
+
+type HttpHeaderTransformCallback func(kind uint32, url string) []HttpHeader
+
+type HttpHeaderTransformState struct {
+	callback HttpHeaderTransformCallback
+	handle   cgo.Handle
+	once     sync.Once
+}
+
+func newHttpHeaderTransformState(callback HttpHeaderTransformCallback) *HttpHeaderTransformState {
+	state := &HttpHeaderTransformState{callback: callback}
+	state.handle = cgo.NewHandle(state)
+	return state
+}
+
+func SetHttpHeaderTransform(runtime uint64, callback HttpHeaderTransformCallback) (*HttpHeaderTransformState, int32) {
+	if callback == nil {
+		return nil, int32(C.MLN_STATUS_INVALID_ARGUMENT)
+	}
+	state := newHttpHeaderTransformState(callback)
+	descriptor := C.mln_http_header_transform{
+		size:      C.uint32_t(unsafe.Sizeof(C.mln_http_header_transform{})),
+		callback:  C.mln_http_header_transform_callback(C.goMaplibreHttpHeaderTransform),
+		user_data: C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
+	}
+	status := int32(C.mln_runtime_set_http_header_transform(C.mln_runtime(runtime), &descriptor))
+	if status != int32(C.MLN_STATUS_OK) {
+		state.Release()
+		return nil, status
+	}
+	return state, int32(C.MLN_STATUS_OK)
+}
+
+func ClearHttpHeaderTransform(runtime uint64) int32 {
+	return int32(C.mln_runtime_clear_http_header_transform(C.mln_runtime(runtime)))
+}
+
+func (state *HttpHeaderTransformState) Release() {
+	if state != nil {
+		state.once.Do(func() { state.handle.Delete() })
+	}
 }
 
 // ResourceRequest is the copied internal shape for provider callbacks.
