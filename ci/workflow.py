@@ -33,7 +33,7 @@ def architecture(preset: str) -> str:
 
 def backend(preset: str) -> str:
     value = preset.rsplit("-", 1)[-1]
-    if value not in {"egl", "metal", "vulkan", "webgl", "wgl"}:
+    if value not in {"egl", "metal", "vulkan", "webgl", "webgpu", "wgl"}:
         raise SystemExit(f"error: cannot determine backend from preset {preset!r}")
     return value
 

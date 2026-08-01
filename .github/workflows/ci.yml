@@ -430,6 +430,23 @@ jobs:
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test:emscripten emscripten-wasm32-webgl
 
+  target-emscripten-wasm32-webgpu:
+    name: target / emscripten-wasm32-webgpu
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: emscripten-wasm32-webgpu
+          gradle: false
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test:emscripten emscripten-wasm32-webgpu
+
   target-macos-arm64-metal:
     name: target / macos-arm64-metal
     runs-on: macos-26
@@ -1216,6 +1233,7 @@ jobs:
       - target-linux-arm64-egl
       - target-linux-arm64-vulkan
       - target-emscripten-wasm32-webgl
+      - target-emscripten-wasm32-webgpu
       - target-macos-arm64-metal
       - target-macos-arm64-vulkan
       - target-macos-arm64-egl

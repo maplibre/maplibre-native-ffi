@@ -65,10 +65,9 @@ function(mln_configure_browser_c_api_test)
     list(APPEND browser_args --browser-arg --enable-unsafe-webgpu --browser-arg
          --enable-features=Vulkan)
   else()
-    # Software WebGL2 for a runner with no GPU. This is deliberately not passed
-    # to the WebGPU run: it forces a software GL path that has nothing to do
-    # with Dawn, and the two together are what to suspect first if the browser
-    # fails to start.
+    # Software WebGL2 for a runner with no GPU. The WebGPU run does not get it,
+    # because it selects a software GL implementation and Dawn reaches the GPU
+    # through Vulkan.
     list(APPEND browser_args --browser-arg --enable-unsafe-swiftshader)
   endif()
 

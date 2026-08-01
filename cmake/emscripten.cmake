@@ -36,8 +36,13 @@ add_link_options(
 # and above, where wasm-opt runs at all, so an unoptimised link is not evidence
 # either way.
 #
-# TODO(browser-webgpu): JSPI would let WebGPU use native exceptions too, once
-# emdawnwebgpu supports it.
+# TODO(browser-webgpu): JSPI would let WebGPU keep native exceptions, and
+# emdawnwebgpu already accepts it -- its own validation asks for "Asyncify or
+# JSPI". What blocks it is upstream: MapLibre Native pins -sASYNCIFY=1 as an
+# interface link option in vendor/dawn.cmake, and an interface option lands
+# after
+# ours, so a -sJSPI here is overridden. Adopting JSPI needs that flag to become
+# configurable upstream first.
 if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
   add_compile_options(-fexceptions)
   add_link_options(-fexceptions)

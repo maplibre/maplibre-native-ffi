@@ -193,9 +193,9 @@
       "inherits": ["_emscripten-wasm32", "_webgl"]
     },
     {
-      "name": "browser-wasm32-webgpu",
+      "name": "emscripten-wasm32-webgpu",
       "displayName": "Browser WASM32 WebGPU",
-      "inherits": ["_browser-wasm32", "_webgpu"]
+      "inherits": ["_emscripten-wasm32", "_webgpu"]
     },
     {
       "name": "macos-arm64-metal",
@@ -282,8 +282,8 @@
       "jobs": 0
     },
     {
-      "name": "browser-wasm32-webgpu",
-      "configurePreset": "browser-wasm32-webgpu",
+      "name": "emscripten-wasm32-webgpu",
+      "configurePreset": "emscripten-wasm32-webgpu",
       "jobs": 0
     },
     {
@@ -421,8 +421,8 @@
       "inherits": "_test-base"
     },
     {
-      "name": "browser-wasm32-webgpu",
-      "configurePreset": "browser-wasm32-webgpu",
+      "name": "emscripten-wasm32-webgpu",
+      "configurePreset": "emscripten-wasm32-webgpu",
       "inherits": "_test-base"
     },
     {
@@ -603,10 +603,10 @@
       ]
     },
     {
-      "name": "browser-wasm32-webgpu",
+      "name": "emscripten-wasm32-webgpu",
       "steps": [
-        { "type": "configure", "name": "browser-wasm32-webgpu" },
-        { "type": "build", "name": "browser-wasm32-webgpu" }
+        { "type": "configure", "name": "emscripten-wasm32-webgpu" },
+        { "type": "build", "name": "emscripten-wasm32-webgpu" }
       ]
     },
     {

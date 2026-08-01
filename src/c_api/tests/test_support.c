@@ -2,6 +2,7 @@
 #define _POSIX_C_SOURCE 200809L
 #endif
 
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -273,9 +274,36 @@ uint64_t mln_test_monotonic_milliseconds(void) {
 #endif
 }
 
+// A thread that suspends cannot be joined on the browser WebGPU target, so the
+// harness waits on a flag the entry function sets instead of on thread exit.
+//
+// Requesting a WebGPU adapter or device suspends the calling thread through
+// Asyncify, and emscripten's -sASYNCIFY=1 cannot carry a pthread's entry point
+// across a suspension: invokeEntryPoint() runs its finish() step as soon as the
+// entry returns control, which a suspension does immediately, and skips
+// __emscripten_thread_exit() because Asyncify is holding a runtime keepalive at
+// that moment. When the entry later resumes and really does return, it returns
+// into Asyncify's rewind rather than back into invokeEntryPoint, so nothing
+// ever marks the thread exited and pthread_join blocks forever. Threads that
+// never suspend are unaffected, which is why only this target needs the flag.
+//
+// Waiting on the flag keeps what the tests actually need: once it is set the
+// entry function has returned, and the release/acquire pair publishes
+// everything the entry wrote.
+//
+// TODO(browser-webgpu): JSPI (-sASYNCIFY=2) is the upstream fix -- emscripten
+// awaits the entry point there -- but MapLibre Native pins -sASYNCIFY=1 in
+// vendor/dawn.cmake, so adopting it needs an upstream change first.
+#if defined(__EMSCRIPTEN__) && defined(MLN_TEST_BACKEND_WEBGPU)
+#define MLN_TEST_JOIN_ON_FLAG 1
+#endif
+
 struct mln_test_thread {
   void (*entry)(void*);
   void* argument;
+#if defined(MLN_TEST_JOIN_ON_FLAG)
+  atomic_bool entry_returned;
+#endif
 #if defined(_WIN32)
   HANDLE handle;
 #else
@@ -283,16 +311,26 @@ struct mln_test_thread {
 #endif
 };
 
+static void note_entry_returned(mln_test_thread* thread) {
+#if defined(MLN_TEST_JOIN_ON_FLAG)
+  atomic_store(&thread->entry_returned, true);
+#else
+  (void)thread;
+#endif
+}
+
 #if defined(_WIN32)
 static DWORD WINAPI thread_trampoline(LPVOID argument) {
   mln_test_thread* thread = argument;
   thread->entry(thread->argument);
+  note_entry_returned(thread);
   return 0;
 }
 #else
 static void* thread_trampoline(void* argument) {
   mln_test_thread* thread = argument;
   thread->entry(thread->argument);
+  note_entry_returned(thread);
   return NULL;
 }
 #endif
@@ -302,6 +340,9 @@ mln_test_thread* mln_test_thread_start(void (*entry)(void*), void* argument) {
   TEST_ASSERT_NOT_NULL(thread);
   thread->entry = entry;
   thread->argument = argument;
+#if defined(MLN_TEST_JOIN_ON_FLAG)
+  atomic_init(&thread->entry_returned, false);
+#endif
 #if defined(_WIN32)
   thread->handle = CreateThread(NULL, 0, thread_trampoline, thread, 0, NULL);
   TEST_ASSERT_NOT_NULL(thread->handle);
@@ -317,7 +358,17 @@ void mln_test_thread_join(mln_test_thread* thread) {
   if (thread == NULL) {
     return;
   }
-#if defined(_WIN32)
+#if defined(MLN_TEST_JOIN_ON_FLAG)
+  // Unbounded on purpose: this stands in for pthread_join, and a test that
+  // never finishes should hit the runner's timeout rather than carry on with a
+  // thread still running. Parking rather than spinning, because the thread
+  // being waited on needs the CPU to make progress.
+  while (!atomic_load(&thread->entry_returned)) {
+    mln_test_sleep_millisecond();
+  }
+  // Detached rather than joined, since nothing will ever report it as exited.
+  pthread_detach(thread->handle);
+#elif defined(_WIN32)
   WaitForSingleObject(thread->handle, INFINITE);
   CloseHandle(thread->handle);
 #else
@@ -501,11 +552,24 @@ static bool await_future(WGPUInstance instance, WGPUFuture future) {
   // device creation is well under a second even on a contended runner, so this
   // is generous rather than a performance assertion -- and it is paid once per
   // thread, not once per fixture.
+  //
+  // A non-zero timeout is only legal on an instance that asked for timed waits;
+  // see create_webgpu_device().
   const uint64_t timeout_ns = UINT64_C(5) * 1000U * 1000U * 1000U;
   WGPUFutureWaitInfo wait = {.future = future, .completed = false};
-  return wgpuInstanceWaitAny(instance, 1, &wait, timeout_ns) ==
-           WGPUWaitStatus_Success &&
-         wait.completed;
+  const WGPUWaitStatus status =
+    wgpuInstanceWaitAny(instance, 1, &wait, timeout_ns);
+  if (status != WGPUWaitStatus_Success || !wait.completed) {
+    // Worth printing: emdawnwebgpu reports why it refused a wait through
+    // DEBUG_PRINTF, which an optimised build compiles out, so the status is the
+    // only thing that separates a timeout from a rejected wait.
+    fprintf(
+      stderr, "waiting on a WebGPU future failed (status %d, completed %d)\n",
+      (int)status, (int)wait.completed
+    );
+    return false;
+  }
+  return true;
 }
 
 static void on_adapter(
@@ -542,9 +606,19 @@ static _Thread_local webgpu_state thread_webgpu_state;
 static _Thread_local bool thread_webgpu_attempted;
 
 static bool create_webgpu_device(webgpu_state* state) {
-  WGPUInstanceDescriptor instance_descriptor = {0};
+  // Waiting on a future with a timeout has to be asked for up front: otherwise
+  // wgpuInstanceWaitAny rejects every non-zero timeout instead of waiting, and
+  // the bound in await_future() becomes an immediate failure. The capability
+  // needs Asyncify, which the emdawnwebgpu port enables, and wgpuCreateInstance
+  // returns NULL when it is asked for without it.
+  WGPUInstanceDescriptor instance_descriptor = {
+    .capabilities = {.timedWaitAnyEnable = true},
+  };
   state->instance = wgpuCreateInstance(&instance_descriptor);
   if (state->instance == NULL) {
+    fprintf(
+      stderr, "creating a WebGPU instance with timed waits enabled failed\n"
+    );
     return false;
   }
 
@@ -564,7 +638,6 @@ static bool create_webgpu_device(webgpu_state* state) {
   ) {
     fprintf(stderr, "requesting a WebGPU adapter failed\n");
     wgpuInstanceRelease(state->instance);
-    free(state);
     return false;
   }
 
