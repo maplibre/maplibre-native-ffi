@@ -55,6 +55,72 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     )
   }
 
+  public actual fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor) {
+    NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("set target")
+    Status.check(
+      MaplibreNativeC.mln_metal_surface_set_target(
+        requireLiveHandle(),
+        metalSurfaceDescriptor(descriptor),
+      )
+    )
+  }
+
+  public actual fun setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor) {
+    NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("set target")
+    Status.check(
+      MaplibreNativeC.mln_vulkan_surface_set_target(
+        requireLiveHandle(),
+        vulkanSurfaceDescriptor(descriptor),
+      )
+    )
+  }
+
+  public actual fun setOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor) {
+    NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("set target")
+    Status.check(
+      MaplibreNativeC.mln_opengl_surface_set_target(
+        requireLiveHandle(),
+        openglSurfaceDescriptor(descriptor),
+      )
+    )
+  }
+
+  public actual fun setMetalBorrowedTextureTarget(descriptor: MetalBorrowedTextureDescriptor) {
+    NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("set target")
+    Status.check(
+      MaplibreNativeC.mln_metal_borrowed_texture_set_target(
+        requireLiveHandle(),
+        metalBorrowedTextureDescriptor(descriptor),
+      )
+    )
+  }
+
+  public actual fun setVulkanBorrowedTextureTarget(descriptor: VulkanBorrowedTextureDescriptor) {
+    NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("set target")
+    Status.check(
+      MaplibreNativeC.mln_vulkan_borrowed_texture_set_target(
+        requireLiveHandle(),
+        vulkanBorrowedTextureDescriptor(descriptor),
+      )
+    )
+  }
+
+  public actual fun setOpenGLBorrowedTextureTarget(descriptor: OpenGLBorrowedTextureDescriptor) {
+    NativeAccess.ensureLoaded()
+    activeFrame.ensureInactive("set target")
+    Status.check(
+      MaplibreNativeC.mln_opengl_borrowed_texture_set_target(
+        requireLiveHandle(),
+        openglBorrowedTextureDescriptor(descriptor),
+      )
+    )
+  }
+
   public actual fun renderUpdate(): Boolean {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("render")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 import time
 
 import pytest
@@ -105,6 +106,26 @@ def render_until_update(
     )
     assert event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE
     assert session.render_update()
+
+
+def render_until(
+    runtime: mln.RuntimeHandle,
+    session: render.RenderSessionHandle,
+    condition: Callable[[], bool],
+    description: str,
+    *,
+    iterations: int = 5000,
+) -> None:
+    """Pump and render until `condition` holds, failing with `description`."""
+    for _ in range(iterations):
+        runtime.pump()
+        while event := runtime.poll_event():
+            if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
+                session.render_update()
+        if condition():
+            return
+        time.sleep(0.001)
+    raise AssertionError(description)
 
 
 def request_still_image_if_needed(map_handle: mln.MapHandle) -> None:

@@ -141,11 +141,162 @@ final class RenderSessionHandle {
   NativeRenderSession get _handle => _state.handle;
 
   /// Resizes an attached render session.
+  ///
+  /// Surface and session-owned texture targets resize in place. A caller-owned
+  /// texture is sized by its owner and is rejected here: allocate one at the
+  /// new size and hand it over with [setMetalBorrowedTextureTarget] or its
+  /// Vulkan or OpenGL counterpart, which keeps this session.
   void resize(int width, int height, {double scaleFactor = 1}) {
     _checkNoActiveTextureFrame('resize render session');
     _check(
       _c.raw.mln_render_session_resize(_handle.raw, width, height, scaleFactor),
     );
+  }
+
+  /// Presents this attached surface session through a new Metal surface.
+  ///
+  /// A host surface can be destroyed and recreated while the map goes on
+  /// living, which is what Android rotation, a Flutter `SurfaceProducer`
+  /// lifecycle change, and a window resize that reallocates all look like from
+  /// here. Replacing the surface in place keeps this session's renderer, and
+  /// with it the tile pyramid, glyph and image atlases, symbol placement, and
+  /// feature state.
+  ///
+  /// [descriptor] names the same graphics context this session attached with,
+  /// and its extent applies as [resize] applies one. A target on a different
+  /// context throws an [InvalidArgumentException], and one this session's
+  /// compiled state cannot serve throws an [UnsupportedFeatureException]. Both leave
+  /// this session rendering into the surface it has; [close] it and attach
+  /// again to take that target.
+  void setMetalSurfaceTarget(MetalSurfaceDescriptor descriptor) {
+    _checkNoActiveTextureFrame('set Metal surface target');
+    withNativeArena((arena) {
+      final nativeDescriptor = arena<raw.mln_metal_surface_descriptor>();
+      nativeDescriptor.ref = _metalSurfaceDescriptorToNative(descriptor);
+      _check(
+        _c.raw.mln_metal_surface_set_target(_handle.raw, nativeDescriptor),
+      );
+    });
+  }
+
+  /// Presents this attached surface session through a new Vulkan surface.
+  ///
+  /// See [setMetalSurfaceTarget] for what replacing a surface preserves. The
+  /// outgoing `VkSurfaceKHR` must still be valid: this session holds a
+  /// swapchain built from it, and Vulkan destroys every swapchain before its
+  /// surface.
+  void setVulkanSurfaceTarget(VulkanSurfaceDescriptor descriptor) {
+    _checkNoActiveTextureFrame('set Vulkan surface target');
+    withNativeArena((arena) {
+      final nativeDescriptor = arena<raw.mln_vulkan_surface_descriptor>();
+      nativeDescriptor.ref = _vulkanSurfaceDescriptorToNative(descriptor);
+      _check(
+        _c.raw.mln_vulkan_surface_set_target(_handle.raw, nativeDescriptor),
+      );
+    });
+  }
+
+  /// Presents this attached surface session through a new OpenGL surface.
+  ///
+  /// See [setMetalSurfaceTarget] for what replacing a surface preserves. The
+  /// new surface is made current on the next render, so a host may hand over a
+  /// replacement for one it has already destroyed. A surface accepted here can
+  /// still prove unusable, which the next [renderUpdate] reports rather than
+  /// this call.
+  void setOpenGLSurfaceTarget(OpenGLSurfaceDescriptor descriptor) {
+    _checkNoActiveTextureFrame('set OpenGL surface target');
+    withNativeArena((arena) {
+      final nativeDescriptor = arena<raw.mln_opengl_surface_descriptor>();
+      nativeDescriptor.ref = _openglSurfaceDescriptorToNative(descriptor);
+      _check(
+        _c.raw.mln_opengl_surface_set_target(_handle.raw, nativeDescriptor),
+      );
+    });
+  }
+
+  /// Renders this attached texture session into a new caller-owned Metal
+  /// texture.
+  ///
+  /// A caller-owned texture is sized by its owner, so a host that follows a
+  /// resize reallocates rather than resizing and [resize] rejects the attempt.
+  /// Handing the replacement over here keeps this session's renderer instead,
+  /// so the map does not go cold on every resize.
+  ///
+  /// The replacement belongs to the device this session attached with and
+  /// carries the pixel format it attached with; one that does not is rejected
+  /// with this session still rendering into the texture it has. The caller owns
+  /// the replacement and keeps it valid until the next replacement, [detach],
+  /// or [close]. This session never retained the outgoing texture and never
+  /// releases it, but reads from it during this call, so keep that one valid
+  /// until the call returns.
+  void setMetalBorrowedTextureTarget(
+    MetalBorrowedTextureDescriptor descriptor,
+  ) {
+    _checkNoActiveTextureFrame('set Metal borrowed texture target');
+    withNativeArena((arena) {
+      final nativeDescriptor =
+          arena<raw.mln_metal_borrowed_texture_descriptor>();
+      nativeDescriptor.ref = _metalBorrowedTextureDescriptorToNative(
+        descriptor,
+      );
+      _check(
+        _c.raw.mln_metal_borrowed_texture_set_target(
+          _handle.raw,
+          nativeDescriptor,
+        ),
+      );
+    });
+  }
+
+  /// Renders this attached texture session into a new caller-owned Vulkan
+  /// image.
+  ///
+  /// See [setMetalBorrowedTextureTarget] for what replacing a target preserves.
+  /// The replacement carries the format and both layouts this session attached
+  /// with, since its render pass was built around them.
+  void setVulkanBorrowedTextureTarget(
+    VulkanBorrowedTextureDescriptor descriptor,
+  ) {
+    _checkNoActiveTextureFrame('set Vulkan borrowed texture target');
+    withNativeArena((arena) {
+      final nativeDescriptor =
+          arena<raw.mln_vulkan_borrowed_texture_descriptor>();
+      nativeDescriptor.ref = _vulkanBorrowedTextureDescriptorToNative(
+        descriptor,
+      );
+      _check(
+        _c.raw.mln_vulkan_borrowed_texture_set_target(
+          _handle.raw,
+          nativeDescriptor,
+        ),
+      );
+    });
+  }
+
+  /// Renders this attached texture session into a new caller-owned OpenGL
+  /// texture.
+  ///
+  /// See [setMetalBorrowedTextureTarget] for what replacing a target preserves.
+  /// The replacement belongs to the context this session attached with, or one
+  /// in its share group, and that context must be current on this isolate's
+  /// thread.
+  void setOpenGLBorrowedTextureTarget(
+    OpenGLBorrowedTextureDescriptor descriptor,
+  ) {
+    _checkNoActiveTextureFrame('set OpenGL borrowed texture target');
+    withNativeArena((arena) {
+      final nativeDescriptor =
+          arena<raw.mln_opengl_borrowed_texture_descriptor>();
+      nativeDescriptor.ref = _openglBorrowedTextureDescriptorToNative(
+        descriptor,
+      );
+      _check(
+        _c.raw.mln_opengl_borrowed_texture_set_target(
+          _handle.raw,
+          nativeDescriptor,
+        ),
+      );
+    });
   }
 
   /// Processes the latest map render update and reports whether it rendered.

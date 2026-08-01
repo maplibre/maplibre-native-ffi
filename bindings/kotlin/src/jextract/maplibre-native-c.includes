@@ -628,10 +628,13 @@
 # include/maplibre_native_c/surface.h
 --include-function mln_metal_surface_attach
 --include-function mln_metal_surface_descriptor_default
+--include-function mln_metal_surface_set_target
 --include-function mln_opengl_surface_attach
 --include-function mln_opengl_surface_descriptor_default
+--include-function mln_opengl_surface_set_target
 --include-function mln_vulkan_surface_attach
 --include-function mln_vulkan_surface_descriptor_default
+--include-function mln_vulkan_surface_set_target
 --include-struct mln_metal_surface_descriptor
 --include-struct mln_opengl_surface_descriptor
 --include-struct mln_vulkan_surface_descriptor
@@ -639,12 +642,14 @@
 # include/maplibre_native_c/texture.h
 --include-function mln_metal_borrowed_texture_attach
 --include-function mln_metal_borrowed_texture_descriptor_default
+--include-function mln_metal_borrowed_texture_set_target
 --include-function mln_metal_owned_texture_acquire_frame
 --include-function mln_metal_owned_texture_attach
 --include-function mln_metal_owned_texture_descriptor_default
 --include-function mln_metal_owned_texture_release_frame
 --include-function mln_opengl_borrowed_texture_attach
 --include-function mln_opengl_borrowed_texture_descriptor_default
+--include-function mln_opengl_borrowed_texture_set_target
 --include-function mln_opengl_owned_texture_acquire_frame
 --include-function mln_opengl_owned_texture_attach
 --include-function mln_opengl_owned_texture_descriptor_default
@@ -653,6 +658,7 @@
 --include-function mln_texture_read_premultiplied_rgba8
 --include-function mln_vulkan_borrowed_texture_attach
 --include-function mln_vulkan_borrowed_texture_descriptor_default
+--include-function mln_vulkan_borrowed_texture_set_target
 --include-function mln_vulkan_owned_texture_acquire_frame
 --include-function mln_vulkan_owned_texture_attach
 --include-function mln_vulkan_owned_texture_descriptor_default

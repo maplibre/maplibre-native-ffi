@@ -496,6 +496,84 @@ class _RenderSessionHandle:
     def detached(self) -> bool: ...
     def close(self) -> None: ...
     def resize(self, width: int, height: int, scale_factor: float) -> None: ...
+    def set_metal_surface_target(
+        self,
+        width: int,
+        height: int,
+        scale_factor: float,
+        device_address: int,
+        layer_address: int,
+    ) -> None: ...
+    def set_vulkan_surface_target(
+        self,
+        width: int,
+        height: int,
+        scale_factor: float,
+        instance_address: int,
+        physical_device_address: int,
+        device_address: int,
+        graphics_queue_address: int,
+        graphics_queue_family_index: int,
+        get_instance_proc_addr: int,
+        get_device_proc_addr: int,
+        surface_address: int,
+    ) -> None: ...
+    def set_opengl_surface_target(
+        self,
+        width: int,
+        height: int,
+        scale_factor: float,
+        context_platform: int,
+        context_address_1: int,
+        context_address_2: int,
+        share_context_address: int,
+        get_proc_address: int,
+        surface_address: int,
+    ) -> None: ...
+    def set_metal_borrowed_texture_target(
+        self,
+        width: int,
+        height: int,
+        scale_factor: float,
+        physical_width: int,
+        physical_height: int,
+        texture_address: int,
+    ) -> None: ...
+    def set_vulkan_borrowed_texture_target(
+        self,
+        width: int,
+        height: int,
+        scale_factor: float,
+        physical_width: int,
+        physical_height: int,
+        instance_address: int,
+        physical_device_address: int,
+        device_address: int,
+        graphics_queue_address: int,
+        graphics_queue_family_index: int,
+        get_instance_proc_addr: int,
+        get_device_proc_addr: int,
+        image_address: int,
+        image_view_address: int,
+        format: int,
+        initial_layout: int,
+        final_layout: int,
+    ) -> None: ...
+    def set_opengl_borrowed_texture_target(
+        self,
+        width: int,
+        height: int,
+        scale_factor: float,
+        physical_width: int,
+        physical_height: int,
+        context_platform: int,
+        context_address_1: int,
+        context_address_2: int,
+        share_context_address: int,
+        get_proc_address: int,
+        texture: int,
+        target: int,
+    ) -> None: ...
     def render_update(self) -> bool: ...
     def detach(self) -> "_DetachedRenderSessionHandle": ...
     def reduce_memory_use(self) -> None: ...

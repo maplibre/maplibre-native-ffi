@@ -447,6 +447,58 @@ public sealed unsafe class RenderSessionTests
         try
         {
             AssertActiveFrameError(() => session.Resize(64, 64, 1));
+            var extent = new RenderTargetExtent(64, 64, 1);
+            var handle = NativePointer.FromBorrowedAddress(1);
+            AssertActiveFrameError(() =>
+                session.SetMetalSurfaceTarget(
+                    new MetalSurfaceDescriptor { Extent = extent, Layer = handle }
+                )
+            );
+            AssertActiveFrameError(() =>
+                session.SetVulkanSurfaceTarget(
+                    new VulkanSurfaceDescriptor { Extent = extent, Surface = handle }
+                )
+            );
+            AssertActiveFrameError(() =>
+                session.SetOpenGLSurfaceTarget(
+                    new OpenGLSurfaceDescriptor { Extent = extent, Surface = handle }
+                )
+            );
+            AssertActiveFrameError(() =>
+                session.SetMetalBorrowedTextureTarget(
+                    new MetalBorrowedTextureDescriptor
+                    {
+                        Extent = extent,
+                        PhysicalWidth = 64,
+                        PhysicalHeight = 64,
+                        Texture = handle,
+                    }
+                )
+            );
+            AssertActiveFrameError(() =>
+                session.SetVulkanBorrowedTextureTarget(
+                    new VulkanBorrowedTextureDescriptor
+                    {
+                        Extent = extent,
+                        PhysicalWidth = 64,
+                        PhysicalHeight = 64,
+                        Image = handle,
+                        ImageView = handle,
+                    }
+                )
+            );
+            AssertActiveFrameError(() =>
+                session.SetOpenGLBorrowedTextureTarget(
+                    new OpenGLBorrowedTextureDescriptor
+                    {
+                        Extent = extent,
+                        PhysicalWidth = 64,
+                        PhysicalHeight = 64,
+                        Texture = 1,
+                        Target = 0x0de1,
+                    }
+                )
+            );
             AssertActiveFrameError(() => _ = session.RenderUpdate());
             AssertActiveFrameError(session.Detach);
             AssertActiveFrameError(() => _ = session.TextureImageInfo());

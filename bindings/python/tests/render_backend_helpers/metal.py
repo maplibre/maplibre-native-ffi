@@ -170,6 +170,28 @@ class MetalBorrowedTexture:
             texture=_pointer(self.texture, "MTLTexture"),
         )
 
+    def read_rgba(self) -> bytes:
+        queue = self.context.device.newCommandQueue()
+        if queue is None:
+            msg = "MTLDevice.newCommandQueue returned nil"
+            raise MetalUnavailableError(msg)
+        command_buffer = queue.commandBuffer()
+        encoder = command_buffer.blitCommandEncoder()
+        # A texture created without an explicit storage mode is managed on
+        # macOS, so its CPU copy stays stale until a blit synchronizes it.
+        encoder.synchronizeResource_(self.texture)
+        encoder.endEncoding()
+        command_buffer.commit()
+        command_buffer.waitUntilCompleted()
+        pixels = bytearray(self.width * self.height * 4)
+        self.texture.getBytes_bytesPerRow_fromRegion_mipmapLevel_(
+            pixels,
+            self.width * 4,
+            Metal.MTLRegionMake2D(0, 0, self.width, self.height),
+            0,
+        )
+        return bytes(pixels)
+
     def exists(self) -> bool:
         return not self._closed and self.texture is not None
 

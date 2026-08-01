@@ -433,10 +433,10 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
     /// Resizes this attached render session.
     ///
     /// Surface and owned-texture sessions resize in place. Borrowed texture
-    /// targets are sized by their owner and return `error.Unsupported`: close
-    /// this session, recreate the texture, and attach a new session. A map
-    /// holds at most one attached session, so close before attaching the
-    /// replacement.
+    /// targets are sized by their owner and return `error.Unsupported`:
+    /// allocate a texture at the new size and hand it over with the
+    /// `set*BorrowedTextureTarget` method for the backend, which keeps this
+    /// session.
     ///
     /// The session keeps its renderer across a resize, so renderer-held state
     /// such as feature state carries over. A scale factor change is the
@@ -451,6 +451,95 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
             c.mln_render_session_resize(lease.native, extent.width, extent.height, extent.scale_factor),
             lease.diagnostic_store,
         );
+    }
+
+    /// Presents this attached surface session through a new Metal surface.
+    ///
+    /// A host surface can be destroyed and recreated while the map goes on
+    /// living, which is what Android rotation, a Flutter `SurfaceProducer`
+    /// lifecycle change, and a window resize that reallocates all look like
+    /// from here. Replacing the surface in place keeps this session's renderer,
+    /// and with it the tile pyramid, glyph and image atlases, symbol placement,
+    /// and feature state.
+    ///
+    /// The descriptor names the graphics context this session attached with,
+    /// and its extent applies exactly as `resize` applies one, so the map
+    /// publishes an update matching the new size only once pumped. A descriptor
+    /// naming another device returns `error.InvalidArgument`, and a replacement
+    /// this session's compiled state cannot serve returns `error.Unsupported`;
+    /// both leave the session rendering into the surface it has, and closing it
+    /// and attaching again is what takes the new target.
+    pub fn setMetalSurfaceTarget(self: *RenderSessionHandle, descriptor: MetalSurfaceDescriptor) status.Error!void {
+        var raw = metalSurfaceDescriptorToNative(descriptor);
+        return try setTarget(self.*, c.mln_metal_surface_set_target, &raw);
+    }
+
+    /// Presents this attached surface session through a new Vulkan surface.
+    ///
+    /// See `setMetalSurfaceTarget` for what replacing a surface preserves. The
+    /// outgoing `VkSurfaceKHR` must still be valid: this session holds a
+    /// swapchain built from it, and Vulkan destroys every swapchain before its
+    /// surface. A host that has to release its surface first closes this
+    /// session and attaches again instead.
+    pub fn setVulkanSurfaceTarget(self: *RenderSessionHandle, descriptor: VulkanSurfaceDescriptor) status.Error!void {
+        var raw = vulkanSurfaceDescriptorToNative(descriptor);
+        return try setTarget(self.*, c.mln_vulkan_surface_set_target, &raw);
+    }
+
+    /// Presents this attached surface session through a new OpenGL surface.
+    ///
+    /// See `setMetalSurfaceTarget` for what replacing a surface preserves. The
+    /// new surface is made current on the next render, so a host may hand over
+    /// a replacement for one it has already destroyed. A surface accepted here
+    /// can still prove unusable, which the next `renderUpdate` reports as
+    /// `error.NativeError` rather than this call.
+    pub fn setOpenGLSurfaceTarget(self: *RenderSessionHandle, descriptor: OpenGLSurfaceDescriptor) status.Error!void {
+        var raw = openglSurfaceDescriptorToNative(descriptor);
+        return try setTarget(self.*, c.mln_opengl_surface_set_target, &raw);
+    }
+
+    /// Renders this attached texture session into a new caller-owned Metal
+    /// texture.
+    ///
+    /// A caller-owned texture is sized by its owner, so a host that follows a
+    /// resize reallocates rather than resizing and `resize` returns
+    /// `error.Unsupported`. Handing the replacement over here keeps this
+    /// session's renderer instead, so the map does not go cold on every resize,
+    /// and the new extent applies exactly as `resize` applies one.
+    ///
+    /// The replacement belongs to the device this session attached with and
+    /// carries the pixel format it attached with; one that does not returns
+    /// `error.InvalidArgument` or `error.Unsupported` with this session still
+    /// rendering into the texture it has. The caller owns the replacement and
+    /// keeps it valid until the next replacement, detach, or close. This
+    /// session never retained the outgoing texture and never releases it, but
+    /// reads from it during this call, so keep it valid until the call returns.
+    pub fn setMetalBorrowedTextureTarget(self: *RenderSessionHandle, descriptor: MetalBorrowedTextureDescriptor) status.Error!void {
+        var raw = metalBorrowedTextureDescriptorToNative(descriptor);
+        return try setTarget(self.*, c.mln_metal_borrowed_texture_set_target, &raw);
+    }
+
+    /// Renders this attached texture session into a new caller-owned Vulkan
+    /// image.
+    ///
+    /// See `setMetalBorrowedTextureTarget` for what replacing a target
+    /// preserves. The replacement carries the format and both layouts this
+    /// session attached with, since its render pass was built around them.
+    pub fn setVulkanBorrowedTextureTarget(self: *RenderSessionHandle, descriptor: VulkanBorrowedTextureDescriptor) status.Error!void {
+        var raw = vulkanBorrowedTextureDescriptorToNative(descriptor);
+        return try setTarget(self.*, c.mln_vulkan_borrowed_texture_set_target, &raw);
+    }
+
+    /// Renders this attached texture session into a new caller-owned OpenGL
+    /// texture.
+    ///
+    /// See `setMetalBorrowedTextureTarget` for what replacing a target
+    /// preserves. The replacement belongs to the context this session attached
+    /// with, or one in its share group, and that context must be current on
+    /// this thread.
+    pub fn setOpenGLBorrowedTextureTarget(self: *RenderSessionHandle, descriptor: OpenGLBorrowedTextureDescriptor) status.Error!void {
+        var raw = openglBorrowedTextureDescriptorToNative(descriptor);
+        return try setTarget(self.*, c.mln_opengl_borrowed_texture_set_target, &raw);
     }
 
     /// Renders the latest available map render update. The map retains its
@@ -930,11 +1019,7 @@ pub fn attachMetalOwnedTexture(map: *map_module.MapHandle, descriptor: MetalOwne
 }
 
 pub fn attachMetalBorrowedTexture(map: *map_module.MapHandle, descriptor: MetalBorrowedTextureDescriptor) status.Error!RenderSessionHandle {
-    var raw = c.mln_metal_borrowed_texture_descriptor_default();
-    raw.extent = renderTargetExtentToNative(descriptor.extent);
-    raw.physical_width = descriptor.physical_width;
-    raw.physical_height = descriptor.physical_height;
-    raw.texture = descriptor.texture.toPtr();
+    var raw = metalBorrowedTextureDescriptorToNative(descriptor);
     return try attach(map, c.mln_metal_borrowed_texture_attach, &raw);
 }
 
@@ -946,16 +1031,7 @@ pub fn attachVulkanOwnedTexture(map: *map_module.MapHandle, descriptor: VulkanOw
 }
 
 pub fn attachVulkanBorrowedTexture(map: *map_module.MapHandle, descriptor: VulkanBorrowedTextureDescriptor) status.Error!RenderSessionHandle {
-    var raw = c.mln_vulkan_borrowed_texture_descriptor_default();
-    raw.extent = renderTargetExtentToNative(descriptor.extent);
-    raw.physical_width = descriptor.physical_width;
-    raw.physical_height = descriptor.physical_height;
-    raw.context = vulkanContextToNative(descriptor.context);
-    raw.image = descriptor.image.toPtr();
-    raw.image_view = descriptor.image_view.toPtr();
-    raw.format = descriptor.format;
-    raw.initial_layout = descriptor.initial_layout;
-    raw.final_layout = descriptor.final_layout;
+    var raw = vulkanBorrowedTextureDescriptorToNative(descriptor);
     return try attach(map, c.mln_vulkan_borrowed_texture_attach, &raw);
 }
 
@@ -967,37 +1043,22 @@ pub fn attachOpenGLOwnedTexture(map: *map_module.MapHandle, descriptor: OpenGLOw
 }
 
 pub fn attachOpenGLBorrowedTexture(map: *map_module.MapHandle, descriptor: OpenGLBorrowedTextureDescriptor) status.Error!RenderSessionHandle {
-    var raw = c.mln_opengl_borrowed_texture_descriptor_default();
-    raw.extent = renderTargetExtentToNative(descriptor.extent);
-    raw.physical_width = descriptor.physical_width;
-    raw.physical_height = descriptor.physical_height;
-    raw.context = openglContextToNative(descriptor.context);
-    raw.texture = descriptor.texture;
-    raw.target = descriptor.target;
+    var raw = openglBorrowedTextureDescriptorToNative(descriptor);
     return try attach(map, c.mln_opengl_borrowed_texture_attach, &raw);
 }
 
 pub fn attachMetalSurface(map: *map_module.MapHandle, descriptor: MetalSurfaceDescriptor) status.Error!RenderSessionHandle {
-    var raw = c.mln_metal_surface_descriptor_default();
-    raw.extent = renderTargetExtentToNative(descriptor.extent);
-    raw.context = metalContextToNative(descriptor.context);
-    raw.layer = descriptor.layer.toPtr();
+    var raw = metalSurfaceDescriptorToNative(descriptor);
     return try attach(map, c.mln_metal_surface_attach, &raw);
 }
 
 pub fn attachVulkanSurface(map: *map_module.MapHandle, descriptor: VulkanSurfaceDescriptor) status.Error!RenderSessionHandle {
-    var raw = c.mln_vulkan_surface_descriptor_default();
-    raw.extent = renderTargetExtentToNative(descriptor.extent);
-    raw.context = vulkanContextToNative(descriptor.context);
-    raw.surface = descriptor.surface.toPtr();
+    var raw = vulkanSurfaceDescriptorToNative(descriptor);
     return try attach(map, c.mln_vulkan_surface_attach, &raw);
 }
 
 pub fn attachOpenGLSurface(map: *map_module.MapHandle, descriptor: OpenGLSurfaceDescriptor) status.Error!RenderSessionHandle {
-    var raw = c.mln_opengl_surface_descriptor_default();
-    raw.extent = renderTargetExtentToNative(descriptor.extent);
-    raw.context = openglContextToNative(descriptor.context);
-    raw.surface = descriptor.surface.toPtr();
+    var raw = openglSurfaceDescriptorToNative(descriptor);
     return try attach(map, c.mln_opengl_surface_attach, &raw);
 }
 
@@ -1015,6 +1076,21 @@ fn attach(
     );
     errdefer _ = c.mln_render_session_destroy(session);
     return try newRenderSession(session, map.*, registration.diagnostic_store);
+}
+
+/// Shared body for the `set*Target` methods.
+///
+/// The native descriptor is materialized by the caller and lives for the
+/// duration of this call, which is all the C API borrows it for.
+fn setTarget(
+    handle: RenderSessionHandle,
+    comptime setTargetFn: anytype,
+    descriptor: anytype,
+) status.Error!void {
+    const lease = try renderSessionLease(handle);
+    defer lease.release();
+    try ensureNoActiveOwnedFrame(lease);
+    try status.checkStatus(setTargetFn(lease.native, descriptor), lease.diagnostic_store);
 }
 
 fn newRenderSession(
@@ -1542,6 +1618,64 @@ fn copyFeatureIdentifier(allocator: std.mem.Allocator, raw: c.mln_feature) statu
 fn copyStringView(allocator: std.mem.Allocator, view: c.mln_string_view) std.mem.Allocator.Error![]const u8 {
     if (view.size == 0) return allocator.dupe(u8, "");
     return allocator.dupe(u8, view.data[0..view.size]);
+}
+
+fn metalSurfaceDescriptorToNative(descriptor: MetalSurfaceDescriptor) c.mln_metal_surface_descriptor {
+    var raw = c.mln_metal_surface_descriptor_default();
+    raw.extent = renderTargetExtentToNative(descriptor.extent);
+    raw.context = metalContextToNative(descriptor.context);
+    raw.layer = descriptor.layer.toPtr();
+    return raw;
+}
+
+fn vulkanSurfaceDescriptorToNative(descriptor: VulkanSurfaceDescriptor) c.mln_vulkan_surface_descriptor {
+    var raw = c.mln_vulkan_surface_descriptor_default();
+    raw.extent = renderTargetExtentToNative(descriptor.extent);
+    raw.context = vulkanContextToNative(descriptor.context);
+    raw.surface = descriptor.surface.toPtr();
+    return raw;
+}
+
+fn openglSurfaceDescriptorToNative(descriptor: OpenGLSurfaceDescriptor) c.mln_opengl_surface_descriptor {
+    var raw = c.mln_opengl_surface_descriptor_default();
+    raw.extent = renderTargetExtentToNative(descriptor.extent);
+    raw.context = openglContextToNative(descriptor.context);
+    raw.surface = descriptor.surface.toPtr();
+    return raw;
+}
+
+fn metalBorrowedTextureDescriptorToNative(descriptor: MetalBorrowedTextureDescriptor) c.mln_metal_borrowed_texture_descriptor {
+    var raw = c.mln_metal_borrowed_texture_descriptor_default();
+    raw.extent = renderTargetExtentToNative(descriptor.extent);
+    raw.physical_width = descriptor.physical_width;
+    raw.physical_height = descriptor.physical_height;
+    raw.texture = descriptor.texture.toPtr();
+    return raw;
+}
+
+fn vulkanBorrowedTextureDescriptorToNative(descriptor: VulkanBorrowedTextureDescriptor) c.mln_vulkan_borrowed_texture_descriptor {
+    var raw = c.mln_vulkan_borrowed_texture_descriptor_default();
+    raw.extent = renderTargetExtentToNative(descriptor.extent);
+    raw.physical_width = descriptor.physical_width;
+    raw.physical_height = descriptor.physical_height;
+    raw.context = vulkanContextToNative(descriptor.context);
+    raw.image = descriptor.image.toPtr();
+    raw.image_view = descriptor.image_view.toPtr();
+    raw.format = descriptor.format;
+    raw.initial_layout = descriptor.initial_layout;
+    raw.final_layout = descriptor.final_layout;
+    return raw;
+}
+
+fn openglBorrowedTextureDescriptorToNative(descriptor: OpenGLBorrowedTextureDescriptor) c.mln_opengl_borrowed_texture_descriptor {
+    var raw = c.mln_opengl_borrowed_texture_descriptor_default();
+    raw.extent = renderTargetExtentToNative(descriptor.extent);
+    raw.physical_width = descriptor.physical_width;
+    raw.physical_height = descriptor.physical_height;
+    raw.context = openglContextToNative(descriptor.context);
+    raw.texture = descriptor.texture;
+    raw.target = descriptor.target;
+    return raw;
 }
 
 fn metalContextToNative(context: MetalContextDescriptor) c.mln_metal_context_descriptor {

@@ -26,7 +26,6 @@ from .errors import InvalidArgumentError
 from .geo import GeoJson, Geometry, LatLng, LatLngBounds
 from .json import JsonObject, JsonValue
 from .render import (
-    EglContextDescriptor,
     MetalBorrowedTextureDescriptor,
     MetalOwnedTextureDescriptor,
     MetalSurfaceDescriptor,
@@ -38,7 +37,7 @@ from .render import (
     VulkanBorrowedTextureDescriptor,
     VulkanOwnedTextureDescriptor,
     VulkanSurfaceDescriptor,
-    WglContextDescriptor,
+    _opengl_context_parts,
 )
 from .style import (
     CanonicalTileId,
@@ -1693,29 +1692,6 @@ class MapHandle(NativeHandleMixin):
             descriptor.texture,
             descriptor.target,
         )
-
-
-def _opengl_context_parts(
-    context: EglContextDescriptor | WglContextDescriptor,
-) -> tuple[int, int, int, int, int]:
-    if isinstance(context, WglContextDescriptor):
-        return (
-            1,
-            context.device_context.address,
-            0,
-            context.share_context.address,
-            context.get_proc_address.address,
-        )
-    if isinstance(context, EglContextDescriptor):
-        return (
-            2,
-            context.display.address,
-            context.config.address,
-            context.share_context.address,
-            context.get_proc_address.address,
-        )
-    msg = f"unsupported OpenGL context descriptor: {type(context)!r}"
-    raise TypeError(msg)
 
 
 __all__ = [

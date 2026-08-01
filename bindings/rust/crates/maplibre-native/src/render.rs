@@ -1282,9 +1282,10 @@ impl RenderSessionHandle {
     ///
     /// The descriptor names the same graphics context this session attached
     /// with, and its extent applies as a resize does. A target on a different
-    /// context, or one this session's compiled state cannot serve, reports an
-    /// unsupported-feature error with this session still rendering into the
-    /// surface it has; close it and attach again to take that one.
+    /// context reports an invalid-argument error, and one this session's
+    /// compiled state cannot serve reports an unsupported-feature error. Both
+    /// leave this session rendering into the surface it has; close it and
+    /// attach again to take that target.
     pub fn set_metal_surface_target(&self, descriptor: &MetalSurfaceDescriptor) -> Result<()> {
         self.set_target(descriptor.to_native(), |session, raw| {
             // SAFETY: session is a live render session handle owned by this
@@ -1330,10 +1331,10 @@ impl RenderSessionHandle {
     /// keeps this session's renderer instead, so the map does not go cold on
     /// every resize.
     ///
-    /// The replacement belongs to the device this session attached with and
-    /// carries the pixel format it attached with; one that does not reports an
-    /// unsupported-feature error with this session still rendering into the
-    /// texture it has. The caller owns the replacement and keeps it valid until
+    /// The replacement belongs to the device this session attached with, which
+    /// reports an invalid-argument error otherwise, and carries the pixel
+    /// format it attached with, which reports an unsupported-feature error
+    /// otherwise. Both leave this session rendering into the texture it has. The caller owns the replacement and keeps it valid until
     /// the next replacement, detach, or close. This session never retained the
     /// outgoing texture and never releases it, but reads from it during this
     /// call, so keep it valid until the call returns.
