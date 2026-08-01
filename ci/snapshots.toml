@@ -117,21 +117,34 @@ paths = [
   "gradlew.bat",
 ]
 
+[components.python]
+description = "Backend-specific Python wheels on the GitHub Pages package index."
+depends = ["native"]
+paths = [
+  "bindings/python/**",
+  # The extension reuses the Rust binding's low-level ownership and FFI layers.
+  "bindings/rust/**",
+  "pyproject.toml",
+  "uv.lock",
+]
+
 [components.docs]
 description = "Docs site on GitHub Pages."
-depends = ["kotlin"]
+depends = ["kotlin", "python"]
 # The site embeds an API reference generated from every binding, so it takes the
 # binding sources along with the ecosystem roots each doc tool builds through.
 # As the remaining bindings gain components of their own, `depends` should name
 # them and these entries should move to the component that owns them.
 paths = [
-  "bindings/**",
+  "bindings/dart/**",
+  "bindings/dotnet/**",
+  "bindings/go/**",
+  "bindings/swift/**",
+  "bindings/zig/**",
   "package.json",
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
   ".npmrc",
-  "pyproject.toml",
-  "uv.lock",
   "Directory.Packages.props",
   "Maplibre.Native.slnx",
   ".config/dotnet-tools.json",

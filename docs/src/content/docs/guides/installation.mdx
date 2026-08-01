@@ -123,11 +123,39 @@ printf("backends: %#x\n", mln_supported_render_backend_mask());
 ## Language bindings
 
 Bindings live under `bindings/` for Kotlin, Rust, Swift, Zig, .NET, Python, Go,
-and Dart. Only the Kotlin artifacts are published anywhere today, as
-`org.maplibre.nativeffi` snapshots on
-[Maven Central's snapshot repository](https://central.sonatype.com/repository/maven-snapshots/org/maplibre/nativeffi/).
-For the rest, depend on the binding by path or git from a checkout and point its
-build at a native install prefix.
+and Dart. Kotlin artifacts are available as `org.maplibre.nativeffi` snapshots
+on [Maven Central's snapshot repository](https://central.sonatype.com/repository/maven-snapshots/org/maplibre/nativeffi/),
+and Python wheels are available from the opt-in index below. Other bindings use
+a path or git dependency from a checkout and a native install prefix.
+
+### Python
+
+The Python snapshot wheels include the native shared library. Choose the
+distribution matching the one renderer your application uses:
+
+```bash
+python -m pip install --index-url \
+  https://maplibre.github.io/maplibre-native-ffi/simple/ \
+  maplibre-native-vulkan
+```
+
+The wheels declare no dependencies, so this index serves the whole install and
+replaces PyPI rather than joining it. That is deliberate: with
+`--extra-index-url` these names stay resolvable from PyPI too, and whichever
+index offers the higher version wins.
+
+Use `maplibre-native-opengl` for the OpenGL renderer on Linux or
+`maplibre-native-metal` for Metal on Apple silicon. All three distributions
+provide the `maplibre_native` import, so install exactly one. Snapshot versions
+carry the publication time, such as `0.1.0.dev202608010314`, and the index
+retains only its current build. The wheels require Python 3.14 or newer and use
+Python's stable ABI from 3.14 onward.
+
+A wheel's platform tag states what it needs, so pip installs one only where it
+runs. The Linux tag names the build runner's glibc rather than the
+`GLIBC_2.17` floor the native archives hold to, because the extension module is
+compiled alongside the wheel; take the archive and build the binding from source
+for a host older than the tag.
 
 ### Rust
 
