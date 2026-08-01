@@ -610,10 +610,18 @@ that pass.
 - The session stays live either way, and so does its renderer, so the map keeps
   its tiles and atlases across a resize. A scale factor change is the exception
   the C API documents, rebuilding the renderer for the new pixel ratio.
-- A `set_target` that fails leaves the session on the target it already had, so
-  keep that one and release the replacement rather than the reverse. The session
-  never reads the outgoing target, so an example whose graphics layer frees it
-  before handing over the replacement is conformant.
+- Pick an ownership strategy for the handover and follow the C API's rules for
+  it. An example that keeps the outgoing target until the call returns can roll
+  back: a rejected replacement leaves the session on the target it had, so it
+  releases the replacement and keeps rendering. An example whose graphics layer
+  frees the outgoing target first cannot roll back, and treats a rejected
+  handover as a session to close and attach again. Caller-owned textures allow
+  either, because no backend reads the outgoing texture.
+- A Vulkan surface is the exception, and requires the retaining strategy: its
+  outgoing `VkSurfaceKHR` must still be valid when `set_target` is called,
+  because the session destroys the swapchain built from it first.
+- `MLN_STATUS_NATIVE_ERROR` means the replacement was already under way, so the
+  session is closed rather than reused whichever strategy an example picked.
 - Build the replacement to match what the session attached with, which the C API
   states per backend and per function. `set_target` reports
   `MLN_STATUS_UNSUPPORTED` for a target that differs, leaving the session on the
@@ -826,13 +834,13 @@ same render loop thread. Keep runtime and map handles alive either way, and
 attach again on that thread once a context and surface exist, per
 [Reattach](#reattach).
 
-| Transition                       | Behavior                                                                                                                                                           |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| View will appear                 | Mark the view visible. If the app is in the foreground, start the render loop, refresh viewport, attach or reattach the render target, and set the render request. |
-| View did disappear               | Mark the view not visible. Stop the render loop. Close the render target when the presentation surface is destroyed or invalidated.                                |
-| App foreground                   | Mark the app foreground. If the view is visible, start the render loop, refresh viewport, attach or reattach the render target, and set the render request.        |
-| App background                   | Mark the app background. Stop the render loop. Close the render target when the presentation surface is destroyed or invalidated.                                  |
-| View destroyed / app termination | Run [Shared shutdown](#shutdown).                                                                                                                                  |
+| Transition                       | Behavior                                                                                                                                                                                             |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| View will appear                 | Mark the view visible. If the app is in the foreground, start the render loop, refresh viewport, hand a parked session its surface or attach the render target, and set the render request.          |
+| View did disappear               | Mark the view not visible. Stop the render loop. Park the session when the presentation surface goes away and the graphics context survives; close the render target only when that context is gone. |
+| App foreground                   | Mark the app foreground. If the view is visible, start the render loop, refresh viewport, hand a parked session its surface or attach the render target, and set the render request.                 |
+| App background                   | Mark the app background. Stop the render loop. Park the session when the presentation surface goes away and the graphics context survives; close the render target only when that context is gone.   |
+| View destroyed / app termination | Run [Shared shutdown](#shutdown).                                                                                                                                                                    |
 
 ### Entry and shell
 

@@ -440,8 +440,8 @@ func (target *openGLBorrowedTextureTarget) Resize(v viewport) error {
 		glDeleteTexture(replacement)
 		return fmt.Errorf("OpenGL borrowed texture set target failed: %w", err)
 	}
-	// Only once the session has taken the replacement, so the outgoing texture
-	// stays alive for the duration of that call.
+	// Only once the session has taken the replacement, so a rejected one leaves
+	// this target on the texture it already had.
 	outgoing := target.texture
 	target.texture = replacement
 	if outgoing != 0 {

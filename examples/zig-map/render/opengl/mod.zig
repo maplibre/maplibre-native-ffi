@@ -353,6 +353,17 @@ const OpenGLContext = struct {
         };
     }
 
+    /// Re-reads the platform surface for this window.
+    ///
+    /// SDL can hand back a different EGL window surface once the window has
+    /// been resized, and a session still presenting through the old one draws
+    /// nowhere. Returns whether the handle changed.
+    fn refreshPlatformSurface(self: *OpenGLContext) !bool {
+        const previous = self.surface();
+        self.platform = try platformContext(self.window);
+        return !std.meta.eql(self.surface(), previous);
+    }
+
     fn surface(self: *const OpenGLContext) maplibre.NativePointer {
         return switch (self.platform) {
             .wgl => |wgl| maplibre.NativePointer.fromPtr(@ptrCast(wgl.device_context)),
@@ -653,8 +664,8 @@ const OpenGLBorrowedTextureBackend = struct {
             diagnostics.logError("OpenGL borrowed texture set target failed", err, null);
             return types.AppError.TextureResizeFailed;
         };
-        // Only once the session has taken the replacement: it renders into the
-        // outgoing texture until that call returns, so delete it after.
+        // Only once the session has taken the replacement, so a rejected one
+        // leaves this target on the texture it already had.
         self.borrowed_texture.deinit(&self.compositor.context, self.compositor.procs);
         self.borrowed_texture = replacement;
     }
@@ -724,8 +735,29 @@ const OpenGLSurfaceBackend = struct {
         self.context.deinit();
     }
 
+    /// Follows a resized window.
+    ///
+    /// SDL can hand back a different EGL window surface for the resized window.
+    /// The live session takes that replacement rather than being closed and
+    /// attached again, so it keeps its renderer either way.
     fn resize(self: *OpenGLSurfaceBackend, viewport: types.Viewport) !void {
-        try self.session.resize(viewport, null);
+        const replaced = self.context.refreshPlatformSurface() catch |err| {
+            diagnostics.logError("OpenGL surface refresh failed", err, null);
+            return types.AppError.SurfaceAttachFailed;
+        };
+        if (!replaced) {
+            try self.session.resize(viewport, null);
+            return;
+        }
+        const handle = try self.session.surfaceHandle();
+        handle.setOpenGLSurfaceTarget(.{
+            .extent = render_target.extent(viewport),
+            .context = self.context.descriptor(),
+            .surface = self.context.surface(),
+        }) catch |err| {
+            diagnostics.logError("OpenGL surface set target failed", err, null);
+            return types.AppError.SurfaceAttachFailed;
+        };
     }
 
     fn finishFrame(self: *OpenGLSurfaceBackend) !void {

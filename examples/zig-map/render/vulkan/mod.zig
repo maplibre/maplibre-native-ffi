@@ -438,8 +438,8 @@ const VulkanBorrowedTextureBackend = struct {
             diagnostics.logError("Vulkan borrowed texture set target failed", err, null);
             return types.AppError.TextureResizeFailed;
         };
-        // Only once the session has taken the replacement: it renders into the
-        // outgoing image until that call returns, so destroy it after.
+        // Only once the session has taken the replacement, so a rejected one
+        // leaves this target on the image it already had.
         self.borrowed_image.deinit(self.compositor.context.device);
         self.borrowed_image = replacement;
     }

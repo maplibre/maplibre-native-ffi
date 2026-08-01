@@ -43,6 +43,13 @@ pub const Session = union(enum) {
         };
     }
 
+    pub fn surfaceHandle(self: *Session) !*maplibre.RenderSessionHandle {
+        return switch (self.*) {
+            .surface => |*surface| surface,
+            .none, .texture => types.AppError.SurfaceAttachFailed,
+        };
+    }
+
     pub fn renderUpdate(
         self: *Session,
         diagnostic_store: ?*const maplibre.DiagnosticStore,

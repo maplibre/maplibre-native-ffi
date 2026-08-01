@@ -178,8 +178,8 @@ impl RenderTarget {
                     return Err(error);
                 }
                 compositor.resize(viewport);
-                // Only once the session has taken the replacement, so the
-                // outgoing texture stays alive for the duration of that call.
+                // Only once the session has taken the replacement, so a rejected
+                // one leaves this target on the texture it already had.
                 let outgoing = std::mem::replace(&mut **texture, replacement);
                 outgoing.close(Some(opengl));
                 Ok(())

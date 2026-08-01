@@ -168,8 +168,8 @@ internal object VulkanRenderTarget {
         RenderTarget.closeSuppressed(error, replacement)
         throw error
       }
-      // Only once the session has taken the replacement: destroying the outgoing image before that
-      // call returns would pull it out from under the session.
+      // Only once the session has taken the replacement, so a rejected one leaves this target on
+      // the image it already had.
       image.close()
       image = replacement
     }

@@ -85,8 +85,8 @@ public expect class RenderSessionHandle : AutoCloseable {
    * it attached with; another device throws `InvalidArgumentException` and another pixel format
    * throws `UnsupportedFeatureException`, both leaving this session rendering into the texture it
    * has. The caller owns the replacement and keeps it valid until the next replacement, [detach],
-   * or [close]. This session never retained the outgoing texture and never releases it, so the
-   * caller is free to release that one once this call returns.
+   * or [close]. This session never retained the outgoing texture, never releases it, and never
+   * reads it here, so a caller that already released it hands over the replacement all the same.
    */
   public fun setMetalBorrowedTextureTarget(descriptor: MetalBorrowedTextureDescriptor)
 

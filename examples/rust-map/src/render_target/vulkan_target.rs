@@ -94,8 +94,8 @@ impl RenderTarget {
                         "Vulkan texture compositor resize failed: {error:?}"
                     ))
                 })?;
-                // Only once the session has taken the replacement: dropping the
-                // outgoing image destroys it, and it has to outlive that call.
+                // Only once the session has taken the replacement, so a rejected
+                // one leaves this target on the image it already had.
                 **image = replacement;
                 Ok(())
             }
