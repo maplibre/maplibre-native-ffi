@@ -171,8 +171,8 @@ internal object OpenGLRenderTarget {
         RenderTarget.closeSuppressed(error, replacement)
         throw error
       }
-      // Only once the session has taken the replacement: deleting the outgoing texture before that
-      // call returns would pull it out from under the session.
+      // Only once the session has taken the replacement, so a rejected one leaves this target on
+      // the texture it already had.
       texture.close()
       texture = replacement
     }

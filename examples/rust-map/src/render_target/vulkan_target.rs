@@ -89,14 +89,17 @@ impl RenderTarget {
                     ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL.as_raw() as u32,
                 );
                 session.set_vulkan_borrowed_texture_target(&descriptor)?;
+                // Adopted the moment the session takes it, and before anything
+                // else that can fail: the session renders into this image now,
+                // so dropping the local would pull it out from under it. A
+                // rejected replacement never gets here, leaving this target on
+                // the image it already had.
+                **image = replacement;
                 compositor.resize(viewport).map_err(|error| {
                     compositor_error(format!(
                         "Vulkan texture compositor resize failed: {error:?}"
                     ))
                 })?;
-                // Only once the session has taken the replacement, so a rejected
-                // one leaves this target on the image it already had.
-                **image = replacement;
                 Ok(())
             }
             Self::Surface { session } => session.resize(

@@ -190,7 +190,18 @@ internal class AndroidMapView(context: Context) :
     val currentGraphics = graphics ?: return
     val currentViewport = viewport?.takeUnless { it.isEmpty } ?: return
     val target = renderTarget ?: return
-    target.resize(currentGraphics, currentViewport)
+    try {
+      target.resize(currentGraphics, currentViewport)
+    } catch (error: RuntimeException) {
+      // The surface this session was presenting through is already gone by now,
+      // and a failed handover may have left it holding either that one or the
+      // replacement. Close it here rather than let a lifecycle callback throw
+      // with a live session naming a destroyed surface; the next surface
+      // attaches a new one.
+      Log.w(TAG, "$change: handing the surface over failed; the session is closed", error)
+      detachSurface()
+      return
+    }
     Log.i(TAG, "$change: the live session followed it and kept its renderer")
   }
 
