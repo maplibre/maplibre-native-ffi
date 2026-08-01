@@ -1,9 +1,16 @@
+# Produces the distributable wheel, so it optimizes and vendors: `--release`
+# because the native library it wraps is built Release too, and an explicit
+# `--auditwheel repair` because maturin only defaults to repairing on Linux,
+# which would leave a macOS wheel pointing at the build machine's install tree.
 [tasks.build]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
+# Wheel repair rewrites the extension's dependency names in place. Recompile it
+# so a previous wheel cannot feed those private names into the next repair.
+cargo clean --package maplibre-native-python
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
-  uv run --project . --no-sync maturin build --auditwheel skip
+  uv run --project . --no-sync maturin build --release --auditwheel repair
 '''
 
 [tasks._install-extension]
@@ -12,8 +19,10 @@ hide = true
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
+# See `build`: repaired extension artifacts are outputs, never compiler inputs.
+cargo clean --package maplibre-native-python
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
-  uv run --project . --no-sync maturin build --out dist --auditwheel skip
+  uv run --project . --no-sync maturin build --out dist
 uv pip install --python "$MISE_MONOREPO_ROOT/.venv" --reinstall --no-index --find-links dist \
   "maplibre-native==0.0.0"
 '''

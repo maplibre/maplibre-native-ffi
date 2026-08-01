@@ -17,6 +17,7 @@ on:
           - all
           - native
           - kotlin
+          - python
           - docs
 
 permissions:
@@ -42,8 +43,10 @@ jobs:
       run_id: ${{ steps.source.outputs.run_id }}
       sha: ${{ steps.source.outputs.sha }}
       ci_run_url: ${{ steps.source.outputs.ci_run_url }}
+      snapshot_version: ${{ steps.version.outputs.value }}
       publish_native: ${{ steps.plan.outputs.publish_native }}
       publish_kotlin: ${{ steps.plan.outputs.publish_kotlin }}
+      publish_python: ${{ steps.plan.outputs.publish_python }}
       publish_docs: ${{ steps.plan.outputs.publish_docs }}
     steps:
       # The artifacts every publish job downloads come from one CI run, so that
@@ -120,14 +123,140 @@ jobs:
           mise run --no-deps ci:snapshot-state plan
           --components "${{ inputs.components || 'all' }}"
           --force "${{ inputs.components != '' && inputs.components != 'all' }}"
+      # Minutes, not just the date: a scheduled run and a manual one on the same
+      # day would otherwise publish different bytes under one version, and pip
+      # would never see the second as an upgrade.
+      - name: Date the snapshot version
+        id: version
+        run: echo "value=0.1.0.dev$(date -u +%Y%m%d%H%M)" >> "$GITHUB_OUTPUT"
+
+  stage-python:
+    name: Python wheel / ${{ matrix.backend }}
+    needs:
+      - plan
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    if: ${{ needs.plan.outputs.publish_python == 'true' }}
+    environment: sccache
+    permissions:
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - backend: vulkan
+            preset: linux-x64-vulkan
+            runner: ubuntu-latest
+          - backend: opengl
+            preset: linux-x64-egl
+            runner: ubuntu-latest
+          - backend: metal
+            preset: macos-arm64-metal
+            runner: macos-26
+            macos_deployment_target: "14.3"
+    env:
+      SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
+      SNAPSHOT_VERSION: ${{ needs.plan.outputs.snapshot_version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SNAPSHOT_SHA }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: ${{ matrix.preset }}
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.plan.outputs.run_id }}
+          name: native-package-${{ matrix.preset }}-${{ env.SNAPSHOT_SHA }}
+          path: build/packages/native/python-input
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          ${{ matrix.preset }}
+          build/packages/native/python-input/maplibre-native-c-${{ matrix.preset }}.tar.gz
+      # The native artifact is built for macOS 14.3, and maturin derives the
+      # wheel's platform tag from this variable. Left unset, the tag would
+      # promise older releases a dylib they cannot load.
+      - run: mise run //bindings/python:build ${{ matrix.preset }}
+        env:
+          MISE_TASK_SKIP: "//:build"
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macos_deployment_target }}
+      - name: Prepare backend wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          wheels=(target/wheels/*.whl)
+          if [[ "${#wheels[@]}" -ne 1 ]]; then
+            echo "expected one wheel, found ${#wheels[@]}" >&2
+            exit 1
+          fi
+          mise run --no-deps ci:prepare-python-snapshot relabel \
+            "${wheels[0]}" build/packages/python/wheels \
+            "${{ matrix.backend }}" "$SNAPSHOT_VERSION"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: python-wheel-${{ matrix.backend }}-${{ env.SNAPSHOT_SHA }}
+          path: build/packages/python/wheels/*.whl
+          if-no-files-found: error
+          retention-days: 1
+
+  python-index:
+    name: Python package index
+    needs:
+      - plan
+      - stage-python
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+    env:
+      MISE_NO_HOOKS: "1"
+      SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SNAPSHOT_SHA }}
+          persist-credentials: false
+      - uses: jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
+        with:
+          cache: false
+          install_args: python
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: python-wheel-*-${{ env.SNAPSHOT_SHA }}
+          path: build/packages/python/wheels
+          merge-multiple: true
+      - run: >-
+          mise run --no-deps ci:prepare-python-snapshot index
+          build/packages/python/wheels build/packages/python/simple
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: python-simple-index-${{ env.SNAPSHOT_SHA }}
+          path: build/packages/python/simple
+          if-no-files-found: error
+          retention-days: 1
 
   docs-pages:
     name: Docs Pages
     needs:
       - plan
+      - python-index
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    if: ${{ needs.plan.outputs.publish_docs == 'true' }}
+    # Runs whatever became of the Python jobs. The steps below take the staged
+    # index when there is one and mirror the live one otherwise, so a wheel
+    # failure degrades this to a docs-only publish instead of blocking it.
+    if: >-
+      ${{
+        always() && needs.plan.result == 'success' &&
+        (needs.plan.outputs.publish_docs == 'true' || needs.plan.outputs.publish_python == 'true')
+      }}
     environment: sccache
     permissions:
       actions: read
@@ -163,6 +292,20 @@ jobs:
       - run: mise run //docs:build
         env:
           MISE_TASK_SKIP: "//:build"
+      # Keyed on the index job rather than on the plan: a failed wheel build
+      # skips it, and a docs publish should carry the live index forward rather
+      # than fail reaching for an artifact that was never uploaded.
+      - if: ${{ needs.python-index.result == 'success' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: python-simple-index-${{ env.SNAPSHOT_SHA }}
+          path: docs/dist/simple
+      # A docs-only deploy still replaces the whole Pages site, so carry the
+      # current feed forward rather than erasing a separately gated component.
+      - if: ${{ needs.python-index.result != 'success' }}
+        run: >-
+          mise run --no-deps ci:prepare-python-snapshot mirror
+          https://maplibre.github.io/maplibre-native-ffi/simple/ docs/dist/simple
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: docs/dist
@@ -445,6 +588,7 @@ jobs:
     needs:
       - plan
       - deploy-docs
+      - python-index
       - publish-kotlin-roots
       - publish
     # Only components that published get their state tag moved, so a failed or
@@ -472,6 +616,8 @@ jobs:
           DOCS_RESULT: ${{ needs.deploy-docs.result }}
           KOTLIN_RESULT: ${{ needs.publish-kotlin-roots.result }}
           NATIVE_RESULT: ${{ needs.publish.result }}
+          PUBLISH_DOCS: ${{ needs.plan.outputs.publish_docs }}
+          PYTHON_RESULT: ${{ needs.python-index.result }}
         run: |
           set -euo pipefail
 
@@ -482,8 +628,15 @@ jobs:
           if [[ "$KOTLIN_RESULT" == success ]]; then
             published+=(kotlin)
           fi
-          if [[ "$DOCS_RESULT" == success ]]; then
+          if [[ "$PUBLISH_DOCS" == true && "$DOCS_RESULT" == success ]]; then
             published+=(docs)
+          fi
+          # The deploy alone does not say the wheels made it: docs-pages
+          # succeeds by mirroring the live index when staging failed, and
+          # recording python then would tell the next run there is nothing to
+          # retry.
+          if [[ "$PYTHON_RESULT" == success && "$DOCS_RESULT" == success ]]; then
+            published+=(python)
           fi
 
           mise run --no-deps ci:snapshot-state record ${published[@]+"${published[@]}"}
@@ -497,6 +650,8 @@ jobs:
     needs:
       - plan
       - docs-pages
+      - stage-python
+      - python-index
       - deploy-docs
       - stage-kotlin
       - verify-kotlin
