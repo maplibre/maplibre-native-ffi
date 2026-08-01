@@ -181,7 +181,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
       closeRenderSession()
       stopRuntimeLoop()
     }
-    return MapRuntimeLoop(extent, commands, renderRequest).also { runtimeLoop = it }
+    return MapRuntimeLoop(extent, commands, ::requestRender).also { runtimeLoop = it }
   }
 
   private fun stopRuntimeLoop() {
