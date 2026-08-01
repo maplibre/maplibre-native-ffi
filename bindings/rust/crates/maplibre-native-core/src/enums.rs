@@ -9,6 +9,7 @@ bitflags::bitflags! {
         const METAL = sys::MLN_RENDER_BACKEND_FLAG_METAL;
         const VULKAN = sys::MLN_RENDER_BACKEND_FLAG_VULKAN;
         const OPENGL = sys::MLN_RENDER_BACKEND_FLAG_OPENGL;
+        const WEBGPU = sys::MLN_RENDER_BACKEND_FLAG_WEBGPU;
         const _ = !0;
     }
 }
@@ -19,6 +20,7 @@ bitflags::bitflags! {
     pub struct OpenGLContextProviderMask: u32 {
         const WGL = sys::MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL;
         const EGL = sys::MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL;
+        const WEBGL = sys::MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL;
         const _ = !0;
     }
 }
@@ -1029,6 +1031,10 @@ mod tests {
             RenderBackendMask::OPENGL.bits(),
             sys::MLN_RENDER_BACKEND_FLAG_OPENGL
         );
+        assert_eq!(
+            RenderBackendMask::WEBGPU.bits(),
+            sys::MLN_RENDER_BACKEND_FLAG_WEBGPU
+        );
         assert_eq!(RenderBackendMask::from_bits_retain(1 << 31).bits(), 1 << 31);
 
         assert_eq!(
@@ -1038,6 +1044,10 @@ mod tests {
         assert_eq!(
             OpenGLContextProviderMask::EGL.bits(),
             sys::MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL
+        );
+        assert_eq!(
+            OpenGLContextProviderMask::WEBGL.bits(),
+            sys::MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL
         );
         assert_eq!(
             OpenGLContextProviderMask::from_bits_retain(1 << 31).bits(),

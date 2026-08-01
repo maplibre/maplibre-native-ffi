@@ -203,6 +203,74 @@ typedef struct mln_opengl_borrowed_texture_descriptor {
   uint32_t target;
 } mln_opengl_borrowed_texture_descriptor;
 
+/** WebGPU texture session attachment options for a session-owned target. */
+typedef struct mln_webgpu_owned_texture_descriptor {
+  uint32_t size;
+  /** Logical texture extent. */
+  mln_render_target_extent extent;
+  /** Borrowed WebGPU context. device is required. */
+  mln_webgpu_context_descriptor context;
+} mln_webgpu_owned_texture_descriptor;
+
+/** WebGPU caller-owned texture session attachment options. */
+typedef struct mln_webgpu_borrowed_texture_descriptor {
+  uint32_t size;
+  /** Logical texture extent. */
+  mln_render_target_extent extent;
+  /**
+   * Physical texture width in device pixels.
+   *
+   * Stated independently of extent so caller-owned texture sizes that cannot be
+   * represented by logical extent times scale stay expressible.
+   */
+  uint32_t physical_width;
+  /** Physical texture height in device pixels. */
+  uint32_t physical_height;
+  /** Borrowed WebGPU context. device is required. */
+  mln_webgpu_context_descriptor context;
+  /**
+   * Borrowed WGPUTexture. Required.
+   *
+   * The texture and view must be created by context.device, and rendering is
+   * submitted through context.queue or that device's default queue. The texture
+   * must be 2D, single-sample, and render-attachment capable. Its physical
+   * dimensions and format must match this descriptor. Include TextureBinding
+   * usage when the host will sample from the texture after rendering.
+   */
+  void* texture;
+  /**
+   * Borrowed WGPUTextureView for texture. Required.
+   *
+   * The view must be a 2D color view compatible with texture and format.
+   */
+  void* texture_view;
+  /** Backend-native WGPUTextureFormat value. Undefined is invalid. */
+  uint32_t format;
+} mln_webgpu_borrowed_texture_descriptor;
+
+/** WebGPU frame acquired from a session-owned texture target. */
+typedef struct mln_webgpu_owned_texture_frame {
+  uint32_t size;
+  /** Session generation that produced this frame. */
+  uint64_t generation;
+  /** Physical WebGPU texture width in device pixels. */
+  uint32_t width;
+  /** Physical WebGPU texture height in device pixels. */
+  uint32_t height;
+  /** UI-to-device pixel scale used for this frame. */
+  double scale_factor;
+  /** Opaque frame identity used to reject stale releases. */
+  uint64_t frame_id;
+  /** Borrowed WGPUTexture. Valid until frame release. */
+  void* texture;
+  /** Borrowed WGPUTextureView. Valid until frame release. */
+  void* texture_view;
+  /** Borrowed WGPUDevice. Valid until frame release. */
+  void* device;
+  /** Backend-native WGPUTextureFormat value. */
+  uint32_t format;
+} mln_webgpu_owned_texture_frame;
+
 /** OpenGL frame acquired from a session-owned texture target. */
 typedef struct mln_opengl_owned_texture_frame {
   uint32_t size;
@@ -276,6 +344,18 @@ mln_opengl_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
  */
 MLN_API mln_opengl_borrowed_texture_descriptor
 mln_opengl_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
+
+/**
+ * Returns WebGPU owned-texture descriptor defaults for this C API version.
+ */
+MLN_API mln_webgpu_owned_texture_descriptor
+mln_webgpu_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
+
+/**
+ * Returns WebGPU borrowed-texture descriptor defaults for this C API version.
+ */
+MLN_API mln_webgpu_borrowed_texture_descriptor
+mln_webgpu_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
  * Returns texture image info defaults for this C API version.
@@ -783,6 +863,160 @@ MLN_API mln_status mln_opengl_owned_texture_acquire_frame(
  */
 MLN_API mln_status mln_opengl_owned_texture_release_frame(
   mln_render_session session, const mln_opengl_owned_texture_frame* frame
+) MLN_NOEXCEPT;
+
+/**
+ * Attaches a WebGPU texture render target owned by the session to a map.
+ *
+ * The map may have at most one live render session. The calling thread becomes
+ * the session's owner thread, and every texture-session call is affine to it.
+ * The map need only be live, so a host may attach on the thread that drives its
+ * render loop while the map stays on the runtime loop thread. Attach creates
+ * the session's graphics resources on the calling thread, so the host resources
+ * named by descriptor must be usable there. The session creates a WebGPU
+ * texture on descriptor->context.device. The caller owns that device and queue
+ * and keeps them valid until detach or destroy; the session borrows them for
+ * its whole life rather than for the duration of this call. Host sampling or
+ * copying may use the acquired texture after acquire succeeds and before
+ * release. On success, *out_session receives a handle the caller destroys with
+ * mln_render_session_destroy().
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
+ *   null or invalid, out_session is null, or *out_session is not null.
+ * - MLN_STATUS_INVALID_STATE when the map already has a render session.
+ * - MLN_STATUS_UNSUPPORTED when WebGPU texture sessions are not supported by
+ *   this build.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_webgpu_owned_texture_attach(
+  mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
+  mln_render_session* out_session
+) MLN_NOEXCEPT;
+
+/**
+ * Attaches a WebGPU caller-owned texture render target to a map.
+ *
+ * The map may have at most one live render session. The calling thread becomes
+ * the session's owner thread, and every texture-session call is affine to it.
+ * The map need only be live, so a host may attach on the thread that drives its
+ * render loop while the map stays on the runtime loop thread.
+ *
+ * The session renders into descriptor->texture_view. The caller owns the
+ * texture and view, keeps them valid until detach or destroy, and synchronizes
+ * any use outside this session. The same holds for descriptor->context: the
+ * session borrows that device and queue for its whole life, not just for this
+ * call.
+ *
+ * Before each mln_render_session_render_update(), make the texture available on
+ * descriptor->context.queue and keep it out of concurrent use. The session
+ * submits rendering on that queue before mln_render_session_render_update()
+ * returns.
+ *
+ * mln_render_session_resize() returns MLN_STATUS_UNSUPPORTED for this target,
+ * which the host owns and sizes. Follow a resized host by allocating a texture
+ * and view at the new size and handing them over with
+ * mln_webgpu_borrowed_texture_set_target(), which keeps the session.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
+ *   null or invalid, out_session is null, or *out_session is not null.
+ * - MLN_STATUS_INVALID_STATE when the map already has a render session.
+ * - MLN_STATUS_UNSUPPORTED when WebGPU borrowed texture sessions are not
+ *   supported by this build.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_webgpu_borrowed_texture_attach(
+  mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
+  mln_render_session* out_session
+) MLN_NOEXCEPT;
+
+/**
+ * Renders an attached WebGPU texture session into a new caller-owned texture.
+ *
+ * See mln_metal_borrowed_texture_set_target() for what replacing a target
+ * preserves and when a host reaches for it. descriptor->context must name the
+ * device the session attached with, so the session keeps every resource the
+ * renderer allocated on it across the change, and the queue the session
+ * attached with, because the replacement is taken without reading the queue
+ * again. A null queue names that device's default queue here exactly as it does
+ * at attach. descriptor->context.instance is not compared, because a texture
+ * session never uses it.
+ *
+ * The replacement must carry the format this session built its render pipelines
+ * around. MLN_STATUS_UNSUPPORTED reports one that does not, with the session
+ * still rendering into the texture it has, and destroying the session and
+ * attaching again is what changes it.
+ *
+ * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
+ * target is touched and leaves the session rendering into the one it had.
+ * MLN_STATUS_NATIVE_ERROR is the only one that can mean a replacement was
+ * already under way, which cannot be unwound; it can also come from a check
+ * made before anything was touched, and the two do not read differently here.
+ * Treat it as a session to destroy with mln_render_session_destroy().
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
+ *   null or invalid, or descriptor->context names a device or queue other than
+ *   the session's.
+ * - MLN_STATUS_INVALID_STATE when the session is detached or a texture frame is
+ *   currently acquired.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
+ *   owner thread.
+ * - MLN_STATUS_UNSUPPORTED when the session does not render into a caller-owned
+ *   WebGPU texture, when descriptor->format differs from the session's, or when
+ *   WebGPU borrowed texture sessions are not supported by this build.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_webgpu_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_webgpu_borrowed_texture_descriptor* descriptor
+) MLN_NOEXCEPT;
+
+/**
+ * Acquires the most recently rendered WebGPU texture frame.
+ *
+ * Use this function with sessions created by mln_webgpu_owned_texture_attach().
+ *
+ * The returned texture, texture view, and device pointers are borrowed and
+ * remain valid only until mln_webgpu_owned_texture_release_frame() is called
+ * for the same frame. While acquired, resize, render update, detach, destroy,
+ * and a second acquire return MLN_STATUS_INVALID_STATE.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, out_frame is
+ *   null, or out_frame->size is too small.
+ * - MLN_STATUS_INVALID_STATE when the session is detached, no rendered frame is
+ *   available, or a texture frame is already acquired.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
+ *   owner thread.
+ * - MLN_STATUS_UNSUPPORTED when session cannot expose a WebGPU texture frame.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_webgpu_owned_texture_acquire_frame(
+  mln_render_session session, mln_webgpu_owned_texture_frame* out_frame
+) MLN_NOEXCEPT;
+
+/**
+ * Releases a WebGPU texture frame acquired from a session-owned texture target.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, frame is
+ *   null, frame->size is too small, or frame identity does not match the
+ *   acquired frame.
+ * - MLN_STATUS_INVALID_STATE when no texture frame is currently acquired.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
+ *   owner thread.
+ * - MLN_STATUS_UNSUPPORTED when session cannot release a WebGPU texture frame.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_webgpu_owned_texture_release_frame(
+  mln_render_session session, const mln_webgpu_owned_texture_frame* frame
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

@@ -14,6 +14,7 @@ const vk = if (build_options.supports_vulkan) @import("vulkan") else struct {};
 
 const supports_wgl = build_options.supports_opengl and builtin.os.tag == .windows;
 const supports_egl = build_options.supports_opengl and (builtin.os.tag == .linux or builtin.os.tag == .macos);
+const supports_webgl = build_options.supports_opengl and builtin.os.tag == .emscripten;
 
 const egl = if (supports_egl) @import("egl") else struct {};
 
@@ -47,7 +48,7 @@ const cluster_style_json =
 
 test "supported render backend is exposed semantically" {
     const support_mask = maplibre.supportedRenderBackends();
-    try testing.expect(support_mask.metal or support_mask.opengl or support_mask.vulkan);
+    try testing.expect(support_mask.metal or support_mask.opengl or support_mask.vulkan or support_mask.webgpu);
     if (build_options.supports_metal) try testing.expect(support_mask.metal);
     if (build_options.supports_opengl) try testing.expect(support_mask.opengl);
     if (build_options.supports_vulkan) try testing.expect(support_mask.vulkan);
@@ -58,9 +59,11 @@ test "supported OpenGL context providers are exposed semantically" {
     if (!build_options.supports_opengl) {
         try testing.expect(!providers.wgl);
         try testing.expect(!providers.egl);
+        try testing.expect(!providers.webgl);
     } else {
         try testing.expectEqual(supports_wgl, providers.wgl);
         try testing.expectEqual(supports_egl, providers.egl);
+        try testing.expectEqual(supports_webgl, providers.webgl);
     }
 }
 

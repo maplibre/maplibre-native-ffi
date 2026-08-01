@@ -54,6 +54,34 @@ auto validate_opengl_borrowed_texture_descriptor(
   const mln_opengl_borrowed_texture_descriptor* descriptor,
   bool require_supported_provider
 ) -> mln_status;
+auto validate_webgpu_owned_texture_descriptor(
+  const mln_webgpu_owned_texture_descriptor* descriptor
+) -> mln_status;
+auto validate_webgpu_borrowed_texture_descriptor(
+  const mln_webgpu_borrowed_texture_descriptor* descriptor
+) -> mln_status;
+auto webgpu_owned_texture_descriptor_default() noexcept
+  -> mln_webgpu_owned_texture_descriptor;
+auto webgpu_borrowed_texture_descriptor_default() noexcept
+  -> mln_webgpu_borrowed_texture_descriptor;
+auto webgpu_owned_texture_attach(
+  mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
+  mln_render_session* out_session
+) -> mln_status;
+auto webgpu_borrowed_texture_attach(
+  mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
+  mln_render_session* out_session
+) -> mln_status;
+auto webgpu_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_webgpu_borrowed_texture_descriptor* descriptor
+) -> mln_status;
+auto webgpu_owned_texture_acquire_frame(
+  mln_render_session texture, mln_webgpu_owned_texture_frame* out_frame
+) -> mln_status;
+auto webgpu_owned_texture_release_frame(
+  mln_render_session texture, const mln_webgpu_owned_texture_frame* frame
+) -> mln_status;
 auto metal_owned_texture_attach(
   mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
   mln_render_session* out_session

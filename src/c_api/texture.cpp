@@ -38,6 +38,16 @@ auto mln_opengl_borrowed_texture_descriptor_default(void) noexcept
   return mln::core::opengl_borrowed_texture_descriptor_default();
 }
 
+auto mln_webgpu_owned_texture_descriptor_default(void) noexcept
+  -> mln_webgpu_owned_texture_descriptor {
+  return mln::core::webgpu_owned_texture_descriptor_default();
+}
+
+auto mln_webgpu_borrowed_texture_descriptor_default(void) noexcept
+  -> mln_webgpu_borrowed_texture_descriptor {
+  return mln::core::webgpu_borrowed_texture_descriptor_default();
+}
+
 auto mln_texture_image_info_default(void) noexcept -> mln_texture_image_info {
   return mln::core::texture_image_info_default();
 }
@@ -204,5 +214,50 @@ auto mln_opengl_owned_texture_release_frame(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::opengl_owned_texture_release_frame(session, frame);
+  });
+}
+
+auto mln_webgpu_owned_texture_attach(
+  mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
+  mln_render_session* out_session
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::webgpu_owned_texture_attach(map, descriptor, out_session);
+  });
+}
+
+auto mln_webgpu_borrowed_texture_attach(
+  mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
+  mln_render_session* out_session
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::webgpu_borrowed_texture_attach(
+      map, descriptor, out_session
+    );
+  });
+}
+
+auto mln_webgpu_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_webgpu_borrowed_texture_descriptor* descriptor
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::webgpu_borrowed_texture_set_target(session, descriptor);
+  });
+}
+
+auto mln_webgpu_owned_texture_acquire_frame(
+  mln_render_session session, mln_webgpu_owned_texture_frame* out_frame
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::webgpu_owned_texture_acquire_frame(session, out_frame);
+  });
+}
+
+auto mln_webgpu_owned_texture_release_frame(
+  mln_render_session session, const mln_webgpu_owned_texture_frame* frame
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::webgpu_owned_texture_release_frame(session, frame);
   });
 }

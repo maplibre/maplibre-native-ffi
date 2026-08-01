@@ -19,6 +19,7 @@ namespace Maplibre.Native.Internal.C
         MLN_RENDER_BACKEND_FLAG_METAL = 1U << 0,
         MLN_RENDER_BACKEND_FLAG_VULKAN = 1U << 1,
         MLN_RENDER_BACKEND_FLAG_OPENGL = 1U << 2,
+        MLN_RENDER_BACKEND_FLAG_WEBGPU = 1U << 3,
     }
 
     internal static partial class NativeMethods

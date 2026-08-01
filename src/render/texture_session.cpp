@@ -104,6 +104,127 @@ auto vulkan_borrowed_texture_descriptor_default() noexcept
   };
 }
 
+auto webgpu_owned_texture_descriptor_default() noexcept
+  -> mln_webgpu_owned_texture_descriptor {
+  return mln_webgpu_owned_texture_descriptor{
+    .size = sizeof(mln_webgpu_owned_texture_descriptor),
+    .extent =
+      mln_render_target_extent{
+        .size = sizeof(mln_render_target_extent),
+        .width = 256,
+        .height = 256,
+        .scale_factor = 1.0,
+      },
+    .context = mln_webgpu_context_descriptor{
+      .size = sizeof(mln_webgpu_context_descriptor),
+      .instance = nullptr,
+      .device = nullptr,
+      .queue = nullptr,
+    },
+  };
+}
+
+auto webgpu_borrowed_texture_descriptor_default() noexcept
+  -> mln_webgpu_borrowed_texture_descriptor {
+  return mln_webgpu_borrowed_texture_descriptor{
+    .size = sizeof(mln_webgpu_borrowed_texture_descriptor),
+    .extent =
+      mln_render_target_extent{
+        .size = sizeof(mln_render_target_extent),
+        .width = 256,
+        .height = 256,
+        .scale_factor = 1.0,
+      },
+    .physical_width = 256,
+    .physical_height = 256,
+    .context =
+      mln_webgpu_context_descriptor{
+        .size = sizeof(mln_webgpu_context_descriptor),
+        .instance = nullptr,
+        .device = nullptr,
+        .queue = nullptr,
+      },
+    .texture = nullptr,
+    .texture_view = nullptr,
+    .format = 0,
+  };
+}
+
+namespace {
+
+// A host owns its WebGPU device, so a session needs one handed to it. The
+// instance and queue are optional: a texture session needs no surface, and a
+// null queue means the device's default queue.
+auto validate_webgpu_context(const mln_webgpu_context_descriptor& context)
+  -> mln_status {
+  if (context.size < sizeof(mln_webgpu_context_descriptor)) {
+    set_thread_error("mln_webgpu_context_descriptor.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (context.device == nullptr) {
+    set_thread_error("WebGPU device must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+}  // namespace
+
+auto validate_webgpu_owned_texture_descriptor(
+  const mln_webgpu_owned_texture_descriptor* descriptor
+) -> mln_status {
+  if (descriptor == nullptr) {
+    set_thread_error("texture descriptor must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (descriptor->size < sizeof(mln_webgpu_owned_texture_descriptor)) {
+    set_thread_error("mln_webgpu_owned_texture_descriptor.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto extent_status = validate_render_target_extent(
+    descriptor->extent, "texture dimensions and scale_factor must be positive"
+  );
+  if (extent_status != MLN_STATUS_OK) {
+    return extent_status;
+  }
+  return validate_webgpu_context(descriptor->context);
+}
+
+auto validate_webgpu_borrowed_texture_descriptor(
+  const mln_webgpu_borrowed_texture_descriptor* descriptor
+) -> mln_status {
+  if (descriptor == nullptr) {
+    set_thread_error("texture descriptor must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (descriptor->size < sizeof(mln_webgpu_borrowed_texture_descriptor)) {
+    set_thread_error(
+      "mln_webgpu_borrowed_texture_descriptor.size is too small"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto extent_status = validate_render_target_extent(
+    descriptor->extent, "texture dimensions and scale_factor must be positive"
+  );
+  if (extent_status != MLN_STATUS_OK) {
+    return extent_status;
+  }
+  const auto context_status = validate_webgpu_context(descriptor->context);
+  if (context_status != MLN_STATUS_OK) {
+    return context_status;
+  }
+  if (descriptor->texture == nullptr || descriptor->texture_view == nullptr) {
+    set_thread_error("WebGPU texture and texture_view must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  // WGPUTextureFormat_Undefined is zero; the WebGPU build asserts that.
+  if (descriptor->format == 0) {
+    set_thread_error("WebGPU texture format must be specified");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
 auto validate_metal_owned_texture_descriptor(
   const mln_metal_owned_texture_descriptor* descriptor
 ) -> mln_status {

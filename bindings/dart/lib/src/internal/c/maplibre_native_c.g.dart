@@ -2120,6 +2120,14 @@ mln_opengl_owned_texture_descriptor_default();
 external mln_opengl_borrowed_texture_descriptor
 mln_opengl_borrowed_texture_descriptor_default();
 
+@ffi.Native<mln_webgpu_owned_texture_descriptor Function()>()
+external mln_webgpu_owned_texture_descriptor
+mln_webgpu_owned_texture_descriptor_default();
+
+@ffi.Native<mln_webgpu_borrowed_texture_descriptor Function()>()
+external mln_webgpu_borrowed_texture_descriptor
+mln_webgpu_borrowed_texture_descriptor_default();
+
 @ffi.Native<mln_texture_image_info Function()>()
 external mln_texture_image_info mln_texture_image_info_default();
 
@@ -2315,6 +2323,65 @@ external int mln_opengl_owned_texture_release_frame(
   ffi.Pointer<mln_opengl_owned_texture_frame> frame,
 );
 
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_webgpu_owned_texture_descriptor>,
+    ffi.Pointer<mln_render_session>,
+  )
+>()
+external int mln_webgpu_owned_texture_attach(
+  int map,
+  ffi.Pointer<mln_webgpu_owned_texture_descriptor> descriptor,
+  ffi.Pointer<mln_render_session> out_session,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_webgpu_borrowed_texture_descriptor>,
+    ffi.Pointer<mln_render_session>,
+  )
+>()
+external int mln_webgpu_borrowed_texture_attach(
+  int map,
+  ffi.Pointer<mln_webgpu_borrowed_texture_descriptor> descriptor,
+  ffi.Pointer<mln_render_session> out_session,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_webgpu_borrowed_texture_descriptor>,
+  )
+>()
+external int mln_webgpu_borrowed_texture_set_target(
+  int session,
+  ffi.Pointer<mln_webgpu_borrowed_texture_descriptor> descriptor,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_webgpu_owned_texture_frame>,
+  )
+>()
+external int mln_webgpu_owned_texture_acquire_frame(
+  int session,
+  ffi.Pointer<mln_webgpu_owned_texture_frame> out_frame,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_webgpu_owned_texture_frame>,
+  )
+>()
+external int mln_webgpu_owned_texture_release_frame(
+  int session,
+  ffi.Pointer<mln_webgpu_owned_texture_frame> frame,
+);
+
 @ffi.Native<ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Char>, ffi.Uint64)>()
 external ffi.Pointer<ffi.Void> mln_adapter_handle_leak_token_create(
   ffi.Pointer<ffi.Char> type_name,
@@ -2453,7 +2520,8 @@ sealed class mln_status {
 enum mln_render_backend_flag {
   MLN_RENDER_BACKEND_FLAG_METAL(1),
   MLN_RENDER_BACKEND_FLAG_VULKAN(2),
-  MLN_RENDER_BACKEND_FLAG_OPENGL(4);
+  MLN_RENDER_BACKEND_FLAG_OPENGL(4),
+  MLN_RENDER_BACKEND_FLAG_WEBGPU(8);
 
   final int value;
   const mln_render_backend_flag(this.value);
@@ -2462,6 +2530,7 @@ enum mln_render_backend_flag {
     1 => MLN_RENDER_BACKEND_FLAG_METAL,
     2 => MLN_RENDER_BACKEND_FLAG_VULKAN,
     4 => MLN_RENDER_BACKEND_FLAG_OPENGL,
+    8 => MLN_RENDER_BACKEND_FLAG_WEBGPU,
     _ => throw ArgumentError(
       'Unknown value for mln_render_backend_flag: $value',
     ),
@@ -4579,6 +4648,17 @@ final class mln_vulkan_context_descriptor extends ffi.Struct {
   external ffi.Pointer<ffi.Void> get_device_proc_addr;
 }
 
+final class mln_webgpu_context_descriptor extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  external ffi.Pointer<ffi.Void> instance;
+
+  external ffi.Pointer<ffi.Void> device;
+
+  external ffi.Pointer<ffi.Void> queue;
+}
+
 enum mln_opengl_context_provider_flag {
   MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL(1),
   MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL(2),
@@ -5410,6 +5490,66 @@ final class mln_opengl_borrowed_texture_descriptor extends ffi.Struct {
 
   @ffi.Uint32()
   external int target;
+}
+
+final class mln_webgpu_owned_texture_descriptor extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  external mln_render_target_extent extent;
+
+  external mln_webgpu_context_descriptor context;
+}
+
+final class mln_webgpu_borrowed_texture_descriptor extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  external mln_render_target_extent extent;
+
+  @ffi.Uint32()
+  external int physical_width;
+
+  @ffi.Uint32()
+  external int physical_height;
+
+  external mln_webgpu_context_descriptor context;
+
+  external ffi.Pointer<ffi.Void> texture;
+
+  external ffi.Pointer<ffi.Void> texture_view;
+
+  @ffi.Uint32()
+  external int format;
+}
+
+final class mln_webgpu_owned_texture_frame extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint64()
+  external int generation;
+
+  @ffi.Uint32()
+  external int width;
+
+  @ffi.Uint32()
+  external int height;
+
+  @ffi.Double()
+  external double scale_factor;
+
+  @ffi.Uint64()
+  external int frame_id;
+
+  external ffi.Pointer<ffi.Void> texture;
+
+  external ffi.Pointer<ffi.Void> texture_view;
+
+  external ffi.Pointer<ffi.Void> device;
+
+  @ffi.Uint32()
+  external int format;
 }
 
 final class mln_opengl_owned_texture_frame extends ffi.Struct {

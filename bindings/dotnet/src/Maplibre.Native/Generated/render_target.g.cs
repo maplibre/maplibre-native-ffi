@@ -45,6 +45,18 @@ namespace Maplibre.Native.Internal.C
         public void* get_device_proc_addr;
     }
 
+    internal unsafe partial struct mln_webgpu_context_descriptor
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        public void* instance;
+
+        public void* device;
+
+        public void* queue;
+    }
+
     [NativeTypeName("uint32_t")]
     internal enum mln_opengl_context_provider_flag : uint
     {
@@ -104,7 +116,7 @@ namespace Maplibre.Native.Internal.C
 
         public mln_opengl_context_platform platform;
 
-        [NativeTypeName("__AnonymousRecord_render_target_L120_C3")]
+        [NativeTypeName("__AnonymousRecord_render_target_L139_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]

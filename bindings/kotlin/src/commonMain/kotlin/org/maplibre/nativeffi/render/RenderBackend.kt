@@ -4,7 +4,8 @@ package org.maplibre.nativeffi.render
 public enum class RenderBackend(public val nativeMask: Int) {
   METAL(1),
   VULKAN(1 shl 1),
-  OPENGL(1 shl 2);
+  OPENGL(1 shl 2),
+  WEBGPU(1 shl 3);
 
   internal companion object {
     internal fun fromMask(mask: UInt): Set<RenderBackend> = fromMask(mask.toInt())

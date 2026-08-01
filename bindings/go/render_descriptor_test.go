@@ -7,17 +7,18 @@ import (
 )
 
 func TestRenderBackendAndOpenGLProviderMasks(t *testing.T) {
-	backends := RenderBackendMetal | RenderBackendVulkan | RenderBackendOpenGL | RenderBackendMask(1<<30)
-	if !backends.Has(RenderBackendOpenGL) {
-		t.Fatalf("backend mask %08x should include OpenGL", uint32(backends))
+	backends := RenderBackendMetal | RenderBackendVulkan | RenderBackendOpenGL | RenderBackendWebGPU | RenderBackendMask(1<<30)
+	if !backends.Has(RenderBackendOpenGL) || !backends.Has(RenderBackendWebGPU) {
+		t.Fatalf("backend mask %08x should include OpenGL and WebGPU", uint32(backends))
 	}
 	if !backends.Has(RenderBackendMask(1 << 30)) {
 		t.Fatalf("backend mask should preserve unknown future bits")
 	}
 
-	providers := OpenGLContextProviderWGL | OpenGLContextProviderEGL | OpenGLContextProviderMask(1<<30)
-	if !providers.Has(OpenGLContextProviderWGL) || !providers.Has(OpenGLContextProviderEGL) {
-		t.Fatalf("provider mask %08x should include WGL and EGL", uint32(providers))
+	providers := OpenGLContextProviderWGL | OpenGLContextProviderEGL | OpenGLContextProviderWebGL | OpenGLContextProviderMask(1<<30)
+	if !providers.Has(OpenGLContextProviderWGL) || !providers.Has(OpenGLContextProviderEGL) ||
+		!providers.Has(OpenGLContextProviderWebGL) {
+		t.Fatalf("provider mask %08x should include WGL, EGL, and WebGL", uint32(providers))
 	}
 	if !providers.Has(OpenGLContextProviderMask(1 << 30)) {
 		t.Fatalf("provider mask should preserve unknown future bits")
