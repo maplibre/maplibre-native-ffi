@@ -343,6 +343,17 @@ MLN_API mln_status mln_adapter_http_header_transform_callback(
 ) MLN_NOEXCEPT;
 
 /**
+ * Validates one null-terminated HTTP header from an adapter-owned rule table.
+ *
+ * This applies the C API's field-name, UTF-8 field-value, control-byte, and
+ * transport-managed-name rules without requiring an active transform callback.
+ * A diagnostic for a rejected header never includes its value.
+ */
+MLN_API mln_status mln_adapter_http_header_validate(
+  const char* name, const char* value
+) MLN_NOEXCEPT;
+
+/**
  * The mln_resource_provider_callback implementation for provider rules.
  *
  * The user_data pointer is an mln_adapter_resource_provider_rules table. A

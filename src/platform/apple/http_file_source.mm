@@ -43,13 +43,34 @@ static BOOL MLNSameOrigin(NSURL* first, NSURL* second) {
 }
 
 @interface MLNHTTPRedirectDelegate : NSObject <NSURLSessionTaskDelegate>
+- (instancetype)initWithForwardingDelegate:
+  (id<NSURLSessionDelegate>)forwardingDelegate;
 - (void)registerTask:(NSURLSessionTask*)task
   transformedHeaders:(NSArray<NSString*>*)headers;
 @end
 
 static char MLNTransformedHeaderNamesKey;
 
-@implementation MLNHTTPRedirectDelegate
+@implementation MLNHTTPRedirectDelegate {
+  id<NSURLSessionDelegate> forwardingDelegate;
+}
+
+- (instancetype)initWithForwardingDelegate:(id<NSURLSessionDelegate>)delegate {
+  self = [super init];
+  if (self) forwardingDelegate = delegate;
+  return self;
+}
+
+- (BOOL)respondsToSelector:(SEL)selector {
+  return [super respondsToSelector:selector] ||
+         [forwardingDelegate respondsToSelector:selector];
+}
+
+- (id)forwardingTargetForSelector:(SEL)selector {
+  if ([forwardingDelegate respondsToSelector:selector])
+    return forwardingDelegate;
+  return [super forwardingTargetForSelector:selector];
+}
 
 - (void)registerTask:(NSURLSessionTask*)task
   transformedHeaders:(NSArray<NSString*>*)headers {
@@ -66,14 +87,35 @@ static char MLNTransformedHeaderNamesKey;
            completionHandler:(void (^)(NSURLRequest*))completionHandler {
   NSArray<NSString*>* headers =
     objc_getAssociatedObject(task, &MLNTransformedHeaderNamesKey);
-  if (MLNSameOrigin(response.URL, request.URL) || headers.count == 0) {
-    completionHandler(request);
+  void (^completeRedirect)(NSURLRequest*) = ^(NSURLRequest* forwardedRequest) {
+    if (
+      forwardedRequest == nil ||
+      MLNSameOrigin(response.URL, forwardedRequest.URL) || headers.count == 0
+    ) {
+      completionHandler(forwardedRequest);
+      return;
+    }
+    NSMutableURLRequest* stripped = [forwardedRequest mutableCopy];
+    for (NSString* name in headers)
+      [stripped setValue:nil forHTTPHeaderField:name];
+    completionHandler(stripped);
+  };
+  if (
+    [forwardingDelegate
+      respondsToSelector:@selector(
+                           URLSession:task:willPerformHTTPRedirection:
+                           newRequest:completionHandler:
+                         )]
+  ) {
+    [(id<NSURLSessionTaskDelegate>)forwardingDelegate
+                      URLSession:session
+                            task:task
+      willPerformHTTPRedirection:response
+                      newRequest:request
+               completionHandler:completeRedirect];
     return;
   }
-  NSMutableURLRequest* stripped = [request mutableCopy];
-  for (NSString* name in headers)
-    [stripped setValue:nil forHTTPHeaderField:name];
-  completionHandler(stripped);
+  completeRedirect(request);
 }
 @end
 
@@ -430,12 +472,14 @@ std::unique_ptr<AsyncRequest> HTTPFileSource::request(
 
     assert(session);
 
-    BOOL usesRedirectDelegate = session == impl->session;
-    if (!usesRedirectDelegate && transformedHeaderNames.count > 0) {
+    MLNHTTPRedirectDelegate* redirectDelegate =
+      session == impl->session ? impl->redirectDelegate : nil;
+    if (!redirectDelegate && transformedHeaderNames.count > 0) {
+      redirectDelegate = [[MLNHTTPRedirectDelegate alloc]
+        initWithForwardingDelegate:session.delegate];
       session = [NSURLSession sessionWithConfiguration:session.configuration
-                                              delegate:impl->redirectDelegate
-                                         delegateQueue:nil];
-      usesRedirectDelegate = YES;
+                                              delegate:redirectDelegate
+                                         delegateQueue:session.delegateQueue];
       invalidateSessionOnCompletion = YES;
     }
 
@@ -606,9 +650,9 @@ std::unique_ptr<AsyncRequest> HTTPFileSource::request(
           shared->notify(response);
         }];
 
-    if (usesRedirectDelegate) {
-      [impl->redirectDelegate registerTask:request->task
-                        transformedHeaders:transformedHeaderNames];
+    if (redirectDelegate) {
+      [redirectDelegate registerTask:request->task
+                  transformedHeaders:transformedHeaderNames];
     }
 
     [request->task resume];

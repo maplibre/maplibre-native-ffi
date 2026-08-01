@@ -211,9 +211,34 @@ static void http_header_routes_match_exact_prefix_kind_and_order(void) {
   );
 }
 
+static void http_header_validation_uses_the_native_policy(void) {
+  static const char invalid_utf8[] = {'b', 'a', 'd', (char)0xFF, '\0'};
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_adapter_http_header_validate("X-Test", "caf\xC3\xA9")
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_adapter_http_header_validate("Bad Name", "value")
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_adapter_http_header_validate("Range", "bytes=0-1")
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_adapter_http_header_validate("Authorization", "bad\r\nvalue")
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_adapter_http_header_validate("Authorization", invalid_utf8)
+  );
+}
+
 void run_callback_adapter_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(queued_provider_routes_reject_raw_invalid_route_descriptors);
   RUN_TEST(queued_provider_routes_tolerate_raw_absent_request_urls);
   RUN_TEST(http_header_routes_match_exact_prefix_kind_and_order);
+  RUN_TEST(http_header_validation_uses_the_native_policy);
 }

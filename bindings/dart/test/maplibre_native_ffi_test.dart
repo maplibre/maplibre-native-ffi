@@ -940,6 +940,32 @@ void main() {
       throwsA(isA<InvalidArgumentException>()),
     );
     expect(
+      () => runtime.setHttpHeaderTransformRules([
+        const HttpHeaderTransformRule(
+          url: 'https://example.com/',
+          headers: [HttpHeader(name: 'Bad Name', value: 'secret')],
+        ),
+      ]),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+    expect(
+      () => runtime.setHttpHeaderTransformRules([
+        const HttpHeaderTransformRule(
+          url: 'https://example.com/',
+          headers: [HttpHeader(name: 'Range', value: 'secret')],
+        ),
+      ]),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+    runtime.setHttpHeaderTransformRules([
+      const HttpHeaderTransformRule(
+        url: 'https://example.com/',
+        matchPrefix: true,
+        headers: [HttpHeader(name: 'X-Test', value: 'café')],
+      ),
+    ]);
+    runtime.clearHttpHeaderTransform();
+    expect(
       () => runtime.setResourceProviderRules([
         ResourceProviderRule(
           requestedUrl: 'https://example.com/provider\u0000truncated',

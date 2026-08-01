@@ -210,6 +210,9 @@ auto clear_resource_transform(mln_runtime runtime) -> mln_status;
 auto set_http_header_transform(
   mln_runtime runtime, const mln_http_header_transform* transform
 ) -> mln_status;
+auto validate_http_header(
+  const char* name, size_t name_size, const char* value, size_t value_size
+) -> mln_status;
 auto http_header_transform_response_set(
   mln_http_header_transform_response* response, const char* name,
   size_t name_size, const char* value, size_t value_size

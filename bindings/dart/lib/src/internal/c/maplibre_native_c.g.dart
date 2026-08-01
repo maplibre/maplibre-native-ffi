@@ -2384,6 +2384,12 @@ external int mln_adapter_http_header_transform_callback(
   ffi.Pointer<mln_http_header_transform_response> out_response,
 );
 
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>)>()
+external int mln_adapter_http_header_validate(
+  ffi.Pointer<ffi.Char> name,
+  ffi.Pointer<ffi.Char> value,
+);
+
 @ffi.Native<
   ffi.Uint32 Function(
     ffi.Pointer<ffi.Void>,

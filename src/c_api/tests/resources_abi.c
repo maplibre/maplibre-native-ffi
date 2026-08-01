@@ -417,6 +417,7 @@ static void resource_transform_rejects_raw_invalid_descriptors(void) {
 }
 
 static void http_header_transform_rejects_raw_invalid_inputs(void) {
+  static const char invalid_utf8[] = {'b', 'a', 'd', (char)0xFF};
   mln_runtime runtime = mln_test_create_runtime();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
@@ -461,6 +462,12 @@ static void http_header_transform_rejects_raw_invalid_inputs(void) {
     MLN_STATUS_INVALID_ARGUMENT, mln_http_header_transform_response_set(
                                    &response, "Range", 5, "bytes=0-1", 9
                                  )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_http_header_transform_response_set(
+      &response, "Authorization", 13, invalid_utf8, sizeof(invalid_utf8)
+    )
   );
   mln_test_destroy_runtime(runtime);
 }

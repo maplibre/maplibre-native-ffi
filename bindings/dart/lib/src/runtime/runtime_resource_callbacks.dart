@@ -115,48 +115,19 @@ final class _HttpHeaderTransformState {
   }
 }
 
-const _transportManagedHeaderNames = <String>{
-  'host',
-  'content-length',
-  'transfer-encoding',
-  'connection',
-  'proxy-connection',
-  'proxy-authorization',
-  'keep-alive',
-  'te',
-  'trailer',
-  'upgrade',
-  'range',
-  'if-none-match',
-  'if-modified-since',
-  'accept-encoding',
-  'user-agent',
-};
-
 void _validateHttpHeader(HttpHeader header) {
   _checkNativeCString(header.name);
   _checkNativeCString(header.value);
-  const tokenPunctuation = "!#\$%&'*+-.^_`|~";
-  if (header.name.isEmpty ||
-      header.name.codeUnits.any(
-        (unit) =>
-            !((unit >= 0x30 && unit <= 0x39) ||
-                (unit >= 0x41 && unit <= 0x5a) ||
-                (unit >= 0x61 && unit <= 0x7a) ||
-                tokenPunctuation.codeUnits.contains(unit)),
-      )) {
-    throwInvalidArgument('Invalid HTTP header name: ${header.name}');
-  }
-  if (header.value.codeUnits.any(
-    (unit) => unit != 0x09 && (unit < 0x20 || unit == 0x7f),
-  )) {
-    throwInvalidArgument('HTTP header value contains a control character');
-  }
-  if (_transportManagedHeaderNames.contains(header.name.toLowerCase())) {
-    throwInvalidArgument(
-      'HTTP header is managed by MapLibre or the transport: ${header.name}',
+  withNativeArena((arena) {
+    final name = nativeUtf8CString(header.name, arena);
+    final value = nativeUtf8CString(header.value, arena);
+    _check(
+      raw.mln_adapter_http_header_validate(
+        name.pointer.cast<Char>(),
+        value.pointer.cast<Char>(),
+      ),
     );
-  }
+  });
 }
 
 final class _ResourceProviderRulesState {

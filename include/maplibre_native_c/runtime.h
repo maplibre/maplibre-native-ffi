@@ -519,9 +519,10 @@ typedef struct mln_http_header_transform_response {
  *
  * Returns MLN_STATUS_INVALID_ARGUMENT when response is null, response->size is
  * too small, a pointer is null with a non-zero size, name is not a valid HTTP
- * field name, value contains a disallowed control byte, or name identifies a
- * header managed by MapLibre or the platform transport. A diagnostic for a
- * rejected header names the header but never includes its value.
+ * field name, value is not valid UTF-8, value contains a disallowed control
+ * byte, or name identifies a header managed by MapLibre or the platform
+ * transport. A diagnostic for a rejected header names the header but never
+ * includes its value.
  * Returns MLN_STATUS_INVALID_STATE when called outside an active HTTP header
  * transform callback.
  * Returns MLN_STATUS_NATIVE_ERROR when native allocation fails.
@@ -814,6 +815,8 @@ MLN_API mln_status mln_resource_request_wait_until_retired(
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, transform is
  *   null, transform->size is too small, or callback is null.
+ * - MLN_STATUS_UNSUPPORTED on OpenHarmony, whose platform HTTP client cannot
+ *   prevent transformed headers from following a cross-origin redirect.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.

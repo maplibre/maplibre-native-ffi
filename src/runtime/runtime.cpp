@@ -1241,6 +1241,14 @@ auto set_http_header_transform(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
+#if defined(OHOS_PLATFORM)
+  set_thread_error(
+    "HTTP header transforms are unsupported on OpenHarmony because its HTTP "
+    "client cannot prevent transformed headers from crossing origins"
+  );
+  return MLN_STATUS_UNSUPPORTED;
+#endif
+
   auto& state = *live->http_header_transform_state;
   const std::unique_lock lock(state.mutex);
   state.callback = transform->callback;
@@ -1248,18 +1256,93 @@ auto set_http_header_transform(
   return MLN_STATUS_OK;
 }
 
-auto http_header_transform_response_set(
-  mln_http_header_transform_response* response, const char* name,
-  size_t name_size, const char* value, size_t value_size
+namespace {
+
+auto http_header_names_equal(std::string_view left, std::string_view right)
+  -> bool {
+  const auto ascii_lower = [](unsigned char character) -> unsigned char {
+    return character >= 'A' && character <= 'Z'
+             ? static_cast<unsigned char>(character + ('a' - 'A'))
+             : character;
+  };
+  return std::ranges::equal(
+    left, right, [&](char left_character, char right_character) -> bool {
+      return ascii_lower(static_cast<unsigned char>(left_character)) ==
+             ascii_lower(static_cast<unsigned char>(right_character));
+    }
+  );
+}
+
+auto is_valid_utf8(const char* value, std::size_t size) -> bool {
+  const auto bytes = reinterpret_cast<const unsigned char*>(value);
+  std::size_t index = 0;
+  const auto continuation = [&](std::size_t offset) -> bool {
+    return index + offset < size && bytes[index + offset] >= 0x80U &&
+           bytes[index + offset] <= 0xBFU;
+  };
+  while (index < size) {
+    const auto first = bytes[index];
+    if (first <= 0x7FU) {
+      ++index;
+      continue;
+    }
+    if (first >= 0xC2U && first <= 0xDFU && continuation(1)) {
+      index += 2;
+      continue;
+    }
+    if (
+      first == 0xE0U && index + 2 < size && bytes[index + 1] >= 0xA0U &&
+      bytes[index + 1] <= 0xBFU && continuation(2)
+    ) {
+      index += 3;
+      continue;
+    }
+    if (
+      ((first >= 0xE1U && first <= 0xECU) ||
+       (first >= 0xEEU && first <= 0xEFU)) &&
+      continuation(1) && continuation(2)
+    ) {
+      index += 3;
+      continue;
+    }
+    if (
+      first == 0xEDU && index + 2 < size && bytes[index + 1] >= 0x80U &&
+      bytes[index + 1] <= 0x9FU && continuation(2)
+    ) {
+      index += 3;
+      continue;
+    }
+    if (
+      first == 0xF0U && index + 3 < size && bytes[index + 1] >= 0x90U &&
+      bytes[index + 1] <= 0xBFU && continuation(2) && continuation(3)
+    ) {
+      index += 4;
+      continue;
+    }
+    if (
+      first >= 0xF1U && first <= 0xF3U && continuation(1) && continuation(2) &&
+      continuation(3)
+    ) {
+      index += 4;
+      continue;
+    }
+    if (
+      first == 0xF4U && index + 3 < size && bytes[index + 1] >= 0x80U &&
+      bytes[index + 1] <= 0x8FU && continuation(2) && continuation(3)
+    ) {
+      index += 4;
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
+}  // namespace
+
+auto validate_http_header(
+  const char* name, size_t name_size, const char* value, size_t value_size
 ) -> mln_status {
-  if (response == nullptr) {
-    set_thread_error("HTTP header transform response must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (response->size < sizeof(mln_http_header_transform_response)) {
-    set_thread_error("mln_http_header_transform_response.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (name == nullptr && name_size != 0) {
     set_thread_error("HTTP header name must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1299,20 +1382,11 @@ auto http_header_transform_response_set(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const auto equals_ignoring_case =
-    [](std::string_view left, std::string_view right) -> bool {
-    const auto ascii_lower = [](unsigned char character) -> unsigned char {
-      return character >= 'A' && character <= 'Z'
-               ? static_cast<unsigned char>(character + ('a' - 'A'))
-               : character;
-    };
-    return std::ranges::equal(
-      left, right, [&](char left_character, char right_character) -> bool {
-        return ascii_lower(static_cast<unsigned char>(left_character)) ==
-               ascii_lower(static_cast<unsigned char>(right_character));
-      }
-    );
-  };
+  if (value_size != 0 && !is_valid_utf8(value, value_size)) {
+    set_thread_error("HTTP header value must be valid UTF-8");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
   const auto name_view = std::string_view{name, name_size};
   constexpr auto ManagedHeaders = std::array<std::string_view, 15>{
     "Host",
@@ -1333,7 +1407,7 @@ auto http_header_transform_response_set(
   };
   const auto managed = std::ranges::find_if(
     ManagedHeaders, [&](std::string_view candidate) -> bool {
-      return equals_ignoring_case(name_view, candidate);
+      return http_header_names_equal(name_view, candidate);
     }
   );
   if (managed != ManagedHeaders.end()) {
@@ -1343,6 +1417,27 @@ auto http_header_transform_response_set(
     set_thread_error(diagnostic.c_str());
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  return MLN_STATUS_OK;
+}
+
+auto http_header_transform_response_set(
+  mln_http_header_transform_response* response, const char* name,
+  size_t name_size, const char* value, size_t value_size
+) -> mln_status {
+  if (response == nullptr) {
+    set_thread_error("HTTP header transform response must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (response->size < sizeof(mln_http_header_transform_response)) {
+    set_thread_error("mln_http_header_transform_response.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto validation =
+    validate_http_header(name, name_size, value, value_size);
+  if (validation != MLN_STATUS_OK) {
+    return validation;
+  }
+  const auto name_view = std::string_view{name, name_size};
 
   auto* const headers = static_cast<HttpHeaders*>(response->context);
   if (headers == nullptr) {
@@ -1354,7 +1449,7 @@ auto http_header_transform_response_set(
 
   auto existing =
     std::ranges::find_if(*headers, [&](const HttpHeader& header) -> bool {
-      return equals_ignoring_case(header.first, name_view);
+      return http_header_names_equal(header.first, name_view);
     });
   auto copied = HttpHeader{
     std::string{name_view},

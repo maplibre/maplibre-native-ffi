@@ -28,6 +28,7 @@
 #include "maplibre_native_c/callback_adapter.h"
 
 #include "maplibre_native_c.h"
+#include "runtime/runtime.hpp"
 
 namespace {
 
@@ -444,6 +445,19 @@ extern "C" MLN_API auto mln_adapter_http_header_transform_callback(
     return MLN_STATUS_OK;
   }
   return MLN_STATUS_OK;
+}
+
+extern "C" MLN_API auto mln_adapter_http_header_validate(
+  const char* name, const char* value
+) noexcept -> mln_status {
+  try {
+    return mln::core::validate_http_header(
+      name, name == nullptr ? 0 : std::strlen(name), value,
+      value == nullptr ? 0 : std::strlen(value)
+    );
+  } catch (...) {
+    return MLN_STATUS_NATIVE_ERROR;
+  }
 }
 
 extern "C" MLN_API auto mln_adapter_resource_provider_rules_callback(

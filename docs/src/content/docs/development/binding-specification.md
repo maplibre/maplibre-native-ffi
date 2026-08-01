@@ -495,7 +495,8 @@ and values. They reject duplicate names case-insensitively and contain every
 host exception, panic, or callback error so that a failed invocation returns no
 transformed headers. Header field-name, field-value, and transport-managed-name
 validation produces the C API's invalid-argument behavior without exposing a
-header value in diagnostics.
+header value in diagnostics. Header values are valid UTF-8 and contain only the
+horizontal tab and non-control characters accepted by the C API.
 
 The callback runs after resource URL transformation and before an HTTP attempt
 is dispatched. The URL presented to the callback is the transformed URL.
@@ -519,6 +520,13 @@ that changes any origin component removes every transformed header before
 dispatch and does not invoke a destination transform. Native range and
 conditional headers retain their platform transport behavior independently of
 the transformed collection.
+
+#### OpenHarmony
+
+HTTP header transform registration reports unsupported on OpenHarmony while its
+platform HTTP client lacks a redirect-decision hook. This keeps transformed
+credentials out of cross-origin redirects rather than enabling a transport that
+cannot satisfy the redirect contract.
 
 ### Resource providers
 

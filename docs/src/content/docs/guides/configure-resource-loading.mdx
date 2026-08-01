@@ -54,10 +54,12 @@ and the callback may run concurrently on network threads.
 <Code code={httpHeaderTransform} lang="c" title="http-header-transform.c" />
 
 Header names are case-insensitive and each callback result contains at most one value per name.
-MapLibre validates field syntax and reserves transport-managed fields such as `Host`, `Range`,
-`Accept-Encoding`, and `User-Agent`. A non-OK callback result sends the request without any headers
-collected by that invocation. Same-origin redirects preserve transformed headers; a redirect whose
-scheme, host, or effective port changes strips all of them and does not invoke the transform again.
+MapLibre validates field syntax and UTF-8 values and reserves transport-managed fields such as
+`Host`, `Range`, `Accept-Encoding`, and `User-Agent`. A non-OK callback result sends the request
+without any headers collected by that invocation. Same-origin redirects preserve transformed
+headers; a redirect whose scheme, host, or effective port changes strips all of them and does not
+invoke the transform again. OpenHarmony reports this transform as unsupported because its platform
+HTTP client cannot intercept redirects to enforce that rule.
 
 Use `mln_runtime_clear_http_header_transform()` to stop adding headers. The runtime can replace or
 clear the transform while maps are live and waits for earlier callback invocations before returning.
