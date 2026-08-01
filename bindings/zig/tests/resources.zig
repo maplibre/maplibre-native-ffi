@@ -419,8 +419,8 @@ test "resource transform can be cleared after map creation" {
     try waitForStyleLoaded(&runtime);
     server_thread.join();
     server_thread_joined = true;
-    try testing.expect(server_state.served);
     try testing.expectEqual(@as(?anyerror, null), server_state.err);
+    try testing.expect(server_state.served);
     try testing.expectEqual(@as(usize, 0), state.calls.load(.seq_cst));
 }
 
@@ -450,8 +450,8 @@ test "http URL style loads through native network provider" {
     try waitForStyleLoaded(&runtime);
     server_thread.join();
     server_thread_joined = true;
-    try testing.expect(server_state.served);
     try testing.expectEqual(@as(?anyerror, null), server_state.err);
+    try testing.expect(server_state.served);
 }
 
 const PassThroughProviderState = struct {
@@ -505,8 +505,8 @@ test "http style can load from ambient cache after online load" {
 
     server_thread.join();
     server_thread_joined = true;
-    try testing.expect(server_state.served);
     try testing.expectEqual(@as(?anyerror, null), server_state.err);
+    try testing.expect(server_state.served);
 
     try maplibre.setNetworkStatus(.offline, null);
     var cached_runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
@@ -545,8 +545,8 @@ test "resource provider pass-through delegates to native HTTP" {
     try waitForStyleLoaded(&runtime);
     server_thread.join();
     server_thread_joined = true;
-    try testing.expect(server_state.served);
     try testing.expectEqual(@as(?anyerror, null), server_state.err);
+    try testing.expect(server_state.served);
     try testing.expect(state.calls.load(.seq_cst) > 0);
     try testing.expect(state.saw_style.load(.seq_cst));
 }
