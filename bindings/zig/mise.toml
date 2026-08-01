@@ -8,12 +8,14 @@
 [deps.zig]
 auto = true
 description = "Fetch Zig package dependencies."
+dir = "../.."
 sources = ["build.zig", "build.zig.zon"]
 outputs = ["zig-pkg"]
 timeout = "10m"
 run = "zig build --fetch=needed"
 
 [tasks.build]
+dir = "../.."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
@@ -23,6 +25,7 @@ zig build \
 '''
 
 [tasks.test]
+dir = "../.."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 run = '''
@@ -45,6 +48,7 @@ zig build test \
 '''
 
 [tasks."test:ios-simulator"]
+dir = "../.."
 depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/ios-simulator-arm64-metal/install"

@@ -1,3 +1,7 @@
+// This manifest sits at the repository root rather than beside the sources it
+// describes, because Zig resolves a package from the repository root. Source
+// and test paths therefore name their locations under bindings/zig/ explicitly.
+
 const builtin = @import("builtin");
 const std = @import("std");
 const zigglgen = @import("zigglgen");
@@ -493,7 +497,7 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
 
 fn addMaplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module {
     const maplibre_native = b.addModule("maplibre_native", .{
-        .root_source_file = b.path("src/maplibre_native.zig"),
+        .root_source_file = b.path("bindings/zig/src/maplibre_native.zig"),
         .target = options.target,
         .optimize = options.optimize,
     });
@@ -502,7 +506,7 @@ fn addMaplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Modu
 }
 
 fn defaultDocIncludeDirs(b: *std.Build) []const std.Build.LazyPath {
-    return &.{b.path("../../include")};
+    return &.{b.path("include")};
 }
 
 fn addMaplibreNativeDocs(
@@ -512,7 +516,7 @@ fn addMaplibreNativeDocs(
     include_dirs: []const std.Build.LazyPath,
 ) void {
     const docs_module = b.createModule(.{
-        .root_source_file = b.path("src/maplibre_native.zig"),
+        .root_source_file = b.path("bindings/zig/src/maplibre_native.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -545,14 +549,14 @@ fn addTestCompile(b: *std.Build, options: BuildOptions, root_source_file: std.Bu
         .use_lld = if (isIos(options.target)) false else null,
     });
     if (isIos(options.target)) {
-        tests.root_module.addCSourceFile(.{ .file = b.path("../../src/zig_test_support/ios_simulator_dyld_stub.m") });
+        tests.root_module.addCSourceFile(.{ .file = b.path("src/zig_test_support/ios_simulator_dyld_stub.m") });
     }
     linkMaplibreNativeC(b, tests.root_module, repoLinkOptions(options));
     return tests;
 }
 
 fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.Build.Module) *std.Build.Step.Compile {
-    const tests = addTestCompile(b, options, b.path("tests/main.zig"));
+    const tests = addTestCompile(b, options, b.path("bindings/zig/tests/main.zig"));
     tests.root_module.addImport("maplibre_native", maplibre_native);
     addRenderBackendOptions(b, tests.root_module, options.render_backend);
     addRenderBackendTranslateC(b, tests.root_module, .{
@@ -570,7 +574,7 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.B
         tests.root_module.addImport("gl", gl_bindings);
         if (options.target.result.os.tag == .windows) {
             const wgl_test_context = b.createModule(.{
-                .root_source_file = b.path("../../src/zig_test_support/wgl_context.zig"),
+                .root_source_file = b.path("src/zig_test_support/wgl_context.zig"),
                 .target = options.target,
                 .optimize = options.optimize,
             });
@@ -580,12 +584,12 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.B
     }
     if (options.render_backend == .metal) {
         if (options.target.result.os.tag == .ios) {
-            tests.root_module.addCSourceFile(.{ .file = b.path("tests/metal_support_ios.m") });
+            tests.root_module.addCSourceFile(.{ .file = b.path("bindings/zig/tests/metal_support_ios.m") });
             tests.root_module.linkSystemLibrary("objc", .{});
             tests.root_module.linkFramework("Foundation", .{});
         }
         if (options.target.result.os.tag == .macos) {
-            tests.root_module.addCSourceFile(.{ .file = b.path("tests/metal_support_macos.m") });
+            tests.root_module.addCSourceFile(.{ .file = b.path("bindings/zig/tests/metal_support_macos.m") });
             tests.root_module.linkFramework("AppKit", .{});
         }
     }
@@ -650,23 +654,23 @@ pub fn build(b: *std.Build) void {
     const maplibre_native = addMaplibreNativeModule(b, options);
 
     const test_sources = [_]std.Build.LazyPath{
-        b.path("src/status.zig"),
-        b.path("src/runtime.zig"),
-        b.path("src/logging.zig"),
-        b.path("src/map.zig"),
+        b.path("bindings/zig/src/status.zig"),
+        b.path("bindings/zig/src/runtime.zig"),
+        b.path("bindings/zig/src/logging.zig"),
+        b.path("bindings/zig/src/map.zig"),
     };
 
     const test_step = b.step("test", "Run Zig binding tests");
 
     const binding_tests = addBindingTests(b, options, maplibre_native);
     b.default_step.dependOn(&binding_tests.step);
-    const run_binding_tests = addTestRunStep(b, binding_tests, options.target, b.path("../../scripts/run-ios-simulator-test.sh"));
+    const run_binding_tests = addTestRunStep(b, binding_tests, options.target, b.path("scripts/run-ios-simulator-test.sh"));
     test_step.dependOn(&run_binding_tests.step);
 
     for (test_sources) |source| {
         const tests = addTestCompile(b, options, source);
         b.default_step.dependOn(&tests.step);
-        const run_tests = addTestRunStep(b, tests, options.target, b.path("../../scripts/run-ios-simulator-test.sh"));
+        const run_tests = addTestRunStep(b, tests, options.target, b.path("scripts/run-ios-simulator-test.sh"));
         test_step.dependOn(&run_tests.step);
     }
 }

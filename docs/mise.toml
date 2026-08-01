@@ -22,11 +22,11 @@ cp -a target/doc/. docs/public/reference/rust/
 '''
 
 [tasks."api:zig"]
-dir = "../bindings/zig"
+dir = ".."
 run = '''
-rm -rf ../../docs/public/reference/zig
-mkdir -p ../../docs/public/reference
-zig build docs -Dinclude-dir=../../include --prefix ../../docs/public/reference/zig
+rm -rf docs/public/reference/zig
+mkdir -p docs/public/reference
+zig build docs -Dinclude-dir=include --prefix docs/public/reference/zig
 '''
 
 [tasks."api:kotlin"]

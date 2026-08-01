@@ -2,7 +2,7 @@
     .name = .zig_readback,
     .version = "0.16.0",
     .dependencies = .{
-        .maplibre_native = .{ .path = "../../bindings/zig" },
+        .maplibre_native = .{ .path = "../.." },
         .sdl = .{
             .url = "git+https://github.com/castholm/SDL.git#1b67d371a531ecb0499d4b80a865631c299f472a",
             .hash = "sdl-0.5.2+3.4.12-SDL--qPKpwHc40bqAlYs7W9pXJVyLwsGDNa4shNXbOZr",
