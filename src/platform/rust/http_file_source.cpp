@@ -4,6 +4,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -71,6 +72,24 @@ auto optionalCString(char* value) -> std::optional<std::string> {
 
 auto hasSuffix(const std::string& value, const std::string& suffix) -> bool {
   return value.ends_with(suffix);
+}
+
+auto isHTTPURL(const std::string& url) -> bool {
+  const auto parsed = mbgl::util::URL{url};
+  const auto scheme =
+    std::string_view{url}.substr(parsed.scheme.first, parsed.scheme.second);
+  auto equalsIgnoringASCIICase = [scheme](std::string_view expected) {
+    if (scheme.size() != expected.size()) return false;
+    for (std::size_t index = 0; index < scheme.size(); ++index) {
+      const auto actual = static_cast<unsigned char>(scheme[index]);
+      const auto lowered = static_cast<char>(
+        actual >= 'A' && actual <= 'Z' ? actual + ('a' - 'A') : actual
+      );
+      if (lowered != expected[index]) return false;
+    }
+    return true;
+  };
+  return equalsIgnoringASCIICase("http") || equalsIgnoringASCIICase("https");
 }
 
 auto isValidMapboxEndpoint(const std::string& url) -> bool {
@@ -397,9 +416,12 @@ class HTTPRequest : public AsyncRequest {
 
     header_storage.emplace_back("User-Agent", "MapLibreNative/1.0");
 
-    auto transformed = mln::core::invoke_http_header_transform(
-      platformContext, resourceKindToAbi(resource.kind), url.c_str()
-    );
+    auto transformed =
+      isHTTPURL(url)
+        ? mln::core::invoke_http_header_transform(
+            platformContext, resourceKindToAbi(resource.kind), url.c_str()
+          )
+        : mln::core::HttpHeaders{};
     const auto nativeHeaderCount = header_storage.size();
     header_storage.reserve(header_storage.size() + transformed.size());
     for (auto& header : transformed) {

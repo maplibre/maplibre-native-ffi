@@ -487,6 +487,11 @@ std::unique_ptr<AsyncRequest> HTTPFileSource::request(
       [networkManager.delegate respondsToSelector:@selector(willSendRequest:)]
     ) {
       req = [networkManager.delegate willSendRequest:req];
+      if (!MLNSameOrigin(url, req.URL)) {
+        req = [req mutableCopy];
+        for (NSString* name in transformedHeaderNames)
+          [req setValue:nil forHTTPHeaderField:name];
+      }
     }
 
     request->task = [session

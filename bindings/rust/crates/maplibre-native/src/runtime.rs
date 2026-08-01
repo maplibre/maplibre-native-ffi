@@ -2208,6 +2208,29 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-158.
+    fn http_header_transform_skips_non_http_urls() {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        runtime.set_resource_transform(|_| None).unwrap();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let callback_calls = Arc::clone(&calls);
+        runtime
+            .set_http_header_transform(move |_| {
+                callback_calls.fetch_add(1, Ordering::SeqCst);
+                Vec::new()
+            })
+            .unwrap();
+        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+
+        map.set_style_url("jar:file:/packaged/style.json").unwrap();
+        let _ = wait_for_map_loading_failure(&runtime);
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
     // Spec coverage: BND-159.
     fn http_header_transform_preserves_same_origin_and_strips_cross_origin_redirects() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
