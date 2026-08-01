@@ -99,8 +99,10 @@ sccache = "{{vars.sccache_version}}"
 swiftformat = { version = "{{vars.swiftformat_version}}", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
 
 # The native CMake build compiles the Rust platform support library, so Rust is
-# part of the repository-wide native toolchain.
-"core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy", targets = "aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc" }
+# part of the repository-wide native toolchain. `rust-src` is for the browser
+# target alone: rustup ships no `std` for `wasm32-unknown-emscripten` built with
+# atomics, so that target rebuilds `std` from source. See cmake/mln_rust.cmake.
+"core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy,rust-src", targets = "aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc,wasm32-unknown-emscripten" }
 
 # The native CMake build compiles the Linux targets with `zig cc`, so Zig joins
 # the native toolchain there. See cmake/toolchains/zig-linux.cmake. The Zig
@@ -183,6 +185,31 @@ sources = [
 ]
 outputs = { auto = true }
 run = '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"'
+
+[tasks."build:rust-browser"]
+description = "Build the Rust platform support library for the browser target."
+# Emscripten rejects mixing objects that carry atomics with objects that do not
+# under shared memory, and rustup ships no `wasm32-unknown-emscripten` `std`
+# built with atomics, so `std` is rebuilt from source here. `-Zbuild-std` is
+# nightly-only, and this is the one place the repository reaches for a nightly
+# feature: RUSTC_BOOTSTRAP unlocks it on the pinned stable toolchain, which
+# keeps the rest of the workspace, and every artifact we ship, on stable.
+#
+# Building the staticlib needs no linker, so this runs without emsdk. The
+# browser CMake target links it, and will reach cargo the same way every other
+# target does.
+sources = ["Cargo.lock", "Cargo.toml", "src/platform/rust/**/*"]
+outputs = { auto = true }
+env.RUSTC_BOOTSTRAP = "1"
+env.RUSTFLAGS = "-C target-feature=+atomics,+bulk-memory -C panic=abort"
+run = '''
+cargo build \
+  --manifest-path src/platform/rust/Cargo.toml \
+  --package maplibre-native-platform \
+  --target wasm32-unknown-emscripten \
+  --release \
+  -Z build-std=std,panic_abort
+'''
 
 [tasks.clean]
 description = "Remove one native preset build tree."
