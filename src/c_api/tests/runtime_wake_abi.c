@@ -238,6 +238,90 @@ static void a_style_response_wakes_a_parked_owner_thread(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+typedef struct session_resize_probe {
+  mln_map map;
+  atomic_bool attached;
+  atomic_bool start_resize;
+  atomic_int resize_status;
+  atomic_bool resize_done;
+  bool attach_succeeded;
+} session_resize_probe;
+
+// Attaches on its own thread, so the resize below reaches the map the way a
+// host's render loop reaches it: queued from a thread that owns no runtime.
+static void resize_session_entry(void* argument) {
+  session_resize_probe* probe = argument;
+  mln_test_render_fixture fixture = {0};
+  probe->attach_succeeded =
+    mln_test_render_fixture_create(probe->map, &fixture);
+  atomic_store(&probe->attached, true);
+  if (!probe->attach_succeeded) {
+    atomic_store(&probe->resize_done, true);
+    return;
+  }
+
+  while (!atomic_load(&probe->start_resize)) {
+    mln_test_sleep_millisecond();
+  }
+  // Long enough for the owner thread to reach its park, so the wake under test
+  // is the queued resize rather than a flag already set when the pump began.
+  mln_test_sleep_milliseconds(signal_delay_milliseconds);
+  atomic_store(
+    &probe->resize_status,
+    mln_render_session_resize(fixture.session, 96, 48, 1.0)
+  );
+  atomic_store(&probe->resize_done, true);
+
+  mln_test_render_fixture_destroy(&fixture);
+}
+
+// A render thread's resize queues the new size for the map's owner thread. The
+// owner thread takes it from a park without a host wake source, which is what
+// lets a host resize without also arranging to release its own pump.
+static void a_session_resize_releases_a_parked_owner_thread(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+
+  session_resize_probe probe = {.map = map};
+  atomic_init(&probe.attached, false);
+  atomic_init(&probe.start_resize, false);
+  atomic_init(&probe.resize_status, MLN_STATUS_OK);
+  atomic_init(&probe.resize_done, false);
+
+  mln_test_thread* thread = mln_test_thread_start(resize_session_entry, &probe);
+  TEST_ASSERT_TRUE(mln_test_pump_until(runtime, &probe.attached));
+  TEST_ASSERT_TRUE(probe.attach_succeeded);
+  quiesce(runtime);
+  atomic_store(&probe.start_resize, true);
+
+  const uint64_t started = mln_test_monotonic_milliseconds();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds)
+  );
+  const uint64_t elapsed = mln_test_monotonic_milliseconds() - started;
+  TEST_ASSERT_TRUE_MESSAGE(
+    elapsed < prompt_return_milliseconds,
+    "The parked owner thread timed out instead of taking the queued resize."
+  );
+
+  TEST_ASSERT_TRUE(mln_test_pump_until(runtime, &probe.resize_done));
+  mln_test_thread_join(thread);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&probe.resize_status));
+
+  // The pump that took the wake is the one that applied the size.
+  uint32_t width = 0;
+  uint32_t height = 0;
+  double scale_factor = 0.0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_size(map, &width, &height, &scale_factor)
+  );
+  TEST_ASSERT_EQUAL_UINT32(96, width);
+  TEST_ASSERT_EQUAL_UINT32(48, height);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // Queued unread events return a blocking pump without parking.
 static void queued_events_return_from_the_pump_immediately(void) {
   mln_runtime runtime = mln_test_create_runtime();
@@ -402,6 +486,7 @@ void run_runtime_wake_abi_tests(void) {
   RUN_TEST(a_wake_source_releases_a_parked_owner_thread);
   RUN_TEST(a_signal_before_the_pump_sets_the_wake_flag);
   RUN_TEST(a_style_response_wakes_a_parked_owner_thread);
+  RUN_TEST(a_session_resize_releases_a_parked_owner_thread);
   RUN_TEST(queued_events_return_from_the_pump_immediately);
   RUN_TEST(render_updates_coalesce_at_the_queue_tail);
   RUN_TEST(a_wake_source_outlives_its_runtime);
