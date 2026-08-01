@@ -44,6 +44,12 @@ static void* const fake_handle = (void*)(uintptr_t)1;
       MLN_STATUS_INVALID_ARGUMENT, attach(map, &invalid, &session)    \
     );                                                                \
     invalid = default_descriptor();                                   \
+    invalid.extent.width = UINT32_MAX;                                \
+    invalid.extent.scale_factor = 2.0;                                \
+    TEST_ASSERT_EQUAL_INT(                                            \
+      MLN_STATUS_INVALID_ARGUMENT, attach(map, &invalid, &session)    \
+    );                                                                \
+    invalid = default_descriptor();                                   \
     shrink(&invalid);                                                 \
     TEST_ASSERT_EQUAL_INT(                                            \
       MLN_STATUS_INVALID_ARGUMENT, attach(map, &invalid, &session)    \
@@ -57,7 +63,11 @@ static void* const fake_handle = (void*)(uintptr_t)1;
     mln_test_destroy_runtime(runtime);                                \
   } while (false)
 
-#if defined(MLN_TEST_BACKEND_METAL)
+// Every backend's descriptor validation runs on every build. A host that probes
+// a backend this build does not carry still has to learn its descriptor is
+// wrong before it learns the backend is missing, and the backend-native paths
+// reject the same inputs. Gating these by build left the not-this-backend paths
+// unverified, which is how they drifted apart.
 
 static mln_metal_surface_descriptor metal_surface_descriptor(void) {
   mln_metal_surface_descriptor value = mln_metal_surface_descriptor_default();
@@ -127,8 +137,6 @@ static void metal_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
-
-#elif defined(MLN_TEST_BACKEND_OPENGL)
 
 static void configure_opengl_context(mln_opengl_context_descriptor* context) {
 #if defined(MLN_TEST_OPENGL_WGL)
@@ -245,8 +253,6 @@ static void opengl_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-#elif defined(MLN_TEST_BACKEND_VULKAN)
-
 static mln_vulkan_context_descriptor fake_vulkan_context(void) {
   return (mln_vulkan_context_descriptor){
     .size = sizeof(mln_vulkan_context_descriptor),
@@ -342,21 +348,15 @@ static void vulkan_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-#endif
-
 void run_render_backend_abi_tests(void) {
   UnitySetTestFile(__FILE__);
-#if defined(MLN_TEST_BACKEND_METAL)
   RUN_TEST(metal_surface_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(metal_owned_texture_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(metal_borrowed_texture_rejects_unsafe_raw_descriptors);
-#elif defined(MLN_TEST_BACKEND_OPENGL)
-  RUN_TEST(opengl_owned_texture_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(opengl_surface_attach_rejects_unsafe_raw_inputs);
+  RUN_TEST(opengl_owned_texture_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(opengl_borrowed_texture_rejects_unsafe_raw_descriptors);
-#elif defined(MLN_TEST_BACKEND_VULKAN)
   RUN_TEST(vulkan_surface_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(vulkan_owned_texture_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(vulkan_borrowed_texture_rejects_unsafe_raw_descriptors);
-#endif
 }
