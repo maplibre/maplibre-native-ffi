@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+#MISE description="Build .NET snapshot packages or generate/mirror their Sleet feed."
+#MISE shell="bash"
+#MISE tools={ "core:dotnet" = "{{vars.dotnet_version}}", python = "{{vars.python_version}}" }
+#USAGE arg "<command>" help="package, feed, or mirror"
+#USAGE arg "<arguments>..." help="Arguments passed to ci/dotnet_snapshot.py"
+set -euo pipefail
+
+read -r -a arguments <<< "${usage_arguments-}"
+
+# Only feed generation runs Sleet. The docs carry-forward mirror is plain
+# Python, so restoring the tool manifest there would let a NuGet outage stop an
+# unrelated docs deploy from preserving the existing feed.
+if [[ "${usage_command?}" == feed ]]; then
+  dotnet tool restore --tool-manifest bindings/dotnet/.config/dotnet-tools.json --verbosity quiet
+fi
+
+exec python ci/dotnet_snapshot.py "${usage_command}" "${arguments[@]}"

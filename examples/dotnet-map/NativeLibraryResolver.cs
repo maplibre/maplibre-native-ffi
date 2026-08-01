@@ -5,7 +5,6 @@ namespace Maplibre.Native.Examples.DotnetMap;
 
 internal static class NativeLibraryResolver
 {
-    private const string LibraryDirsSwitch = "Maplibre.Native.LibraryDirs";
     private static readonly object RegistrationLock = new();
     private static bool registered;
     private static bool preloadedGlfw;
@@ -103,11 +102,9 @@ internal static class NativeLibraryResolver
 
     private static IEnumerable<string> CandidateLibraryDirectories()
     {
-        var switchDirs = AppContext.GetData(LibraryDirsSwitch) as string;
-        foreach (var directory in PathList(switchDirs))
-        {
-            yield return directory;
-        }
+        // Where the MapLibre install's runtime lands: the OpenGL presets ship
+        // ANGLE's libEGL beside the C API library, and the app copies both.
+        yield return AppContext.BaseDirectory;
 
         // Where NuGet packages stage their native assets for a portable build.
         yield return Path.Combine(
@@ -116,20 +113,5 @@ internal static class NativeLibraryResolver
             RuntimeInformation.RuntimeIdentifier,
             "native"
         );
-    }
-
-    private static IEnumerable<string> PathList(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            yield break;
-        }
-
-        foreach (
-            var directory in value.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
-        )
-        {
-            yield return directory;
-        }
     }
 }

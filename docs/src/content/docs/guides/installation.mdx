@@ -125,8 +125,9 @@ printf("backends: %#x\n", mln_supported_render_backend_mask());
 Bindings live under `bindings/` for Kotlin, Rust, Swift, Zig, .NET, Python, Go,
 and Dart. Kotlin artifacts are available as `org.maplibre.nativeffi` snapshots
 on [Maven Central's snapshot repository](https://central.sonatype.com/repository/maven-snapshots/org/maplibre/nativeffi/),
-and Python wheels are available from the opt-in index below. Other bindings use
-a path or git dependency from a checkout and a native install prefix.
+and Python and .NET snapshots are available from the opt-in feeds below. Other
+bindings use a path or git dependency from a checkout and a native install
+prefix.
 
 ### Python
 
@@ -156,6 +157,50 @@ runs. The Linux tag names the build runner's glibc rather than the
 `GLIBC_2.17` floor the native archives hold to, because the extension module is
 compiled alongside the wheel; take the archive and build the binding from source
 for a host older than the tag.
+
+### .NET
+
+Add the static NuGet v3 feed to your repository's `nuget.config`:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <add key="maplibre-snapshots"
+         value="https://maplibre.github.io/maplibre-native-ffi/nuget/index.json" />
+  </packageSources>
+  <packageSourceMapping>
+    <packageSource key="maplibre-snapshots">
+      <package pattern="Maplibre.Native*" />
+    </packageSource>
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
+</configuration>
+```
+
+The mapping is what keeps these names coming from this feed. The reference
+below floats on `0.1.0-preview.*`, so without it any other configured source
+offering a higher `Maplibre.Native*` version would satisfy the restore instead.
+
+Then reference the runtime package for the one renderer your application uses:
+
+```xml
+<PackageReference Include="Maplibre.Native.Runtime.Vulkan"
+                  Version="0.1.0-preview.*" />
+```
+
+Use `Maplibre.Native.Runtime.OpenGL` for OpenGL or
+`Maplibre.Native.Runtime.Metal` for Metal. Each runtime package brings in the
+managed `Maplibre.Native` binding and selects its native library from
+`runtimes/<rid>/native/`. Snapshot versions carry the publication time, such as
+`0.1.0-preview.202608010314`, and the feed retains only its current build.
+
+The runtime packages carry `android-arm64` and `android-x64` alongside the
+desktop RIDs. An Android app still packages the TLS helper and calls
+`mln_android_init`, as [Package an Android app](#package-an-android-app)
+describes.
 
 ### Rust
 

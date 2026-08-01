@@ -2,6 +2,11 @@
   "version": 1,
   "isRoot": true,
   "tools": {
+    "sleet": {
+      "version": "7.2.0+git.7247be6",
+      "commands": ["sleet"],
+      "rollForward": false
+    },
     "clangsharppinvokegenerator": {
       "version": "21.1.8.3",
       "commands": ["ClangSharpPInvokeGenerator"],

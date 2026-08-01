@@ -1,18 +1,19 @@
 <Project>
   <PropertyGroup>
-    <MaplibreNativeCLinkDir>$(MaplibreNativeCInstallDir)/lib</MaplibreNativeCLinkDir>
     <MaplibreNativeCRuntimeDir Condition="'$(OS)' == 'Windows_NT'">$(MaplibreNativeCInstallDir)/bin</MaplibreNativeCRuntimeDir>
     <MaplibreNativeCRuntimeDir Condition="'$(OS)' != 'Windows_NT'">$(MaplibreNativeCInstallDir)/lib</MaplibreNativeCRuntimeDir>
-    <MaplibreNativeCLibraryPath Condition="'$(OS)' == 'Windows_NT'">$(MaplibreNativeCRuntimeDir)/maplibre-native-c.dll</MaplibreNativeCLibraryPath>
-    <MaplibreNativeCLibraryPath Condition="'$(OS)' != 'Windows_NT' and $([MSBuild]::IsOSPlatform('OSX'))">$(MaplibreNativeCRuntimeDir)/libmaplibre-native-c.dylib</MaplibreNativeCLibraryPath>
-    <MaplibreNativeCLibraryPath Condition="'$(OS)' != 'Windows_NT' and !$([MSBuild]::IsOSPlatform('OSX'))">$(MaplibreNativeCRuntimeDir)/libmaplibre-native-c.so</MaplibreNativeCLibraryPath>
-    <MaplibreNativeCPathSeparator Condition="'$(OS)' == 'Windows_NT'">;</MaplibreNativeCPathSeparator>
-    <MaplibreNativeCPathSeparator Condition="'$(OS)' != 'Windows_NT'">:</MaplibreNativeCPathSeparator>
-    <MaplibreNativeCLoaderLibraryDirs>$(MaplibreNativeCRuntimeDir)$(MaplibreNativeCPathSeparator)$(MaplibreNativeCHostLibraryDirs)</MaplibreNativeCLoaderLibraryDirs>
   </PropertyGroup>
 
   <ItemGroup>
-    <RuntimeHostConfigurationOption Include="Maplibre.Native.LibraryPath" Value="$(MaplibreNativeCLibraryPath)" />
-    <RuntimeHostConfigurationOption Include="Maplibre.Native.LibraryDirs" Value="$(MaplibreNativeCLoaderLibraryDirs)" />
+    <!-- Local builds copy the install's shared libraries beside the app,
+         matching how NuGet runtime assets enter the standard native-library
+         lookup. Every shared library, not just the C API one: the OpenGL
+         presets install ANGLE beside it and resolve it through the loader. The
+         install's static archive stays behind. -->
+    <Content Include="$(MaplibreNativeCRuntimeDir)/*.so;$(MaplibreNativeCRuntimeDir)/*.so.*;$(MaplibreNativeCRuntimeDir)/*.dylib;$(MaplibreNativeCRuntimeDir)/*.dll">
+      <Link>%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 </Project>
