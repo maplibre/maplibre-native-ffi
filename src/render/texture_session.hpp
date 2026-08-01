@@ -25,6 +25,35 @@ auto validate_texture(
 auto validate_live_attached_texture(
   mln_render_session texture, mln_render_session_object*& out_texture
 ) -> mln_status;
+// The backend-independent half of texture descriptor validation: pointer, size,
+// nested size, extent, and the handles the descriptor declares required. The
+// backend that owns a descriptor adds whatever probing needs its own headers on
+// top; every other build reaches this through the unsupported stub, so both
+// learn the same verdict from one definition.
+//
+// `require_supported_provider` is false wherever no OpenGL context can be
+// created, so a host probing for OpenGL still hears about a malformed
+// descriptor rather than an unsupported provider.
+auto validate_metal_owned_texture_descriptor(
+  const mln_metal_owned_texture_descriptor* descriptor
+) -> mln_status;
+auto validate_metal_borrowed_texture_descriptor(
+  const mln_metal_borrowed_texture_descriptor* descriptor
+) -> mln_status;
+auto validate_vulkan_owned_texture_descriptor(
+  const mln_vulkan_owned_texture_descriptor* descriptor
+) -> mln_status;
+auto validate_vulkan_borrowed_texture_descriptor(
+  const mln_vulkan_borrowed_texture_descriptor* descriptor
+) -> mln_status;
+auto validate_opengl_owned_texture_descriptor(
+  const mln_opengl_owned_texture_descriptor* descriptor,
+  bool require_supported_provider
+) -> mln_status;
+auto validate_opengl_borrowed_texture_descriptor(
+  const mln_opengl_borrowed_texture_descriptor* descriptor,
+  bool require_supported_provider
+) -> mln_status;
 auto metal_owned_texture_attach(
   mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
   mln_render_session* out_session
