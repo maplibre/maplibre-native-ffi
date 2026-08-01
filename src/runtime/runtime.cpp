@@ -1091,13 +1091,28 @@ auto create_runtime(
     std::make_shared<ResourceTransformState>();
   owned_runtime->resource_provider_state =
     std::make_shared<ResourceProviderState>();
+  auto* published = owned_runtime.get();
+  // Reserving the token allocates, so it happens before this thread is marked
+  // as owning a runtime.
+  published->platform_context = reserve_platform_context();
   {
     const std::scoped_lock lock(live_runtime_threads_mutex());
     live_runtime_threads().insert(owner_thread);
   }
-  auto* published = owned_runtime.get();
-  published->platform_context = reserve_platform_context();
-  *out_runtime = handle_table<RuntimeObject>().insert(std::move(owned_runtime));
+  try {
+    *out_runtime =
+      handle_table<RuntimeObject>().insert(std::move(owned_runtime));
+  } catch (...) {
+    // The caller receives no handle, so it has nothing to destroy and no way to
+    // give the owner thread back. Releasing it here is what keeps a failed
+    // creation from rejecting every later one on the same thread.
+    {
+      const std::scoped_lock lock(live_runtime_threads_mutex());
+      live_runtime_threads().erase(owner_thread);
+    }
+    unregister_platform_context(published->platform_context);
+    throw;
+  }
   published->self = *out_runtime;
   bind_platform_context(published->platform_context, *out_runtime);
   return MLN_STATUS_OK;
