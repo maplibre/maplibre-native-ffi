@@ -1,0 +1,45 @@
+---
+title: Render a Map Image Without a Window
+description: Render a map offscreen into a texture render target and read the finished image into host memory.
+sidebar:
+  order: 3
+---
+
+import { Code } from "@astrojs/starlight/components";
+import stillImage from "../../../../snippets/c/still-image.c?raw";
+
+A host that renders map images offscreen creates the map in static mode and
+attaches an owned texture render target. A static map renders one image per
+request and reports the outcome as an event. Unlike a live view, this path needs
+no window, no swap chain, and no display refresh callback, so it fits a tile
+service, a thumbnail job, or a texture in a 3D scene.
+
+The render session allocates the texture for an owned texture target. Once the
+image is ready, the host reads it into its own memory with
+`mln_texture_read_premultiplied_rgba8`, or acquires the backend texture for the
+last frame and samples it while the frame is held. Each render backend has its
+own descriptor type and attach function.
+
+Create the map at the size that the render target uses. A session attached at a
+different size sets the map size on the map's owner thread, so the map keeps its
+previous size until the next pump. A still-image request made before the new
+size reaches the map is spent on an update that renders nothing.
+
+A static map advances its loading through the render calls themselves, so call
+`mln_render_session_render_update` on every turn of the loop instead of only
+when `MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE` arrives. The runtime reports
+`MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED` from the map's run loop, so that
+event can arrive before or after the render call that produced the pixels. The
+image is ready once the event has arrived and a render call has reported a
+frame.
+
+<Code code={stillImage} lang="c" title="still-image.c" meta={`collapse={1-8, 10-29, 66-72, 101-113} mark={"Ready only when both have happened":38} mark={"A static map loads through its render calls":57-60} mark={"The session allocates the texture it renders into":83-85} mark={"A null buffer probes the required byte length":94}`} />
+
+The copy is premultiplied RGBA8 in physical pixels, laid out with `info.stride`
+bytes per row.
+
+A host whose destination texture already exists, such as a material in a 3D
+scene or a frame from a compositor's pool, attaches a borrowed texture target
+instead. `mln_texture_read_premultiplied_rgba8` returns
+`MLN_STATUS_UNSUPPORTED` for a borrowed target, so that host copies the pixels
+with the graphics API that allocated the texture.

@@ -1,0 +1,45 @@
+---
+title: Read Features from a Source
+description: Query the features that a source holds, and expand a cluster into the features under it.
+sidebar:
+  order: 9
+---
+
+import { Code } from "@astrojs/starlight/components";
+import sourceFeatures from "../../../../snippets/c/query-source-features.c?raw";
+import clusterLeaves from "../../../../snippets/c/cluster-leaves.c?raw";
+
+A source query reports the features that a source holds, including the features
+that no layer draws. The query belongs to the render session and runs on the
+session's owner thread. The session builds its renderer during the first
+`mln_render_session_render_update`, and a query before that render update
+returns `MLN_STATUS_INVALID_STATE`.
+
+Name the source by its style source ID. A vector source also needs source-layer
+IDs, because one vector tile holds several layers and MapLibre reads the layers
+that you name. A vector query with no source-layer ID returns zero features. A
+GeoJSON source holds a single layer and ignores the field.
+
+<Code code={sourceFeatures} lang="c" title="query-source-features.c" meta={'collapse={1-22} mark={"Vector sources read only the source layers named here":24-29} mark={"The ID of the source, not one of its source layers":33} mark={"Copy anything you keep before this call, because feature views belong to the result":38}'} />
+
+The same query returns different features as the camera moves, because a query
+covers the tiles that the source has loaded for the current camera. Tiles that
+arrive later appear in the next query, and a source that no layer uses loads no
+tiles at all. Read the result count rather than the status when you expect
+features, because an unknown source ID also produces an empty result with
+`MLN_STATUS_OK`.
+
+Expanding a cluster is a source read as well.
+`mln_render_session_query_feature_extensions` runs a named extension against one
+feature of one source. The `supercluster` extension reads a GeoJSON source that
+has clustering enabled, and its `leaves` field returns the features under one
+cluster as a feature collection.
+
+<Code code={clusterLeaves} lang="c" title="cluster-leaves.c" meta={'collapse={1-43} mark={"The cluster feature comes from a source query, unmodified":46} mark={"Both bounds are unsigned, because supercluster matches numbers by exact JSON type":48-54} mark={"The extension name, then the field within it":58} mark={"Read the type tag on the result before you read the union":61}'} />
+
+Pass a cluster feature back exactly as a query returned it. `supercluster` reads
+the `cluster_id` property and the `limit` and `offset` arguments as unsigned
+JSON values, and it treats a double or a signed integer as absent. Feature
+descriptors copied out of a query result keep the JSON type of every property. A
+host that rebuilds the feature through a JSON layer that stores every number as
+a double receives a successful query with an empty result.

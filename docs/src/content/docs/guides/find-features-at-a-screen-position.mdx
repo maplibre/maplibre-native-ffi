@@ -1,0 +1,37 @@
+---
+title: Find Features at a Screen Position
+description: Query the features that the renderer drew at a screen position, and copy what your host keeps before the result is destroyed.
+sidebar:
+  order: 8
+---
+
+import { Code } from "@astrojs/starlight/components";
+import querySnippet from "../../../../snippets/c/query-rendered-features.c?raw";
+
+A rendered feature query reads the frame that the renderer produced, so the
+query belongs to the render session and runs on the session's owner thread. The
+session builds its renderer during the first `mln_render_session_render_update`,
+and a query before that render update returns `MLN_STATUS_INVALID_STATE`. A
+result describes the last frame that the session drew, so render again after a
+camera move or a style change when the answer has to match the new state. A
+query over an area whose tiles are still loading returns zero features, and the
+same query returns features once those tiles arrive and render.
+
+Screen coordinates are logical map pixels measured from the top-left of the
+viewport, the same space that `mln_map_pixel_for_lat_lng` reports. A host that
+tracks positions in physical device pixels divides them by the scale factor of
+the render session.
+
+The geometry states where to search. A point matches the exact position, and a
+box matches a rectangle around it. Symbols and thin lines are small targets, so
+a hit test uses a box with a few pixels of tolerance. Box corners come in any
+order, and MapLibre clips the box to the viewport. Name the layer IDs that your
+host treats as selectable.
+
+<Code code={querySnippet} lang="c" title="query-rendered-features.c" meta={'collapse={1-32} mark={"Tolerance around the position, in logical pixels":38-42} mark={"Naming layers keeps background and land fills out of the result":44-49} mark={"The result handle is owned on success":51-55} mark={"Copy anything you keep, then destroy the result":57-58}'} />
+
+Each feature that `mln_feature_query_result_get` returns holds views into
+storage that the result owns, and those views stay valid until the result is
+destroyed. Copy every string, property value, and geometry that your host keeps
+past the query, then destroy the result with
+`mln_feature_query_result_destroy`.

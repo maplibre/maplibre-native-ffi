@@ -1,41 +1,48 @@
-// Moving the camera. Camera options are a field mask plus values: only the
-// fields you flag are applied, so partial updates leave everything else alone.
+// Applying one camera two ways: immediately, and over 800 milliseconds.
 
 #include <maplibre_native_c.h>
 
-void move_camera(mln_map map) {
+static mln_camera_options downtown(void) {
   mln_camera_options camera = mln_camera_options_default();
-  camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
+  camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM |
+                  MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH;
   camera.latitude = 37.7749;
   camera.longitude = -122.4194;
   camera.zoom = 13.0;
-
-  mln_map_jump_to(map, &camera);
-
-  // ease_to defaults to a zero duration, so it behaves like a jump unless you
-  // ask for time.
-  mln_animation_options animation = mln_animation_options_default();
-  animation.fields = MLN_ANIMATION_OPTION_DURATION;
-  animation.duration_ms = 800.0;
-  mln_map_ease_to(map, &camera, &animation);
-
-  // fly_to is the exception: with no options it derives its own duration from
-  // the distance travelled.
-  mln_map_fly_to(map, &camera, NULL);
+  camera.bearing = 12.0;
+  camera.pitch = 30.0;
+  return camera;
 }
 
-void fit_bounds(mln_map map, mln_lat_lng_bounds bounds) {
-  mln_camera_fit_options fit = mln_camera_fit_options_default();
-  fit.fields = MLN_CAMERA_FIT_OPTION_PADDING;
-  fit.padding =
-    (mln_edge_insets){.top = 24, .left = 24, .bottom = 24, .right = 24};
+mln_status jump_downtown(mln_map map) {
+  const mln_camera_options camera = downtown();
+  return mln_map_jump_to(map, &camera);
+}
 
-  // camera_for_* computes a camera; it does not apply one. Hand the result to a
-  // transition to move there.
-  mln_camera_options fitted = mln_camera_options_default();
-  const mln_status status =
-    mln_map_camera_for_lat_lng_bounds(map, bounds, &fit, &fitted);
-  if (status == MLN_STATUS_OK) {
-    mln_map_ease_to(map, &fitted, NULL);
+mln_status ease_downtown(mln_map map, uint64_t transition_id) {
+  const mln_camera_options camera = downtown();
+
+  mln_animation_options animation = mln_animation_options_default();
+  animation.fields = MLN_ANIMATION_OPTION_DURATION |
+                     MLN_ANIMATION_OPTION_EASING |
+                     MLN_ANIMATION_OPTION_TRANSITION_ID;
+  animation.duration_ms = 800.0;
+  animation.easing =
+    (mln_unit_bezier){.x1 = 0.25, .y1 = 0.1, .x2 = 0.25, .y2 = 1.0};
+  animation.transition_id = transition_id;
+
+  return mln_map_ease_to(map, &camera, &animation);
+}
+
+bool transition_finished(
+  const mln_runtime_event* event, uint64_t transition_id
+) {
+  if (
+    event->type != MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED ||
+    event->payload_type != MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED
+  ) {
+    return false;
   }
+  const mln_runtime_event_camera_transition_finished* finished = event->payload;
+  return finished->transition_id == transition_id;
 }

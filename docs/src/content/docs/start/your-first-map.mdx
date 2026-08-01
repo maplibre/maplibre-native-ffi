@@ -1,0 +1,43 @@
+---
+title: Your First Map
+description: Create a runtime and a map, load a style, attach a render session to a window surface, and run the loop that keeps a map on screen.
+sidebar:
+  order: 2
+---
+
+import { Code } from "@astrojs/starlight/components";
+
+import firstMap from "../../../../snippets/c/first-map.c?raw";
+
+Every integration performs the same operations: create a runtime and a map, load
+a style, attach a render session, render frames, and destroy the three in order.
+This page shows them once, in a program that keeps a street map on screen.
+
+One thread does all of it. The thread that creates the runtime becomes the
+runtime's owner thread, the map that you create under that runtime takes the
+same owner thread, and attaching the render session on that thread makes it the
+session's owner thread as well.
+
+<Code code={firstMap} lang="c" title="first-map.c" meta={'collapse={4-33, 39-54, 61-72} mark={"Create in order: runtime, map, then render session":74-80} mark={"Renders the map\'s latest update, and reports whether it drew":108-110} mark={"Destroy in reverse":117-119}'} />
+
+`mln_map_set_style_url` returns once the map accepts the request, and the style
+document, its sources, and its tiles arrive across the pumps that follow. When
+a style fails to load, the runtime reports a map loading-failed event whose
+message carries the failure text.
+
+Each pump call does the work that the map has queued: parsing style documents,
+delivering network responses, and advancing camera transitions.
+
+The map publishes render updates, and the render session draws them.
+`mln_render_session_render_update` renders the map's latest update, presents it
+through the surface, and reports whether it rendered. On the first turns of
+the loop the map has usually published no update for the session's extent yet,
+so the call reports no render and the program keeps its request pending.
+
+Teardown reverses creation. `mln_map_destroy` reports
+`MLN_STATUS_INVALID_STATE` while a render session is attached, and
+`mln_runtime_destroy` reports the same status while the runtime owns live maps.
+
+Run the program. The window shows a street map of San Francisco at zoom 13, and
+more detail appears as tiles arrive. For the model behind the three objects
+that you created, read [Concepts](/maplibre-native-ffi/concepts/).

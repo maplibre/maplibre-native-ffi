@@ -1,6 +1,4 @@
-// Attaching an API key to tile requests. A style names sprites, glyphs, and
-// tiles on origins you do not control, and the transform runs for those too, so
-// match your own host before adding the credential.
+// Attaching an API key to the requests that reach one origin.
 
 #include <maplibre_native_c.h>
 #include <string.h>
@@ -34,8 +32,6 @@ static mln_status add_api_key(
 }
 
 void install_transform(mln_runtime runtime, char* api_key) {
-  // MapLibre calls this on its network threads, and both the callback and
-  // user_data have to outlive the transform.
   mln_resource_transform transform = {
     .size = sizeof(transform),
     .callback = add_api_key,

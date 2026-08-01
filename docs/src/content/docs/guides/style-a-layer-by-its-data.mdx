@@ -1,0 +1,38 @@
+---
+title: Style a Layer by Its Data
+description: Set a layer's paint and layout properties from each feature's own data, and filter which features the layer draws.
+sidebar:
+  order: 6
+---
+
+import { Code } from "@astrojs/starlight/components";
+import styleByData from "../../../../snippets/c/style-by-data.c?raw";
+
+A layer property holds either a constant or an expression. An expression reads
+the feature that the layer is drawing, so one rule styles every feature from its
+own data. `mln_map_set_layer_property` sets one property of one layer. Set a
+property once the map reports `MLN_RUNTIME_EVENT_MAP_STYLE_LOADED`, and set it
+again after every later style load, because a property value belongs to the
+style that was loaded when you set it.
+
+The value is a style-spec JSON value descriptor: a tree of `mln_json_value`
+nodes. A constant is a scalar node. An expression is an array node whose first
+element names the operator and whose remaining elements are its arguments, each
+one another node. That one shape covers everything the style specification
+allows in that position: `["get", "mag"]` reads a feature property, and
+`["match", ["get", "kind"], "aftershock", "#3355cc", "#cc4433"]` chooses a color
+per category.
+
+A filter chooses which of the source's features the layer draws, and a filter is
+an expression that returns a boolean. `mln_map_set_layer_filter` takes the same
+kind of descriptor, and a null filter clears the layer's filter.
+
+The descriptors, arrays, and strings that you build stay yours and can live on
+the stack. MapLibre parses a property value or a filter and copies it into typed
+style storage before the call returns.
+
+<Code code={styleByData} lang="c" title="style-by-data.c" meta={'collapse={1-36} mark={"An expression array holds the operator, then its arguments":38-48} mark={"The property name is the one that the style specification defines":50-51} mark={"The same node nests in a second value with no rebuild":54-58}'} />
+
+Both calls run on the map's owner thread and apply to the live style
+immediately. A host that pumps the runtime and renders on update draws the new
+appearance in its next frame.

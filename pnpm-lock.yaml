@@ -17,6 +17,9 @@ importers:
       '@astrojs/starlight':
         specifier: ^0.41.4
         version: 0.41.4(@astrojs/markdown-remark@7.2.1)(astro@7.1.3(@astrojs/markdown-remark@7.2.1)(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@24.13.3)(rollup@4.62.0)(yaml@2.9.0))
+      '@expressive-code/plugin-collapsible-sections':
+        specifier: ^0.44.1
+        version: 0.44.1
       '@fontsource/alata':
         specifier: ^5.3.0
         version: 5.3.0
@@ -434,6 +437,9 @@ packages:
 
   '@expressive-code/core@0.44.1':
     resolution: {integrity: sha512-3dDo9N8D7hYrLNNMMWFovg3+aDUtnQm7c7z0GZc1c0LEFVBc0Q6lKG+tVT28gDadOvsgOANfCn35fgpe97Pmgg==}
+
+  '@expressive-code/plugin-collapsible-sections@0.44.1':
+    resolution: {integrity: sha512-1XG4PfamU5JPpWf9Z5jEsS1mNbeymntwn1EoQE40PPS5K9rUNTKpY5GFYEI60vWwj890a3/Oz9bCWTomvFityQ==}
 
   '@expressive-code/plugin-frames@0.44.1':
     resolution: {integrity: sha512-HC/bdRao9225ApcgO/e3jn8ZOhldKO7ob1O/Tcipvtv7Vb5nMphZhMtD9uuywpvxkPYBHJi3504WhrKg05Dwqg==}
@@ -3892,6 +3898,10 @@ snapshots:
       postcss-nested: 6.2.0(postcss@8.5.24)
       unist-util-visit: 5.1.0
       unist-util-visit-parents: 6.0.2
+
+  '@expressive-code/plugin-collapsible-sections@0.44.1':
+    dependencies:
+      '@expressive-code/core': 0.44.1
 
   '@expressive-code/plugin-frames@0.44.1':
     dependencies:

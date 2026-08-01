@@ -38,9 +38,13 @@ export default defineConfig({
       ],
       sidebar: [
         { label: "Overview", link: "/" },
+        {
+          label: "Get started",
+          items: [{ autogenerate: { directory: "start" } }],
+        },
         { label: "Concepts", slug: "concepts" },
         {
-          label: "Usage",
+          label: "Guides",
           items: [{ autogenerate: { directory: "guides" } }],
         },
         {

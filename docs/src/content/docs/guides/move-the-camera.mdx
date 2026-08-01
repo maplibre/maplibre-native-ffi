@@ -1,0 +1,45 @@
+---
+title: Move the Camera
+description: Position the map camera instantly, animate it over a duration, or fit it to geographic bounds.
+sidebar:
+  order: 2
+---
+
+import { Code } from "@astrojs/starlight/components";
+import cameraSnippet from "../../../../snippets/c/camera.c?raw";
+import fitBoundsSnippet from "../../../../snippets/c/camera-fit-bounds.c?raw";
+
+The camera belongs to the map, so a camera call needs a live map and the map's
+owner thread, and it works before any render session exists. Camera options pair
+a field mask with values: MapLibre applies the fields that you flag and leaves
+every other field at its current value, so a call that flags only zoom changes
+only the zoom.
+
+Three commands apply a camera, and they differ in timing. `mln_map_jump_to`
+applies the camera immediately. `mln_map_ease_to` interpolates to it over
+`duration_ms` along a cubic easing curve, and the ease duration defaults to
+zero, so an ease that omits `duration_ms` also applies the camera immediately.
+`mln_map_fly_to` follows a curved flight path, and when you set no duration it
+derives one from the flight distance and a velocity of 1.2 screenfuls per
+second. A duration measures host time across many frames, because an animated
+transition advances while the host pumps the runtime and the map renders.
+
+<Code code={cameraSnippet} lang="c" title="camera.c" meta={'collapse={1-4, 9-13} mark={"Only flagged fields change":7-8} mark={"An ease needs an explicit duration to animate":29} mark={"A caller-chosen identity for this transition":32} mark={"The finished event carries that identity":46-47}'} />
+
+To frame a region rather than a point, compute the camera for it first.
+`mln_map_camera_for_lat_lng_bounds` reports the camera that fits the bounds
+inside the current viewport, inset by the padding that you pass. Apply that
+camera with any of the three commands.
+
+<Code code={fitBoundsSnippet} lang="c" title="camera-fit-bounds.c" meta={'collapse={1-4, 14-16} mark={"Padding insets each viewport edge, in logical pixels":7-9} mark={"Computes a camera without moving the map":12-13} mark={"Applying the camera chooses the timing":18}'} />
+
+Set `transition_id` on the animation options when the host needs to know that a
+transition ended. The runtime queues one
+`MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED` event that carries that
+value, whether the transition ran to completion, was superseded by a later
+camera command, or was cancelled by `mln_map_cancel_transitions`. The event
+establishes which transition released the camera and carries no completion
+reason, so a host that distinguishes completion from cancellation compares the
+resulting camera against the one that it requested. Drain the event from the
+runtime that owns the map, as described in
+[Concepts](/maplibre-native-ffi/concepts/).

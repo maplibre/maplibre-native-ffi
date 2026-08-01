@@ -3,62 +3,61 @@ title: Concepts
 description: Core mental models for using MapLibre Native FFI.
 ---
 
-## Mental Model
+MapLibre Native FFI exposes MapLibre Native concepts directly. Applications use
+it through a language binding or call the C API themselves, and higher-level
+adapters build on the same model.
 
-MapLibre Native FFI exposes MapLibre Native concepts directly. Applications can
-use it directly or through language bindings, and higher-level adapters can
-build on the same model. It provides a common portable API surface for native
-map integration.
-
-Three concepts form the core API: the runtime, the map, and the render session.
-Events and bindings connect those concepts to host code.
+Three objects form the core API: the runtime, the map, and the render session.
+Events and bindings connect those objects to host code.
 
 ## Runtime
 
 The runtime owns scheduler state and event storage for one host owner thread.
-Host code creates a runtime on the thread that will pump it. Runtime work and
-events flow through that owner thread.
+Host code creates a runtime on the thread that will pump it, and runtime work
+and events flow through that thread.
 
-Each owner thread may have one live runtime. The host pumps that runtime to let
-MapLibre Native make progress and to collect completed work.
+Each owner thread carries at most one live runtime. MapLibre Native makes
+progress when the host pumps that runtime, which also collects completed work.
 
-A host paces the pump itself. Display-paced hosts pump once per frame. A host
-that owns its pump thread parks that thread until the runtime has work, and
-wakes it from its own threads through a wake source.
+The host sets the pace. A display-paced host pumps once per frame. A host that
+owns its pump thread parks that thread until the runtime has work, and wakes it
+from its own threads through a wake source.
 
 ## Map
 
-A map belongs to a runtime. It owns map state: style documents, sources, layers,
-images, camera state, feature state, observer events, and render invalidation.
+A map belongs to a runtime. It owns style documents, sources, layers, images,
+camera state, feature state, observer events, and render invalidation.
 
-A map is independent of any particular render target. Host code can create,
-configure, query, and observe the map without tying that map state to a window,
-surface, or texture.
+A map is independent of any particular render target. Host code creates,
+configures, queries, and observes a map that has yet to draw a frame.
 
-Sources and layers are added as style-spec JSON, which keeps the API in step
+Sources and layers arrive as style-spec JSON. The API therefore stays in step
 with the style specification across every layer type. Typed entry points exist
 where a layer needs a surface beyond construction, such as source-type
 validation or typed per-frame setters.
 
-## Render Session
+## Render session
 
-A render session renders one map to one render target. Render targets are
-surfaces or textures.
+A render session renders one map to one render target. A map carries at most one
+live render session.
 
-Surface sessions render and present through caller-provided native surfaces.
-Texture sessions render offscreen into session-owned backend targets or
-caller-owned borrowed backend targets.
+Render targets come in three kinds:
 
-A map may have one live render session at a time. Keeping render sessions
-separate from maps lets host code manage graphics backend lifecycle outside the
-map object itself.
+| Render target           | Owned by | Renders                              |
+| ----------------------- | -------- | ------------------------------------ |
+| native surface          | caller   | To a window or view, and presents    |
+| owned texture target    | session  | Offscreen, into a session allocation |
+| borrowed texture target | caller   | Offscreen, into a caller allocation  |
 
-A render session records its own owner thread: the thread that attached it,
-fixed for the session's lifetime. Attaching requires only that the map be live,
-not that the calling thread own it, so host code attaches on the thread that
-owns its window, graphics context, and display refresh callback while the
-runtime and map are pumped on another thread. Session calls from any other
-thread report the owner-thread status.
+Keeping render sessions separate from maps lets host code manage graphics
+backend lifecycle outside the map object.
+
+A render session records its own owner thread, which is the thread that attached
+it, and that thread stays fixed for the session's lifetime. Attaching requires
+only a live map, so the attaching thread can differ from the map's owner thread.
+A host therefore attaches on the thread that owns its window, graphics context,
+and display refresh callback, while it pumps the runtime and map on another
+thread. A session call from any other thread reports the owner-thread status.
 
 ## Events
 
@@ -70,21 +69,17 @@ Events report map lifecycle, rendering progress, resource activity, diagnostics,
 and asynchronous failures.
 
 Rendering observer events reach the runtime queue through the map's run loop, so
-a frame's events are drained by a later pump rather than inside the render call
+a later pump drains the events that a frame produced rather than the render call
 that produced them.
 
 Queued events belong to their source. Destroying a map discards that map's
-queued events without a flush or a terminal event, so host state mirrored from
-events is only as current as the last drain before teardown. Snapshot the state
-a host needs synchronously while the map is live, and let teardown run to
-completion rather than waiting on an event from the map being destroyed.
+queued events immediately, so host state mirrored from events stays only as
+current as the last drain before teardown. A host that needs such state at
+teardown reads it synchronously while the map is live.
 
-## Language Bindings
+## Language bindings
 
-Language bindings preserve the same runtime, map, render session, and event
-model in the target language. They keep the API portable while matching the
-target language's handle and error conventions.
-
-Bindings sit directly above the C API and stay close to its shape. They expose
-the same core objects and relationships with language-appropriate safety around
-handles, lifetimes, errors, and event draining.
+Language bindings preserve the runtime, map, render session, and event model in
+the target language. They sit directly above the C API and expose the same
+objects and relationships, adding language-appropriate safety around handles,
+lifetimes, errors, and event draining.

@@ -92,6 +92,8 @@ shared = [
   "!.github/dependabot.yml",
   "!.github/FUNDING.yml",
   "!.coderabbit.yaml",
+  "!.agents/**",
+  "!.claude/**",
   "!.idea/**",
   "!.ona/**",
   "!.vscode/**",

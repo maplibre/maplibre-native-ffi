@@ -1,0 +1,44 @@
+---
+title: Show a GeoJSON Dataset
+description: Add a GeoJSON source and a layer that draws it, so your own data appears on the map.
+sidebar:
+  order: 4
+---
+
+import { Code } from "@astrojs/starlight/components";
+import geojsonDataset from "../../../../snippets/c/geojson-dataset.c?raw";
+
+Your data appears on the map through two objects. A source holds the GeoJSON,
+and a layer draws the features that the source contains. Both belong to the
+style that is loaded when you add them. Add them once the map reports
+`MLN_RUNTIME_EVENT_MAP_STYLE_LOADED`, and add them again after every later style
+load.
+
+A source takes its data in one of two forms.
+`mln_map_add_geojson_source_url` names a URL that MapLibre fetches through its
+resource system, and suits data that lives on a server.
+`mln_map_add_geojson_source_data` takes geometry and feature descriptors inline
+and copies them before it returns, and suits data that your host already holds
+in memory.
+
+Decide the source options when you add the source, because they are fixed for
+its lifetime. Clustering matters most, because changing it later requires
+removing the source and its layers and adding them again. A clustering source
+groups nearby points into cluster features, and the cluster radius, the highest
+zoom that clusters, and the number of points that a cluster requires belong to
+the same options. A clustering source also constrains inline data:
+`mln_map_add_geojson_source_data` returns `MLN_STATUS_INVALID_ARGUMENT` unless
+the data is a feature collection whose every feature carries point geometry.
+
+The layer is a style-spec layer object with at least an `id`, a `type`, and the
+`source` ID. A circle layer draws points, a line layer draws line strings, and a
+fill layer draws polygons, so choose the type that matches your geometry.
+Drawing order follows the style: an empty before-layer ID appends the layer
+above the rest of the style, and naming an existing layer inserts the new layer
+beneath that one.
+
+<Code code={geojsonDataset} lang="c" title="geojson-dataset.c" meta={'collapse={1-19, 39-51, 57-68} mark={"The style-loaded event for this map":21-24} mark={"Each value applies when its field bit is set":28-31} mark={"An empty before-layer ID appends the layer":53}'} />
+
+MapLibre fetches and tiles the data on its own threads. A host that already
+pumps the runtime and renders on update draws the new features in the first
+frame after that work finishes.

@@ -1,0 +1,59 @@
+---
+title: Sign or Rewrite Resource Requests
+description: Attach credentials to network URLs with a resource transform, or serve resource bytes yourself with a resource provider.
+sidebar:
+  order: 12
+---
+
+import { Code } from "@astrojs/starlight/components";
+import transformSnippet from "../../../../snippets/c/resource-transform.c?raw";
+import providerSnippet from "../../../../snippets/c/resource-provider.c?raw";
+
+Two extension points intercept the network requests that a map makes. A resource
+transform rewrites a URL before the request is sent, and a resource provider
+answers the request with bytes that you supply. Register either one on the
+runtime, from the runtime owner thread.
+
+Every value that a callback reads must be safe to read from several threads at
+once, because MapLibre may invoke either callback on a network or worker thread
+instead of the runtime owner thread. Return from each callback quickly, because
+a resource request waits on it. A transform callback calls one C API function,
+`mln_resource_transform_response_set_url`. A provider callback calls the request
+handle functions, and only for the handle that it received.
+
+Rewrite the URL when a request needs a credential, a signature, or a different
+host. The transform runs for every resource that MapLibre fetches over the
+network, including nested PMTiles range requests. Compare the URL against your
+own host before you attach a credential, because a style names glyphs, sprites,
+and tiles on origins that you do not control. Resources that MapLibre loads from
+files, assets, MBTiles archives, and the cache database reach the map without
+the transform.
+
+<Code code={transformSnippet} lang="c" title="resource-transform.c" meta={'collapse={1-12, 17-19} mark={"Only your own origin receives the credential":20-22} mark={"The helper copies the URL for this invocation":29-31} mark={"Registering replaces any previous transform":35-40}'} />
+
+Supply the bytes yourself when MapLibre cannot load a resource on its own, such
+as an archive inside your application package or a scheme of your own. Such a
+scheme reaches the provider, because MapLibre routes every scheme that it does
+not recognize to the network layer. Fetch `resolved_url`. It is the URL after
+the runtime applies tile server normalization and its API key, while
+`requested_url` is the logical identity that the cache stores. A request that
+the provider handles never reaches the transform, because the provider runs
+before MapLibre's online file source.
+
+<Code code={providerSnippet} lang="c" title="resource-provider.c" meta={'collapse={1-15, 20-23} mark={"Match only the URLs that your host serves":24-27} mark={"Every other request continues to the MapLibre network stack":28} mark={"The C API copies these bytes before the completing call returns":31-38} mark={"Release the handle once, then report that you handled the request":39-40} mark={"Registering replaces any previous provider":44-49}'} />
+
+A provider that owns an I/O pool returns
+`MLN_RESOURCE_PROVIDER_DECISION_HANDLE`, keeps the handle, and calls
+`mln_resource_request_complete` from any thread once the bytes arrive. Check
+`mln_resource_request_cancelled` before expensive work, because MapLibre cancels
+requests whose resources it no longer needs. Release each handle exactly once
+with `mln_resource_request_release`, after you complete the request or decide
+against completing it.
+
+The runtime stores each callback and its `user_data` by reference. Keep host
+state that a callback reads reachable until you register a replacement, clear
+the callback, or destroy the runtime. Each of those calls waits for in-flight
+callbacks to return, so you free that state once one of them returns. Release
+any host lock that a callback also acquires before you call
+`mln_runtime_destroy`, because a callback blocked on that lock cannot return,
+and neither can the destroy call.
