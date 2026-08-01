@@ -7,8 +7,18 @@ internal class MacMetalBridge : NativeSurfaceBridge {
   private var texture = NativeHandle(0)
   private var metalDevice = NativeHandle(0)
   private var pixelFormat = 0L
-  private var generation = 0L
   private var currentExtent = SurfaceExtent.Empty
+
+  // Read on the Compose thread while the renderer thread writes them.
+  @Volatile private var generation = 0L
+  @Volatile private var renderedGeneration = 0L
+
+  // The texture a frame last landed in, kept alive until one lands in its
+  // replacement. Skiko allocates a new texture for every resize and the map
+  // needs a frame or two to fill it, so this is what the consumer draws in
+  // between rather than having nothing to show.
+  private var retiredTexture = NativeHandle(0)
+  @Volatile private var retiredGeneration = 0L
 
   override val backend: ProducerBackend = ProducerBackend.METAL
 
@@ -63,8 +73,23 @@ internal class MacMetalBridge : NativeSurfaceBridge {
       generation = generation,
     )
 
+  override fun completeProducerAccess(frame: NativeSurfaceFrame) {
+    renderedGeneration = frame.target.generation
+  }
+
   override fun draw(scope: DrawScope, target: NativeSurfaceTarget): Boolean {
-    if (target !is MetalTextureTarget || target.texture.address == 0L) {
+    if (target !is MetalTextureTarget) {
+      return false
+    }
+    // Only a texture this bridge still holds is safe to draw, which is the
+    // current one and the retired one behind it.
+    val held =
+      when (target.generation) {
+        generation -> texture
+        retiredGeneration -> retiredTexture
+        else -> NativeHandle(0)
+      }
+    if (held.address == 0L || held.address != target.texture.address) {
       return false
     }
     return SkikoHost.drawMetalTexture(scope, target)
@@ -72,6 +97,7 @@ internal class MacMetalBridge : NativeSurfaceBridge {
 
   override fun <T> withProducerAccess(frame: NativeSurfaceFrame, action: () -> T): T =
     rendererDispatcher.run {
+      releaseRetiredOnceReplaced()
       MacMetalBridgeNative.runInAutoreleasePool(action)
     }
 
@@ -104,16 +130,57 @@ internal class MacMetalBridge : NativeSurfaceBridge {
         height = extent.physicalHeight,
       )
     if (textureAddress != oldTexture.address) {
-      releaseMetalTexture(oldTexture)
+      retire(oldTexture, deviceChanged = metalDevice.address != requiredMetalDevice.ptr)
     }
     texture = NativeHandle(textureAddress)
     metalDevice = NativeHandle(requiredMetalDevice.ptr)
     pixelFormat = MacMetalBridgeNative.texturePixelFormat(textureAddress)
   }
 
+  // Holds the outgoing texture for the consumer to draw while the replacement
+  // is still empty. A texture nothing ever rendered into has nothing to show,
+  // and one from a device Skiko has replaced cannot be drawn on the new one.
+  private fun retire(outgoing: NativeHandle, deviceChanged: Boolean) {
+    if (outgoing.address == 0L) {
+      return
+    }
+    if (deviceChanged) {
+      // Both belong to the device Skiko replaced, and neither can be drawn on
+      // the new one.
+      releaseMetalTexture(outgoing)
+      releaseMetalTexture(retiredTexture)
+      retiredTexture = NativeHandle(0)
+      retiredGeneration = 0
+      return
+    }
+    if (renderedGeneration != generation) {
+      // Keeps whatever is already retired: it is still the last texture a frame
+      // landed in, and this one never held a frame at all.
+      releaseMetalTexture(outgoing)
+      return
+    }
+    releaseMetalTexture(retiredTexture)
+    retiredTexture = outgoing
+    retiredGeneration = generation
+  }
+
+  // Runs a frame after the replacement first rendered, so the consumer's last
+  // recorded frame from the retired texture has been flushed by then.
+  private fun releaseRetiredOnceReplaced() {
+    if (retiredTexture.address == 0L || renderedGeneration != generation) {
+      return
+    }
+    releaseMetalTexture(retiredTexture)
+    retiredTexture = NativeHandle(0)
+    retiredGeneration = 0
+  }
+
   private fun disposeTexture() {
     releaseMetalTexture(texture)
     texture = NativeHandle(0)
+    releaseMetalTexture(retiredTexture)
+    retiredTexture = NativeHandle(0)
+    retiredGeneration = 0
     metalDevice = NativeHandle(0)
     pixelFormat = 0
   }

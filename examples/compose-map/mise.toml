@@ -12,10 +12,14 @@ run = '''
 '''
 
 [tasks.run]
-depends = ["//:build"]
+# The preset picks the backend: the example takes it from the render backend the
+# native library was built with, so a bridge other than the host default's is
+# reached by running against that preset.
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = '''
 ./gradlew \
-  -PmaplibreNativeCInstallDir="build/{{vars.host_native_preset}}/install" \
+  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
   :examples:compose-map:run
 '''

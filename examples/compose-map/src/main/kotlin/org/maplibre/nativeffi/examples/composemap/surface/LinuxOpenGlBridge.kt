@@ -79,8 +79,20 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
   private var exportedTexture: LinuxExportedVulkanTexture? = null
   private var producerTexture: LinuxEglImportedTexture? = null
   private var consumerTexture: LinuxOpenGlImportedTexture? = null
-  private var generation = 0L
   private var currentExtent = SurfaceExtent.Empty
+
+  @Volatile private var generation = 0L
+  @Volatile private var renderedGeneration = 0L
+
+  // The consumer texture a frame last landed in, kept alive with the memory it
+  // imports until one lands in its replacement. Skiko allocates a new texture
+  // for every resize and the map needs a frame or two to fill it, so this is
+  // what the consumer draws in between rather than having nothing to show. The
+  // producer import is not kept: the session already renders through the new
+  // texture.
+  private var retiredConsumerTexture: LinuxOpenGlImportedTexture? = null
+  private var retiredExportedTexture: LinuxExportedVulkanTexture? = null
+  @Volatile private var retiredGeneration = 0L
 
   override val backend: ProducerBackend = ProducerBackend.OPENGL
 
@@ -113,6 +125,12 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
     extent: SurfaceExtent,
     presentationTimeNanos: Long?,
   ): NativeSurfaceFrame {
+    // Runs a frame after the replacement first rendered, so the consumer's last
+    // recorded frame from the retired texture has been flushed by then. The
+    // consumer context is current here, which is what closing it needs.
+    if (retiredConsumerTexture != null && renderedGeneration == generation) {
+      disposeRetiredTexture(consumerContextCurrent = true)
+    }
     if (producerTexture == null || consumerTexture == null || extent != currentExtent) {
       recreateTexture(extent)
     }
@@ -125,6 +143,7 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
   }
 
   override fun completeProducerAccess(frame: NativeSurfaceFrame) {
+    renderedGeneration = frame.target.generation
     runOnProducerThread { egl.waitIdle() }
   }
 
@@ -137,13 +156,21 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
     if (target !is OpenGlTextureTarget) {
       return false
     }
-    val texture = consumerTexture ?: return false
+    // Only a texture this bridge still holds is safe to draw, which is the
+    // current one and the retired one behind it.
+    val texture =
+      when (target.generation) {
+        generation -> consumerTexture
+        retiredGeneration -> retiredConsumerTexture
+        else -> null
+      } ?: return false
     return SkikoHost.drawOpenGlTexture(scope, texture.target(target.generation))
   }
 
   override fun close() {
     try {
       disposeTexture(consumerContextCurrent = false)
+      disposeRetiredTexture(consumerContextCurrent = false)
     } finally {
       try {
         runOnProducerThread { egl.close() }
@@ -166,7 +193,7 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
       return
     }
 
-    disposeTexture(consumerContextCurrent = true)
+    retireTexture()
     val context =
       vulkan ?: LinuxVulkanContext.create(currentOpenGlDeviceUuids()).also { vulkan = it }
     val exported = context.createExportedTexture(extent)
@@ -196,6 +223,41 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
       exported.close()
       throw error
     }
+  }
+
+  // Holds the outgoing consumer texture for drawing while the replacement is
+  // still empty. A texture nothing ever rendered into has nothing to show, so
+  // it goes the way it always did.
+  private fun retireTexture() {
+    if (renderedGeneration != generation || consumerTexture == null) {
+      disposeTexture(consumerContextCurrent = true)
+      return
+    }
+    disposeRetiredTexture(consumerContextCurrent = true)
+    val oldProducerTexture = producerTexture
+    producerTexture = null
+    if (oldProducerTexture != null) {
+      runOnProducerThread { oldProducerTexture.close() }
+    }
+    retiredConsumerTexture = consumerTexture
+    retiredExportedTexture = exportedTexture
+    retiredGeneration = generation
+    consumerTexture = null
+    exportedTexture = null
+  }
+
+  private fun disposeRetiredTexture(consumerContextCurrent: Boolean = true) {
+    retiredConsumerTexture?.let { texture ->
+      if (consumerContextCurrent) {
+        texture.close()
+      } else {
+        SkikoHost.withLinuxOpenGlContext { texture.close() }
+      }
+    }
+    retiredConsumerTexture = null
+    retiredExportedTexture?.close()
+    retiredExportedTexture = null
+    retiredGeneration = 0
   }
 
   private fun disposeTexture(consumerContextCurrent: Boolean = true) {

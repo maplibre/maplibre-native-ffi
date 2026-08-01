@@ -63,9 +63,21 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
   }
   private var wgl: WindowsWglContext? = null
   private var direct3DTexture = NativeHandle(0)
+  private var direct3DDevice = NativeHandle(0)
   private var producerTexture: WindowsWglImportedD3D12Texture? = null
-  private var generation = 0L
   private var currentExtent = SurfaceExtent.Empty
+
+  // Read on the Compose thread while the producer thread writes them.
+  @Volatile private var generation = 0L
+  @Volatile private var renderedGeneration = 0L
+
+  // The Direct3D texture a frame last landed in, kept alive until one lands in
+  // its replacement. Skiko allocates a new texture for every resize and the map
+  // needs a frame or two to fill it, so this is what the consumer draws in
+  // between rather than having nothing to show. The producer import is not
+  // kept: the session already renders through the new texture.
+  private var retiredDirect3DTexture = NativeHandle(0)
+  @Volatile private var retiredGeneration = 0L
 
   override val backend: ProducerBackend = ProducerBackend.OPENGL
 
@@ -110,22 +122,37 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
   }
 
   override fun completeProducerAccess(frame: NativeSurfaceFrame) {
+    renderedGeneration = frame.target.generation
     runOnProducerThread { wgl?.waitIdle() }
   }
 
   override fun <T> withProducerAccess(frame: NativeSurfaceFrame, action: () -> T): T =
-    runOnProducerThread(action)
+    runOnProducerThread {
+      releaseRetiredOnceReplaced()
+      action()
+    }
 
   override fun <T> withRendererAccess(action: () -> T): T = runOnProducerThread(action)
 
   override fun draw(scope: DrawScope, target: NativeSurfaceTarget): Boolean {
-    if (target !is OpenGlTextureTarget || direct3DTexture.address == 0L) {
+    if (target !is OpenGlTextureTarget) {
+      return false
+    }
+    // Only a texture this bridge still holds is safe to draw, which is the
+    // current one and the retired one behind it.
+    val texture =
+      when (target.generation) {
+        generation -> direct3DTexture
+        retiredGeneration -> retiredDirect3DTexture
+        else -> NativeHandle(0)
+      }
+    if (texture.address == 0L) {
       return false
     }
     return SkikoHost.drawDirect3DTexture(
       scope,
       Direct3DTextureTarget(
-        texture = direct3DTexture,
+        texture = texture,
         format = WindowsD3D12Interop.DXGI_FORMAT_R8G8B8A8_UNORM,
         colorFormat = SurfaceColorFormat.RGBA_8888,
         origin = TextureOrigin.BOTTOM_LEFT,
@@ -159,11 +186,14 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
       return
     }
 
-    val direct3DDevice = device ?: SkikoHost.requireDirect3DDevice()
-    disposeTexture()
+    val requiredDirect3DDevice = device ?: SkikoHost.requireDirect3DDevice()
+    // Only the device that allocated it can present it, so a Skiko device change
+    // leaves nothing worth keeping from the outgoing texture.
+    retireTexture(deviceChanged = direct3DDevice.address != requiredDirect3DDevice.ptr)
+    direct3DDevice = NativeHandle(requiredDirect3DDevice.ptr)
     direct3DTexture =
       WindowsD3D12Interop.createSharedTexture(
-        direct3DDevice,
+        requiredDirect3DDevice,
         extent,
         dxgiFormat = WindowsD3D12Interop.DXGI_FORMAT_R8G8B8A8_UNORM,
       )
@@ -204,17 +234,66 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
     return selectedImport.texture
   }
 
-  private fun disposeTexture() {
+  // Holds the outgoing texture for the consumer to draw while the replacement
+  // is still empty. A texture nothing ever rendered into has nothing to show.
+  private fun retireTexture(deviceChanged: Boolean) {
+    if (deviceChanged) {
+      // Both belong to the device Skiko replaced, and neither can be presented
+      // by the new one.
+      disposeTexture()
+      return
+    }
+    if (renderedGeneration != generation || direct3DTexture.address == 0L) {
+      // Keeps whatever is already retired: it is still the last texture a frame
+      // landed in, and this one never held a frame at all.
+      disposeCurrentTexture()
+      return
+    }
     val oldProducerTexture = producerTexture
     producerTexture = null
     if (oldProducerTexture != null) {
       runOnProducerThread { oldProducerTexture.close() }
     }
-    if (direct3DTexture.address != 0L) {
-      SkikoHost.forgetDirect3DTexture(direct3DTexture)
-      WindowsD3D12Interop.release(direct3DTexture)
-      direct3DTexture = NativeHandle(0)
+    releaseDirect3DTexture(retiredDirect3DTexture)
+    retiredDirect3DTexture = direct3DTexture
+    retiredGeneration = generation
+    direct3DTexture = NativeHandle(0)
+  }
+
+  // Runs a frame after the replacement first rendered, so the consumer's last
+  // recorded frame from the retired texture has been flushed by then.
+  private fun releaseRetiredOnceReplaced() {
+    if (retiredDirect3DTexture.address == 0L || renderedGeneration != generation) {
+      return
     }
+    releaseDirect3DTexture(retiredDirect3DTexture)
+    retiredDirect3DTexture = NativeHandle(0)
+    retiredGeneration = 0
+  }
+
+  private fun disposeTexture() {
+    disposeCurrentTexture()
+    releaseDirect3DTexture(retiredDirect3DTexture)
+    retiredDirect3DTexture = NativeHandle(0)
+    retiredGeneration = 0
+  }
+
+  private fun disposeCurrentTexture() {
+    val oldProducerTexture = producerTexture
+    producerTexture = null
+    if (oldProducerTexture != null) {
+      runOnProducerThread { oldProducerTexture.close() }
+    }
+    releaseDirect3DTexture(direct3DTexture)
+    direct3DTexture = NativeHandle(0)
+  }
+
+  private fun releaseDirect3DTexture(texture: NativeHandle) {
+    if (texture.address == 0L) {
+      return
+    }
+    SkikoHost.forgetDirect3DTexture(texture)
+    WindowsD3D12Interop.release(texture)
   }
 
   private fun <T> runOnProducerThread(action: () -> T): T {
