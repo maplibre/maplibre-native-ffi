@@ -146,6 +146,13 @@ static void configure_opengl_context(mln_opengl_context_descriptor* context) {
     .device_context = fake_handle,
     .share_context = fake_handle,
   };
+#elif defined(MLN_TEST_OPENGL_WEBGL)
+  context->platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
+  context->data.webgl = (mln_webgl_context_descriptor){
+    .size = sizeof(mln_webgl_context_descriptor),
+    // Not a live context: these tests only reach descriptor validation.
+    .context = 1,
+  };
 #else
   context->platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL;
   context->data.egl = (mln_egl_context_descriptor){
@@ -159,6 +166,8 @@ static void configure_opengl_context(mln_opengl_context_descriptor* context) {
 static void shrink_opengl_context(mln_opengl_context_descriptor* context) {
 #if defined(MLN_TEST_OPENGL_WGL)
   context->data.wgl.size = sizeof(mln_wgl_context_descriptor) - 1;
+#elif defined(MLN_TEST_OPENGL_WEBGL)
+  context->data.webgl.size = sizeof(mln_webgl_context_descriptor) - 1;
 #else
   context->data.egl.size = sizeof(mln_egl_context_descriptor) - 1;
 #endif
@@ -166,6 +175,8 @@ static void shrink_opengl_context(mln_opengl_context_descriptor* context) {
 static void clear_opengl_context(mln_opengl_context_descriptor* context) {
 #if defined(MLN_TEST_OPENGL_WGL)
   context->data.wgl.share_context = NULL;
+#elif defined(MLN_TEST_OPENGL_WEBGL)
+  context->data.webgl.context = 0;
 #else
   context->data.egl.share_context = NULL;
 #endif

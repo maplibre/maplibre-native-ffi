@@ -33,10 +33,22 @@ function(mln_configure_browser_c_api_test)
     mln_c_api_tests
     PRIVATE
       "-sENVIRONMENT=web,worker"
+      # main() runs on a worker, where blocking is legal. MapLibre blocks in
+      # waitForEmpty() and during teardown, which the browser main thread
+      # forbids, so this is what lets the suite run as written.
+      "-sPROXY_TO_PTHREAD"
+      # Fixtures create their WebGL2 contexts on whichever worker attaches the
+      # session, each on a private OffscreenCanvas of its own.
+      "-sOFFSCREENCANVAS_SUPPORT=1"
+      # emscripten_webgl_create_context() resolves its target through this
+      # table,
+      # so registering a canvas in it needs the table reachable from JS.
+      "-sEXPORTED_RUNTIME_METHODS=specialHTMLTargets"
       "SHELL:--shell-file ${PROJECT_SOURCE_DIR}/src/c_api/tests/browser_shell.html"
       # Unity reports through stdout and the process exit status, so the runner
       # needs the module to exit rather than keep its runtime alive.
-      "-sEXIT_RUNTIME=1" ${embed_options})
+      "-sEXIT_RUNTIME=1"
+      ${embed_options})
   find_program(MLN_FFI_NODE_EXECUTABLE node REQUIRED)
   add_test(
     NAME c-api
