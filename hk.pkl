@@ -26,6 +26,11 @@ local lintSteps = new Mapping<String, Step> {
     )
     check = "mise run ci:check-action-pins"
   }
+  // Whole-repository check: any added or removed file can break scope coverage,
+  // so this runs on every invocation rather than filtering on a glob.
+  ["snapshot-scopes"] {
+    check = "mise run ci:check-snapshot-scopes"
+  }
   ["jvl"] {
     glob = List("**/*.json", "**/*.jsonc")
     check = "jvl check {{files}}"
