@@ -14,6 +14,7 @@ import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCObject
 import kotlinx.cinterop.StableRef
+import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.asStableRef
 import kotlinx.cinterop.get
@@ -23,6 +24,7 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.rawValue
 import kotlinx.cinterop.staticCFunction
 import kotlinx.cinterop.toLong
+import kotlinx.cinterop.usePinned
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.error.InvalidArgumentException
@@ -56,7 +58,9 @@ import platform.Metal.MTLCreateSystemDefaultDevice
 import platform.Metal.MTLDeviceProtocol
 import platform.Metal.MTLPixelFormatBGRA8Unorm
 import platform.Metal.MTLPixelFormatRGBA8Unorm
+import platform.Metal.MTLRegionMake2D
 import platform.Metal.MTLTextureDescriptor
+import platform.Metal.MTLTextureProtocol
 import platform.Metal.MTLTextureUsageRenderTarget
 import platform.Metal.MTLTextureUsageShaderRead
 import platform.QuartzCore.CAMetalLayer
@@ -499,11 +503,22 @@ class RenderSessionHandleTest {
                 physicalHeight = 8,
                 texture = NativePointer.ofAddress(replacementTexture.address()),
               )
+            // Freshly allocated, so anything non-zero later came from this
+            // session rendering into it after the handoff.
+            assertTrue(
+              readMetalTextureRgba(device, replacementTexture, 16, 8).all { it == 0.toByte() },
+              "a freshly allocated replacement should start blank",
+            )
             session.setMetalBorrowedTextureTarget(replacement)
             assertSame(borrowedMap, session.map())
             assertFalse(session.renderUpdate())
             runtime.pump(0)
             assertTrue(session.renderUpdate())
+            // The session paints the texture it was handed, not the one it had.
+            assertTrue(
+              readMetalTextureRgba(device, replacementTexture, 16, 8).any { it != 0.toByte() },
+              "the replacement texture should have been rendered into",
+            )
             assertEquals(replacementTexture.address(), replacement.texture.address)
             // The session never retained the outgoing texture, so the host
             // still owns the one it attached with.
@@ -789,6 +804,38 @@ class RenderSessionHandleTest {
       )
     descriptor.usage = MTLTextureUsageRenderTarget or MTLTextureUsageShaderRead
     return device.newTextureWithDescriptor(descriptor) ?: error("Metal texture creation failed")
+  }
+
+  // Reads a borrowed texture back to the CPU. A texture created without an
+  // explicit storage mode is managed on macOS, so its CPU copy stays stale
+  // until a blit synchronizes it.
+  private fun readMetalTextureRgba(
+    device: MTLDeviceProtocol,
+    texture: ObjCObject,
+    width: Int,
+    height: Int,
+  ): ByteArray {
+    val metalTexture = texture as MTLTextureProtocol
+    val queue = device.newCommandQueue() ?: error("MTLDevice.newCommandQueue returned nil")
+    val commandBuffer = queue.commandBuffer() ?: error("MTLCommandQueue.commandBuffer returned nil")
+    val encoder =
+      commandBuffer.blitCommandEncoder()
+        ?: error("MTLCommandBuffer.blitCommandEncoder returned nil")
+    encoder.synchronizeResource(metalTexture)
+    encoder.endEncoding()
+    commandBuffer.commit()
+    commandBuffer.waitUntilCompleted()
+
+    val pixels = ByteArray(width * height * 4)
+    pixels.usePinned { pinned ->
+      metalTexture.getBytes(
+        pinned.addressOf(0),
+        (width * 4).toULong(),
+        MTLRegionMake2D(0u, 0u, width.toULong(), height.toULong()),
+        0u,
+      )
+    }
+    return pixels
   }
 
   private fun createMetalLayer(device: MTLDeviceProtocol, width: Int, height: Int): CAMetalLayer {

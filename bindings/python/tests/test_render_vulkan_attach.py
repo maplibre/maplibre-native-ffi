@@ -182,6 +182,12 @@ def test_vulkan_borrowed_texture_set_target_hands_over_a_replacement() -> None:
     A caller-owned image is sized by its owner, so a host that follows a resize
     allocates an image at the new size and hands it over instead of resizing
     this session.
+
+    This verifies that the handoff is accepted, that the map takes the extent
+    handed with it, and that the session stays usable. It does not read the
+    replacement back — the Vulkan helper has no staging-buffer readback — so
+    the proof that pixels land in the replacement image is the Zig binding's
+    equivalent test, which does.
     """
     _require_native_vulkan_support()
 

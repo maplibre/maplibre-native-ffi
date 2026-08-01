@@ -173,6 +173,38 @@ impl OwnedTextureTestContext {
         }
     }
 
+    /// Hands the session a placeholder replacement of this context's own
+    /// backend. The session's kind is checked before the descriptor, so the
+    /// placeholder handle is never dereferenced — but the setter has to match
+    /// the backend, or an unsupported build would answer instead of the kind.
+    fn set_placeholder_borrowed_target(
+        &self,
+        session: &RenderSessionHandle,
+        extent: &RenderTargetExtent,
+    ) -> Result<()> {
+        // SAFETY: Test passes an opaque non-null address that the rejected call
+        // never dereferences.
+        let placeholder = unsafe { NativePointer::from_address(0x1) };
+        match self {
+            Self::Metal(_) => session.set_metal_borrowed_texture_target(
+                &MetalBorrowedTextureDescriptor::new(extent.clone(), 64, 64, placeholder),
+            ),
+            Self::Vulkan(context) => {
+                session.set_vulkan_borrowed_texture_target(&VulkanBorrowedTextureDescriptor::new(
+                    extent.clone(),
+                    64,
+                    64,
+                    context.descriptor(),
+                    placeholder,
+                    placeholder,
+                    1,
+                    0,
+                    1,
+                ))
+            }
+        }
+    }
+
     fn try_acquire_frame_extent(
         &self,
         session: &RenderSessionHandle,
@@ -1702,22 +1734,15 @@ fn set_target_reports_unsupported_for_a_session_owned_texture() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
     let extent = RenderTargetExtent::new(64, 64, 1.0);
-    let (_context, session) =
+    let (context, session) =
         create_owned_texture_session(&map.attach_ref().unwrap(), extent.clone())
             .expect("Metal or Vulkan owned texture test session should attach when supported");
 
-    // A session-owned texture is sized and replaced by its session. The session
-    // is checked before the descriptor, so this reports the target kind rather
-    // than the placeholder handle below, which is never dereferenced.
-    let error = session
-        .set_metal_borrowed_texture_target(&MetalBorrowedTextureDescriptor::new(
-            extent,
-            64,
-            64,
-            // SAFETY: Test passes an opaque non-null address that the rejected
-            // call never dereferences.
-            unsafe { NativePointer::from_address(0x1) },
-        ))
+    // A session-owned texture is sized and replaced by its session. The setter
+    // has to be this build's own backend, or "not supported by this build"
+    // would answer in place of the target-kind rejection under test.
+    let error = context
+        .set_placeholder_borrowed_target(&session, &extent)
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::Unsupported);
 

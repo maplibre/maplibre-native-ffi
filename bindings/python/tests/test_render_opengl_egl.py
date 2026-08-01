@@ -13,6 +13,7 @@ from maplibre_native import camera, geo, json, query, render
 
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
+    RED_BACKGROUND_STYLE_JSON,
     assert_cluster_feature_extensions,
     assert_typed_geojson_cluster_source,
     render_until,
@@ -611,7 +612,7 @@ def test_egl_borrowed_texture_set_target_hands_over_a_replacement() -> None:
                 ) as map_handle:
                     session = map_handle.attach_opengl_borrowed_texture(descriptor)
                     try:
-                        map_handle.set_style_json(EMPTY_STYLE_JSON)
+                        map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON)
                         render_until_update(runtime, session)
 
                         with pytest.raises(mln.UnsupportedFeatureError) as raised:
@@ -621,6 +622,10 @@ def test_egl_borrowed_texture_set_target_hands_over_a_replacement() -> None:
                         with _egl_borrowed_texture(
                             context, width=48, height=24
                         ) as replacement:
+                            # Freshly allocated, so anything drawn into it
+                            # later came from this session after the handoff.
+                            assert not any(replacement.read_rgba())
+
                             # The C API replaces the target on the calling
                             # thread, so the host context is current for it.
                             context.make_current(replacement.surface)
@@ -631,16 +636,18 @@ def test_egl_borrowed_texture_set_target_hands_over_a_replacement() -> None:
                             finally:
                                 context.clear_current()
 
-                            # The session kept its renderer and renders at the
-                            # extent it was handed, once the map catches up.
+                            # The session kept its renderer and paints the
+                            # texture it was handed, at the extent handed with
+                            # it, once the map catches up.
                             render_until(
                                 runtime,
                                 session,
                                 lambda: (
                                     map_handle.get_size()
                                     == (48, 24, pytest.approx(1.0))
+                                    and any(replacement.read_rgba())
                                 ),
-                                "the map never took the replacement texture extent",
+                                "the replacement texture was never rendered into",
                             )
                             assert session.render_update()
 

@@ -285,6 +285,39 @@ class EglBorrowedTexture:
         context.clear_current()
         return cls(context, surface, texture, width, height, scale_factor)
 
+    def read_rgba(self) -> bytes:
+        """Read this texture back through a scratch framebuffer."""
+        self.context.make_current(self.surface)
+        try:
+            framebuffer = GL.glGenFramebuffers(1)
+            GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, framebuffer)
+            GL.glFramebufferTexture2D(
+                GL.GL_FRAMEBUFFER,
+                GL.GL_COLOR_ATTACHMENT0,
+                GL.GL_TEXTURE_2D,
+                self.texture,
+                0,
+            )
+            status = GL.glCheckFramebufferStatus(GL.GL_FRAMEBUFFER)
+            if status != GL.GL_FRAMEBUFFER_COMPLETE:
+                msg = f"borrowed texture framebuffer is incomplete: 0x{status:x}"
+                raise EglUnavailableError(msg)
+            pixels = (ctypes.c_ubyte * (self.width * self.height * 4))()
+            GL.glReadPixels(
+                0,
+                0,
+                self.width,
+                self.height,
+                GL.GL_RGBA,
+                GL.GL_UNSIGNED_BYTE,
+                pixels,
+            )
+            GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, 0)
+            GL.glDeleteFramebuffers(1, [framebuffer])
+            return bytes(pixels)
+        finally:
+            self.context.clear_current()
+
     def descriptor(self) -> render.OpenGLBorrowedTextureDescriptor:
         return render.OpenGLBorrowedTextureDescriptor(
             extent=render.RenderTargetExtent(

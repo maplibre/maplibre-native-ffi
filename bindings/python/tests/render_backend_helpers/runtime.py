@@ -10,6 +10,15 @@ from maplibre_native import camera, geo, json, query, render, style
 
 EMPTY_STYLE_JSON = '{"version":8,"sources":{},"layers":[]}'
 
+RED_BACKGROUND_STYLE_JSON = (
+    '{"version":8,"sources":{},"layers":['
+    '{"id":"background","type":"background",'
+    '"paint":{"background-color":"#ff0000"}}]}'
+)
+"""A style that paints every pixel, for tests that read a target back."""
+
+RED_PIXEL = b"\xff\x00\x00\xff"
+
 CLUSTER_POINTS = geo.FeatureCollection(
     tuple(
         geo.Feature(

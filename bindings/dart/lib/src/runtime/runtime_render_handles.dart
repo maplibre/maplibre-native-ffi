@@ -222,9 +222,10 @@ final class RenderSessionHandle {
   /// Handing the replacement over here keeps this session's renderer instead,
   /// so the map does not go cold on every resize.
   ///
-  /// The replacement belongs to the device this session attached with and
-  /// carries the pixel format it attached with; one that does not is rejected
-  /// with this session still rendering into the texture it has. The caller owns
+  /// The replacement belongs to the device this session attached with, which
+  /// throws an [InvalidArgumentException] otherwise, and carries the pixel
+  /// format it attached with, which throws an [UnsupportedFeatureException]
+  /// otherwise. Both leave this session rendering into the texture it has. The caller owns
   /// the replacement and keeps it valid until the next replacement, [detach],
   /// or [close]. This session never retained the outgoing texture and never
   /// releases it, but reads from it during this call, so keep that one valid

@@ -815,10 +815,10 @@ func (session *RenderSessionHandle) SetOpenGLSurfaceTarget(descriptor OpenGLSurf
 // error. Handing the replacement over here keeps this session's renderer
 // instead, so the map does not go cold on every resize.
 //
-// The replacement belongs to the device this session attached with and carries
-// the pixel format it attached with; one that does not reports an
-// unsupported-feature error with this session still rendering into the texture
-// it has. The caller owns the replacement and keeps it valid until the next
+// The replacement belongs to the device this session attached with, which
+// reports an invalid-argument error otherwise, and carries the pixel format it
+// attached with, which reports an unsupported-feature error otherwise. Both
+// leave this session rendering into the texture it has. The caller owns the replacement and keeps it valid until the next
 // replacement, detach, or session close. This session never retained the
 // outgoing texture and never releases it, but reads from it during this call,
 // so keep that texture valid until the call returns.
