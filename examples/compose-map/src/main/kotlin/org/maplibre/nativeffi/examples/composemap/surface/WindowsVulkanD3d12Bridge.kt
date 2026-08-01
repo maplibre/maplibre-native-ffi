@@ -114,7 +114,7 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
     rendererDispatcher.run { resizeOnRendererThread(extent, device) }
   }
 
-  private fun resizeOnRendererThread(extent: SurfaceExtent, device: SkikoDirect3DDevice? = null) {
+  private fun resizeOnRendererThread(extent: SurfaceExtent, device: SkikoDirect3DDevice?) {
     if (extent == currentExtent && importedTexture != null) {
       return
     }
@@ -201,13 +201,17 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
   private fun target(generation: Long): NativeSurfaceTarget =
     checkNotNull(importedTexture) { "Windows Vulkan texture is not initialized" }.target(generation)
 
-  private fun recreateTexture(extent: SurfaceExtent, device: SkikoDirect3DDevice? = null) {
+  private fun recreateTexture(extent: SurfaceExtent, device: SkikoDirect3DDevice?) {
     if (extent.isEmpty) {
       disposeTexture()
       return
     }
 
-    val requiredDirect3DDevice = device ?: SkikoHost.requireDirect3DDevice()
+    // Resolved by the caller, on a thread that may ask Skiko for it. Reaching
+    // for it here would ask from the producer thread, and answering that waits
+    // on the event dispatch thread, which is already waiting on this one.
+    val requiredDirect3DDevice =
+      checkNotNull(device) { "The Skiko Direct3D device is resolved before this hop" }
     val storageExtent = extent
     // Only the device that allocated it can present it, so a Skiko device change
     // leaves nothing worth keeping from the outgoing texture.

@@ -37,7 +37,7 @@ internal class MacMetalBridge : NativeSurfaceBridge {
     rendererDispatcher.run { resizeOnRendererThread(extent, skikoDevice) }
   }
 
-  private fun resizeOnRendererThread(extent: SurfaceExtent, skikoDevice: SkikoMetalDevice? = null) {
+  private fun resizeOnRendererThread(extent: SurfaceExtent, skikoDevice: SkikoMetalDevice?) {
     if (extent == currentExtent && texture.address != 0L) {
       return
     }
@@ -111,13 +111,17 @@ internal class MacMetalBridge : NativeSurfaceBridge {
     }
   }
 
-  private fun recreateTexture(extent: SurfaceExtent, skikoDevice: SkikoMetalDevice? = null) {
+  private fun recreateTexture(extent: SurfaceExtent, skikoDevice: SkikoMetalDevice?) {
     if (extent.isEmpty) {
       disposeTexture()
       return
     }
     val oldTexture = texture
-    val requiredMetalDevice = skikoDevice ?: SkikoHost.requireMetalDevice()
+    // Resolved by the caller, on a thread that may ask Skiko for it. Reaching
+    // for it here would ask from the renderer thread, and answering that waits
+    // on the event dispatch thread, which is already waiting on this one.
+    val requiredMetalDevice =
+      checkNotNull(skikoDevice) { "The Skiko Metal device is resolved before this hop" }
     // Only the device that allocated it can take it back, so a Skiko device change allocates
     // rather than reusing and this bridge never names one device while holding the other's texture.
     val reusableTexture =

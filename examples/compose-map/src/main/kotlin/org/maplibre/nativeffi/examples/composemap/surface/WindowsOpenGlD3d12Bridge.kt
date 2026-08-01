@@ -96,7 +96,7 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
     runOnProducerThread { resizeOnProducerThread(extent, device) }
   }
 
-  private fun resizeOnProducerThread(extent: SurfaceExtent, device: SkikoDirect3DDevice? = null) {
+  private fun resizeOnProducerThread(extent: SurfaceExtent, device: SkikoDirect3DDevice?) {
     if (extent == currentExtent && producerTexture != null) {
       return
     }
@@ -180,13 +180,17 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
   private fun target(generation: Long): NativeSurfaceTarget =
     checkNotNull(producerTexture) { "Windows WGL texture is not initialized" }.target(generation)
 
-  private fun recreateTexture(extent: SurfaceExtent, device: SkikoDirect3DDevice? = null) {
+  private fun recreateTexture(extent: SurfaceExtent, device: SkikoDirect3DDevice?) {
     if (extent.isEmpty) {
       disposeTexture()
       return
     }
 
-    val requiredDirect3DDevice = device ?: SkikoHost.requireDirect3DDevice()
+    // Resolved by the caller, on a thread that may ask Skiko for it. Reaching
+    // for it here would ask from the producer thread, and answering that waits
+    // on the event dispatch thread, which is already waiting on this one.
+    val requiredDirect3DDevice =
+      checkNotNull(device) { "The Skiko Direct3D device is resolved before this hop" }
     // Only the device that allocated it can present it, so a Skiko device change
     // leaves nothing worth keeping from the outgoing texture.
     retireTexture(deviceChanged = direct3DDevice.address != requiredDirect3DDevice.ptr)
