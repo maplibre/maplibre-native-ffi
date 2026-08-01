@@ -1093,8 +1093,11 @@ auto create_runtime(
     std::make_shared<ResourceProviderState>();
   auto* published = owned_runtime.get();
   // Reserving the token allocates, so it happens before this thread is marked
-  // as owning a runtime.
-  published->platform_context = reserve_platform_context();
+  // as owning a runtime. The local is what the failure path below reads: the
+  // insert takes the shared_ptr by value, so a throw there destroys the runtime
+  // while unwinding and the token can no longer be read back off it.
+  auto* const platform_context = reserve_platform_context();
+  published->platform_context = platform_context;
   {
     const std::scoped_lock lock(live_runtime_threads_mutex());
     live_runtime_threads().insert(owner_thread);
@@ -1110,11 +1113,11 @@ auto create_runtime(
       const std::scoped_lock lock(live_runtime_threads_mutex());
       live_runtime_threads().erase(owner_thread);
     }
-    unregister_platform_context(published->platform_context);
+    unregister_platform_context(platform_context);
     throw;
   }
   published->self = *out_runtime;
-  bind_platform_context(published->platform_context, *out_runtime);
+  bind_platform_context(platform_context, *out_runtime);
   return MLN_STATUS_OK;
 }
 
