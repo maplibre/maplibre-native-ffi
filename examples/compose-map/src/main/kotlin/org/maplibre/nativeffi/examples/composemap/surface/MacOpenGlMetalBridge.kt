@@ -126,16 +126,22 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
     frameId: Long,
     extent: SurfaceExtent,
     presentationTimeNanos: Long?,
-  ): NativeSurfaceFrame = rendererDispatcher.run {
+  ): NativeSurfaceFrame {
+    // Through resize, so the Skiko device is resolved on this thread. Resolving
+    // it reaches the event dispatch thread, and this call arrives on it: asking
+    // for the device from the renderer thread instead would leave each waiting
+    // on the other.
     if (importedTexture == null || extent != currentExtent) {
-      resizeOnRendererThread(extent)
+      resize(extent)
     }
-    NativeSurfaceFrameLease(
-      frameId = frameId,
-      extent = extent,
-      target = target(generation),
-      presentationTimeNanos = presentationTimeNanos,
-    )
+    return rendererDispatcher.run {
+      NativeSurfaceFrameLease(
+        frameId = frameId,
+        extent = extent,
+        target = target(generation),
+        presentationTimeNanos = presentationTimeNanos,
+      )
+    }
   }
 
   override fun completeProducerAccess(frame: NativeSurfaceFrame) {
