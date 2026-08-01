@@ -48,6 +48,10 @@ public fun ComposeNativeSurface(
   DisposableEffect(renderer, bridgeSelection, bridge, session, activeController) {
     when (bridgeSelection) {
       is NativeSurfaceBridgeSelection.Failed -> {
+        // Also to the console, because a bridge that never initializes is the
+        // one failure whose only other report is a window that may not be
+        // showing anything else worth reading.
+        bridgeSelection.error.printStackTrace()
         activeController.setState(
           NativeSurfaceState.Failed(
             message = "Native surface bridge initialization failed: ${bridgeSelection.message}",
