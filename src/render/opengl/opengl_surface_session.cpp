@@ -78,28 +78,15 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   }
 
   void destroy_backend() {
-    auto cleanup = [this] {
-      resource.reset();
-      context.reset();
-    };
     if (has_native_context()) {
       // Making the surface current can fail, and set_target lets a host install
       // a surface that only turns out to be unusable later, so this is
-      // reachable. Release the GL objects only when the context is current, but
-      // release the context itself either way: skipping it would leak the HGLRC
-      // or EGLContext for a session the host has already destroyed.
+      // reachable. Run the GL teardown against whatever can be made current,
+      // but release the context itself either way: skipping it would leak the
+      // HGLRC or EGLContext for a session the host has already destroyed.
       try {
-        auto guard = mbgl::gfx::BackendScope{*this};
-        cleanup();
+        cleanup_while_current();
       } catch (...) {
-        // Nothing can be made current, so no GL call is safe from here. Give up
-        // the renderable resource and the mbgl context without running their
-        // teardown: destroying either issues the deletes it has queued, and
-        // after destroy_native_context() those land on whatever context is
-        // current instead. The objects they name go when the driver tears the
-        // native context down, so this leaks bookkeeping, not GPU memory.
-        static_cast<void>(resource.release());
-        static_cast<void>(context.release());
         getThreadPool().runRenderJobs(true);
         destroy_native_context();
         throw;
@@ -109,6 +96,41 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
     }
     getThreadPool().runRenderJobs(true);
     destroy_native_context();
+  }
+
+  void cleanup() {
+    resource.reset();
+    context.reset();
+  }
+
+  // Runs GL teardown with this session's context current, through the surface
+  // it presents to or, when that cannot be made current, through the drawable
+  // the context itself was created from. The second try is what keeps the
+  // deletes reachable: this context is created in the host's share group, so
+  // the textures, buffers, and programs the renderer built there outlive it and
+  // stay allocated until something in the group deletes them.
+  void cleanup_while_current() {
+    try {
+      auto guard = mbgl::gfx::BackendScope{*this};
+      cleanup();
+      return;
+    } catch (...) {  // NOLINT(bugprone-empty-catch)
+      // Fall through to the drawable the context was created from.
+    }
+    fallback_drawable_ = true;
+    try {
+      auto guard = mbgl::gfx::BackendScope{*this};
+      cleanup();
+    } catch (...) {
+      // Nothing can be made current, so no GL call is safe from here. Give up
+      // the renderable resource and the mbgl context without running their
+      // teardown: destroying either issues the deletes it has queued, and after
+      // destroy_native_context() those land on whatever context is current
+      // instead. What they name is left to the host's share group.
+      static_cast<void>(resource.release());
+      static_cast<void>(context.release());
+      throw;
+    }
   }
 
   auto getDefaultRenderable() -> mbgl::gfx::Renderable& override {
@@ -220,11 +242,12 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
       if (render_context_ == nullptr) {
         create_wgl_context();
       }
+      auto* const draw_surface =
+        fallback_drawable_
+          ? static_cast<HDC>(descriptor_.context.data.wgl.device_context)
+          : static_cast<HDC>(descriptor_.surface);
       if (
-        wglMakeCurrent(
-          static_cast<HDC>(descriptor_.surface),
-          static_cast<HGLRC>(render_context_)
-        ) == 0
+        wglMakeCurrent(draw_surface, static_cast<HGLRC>(render_context_)) == 0
       ) {
         throw std::runtime_error("Switching OpenGL WGL context failed");
       }
@@ -242,9 +265,13 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
     if (!egl_context_) {
       egl_context_.emplace(descriptor_.context.data.egl);
     }
-    egl_context_->activate_surface(
-      static_cast<EGLSurface>(descriptor_.surface)
-    );
+    if (fallback_drawable_) {
+      egl_context_->activate_pbuffer();
+    } else {
+      egl_context_->activate_surface(
+        static_cast<EGLSurface>(descriptor_.surface)
+      );
+    }
 #else
     throw std::runtime_error("OpenGL context provider is unsupported");
 #endif
@@ -298,6 +325,9 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
 #endif
 
   mln_opengl_surface_descriptor descriptor_{};
+  // Set once teardown has found the session's surface unusable, so activate()
+  // reaches for the drawable the context was created from instead.
+  bool fallback_drawable_ = false;
 
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
   void* render_context_ = nullptr;

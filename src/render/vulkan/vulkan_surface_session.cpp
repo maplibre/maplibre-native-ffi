@@ -211,6 +211,13 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
     // mbgl::vulkan::SurfaceRenderableResource::recreateSwapchain(), which
     // preserves it for the same reason; initRenderPass() is a no-op while it
     // lives.
+    //
+    // Correctness does not rest on that assumption. Should the surface report a
+    // different format, initSwapchain() passes it to setColorFormat(), which
+    // drops the pass, and initRenderPass() builds one to match before init()
+    // creates the framebuffers — so the framebuffers always name the pass that
+    // is live. Only the pipeline cache pays, and only in a case a driver does
+    // not produce for a surface it is already presenting.
     void resize(mbgl::Size size) {
       if (!renderPass) {
         return;
