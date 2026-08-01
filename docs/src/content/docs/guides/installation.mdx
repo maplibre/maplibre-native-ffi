@@ -125,9 +125,9 @@ printf("backends: %#x\n", mln_supported_render_backend_mask());
 Bindings live under `bindings/` for Kotlin, Rust, Swift, Zig, .NET, Python, Go,
 and Dart. Kotlin artifacts are available as `org.maplibre.nativeffi` snapshots
 on [Maven Central's snapshot repository](https://central.sonatype.com/repository/maven-snapshots/org/maplibre/nativeffi/),
-and Python and .NET snapshots are available from the opt-in feeds below. Other
-bindings use a path or git dependency from a checkout and a native install
-prefix.
+and Python and .NET snapshots are available from the opt-in feeds below. Every
+other binding comes from a checkout — by git where the ecosystem supports it, by
+path otherwise — with its build pointed at a native install prefix.
 
 ### Python
 
@@ -303,6 +303,43 @@ revision and the hook fetches the current snapshot for it. An Android target
 resolves to the `android-*` archive, which the hook bundles as the code asset —
 such an app still packages the TLS helper and calls `mln_android_init`, as
 [Package an Android app](#package-an-android-app) describes.
+
+The two below take the native library by hand, from the archive above. That is
+the native idiom in each: Swift's `systemLibrary` target is built around
+pkg-config finding a system library, and Go has no hook that runs during a
+consumer's build. It is also the same mechanism this repository's own builds
+use, so it costs no machinery.
+
+Each example takes `main`, which is the newest binding source rather than the
+one the archive above was built from: the snapshot republishes on its own
+schedule, so `main` runs ahead of it between publishes. While the C ABI is
+unstable that gap can be a compile error. The snapshot tag names the commit its
+archives came from, so pin your dependency to that commit when you want the two
+to agree exactly.
+
+### Swift
+
+```swift
+.package(url: "https://github.com/maplibre/maplibre-native-ffi", branch: "main")
+```
+
+Then depend on the `MaplibreNative` product. The manifest sits at the repository
+root, so this resolves as an ordinary package. Export `PKG_CONFIG_PATH` to the
+prefix's `share/pkgconfig` before building, and pass
+`-Xlinker -rpath -Xlinker <prefix>/lib` so the built binary finds the library at
+run time.
+
+### Go
+
+The module proxy already serves every commit, so nothing needs publishing:
+
+```bash
+go get github.com/maplibre/maplibre-native-ffi/bindings/go@main
+```
+
+That resolves to a pseudo-version such as
+`v0.0.0-20260801064622-5eebd921a263`. The module zip holds only `bindings/go/**`
+— no clone and no submodules. cgo reads the same `PKG_CONFIG_PATH`.
 
 Each binding wraps the runtime, map, and render session model these guides
 describe. Read on in C, then consult the
