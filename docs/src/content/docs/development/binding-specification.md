@@ -89,17 +89,20 @@ release. Bindings whose ecosystem does not MUST document the manual install
 instead; Go has no such hook by design, and SwiftPM sandboxes plugins away from
 the network.
 
-Rust implements this in `bindings/rust/crates/maplibre-native-sys/build.rs`.
+Rust implements this in `bindings/rust/crates/maplibre-native-sys/build.rs` and
+Dart in `bindings/dart/hook/build.dart`.
 
 Requirements for a binding that acquires the library:
 
-- The binding's existing local-development variable MUST take precedence and
-  MUST skip all network access when set. One variable serves local development
-  and consumer opt-out; a binding MUST NOT add a second discovery mechanism
-  beside it.
+- The binding's local-development pointer at an install prefix MUST take
+  precedence and MUST skip all network access when set. One mechanism serves
+  local development and consumer opt-out; a binding MUST NOT add a second
+  discovery mechanism beside it. Rust reads `MAPLIBRE_NATIVE_C_INSTALL_DIR`;
+  Dart reads a file, because build hooks run in a semi-hermetic environment that
+  strips arbitrary environment variables.
 - The target platform and the selected render backend together MUST resolve to
   exactly one published preset. A target with no published artifact MUST fail
-  with a message naming the local-development variable. MapLibre Native compiles
+  with a message naming the local-development pointer. MapLibre Native compiles
   one renderer per build, so the backend selector MUST reject a request for more
   than one backend rather than choosing between them.
 - The backend selector MUST use the target language's own configuration idiom,
@@ -114,9 +117,13 @@ Requirements for a binding that acquires the library:
   and concurrent builds cannot observe a partial one.
 - An unreachable release MUST reuse a cached prefix when one exists, warning
   that it may be out of date, and MUST otherwise fail naming the
-  local-development variable. Offline builds stay possible either way.
+  local-development pointer. Offline builds stay possible either way.
 - The extracted prefix's descriptor MUST be checked against the requested
-  preset.
+  preset. A binding whose local-development pointer is written by tooling rather
+  than named by the consumer MUST check that prefix against the build's target
+  too, because the pointer then names whichever preset was built last. Dart's is
+  written by a mise task and checked; Rust's environment variable is named by
+  whoever set it and taken as given.
 - The binding MUST warn when the checkout's public headers differ from the
   artifact's. The snapshot release publishes on its own schedule and its commit
   lags the checkout by design, so the commits themselves are not the signal; the

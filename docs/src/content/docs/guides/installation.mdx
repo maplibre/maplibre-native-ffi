@@ -184,6 +184,53 @@ when that happens, though Cargo prints build script warnings for git
 dependencies only under `cargo build -vv`. Build the native library from source
 and set `MAPLIBRE_NATIVE_C_INSTALL_DIR` when you need a specific commit.
 
+### Dart
+
+The Dart binding fetches the native library from a build hook, so a git
+dependency needs no separate install:
+
+```yaml
+dependencies:
+  maplibre_native_ffi:
+    git:
+      url: https://github.com/maplibre/maplibre-native-ffi
+      path: bindings/dart
+```
+
+The hook downloads the archive matching your target, verifies it against the
+release's `SHA256SUMS`, and caches it under `.dart_tool/`. It runs for
+`dart run`, `dart test`, and `dart build`, and the library reaches the binding
+as a code asset rather than through the host's dynamic-library search path.
+
+Pick a render backend in your application's `pubspec.yaml`, or take the platform
+default (`vulkan` on Linux and Windows, `metal` on macOS, `opengl` on Android):
+
+```yaml
+hooks:
+  user_defines:
+    maplibre_native_ffi:
+      backend: opengl
+```
+
+Only the root package can set user-defines, which is the right scope: choosing a
+renderer is an application decision. A lagging snapshot shows up here as a
+failure to resolve an `mln_*` symbol at run time, and the hook warns which
+headers differ when it downloads.
+
+A pinned revision keeps whichever artifact its first build cached, so the
+CI publishes 64-bit artifacts only, so an Android application builds for
+`arm64-v8a` and `x86_64`. A Flutter app adds `armeabi-v7a` unless told
+otherwise, and the hook fails on that ABI rather than substituting another;
+`flutter build apk --target-platform android-arm64,android-x64` names the two
+that are served.
+
+A pinned revision keeps whichever artifact its first build cached, so the
+library under a given rev never moves; `dart pub upgrade` resolves a new
+revision and the hook fetches the current snapshot for it. An Android target
+resolves to the `android-*` archive, which the hook bundles as the code asset —
+such an app still packages the TLS helper and calls `mln_android_init`, as
+[Package an Android app](#package-an-android-app) describes.
+
 Each binding wraps the runtime, map, and render session model these guides
 describe. Read on in C, then consult the
 [Rust](/maplibre-native-ffi/reference/rust/maplibre_native/),
