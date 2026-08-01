@@ -18,6 +18,10 @@
 #include <time.h>
 #endif
 
+#if defined(MLN_TEST_BACKEND_OPENGL) && defined(MLN_TEST_OPENGL_WEBGL)
+#include <emscripten/html5.h>
+#endif
+
 #if defined(MLN_TEST_BACKEND_OPENGL) && defined(MLN_TEST_OPENGL_EGL)
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -166,11 +170,18 @@ uint8_t* mln_test_read_fixture(const char* relative_path, size_t* out_size) {
   if (out_size != NULL) {
     *out_size = 0;
   }
+#if defined(__EMSCRIPTEN__)
+  // The browser suite embeds its fixtures in the module at a fixed virtual
+  // path, so unlike a native run there is no checkout path to keep out of the
+  // objects. See mln_configure_browser_c_api_test().
+  const char* fixture_dir = "/fixtures";
+#else
   const char* fixture_dir = getenv("MLN_TEST_FIXTURE_DIR");
   TEST_ASSERT_TRUE_MESSAGE(
     fixture_dir != NULL && fixture_dir[0] != '\0',
     "MLN_TEST_FIXTURE_DIR is unset; run the suite through ctest"
   );
+#endif
 
   char path[1024];
   const int written =
@@ -441,6 +452,71 @@ static void destroy_backend_state(void* opaque_state) {
   eglDestroySurface(state->display, state->surface);
   eglDestroyContext(state->display, state->context);
   eglTerminate(state->display);
+  free(state);
+}
+
+#elif defined(MLN_TEST_BACKEND_OPENGL) && defined(MLN_TEST_OPENGL_WEBGL)
+
+typedef struct webgl_state {
+  EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
+} webgl_state;
+
+// The browser owns the context a session renders into, so the fixture creates a
+// real WebGL2 context on the page's canvas and hands it over, the way a browser
+// host would. The canvas comes from emcc's HTML shell.
+static bool create_backend_state(void** out_state, void* out_context) {
+  webgl_state* state = calloc(1, sizeof(*state));
+  if (state == NULL) {
+    return false;
+  }
+
+  EmscriptenWebGLContextAttributes attributes;
+  emscripten_webgl_init_context_attributes(&attributes);
+  // WebGL2 is the GLES 3.0 the OpenGL backend targets.
+  attributes.majorVersion = 2;
+  attributes.minorVersion = 0;
+  attributes.depth = EM_TRUE;
+  attributes.stencil = EM_TRUE;
+  attributes.antialias = EM_FALSE;
+  // The suite renders into its own texture rather than presenting, so the
+  // context needs no drawing buffer preservation.
+  attributes.preserveDrawingBuffer = EM_FALSE;
+
+  state->context = emscripten_webgl_create_context("#canvas", &attributes);
+  if (state->context <= 0) {
+    free(state);
+    return false;
+  }
+  if (
+    emscripten_webgl_make_context_current(state->context) !=
+    EMSCRIPTEN_RESULT_SUCCESS
+  ) {
+    emscripten_webgl_destroy_context(state->context);
+    free(state);
+    return false;
+  }
+
+  *(mln_opengl_context_descriptor*)out_context =
+    (mln_opengl_context_descriptor){
+      .size = sizeof(mln_opengl_context_descriptor),
+      .platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL,
+      .data = {
+        .webgl = {
+          .size = sizeof(mln_webgl_context_descriptor),
+          .context = state->context,
+        }
+      },
+    };
+  *out_state = state;
+  return true;
+}
+
+static void destroy_backend_state(void* opaque_state) {
+  webgl_state* state = opaque_state;
+  if (state == NULL) {
+    return;
+  }
+  emscripten_webgl_destroy_context(state->context);
   free(state);
 }
 

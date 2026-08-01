@@ -1,3 +1,51 @@
+# Builds the C API suite as a page and registers the runner that drives it.
+#
+# The suite needs three things a native run gets for free:
+#
+#   * A canvas, because the OpenGL fixture creates a real WebGL2 context. emcc's
+#     default HTML shell supplies one, so the suite links to .html.
+#   * Its tile fixtures, which it opens through stdio. They are embedded in the
+#     module rather than served, so the suite reads them the same way it does
+#     everywhere else.
+#   * Cross-origin isolation. The build uses pthreads, so SharedArrayBuffer has
+#     to be available, which means COOP/COEP response headers and therefore a
+#     real HTTP origin rather than file://. The runner serves the directory.
+function(mln_configure_browser_c_api_test)
+  set(fixture_dir
+      "${PROJECT_SOURCE_DIR}/third_party/maplibre-native/test/fixtures")
+  # Only the tile fixtures the suite decodes travel into the module. Embedding
+  # the whole fixtures tree would carry 81MB of unrelated render-test images.
+  file(GLOB_RECURSE embedded_fixtures RELATIVE "${fixture_dir}"
+       CONFIGURE_DEPENDS "${fixture_dir}/*.mlt")
+  if(NOT embedded_fixtures)
+    message(FATAL_ERROR "no MLT tile fixtures found under ${fixture_dir}")
+  endif()
+  # SHELL: keeps each flag with its value: CMake deduplicates repeated link
+  # options, which would otherwise collapse the second --embed-file and leave
+  # its path standing alone as an input file.
+  set(embed_options)
+  foreach(fixture IN LISTS embedded_fixtures)
+    list(APPEND embed_options
+         "SHELL:--embed-file ${fixture_dir}/${fixture}@/fixtures/${fixture}")
+  endforeach()
+  set_target_properties(mln_c_api_tests PROPERTIES SUFFIX ".html")
+  target_link_options(
+    mln_c_api_tests
+    PRIVATE
+      "-sENVIRONMENT=web,worker"
+      "SHELL:--shell-file ${PROJECT_SOURCE_DIR}/src/c_api/tests/browser_shell.html"
+      # Unity reports through stdout and the process exit status, so the runner
+      # needs the module to exit rather than keep its runtime alive.
+      "-sEXIT_RUNTIME=1" ${embed_options})
+  find_program(MLN_FFI_NODE_EXECUTABLE node REQUIRED)
+  add_test(
+    NAME c-api
+    COMMAND
+      "${MLN_FFI_NODE_EXECUTABLE}"
+      "${PROJECT_SOURCE_DIR}/scripts/run-browser-test.mjs"
+      "$<TARGET_FILE:mln_c_api_tests>")
+endfunction()
+
 function(mln_add_c_api_test)
   get_target_property(test_supported mln_ffi_platform_dependencies
                       MLN_FFI_TEST_SUPPORTED)
@@ -42,6 +90,13 @@ function(mln_add_c_api_test)
   # agree on it, so unlike UNITY_USE_FLUSH_STDOUT (which only affects calls
   # inside Unity's sources) this one is PUBLIC.
   target_compile_definitions(unity PUBLIC UNITY_INCLUDE_DOUBLE)
+  # Unity infers 64-bit assertion support from pointer width. Handles in this C
+  # API are 64 bits wherever they are, so a 32-bit target still needs the UINT64
+  # assertions. Like UNITY_INCLUDE_DOUBLE this has to be PUBLIC, because Unity's
+  # own translation unit and every test that includes unity.h must agree on it.
+  if(CMAKE_SIZEOF_VOID_P LESS 8)
+    target_compile_definitions(unity PUBLIC UNITY_SUPPORT_64)
+  endif()
   if(MSVC AND CMAKE_C_COMPILER_ID MATCHES "Clang")
     # Unity's Unix -Wall flag means -Weverything to clang-cl. Neutralize it to
     # match the framework's MSVC warning behavior.
@@ -115,6 +170,10 @@ function(mln_add_c_api_test)
       PRIVATE MLN_TEST_BACKEND_OPENGL=1)
     if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
       target_compile_definitions(mln_c_api_tests PRIVATE MLN_TEST_OPENGL_WGL=1)
+    elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
+      target_compile_definitions(
+        mln_c_api_tests
+        PRIVATE MLN_TEST_OPENGL_WEBGL=1)
     else()
       target_compile_definitions(mln_c_api_tests PRIVATE MLN_TEST_OPENGL_EGL=1)
     endif()
@@ -133,6 +192,11 @@ function(mln_add_c_api_test)
                       MLN_FFI_TEST_LINK_OPTIONS)
   if(test_link_options)
     target_link_options(mln_c_api_tests PRIVATE ${test_link_options})
+  endif()
+
+  if(EMSCRIPTEN)
+    mln_configure_browser_c_api_test()
+    return()
   endif()
 
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS")

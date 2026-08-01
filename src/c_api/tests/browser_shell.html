@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<!--
+  Page shell for the C API suite. Replaces Emscripten's default shell so the run
+  reports a result the runner can act on rather than text in a textarea:
+
+    * A canvas, which the OpenGL fixture creates its WebGL2 context on.
+    * print/printErr collected verbatim, so a failure reads the same as a native
+      ctest run.
+    * onExit posts Unity's exit status back to the runner, which is serving this
+      page. An uncaught error or an abort posts too, so a crash fails the run
+      instead of hanging it until the timeout.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>maplibre-native-c API tests</title>
+  </head>
+  <body>
+    <canvas id="canvas" width="64" height="64"></canvas>
+    <script>
+    const lines = [];
+let reported = false;
+
+function report(status) {
+  if (reported) return;
+  reported = true;
+  void fetch("/__result", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status, output: lines.join("\n") }),
+  });
+}
+
+function record(text) {
+  lines.push(text);
+  console.log(text);
+}
+
+window.addEventListener("error", (event) => {
+  record(`uncaught error: ${event.message}`);
+  report(70);
+});
+window.addEventListener("unhandledrejection", (event) => {
+  record(`unhandled rejection: ${event.reason}`);
+  report(70);
+});
+
+var Module = {
+  canvas: document.getElementById("canvas"),
+  print: record,
+  printErr: record,
+  onExit: (status) => report(status),
+  onAbort: (reason) => {
+    record(`aborted: ${reason}`);
+    report(70);
+  },
+};
+    </script>
+    {{{ SCRIPT }}}
+  </body>
+</html>
