@@ -321,14 +321,21 @@ to agree exactly.
 ### Swift
 
 ```swift
-.package(url: "https://github.com/maplibre/maplibre-native-ffi", branch: "main")
+.package(url: "https://github.com/maplibre/maplibre-native-ffi", branch: "main"),
 ```
 
-Then depend on the `MaplibreNative` product. The manifest sits at the repository
-root, so this resolves as an ordinary package. Export `PKG_CONFIG_PATH` to the
-prefix's `share/pkgconfig` before building, and pass
-`-Xlinker -rpath -Xlinker <prefix>/lib` so the built binary finds the library at
-run time.
+The manifest sits at the repository root, so this resolves as an ordinary
+package. Depend on its `MaplibreNative` product under the package's identity,
+which SwiftPM takes from the repository name rather than from the manifest's
+own:
+
+```swift
+.product(name: "MaplibreNative", package: "maplibre-native-ffi"),
+```
+
+Export `PKG_CONFIG_PATH` to the prefix's `share/pkgconfig` before building, and
+pass `-Xlinker -rpath -Xlinker <prefix>/lib` so the built binary finds the
+library at run time.
 
 ### Go
 
@@ -341,6 +348,11 @@ go get github.com/maplibre/maplibre-native-ffi/bindings/go@main
 That resolves to a pseudo-version such as
 `v0.0.0-20260801064622-5eebd921a263`. The module zip holds only `bindings/go/**`
 — no clone and no submodules. cgo reads the same `PKG_CONFIG_PATH`.
+
+pkg-config supplies compiler and linker flags, not a loader path. On Linux and
+macOS the flags carry an rpath; on Windows they cannot, so put the prefix's
+`bin/` on `PATH` or copy `maplibre-native-c.dll` beside the executable before
+running or testing, which is what the binding's own Windows tasks do.
 
 ### Zig
 
