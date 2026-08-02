@@ -157,6 +157,8 @@ private fun RenderBackend.toProducerBackend(): ProducerBackend? =
     RenderBackend.METAL -> ProducerBackend.METAL
     RenderBackend.VULKAN -> ProducerBackend.VULKAN
     RenderBackend.OPENGL -> ProducerBackend.OPENGL
+    // The Skia bridges this example produces for have no WebGPU consumer.
+    RenderBackend.WEBGPU -> null
   }
 
 private fun VulkanContextHandles.toDescriptor(): VulkanContextDescriptor =

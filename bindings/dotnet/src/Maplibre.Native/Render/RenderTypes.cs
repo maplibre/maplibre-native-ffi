@@ -19,6 +19,7 @@ public enum RenderBackend : uint
     Metal = 1u << 0,
     Vulkan = 1u << 1,
     OpenGL = 1u << 2,
+    WebGpu = 1u << 3,
 }
 
 /// <summary>OpenGL context providers reported by the native library.</summary>
@@ -28,6 +29,7 @@ public enum OpenGLContextProvider : uint
     None = 0,
     Wgl = 1u << 0,
     Egl = 1u << 1,
+    WebGl = 1u << 2,
 }
 
 public readonly record struct RenderTargetExtent(uint Width, uint Height, double ScaleFactor)

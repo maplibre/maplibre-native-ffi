@@ -125,6 +125,8 @@ static void set_target_rejects_a_session_owned_texture(void) {
     mln_vulkan_borrowed_texture_descriptor_default();
   const mln_opengl_borrowed_texture_descriptor opengl =
     mln_opengl_borrowed_texture_descriptor_default();
+  const mln_webgpu_borrowed_texture_descriptor webgpu =
+    mln_webgpu_borrowed_texture_descriptor_default();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_UNSUPPORTED,
     mln_metal_borrowed_texture_set_target(fixture.session, &metal)
@@ -136,6 +138,10 @@ static void set_target_rejects_a_session_owned_texture(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_UNSUPPORTED,
     mln_opengl_borrowed_texture_set_target(fixture.session, &opengl)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_UNSUPPORTED,
+    mln_webgpu_borrowed_texture_set_target(fixture.session, &webgpu)
   );
 
   // A surface descriptor names a target this session does not have at all.

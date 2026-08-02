@@ -206,6 +206,9 @@ final class RenderBackendMask {
   /// OpenGL backend support bit.
   static const opengl = RenderBackendMask(1 << 2);
 
+  /// WebGPU backend support bit.
+  static const webgpu = RenderBackendMask(1 << 3);
+
   /// Raw backend mask bits.
   final int bits;
 

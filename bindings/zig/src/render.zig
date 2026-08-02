@@ -132,6 +132,7 @@ pub const RenderBackendSupport = struct {
     metal: bool,
     opengl: bool,
     vulkan: bool,
+    webgpu: bool,
 };
 
 pub fn supportedRenderBackends() RenderBackendSupport {
@@ -140,12 +141,14 @@ pub fn supportedRenderBackends() RenderBackendSupport {
         .metal = (mask & c.MLN_RENDER_BACKEND_FLAG_METAL) != 0,
         .opengl = (mask & c.MLN_RENDER_BACKEND_FLAG_OPENGL) != 0,
         .vulkan = (mask & c.MLN_RENDER_BACKEND_FLAG_VULKAN) != 0,
+        .webgpu = (mask & c.MLN_RENDER_BACKEND_FLAG_WEBGPU) != 0,
     };
 }
 
 pub const OpenGLContextProviderSupport = struct {
     wgl: bool,
     egl: bool,
+    webgl: bool,
 };
 
 pub fn supportedOpenGLContextProviders() OpenGLContextProviderSupport {
@@ -153,6 +156,7 @@ pub fn supportedOpenGLContextProviders() OpenGLContextProviderSupport {
     return .{
         .wgl = (mask & c.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL) != 0,
         .egl = (mask & c.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL) != 0,
+        .webgl = (mask & c.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL) != 0,
     };
 }
 

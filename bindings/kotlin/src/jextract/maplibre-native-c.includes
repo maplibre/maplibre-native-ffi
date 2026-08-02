@@ -8,6 +8,7 @@
 --include-constant MLN_RENDER_BACKEND_FLAG_METAL
 --include-constant MLN_RENDER_BACKEND_FLAG_OPENGL
 --include-constant MLN_RENDER_BACKEND_FLAG_VULKAN
+--include-constant MLN_RENDER_BACKEND_FLAG_WEBGPU
 --include-constant MLN_STATUS_INVALID_ARGUMENT
 --include-constant MLN_STATUS_INVALID_STATE
 --include-constant MLN_STATUS_NATIVE_ERROR
@@ -354,6 +355,7 @@
 --include-struct mln_render_target_extent
 --include-struct mln_vulkan_context_descriptor
 --include-struct mln_webgl_context_descriptor
+--include-struct mln_webgpu_context_descriptor
 --include-struct mln_wgl_context_descriptor
 
 # include/maplibre_native_c/runtime.h
@@ -672,6 +674,13 @@
 --include-function mln_vulkan_owned_texture_attach
 --include-function mln_vulkan_owned_texture_descriptor_default
 --include-function mln_vulkan_owned_texture_release_frame
+--include-function mln_webgpu_borrowed_texture_attach
+--include-function mln_webgpu_borrowed_texture_descriptor_default
+--include-function mln_webgpu_borrowed_texture_set_target
+--include-function mln_webgpu_owned_texture_acquire_frame
+--include-function mln_webgpu_owned_texture_attach
+--include-function mln_webgpu_owned_texture_descriptor_default
+--include-function mln_webgpu_owned_texture_release_frame
 --include-struct mln_metal_borrowed_texture_descriptor
 --include-struct mln_metal_owned_texture_descriptor
 --include-struct mln_metal_owned_texture_frame
@@ -682,3 +691,6 @@
 --include-struct mln_vulkan_borrowed_texture_descriptor
 --include-struct mln_vulkan_owned_texture_descriptor
 --include-struct mln_vulkan_owned_texture_frame
+--include-struct mln_webgpu_borrowed_texture_descriptor
+--include-struct mln_webgpu_owned_texture_descriptor
+--include-struct mln_webgpu_owned_texture_frame

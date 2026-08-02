@@ -31,12 +31,12 @@ class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   @Test
   fun renderBackendMasksRoundTrip() {
     assertEquals(
-      setOf(RenderBackend.METAL, RenderBackend.VULKAN, RenderBackend.OPENGL),
-      RenderBackend.fromMask(7U),
+      setOf(RenderBackend.METAL, RenderBackend.VULKAN, RenderBackend.OPENGL, RenderBackend.WEBGPU),
+      RenderBackend.fromMask(15U),
     )
     assertEquals(
-      setOf(OpenGLContextProvider.WGL, OpenGLContextProvider.EGL),
-      OpenGLContextProvider.fromMask(3U),
+      setOf(OpenGLContextProvider.WGL, OpenGLContextProvider.EGL, OpenGLContextProvider.WEBGL),
+      OpenGLContextProvider.fromMask(7U),
     )
     assertEquals(emptySet(), RenderBackend.fromMask(0U))
   }

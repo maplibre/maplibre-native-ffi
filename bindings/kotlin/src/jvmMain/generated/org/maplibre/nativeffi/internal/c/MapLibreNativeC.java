@@ -104,6 +104,15 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     public static int MLN_RENDER_BACKEND_FLAG_OPENGL() {
         return MLN_RENDER_BACKEND_FLAG_OPENGL;
     }
+    private static final int MLN_RENDER_BACKEND_FLAG_WEBGPU = (int)8L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_render_backend_flag.MLN_RENDER_BACKEND_FLAG_WEBGPU = 8
+     * }
+     */
+    public static int MLN_RENDER_BACKEND_FLAG_WEBGPU() {
+        return MLN_RENDER_BACKEND_FLAG_WEBGPU;
+    }
 
     private static class mln_c_version {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
@@ -17289,6 +17298,122 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
+    private static class mln_webgpu_owned_texture_descriptor_default {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mln_webgpu_owned_texture_descriptor.layout()    );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_webgpu_owned_texture_descriptor_default");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_webgpu_owned_texture_descriptor mln_webgpu_owned_texture_descriptor_default()
+     * }
+     */
+    public static FunctionDescriptor mln_webgpu_owned_texture_descriptor_default$descriptor() {
+        return mln_webgpu_owned_texture_descriptor_default.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_webgpu_owned_texture_descriptor mln_webgpu_owned_texture_descriptor_default()
+     * }
+     */
+    public static MethodHandle mln_webgpu_owned_texture_descriptor_default$handle() {
+        return mln_webgpu_owned_texture_descriptor_default.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_webgpu_owned_texture_descriptor mln_webgpu_owned_texture_descriptor_default()
+     * }
+     */
+    public static MemorySegment mln_webgpu_owned_texture_descriptor_default$address() {
+        return mln_webgpu_owned_texture_descriptor_default.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_webgpu_owned_texture_descriptor mln_webgpu_owned_texture_descriptor_default()
+     * }
+     */
+    public static MemorySegment mln_webgpu_owned_texture_descriptor_default(SegmentAllocator allocator) {
+        var mh$ = mln_webgpu_owned_texture_descriptor_default.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_webgpu_owned_texture_descriptor_default", allocator);
+            }
+            return (MemorySegment)mh$.invokeExact(allocator);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_webgpu_borrowed_texture_descriptor_default {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mln_webgpu_borrowed_texture_descriptor.layout()    );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_webgpu_borrowed_texture_descriptor_default");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_webgpu_borrowed_texture_descriptor mln_webgpu_borrowed_texture_descriptor_default()
+     * }
+     */
+    public static FunctionDescriptor mln_webgpu_borrowed_texture_descriptor_default$descriptor() {
+        return mln_webgpu_borrowed_texture_descriptor_default.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_webgpu_borrowed_texture_descriptor mln_webgpu_borrowed_texture_descriptor_default()
+     * }
+     */
+    public static MethodHandle mln_webgpu_borrowed_texture_descriptor_default$handle() {
+        return mln_webgpu_borrowed_texture_descriptor_default.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_webgpu_borrowed_texture_descriptor mln_webgpu_borrowed_texture_descriptor_default()
+     * }
+     */
+    public static MemorySegment mln_webgpu_borrowed_texture_descriptor_default$address() {
+        return mln_webgpu_borrowed_texture_descriptor_default.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_webgpu_borrowed_texture_descriptor mln_webgpu_borrowed_texture_descriptor_default()
+     * }
+     */
+    public static MemorySegment mln_webgpu_borrowed_texture_descriptor_default(SegmentAllocator allocator) {
+        var mh$ = mln_webgpu_borrowed_texture_descriptor_default.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_webgpu_borrowed_texture_descriptor_default", allocator);
+            }
+            return (MemorySegment)mh$.invokeExact(allocator);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mln_texture_image_info_default {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             mln_texture_image_info.layout()    );
@@ -18322,6 +18447,313 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         try {
             if (TRACE_DOWNCALLS) {
                 traceDowncall("mln_opengl_owned_texture_release_frame", session, frame);
+            }
+            return (int)mh$.invokeExact(session, frame);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_webgpu_owned_texture_attach {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_webgpu_owned_texture_attach");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_owned_texture_attach(mln_map map, const mln_webgpu_owned_texture_descriptor *descriptor, mln_render_session *out_session)
+     * }
+     */
+    public static FunctionDescriptor mln_webgpu_owned_texture_attach$descriptor() {
+        return mln_webgpu_owned_texture_attach.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_owned_texture_attach(mln_map map, const mln_webgpu_owned_texture_descriptor *descriptor, mln_render_session *out_session)
+     * }
+     */
+    public static MethodHandle mln_webgpu_owned_texture_attach$handle() {
+        return mln_webgpu_owned_texture_attach.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_owned_texture_attach(mln_map map, const mln_webgpu_owned_texture_descriptor *descriptor, mln_render_session *out_session)
+     * }
+     */
+    public static MemorySegment mln_webgpu_owned_texture_attach$address() {
+        return mln_webgpu_owned_texture_attach.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_owned_texture_attach(mln_map map, const mln_webgpu_owned_texture_descriptor *descriptor, mln_render_session *out_session)
+     * }
+     */
+    public static int mln_webgpu_owned_texture_attach(long map, MemorySegment descriptor, MemorySegment out_session) {
+        var mh$ = mln_webgpu_owned_texture_attach.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_webgpu_owned_texture_attach", map, descriptor, out_session);
+            }
+            return (int)mh$.invokeExact(map, descriptor, out_session);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_webgpu_borrowed_texture_attach {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_webgpu_borrowed_texture_attach");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_borrowed_texture_attach(mln_map map, const mln_webgpu_borrowed_texture_descriptor *descriptor, mln_render_session *out_session)
+     * }
+     */
+    public static FunctionDescriptor mln_webgpu_borrowed_texture_attach$descriptor() {
+        return mln_webgpu_borrowed_texture_attach.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_borrowed_texture_attach(mln_map map, const mln_webgpu_borrowed_texture_descriptor *descriptor, mln_render_session *out_session)
+     * }
+     */
+    public static MethodHandle mln_webgpu_borrowed_texture_attach$handle() {
+        return mln_webgpu_borrowed_texture_attach.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_borrowed_texture_attach(mln_map map, const mln_webgpu_borrowed_texture_descriptor *descriptor, mln_render_session *out_session)
+     * }
+     */
+    public static MemorySegment mln_webgpu_borrowed_texture_attach$address() {
+        return mln_webgpu_borrowed_texture_attach.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_borrowed_texture_attach(mln_map map, const mln_webgpu_borrowed_texture_descriptor *descriptor, mln_render_session *out_session)
+     * }
+     */
+    public static int mln_webgpu_borrowed_texture_attach(long map, MemorySegment descriptor, MemorySegment out_session) {
+        var mh$ = mln_webgpu_borrowed_texture_attach.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_webgpu_borrowed_texture_attach", map, descriptor, out_session);
+            }
+            return (int)mh$.invokeExact(map, descriptor, out_session);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_webgpu_borrowed_texture_set_target {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_webgpu_borrowed_texture_set_target");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_borrowed_texture_set_target(mln_render_session session, const mln_webgpu_borrowed_texture_descriptor *descriptor)
+     * }
+     */
+    public static FunctionDescriptor mln_webgpu_borrowed_texture_set_target$descriptor() {
+        return mln_webgpu_borrowed_texture_set_target.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_borrowed_texture_set_target(mln_render_session session, const mln_webgpu_borrowed_texture_descriptor *descriptor)
+     * }
+     */
+    public static MethodHandle mln_webgpu_borrowed_texture_set_target$handle() {
+        return mln_webgpu_borrowed_texture_set_target.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_borrowed_texture_set_target(mln_render_session session, const mln_webgpu_borrowed_texture_descriptor *descriptor)
+     * }
+     */
+    public static MemorySegment mln_webgpu_borrowed_texture_set_target$address() {
+        return mln_webgpu_borrowed_texture_set_target.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_borrowed_texture_set_target(mln_render_session session, const mln_webgpu_borrowed_texture_descriptor *descriptor)
+     * }
+     */
+    public static int mln_webgpu_borrowed_texture_set_target(long session, MemorySegment descriptor) {
+        var mh$ = mln_webgpu_borrowed_texture_set_target.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_webgpu_borrowed_texture_set_target", session, descriptor);
+            }
+            return (int)mh$.invokeExact(session, descriptor);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_webgpu_owned_texture_acquire_frame {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_webgpu_owned_texture_acquire_frame");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_owned_texture_acquire_frame(mln_render_session session, mln_webgpu_owned_texture_frame *out_frame)
+     * }
+     */
+    public static FunctionDescriptor mln_webgpu_owned_texture_acquire_frame$descriptor() {
+        return mln_webgpu_owned_texture_acquire_frame.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_owned_texture_acquire_frame(mln_render_session session, mln_webgpu_owned_texture_frame *out_frame)
+     * }
+     */
+    public static MethodHandle mln_webgpu_owned_texture_acquire_frame$handle() {
+        return mln_webgpu_owned_texture_acquire_frame.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_owned_texture_acquire_frame(mln_render_session session, mln_webgpu_owned_texture_frame *out_frame)
+     * }
+     */
+    public static MemorySegment mln_webgpu_owned_texture_acquire_frame$address() {
+        return mln_webgpu_owned_texture_acquire_frame.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_owned_texture_acquire_frame(mln_render_session session, mln_webgpu_owned_texture_frame *out_frame)
+     * }
+     */
+    public static int mln_webgpu_owned_texture_acquire_frame(long session, MemorySegment out_frame) {
+        var mh$ = mln_webgpu_owned_texture_acquire_frame.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_webgpu_owned_texture_acquire_frame", session, out_frame);
+            }
+            return (int)mh$.invokeExact(session, out_frame);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_webgpu_owned_texture_release_frame {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_webgpu_owned_texture_release_frame");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_owned_texture_release_frame(mln_render_session session, const mln_webgpu_owned_texture_frame *frame)
+     * }
+     */
+    public static FunctionDescriptor mln_webgpu_owned_texture_release_frame$descriptor() {
+        return mln_webgpu_owned_texture_release_frame.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_owned_texture_release_frame(mln_render_session session, const mln_webgpu_owned_texture_frame *frame)
+     * }
+     */
+    public static MethodHandle mln_webgpu_owned_texture_release_frame$handle() {
+        return mln_webgpu_owned_texture_release_frame.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_owned_texture_release_frame(mln_render_session session, const mln_webgpu_owned_texture_frame *frame)
+     * }
+     */
+    public static MemorySegment mln_webgpu_owned_texture_release_frame$address() {
+        return mln_webgpu_owned_texture_release_frame.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_webgpu_owned_texture_release_frame(mln_render_session session, const mln_webgpu_owned_texture_frame *frame)
+     * }
+     */
+    public static int mln_webgpu_owned_texture_release_frame(long session, MemorySegment frame) {
+        var mh$ = mln_webgpu_owned_texture_release_frame.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_webgpu_owned_texture_release_frame", session, frame);
             }
             return (int)mh$.invokeExact(session, frame);
         } catch (Error | RuntimeException ex) {

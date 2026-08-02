@@ -1517,9 +1517,11 @@ fn opengl_context_provider_mask_is_exposed_semantically() {
     let providers = crate::supported_opengl_context_providers();
     let backends = crate::supported_render_backends();
     if backends.contains(RenderBackendMask::OPENGL) {
-        assert!(
-            providers.intersects(OpenGLContextProviderMask::WGL | OpenGLContextProviderMask::EGL)
-        );
+        assert!(providers.intersects(
+            OpenGLContextProviderMask::WGL
+                | OpenGLContextProviderMask::EGL
+                | OpenGLContextProviderMask::WEBGL
+        ));
     } else {
         assert!(providers.is_empty());
     }

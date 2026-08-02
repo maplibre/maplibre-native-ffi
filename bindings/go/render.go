@@ -24,6 +24,7 @@ const (
 	RenderBackendMetal  RenderBackendMask = RenderBackendMask(C.MLN_RENDER_BACKEND_FLAG_METAL)
 	RenderBackendVulkan RenderBackendMask = RenderBackendMask(C.MLN_RENDER_BACKEND_FLAG_VULKAN)
 	RenderBackendOpenGL RenderBackendMask = RenderBackendMask(C.MLN_RENDER_BACKEND_FLAG_OPENGL)
+	RenderBackendWebGPU RenderBackendMask = RenderBackendMask(C.MLN_RENDER_BACKEND_FLAG_WEBGPU)
 )
 
 // OpenGLContextProviderMask preserves the OpenGL context provider bits reported
@@ -31,8 +32,9 @@ const (
 type OpenGLContextProviderMask uint32
 
 const (
-	OpenGLContextProviderWGL OpenGLContextProviderMask = OpenGLContextProviderMask(C.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL)
-	OpenGLContextProviderEGL OpenGLContextProviderMask = OpenGLContextProviderMask(C.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL)
+	OpenGLContextProviderWGL   OpenGLContextProviderMask = OpenGLContextProviderMask(C.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL)
+	OpenGLContextProviderEGL   OpenGLContextProviderMask = OpenGLContextProviderMask(C.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL)
+	OpenGLContextProviderWebGL OpenGLContextProviderMask = OpenGLContextProviderMask(C.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL)
 )
 
 // Has reports whether all provider bits in provider are present.

@@ -138,6 +138,84 @@ static void metal_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static mln_webgpu_owned_texture_descriptor webgpu_owned_descriptor(void) {
+  mln_webgpu_owned_texture_descriptor value =
+    mln_webgpu_owned_texture_descriptor_default();
+  value.context.device = fake_handle;
+  return value;
+}
+static void clear_webgpu_owned(
+  mln_webgpu_owned_texture_descriptor* descriptor
+) {
+  descriptor->context.device = NULL;
+}
+static void shrink_webgpu_owned(
+  mln_webgpu_owned_texture_descriptor* descriptor
+) {
+  descriptor->context.size = sizeof(mln_webgpu_context_descriptor) - 1;
+}
+
+// This verifies nulls, a non-null output handle, undersized descriptors, and
+// missing required WebGPU handles.
+static void webgpu_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
+  EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(
+    mln_webgpu_owned_texture_descriptor, webgpu_owned_descriptor,
+    mln_webgpu_owned_texture_attach, clear_webgpu_owned, shrink_webgpu_owned
+  );
+}
+
+// This verifies nested extent sizing, physical size, and the required borrowed
+// WebGPU handles and format hidden by binding descriptors.
+static void webgpu_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_webgpu_borrowed_texture_descriptor descriptor =
+    mln_webgpu_borrowed_texture_descriptor_default();
+  descriptor.context.device = fake_handle;
+  descriptor.texture = fake_handle;
+  descriptor.texture_view = fake_handle;
+  descriptor.format = 18;
+  mln_render_session session = MLN_HANDLE_NULL;
+
+  mln_webgpu_borrowed_texture_descriptor invalid = descriptor;
+  invalid.extent.size = sizeof(mln_render_target_extent) - 1;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_webgpu_borrowed_texture_attach(map, &invalid, &session)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
+  invalid = descriptor;
+  invalid.physical_width = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_webgpu_borrowed_texture_attach(map, &invalid, &session)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
+  invalid = descriptor;
+  invalid.context.device = NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_webgpu_borrowed_texture_attach(map, &invalid, &session)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
+  invalid = descriptor;
+  invalid.texture_view = NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_webgpu_borrowed_texture_attach(map, &invalid, &session)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
+  invalid = descriptor;
+  invalid.format = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_webgpu_borrowed_texture_attach(map, &invalid, &session)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void configure_opengl_context(mln_opengl_context_descriptor* context) {
 #if defined(MLN_TEST_OPENGL_WGL)
   context->platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL;
@@ -370,4 +448,6 @@ void run_render_backend_abi_tests(void) {
   RUN_TEST(vulkan_surface_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(vulkan_owned_texture_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(vulkan_borrowed_texture_rejects_unsafe_raw_descriptors);
+  RUN_TEST(webgpu_owned_texture_attach_rejects_unsafe_raw_inputs);
+  RUN_TEST(webgpu_borrowed_texture_rejects_unsafe_raw_descriptors);
 }

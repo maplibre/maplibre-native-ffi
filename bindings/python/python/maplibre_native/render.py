@@ -34,6 +34,7 @@ class RenderBackend(IntFlag):
     METAL = 1 << 0
     VULKAN = 1 << 1
     OPENGL = 1 << 2
+    WEBGPU = 1 << 3
 
 
 class OpenGLContextProvider(IntFlag):
@@ -42,6 +43,7 @@ class OpenGLContextProvider(IntFlag):
     NONE = 0
     WGL = 1 << 0
     EGL = 1 << 1
+    WEBGL = 1 << 2
 
 
 class NativePointer:

@@ -142,6 +142,14 @@ class TextureSessionBackend {
       "session does not render into a caller-owned OpenGL texture"
     );
   }
+  virtual auto set_webgpu_borrowed_target(
+    const mln_webgpu_borrowed_texture_descriptor& descriptor
+  ) -> mln_status {
+    (void)descriptor;
+    return unsupported_retarget(
+      "session does not render into a caller-owned WebGPU texture"
+    );
+  }
 
   virtual void prepare_render_resources() {}
   virtual auto after_render(

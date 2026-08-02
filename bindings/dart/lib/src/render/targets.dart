@@ -217,6 +217,9 @@ final class OpenGLContextProviderMask {
   /// EGL context provider support bit.
   static const egl = OpenGLContextProviderMask(1 << 1);
 
+  /// WebGL context provider support bit.
+  static const webgl = OpenGLContextProviderMask(1 << 2);
+
   /// Raw provider mask bits.
   final int bits;
 

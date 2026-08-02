@@ -52,6 +52,25 @@ typedef struct mln_vulkan_context_descriptor {
   void* get_device_proc_addr;
 } mln_vulkan_context_descriptor;
 
+/**
+ * WebGPU backend context fields shared by WebGPU render targets.
+ *
+ * A browser host owns its WebGPU device, so a session borrows these rather than
+ * creating any of them.
+ */
+typedef struct mln_webgpu_context_descriptor {
+  uint32_t size;
+  /** Borrowed WGPUInstance. Optional for texture sessions. */
+  void* instance;
+  /** Borrowed WGPUDevice. Required. */
+  void* device;
+  /**
+   * Borrowed WGPUQueue. Optional; null uses the device default queue. A
+   * non-null queue must belong to device.
+   */
+  void* queue;
+} mln_webgpu_context_descriptor;
+
 /** OpenGL context providers supported by this build. */
 typedef enum mln_opengl_context_provider_flag : uint32_t {
   MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL = 1u << 0u,

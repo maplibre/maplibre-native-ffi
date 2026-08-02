@@ -124,7 +124,7 @@ typedef struct foreign_call_probe {
   mln_status clear_data_status;
   mln_status readback_status;
   mln_status surface_set_target_status[3];
-  mln_status texture_set_target_status[3];
+  mln_status texture_set_target_status[4];
 } foreign_call_probe;
 
 static void call_session_from_a_foreign_thread(void* argument) {
@@ -163,12 +163,16 @@ static void call_session_from_a_foreign_thread(void* argument) {
     mln_vulkan_borrowed_texture_descriptor_default();
   const mln_opengl_borrowed_texture_descriptor opengl_texture =
     mln_opengl_borrowed_texture_descriptor_default();
+  const mln_webgpu_borrowed_texture_descriptor webgpu_texture =
+    mln_webgpu_borrowed_texture_descriptor_default();
   probe->texture_set_target_status[0] =
     mln_metal_borrowed_texture_set_target(probe->session, &metal_texture);
   probe->texture_set_target_status[1] =
     mln_vulkan_borrowed_texture_set_target(probe->session, &vulkan_texture);
   probe->texture_set_target_status[2] =
     mln_opengl_borrowed_texture_set_target(probe->session, &opengl_texture);
+  probe->texture_set_target_status[3] =
+    mln_webgpu_borrowed_texture_set_target(probe->session, &webgpu_texture);
   atomic_store(&probe->finished, true);
 }
 
@@ -196,10 +200,16 @@ static void session_entry_points_reject_a_foreign_thread(void) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_WRONG_THREAD, probe.reduce_memory_status);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_WRONG_THREAD, probe.clear_data_status);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_WRONG_THREAD, probe.readback_status);
-  for (size_t index = 0; index < 3; index += 1) {
+  const size_t surface_targets =
+    sizeof(probe.surface_set_target_status) / sizeof(mln_status);
+  for (size_t index = 0; index < surface_targets; index += 1) {
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_WRONG_THREAD, probe.surface_set_target_status[index]
     );
+  }
+  const size_t texture_targets =
+    sizeof(probe.texture_set_target_status) / sizeof(mln_status);
+  for (size_t index = 0; index < texture_targets; index += 1) {
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_WRONG_THREAD, probe.texture_set_target_status[index]
     );

@@ -39,7 +39,12 @@ public sealed class MaplibreTests
 
         Assert.Equal(
             providers,
-            providers & (OpenGLContextProvider.Wgl | OpenGLContextProvider.Egl)
+            providers
+                & (
+                    OpenGLContextProvider.Wgl
+                    | OpenGLContextProvider.Egl
+                    | OpenGLContextProvider.WebGl
+                )
         );
     }
 

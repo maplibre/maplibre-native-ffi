@@ -12,7 +12,7 @@ import Testing
 
 @Test func supportedOpenGLContextProvidersPreserveMaskBits() {
   let providers = Maplibre.supportedOpenGLContextProviders()
-  #expect(providers.isSubset(of: [.wgl, .egl]))
+  #expect(providers.isSubset(of: [.wgl, .egl, .webGL]))
 }
 
 @Test func unknownNetworkStatusIsRejectedBeforeCallingC() {
