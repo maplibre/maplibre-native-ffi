@@ -5,8 +5,7 @@
 
 typedef struct asset_store asset_store;
 
-// Yours to supply: a lookup that several threads may call at once, returning
-// bytes that stay valid until it returns.
+// The host supplies a concurrent lookup. Its bytes remain valid until return.
 bool asset_store_find(
   const asset_store* store, const char* url, const uint8_t** out_bytes,
   size_t* out_size

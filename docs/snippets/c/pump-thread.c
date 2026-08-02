@@ -1,5 +1,5 @@
-// A host-owned pump thread. The runtime and the map live on this thread, and
-// the display thread owns the render session and calls render_update.
+// A host-owned pump thread. The runtime and map use this owner thread. The
+// display thread owns the render session and draws its updates.
 
 #include <maplibre_native_c.h>
 #include <stdatomic.h>

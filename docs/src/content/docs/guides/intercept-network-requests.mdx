@@ -1,6 +1,6 @@
 ---
-title: Intercept Network Requests
-description: Rewrite a resource URL before the request is sent, or answer the request with bytes that you supply.
+title: Intercept network requests
+description: Rewrite a resource URL or answer its request from host storage.
 sidebar:
   order: 16
 ---
@@ -11,57 +11,51 @@ import { region } from "../../../snippets";
 import transformSnippet from "../../../../snippets/c/resource-transform.c?raw";
 import providerSnippet from "../../../../snippets/c/resource-provider.c?raw";
 
-Two extension points intercept the network requests that a map makes. A resource
-transform rewrites a URL before the request is sent, and a resource provider
-answers the request with bytes that you supply. Register either one on the
-runtime, from the runtime owner thread.
+Two extension points intercept resource requests. A resource transform rewrites
+a URL before the network request. A resource provider supplies the response
+bytes. Register either one on the runtime owner thread.
 
-Every value that a callback reads must be safe to read from several threads at
-once, because MapLibre may invoke either callback on a network or worker thread
-instead of the runtime owner thread. Return from each callback quickly, because
-the resource request waits for it. A transform callback calls one function, which sets the replacement URL on the response. A provider callback calls
-the request handle functions, and only for the handle that it received.
+MapLibre can invoke either callback concurrently on network and worker threads.
+Protect every value that a callback reads and return quickly because the
+resource request waits. A transform callback sets a replacement URL. A provider
+callback operates only on the request handle that it received.
 
 ## Rewrite a URL with a transform
 
-Rewrite the URL when a request needs a credential, a signature, or a different
-host. The transform runs for every resource that MapLibre fetches over the
-network, including nested PMTiles range requests. Resources that MapLibre loads
-from files, assets, MBTiles archives, and the cache database reach the map
-without the transform.
+Rewrite a URL to add a credential or signature, or to select another host. The
+transform runs for every network resource, including nested PMTiles range
+requests. File, asset, MBTiles, and cache-database resources bypass it.
 
 Compare the URL against your own host before you attach a credential, because a
 style names glyphs, sprites, and tiles on origins that you do not control.
 
 <Code code={region(transformSnippet, "match")} lang="c" title="resource-transform.c" />
 
-Build the replacement URL in host storage, then set it on the response. A
-callback that returns a non-OK status leaves the request unchanged.
+Build the replacement URL in host storage, then set it on the response. Returning
+a non-OK status preserves the original request.
 
 <Code code={region(transformSnippet, "rewrite")} lang="c" title="resource-transform.c" />
 
-Registering a transform replaces any previous one. When the registration call returns, no in-flight request can invoke
-the transform that it replaced.
+Registering a transform replaces the previous transform. After the registration
+call returns, the replaced transform has no in-flight callbacks.
 
 <Code code={region(transformSnippet, "install")} lang="c" title="resource-transform.c" />
 
 ## Serve the bytes with a provider
 
-Supply the bytes yourself when MapLibre cannot load a resource on its own, such
-as an archive inside your application package or a scheme of your own. Such a
-scheme reaches the provider, because MapLibre routes every scheme that it does
-not recognize to the network layer. A request that the provider handles never
-reaches the transform, because the provider runs before MapLibre's online file
-source.
+Use a provider for host-managed storage, such as an application archive or a
+custom URL scheme. MapLibre routes unrecognized schemes to the network layer,
+where the provider runs before the online file source. A provider response
+bypasses the transform.
 
-Match the requests that your host serves, and pass every other request through
-to MapLibre's network stack. Fetch the resolved URL, which includes the tile
-server normalization and the API key that the runtime applies. The requested URL is the logical identity that the cache stores.
+Match the requests that the host serves, and pass every other request to
+MapLibre's network stack. Fetch the resolved URL after tile-server normalization
+and API-key insertion. The cache uses the requested URL as the logical identity.
 
 <Code code={region(providerSnippet, "match")} lang="c" title="resource-provider.c" />
 
-A provider that already holds the bytes completes the request inside the
-callback, releases the handle, and reports that it handled the request.
+A provider with the bytes available completes the request inside the callback,
+releases the handle, and reports that it handled the request.
 
 <Code code={region(providerSnippet, "complete")} lang="c" title="resource-provider.c" />
 
@@ -70,16 +64,15 @@ provider took stay valid. Complete and release each of them as usual.
 
 <Code code={region(providerSnippet, "install")} lang="c" title="resource-provider.c" />
 
-A provider that owns an I/O pool reports the same decision, keeps the handle, and completes the request from any thread once the bytes arrive. Check
-whether the request was cancelled before expensive work, because MapLibre
-cancels requests whose resources it no longer needs. Release each handle exactly
-once, after you complete the request or decide against completing it.
+A provider with an I/O pool reports the same decision and retains the handle.
+Complete the request from any thread when the bytes arrive. Check for
+cancellation before expensive work. Release each handle exactly once, after
+completion or cancellation.
 
 ## Keep callback state reachable
 
-The runtime stores each callback and its user data by reference. Keep any host
-state that a callback reads reachable until you register a replacement, clear
-the callback, or destroy the runtime. Each of those calls waits for in-flight
-callbacks to return. Free that state after one of those calls returns. Release
-any host lock that a callback also acquires before you destroy the runtime, because a callback blocked on that lock cannot return,
-and neither can the destroy call.
+The runtime stores each callback and its user data by reference. Keep callback
+state reachable until replacing or clearing the callback, or destroying the
+runtime. Each operation waits for in-flight callbacks to return. Release any
+host lock that a callback also acquires before destroying the runtime. Holding
+that lock can deadlock destruction.

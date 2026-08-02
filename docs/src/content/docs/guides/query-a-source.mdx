@@ -1,5 +1,5 @@
 ---
-title: Query a Source
+title: Query a source
 description: Read the features that a source holds, and expand a cluster into the features under it.
 sidebar:
   order: 13
@@ -11,13 +11,13 @@ import { region } from "../../../snippets";
 import sourceFeatures from "../../../../snippets/c/query-source-features.c?raw";
 import clusterLeaves from "../../../../snippets/c/cluster-leaves.c?raw";
 
-A source query reports the features that a source holds, including the features
-that no layer draws. To find what a reader can see at a screen position instead,
-use a rendered query, described in
-[Query a Map](/maplibre-native-ffi/guides/query-a-map/).
+A source query reports the loaded features in a source, including features that
+no layer draws. To find features at a screen position, use
+[Query a map](/maplibre-native-ffi/guides/query-a-map/).
 
-The query belongs to the render session and runs on the
-session's owner thread. The session builds its renderer during the first render update, and a query before that returns an invalid-state status.
+The query belongs to the render session and runs on the session's owner thread.
+Source queries become available after the first render update. An earlier query
+reports an invalid-state status.
 
 ## Run the query
 
@@ -33,25 +33,23 @@ argument, and it differs from the source-layer IDs in the options.
 
 <Code code={region(sourceFeatures, "query")} lang="c" title="query-source-features.c" />
 
-Read the result count rather than the status when you expect features, because
-an unknown source ID also produces an empty result with a success status.
+A successful query can return an empty result for an unknown source ID. Check
+the result count when the host expects features.
 
 <Code code={region(sourceFeatures, "read")} lang="c" title="query-source-features.c" />
 
-The same query returns different features as the camera moves, because a query
-covers the tiles that the source has loaded for the current camera. Tiles that
-arrive later appear in the next query, and a source that no layer uses loads no
-tiles at all.
+A query covers the tiles that the source loaded for the current camera. Its
+result therefore changes as the camera moves and more tiles arrive. A source
+loads tiles only while a layer uses it.
 
 ## Expand a cluster
 
-An extension query runs a named extension against one
-feature of one source. The `supercluster` extension reads a GeoJSON source that
-has clustering enabled, and its `leaves` field returns the features under one
-cluster as a feature collection.
+An extension query runs a named extension against one source feature. The
+`supercluster` extension reads a clustered GeoJSON source. Its `leaves` field
+returns the features under one cluster as a feature collection.
 
-`supercluster` matches numbers by exact JSON type, so build the `limit` and
-`offset` arguments as unsigned values.
+`supercluster` matches numbers by exact JSON type. Build the `limit` and `offset`
+arguments as unsigned values.
 
 <Code code={region(clusterLeaves, "arguments")} lang="c" title="cluster-leaves.c" />
 
@@ -60,14 +58,14 @@ within that extension.
 
 <Code code={region(clusterLeaves, "query")} lang="c" title="cluster-leaves.c" />
 
-An extension can answer with a single value instead of a feature collection, so
-the result states which of the two it holds. Check that before reading it.
+An extension result identifies whether it contains a single value or a feature
+collection. Check the result kind before reading the value.
 
 <Code code={region(clusterLeaves, "leaves")} lang="c" title="cluster-leaves.c" />
 
 Pass the cluster feature to the extension query exactly as a source query
-returned it. `supercluster` reads the `cluster_id` property by the same rule, so
-a double or a signed integer counts as absent. A feature descriptor copied out
-of a query result keeps the JSON type of every property. A host that rebuilds
-the feature through a JSON layer that stores every number as a double receives a
-successful query with an empty result.
+returned it. `supercluster` also matches `cluster_id` by exact JSON type. A
+double or signed integer counts as absent. A feature descriptor copied from a
+query result preserves each property's JSON type. Rebuilding the feature through
+a JSON layer that stores every number as a double produces a successful query
+with an empty result.

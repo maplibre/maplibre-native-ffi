@@ -1,12 +1,10 @@
-// Moving the camera from a drag and a pinch, and marking the commands in
-// between as one gesture.
+// Applying drag and pinch input within one gesture.
 
 #include <maplibre_native_c.h>
 
 void begin_gesture(mln_map map) {
   // #region bracket
-  // Stops a running transition, so the animation and the gesture do not both
-  // move the camera.
+  // Give the gesture sole control of the camera.
   mln_map_cancel_transitions(map);
   mln_map_set_gesture_in_progress(map, true);
   // #endregion bracket

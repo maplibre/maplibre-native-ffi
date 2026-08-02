@@ -58,7 +58,7 @@ mln_render_session attach_to_host_texture(
   descriptor.extent.scale_factor = scale_factor;
 
   // Stated rather than derived from the logical extent. These must equal the
-  // texture's level-0 dimensions, which the session cannot verify on ES 3.0.
+  // texture's level-0 dimensions. The session cannot verify them on ES 3.0.
   descriptor.physical_width = (uint32_t)(logical_width * scale_factor);
   descriptor.physical_height = (uint32_t)(logical_height * scale_factor);
 

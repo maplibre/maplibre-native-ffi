@@ -72,8 +72,7 @@ size_t delete_other_regions(mln_runtime runtime, const char* keep_metadata) {
   mln_offline_region_list_count(list, &count);
 
   for (size_t index = 0; index < count; index++) {
-    // info.definition and info.metadata point into the list, so copy whatever
-    // outlives mln_offline_region_list_destroy().
+    // Copy the definition and metadata before destroying the list.
     mln_offline_region_info info = {.size = sizeof(info)};
     if (mln_offline_region_list_get(list, index, &info) != MLN_STATUS_OK) {
       continue;

@@ -1,5 +1,5 @@
 ---
-title: Render a Static Image
+title: Render a static image
 description: Create a map in static mode, request one image, and read the finished pixels into host memory.
 sidebar:
   order: 7
@@ -10,22 +10,20 @@ import { region } from "../../../snippets";
 
 import stillImage from "../../../../snippets/c/still-image.c?raw";
 
-A static map renders one image per request rather than redrawing as data and
-camera state change. A tile service, a thumbnail job, or an export asks for an
-image, waits for it, and reads the pixels into host memory.
+A static map renders one image per request. Use it for a tile service, thumbnail
+job, or image export that waits for completion and reads pixels into host
+memory.
 
-Static mode is fixed when the map is created, so a host that produces images
-creates a map for that, as
-[Create a Map](/maplibre-native-ffi/guides/create-a-map/) describes. Reading
-pixels back also requires a session-owned texture, because that is the one
-target kind the map allocates and can copy out of.
+Static mode is fixed when the map is created. Create a dedicated static map, as
+[Create a map](/maplibre-native-ffi/guides/create-a-map/) describes. Reading
+pixels also requires a session-owned texture. The render session allocates this
+target and can copy its contents into host memory.
 
 ## Request one image
 
-Create the map at the size that the render target uses. A session attached at a
-different size sets the map size on the map's owner thread, and the map keeps
-its previous size until the next pump, so a request made before the new size
-reaches the map produces an update that renders nothing.
+Create the map at the render target's size. Attaching a session with a different
+size queues a map-size update on the map's owner thread. Pump before requesting
+an image. The map then uses the new size.
 
 <Code code={region(stillImage, "create")} lang="c" title="still-image.c" />
 
@@ -35,19 +33,16 @@ this snippet uses OpenGL through EGL.
 
 <Code code={region(stillImage, "attach")} lang="c" title="still-image.c" />
 
-Render on every turn of the loop, because a static map advances its loading
-through the render calls themselves. The runtime reports a still-image-finished
-event from the map's run loop, and that event can arrive before or after the
-render call that produced the pixels. The image is ready once the event has
-arrived and a render call has reported a frame, which is why the loop waits for
-both.
+Render on every turn of the loop. A static map advances loading through the
+render calls. The still-image-finished event can arrive before or after the
+render call that produced the pixels. The image is ready after both the event
+and a successfully rendered frame.
 
 <Code code={region(stillImage, "await")} lang="c" title="still-image.c" />
 
 ## Read the pixels
 
-Probe for the size first, because the extent in physical pixels depends on the
-scale factor that the descriptor set. The copy is premultiplied RGBA8, laid out
-with the row stride that the probe reports.
+Probe for the size first. The scale factor determines the physical extent. The
+copy uses premultiplied RGBA8 with the row stride that the probe reports.
 
 <Code code={region(stillImage, "read")} lang="c" title="still-image.c" />

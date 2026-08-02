@@ -1,19 +1,19 @@
 ---
 title: Install
-description: Add MapLibre Native FFI to a project in your language, and get the native library where your language needs it.
+description: Add a language binding and its native library to a project.
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 
 <Aside type="caution" title="Prerelease only">
   Tagged releases are not yet available. Each channel is a floating snapshot
-  that moves whenever `main` does, so package names, coordinates, and the
-  C ABI change under you.
+  that moves with `main`. Package names, coordinates, and the C ABI can change
+  between snapshots.
 </Aside>
 
-Choose a render backend first. Metal is recommended for Apple platforms, OpenGL
-for emulators and VMs, and Vulkan for other platforms. Then find your language
-below. Some bindings fetch the native library themselves; the rest send you to
+Choose a render backend first. Use Metal for Apple platforms, OpenGL for
+emulators and virtual machines, and Vulkan for other platforms. Then find your
+language below. Some bindings fetch the native library; the others use
 [Get the native library](#get-the-native-library).
 
 ## Kotlin
@@ -36,8 +36,8 @@ dependencies {
 ```
 
 On Android, call `MaplibreAndroid.initialize(context)` before you create a
-runtime. The runtime AAR carries the platform TLS component already, so a
-Kotlin app needs nothing further.
+runtime. The runtime AAR includes the platform TLS component. A Kotlin app needs
+no additional TLS package.
 
 The other runtimes are `maplibre-native-ffi-runtime-opengl` and
 `maplibre-native-ffi-runtime-metal`.
@@ -75,9 +75,8 @@ explicit = true
 maplibre-native-vulkan = { index = "maplibre-snapshots" }
 ```
 
-The index configuration above is uv's. Marking the index explicit keeps every
-other dependency on PyPI, so only this package resolves from the snapshot
-index.
+This index configuration uses uv. The explicit index limits snapshot resolution
+to this package; all other dependencies continue to resolve from PyPI.
 
 The other distributions are `maplibre-native-opengl` and
 `maplibre-native-metal`.
@@ -132,8 +131,7 @@ your own build instead.
 
 ## Swift
 
-The package manifest sits at the repository root, so this resolves as an
-ordinary package.
+The package manifest at the repository root defines the Swift package.
 
 ```swift title="Package.swift"
 .package(url: "https://github.com/maplibre/maplibre-native-ffi", branch: "main")
@@ -175,7 +173,7 @@ On Windows, add `<prefix>/bin` to `PATH` or copy the DLL beside your executable.
 
 ## Get the native library
 
-Download `maplibre-native-c-<preset>.tar.gz` for your target from the
+Download `maplibre-native-c-<preset>.tar.gz` for the target from the
 [latest snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot)
 and unpack it. The directory you unpack to is the install prefix.
 
@@ -194,9 +192,8 @@ mise run build macos-arm64-metal  # prefix at build/macos-arm64-metal/install
 
 ### On Android
 
-Depend on the runtime AAR rather than unpacking a tarball. It carries the
-native library for every ABI, and the platform TLS component that Android HTTPS
-requests need.
+Depend on the runtime AAR. It contains the native library for every ABI and the
+platform TLS component that Android HTTPS requests require.
 
 ```kotlin title="build.gradle.kts"
 implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:0.1.0-SNAPSHOT")

@@ -3,8 +3,7 @@
 #include <maplibre_native_c.h>
 #include <stdint.h>
 
-// Your logging system. Called from MapLibre's threads, so it must be safe to
-// call from several at once.
+// The host logging system. MapLibre can call it concurrently from its threads.
 extern void host_log(int severity, const char* category, const char* message);
 
 static const char* category_name(uint32_t event) {
@@ -42,8 +41,7 @@ static uint32_t forward_to_host(
 
 mln_status capture_logs(void) {
   // #region install
-  // The callback is process-global rather than per-runtime, and it is stored
-  // by reference, so it must outlive every runtime in the process.
+  // The process-global callback remains valid for every runtime's lifetime.
   return mln_log_set_callback(forward_to_host, NULL);
   // #endregion install
 }

@@ -1,6 +1,6 @@
 ---
-title: Load a Style
-description: Give a map its base style from a URL or from text your host holds, and understand what a later style load discards.
+title: Load a style
+description: Load a base style from a URL or host text, then replay additions after later style loads.
 sidebar:
   order: 2
 ---
@@ -10,40 +10,37 @@ import { region } from "../../../snippets";
 
 import loadStyle from "../../../../snippets/c/load-style.c?raw";
 
-A style decides everything the map draws: which tiles it fetches, which layers
-it paints, and in what order. A map with no style renders nothing, so loading
-one is the first thing to do with a new map.
+A style defines the tiles, layers, and drawing order of a map. Load one before
+rendering a new map.
 
 ## Choose where the style comes from
 
-Set a style URL when a server publishes it, which is the usual case for a hosted
-base map. MapLibre fetches it through the same resource system that loads tiles,
-so a URL also reaches any cache, offline region, or request transform that the
-runtime has.
+Set a style URL for a hosted base map. MapLibre fetches it through the resource
+system that also loads tiles. The request therefore uses the runtime's cache,
+offline regions, and resource transform.
 
 <Code code={region(loadStyle, "url")} lang="c" title="load-style.c" />
 
-Set the style text instead when your host already holds it: a base style shipped
-inside the application, or one composed at runtime. MapLibre parses and copies
-it before the call returns.
+Set style text when the host already has the document, such as a bundled base
+style or one composed at runtime. MapLibre parses and copies the text before the
+call returns.
 
 <Code code={region(loadStyle, "json")} lang="c" title="load-style.c" />
 
-Either call returns as soon as the map accepts the request. The style, its
-sources, its glyphs, and its first tiles arrive across the pumps that follow,
-and the map reports a style-loaded event once the style has parsed and its
-sources exist. A loading-failed event reports the other outcome and carries the
+Either call returns when the map accepts the request. Later pumps load the
+style, sources, glyphs, and first tiles. A style-loaded event reports that the
+style has parsed and its sources exist. A loading-failed event carries the
 failure text.
-[Handle Events](/maplibre-native-ffi/guides/handle-events/) covers reading both.
+[Handle events](/maplibre-native-ffi/guides/handle-events/) covers reading both.
 
-## Everything you add belongs to one loaded style
+## Replay additions after a style load
 
 Sources, layers, images, and layer properties that your host adds belong to the
 style that was loaded when they were added. Loading another style discards all
 of them.
 
-A host that adds its own data therefore adds it after the style-loaded event,
-and does the same again after every later style load. A host that switches base
-maps at runtime keeps whatever it needs to replay, and replays it each time.
+A host adds its own data after the style-loaded event and repeats those changes
+after every later style load. A host that switches base maps keeps the changes
+that it needs to replay.
 
-The camera is the exception, and it survives a style load unchanged.
+Camera state survives a style load unchanged.

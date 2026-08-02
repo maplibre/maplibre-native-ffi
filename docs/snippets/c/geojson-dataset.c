@@ -8,8 +8,8 @@ static mln_string_view sv(const char* text) {
   return (mln_string_view){.data = text, .size = strlen(text)};
 }
 
-// Style-spec JSON crosses the boundary as a descriptor graph, so one small
-// helper per value type keeps the call sites short.
+// Style-spec JSON crosses the boundary as a descriptor graph. One small helper
+// per value type keeps the call sites short.
 static mln_json_value json_string(const char* text) {
   return (mln_json_value){
     .size = sizeof(mln_json_value),
@@ -80,7 +80,7 @@ mln_status show_one_point(mln_map map, mln_lat_lng position) {
     .data = {.feature_collection = {.features = &feature, .feature_count = 1}},
   };
 
-  // A null options pointer selects the defaults, which leave clustering off.
+  // A null options pointer selects the defaults. Clustering is off by default.
   return mln_map_add_geojson_source_data(map, sv("pins"), &data, NULL);
   // #endregion inline-data
 }

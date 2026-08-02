@@ -1,6 +1,6 @@
 ---
-title: Create a Map
-description: Create a runtime and a map, choose the options that are fixed for the map's life, and release the two in order.
+title: Create a map
+description: Create a runtime and map with their fixed options, then release both in order.
 sidebar:
   order: 1
 ---
@@ -10,9 +10,9 @@ import { region } from "../../../snippets";
 
 import createMap from "../../../../snippets/c/create-map.c?raw";
 
-A map belongs to a runtime, and the runtime belongs to the thread that created
-it. That thread becomes the owner thread for the runtime and for every map under
-it, so create both on the thread that will pump them.
+A map belongs to a runtime. The thread that creates the runtime becomes the
+owner thread for the runtime and every map under it. Create both on the thread
+that will pump them.
 
 One runtime serves any number of maps and holds the shared work: the scheduler,
 the event queue, the network stack, and one cache database.
@@ -21,31 +21,28 @@ the event queue, the network stack, and one cache database.
 
 ## Choose the options that outlive the call
 
-Most map options can be changed later. Three cannot, and getting them wrong
-means creating the map again.
+Three map options are fixed at creation: the scale factor, the map mode, and
+FastPFOR decoding.
 
-The scale factor is fixed for the map's life. It chooses which sprites, glyphs,
-and raster tiles the map downloads, so pass the display density that the map
-will render at. A render target carries its own scale factor for geometry, and
-attaching one that disagrees logs a warning and keeps serving imagery at the
-map's density.
+The scale factor selects the sprites, glyphs, and raster tiles that the map
+downloads. Set it to the display density that the map will use. A render target
+has its own scale factor for geometry. Attaching a target with a different value
+logs a warning and continues to load imagery at the map's density.
 
 <Code code={region(createMap, "map")} lang="c" title="create-map.c" />
 
-The width and height are the exception that looks like a rule. They set the
-viewport only until the first render target attaches, after which the target's
-extent replaces them. They still matter before that point, because camera and
-projection queries answer against them.
+The width and height set the viewport until the first render target attaches.
+That target's extent then replaces them. Before the first attach, camera and
+projection queries use the initial width and height.
 
-The map mode is fixed as well. A continuous map redraws as data arrives and as
-the camera moves, which is what an on-screen map needs. A static map produces
-one image per request, and a tile map produces one image for a single tile.
+A continuous map redraws as data arrives and the camera moves. Use this mode for
+an on-screen map. A static map produces one image per request, and a tile map
+produces one image for a single tile.
 
 <Code code={region(createMap, "mode")} lang="c" title="create-map.c" />
 
-The last fixed option is FastPFOR decoding, which applies to every MapLibre
-Tiles source that the map loads. Enable it at creation when your tile sets use
-that encoding.
+FastPFOR decoding applies to every MapLibre Tiles source that the map loads.
+Enable it at creation when your tile sets use that encoding.
 
 ## Release in order
 

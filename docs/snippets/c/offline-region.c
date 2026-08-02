@@ -91,8 +91,7 @@ mln_offline_region_id download_region(
   // #endregion result
 
   // #region region-id
-  // info.metadata points into the snapshot, so only info.id outlives the
-  // destroy below.
+  // Copy metadata before destroying the snapshot; info.id remains valid.
   mln_offline_region_info info = {.size = sizeof(info)};
   mln_offline_region_snapshot_get(region, &info);
   mln_offline_region_snapshot_destroy(region);
@@ -138,8 +137,7 @@ bool region_progress(
   const mln_runtime_event_offline_region_status* progress = event->payload;
   if (progress->region_id != region_id) return false;
 
-  // required_resource_count grows while MapLibre discovers resources, so the
-  // fraction is an estimate until required_resource_count_is_precise is true.
+  // Treat the fraction as an estimate until the required count is precise.
   *out_fraction = progress->status.required_resource_count == 0
                     ? 0.0
                     : (double)progress->status.completed_resource_count /

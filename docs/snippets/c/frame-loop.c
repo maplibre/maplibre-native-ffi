@@ -1,5 +1,5 @@
 // One turn of a display-paced host loop: pump the runtime, drain its events,
-// and render when the map has something new. Call it from your frame callback.
+// and draw a published render update. Call it from the frame callback.
 
 #include <maplibre_native_c.h>
 

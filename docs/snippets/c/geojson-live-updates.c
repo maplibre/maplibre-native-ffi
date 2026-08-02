@@ -1,5 +1,4 @@
-// Replacing the data on a GeoJSON source that is already on the style, once
-// per tick of a live feed.
+// Replacing the data on a GeoJSON source for each live-feed update.
 
 #include <maplibre_native_c.h>
 #include <string.h>

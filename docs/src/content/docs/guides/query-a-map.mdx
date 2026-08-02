@@ -1,6 +1,6 @@
 ---
-title: Query a Map
-description: Read the features that the renderer drew at a screen position, and copy what your host keeps before the result is destroyed.
+title: Query a map
+description: Find features in the last frame and copy borrowed values before destroying the result.
 sidebar:
   order: 12
 ---
@@ -10,25 +10,22 @@ import { region } from "../../../snippets";
 
 import querySnippet from "../../../../snippets/c/query-rendered-features.c?raw";
 
-A rendered feature query reports what the renderer drew at a screen position,
-which is what a hit test needs. To read what a source holds instead, including
-the features that no layer draws, use a source query, described in
-[Query a Source](/maplibre-native-ffi/guides/query-a-source/).
+A rendered feature query finds features in the last frame at a screen position.
+Use it for hit testing. To read source features that no layer draws, use
+[Query a source](/maplibre-native-ffi/guides/query-a-source/).
 
 A rendered query belongs to the render session and runs on the session's owner
-thread, because it reads the frame that the renderer produced. The session
-builds its renderer during the first render update, and a query before that returns an invalid-state status.
+thread. It reads the last frame that the session drew. A query before the first
+render update reports an invalid-state status.
 
-The query answers against the last frame that the session drew, so render again
-after a camera move or a style change when the answer has to match the new
-state. A query over an area whose tiles are still loading finds nothing, and the
-same query finds features once those tiles arrive and render.
+The query uses the last frame that the session drew. Render after a camera move
+or style change when the result must match the new state. A query finds features
+after the relevant tiles load and render.
 
 Screen coordinates are logical map pixels measured from the top-left of the
-viewport, the same space that the map's coordinate-to-pixel query reports. A
-host that
-tracks positions in physical device pixels divides them by the scale factor of
-the render session.
+viewport. The map's coordinate-to-pixel query uses the same space. A host that
+tracks positions in physical device pixels divides them by the render session's
+scale factor.
 
 The geometry states where to search. A point matches the exact position, and a
 box matches a rectangle around it. A hit test uses a box with a few logical
@@ -43,17 +40,14 @@ land fills out of the result.
 
 <Code code={region(querySnippet, "layers")} lang="c" title="query-rendered-features.c" />
 
-On success, the query returns a result handle that the caller owns.
-Destroy it once your host has copied
-everything that it keeps.
+On success, the query returns a result handle that the host owns. Destroy it
+after copying every value that the host keeps.
 
 <Code code={region(querySnippet, "query")} lang="c" title="query-rendered-features.c" />
 
-Reading an entry produces a queried feature that reports which of its optional
-members are present, because a feature carries an ID, a source layer, or a state
-object only when the source supplied one. Each member holds a view into storage
-that the result owns. Copy every string, property value, and geometry
-that your host keeps past the query, because those views stay valid only until
-the result is destroyed.
+Reading an entry produces a queried feature with presence information for its
+optional members. A feature can include an ID, a source layer, and a state
+object. Each member is a view into result-owned storage. Copy every string,
+property value, and geometry that the host keeps before destroying the result.
 
 <Code code={region(querySnippet, "read")} lang="c" title="query-rendered-features.c" />

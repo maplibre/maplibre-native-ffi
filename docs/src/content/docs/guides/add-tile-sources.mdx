@@ -1,6 +1,6 @@
 ---
-title: Add Tile Sources
-description: Add a vector, raster, or elevation tile endpoint to a map, and draw it with a style layer.
+title: Add tile sources
+description: Add a vector, raster, or elevation tile source and draw it with a style layer.
 sidebar:
   order: 9
 ---
@@ -16,26 +16,24 @@ Drawing a tile endpoint takes two style objects: a source that describes where
 the tiles are and how to read them, and a layer that draws them. Both belong to
 the loaded style. Add them after a style-loaded event and again after every
 later style load, as
-[Load a Style](/maplibre-native-ffi/guides/load-a-style/) describes.
+[Load a style](/maplibre-native-ffi/guides/load-a-style/) describes.
 
-How you describe the source depends on what the server publishes. A server with
-a TileJSON document describes itself, and MapLibre reads it. For any other
-server you name the tile URLs and the tile set's properties yourself.
+How you describe the source depends on what the server publishes. MapLibre reads
+tile URLs and properties from a TileJSON document. For other servers, supply the
+tile URLs and properties directly.
 
 ## From a TileJSON document
 
-Pass the document URL and null options when the server publishes a TileJSON
-document. MapLibre fetches the document and reads the tile URLs, the zoom range,
-the scheme, the bounds, and the attribution from it. Then add a layer that names
-the source.
+Pass the document URL and use the default options when the server publishes a
+TileJSON document. MapLibre reads the tile URLs, zoom range, scheme, bounds, and
+attribution. Then add a layer that names the source.
 
 <Code code={region(tilejsonSnippet, "source")} lang="c" title="tile-source-tilejson.c" />
 
-Options override a few of the document's fields: the zoom range and the vector
-encoding on a vector source, the tile size on a raster or raster-DEM source, and
-the DEM encoding on a raster-DEM source. Set the vector encoding to MapLibre Tiles for such a server,
-because vector tiles decode as MVT by default. A tile set whose integer streams
-use FastPFOR encodings also needs the FastPFOR option on the map options.
+Options can override the document's zoom range and encoding. They can also
+override the tile size for raster and raster-DEM sources. Vector tiles decode as
+MVT by default. Select MapLibre Tiles for that encoding. MapLibre Tiles data with
+FastPFOR integer streams also requires the FastPFOR map option.
 
 A vector tile carries several named layers. A layer that draws one of them sets
 `source` to the source ID and `source-layer` to the name inside the tile.
@@ -44,20 +42,21 @@ A vector tile carries several named layers. A layer that draws one of them sets
 
 ## From URL templates
 
-Describe the tile set yourself when the server publishes no TileJSON document.
-Each tile URL contains the `{z}`, `{x}`, and `{y}` placeholders, and MapLibre
-fills them for each tile. Several URLs that differ only in host name let MapLibre
-distribute the requests among those hosts.
+Supply URL templates when the server has no TileJSON document. Each template
+contains the `{z}`, `{x}`, and `{y}` placeholders. MapLibre fills them for each
+tile. Several templates with different host names distribute requests among
+those hosts.
 
 <Code code={region(templatesSnippet, "tiles")} lang="c" title="tile-source-templates.c" />
 
-Each option applies only when you set it, and the defaults set none of them.
+Set only the options that the server requires.
 
 <Code code={region(templatesSnippet, "options")} lang="c" title="tile-source-templates.c" />
 
-Bounds keep requests inside the area that the server covers, and the zoom range
-keeps them inside the levels that it serves. The attribution string is readable afterwards from the source. The scheme defaults to
-XYZ, and TMS suits a server that numbers rows from the south.
+Bounds limit requests to the area that the server covers, and the zoom range
+limits them to the available levels. The source retains the attribution string
+for later reads. The default XYZ scheme numbers rows from the north; use TMS for
+a server that numbers rows from the south.
 
 <Code code={region(templatesSnippet, "bounds")} lang="c" title="tile-source-templates.c" />
 
@@ -68,10 +67,9 @@ add a raster layer that names the source.
 
 ## Elevation tiles and hillshade
 
-Raster-DEM tiles carry elevation in their color channels, in one of two
-encodings: Mapbox Terrain-RGB, the default, and Terrarium. Match the encoding
-that your server documents, because decoding with the other one produces wrong
-elevations.
+Raster-DEM tiles encode elevation in their color channels as Mapbox Terrain-RGB
+or Terrarium. Mapbox Terrain-RGB is the default. Select the encoding that the
+server publishes to obtain the correct elevations.
 
 <Code code={region(rasterDemSnippet, "options")} lang="c" title="tile-source-raster-dem.c" />
 
@@ -79,7 +77,7 @@ A raster-DEM source takes the same tile URL templates as a raster source.
 
 <Code code={region(rasterDemSnippet, "source")} lang="c" title="tile-source-raster-dem.c" />
 
-A hillshade layer requires a raster-DEM source.
-`mln_map_add_hillshade_layer` adds that layer without a JSON layer object.
+A hillshade layer requires a raster-DEM source. The dedicated hillshade-layer
+call adds it without a JSON layer object.
 
 <Code code={region(rasterDemSnippet, "layer")} lang="c" title="tile-source-raster-dem.c" />

@@ -1,5 +1,4 @@
-// Attaching host state to one feature, so that style expressions reading
-// feature-state draw it differently from its neighbours.
+// Attaching host state to one feature for use in style expressions.
 
 #include <maplibre_native_c.h>
 #include <string.h>
@@ -41,7 +40,7 @@ mln_status set_selected(
     .data = {.object_value = {.members = members, .member_count = 1}},
   };
 
-  // The call copies the value, so `state` can go out of scope afterwards.
+  // The call copies the value before `state` leaves scope.
   return mln_render_session_set_feature_state(session, &selector, &state);
   // #endregion set
 }

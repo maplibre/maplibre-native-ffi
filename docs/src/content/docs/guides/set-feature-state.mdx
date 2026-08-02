@@ -1,6 +1,6 @@
 ---
-title: Set Feature State
-description: Attach per-feature state that style expressions read, so one feature draws differently from its neighbours.
+title: Set feature state
+description: Set per-feature state, use it in style expressions, and read it back.
 sidebar:
   order: 14
 ---
@@ -16,18 +16,16 @@ style expressions read while the map draws. One styling rule then covers
 selection, hover, a live value, or a computed status, because each feature
 supplies its own input to that rule.
 
-Feature state belongs to the [render session](/maplibre-native-ffi/concepts/),
-because the session's renderer owns the tiles that the state applies to. That
-renderer exists after the first render update that follows
-a style load. Render once before you set state; a call made earlier returns
-an invalid-state status. Every feature-state call runs on the session's owner
-thread.
+Feature state belongs to the [render session](/maplibre-native-ffi/concepts/)
+and applies to its loaded tiles. Set state after the first render update that
+follows a style load. An earlier call reports an invalid-state status. Every
+feature-state call runs on the session's owner thread.
 
 ## Set state on a feature
 
-A selector names what the state belongs to: the source ID, the source layer ID
-for a vector source, and the feature ID. Feature IDs match as text, so a feature
-whose GeoJSON `id` is the number 7 is selected by `"7"`.
+A selector contains the source ID, the source-layer ID for a vector source, and
+the feature ID. Feature IDs match as text. Select a feature whose GeoJSON `id`
+is the number 7 with `"7"`.
 
 <Code code={region(featureState, "select")} lang="c" title="feature-state.c" />
 
@@ -54,9 +52,9 @@ with neither one removes the state of every feature in the source layer.
 
 ## Read state back
 
-Reading the state back copies what the session holds
-into a snapshot handle that you own. The snapshot holds an empty object when the
-source or the feature has no state.
+Reading state copies the session's value into a snapshot handle that the host
+owns. The snapshot contains an empty object when the source or feature has no
+state.
 
 <Code code={region(featureStateRead, "get")} lang="c" title="feature-state-read.c" />
 
@@ -73,9 +71,9 @@ that you keep, because destroying the snapshot invalidates those pointers.
 
 ## How long state lives
 
-The state lives as long as the session's renderer. A resize keeps that renderer,
-and so does replacing the render target in place, as [Attach a Render Target](/maplibre-native-ffi/guides/attach-a-render-target/) describes. A renderer compiles its shaders for
-a fixed pixel ratio, so a call that changes the scale factor builds a new
-renderer, and so does destroying a session and attaching another. Feature state
-starts empty on a new renderer. A host that needs the state to survive one keeps
-its own copy and sets it again after the next render update.
+Feature state lives with a render session's rendering resources. A resize or an
+in-place target replacement preserves those resources, as
+[Attach a render target](/maplibre-native-ffi/guides/attach-a-render-target/)
+describes. Changing the scale factor recreates them. Destroying the session and
+attaching another does the same. Feature state starts empty after either change.
+To preserve it, keep a host copy and set it again after the next render update.

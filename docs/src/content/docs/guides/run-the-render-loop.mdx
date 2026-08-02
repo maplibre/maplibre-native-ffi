@@ -1,6 +1,6 @@
 ---
-title: Run the Render Loop
-description: Choose which thread pumps the runtime, then build the loop that pumps it and draws frames.
+title: Run the render loop
+description: Choose the runtime owner thread, then pump it and draw frames.
 sidebar:
   order: 4
 ---
@@ -11,29 +11,27 @@ import { region } from "../../../snippets";
 import frameLoop from "../../../../snippets/c/frame-loop.c?raw";
 import pumpThread from "../../../../snippets/c/pump-thread.c?raw";
 
-MapLibre Native makes progress only while the host pumps the runtime. A pump
-runs the work that the map has queued, such as style parsing, tile loads, and
-camera transitions, and it services the runtime's own network and database work.
-Drawing is a separate call: the map publishes a render update, and the render
-session draws it.
+Pumping the runtime advances MapLibre Native. A pump drains queued map work and
+services network and database work. Drawing is separate: the map publishes a
+render update, and the render session draws it.
 
-Pumping the runtime and polling it for events both run on the runtime owner
-thread, and either one reports a wrong-thread status from anywhere else. The
-first decision is therefore which thread pumps.
+Pump the runtime and drain its events on the runtime owner thread. Both
+operations report a wrong-thread status from another thread. Choose the owner
+thread before creating the runtime.
 
-## Choose which thread pumps
+## Choose the runtime owner thread
 
-Pump from the display thread when your host already has a frame callback and the
-map is the main work on that thread. The runtime, the map, and the render
-session then share one thread, and the loop needs no shared state at all. The
-cost is that a pump drains to completion, so one call can span a whole style
-parse. Budget a pump as variable work rather than as a fixed slice of a frame.
+Pump from the display thread when the host already has a frame callback and the
+map is the main work on that thread. The runtime, map, and render session then
+share one thread, and the loop needs no shared state. A pump drains to
+completion, and one call can span an entire style parse. Budget for variable
+work in the frame callback.
 
-Pump from a thread of your own when a long pump must not stall the display, when
-the map must keep loading while the display sits idle, or when the host draws no
-frames at all. That thread parks inside the pump, so the runtime's own work sets
-how often the loop runs, and the display thread attaches the render session and
-draws. The cost is a second thread, a little shared state, and a wake source.
+Use a dedicated thread when a long pump would stall the display, the map must
+load while the display is idle, or the host draws no frames. That thread parks
+inside the pump, and runtime work sets the loop cadence. The display thread
+attaches the render session and draws. This design needs shared state and a wake
+source.
 
 ## Pump from the frame callback
 
@@ -42,39 +40,33 @@ display already sets the pace.
 
 <Code code={region(frameLoop, "pump")} lang="c" title="frame-loop.c" />
 
-The helper compares each event's source against the map before reading the rest
-of it, because one runtime can own several maps, and every map's events share
-one queue. It reports a frame on a render update, and on a finished frame whose
-repaint flag is set. That second case is how
-camera animations and label placement settle over several frames.
+The helper compares each event's source against the map before interpreting the
+event. Every map in one runtime shares the queue. It requests a frame after a
+render update and after a finished frame with its repaint flag set. Repaint
+frames advance camera animations and label placement.
 
-A host that stops requesting frames when the map goes idle has one trap to
-close. Pumping happens inside the frame callback, so with no frames there is no
-pump, and a style edit or a source update made while idle never advances: the
-new layer stays invisible until something unrelated asks for a frame. Ask for
-one after any change your host makes to the map.
+A display-paced host stops pumping when it stops requesting frames. Request a
+frame after every map change. This lets an idle loop process the change.
 
-Draw the pending frame after the drain. Keep the frame pending and call again on
-the next turn whenever the render call reports that it drew nothing, which means
-that the map has published no update for this session's extent yet. That
-result is ordinary at startup and on the turns right after an attach or a
-resize.
+Draw a pending frame after draining events. When the render call reports that it
+drew no frame, keep the frame pending for the next turn. This result means that
+the map has not published an update for the session's extent. It is expected at
+startup and after an attach or resize.
 
 <Code code={region(frameLoop, "render")} lang="c" title="frame-loop.c" />
 
 ## Pump on a thread of your own
 
-The pump thread owns the runtime and the map, and the display thread owns the
-render session. A pump call from the display thread returns
-a wrong-thread status, and a render call from the pump thread does the same.
+The pump thread owns the runtime and map. The display thread owns the render
+session. Each operation reports a wrong-thread status when called from the
+other thread.
 
 The two threads share a flag that the pump thread sets when a frame is due, a
 flag that the display thread sets to stop the loop, and a wake source.
 
 <Code code={region(pumpThread, "channel")} lang="c" title="pump-thread.c" />
 
-Acquiring a wake source needs the runtime owner thread, so the pump thread
-acquires it before it starts the loop.
+Acquire the wake source on the runtime owner thread before starting the loop.
 
 <Code code={region(pumpThread, "acquire")} lang="c" title="pump-thread.c" />
 
@@ -84,21 +76,17 @@ stop.
 
 <Code code={region(pumpThread, "signal")} lang="c" title="pump-thread.c" />
 
-The loop parks inside the pump until a wake arrives: the owner thread receiving
-work, the runtime queueing an event, or a signal on the wake source. Pass a
-positive timeout rather than a negative one, because the runtime registers no
-timers of its own, and the bound is what lets the loop reach its own stop check
-when no wake arrives. This snippet parks for 100 ms, so the loop notices a stop
-request at least ten times a second.
+The loop parks until owner-thread work, a runtime event, or the wake source
+signals it. Use a positive timeout to reach the stop check even when no wake
+arrives. The runtime registers no timers of its own. This snippet parks for 100
+ms and checks for a stop at least ten times a second.
 
 <Code code={region(pumpThread, "loop")} lang="c" title="pump-thread.c" />
 
 Call a parking pump outside any lock that a signalling thread also acquires. The
 display thread reads the pending flag on its next frame and draws.
 
-Own that thread outright. The owner thread is a specific operating-system
-thread, fixed when the runtime is created, and serialization is a weaker
-guarantee than affinity: a serial dispatch queue, an actor, or a pooled executor
-each promise that your calls happen one at a time, while none of them promises
-they happen on one thread. Work scheduled that way lands wherever the pool has
-room, and the wrong-thread failures that follow appear at random.
+Use a dedicated operating-system thread. The runtime records that specific
+thread at creation. Serial dispatch queues, actors, and pooled executors provide
+serialization but can move work between threads. Calls that move report a
+wrong-thread status.

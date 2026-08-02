@@ -1,6 +1,6 @@
 ---
-title: Style Layers by Data
-description: Set a layer's paint and layout properties from each feature's own data, and filter which features the layer draws.
+title: Style layers by data
+description: Use feature data in layer properties and filters.
 sidebar:
   order: 10
 ---
@@ -10,23 +10,21 @@ import { region } from "../../../snippets";
 
 import styleByData from "../../../../snippets/c/style-by-data.c?raw";
 
-A layer property holds either a constant or an expression. An expression reads
-the feature that the layer is drawing, so one rule styles every feature from its
-own data. A property value belongs to the style that was loaded when you set it,
-so set it again after every later style load, as
-[Load a Style](/maplibre-native-ffi/guides/load-a-style/) describes.
+A layer property contains a constant or an expression. An expression reads each
+feature's data, allowing one rule to style every feature. A property value
+belongs to the loaded style. Set it again after every later style load, as
+[Load a style](/maplibre-native-ffi/guides/load-a-style/) describes.
 
-A value is a style-spec JSON value descriptor: a tree of JSON nodes.
-A constant is a scalar node, and an expression is an array node whose first
-element names the operator and whose remaining elements are its arguments. The
-snippet builds each node with a small constructor, one per JSON type, and the
-array constructor references a caller-owned array of child nodes.
+Style properties use style-spec JSON values. A constant is a scalar, and an
+expression is an array whose first element names the operator. The remaining
+elements are its arguments. This C snippet builds a descriptor tree with one
+small constructor per JSON type.
 
 <Code code={region(styleByData, "node")} lang="c" title="style-by-data.c" />
 
-An argument is another node, so build the inner expressions first and hold each
-one in a variable. `["get", "mag"]` reads the feature property named `mag`, and
-`["linear"]` names the interpolation curve.
+Build inner expressions before the arrays that contain them. `["get", "mag"]`
+reads the feature property named `mag`, and `["linear"]` names the interpolation
+curve.
 
 <Code code={region(styleByData, "expression")} lang="c" title="style-by-data.c" />
 
@@ -40,16 +38,15 @@ one that the style specification defines for that layer's type.
 
 <Code code={region(styleByData, "set")} lang="c" title="style-by-data.c" />
 
-A filter chooses which of the source's features the layer draws, and a filter is
-an expression that returns a boolean. Setting a filter takes the same kind of
-descriptor, and an empty filter clears the layer's. The snippet
-reuses the `magnitude` node in this second value.
+A filter is a boolean expression that selects the source features to draw. It
+uses the same value representation as a style property. An empty filter clears
+the layer's filter. The snippet reuses the `magnitude` node in this second value.
 
 <Code code={region(styleByData, "filter")} lang="c" title="style-by-data.c" />
 
-You own the descriptors, arrays, and strings that you build, and they can live
-on the stack. MapLibre parses a property value or a filter and copies it into
-typed style storage before the call returns.
+The host owns the descriptors, arrays, and strings, and can allocate them on the
+stack. MapLibre parses and copies a property value or filter before the call
+returns.
 
 Both calls run on the map's owner thread and apply to the live style
 immediately. A host that pumps the runtime and renders on update draws the new

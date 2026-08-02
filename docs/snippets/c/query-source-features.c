@@ -40,8 +40,8 @@ void list_source_features(mln_render_session session) {
   if (queried != MLN_STATUS_OK) return;
 
   read_features(result);
-  // Copy anything you keep before this line, because every feature view
-  // belongs to the result.
+  // Copy retained values before this line; every feature view belongs to the
+  // result.
   mln_feature_query_result_destroy(result);
   // #endregion query
 }

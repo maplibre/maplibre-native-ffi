@@ -1,6 +1,6 @@
 ---
-title: Add GeoJSON Data
-description: Choose where a GeoJSON source reads its data and which options it keeps for life, then add a layer that draws it.
+title: Add GeoJSON data
+description: Choose a GeoJSON data source and its fixed options, then add a layer that draws the features.
 sidebar:
   order: 8
 ---
@@ -10,27 +10,24 @@ import { region } from "../../../snippets";
 
 import geojsonDataset from "../../../../snippets/c/geojson-dataset.c?raw";
 
-Your data appears on the map through two objects. A source holds the GeoJSON,
-and a layer draws the features that the source contains. Both belong to the
-style that is loaded when you add them, so add them after a style-loaded event
-and again after every later style load, as
-[Load a Style](/maplibre-native-ffi/guides/load-a-style/) describes.
+Data appears on the map through two style objects. A source contains the
+GeoJSON, and a layer draws its features. Add both after a style-loaded event.
+Repeat the additions after every later style load, as
+[Load a style](/maplibre-native-ffi/guides/load-a-style/) describes.
 
 ## Choose the data form and the options
 
-A source reads its data in one of two forms.
-`mln_map_add_geojson_source_url` names a URL, which MapLibre fetches through its
-resource system and reloads on its own. It suits data that a server publishes.
-`mln_map_add_geojson_source_data` takes geometry and feature descriptors that
-your host already holds in memory, and copies them before it returns. It suits
-data that your host computes or receives over its own transport.
+A source reads its data from a URL or from host memory. Use
+`mln_map_add_geojson_source_url` for data that a server publishes. MapLibre
+fetches the URL through its resource system and reloads it when requested. Use
+`mln_map_add_geojson_source_data` for data that the host computes or receives
+through its own transport. The call copies the geometry and feature descriptors
+before it returns.
 
-The source options are the other choice, and they are fixed for the source's
-lifetime. Clustering carries the highest cost of changing your mind: switching
-it later requires removing the source and every layer that draws it, then adding
-them again. A clustering source groups nearby points into cluster features, and
-the cluster radius, the highest zoom that clusters, and the number of points
-that a cluster requires belong to the same options.
+Choose the source options at creation. Changing them requires removing every
+layer that draws the source, replacing the source, and adding the layers again.
+A clustering source groups nearby points into cluster features. Its options set
+the cluster radius, maximum clustering zoom, and minimum cluster size.
 
 <Code code={region(geojsonDataset, "options")} lang="c" title="geojson-dataset.c" />
 
@@ -47,21 +44,18 @@ points, a line layer draws line strings, and a fill layer draws polygons.
 
 <Code code={region(geojsonDataset, "layer")} lang="c" title="geojson-dataset.c" />
 
-Drawing order follows the style. The empty before-layer ID in the last argument
-appends the layer above the rest of the style, and naming an existing layer
-inserts the new layer beneath that one.
+Drawing order follows the style. Append the layer to draw it above the existing
+layers, or name an existing layer to insert the new layer beneath it.
 
 <Code code={region(geojsonDataset, "add-layer")} lang="c" title="geojson-dataset.c" />
 
 ## Supply the data from memory
 
-Inline data replaces the URL with a GeoJSON descriptor that you build. A
-clustering source constrains that descriptor, and the call returns
-an invalid-argument status unless the data is a feature collection whose
-every feature carries point geometry.
+Inline data uses a GeoJSON descriptor that the host builds. A clustering source
+requires a feature collection in which every feature has point geometry. Other
+shapes report an invalid-argument status.
 
 <Code code={region(geojsonDataset, "inline-data")} lang="c" title="geojson-dataset.c" />
 
-MapLibre tiles the data on its own threads either way. A host that already pumps
-the runtime and renders on update draws the new features in the first frame
-after that work finishes.
+MapLibre tiles both data forms on worker threads. A host that pumps the runtime
+and renders on update draws the new features after tiling finishes.

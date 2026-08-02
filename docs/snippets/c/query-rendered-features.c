@@ -1,5 +1,5 @@
-// Reading the features that the renderer drew at a screen position, and
-// copying the part of a result that outlives the query.
+// Reading features from the last frame at a screen position and copying values
+// that outlive the query.
 
 #include <maplibre_native_c.h>
 #include <string.h>

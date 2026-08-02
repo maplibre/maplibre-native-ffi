@@ -5,7 +5,7 @@
 
 static const char trusted_prefix[] = "https://tiles.example.com/";
 
-// Yours to supply: adds key to url as a query parameter, ahead of any fragment.
+// The host supplies this function to add a query parameter before any fragment.
 bool build_keyed_url(
   const char* url, const char* key, char* out, size_t out_size
 );
@@ -19,7 +19,7 @@ static mln_status add_api_key(
   (void)kind;
 
   if (strncmp(url, trusted_prefix, sizeof(trusted_prefix) - 1) != 0) {
-    return MLN_STATUS_OK;  // A response without a URL keeps the original.
+    return MLN_STATUS_OK;  // An empty response preserves the original URL.
   }
   // #endregion match
 
@@ -29,7 +29,7 @@ static mln_status add_api_key(
     return MLN_STATUS_OK;
   }
 
-  // The helper copies the URL, so rewritten may leave scope here.
+  // The helper copies the URL before rewritten leaves scope.
   return mln_resource_transform_response_set_url(
     out_response, rewritten, strlen(rewritten)
   );

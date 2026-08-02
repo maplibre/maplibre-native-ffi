@@ -12,8 +12,7 @@ mln_status load_style_from_url(mln_map map, const char* style_url) {
 
 mln_status load_style_from_text(mln_map map, const char* style_json) {
   // #region json
-  // MapLibre parses and copies the text before the call returns, so the host
-  // storage behind style_json can be released afterwards.
+  // MapLibre parses and copies the text before the host releases style_json.
   return mln_map_set_style_json(map, style_json);
   // #endregion json
 }

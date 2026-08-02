@@ -1,5 +1,5 @@
-// Renders one map image with no window and copies it to host memory. The map
-// is in static mode and the session owns its texture. OpenGL through EGL here;
+// Renders one map image offscreen and copies it to host memory. The map uses
+// static mode and the session owns its texture. OpenGL through EGL here;
 // Metal and Vulkan use their own descriptor type and attach function.
 
 #include <maplibre_native_c.h>
@@ -103,7 +103,7 @@ static uint8_t* read_pixels(
   return pixels;
 }
 
-// Returns premultiplied RGBA8 pixels that the caller frees, and fills out_info
+// Returns premultiplied RGBA8 pixels that the host frees, and fills out_info
 // with their width, height, and row stride.
 uint8_t* render_still_image(
   mln_runtime runtime, const char* style_url, uint32_t width, uint32_t height,

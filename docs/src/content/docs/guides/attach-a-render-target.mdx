@@ -1,6 +1,6 @@
 ---
-title: Attach a Render Target
-description: Pick the kind of target a render session draws into, attach it on the right thread, and replace it when the window or texture changes.
+title: Attach a render target
+description: Choose a render target, attach it on its owner thread, and replace it when the host allocation changes.
 sidebar:
   order: 3
 ---
@@ -10,94 +10,79 @@ import { region } from "../../../snippets";
 
 import renderTarget from "../../../../snippets/c/render-target.c?raw";
 
-A render session draws one map into one render target, and a map carries at most
-one live session. A map is useful before any session exists: it loads a style,
-accepts sources and layers, and holds a camera, and it keeps all of that when a
-session is attached or released.
+A render session draws one map into one render target. A map has at most one
+live render session. Its style, sources, layers, and camera exist independently
+of that session and remain after the session is released.
 
-Attaching needs a live map, and the attaching thread becomes the session's owner
-thread for as long as the session lives. A host therefore attaches on the thread
-that owns its graphics context and will draw the frames, even when the runtime
-and the map are pumped on another thread.
+The thread that attaches a session becomes its owner thread for the session's
+lifetime. Attach on the thread that owns the graphics context and will draw the
+frames. Another thread can own the runtime and map.
 
 ## Choose the kind of target
 
-A native surface draws to a window or a view and presents each frame to it. Your
-host creates the window, the graphics context, and the surface, and the session
-presents into that surface rather than leaving the swap to you. Choose it for a
-map on screen.
+A native surface draws and presents each frame to a window or view. The host
+creates the window, graphics context, and surface. Use this target for an
+on-screen map.
 
 A session-owned texture draws offscreen into a texture that the session
-allocates. Choose it when there is no window, such as an image service or a
-thumbnail job, or when you composite the map into a scene and have no texture of
-your own to supply. Your host samples the last frame on the GPU by acquiring it
-and releasing it when it has finished reading, or copies the frame into host
-memory, which
-[Render a Static Image](/maplibre-native-ffi/guides/render-a-static-image/)
-covers alongside the static map mode that produces one image per request.
+allocates. Use it for image generation or when compositing into a scene without
+a host-owned destination texture. The host can acquire the last frame for GPU
+sampling or copy it into host memory. [Render a static
+image](/maplibre-native-ffi/guides/render-a-static-image/) covers readback and
+static map mode.
 
-A borrowed texture draws offscreen into a texture that your host allocated and
-owns, such as a material in a 3D scene, a frame from a compositor's pool, or an
-image from an XR swapchain. Your host controls the format and the lifetime and
-copies out with the graphics API that created the texture. Choose it when the
-destination already exists.
+A borrowed texture draws offscreen into a host-owned texture, such as a material
+in a 3D scene, a compositor frame, or an XR swapchain image. The host controls
+the format and lifetime. Use this target when the destination already exists.
 
 ## Attach to a window
 
-Each render backend has its own descriptor type and attach function, and this
-snippet uses OpenGL through EGL. The descriptor carries the logical extent, the
-scale factor, the graphics context, and the surface to present into.
+Each render backend has its own descriptor type and attach function. This
+snippet uses OpenGL through EGL. The descriptor contains the logical extent,
+scale factor, graphics context, and presentation surface.
 
 <Code code={region(renderTarget, "surface")} lang="c" title="render-target.c" />
 
 ## Attach to a texture
 
-A session-owned target takes an extent and a context, and the session allocates
-the texture behind it. The context that you pass shares texture objects with the
-one the session creates, so your host can sample the result.
+A session-owned target takes an extent and a context. The session allocates the
+texture in the context's share group. The host can then sample it.
 
 <Code code={region(renderTarget, "owned")} lang="c" title="render-target.c" />
 
-A borrowed target additionally states the texture's physical size in device
-pixels, separately from the logical extent, and names the texture itself. The
-session renders through a framebuffer at the stated size and cannot read the
-texture's real dimensions on the OpenGL ES contexts it targets, so a texture
-smaller than that size clips or garbles the output. The two must match.
+A borrowed target also contains the texture and its physical size in device
+pixels. The physical size is separate from the logical extent. OpenGL ES cannot
+verify the texture dimensions. The descriptor values must match the actual
+texture to prevent clipped or corrupt output.
 
 <Code code={region(renderTarget, "borrowed")} lang="c" title="render-target.c" />
 
 ## Resize, replace, and release
 
-A window resize is the common case, and it needs neither a new target nor a new
-session. Surface and session-owned texture targets resize in place, on the
-session's owner thread.
+Resize surface and session-owned texture targets in place on the session's owner
+thread. This preserves the target and session.
 
 <Code code={region(renderTarget, "resize")} lang="c" title="render-target.c" />
 
-A borrowed texture is the exception, because its size is the size of the texture
-your host allocated. Resizing reports an unsupported status, and the way to
-change the size is to allocate a new texture and supply it as a replacement
-target, below.
+A borrowed texture gets its size from the host allocation. Resizing reports an
+unsupported status. Allocate a texture at the new size and replace the target.
 
-A host surface can be destroyed and recreated while the map lives on, which is
-what an Android rotation, a Flutter surface lifecycle change, and a
-resize that reallocates all look like from here. Replacing the target in place
-keeps the session and its renderer, so loaded tiles and feature state survive
-the change. Borrowed texture targets replace the same way, when your host
-allocates a new texture.
+A host can recreate a surface while the map remains live. Android rotation,
+Flutter surface lifecycle changes, and reallocating resizes use this path.
+Replacing the target in place preserves the session's rendering resources,
+including loaded tiles and feature state. Use the same operation after
+allocating a replacement borrowed texture.
 
 <Code code={region(renderTarget, "set-target")} lang="c" title="render-target.c" />
 
-A change to the scale factor is the exception. A renderer compiles its shaders
-for a fixed pixel ratio, so that change builds a new renderer, and feature state
-starts empty on it.
+Changing the scale factor recreates the session's rendering resources because
+its shaders use a fixed pixel ratio. Feature state then starts empty.
 
 Release the session before the map. Destroying a map while a session is attached
 reports an invalid-state status.
 
-That ordering crosses threads when the session and the map have different owner
-threads. The thread that owns the map cannot release the session, so it waits
-for the thread that attached it, and a bound on that wait keeps a thread that
-has already failed from hanging the teardown.
+When the session and map have different owner threads, send the release request
+to the session's owner thread. Use a bounded wait. Teardown can then recover if
+that thread has failed.
 
 <Code code={region(renderTarget, "teardown")} lang="c" title="render-target.c" />

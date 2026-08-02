@@ -1,5 +1,5 @@
-// Styling a layer from feature data. Property values and filters are style-spec
-// JSON, so an expression is a JSON array.
+// Styling a layer from feature data. Property values and filters use style-spec
+// JSON. An expression is a JSON array.
 
 #include <maplibre_native_c.h>
 #include <string.h>
