@@ -146,7 +146,7 @@ def feed(args: argparse.Namespace) -> None:
         sleet("init", "--config", str(config_path), "--source", "snapshot")
         sleet(
             "push",
-            str(args.packages),
+            str(args.packages.resolve()),
             "--config",
             str(config_path),
             "--source",
