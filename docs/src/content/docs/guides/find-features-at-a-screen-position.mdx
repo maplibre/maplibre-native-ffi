@@ -6,13 +6,16 @@ sidebar:
 ---
 
 import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
 import querySnippet from "../../../../snippets/c/query-rendered-features.c?raw";
 
-A rendered feature query reads the frame that the renderer produced, so the
-query belongs to the render session and runs on the session's owner thread. The
-session builds its renderer during the first `mln_render_session_render_update`,
-and a query before that render update returns `MLN_STATUS_INVALID_STATE`. A
-result describes the last frame that the session drew, so render again after a
+A rendered feature query belongs to the render session and runs on the session's
+owner thread, because it reads the frame that the renderer produced. The session
+builds its renderer during the first `mln_render_session_render_update`, and a
+query before that render update returns `MLN_STATUS_INVALID_STATE`.
+
+A result describes the last frame that the session drew. Render again after a
 camera move or a style change when the answer has to match the new state. A
 query over an area whose tiles are still loading returns zero features, and the
 same query returns features once those tiles arrive and render.
@@ -23,15 +26,28 @@ tracks positions in physical device pixels divides them by the scale factor of
 the render session.
 
 The geometry states where to search. A point matches the exact position, and a
-box matches a rectangle around it. Symbols and thin lines are small targets, so
-a hit test uses a box with a few pixels of tolerance. Box corners come in any
-order, and MapLibre clips the box to the viewport. Name the layer IDs that your
-host treats as selectable.
+box matches a rectangle around it. A hit test uses a box with a few logical
+pixels of tolerance around the position, because symbols and thin lines are
+small targets. Box corners come in any order, and MapLibre clips the box to the
+viewport.
 
-<Code code={querySnippet} lang="c" title="query-rendered-features.c" meta={'collapse={1-32} mark={"Tolerance around the position, in logical pixels":38-42} mark={"Naming layers keeps background and land fills out of the result":44-49} mark={"The result handle is owned on success":51-55} mark={"Copy anything you keep, then destroy the result":57-58}'} />
+<Code code={region(querySnippet, "geometry")} lang="c" title="query-rendered-features.c" />
 
-Each feature that `mln_feature_query_result_get` returns holds views into
-storage that the result owns, and those views stay valid until the result is
-destroyed. Copy every string, property value, and geometry that your host keeps
-past the query, then destroy the result with
-`mln_feature_query_result_destroy`.
+Naming the layer IDs that your host treats as selectable keeps background and
+land fills out of the result.
+
+<Code code={region(querySnippet, "layers")} lang="c" title="query-rendered-features.c" />
+
+On `MLN_STATUS_OK`, the query returns a result handle that the caller owns.
+Destroy it with `mln_feature_query_result_destroy` once your host has copied
+everything that it keeps.
+
+<Code code={region(querySnippet, "query")} lang="c" title="query-rendered-features.c" />
+
+`mln_feature_query_result_get` fills a `mln_queried_feature` whose `fields` mask
+states which optional members the feature carries. Each member holds a view into
+storage that the result owns. Copy every string, property value, and geometry
+that your host keeps past the query, because those views stay valid only until
+the result is destroyed.
+
+<Code code={region(querySnippet, "read")} lang="c" title="query-rendered-features.c" />

@@ -9,6 +9,7 @@ static mln_string_view sv(const char* text) {
 }
 
 static void read_features(mln_feature_query_result result) {
+  // #region read
   size_t count = 0;
   mln_feature_query_result_count(result, &count);
   for (size_t index = 0; index < count; index++) {
@@ -16,18 +17,22 @@ static void read_features(mln_feature_query_result result) {
     const mln_status got =
       mln_feature_query_result_get(result, index, &feature);
     if (got != MLN_STATUS_OK) continue;
-    // feature.feature holds geometry and properties that the result owns.
+    // feature.feature holds this feature's geometry and properties.
   }
+  // #endregion read
 }
 
 void list_source_features(mln_render_session session) {
+  // #region options
   const mln_string_view source_layers[] = {sv("poi")};
   mln_source_feature_query_options options =
     mln_source_feature_query_options_default();
   options.fields = MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
   options.source_layer_ids = source_layers;
   options.source_layer_id_count = 1;
+  // #endregion options
 
+  // #region query
   mln_feature_query_result result = MLN_HANDLE_NULL;
   const mln_status queried = mln_render_session_query_source_features(
     session, sv("places"), &options, &result
@@ -35,5 +40,8 @@ void list_source_features(mln_render_session session) {
   if (queried != MLN_STATUS_OK) return;
 
   read_features(result);
+  // Copy anything you keep before this line, because every feature view
+  // belongs to the result.
   mln_feature_query_result_destroy(result);
+  // #endregion query
 }

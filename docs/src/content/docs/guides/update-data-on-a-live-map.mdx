@@ -6,15 +6,47 @@ sidebar:
 ---
 
 import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
 import liveUpdates from "../../../../snippets/c/geojson-live-updates.c?raw";
 
 A GeoJSON source that is already on the style accepts new data through one of
 two calls. `mln_map_set_geojson_source_data` takes geometry and feature
-descriptors inline and copies them before it returns.
-`mln_map_set_geojson_source_url` names a new URL that MapLibre fetches through
-its resource system. Both calls need the map's owner thread, and both replace
-the whole dataset. A host that tracks individual features therefore keeps its
-own collection and publishes that collection on every change.
+descriptors inline. `mln_map_set_geojson_source_url` names a new URL that
+MapLibre fetches through its resource system. Both calls run on the map's owner
+thread, and both replace the whole dataset. A host that tracks individual
+features therefore keeps its own collection and publishes that collection on
+every change.
+
+By default MapLibre tiles updated data on a worker thread, and the new features
+appear in one of the frames that follow the update. Set `synchronous_update` on
+the source options when an update has to reach the very next frame. A simulation
+step that advances in lockstep with rendering is one such case, and a still
+image captured immediately after an update is another. Tiling then runs inline
+during the update pass inside `mln_render_session_render_update`, on the render
+session's owner thread, so a large dataset extends that frame.
+
+<Code code={region(liveUpdates, "options")} lang="c" title="geojson-live-updates.c" />
+
+Add the source once with an empty feature collection, before the feed delivers
+anything. Every later update names the same source ID.
+
+<Code code={region(liveUpdates, "add")} lang="c" title="geojson-live-updates.c" />
+
+On every change the host builds one `mln_geometry` and one `mln_feature` for
+each item in its own collection. A point geometry carries a single coordinate.
+
+<Code code={region(liveUpdates, "geometry")} lang="c" title="geojson-live-updates.c" />
+
+The geometries and the features occupy two parallel arrays, sized for the
+largest collection that the host publishes.
+
+<Code code={region(liveUpdates, "features")} lang="c" title="geojson-live-updates.c" />
+
+An `mln_geojson` feature collection holds those descriptors, and one call
+publishes it to the source.
+
+<Code code={region(liveUpdates, "publish")} lang="c" title="geojson-live-updates.c" />
 
 Updating the source keeps its ID, so every layer that draws it keeps drawing,
 and the source keeps the options that it was added with. Removing the source and
@@ -24,18 +56,6 @@ uses the source. A change to the options themselves, clustering in particular,
 is the one case that needs a fresh source, and
 [Show a GeoJSON Dataset](/maplibre-native-ffi/guides/show-a-geojson-dataset/)
 covers adding one.
-
-By default MapLibre tiles updated data on a worker thread, and the new features
-appear in one of the frames that follow the update. Set `synchronous_update` on
-the source options when an update has to reach the very next frame, such as a
-simulation step that advances in lockstep with rendering, or a still image
-captured immediately after the update. Tiling then runs inline during the update
-pass inside `mln_render_session_render_update`, on the render session's owner
-thread. A large dataset extends that frame by the time that the tiling takes.
-Choose the option when you add the source, because it is fixed for the source's
-lifetime.
-
-<Code code={liveUpdates} lang="c" title="geojson-live-updates.c" meta={'collapse={1-11, 18-23, 30-52} mark={"Fixed when the source is added, and applied to every later update":15-16} mark={"Add the source once, and every later update finds it by this ID":24} mark={"The host owns the collection and passes all of it on every change":27-29} mark={"One call replaces the whole dataset, and the source keeps its options":54}'} />
 
 Every update re-tiles the whole dataset. When a feed delivers faster than the
 display refreshes, collect the messages that arrive between frames and publish

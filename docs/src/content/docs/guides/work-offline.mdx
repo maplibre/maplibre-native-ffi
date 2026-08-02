@@ -6,8 +6,10 @@ sidebar:
 ---
 
 import { Code } from "@astrojs/starlight/components";
-import offlineRegionSnippet from "../../../../snippets/c/offline-region.c?raw";
-import offlineStorageSnippet from "../../../../snippets/c/offline-storage.c?raw";
+import { region } from "../../../snippets";
+
+import offlineRegion from "../../../../snippets/c/offline-region.c?raw";
+import offlineStorage from "../../../../snippets/c/offline-storage.c?raw";
 
 One database holds everything that a runtime caches, and `cache_path` in the
 runtime options sets that database's path. The field defaults to `:memory:`, so
@@ -21,28 +23,84 @@ every resource that a defined area needs, and keeps those resources outside the
 ambient budget. Download a region when the application must draw a known area
 without a network.
 
-Every database call is asynchronous, and they share one shape. A `_start`
-function validates its arguments, returns an operation ID, and queues the work.
-The runtime later queues one `MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED`
-event that carries the ID and the operation's own result status. That result
-status is separate from the status that the `_start` call returned. An operation
-that produces a value holds that value until the matching `_take_result` call
+Database calls are asynchronous, and they share one shape. A `_start` function
+validates its arguments, returns an operation ID, and queues the work. The
+runtime later queues one `MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED` event
+that carries the ID and the operation's own result status. That result status is
+separate from the status that the `_start` call returned. An operation that
+produces a value holds that value until the matching `_take_result` call
 consumes it, and every operation holds runtime state until a take or
 `mln_runtime_offline_operation_discard` releases it.
 
-<Code code={offlineRegionSnippet} lang="c" title="offline-region.c" meta={'collapse={1-44, 72-85, 114-119} mark={"MapLibre resolves this definition into every tile, glyph, and sprite that the area needs":49-61} mark={"MapLibre copies the definition and the opaque metadata bytes before this call returns":65-67} mark={"Observation enables the progress and error events for this region":88-90} mark={"An active download proceeds while the host pumps the runtime":98-100} mark={"The fraction stays an estimate until the status reports the required count precise":123-126}'} />
+## Download a region
 
-The runtime queues progress events for observed regions only.
+A region definition names a style and an area. MapLibre resolves the definition
+into every tile, glyph, and sprite that the style needs across the zoom range,
+and stores them under one region ID.
+
+<Code code={region(offlineRegion, "define")} lang="c" title="offline-region.c" />
+
+The create call takes a tagged definition. A tile pyramid covers a bounding box,
+and a geometry region covers a GeoJSON shape.
+
+<Code code={region(offlineRegion, "tag")} lang="c" title="offline-region.c" />
+
+Creation also takes opaque metadata bytes, and the database stores them with the
+region. A host records what the region holds there, such as a name or a version.
+MapLibre copies the definition, the style URL, and the metadata bytes before the
+call returns.
+
+<Code code={region(offlineRegion, "create")} lang="c" title="offline-region.c" />
+
+Taking the result produces a snapshot handle that carries the region record. A
+failed take leaves the operation live, so discard the operation when the host
+stops retrying.
+
+<Code code={region(offlineRegion, "result")} lang="c" title="offline-region.c" />
+
+The region ID is the part of the record that the remaining calls need.
+
+<Code code={region(offlineRegion, "region-id")} lang="c" title="offline-region.c" />
+
+The runtime queues progress and error events for observed regions only, so call
+`mln_runtime_offline_region_set_observed_start` for the new region ID first.
+Setting the download state to active then starts the download, and MapLibre
+fetches the region's resources while the host pumps the runtime.
+
+<Code code={region(offlineRegion, "download")} lang="c" title="offline-region.c" />
+
 `MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED` carries resource counts, tile
-counts, and stored bytes for every change, and
+counts, and stored bytes for every change.
 `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR` reports one resource that
 failed while the rest of the download continues. Drain both from the runtime
 that owns the region, as described in
-[Concepts](/maplibre-native-ffi/concepts/). Setting the download state to
-`MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE` pauses a download, and setting it active
-again resumes from the resources that MapLibre already stored.
+[Concepts](/maplibre-native-ffi/concepts/).
+
+<Code code={region(offlineRegion, "progress")} lang="c" title="offline-region.c" />
+
+Setting the download state to `MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE` pauses a
+download, and setting it active again resumes from the resources that MapLibre
+already stored.
+
+## Read what the database holds
 
 List the regions in the database to learn what an earlier run of the host
-stored, because region records outlive the runtime that wrote them.
+stored, because region records outlive the runtime that wrote them. One list
+operation covers the whole database.
 
-<Code code={offlineStorageSnippet} lang="c" title="offline-storage.c" meta={'collapse={1-43, 72-77} mark={"One operation lists every region in the database":48-50} mark={"Taking the result consumes the operation entry":55-57} mark={"Discard releases an operation whose result the host never took":58-61} mark={"Each entry carries the region ID, its definition, and the metadata that creation stored":68-69} mark={"Deleting a region evicts the resources that no other region requires":81-83}'} />
+<Code code={region(offlineStorage, "list")} lang="c" title="offline-storage.c" />
+
+Taking the result produces a list handle that the host owns. Destroy that handle
+after reading the entries.
+
+<Code code={region(offlineStorage, "result")} lang="c" title="offline-storage.c" />
+
+Each entry carries the region ID, the definition that created the region, and
+the metadata that the host passed at creation.
+
+<Code code={region(offlineStorage, "entries")} lang="c" title="offline-storage.c" />
+
+Deleting a region removes its record and evicts the resources that no other
+region requires.
+
+<Code code={region(offlineStorage, "delete")} lang="c" title="offline-storage.c" />

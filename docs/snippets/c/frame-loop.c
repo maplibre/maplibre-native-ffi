@@ -3,9 +3,9 @@
 
 #include <maplibre_native_c.h>
 
-// needs_repaint means one further frame is needed, which is how camera
-// animations and label placement settle.
-static bool asks_for_another_frame(const mln_runtime_event* event) {
+static bool wants_a_frame(const mln_runtime_event* event, mln_map map) {
+  if (event->source != map) return false;
+  if (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE) return true;
   if (event->type != MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED) return false;
   if (event->payload_type != MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME) {
     return false;
@@ -20,24 +20,18 @@ static bool asks_for_another_frame(const mln_runtime_event* event) {
 void run_one_frame(
   mln_runtime runtime, mln_map map, mln_render_session session, bool* pending
 ) {
+  // #region pump
   mln_runtime_pump(runtime, 0);
 
   mln_runtime_event event = {.size = sizeof(event)};
   bool has_event = false;
   while (mln_runtime_poll_event(runtime, &event, &has_event) == MLN_STATUS_OK &&
          has_event) {
-    // One runtime can own several maps, and every map's events share one
-    // queue. Compare the source before acting on an event.
-    if (event.source != map) continue;
-
-    if (
-      event.type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE ||
-      asks_for_another_frame(&event)
-    ) {
-      *pending = true;
-    }
+    if (wants_a_frame(&event, map)) *pending = true;
   }
+  // #endregion pump
 
+  // #region render
   if (!*pending) return;
 
   bool rendered = false;
@@ -46,4 +40,5 @@ void run_one_frame(
   if (status == MLN_STATUS_OK && rendered) {
     *pending = false;
   }
+  // #endregion render
 }

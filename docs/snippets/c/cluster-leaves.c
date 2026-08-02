@@ -29,10 +29,9 @@ static mln_json_value json_object(
 }
 
 static void read_leaves(mln_feature_extension_result result) {
+  // #region leaves
   mln_feature_extension_result_info info = {.size = sizeof(info)};
-  if (mln_feature_extension_result_get(result, &info) != MLN_STATUS_OK) {
-    return;
-  }
+  if (mln_feature_extension_result_get(result, &info) != MLN_STATUS_OK) return;
   if (info.type != MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION) {
     return;
   }
@@ -40,11 +39,13 @@ static void read_leaves(mln_feature_extension_result result) {
   for (size_t index = 0; index < leaves.feature_count; index++) {
     // leaves.features[index] is one point that the cluster contains.
   }
+  // #endregion leaves
 }
 
 void list_cluster_leaves(
   mln_render_session session, const mln_feature* cluster
 ) {
+  // #region arguments
   const mln_json_value limit = json_uint(10);
   const mln_json_value offset = json_uint(0);
   const mln_json_member members[] = {
@@ -52,7 +53,9 @@ void list_cluster_leaves(
     {.key = sv("offset"), .value = &offset},
   };
   const mln_json_value arguments = json_object(members, 2);
+  // #endregion arguments
 
+  // #region query
   mln_feature_extension_result result = MLN_HANDLE_NULL;
   const mln_status queried = mln_render_session_query_feature_extensions(
     session, sv("places"), cluster, sv("supercluster"), sv("leaves"),
@@ -61,4 +64,5 @@ void list_cluster_leaves(
   if (queried == MLN_STATUS_OK) read_leaves(result);
 
   mln_feature_extension_result_destroy(result);
+  // #endregion query
 }

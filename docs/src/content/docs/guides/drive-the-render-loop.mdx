@@ -6,6 +6,8 @@ sidebar:
 ---
 
 import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
 import frameLoop from "../../../../snippets/c/frame-loop.c?raw";
 import pumpThread from "../../../../snippets/c/pump-thread.c?raw";
 
@@ -14,20 +16,17 @@ MapLibre Native makes progress only while the host pumps the runtime. Call both
 because either function returns `MLN_STATUS_WRONG_THREAD` from any other thread.
 A pump call parks the owner thread when `timeout_ms` allows it, then drains the
 owner-thread task queues, including the tasks that those tasks queue, and
-services the runtime's own network and database work. The drain runs to
-completion, and one call can span a full style parse. Budget a pump as variable
-work.
+services the runtime's own network and database work. Budget a pump as variable
+work, because the drain runs to completion and one call can span a full style
+parse.
 
-Pumping advances the map, and drawing is a separate call. The map publishes a
+Pumping advances the map, and a separate call draws a frame. The map publishes a
 render update, and a later pump queues
 `MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE`. Calling
 `mln_render_session_render_update` then draws that update on the render
 session's owner thread. `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED` carries
-`needs_repaint`, and a true value means that the map needs one further frame.
-Camera animations and label placement settle over those extra frames. Keep the
-frame pending and call again on the next turn whenever a render call reports
-`false`, which is ordinary at startup and on the turns right after an attach or
-a resize.
+`needs_repaint`, and a true value means that the map needs one further frame for
+camera animations and label placement to settle.
 
 `timeout_ms` sets how long the call parks before it drains. Zero drains and
 returns. A positive value parks for up to that many milliseconds. A negative
@@ -41,19 +40,54 @@ outside any lock that a signalling thread acquires.
 ## Pump from the frame callback
 
 When the thread that owns your window also owns the runtime and the map, pump
-with a timeout of zero inside the frame callback and take the cadence from the
-display.
+with a timeout of zero inside the frame callback, so that the display sets how
+often the runtime pumps.
 
-<Code code={frameLoop} lang="c" title="frame-loop.c" meta={`collapse={1-19} mark={"Zero drains and returns":23} mark={"Either event makes a frame pending":33-38} mark={"A false result keeps the frame pending for the next turn":43-48}`} />
+<Code code={region(frameLoop, "pump")} lang="c" title="frame-loop.c" />
+
+The `wants_a_frame` helper compares `event.source` against the map handle before
+it reads the rest of the event, because one runtime can own several maps, and
+every map's events share one queue.
+
+Draw the pending frame after the drain. Keep the frame pending and call again on
+the next turn whenever `mln_render_session_render_update` reports `false`. A
+`false` result means that the map has published no update for this session's
+extent yet. That result is ordinary at startup and on the turns right after an
+attach or a resize.
+
+<Code code={region(frameLoop, "render")} lang="c" title="frame-loop.c" />
 
 ## Pump on a thread of your own
 
 When the runtime and the map live on a thread of their own, that thread parks
-inside the pump and takes its cadence from the runtime's own work. Acquire a
-wake source on that thread, share it with the rest of the host, and signal it
-whenever another thread queues work for the map or requests a stop. The display
-thread attaches the render session and calls
-`mln_render_session_render_update`, and a pump from that thread returns
+inside the pump, and the runtime's own work sets how often the loop runs. The
+display thread attaches the render session and calls
+`mln_render_session_render_update`. A pump call from the display thread returns
 `MLN_STATUS_WRONG_THREAD`.
 
-<Code code={pumpThread} lang="c" title="pump-thread.c" meta={`collapse={1-8, 24-36} mark={"Any thread can signal this to release the parked pump":20-22} mark={"Acquire the wake source on the thread that pumps":41-46} mark={"The park returns after this bound even when no wake arrives":49}`} />
+The two threads share three pieces of state: a flag that the pump thread sets
+when a frame is due, a flag that the display thread sets to stop the loop, and a
+wake source.
+
+<Code code={region(pumpThread, "channel")} lang="c" title="pump-thread.c" />
+
+`mln_runtime_wake_source_acquire` returns `MLN_STATUS_WRONG_THREAD` from any
+thread other than the runtime owner thread, so the pump thread acquires the
+source before it starts the loop. A wake source holds its own reference to the
+runtime's wake state, so the host destroys the two in either order. Call
+`mln_wake_source_destroy` only after every signalling thread has finished.
+
+<Code code={region(pumpThread, "acquire")} lang="c" title="pump-thread.c" />
+
+Any thread may signal the source, and the signal releases a parked pump. The
+display thread signals it after it queues work for the map or sets
+`stop_requested`.
+
+<Code code={region(pumpThread, "signal")} lang="c" title="pump-thread.c" />
+
+The loop parks inside the pump, drains the events that the pump queued, and sets
+`render_pending` when the map has something new. `park_timeout_ms` is 100 ms in
+this snippet, so the loop checks `stop_requested` at least ten times a second.
+The display thread reads `render_pending` on its next frame and renders.
+
+<Code code={region(pumpThread, "loop")} lang="c" title="pump-thread.c" />

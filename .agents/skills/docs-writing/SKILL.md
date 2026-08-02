@@ -188,29 +188,36 @@ Updating a binding reference is welcome; covering all of them is not mandatory.
 ## Snippets
 
 Snippet files under `docs/snippets/` compile in CI, so keep each file complete
-and runnable. Focus them at the presentation layer with Expressive Code:
+and runnable. A page shows only the part it discusses, extracted by name.
 
-- `collapse` hides everything that is not the point, and the lines stay in the
-  file. Collapse hard: a reader should see four to eight meaningful lines with
-  the whole runnable program one click away. Several ranges are allowed:
-  `collapse={1-9, 22-30}`.
-- `mark` draws the eye to the lines that the prose discusses.
-- Comments in the snippet carry line-level guidance. They sit beside the code
-  they explain, they compile with the rest of the file, and they stay correct
-  because CI checks the file they live in.
+Mark a region in the snippet, and show it with `region()`:
 
-Expressive Code marker labels, `mark={"A":15-19}`, render in the same narrow
-slot as the `+` and `-` diff indicators. They hold one to three characters. A
-longer label draws on top of the code, so keep guidance in comments.
-
-Write the attributes as a JSX expression so the labels keep readable quotes:
-
-```mdx
-<Code code={snippet} lang="c" title="query.c" meta={'collapse={1-9} mark={14-16}'} />
+```c
+// #region create
+mln_runtime_create(&options, &runtime);
+// #endregion create
 ```
 
-Prose says why, and the snippet shows how. Skip line-by-line narration of a
-snippet.
+```mdx
+import { region } from "../../../snippets";
+
+<Code code={region(snippet, "create")} lang="c" title="first-map.c" />
+```
+
+Region names beat line numbers, because reformatting a snippet cannot silently
+point a page at the wrong code. A name that no longer exists fails the build.
+
+Show four to eight meaningful lines per block. Several small blocks with prose
+between them read better than one block that covers a whole file.
+
+Comments inside a region carry the guidance that belongs next to the code. Keep
+them for what a reader cannot see: a non-obvious return value, a thread rule, a
+trap. Skip comments that narrate the next line, and skip anything the prose
+already says.
+
+Line markers stay out of it. Expressive Code labels, `mark={"A":15-19}`, hold
+one to three characters and draw on top of longer text, and every line-numbered
+range breaks the next time a formatter moves a line.
 
 ## Specifications
 

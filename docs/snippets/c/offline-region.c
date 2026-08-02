@@ -5,8 +5,9 @@
 #include <stdbool.h>
 #include <string.h>
 
-// Returns the operation's own status, which the completion event carries. A
-// host with a frame loop watches for that event there instead of blocking.
+// Pumps until the completion event for this operation arrives, and returns the
+// operation's own result status. A host with a frame loop reads that event in
+// the loop instead of blocking here.
 static mln_status await_operation(
   mln_runtime runtime, mln_offline_operation_id operation_id
 ) {
@@ -46,20 +47,27 @@ static mln_status finish_operation(
 mln_offline_region_id download_region(
   mln_runtime runtime, mln_lat_lng_bounds bounds, const char* metadata
 ) {
+  // #region define
+  mln_offline_tile_pyramid_region_definition pyramid = {
+    .size = sizeof(pyramid),
+    .style_url = "https://tiles.openfreemap.org/styles/bright",
+    .bounds = bounds,
+    .min_zoom = 10.0,
+    .max_zoom = 15.0,
+    .pixel_ratio = 1.0f,
+    .include_ideographs = false,
+  };
+  // #endregion define
+
+  // #region tag
   mln_offline_region_definition definition = {
     .size = sizeof(definition),
     .type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
-    .data.tile_pyramid = {
-      .size = sizeof(mln_offline_tile_pyramid_region_definition),
-      .style_url = "https://tiles.openfreemap.org/styles/bright",
-      .bounds = bounds,
-      .min_zoom = 10.0,
-      .max_zoom = 15.0,
-      .pixel_ratio = 1.0f,
-      .include_ideographs = false,
-    },
+    .data.tile_pyramid = pyramid,
   };
+  // #endregion tag
 
+  // #region create
   mln_offline_operation_id create_id = 0;
   if (
     mln_runtime_offline_region_create_start(
@@ -69,7 +77,9 @@ mln_offline_region_id download_region(
   ) {
     return 0;
   }
+  // #endregion create
 
+  // #region result
   mln_offline_region_snapshot region = MLN_HANDLE_NULL;
   if (await_operation(runtime, create_id) == MLN_STATUS_OK) {
     mln_runtime_offline_region_create_take_result(runtime, create_id, &region);
@@ -78,10 +88,15 @@ mln_offline_region_id download_region(
     mln_runtime_offline_operation_discard(runtime, create_id);
     return 0;
   }
+  // #endregion result
 
+  // #region region-id
+  // info.metadata points into the snapshot, so only info.id outlives the
+  // destroy below.
   mln_offline_region_info info = {.size = sizeof(info)};
   mln_offline_region_snapshot_get(region, &info);
   mln_offline_region_snapshot_destroy(region);
+  // #endregion region-id
 
   mln_offline_operation_id observe_id = 0;
   if (
@@ -93,6 +108,7 @@ mln_offline_region_id download_region(
     return 0;
   }
 
+  // #region download
   mln_offline_operation_id download_id = 0;
   if (
     mln_runtime_offline_region_set_download_state_start(
@@ -102,6 +118,7 @@ mln_offline_region_id download_region(
   ) {
     return 0;
   }
+  // #endregion download
 
   return info.id;
 }
@@ -117,12 +134,16 @@ bool region_progress(
   ) {
     return false;
   }
+  // #region progress
   const mln_runtime_event_offline_region_status* progress = event->payload;
   if (progress->region_id != region_id) return false;
 
+  // required_resource_count grows while MapLibre discovers resources, so the
+  // fraction is an estimate until required_resource_count_is_precise is true.
   *out_fraction = progress->status.required_resource_count == 0
                     ? 0.0
                     : (double)progress->status.completed_resource_count /
                         (double)progress->status.required_resource_count;
   return progress->status.complete;
+  // #endregion progress
 }

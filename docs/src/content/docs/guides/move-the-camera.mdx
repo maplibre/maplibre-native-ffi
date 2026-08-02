@@ -6,40 +6,59 @@ sidebar:
 ---
 
 import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
 import cameraSnippet from "../../../../snippets/c/camera.c?raw";
 import fitBoundsSnippet from "../../../../snippets/c/camera-fit-bounds.c?raw";
 
-The camera belongs to the map, so a camera call needs a live map and the map's
-owner thread, and it works before any render session exists. Camera options pair
-a field mask with values: MapLibre applies the fields that you flag and leaves
-every other field at its current value, so a call that flags only zoom changes
-only the zoom.
+The camera belongs to the map. A camera call needs a live map and the map's
+owner thread, and it works before any render session exists.
+
+Camera options pair a field mask with values. MapLibre applies the fields that
+you flag and leaves every other field at its current value.
+
+<Code code={region(cameraSnippet, "camera")} lang="c" title="camera.c" />
 
 Three commands apply a camera, and they differ in timing. `mln_map_jump_to`
-applies the camera immediately. `mln_map_ease_to` interpolates to it over
-`duration_ms` along a cubic easing curve, and the ease duration defaults to
-zero, so an ease that omits `duration_ms` also applies the camera immediately.
-`mln_map_fly_to` follows a curved flight path, and when you set no duration it
-derives one from the flight distance and a velocity of 1.2 screenfuls per
-second. A duration measures host time across many frames, because an animated
-transition advances while the host pumps the runtime and the map renders.
+applies the camera immediately.
 
-<Code code={cameraSnippet} lang="c" title="camera.c" meta={'collapse={1-4, 9-13} mark={"Only flagged fields change":7-8} mark={"An ease needs an explicit duration to animate":29} mark={"A caller-chosen identity for this transition":32} mark={"The finished event carries that identity":46-47}'} />
+<Code code={region(cameraSnippet, "jump")} lang="c" title="camera.c" />
+
+`mln_map_ease_to` interpolates to the camera over `duration_ms` along a cubic
+easing curve. The duration defaults to zero, so an ease that omits `duration_ms`
+applies the camera immediately as well. A duration measures host time across
+many frames, because an animated transition advances while the host pumps the
+runtime and the map renders.
+
+<Code code={region(cameraSnippet, "ease")} lang="c" title="camera.c" />
+
+`mln_map_fly_to` takes the same animation options and follows a curved flight
+path. When you set no duration, it derives one from the flight distance and a
+velocity of 1.2 screenfuls per second.
 
 To frame a region rather than a point, compute the camera for it first.
 `mln_map_camera_for_lat_lng_bounds` reports the camera that fits the bounds
-inside the current viewport, inset by the padding that you pass. Apply that
-camera with any of the three commands.
+inside the current viewport, inset by the padding that you pass in logical
+pixels.
 
-<Code code={fitBoundsSnippet} lang="c" title="camera-fit-bounds.c" meta={'collapse={1-4, 14-16} mark={"Padding insets each viewport edge, in logical pixels":7-9} mark={"Computes a camera without moving the map":12-13} mark={"Applying the camera chooses the timing":18}'} />
+<Code code={region(fitBoundsSnippet, "padding")} lang="c" title="camera-fit-bounds.c" />
+
+The query reports a camera and leaves the map unchanged. Apply the result with
+whichever of the three commands matches the timing that you want. This example
+uses `mln_map_fly_to`.
+
+<Code code={region(fitBoundsSnippet, "fit")} lang="c" title="camera-fit-bounds.c" />
 
 Set `transition_id` on the animation options when the host needs to know that a
 transition ended. The runtime queues one
 `MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED` event that carries that
 value, whether the transition ran to completion, was superseded by a later
-camera command, or was cancelled by `mln_map_cancel_transitions`. The event
-establishes which transition released the camera and carries no completion
-reason, so a host that distinguishes completion from cancellation compares the
-resulting camera against the one that it requested. Drain the event from the
-runtime that owns the map, as described in
+camera command, or was cancelled by `mln_map_cancel_transitions`. Drain the
+event from the runtime that owns the map, as described in
 [Concepts](/maplibre-native-ffi/concepts/).
+
+<Code code={region(cameraSnippet, "finished")} lang="c" title="camera.c" />
+
+The event names the transition that ended and carries no completion reason. A
+host that distinguishes completion from cancellation compares the resulting
+camera against the one that it requested.

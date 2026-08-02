@@ -6,13 +6,15 @@ sidebar:
 ---
 
 import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
 import featureState from "../../../../snippets/c/feature-state.c?raw";
 import featureStateRead from "../../../../snippets/c/feature-state-read.c?raw";
 
 Feature state is data that your host attaches to one feature at runtime and that
-style expressions read while the map draws. You write the styling rule once and
-each feature supplies its own input to it, so one style covers selection, hover,
-a live value, or a computed status.
+style expressions read while the map draws. One styling rule then covers
+selection, hover, a live value, or a computed status, because each feature
+supplies its own input to that rule.
 
 Feature state belongs to the [render session](/maplibre-native-ffi/concepts/),
 because the session's renderer owns the tiles that the state applies to. That
@@ -22,15 +24,19 @@ a style load. Render once before you set state; a call made earlier returns
 thread.
 
 A selector names what the state belongs to: the source ID, the source layer ID
-for a vector source, the feature ID, and, for removal, one state key. Feature
-IDs match as text, so a feature whose GeoJSON `id` is the number 7 is selected
-by `"7"`. Setting state writes the keys of the object that you pass, leaves the
-feature's other keys at their current values, and requests a repaint. Removal
-depends on how much of the selector you supply: a state key removes one entry, a
-feature ID alone removes that feature's whole state, and a selector with neither
-one removes the state of every feature in the source layer.
+for a vector source, and the feature ID. Feature IDs match as text, so a feature
+whose GeoJSON `id` is the number 7 is selected by `"7"`.
 
-<Code code={featureState} lang="c" title="feature-state.c" meta={'collapse={1-9, 26-36} mark={"Source, source layer, and feature ID name what the state belongs to":13-17} mark={"The state is a JSON object, and the call copies it before returning":38} mark={"A state key narrows removal to one entry":43-44}'} />
+<Code code={region(featureState, "select")} lang="c" title="feature-state.c" />
+
+The state is a JSON object, and each state key holds one JSON value.
+
+<Code code={region(featureState, "value")} lang="c" title="feature-state.c" />
+
+Setting state writes the keys of the object that you pass, leaves the feature's
+other keys at their current values, and requests a repaint.
+
+<Code code={region(featureState, "set")} lang="c" title="feature-state.c" />
 
 An expression reads one key with `feature-state`, and its fallback value applies
 to every feature that has no value for that key. A circle layer that enlarges
@@ -38,17 +44,34 @@ the selected feature reads
 `["case", ["boolean", ["feature-state", "selected"], false], 10, 5]` for
 `circle-radius`.
 
+Removal depends on how much of the selector you supply. A state key removes one
+entry, a feature ID alone removes that feature's whole state, and a selector
+with neither one removes the state of every feature in the source layer.
+
+<Code code={region(featureState, "remove")} lang="c" title="feature-state.c" />
+
 `mln_render_session_get_feature_state` copies the state that the session holds
 into a snapshot handle that you own. The snapshot holds an empty object when the
 source or the feature has no state.
 
-<Code code={featureStateRead} lang="c" title="feature-state-read.c" meta={'collapse={1-9, 22-32} mark={"The call fills a snapshot handle that you own":14-17} mark={"The root value and everything under it are borrowed from the snapshot":21} mark={"Copy anything you keep, because destroying the snapshot ends its pointers":34}'} />
+<Code code={region(featureStateRead, "get")} lang="c" title="feature-state-read.c" />
 
-The state lives as long as the session's renderer. A resize and a render target
-replacement through `mln_<backend>_surface_set_target` or
-`mln_<backend>_borrowed_texture_set_target` keep that renderer, and the feature
-state with it. A renderer compiles its shaders for a fixed pixel ratio, so any
-of those calls that changes the scale factor builds a new renderer, as does
-destroying a session and attaching another. Feature state starts empty on a new
-renderer. A host that needs the state to survive a display change keeps its own
-copy and sets it again after the next render update.
+The snapshot's root is a JSON object with one member per state key. Reading one
+value iterates over those members and compares each key against the one that you
+want.
+
+<Code code={region(featureStateRead, "member")} lang="c" title="feature-state-read.c" />
+
+The root value and everything under it point into the snapshot. Copy any value
+that you keep, because destroying the snapshot invalidates those pointers.
+
+<Code code={region(featureStateRead, "read")} lang="c" title="feature-state-read.c" />
+
+The state lives as long as the session's renderer. A resize keeps that renderer,
+and so does replacing the render target through
+`mln_<backend>_surface_set_target` or
+`mln_<backend>_borrowed_texture_set_target`. A renderer compiles its shaders for
+a fixed pixel ratio, so a call that changes the scale factor builds a new
+renderer, and so does destroying a session and attaching another. Feature state
+starts empty on a new renderer. A host that needs the state to survive one keeps
+its own copy and sets it again after the next render update.

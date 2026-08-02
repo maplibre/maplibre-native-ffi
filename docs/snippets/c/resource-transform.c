@@ -14,23 +14,29 @@ static mln_status add_api_key(
   void* user_data, uint32_t kind, const char* url,
   mln_resource_transform_response* out_response
 ) {
+  // #region match
   const char* api_key = user_data;
   (void)kind;
 
   if (strncmp(url, trusted_prefix, sizeof(trusted_prefix) - 1) != 0) {
-    return MLN_STATUS_OK;  // Leaving the URL unset keeps the original.
+    return MLN_STATUS_OK;  // A response without a URL keeps the original.
   }
+  // #endregion match
 
+  // #region rewrite
   char rewritten[2048];
   if (!build_keyed_url(url, api_key, rewritten, sizeof(rewritten))) {
-    return MLN_STATUS_OK;  // No key beats a malformed one.
+    return MLN_STATUS_OK;
   }
 
+  // The helper copies the URL, so rewritten may leave scope here.
   return mln_resource_transform_response_set_url(
     out_response, rewritten, strlen(rewritten)
   );
+  // #endregion rewrite
 }
 
+// #region install
 void install_transform(mln_runtime runtime, char* api_key) {
   mln_resource_transform transform = {
     .size = sizeof(transform),
@@ -39,3 +45,4 @@ void install_transform(mln_runtime runtime, char* api_key) {
   };
   mln_runtime_set_resource_transform(runtime, &transform);
 }
+// #endregion install

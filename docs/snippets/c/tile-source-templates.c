@@ -39,11 +39,14 @@ static mln_status add_layer(
 }
 
 mln_status add_orthophotos(mln_map map) {
+  // #region tiles
   const mln_string_view tiles[] = {
     sv("https://a.tiles.example.com/ortho/{z}/{x}/{y}.png"),
     sv("https://b.tiles.example.com/ortho/{z}/{x}/{y}.png"),
   };
+  // #endregion tiles
 
+  // #region options
   mln_style_tile_source_options options =
     mln_style_tile_source_options_default();
   options.fields = MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM |
@@ -51,13 +54,19 @@ mln_status add_orthophotos(mln_map map) {
                    MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS |
                    MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
   options.max_zoom = 19;
+  // 256 suits classic slippy tiles, and the default is 512.
   options.tile_size = 256;
+  // #endregion options
+
+  // #region bounds
   options.bounds = (mln_lat_lng_bounds){
     .southwest = {.latitude = 47.2, .longitude = 5.8},
     .northeast = {.latitude = 55.1, .longitude = 15.1},
   };
   options.attribution = sv("Imagery: Example Survey");
+  // #endregion bounds
 
+  // #region source
   const mln_status status = mln_map_add_raster_source_tiles(
     map, sv("ortho"), tiles, sizeof(tiles) / sizeof(tiles[0]), &options
   );
@@ -65,4 +74,5 @@ mln_status add_orthophotos(mln_map map) {
     return status;
   }
   return add_layer(map, "ortho", "raster", "ortho");
+  // #endregion source
 }

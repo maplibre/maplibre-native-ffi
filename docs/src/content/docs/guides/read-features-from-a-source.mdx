@@ -6,6 +6,8 @@ sidebar:
 ---
 
 import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
 import sourceFeatures from "../../../../snippets/c/query-source-features.c?raw";
 import clusterLeaves from "../../../../snippets/c/cluster-leaves.c?raw";
 
@@ -15,19 +17,27 @@ session's owner thread. The session builds its renderer during the first
 `mln_render_session_render_update`, and a query before that render update
 returns `MLN_STATUS_INVALID_STATE`.
 
-Name the source by its style source ID. A vector source also needs source-layer
-IDs, because one vector tile holds several layers and MapLibre reads the layers
-that you name. A vector query with no source-layer ID returns zero features. A
-GeoJSON source holds a single layer and ignores the field.
+A vector source needs source-layer IDs, because one vector tile holds several
+layers and MapLibre reads the layers that you name. A vector query with
+no source-layer ID returns zero features. A GeoJSON source holds a single layer
+and ignores the field.
 
-<Code code={sourceFeatures} lang="c" title="query-source-features.c" meta={'collapse={1-22} mark={"Vector sources read only the source layers named here":24-29} mark={"The ID of the source, not one of its source layers":33} mark={"Copy anything you keep before this call, because feature views belong to the result":38}'} />
+<Code code={region(sourceFeatures, "options")} lang="c" title="query-source-features.c" />
+
+Name the source itself by its style source ID. That ID is the query's second
+argument, and it differs from the source-layer IDs in the options.
+
+<Code code={region(sourceFeatures, "query")} lang="c" title="query-source-features.c" />
+
+Read the result count rather than the status when you expect features, because
+an unknown source ID also produces an empty result with `MLN_STATUS_OK`.
+
+<Code code={region(sourceFeatures, "read")} lang="c" title="query-source-features.c" />
 
 The same query returns different features as the camera moves, because a query
 covers the tiles that the source has loaded for the current camera. Tiles that
 arrive later appear in the next query, and a source that no layer uses loads no
-tiles at all. Read the result count rather than the status when you expect
-features, because an unknown source ID also produces an empty result with
-`MLN_STATUS_OK`.
+tiles at all.
 
 Expanding a cluster is a source read as well.
 `mln_render_session_query_feature_extensions` runs a named extension against one
@@ -35,11 +45,24 @@ feature of one source. The `supercluster` extension reads a GeoJSON source that
 has clustering enabled, and its `leaves` field returns the features under one
 cluster as a feature collection.
 
-<Code code={clusterLeaves} lang="c" title="cluster-leaves.c" meta={'collapse={1-43} mark={"The cluster feature comes from a source query, unmodified":46} mark={"Both bounds are unsigned, because supercluster matches numbers by exact JSON type":48-54} mark={"The extension name, then the field within it":58} mark={"Read the type tag on the result before you read the union":61}'} />
+`supercluster` matches numbers by exact JSON type, so build the `limit` and
+`offset` arguments as unsigned values.
 
-Pass a cluster feature back exactly as a query returned it. `supercluster` reads
-the `cluster_id` property and the `limit` and `offset` arguments as unsigned
-JSON values, and it treats a double or a signed integer as absent. Feature
-descriptors copied out of a query result keep the JSON type of every property. A
-host that rebuilds the feature through a JSON layer that stores every number as
-a double receives a successful query with an empty result.
+<Code code={region(clusterLeaves, "arguments")} lang="c" title="cluster-leaves.c" />
+
+The call names the source, the cluster feature, the extension, and the field
+within that extension.
+
+<Code code={region(clusterLeaves, "query")} lang="c" title="cluster-leaves.c" />
+
+The result carries a type tag. Read the tag before you read the union, because
+an extension can return a value instead of a feature collection.
+
+<Code code={region(clusterLeaves, "leaves")} lang="c" title="cluster-leaves.c" />
+
+Pass the cluster feature to the extension query exactly as a source query
+returned it. `supercluster` reads the `cluster_id` property by the same rule, so
+a double or a signed integer counts as absent. A feature descriptor copied out
+of a query result keeps the JSON type of every property. A host that rebuilds
+the feature through a JSON layer that stores every number as a double receives a
+successful query with an empty result.

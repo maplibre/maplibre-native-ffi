@@ -6,32 +6,51 @@ sidebar:
 ---
 
 import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
 import styleByData from "../../../../snippets/c/style-by-data.c?raw";
 
 A layer property holds either a constant or an expression. An expression reads
 the feature that the layer is drawing, so one rule styles every feature from its
-own data. `mln_map_set_layer_property` sets one property of one layer. Set a
-property once the map reports `MLN_RUNTIME_EVENT_MAP_STYLE_LOADED`, and set it
-again after every later style load, because a property value belongs to the
-style that was loaded when you set it.
+own data. Set a property after the map reports
+`MLN_RUNTIME_EVENT_MAP_STYLE_LOADED`, and set it again after every later style
+load, because a property value belongs to the style that was loaded when you set
+it.
 
-The value is a style-spec JSON value descriptor: a tree of `mln_json_value`
-nodes. A constant is a scalar node. An expression is an array node whose first
-element names the operator and whose remaining elements are its arguments, each
-one another node. That one shape covers everything the style specification
-allows in that position: `["get", "mag"]` reads a feature property, and
-`["match", ["get", "kind"], "aftershock", "#3355cc", "#cc4433"]` chooses a color
-per category.
+A value is a style-spec JSON value descriptor: a tree of `mln_json_value` nodes.
+A constant is a scalar node, and an expression is an array node whose first
+element names the operator and whose remaining elements are its arguments. The
+snippet builds each node with a small constructor, one per JSON type, and the
+array constructor points at a caller-owned array of child nodes.
+
+<Code code={region(styleByData, "node")} lang="c" title="style-by-data.c" />
+
+An argument is another node, so build the inner expressions first and hold each
+one in a variable. `["get", "mag"]` reads the feature property named `mag`, and
+`["linear"]` names the interpolation curve.
+
+<Code code={region(styleByData, "expression")} lang="c" title="style-by-data.c" />
+
+Those two nodes become elements of the outer array, alongside the stop pairs
+that scale a circle from 4 pixels at magnitude 1 to 24 pixels at magnitude 6.
+
+<Code code={region(styleByData, "property")} lang="c" title="style-by-data.c" />
+
+`mln_map_set_layer_property` sets one property of one layer. The property name
+is the one that the style specification defines for the layer's type.
+
+<Code code={region(styleByData, "set")} lang="c" title="style-by-data.c" />
 
 A filter chooses which of the source's features the layer draws, and a filter is
 an expression that returns a boolean. `mln_map_set_layer_filter` takes the same
-kind of descriptor, and a null filter clears the layer's filter.
+kind of descriptor, and a null filter clears the layer's filter. The snippet
+reuses the `magnitude` node in this second value.
 
-The descriptors, arrays, and strings that you build stay yours and can live on
-the stack. MapLibre parses a property value or a filter and copies it into typed
-style storage before the call returns.
+<Code code={region(styleByData, "filter")} lang="c" title="style-by-data.c" />
 
-<Code code={styleByData} lang="c" title="style-by-data.c" meta={'collapse={1-36} mark={"An expression array holds the operator, then its arguments":38-48} mark={"The property name is the one that the style specification defines":50-51} mark={"The same node nests in a second value with no rebuild":54-58}'} />
+You own the descriptors, arrays, and strings that you build, and they can live
+on the stack. MapLibre parses a property value or a filter and copies it into
+typed style storage before the call returns.
 
 Both calls run on the map's owner thread and apply to the live style
 immediately. A host that pumps the runtime and renders on update draws the new

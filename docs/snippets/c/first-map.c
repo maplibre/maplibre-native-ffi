@@ -71,6 +71,7 @@ int run_map(
   descriptor.context.data.egl.share_context = egl_context;
   descriptor.surface = egl_surface;
 
+  // #region create
   TRY(mln_runtime_create(&runtime_options, &runtime));
   TRY(mln_map_create(runtime, &map_options, &map));
   TRY(
@@ -78,6 +79,7 @@ int run_map(
   );
   TRY(mln_map_jump_to(map, &camera));
   TRY(mln_opengl_surface_attach(map, &descriptor, &session));
+  // #endregion create
 
   bool pending = true;
   while (!host_window_should_close()) {
@@ -102,20 +104,24 @@ int run_map(
 
     if (!pending) continue;
 
+    // #region render
     // False means that the map has published no update for this session's
     // extent yet. Stay pending and try again on the next turn.
     bool rendered = false;
     if (mln_render_session_render_update(session, &rendered) == MLN_STATUS_OK) {
       pending = !rendered;
     }
+    // #endregion render
   }
   exit_code = 0;
 
 teardown:
+  // #region teardown
   // The reverse of creation: destroy the session before the map, and the map
   // before the runtime.
   mln_render_session_destroy(session);
   mln_map_destroy(map);
   mln_runtime_destroy(runtime);
+  // #endregion teardown
   return exit_code;
 }

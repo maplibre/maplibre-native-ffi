@@ -19,6 +19,7 @@ static bool copy_first_source_id(
 ) {
   size_t count = 0;
   mln_feature_query_result_count(result, &count);
+  // #region read
   for (size_t index = 0; index < count; index++) {
     mln_queried_feature feature = {.size = sizeof(feature)};
     const mln_status got =
@@ -28,6 +29,7 @@ static bool copy_first_source_id(
     copy_text(feature.source_id, out_source_id, out_size);
     return true;
   }
+  // #endregion read
   return false;
 }
 
@@ -35,19 +37,24 @@ bool source_at_screen_point(
   mln_render_session session, mln_screen_point at, char* out_source_id,
   size_t out_size
 ) {
+  // #region geometry
   const mln_rendered_query_geometry geometry =
     mln_rendered_query_geometry_box((mln_screen_box){
       .min = {.x = at.x - 6.0, .y = at.y - 6.0},
       .max = {.x = at.x + 6.0, .y = at.y + 6.0},
     });
+  // #endregion geometry
 
+  // #region layers
   const mln_string_view layer_ids[] = {sv("poi-labels"), sv("building-fill")};
   mln_rendered_feature_query_options options =
     mln_rendered_feature_query_options_default();
   options.fields = MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
   options.layer_ids = layer_ids;
   options.layer_id_count = sizeof(layer_ids) / sizeof(layer_ids[0]);
+  // #endregion layers
 
+  // #region query
   mln_feature_query_result result = MLN_HANDLE_NULL;
   const mln_status queried = mln_render_session_query_rendered_features(
     session, &geometry, &options, &result
@@ -57,4 +64,5 @@ bool source_at_screen_point(
   const bool found = copy_first_source_id(result, out_source_id, out_size);
   mln_feature_query_result_destroy(result);
   return found;
+  // #endregion query
 }

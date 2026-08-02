@@ -6,17 +6,21 @@ sidebar:
 ---
 
 import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
 import geojsonDataset from "../../../../snippets/c/geojson-dataset.c?raw";
 
 Your data appears on the map through two objects. A source holds the GeoJSON,
 and a layer draws the features that the source contains. Both belong to the
-style that is loaded when you add them. Add them once the map reports
+style that is loaded when you add them, so add them once the map reports
 `MLN_RUNTIME_EVENT_MAP_STYLE_LOADED`, and add them again after every later style
 load.
 
+<Code code={region(geojsonDataset, "style-loaded")} lang="c" title="geojson-dataset.c" />
+
 A source takes its data in one of two forms.
 `mln_map_add_geojson_source_url` names a URL that MapLibre fetches through its
-resource system, and suits data that lives on a server.
+resource system, and suits data that a server publishes.
 `mln_map_add_geojson_source_data` takes geometry and feature descriptors inline
 and copies them before it returns, and suits data that your host already holds
 in memory.
@@ -26,18 +30,33 @@ its lifetime. Clustering matters most, because changing it later requires
 removing the source and its layers and adding them again. A clustering source
 groups nearby points into cluster features, and the cluster radius, the highest
 zoom that clusters, and the number of points that a cluster requires belong to
-the same options. A clustering source also constrains inline data:
+the same options.
+
+<Code code={region(geojsonDataset, "options")} lang="c" title="geojson-dataset.c" />
+
+Pass the URL and the options to the call that adds the source. The layer names
+the same source ID.
+
+<Code code={region(geojsonDataset, "source")} lang="c" title="geojson-dataset.c" />
+
+The layer is a style-spec layer object with at least an `id`, a `type`, and the
+`source` ID. Choose the type that matches your geometry: a circle layer draws
+points, a line layer draws line strings, and a fill layer draws polygons.
+
+<Code code={region(geojsonDataset, "layer")} lang="c" title="geojson-dataset.c" />
+
+Drawing order follows the style. The empty before-layer ID in the last argument
+appends the layer above the rest of the style, and naming an existing layer
+inserts the new layer beneath that one.
+
+<Code code={region(geojsonDataset, "add-layer")} lang="c" title="geojson-dataset.c" />
+
+Inline data replaces the URL with a GeoJSON descriptor that you build in memory.
+A clustering source constrains that descriptor:
 `mln_map_add_geojson_source_data` returns `MLN_STATUS_INVALID_ARGUMENT` unless
 the data is a feature collection whose every feature carries point geometry.
 
-The layer is a style-spec layer object with at least an `id`, a `type`, and the
-`source` ID. A circle layer draws points, a line layer draws line strings, and a
-fill layer draws polygons, so choose the type that matches your geometry.
-Drawing order follows the style: an empty before-layer ID appends the layer
-above the rest of the style, and naming an existing layer inserts the new layer
-beneath that one.
-
-<Code code={geojsonDataset} lang="c" title="geojson-dataset.c" meta={'collapse={1-19, 39-51, 57-68} mark={"The style-loaded event for this map":21-24} mark={"Each value applies when its field bit is set":28-31} mark={"An empty before-layer ID appends the layer":53}'} />
+<Code code={region(geojsonDataset, "inline-data")} lang="c" title="geojson-dataset.c" />
 
 MapLibre fetches and tiles the data on its own threads. A host that already
 pumps the runtime and renders on update draws the new features in the first

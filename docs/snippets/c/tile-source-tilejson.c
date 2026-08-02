@@ -25,12 +25,14 @@ static mln_status add_layer(
   const mln_json_value type_value = json_string(layer_type);
   const mln_json_value source_value = json_string(source_id);
   const mln_json_value source_layer_value = json_string(source_layer);
+  // #region layer
   const mln_json_member members[] = {
     {.key = sv("id"), .value = &id_value},
     {.key = sv("type"), .value = &type_value},
     {.key = sv("source"), .value = &source_value},
     {.key = sv("source-layer"), .value = &source_layer_value},
   };
+  // #endregion layer
   const mln_json_value layer = {
     .size = sizeof(layer),
     .type = MLN_JSON_VALUE_TYPE_OBJECT,
@@ -40,6 +42,7 @@ static mln_status add_layer(
 }
 
 mln_status add_basemap(mln_map map) {
+  // #region source
   const mln_status status = mln_map_add_vector_source_url(
     map, sv("basemap"), sv("https://tiles.example.com/planet/tiles.json"), NULL
   );
@@ -47,4 +50,5 @@ mln_status add_basemap(mln_map map) {
     return status;
   }
   return add_layer(map, "roads", "line", "basemap", "transportation");
+  // #endregion source
 }

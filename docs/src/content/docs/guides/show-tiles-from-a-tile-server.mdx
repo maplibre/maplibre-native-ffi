@@ -6,43 +6,73 @@ sidebar:
 ---
 
 import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
 import tilejsonSnippet from "../../../../snippets/c/tile-source-tilejson.c?raw";
 import templatesSnippet from "../../../../snippets/c/tile-source-templates.c?raw";
 import rasterDemSnippet from "../../../../snippets/c/tile-source-raster-dem.c?raw";
 
-A tile endpoint reaches the map as two objects. A source describes where the
-tiles are and how to read them, and a layer draws them. Both belong to the
-loaded style, so add them once the map reports `MAP_STYLE_LOADED`, and add them
-again after every later style load.
+Drawing a tile endpoint takes two style objects: a source that describes where
+the tiles are and how to read them, and a layer that draws them. Both belong to
+the loaded style. Add them once the map reports
+`MLN_RUNTIME_EVENT_MAP_STYLE_LOADED`, and add them again after every later style
+load.
 
 Pass the document URL and null options when the server publishes a TileJSON
 document. MapLibre fetches the document and reads the tile URLs, the zoom range,
-the scheme, the bounds, and the attribution from it.
+the scheme, the bounds, and the attribution from it. Then add a layer that names
+the source.
 
-<Code code={tilejsonSnippet} lang="c" title="tile-source-tilejson.c" meta={'collapse={1-41} mark={"The TileJSON document supplies the tile set":43-45} mark={"source-layer names one layer inside the vector tile":49}'} />
+<Code code={region(tilejsonSnippet, "source")} lang="c" title="tile-source-tilejson.c" />
 
 Options override a few of the document's fields: the zoom range and the vector
 encoding on a vector source, the tile size on a raster or raster-DEM source, and
-the DEM encoding on a raster-DEM source.
-
-Describe the tile set yourself when the server publishes no TileJSON document.
-Each tile URL contains the `{z}`, `{x}`, and `{y}` placeholders. Several URLs
-that differ only in host name let MapLibre distribute the requests among those
-hosts. Each option value applies when its bit is present in `fields`, and
-`mln_style_tile_source_options_default()` sets no bits.
-
-<Code code={templatesSnippet} lang="c" title="tile-source-templates.c" meta={'collapse={1-40} mark={"MapLibre fills the placeholders for each tile":43-44} mark={"A value applies when its bit is set":49-52} mark={"256 suits classic slippy tiles; the default is 512":54}'} />
-
-The scheme defaults to XYZ, and TMS suits a server that numbers rows from the
-south. Bounds keep requests inside the area that the server covers, and the zoom
-range keeps them inside the levels that it serves. Set the vector encoding to
+the DEM encoding on a raster-DEM source. Set the vector encoding to
 `MLN_STYLE_VECTOR_TILE_ENCODING_MLT` for a server that serves MapLibre Tiles,
 because vector tiles decode as MVT by default. A tile set whose integer streams
 use FastPFOR encodings also needs `fast_pfor_enabled` on the map options.
+
+A vector tile carries several named layers. A layer that draws one of them sets
+`source` to the source ID and `source-layer` to the name inside the tile.
+
+<Code code={region(tilejsonSnippet, "layer")} lang="c" title="tile-source-tilejson.c" />
+
+Describe the tile set yourself when the server publishes no TileJSON document.
+Each tile URL contains the `{z}`, `{x}`, and `{y}` placeholders, and MapLibre
+fills them for each tile. Several URLs that differ only in host name let MapLibre
+distribute the requests among those hosts.
+
+<Code code={region(templatesSnippet, "tiles")} lang="c" title="tile-source-templates.c" />
+
+Each option value applies when its bit is present in `fields`, and
+`mln_style_tile_source_options_default()` sets no bits.
+
+<Code code={region(templatesSnippet, "options")} lang="c" title="tile-source-templates.c" />
+
+Bounds keep requests inside the area that the server covers, and the zoom range
+keeps them inside the levels that it serves. The attribution string is readable
+afterwards with `mln_map_copy_style_source_attribution`. The scheme defaults to
+XYZ, and TMS suits a server that numbers rows from the south.
+
+<Code code={region(templatesSnippet, "bounds")} lang="c" title="tile-source-templates.c" />
+
+Pass the templates and the options to `mln_map_add_raster_source_tiles`, then
+add a raster layer that names the source.
+
+<Code code={region(templatesSnippet, "source")} lang="c" title="tile-source-templates.c" />
 
 Raster-DEM tiles carry elevation in their color channels, in one of two
 encodings: Mapbox Terrain-RGB, the default, and Terrarium. Match the encoding
 that your server documents, because decoding with the other one produces wrong
 elevations.
 
-<Code code={rasterDemSnippet} lang="c" title="tile-source-raster-dem.c" meta={'collapse={1-9} mark={"Match the encoding that the server documents":15} mark={"The hillshade layer requires a raster-DEM source":28-30}'} />
+<Code code={region(rasterDemSnippet, "options")} lang="c" title="tile-source-raster-dem.c" />
+
+A raster-DEM source takes the same tile URL templates as a raster source.
+
+<Code code={region(rasterDemSnippet, "source")} lang="c" title="tile-source-raster-dem.c" />
+
+A hillshade layer requires a raster-DEM source.
+`mln_map_add_hillshade_layer` adds that layer without a JSON layer object.
+
+<Code code={region(rasterDemSnippet, "layer")} lang="c" title="tile-source-raster-dem.c" />
