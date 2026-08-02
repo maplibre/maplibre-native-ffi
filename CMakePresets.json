@@ -401,6 +401,11 @@
       "execution": { "timeout": 300 }
     },
     {
+      "name": "emscripten-wasm32-webgl",
+      "configurePreset": "emscripten-wasm32-webgl",
+      "inherits": "_test-base"
+    },
+    {
       "name": "linux-x64-egl",
       "configurePreset": "linux-x64-egl",
       "inherits": "_test-base"

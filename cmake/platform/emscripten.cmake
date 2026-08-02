@@ -26,10 +26,8 @@ function(mln_configure_platform_dependencies target)
       emscripten-wasm32
       MLN_FFI_ZIG_TARGET
       wasm32-emscripten
-      # TODO(browser-tests): the C API suite needs a browser harness to run in
-      # (see #37 phase B); it is built and run in the follow-up, not skipped.
       MLN_FFI_TEST_SUPPORTED
-      FALSE)
+      TRUE)
 endfunction()
 
 function(mln_configure_platform target)

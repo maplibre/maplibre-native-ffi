@@ -18,6 +18,34 @@
 #include <time.h>
 #endif
 
+#if defined(MLN_TEST_BACKEND_OPENGL) && defined(MLN_TEST_OPENGL_WEBGL)
+#include <emscripten.h>
+#include <emscripten/html5.h>
+
+// A fixture renders into its own texture and never presents, so it needs a GL
+// context but no on-page canvas. Each one gets a private OffscreenCanvas on
+// whichever thread asked for it, because an OffscreenCanvas belongs to a single
+// thread and the suite attaches sessions from more than one.
+//
+// The registry is GL.offscreenCanvases rather than specialHTMLTargets:
+// findCanvasEventTarget(), which is what resolves the selector under
+// -sOFFSCREENCANVAS_SUPPORT, searches the former and never consults the latter.
+EM_JS(
+  void, mln_test_register_offscreen_canvas,
+  (const char* name, int width, int height), {
+    const id = UTF8ToString(name);
+    Module["GL"].offscreenCanvases[id] = {
+      canvas : new OffscreenCanvas(width, height),
+      id : id,
+    };
+  }
+);
+EM_JS(void, mln_test_unregister_offscreen_canvas, (const char* name), {
+  delete Module["GL"].offscreenCanvases[UTF8ToString(name)];
+});
+
+#endif
+
 #if defined(MLN_TEST_BACKEND_OPENGL) && defined(MLN_TEST_OPENGL_EGL)
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -166,11 +194,18 @@ uint8_t* mln_test_read_fixture(const char* relative_path, size_t* out_size) {
   if (out_size != NULL) {
     *out_size = 0;
   }
+#if defined(__EMSCRIPTEN__)
+  // The browser suite embeds its fixtures in the module at a fixed virtual
+  // path, so unlike a native run there is no checkout path to keep out of the
+  // objects. See mln_configure_browser_c_api_test().
+  const char* fixture_dir = "/fixtures";
+#else
   const char* fixture_dir = getenv("MLN_TEST_FIXTURE_DIR");
   TEST_ASSERT_TRUE_MESSAGE(
     fixture_dir != NULL && fixture_dir[0] != '\0',
     "MLN_TEST_FIXTURE_DIR is unset; run the suite through ctest"
   );
+#endif
 
   char path[1024];
   const int written =
@@ -441,6 +476,94 @@ static void destroy_backend_state(void* opaque_state) {
   eglDestroySurface(state->display, state->surface);
   eglDestroyContext(state->display, state->context);
   eglTerminate(state->display);
+  free(state);
+}
+
+#elif defined(MLN_TEST_BACKEND_OPENGL) && defined(MLN_TEST_OPENGL_WEBGL)
+
+typedef struct webgl_state {
+  EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
+  char id[32];
+} webgl_state;
+
+static atomic_uint webgl_canvas_counter;
+
+// The browser owns the context a session renders into, so the fixture creates a
+// real WebGL2 context on the page's canvas and hands it over, the way a browser
+// host would. The canvas comes from emcc's HTML shell.
+static bool create_backend_state(void** out_state, void* out_context) {
+  webgl_state* state = calloc(1, sizeof(*state));
+  if (state == NULL) {
+    return false;
+  }
+
+  EmscriptenWebGLContextAttributes attributes;
+  emscripten_webgl_init_context_attributes(&attributes);
+  // WebGL2 is the GLES 3.0 the OpenGL backend targets.
+  attributes.majorVersion = 2;
+  attributes.minorVersion = 0;
+  attributes.depth = EM_TRUE;
+  attributes.stencil = EM_TRUE;
+  attributes.antialias = EM_FALSE;
+  // The suite renders into its own texture rather than presenting, so the
+  // context needs no drawing buffer preservation.
+  attributes.preserveDrawingBuffer = EM_FALSE;
+  // The context stays on the thread that created it; nothing renders to the
+  // page, so there is no swap to take over and nothing to proxy.
+  attributes.explicitSwapControl = EM_FALSE;
+  attributes.proxyContextToMainThread = EMSCRIPTEN_WEBGL_CONTEXT_PROXY_DISALLOW;
+
+  const unsigned int serial = atomic_fetch_add(&webgl_canvas_counter, 1U) + 1U;
+  (void)snprintf(state->id, sizeof(state->id), "mln-test-%u", serial);
+  mln_test_register_offscreen_canvas(state->id, 64, 64);
+
+  char target[sizeof(state->id) + 1];
+  (void)snprintf(target, sizeof(target), "#%s", state->id);
+  state->context = emscripten_webgl_create_context(target, &attributes);
+  if (state->context <= 0) {
+    fprintf(
+      stderr, "creating the fixture's WebGL context failed: %ld\n",
+      (long)state->context
+    );
+    mln_test_unregister_offscreen_canvas(state->id);
+    free(state);
+    return false;
+  }
+  const EMSCRIPTEN_RESULT current_result =
+    emscripten_webgl_make_context_current(state->context);
+  if (current_result != EMSCRIPTEN_RESULT_SUCCESS) {
+    fprintf(
+      stderr, "making the fixture's WebGL context current failed: %d\n",
+      current_result
+    );
+    emscripten_webgl_destroy_context(state->context);
+    mln_test_unregister_offscreen_canvas(state->id);
+    free(state);
+    return false;
+  }
+
+  *(mln_opengl_context_descriptor*)out_context =
+    (mln_opengl_context_descriptor){
+      .size = sizeof(mln_opengl_context_descriptor),
+      .platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL,
+      .data = {
+        .webgl = {
+          .size = sizeof(mln_webgl_context_descriptor),
+          .context = state->context,
+        }
+      },
+    };
+  *out_state = state;
+  return true;
+}
+
+static void destroy_backend_state(void* opaque_state) {
+  webgl_state* state = opaque_state;
+  if (state == NULL) {
+    return;
+  }
+  emscripten_webgl_destroy_context(state->context);
+  mln_test_unregister_offscreen_canvas(state->id);
   free(state);
 }
 

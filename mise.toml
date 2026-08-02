@@ -190,14 +190,20 @@ run = '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"
 [tasks."build:emscripten"]
 description = "Configure, build, and install an Emscripten native CMake preset."
 usage = 'arg "[preset]" default="emscripten-wasm32-webgl"'
-# mise scopes a tool to a task rather than to a task's arguments, so the shared
-# `build` task cannot ask for the Emscripten SDK only when it is handed an
-# Emscripten preset. Declaring it here keeps every other native build from
-# installing an SDK it never uses. Android and OpenHarmony need no equivalent
-# task, because their SDKs are located through the environment rather than
-# installed by mise.
+# The Emscripten SDK is large and only Emscripten presets need it, so it is scoped
+# to this task rather than installed for every contributor. That is also why
+# Emscripten presets do not go through the shared `build` task.
 tools = { emsdk = "{{vars.emsdk_version}}" }
 run = '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"'
+
+[tasks."test:emscripten"]
+description = "Build and run C API tests for an Emscripten CMake preset."
+usage = 'arg "[preset]" default="emscripten-wasm32-webgl"'
+depends = [{ task = "//:build:emscripten", args = ["{{usage.preset}}"] }]
+# The suite runs as a page in headless Chromium; see scripts/run-browser-test.mjs
+# for how a browser is located.
+tools = { emsdk = "{{vars.emsdk_version}}" }
+run = 'ctest --preset "$usage_preset"'
 
 [tasks."build:rust-emscripten"]
 description = "Build the Rust platform support library for the Emscripten target."
