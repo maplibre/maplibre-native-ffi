@@ -1,6 +1,7 @@
 ---
 title: Intercept network requests
-description: Rewrite a resource URL or answer its request from host storage.
+description: Rewrite a resource URL, add request headers, or answer a request
+  from host storage.
 sidebar:
   order: 16
 ---
@@ -9,16 +10,19 @@ import { Code } from "@astrojs/starlight/components";
 import { region } from "../../../snippets";
 
 import transformSnippet from "../../../../snippets/c/resource-transform.c?raw";
+import headerSnippet from "../../../../snippets/c/http-header-transform.c?raw";
 import providerSnippet from "../../../../snippets/c/resource-provider.c?raw";
 
-Two extension points intercept resource requests. A resource transform rewrites
-a URL before the network request. A resource provider supplies the response
-bytes. Register either one on the runtime owner thread.
+Three extension points intercept resource requests. A resource transform
+rewrites a URL before the network request. An HTTP header transform adds headers
+to the request that follows. A resource provider supplies the response bytes.
+Register each one on the runtime owner thread.
 
-MapLibre can invoke either callback concurrently on network and worker threads.
-Protect every value that a callback reads and return quickly because the
-resource request waits. A transform callback sets a replacement URL. A provider
-callback operates only on the request handle that it received.
+MapLibre can invoke any of these callbacks concurrently on network and worker
+threads. Protect every value that a callback reads and return quickly because
+the resource request waits. A transform callback sets a replacement URL. A
+header transform callback sets header names and values. A provider callback
+operates only on the request handle that it received.
 
 ## Rewrite a URL with a transform
 
@@ -40,6 +44,37 @@ Registering a transform replaces the previous transform. After the registration
 call returns, the replaced transform has no in-flight callbacks.
 
 <Code code={region(transformSnippet, "install")} lang="c" title="resource-transform.c" />
+
+## Add headers to a request
+
+Add a header to carry a bearer token or another credential that belongs in the
+request rather than in the URL. A header transform runs after URL transformation
+and immediately before the HTTP client sends the request. It reaches online and
+offline requests, including nested PMTiles range requests. Cache hits, non-HTTP
+schemes, and requests that a provider answered bypass it.
+
+Compare the transformed URL against your own origin before you return a
+credential, because the callback runs for every network resource.
+
+<Code code={region(headerSnippet, "match")} lang="c" title="http-header-transform.c" />
+
+Set each name and value on the response. Returning a non-OK status discards the
+headers from that invocation and sends the request unchanged.
+
+<Code code={region(headerSnippet, "set")} lang="c" title="http-header-transform.c" />
+
+Register the transform on the runtime, and use
+`mln_runtime_clear_http_header_transform` to stop adding headers. Both calls
+work while maps are live, so a host installs a refreshed credential without
+recreating the runtime.
+
+<Code code={region(headerSnippet, "install")} lang="c" title="http-header-transform.c" />
+
+A redirect that keeps the scheme, host, and effective port carries the headers
+to its destination. A redirect that changes any of the three removes every
+header that the transform added, and it invokes no transform for the
+destination. Registration returns an unsupported status on OpenHarmony, whose
+HTTP client cannot make that distinction.
 
 ## Serve the bytes with a provider
 

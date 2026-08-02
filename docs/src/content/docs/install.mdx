@@ -127,7 +127,9 @@ hooks:
 ```
 
 Write an install prefix into `.dart_tool/maplibre_native_install_dir` to use
-your own build instead.
+your own build instead. A pinned Git revision keeps the Dart code fixed, and the
+hook still resolves the current snapshot for a build that has no artifact
+cached. Point the hook at your own prefix when you need a fixed native library.
 
 ## Swift
 
@@ -137,7 +139,14 @@ The package manifest at the repository root defines the Swift package.
 .package(url: "https://github.com/maplibre/maplibre-native-ffi", branch: "main")
 ```
 
-Depend on the `MaplibreNative` product.
+Depend on the `MaplibreNative` product. SwiftPM takes the package identity from
+the repository name rather than from the manifest, so name it as
+`maplibre-native-ffi`.
+
+```swift title="Package.swift"
+.product(name: "MaplibreNative", package: "maplibre-native-ffi")
+```
+
 [Get the native library](#get-the-native-library), then export
 `PKG_CONFIG_PATH` before you build.
 
@@ -169,8 +178,6 @@ export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
 cc -std=c23 main.c $(pkg-config --cflags --libs maplibre-native-c) -o main
 ```
 
-On Windows, add `<prefix>/bin` to `PATH` or copy the DLL beside your executable.
-
 ## Get the native library
 
 Download `maplibre-native-c-<preset>.tar.gz` for the target from the
@@ -180,6 +187,10 @@ and unpack it. The directory you unpack to is the install prefix.
 A preset is spelled `<platform>-<arch>-<backend>`, as in `macos-arm64-metal` or
 `linux-x64-vulkan`. OpenGL presets name their context provider in place of the
 backend: `wgl` on Windows and `egl` elsewhere.
+
+On Windows, add `<prefix>/bin` to `PATH` or copy `maplibre-native-c.dll` beside
+your executable, because a prefix carries no loader path there. Linux and macOS
+builds record an rpath into the prefix that they built against.
 
 To build a prefix yourself, install [mise](https://mise.jdx.dev/) and prepare
 the toolchain as the
