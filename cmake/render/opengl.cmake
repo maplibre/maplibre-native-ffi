@@ -53,6 +53,12 @@ function(mln_configure_render_dependencies target)
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
     find_package(OpenGL REQUIRED)
     target_link_libraries(${target} INTERFACE OpenGL::GL Gdi32 User32)
+  elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
+    # WebGL2 is GLES 3.0, which is what MapLibre's GL backend targets. FULL_ES3
+    # supplies the client-side array emulation the backend expects.
+    target_link_options(
+      ${target}
+      INTERFACE "-sMIN_WEBGL_VERSION=2" "-sMAX_WEBGL_VERSION=2" "-sFULL_ES3=1")
   else()
     message(
       FATAL_ERROR
@@ -65,6 +71,11 @@ function(mln_configure_renderer target)
 
   set(MLN_FFI_VENDOR_OPENGL_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/gl/headless_backend.cpp)
+  if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
+    # A browser host owns its WebGL context and hands it to a session, so
+    # upstream's EGL headless host has nothing to do here.
+    set(MLN_FFI_VENDOR_OPENGL_SOURCES)
+  endif()
 
   target_include_directories(
     ${target}
@@ -129,6 +140,15 @@ function(mln_configure_renderer target)
         COMPILE_OPTIONS
         "/FI${PROJECT_SOURCE_DIR}/third_party/khronos/include/GLES3/gl3.h;/FI${PROJECT_SOURCE_DIR}/third_party/khronos/include/GL/wglext.h")
     target_link_libraries(${target} PRIVATE MLN_FFI::RenderDependencies)
+  elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
+    target_compile_definitions(
+      ${target}
+      PRIVATE MLN_FFI_OPENGL_PROVIDER_WEBGL=1)
+    # Emscripten resolves GLES entry points at link time, so this is upstream's
+    # linked table rather than the run-time resolved one the Linux build uses.
+    list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
+         ${MLN_SOURCE_DIR}/platform/linux/src/gl_functions.cpp)
+    target_link_libraries(${target} PRIVATE MLN_FFI::RenderDependencies)
   else()
     message(
       FATAL_ERROR
@@ -136,8 +156,18 @@ function(mln_configure_renderer target)
   endif()
 
   set(MLN_FFI_OPENGL_SOURCES
-      ${PROJECT_SOURCE_DIR}/src/render/opengl/opengl_texture_session.cpp
-      ${PROJECT_SOURCE_DIR}/src/render/opengl/opengl_surface_session.cpp)
+      ${PROJECT_SOURCE_DIR}/src/render/opengl/opengl_texture_session.cpp)
+  if(NOT MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
+    # An OpenGL surface descriptor names a surface object to present to. A
+    # browser WebGL context is bound to its canvas, so a host has nothing to put
+    # there, and the browser composites the canvas without a swap. Settling that
+    # descriptor shape belongs with the first browser host, so the browser build
+    # takes the unsupported stub for now.
+    #
+    # TODO(browser-surface): see #37.
+    list(APPEND MLN_FFI_OPENGL_SOURCES
+         ${PROJECT_SOURCE_DIR}/src/render/opengl/opengl_surface_session.cpp)
+  endif()
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
     list(APPEND MLN_FFI_OPENGL_SOURCES
          ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_context.cpp)

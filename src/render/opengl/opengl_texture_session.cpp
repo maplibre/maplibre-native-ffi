@@ -27,6 +27,8 @@
 #include <Windows.h>
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 #include <EGL/egl.h>
+#elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+#include <emscripten/html5.h>
 #endif
 
 #include "diagnostics/diagnostics.hpp"
@@ -189,20 +191,30 @@ class OpenGLTextureRenderableResource final
   std::optional<mbgl::gl::Framebuffer> framebuffer_;
 };
 
+// A browser session renders into the host's own context, whichever kind of
+// texture it draws into, so MapLibre has to treat its cached GL state as stale
+// each frame. Every other provider gets a session context of its own inside the
+// host's share group and so keeps exclusive ownership of it.
+#if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+constexpr auto session_context_mode = mbgl::gfx::ContextMode::Shared;
+#else
+constexpr auto session_context_mode = mbgl::gfx::ContextMode::Unique;
+#endif
+
 class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
                                    public mbgl::gfx::HeadlessBackend {
  public:
   OpenGLTextureBackend(
     const mln_opengl_owned_texture_descriptor& descriptor, mbgl::Size size
   )
-      : mbgl::gl::RendererBackend(mbgl::gfx::ContextMode::Unique),
+      : mbgl::gl::RendererBackend(session_context_mode),
         mbgl::gfx::HeadlessBackend(size),
         context_(descriptor.context) {}
 
   OpenGLTextureBackend(
     const mln_opengl_borrowed_texture_descriptor& descriptor, mbgl::Size size
   )
-      : mbgl::gl::RendererBackend(mbgl::gfx::ContextMode::Unique),
+      : mbgl::gl::RendererBackend(session_context_mode),
         mbgl::gfx::HeadlessBackend(size),
         context_(descriptor.context),
         borrowed_texture_(descriptor.texture) {}
@@ -297,6 +309,8 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
     return render_context_ != nullptr;
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
     return egl_context_.has_value();
+#elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+    return context_.data.webgl.context > 0;
 #else
     return false;
 #endif
@@ -329,6 +343,10 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
         egl_context_ ? egl_context_->active_api() : EGL_NONE
       )
     );
+#elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+    // Emscripten resolves GLES entry points at link time.
+    (void)name;
+    return nullptr;
 #else
     (void)name;
     return nullptr;
@@ -366,6 +384,14 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
       egl_context_.emplace(context_.data.egl);
     }
     egl_context_->activate_pbuffer();
+#elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+    previous_webgl_context_ = emscripten_webgl_get_current_context();
+    if (
+      emscripten_webgl_make_context_current(context_.data.webgl.context) !=
+      EMSCRIPTEN_RESULT_SUCCESS
+    ) {
+      throw std::runtime_error("Switching WebGL context failed");
+    }
 #else
     throw std::runtime_error("OpenGL context provider is unsupported");
 #endif
@@ -381,6 +407,9 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
     previous_render_context_ = nullptr;
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
     egl_context_->deactivate();
+#elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+    (void)emscripten_webgl_make_context_current(previous_webgl_context_);
+    previous_webgl_context_ = 0;
 #endif
   }
 
@@ -414,6 +443,9 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   }
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   void destroy_native_context() { egl_context_.reset(); }
+#elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+  // The host owns the context this session borrowed.
+  void destroy_native_context() {}
 #else
   void destroy_native_context() {}
 #endif
@@ -428,6 +460,8 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   void* previous_render_context_ = nullptr;
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   std::optional<mln::core::opengl::EglSharedContext> egl_context_;
+#elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+  EMSCRIPTEN_WEBGL_CONTEXT_HANDLE previous_webgl_context_ = 0;
 #endif
 };
 

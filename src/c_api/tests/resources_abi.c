@@ -416,6 +416,33 @@ static void resource_transform_rejects_raw_invalid_descriptors(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Whether a transform can be registered at all is a property of the platform's
+// HTTP transport, not of the arguments: a transport that cannot drop a
+// transformed header when a redirect changes origin would hand the credential
+// to the redirect's destination, so it refuses the registration instead. Hosts
+// authenticate through a resource provider there.
+static void http_header_transform_registration_follows_the_transport(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_http_header_transform transform = {
+    .size = sizeof(mln_http_header_transform),
+    .callback = http_header_transform_stub,
+  };
+#if defined(__EMSCRIPTEN__)
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_UNSUPPORTED,
+    mln_runtime_set_http_header_transform(runtime, &transform)
+  );
+#else
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_set_http_header_transform(runtime, &transform)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_clear_http_header_transform(runtime)
+  );
+#endif
+  mln_test_destroy_runtime(runtime);
+}
+
 static void http_header_transform_rejects_raw_invalid_inputs(void) {
   static const char invalid_utf8[] = {'b', 'a', 'd', (char)0xFF};
   mln_runtime runtime = mln_test_create_runtime();
@@ -1199,6 +1226,7 @@ void run_resources_abi_tests(void) {
   RUN_TEST(offline_database_merge_rejects_raw_null_path);
   RUN_TEST(offline_take_rejects_mismatched_result_kind);
   RUN_TEST(resource_transform_rejects_raw_invalid_descriptors);
+  RUN_TEST(http_header_transform_registration_follows_the_transport);
   RUN_TEST(http_header_transform_rejects_raw_invalid_inputs);
   RUN_TEST(runtime_teardown_leaves_other_runtimes_responsive);
   RUN_TEST(resource_transform_lookup_leaves_other_runtimes_responsive);

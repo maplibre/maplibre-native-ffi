@@ -56,6 +56,8 @@ typedef struct mln_vulkan_context_descriptor {
 typedef enum mln_opengl_context_provider_flag : uint32_t {
   MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL = 1u << 0u,
   MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL = 1u << 1u,
+  /** Browser WebGL context imported into an Emscripten module. */
+  MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL = 1u << 2u,
 } mln_opengl_context_provider_flag;
 
 /** OpenGL platform context provider used by a context descriptor. */
@@ -64,6 +66,8 @@ typedef enum mln_opengl_context_platform : uint32_t {
   MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED = 0u,
   MLN_OPENGL_CONTEXT_PLATFORM_WGL = 1u,
   MLN_OPENGL_CONTEXT_PLATFORM_EGL = 2u,
+  /** Emscripten WebGL context handle. */
+  MLN_OPENGL_CONTEXT_PLATFORM_WEBGL = 3u,
 } mln_opengl_context_platform;
 
 /** WGL context fields shared by OpenGL render targets on Windows. */
@@ -96,6 +100,18 @@ typedef struct mln_egl_context_descriptor {
   void* get_proc_address;
 } mln_egl_context_descriptor;
 
+/**
+ * WebGL context fields shared by OpenGL render targets in the browser.
+ *
+ * The browser owns the context; a session renders into it rather than creating
+ * one of its own, so it is shared rather than exclusively held.
+ */
+typedef struct mln_webgl_context_descriptor {
+  uint32_t size;
+  /** Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE. Must be positive. */
+  int32_t context;
+} mln_webgl_context_descriptor;
+
 /** OpenGL backend context fields shared by OpenGL render targets. */
 typedef struct mln_opengl_context_descriptor {
   uint32_t size;
@@ -104,6 +120,7 @@ typedef struct mln_opengl_context_descriptor {
   union {
     mln_wgl_context_descriptor wgl;
     mln_egl_context_descriptor egl;
+    mln_webgl_context_descriptor webgl;
   } data;
 } mln_opengl_context_descriptor;
 

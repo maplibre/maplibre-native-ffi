@@ -73,8 +73,9 @@ recreating the runtime.
 A redirect that keeps the scheme, host, and effective port carries the headers
 to its destination. A redirect that changes any of the three removes every
 header that the transform added, and it invokes no transform for the
-destination. Registration returns an unsupported status on OpenHarmony, whose
-HTTP client cannot make that distinction.
+destination. Registration returns an unsupported status on OpenHarmony and in
+the browser, whose HTTP clients cannot make that distinction. Serve those
+requests with a provider instead, as the next section shows.
 
 ## Serve the bytes with a provider
 

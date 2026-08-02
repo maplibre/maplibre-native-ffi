@@ -341,8 +341,10 @@
 # include/maplibre_native_c/render_target.h
 --include-constant MLN_OPENGL_CONTEXT_PLATFORM_EGL
 --include-constant MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED
+--include-constant MLN_OPENGL_CONTEXT_PLATFORM_WEBGL
 --include-constant MLN_OPENGL_CONTEXT_PLATFORM_WGL
 --include-constant MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL
+--include-constant MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL
 --include-constant MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL
 --include-function mln_opengl_supported_context_provider_mask
 --include-function mln_render_target_extent_physical_size
@@ -351,6 +353,7 @@
 --include-struct mln_opengl_context_descriptor
 --include-struct mln_render_target_extent
 --include-struct mln_vulkan_context_descriptor
+--include-struct mln_webgl_context_descriptor
 --include-struct mln_wgl_context_descriptor
 
 # include/maplibre_native_c/runtime.h

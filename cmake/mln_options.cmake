@@ -12,7 +12,9 @@ function(mln_configure_options)
     PROPERTY STRINGS metal opengl vulkan)
   set(MLN_FFI_OPENGL_CONTEXT_PROVIDER ""
       CACHE STRING "OpenGL context provider for this wrapper build")
-  set_property(CACHE MLN_FFI_OPENGL_CONTEXT_PROVIDER PROPERTY STRINGS egl wgl)
+  set_property(
+    CACHE MLN_FFI_OPENGL_CONTEXT_PROVIDER
+    PROPERTY STRINGS egl wgl webgl)
   set(MLN_FFI_EGL_ROOT "" CACHE PATH "Path to a local EGL/GLES package")
 
   string(TOLOWER "${MLN_FFI_RENDER_BACKEND}" MLN_FFI_RENDER_BACKEND)
@@ -26,13 +28,20 @@ function(mln_configure_options)
     message(FATAL_ERROR "Metal builds require an Apple platform")
   endif()
   if(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
-    if(NOT MLN_FFI_OPENGL_CONTEXT_PROVIDER MATCHES "^(egl|wgl)$")
+    if(NOT MLN_FFI_OPENGL_CONTEXT_PROVIDER MATCHES "^(egl|wgl|webgl)$")
       message(
         FATAL_ERROR
           "Unsupported OpenGL context provider: ${MLN_FFI_OPENGL_CONTEXT_PROVIDER}")
     endif()
     if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl" AND NOT WIN32)
       message(FATAL_ERROR "OpenGL WGL builds require Windows")
+    endif()
+    if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl" AND NOT EMSCRIPTEN)
+      message(FATAL_ERROR "OpenGL WebGL builds require Emscripten")
+    endif()
+    if(EMSCRIPTEN AND NOT MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
+      message(
+        FATAL_ERROR "Browser OpenGL builds require the webgl context provider")
     endif()
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER)
     message(

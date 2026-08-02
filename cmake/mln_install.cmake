@@ -52,6 +52,13 @@ endfunction()
 
 function(mln_install_c_api_complete_static_archive target)
   get_target_property(MLN_FFI_INSTALL_ARCHIVE ${target} MLN_FFI_INSTALL_ARCHIVE)
+  # A platform that merges nothing leaves this unset -- see
+  # mln_configure_complete_static_archive() and the browser's `none` archive
+  # format. The rest of the prefix, headers and pkg-config included, still
+  # installs; the artifact such a platform distributes instead is its own task.
+  if(NOT MLN_FFI_INSTALL_ARCHIVE)
+    return()
+  endif()
   install(
     FILES "${MLN_FFI_INSTALL_ARCHIVE}"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}"

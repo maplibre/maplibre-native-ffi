@@ -5,7 +5,7 @@
 # mln_ffi_platform_dependencies; nothing here knows which compiler produced the
 # inputs:
 #
-#   MLN_FFI_ARCHIVE_FORMAT          coff, apple, or elf
+#   MLN_FFI_ARCHIVE_FORMAT          coff, apple, elf, or none
 #   MLN_FFI_ARCHIVE_TOOL            archiver for the apple format
 #   MLN_FFI_ARCHIVE_BUNDLED_RUNTIME archives to merge in on demand, such as a
 #                                   C++ runtime the consumer should not supply
@@ -138,6 +138,19 @@ endfunction()
 function(mln_configure_complete_static_archive target)
   get_target_property(MLN_FFI_ARCHIVE_FORMAT mln_ffi_platform_dependencies
                       MLN_FFI_ARCHIVE_FORMAT)
+  # A platform that distributes something other than an archive of native
+  # objects declares `none` and merges nothing. Browser builds are linked into a
+  # wasm module by emcc, and merging wasm archives needs an MRI script rather
+  # than the relocatable link the elf format uses.
+  #
+  # MLN_FFI_INSTALL_ARCHIVE stays unset, which is what tells
+  # mln_install_c_api_complete_static_archive() there is no archive to install.
+  #
+  # TODO(browser-packaging): give the browser a distributable artifact -- see
+  # #37 phase D, which also covers the prelinked module JS consumers need.
+  if(MLN_FFI_ARCHIVE_FORMAT STREQUAL "none")
+    return()
+  endif()
   set(MLN_FFI_COMPLETE_STATIC_DIR
       "${CMAKE_CURRENT_BINARY_DIR}/${target}-complete-static")
   if(MLN_FFI_ARCHIVE_FORMAT STREQUAL "coff")
