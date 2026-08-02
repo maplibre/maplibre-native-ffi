@@ -9,16 +9,22 @@ repository.workspace = true
 crate-type = ["staticlib"]
 
 [dependencies]
-http = "1.4"
+# Image decoding is shared by every platform, so a raster tile decodes to the
+# same pixels everywhere.
 image = { version = "0.25.8", default-features = false, features = ["jpeg", "png", "webp"] }
+
+# The browser gets its HTTP from emscripten_fetch instead, so it needs none of
+# the transport stack: no sockets, no TLS, no worker pool.
+[target.'cfg(not(target_os = "emscripten"))'.dependencies]
+http = "1.4"
 threadpool = "1.8.1"
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = { version = "0.21.1", default-features = false }
 rustls-platform-verifier = "0.6.2"
 
-[target.'cfg(target_os = "windows")'.dependencies]
+[target.'cfg(all(not(target_os = "emscripten"), target_os = "windows"))'.dependencies]
 ureq = { version = "3", default-features = false, features = ["native-tls", "gzip", "socks-proxy"] }
 
-[target.'cfg(not(target_os = "windows"))'.dependencies]
+[target.'cfg(all(not(target_os = "emscripten"), not(target_os = "windows")))'.dependencies]
 ureq = { version = "3", default-features = false, features = ["rustls", "gzip", "platform-verifier", "socks-proxy"] }
