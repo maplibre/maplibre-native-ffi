@@ -417,6 +417,9 @@ jobs:
     name: Deploy Docs Pages
     needs:
       - docs-pages
+    # The Pages build preserves live feeds after a package staging failure.
+    # This status check lets the resulting artifact deploy in that case.
+    if: ${{ !cancelled() && needs.docs-pages.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
