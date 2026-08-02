@@ -7,6 +7,11 @@ min_version = "2026.7.15"
 
 [settings]
 lockfile = true
+# The cross-compilation SDKs install when asked for, through `mise bootstrap` or
+# `mise install`, and never on the way to something else. Otherwise a lint task or a
+# Git hook pulls in gigabytes, and a machine that cannot install one of them cannot
+# run any task at all.
+auto_install_disable_tools = ["android-sdk", "emsdk", "ohos-sdk"]
 # The submodules provider checks Git state directly and intentionally runs on
 # every dependency pass, so suppress its perpetual shell stale warning.
 status.show_deps_stale = false
@@ -44,6 +49,13 @@ shell = "bash -e -c"
 
 [vars]
 actionlint_version = "1.7.8"
+# The Android SDK tool installs the command-line tools and nothing else, so this is
+# their version; the packages below are what .mise/bin/sync-android-packages adds.
+# Gradle reads the package versions from the environment, which `[env]` sets from
+# these.
+android_cmdline_tools_version = "22.0"
+android_cmake_version = "4.1.2"
+android_ndk_version = "28.2.13676358"
 cargo_about_version = "0.9.1"
 cmake_version = "4.3.3"
 dart_version = "3.12.2"
@@ -62,6 +74,7 @@ ktfmt_version = "0.62"
 libxml2_version = "2.13.9"
 node_version = "24.11.0"
 ninja_version = "1.13.2"
+ohos_sdk_version = "6.1"
 pkl_version = "0.31.0"
 pnpm_version = "10.33.2"
 python_version = "3.14.4"
@@ -110,9 +123,30 @@ swiftformat = { version = "{{vars.swiftformat_version}}", backend = "github:nick
 # binding declares its own wider platform set in bindings/zig/mise.toml.
 "core:zig" = { version = "{{vars.zig_version}}", os = ["linux"] }
 
+# Cross-compilation SDKs for the non-host targets. The CMake presets and the Rust
+# cross builds read what these export -- ANDROID_HOME, EMSDK, OHOS_SDK_NATIVE --
+# so declaring them here is what lets one `build <preset>` serve every target.
+#
+# Each is a multi-gigabyte download, and `disable_tools` is how an environment that
+# builds fewer targets keeps them out: .github/actions/setup-ci-deps narrows the set
+# to each job's target, the devcontainer image drops all three, and a contributor
+# does the same in mise.local.toml. See the development overview.
+#
+# The Android SDK tool installs the command-line tools alone, so the packages the
+# builds need are installed once the SDK is in place.
+android-sdk = { version = "{{vars.android_cmdline_tools_version}}", postinstall = ".mise/bin/sync-android-packages {{vars.java_version}} {{vars.android_ndk_version}} {{vars.android_cmake_version}}" }
+emsdk = "{{vars.emsdk_version}}"
+# mise has no registry entry for the OpenHarmony SDK, so this resolves through the
+# plugin the hook below registers. Its unpacking step needs a POSIX shell, which is
+# why Windows is left out.
+ohos-sdk = { version = "{{vars.ohos_sdk_version}}", os = ["linux", "macos"] }
+
 [env]
-MLN_FFI_ANDROID_CMAKE_VERSION = "4.1.2"
-MLN_FFI_ANDROID_NDK_VERSION = "28.2.13676358"
+# The Android SDK packages the CMake presets and the Gradle builds resolve. They are
+# environment variables because Gradle reads them, and they come from `[vars]`
+# because the tool's post-install step takes them as arguments.
+MLN_FFI_ANDROID_CMAKE_VERSION = "{{vars.android_cmake_version}}"
+MLN_FFI_ANDROID_NDK_VERSION = "{{vars.android_ndk_version}}"
 
 # sccache keeps compiled objects in its own disk cache, which every checkout on
 # the machine shares; .mise/bin/with-sccache-basedirs lines the cache keys up
@@ -154,6 +188,14 @@ run = ".mise/bin/sync-rustls-platform-verifier"
 timeout = "2m"
 
 [hooks]
+# The OpenHarmony SDK plugin lives in the repository, and mise resolves a plugin
+# from its own directory, so registering the link is what makes `ohos-sdk` install.
+# Linking is a symlink, and re-linking is how a checkout that moves stops being
+# stale. Moving the plugin to its own repository later replaces this with a
+# `[plugins]` entry naming its URL.
+preinstall = [
+  "mise plugins link --force ohos-sdk .mise/plugins/ohos-sdk",
+]
 postinstall = [
   "hk install --mise --quiet",
 ]
@@ -186,24 +228,6 @@ sources = [
 ]
 outputs = { auto = true }
 run = '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"'
-
-[tasks."build:emscripten"]
-description = "Configure, build, and install an Emscripten native CMake preset."
-usage = 'arg "[preset]" default="emscripten-wasm32-webgl"'
-# The Emscripten SDK is large and only Emscripten presets need it, so it is scoped
-# to this task rather than installed for every contributor. That is also why
-# Emscripten presets do not go through the shared `build` task.
-tools = { emsdk = "{{vars.emsdk_version}}" }
-run = '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"'
-
-[tasks."test:emscripten"]
-description = "Build and run C API tests for an Emscripten CMake preset."
-usage = 'arg "[preset]" default="emscripten-wasm32-webgl"'
-depends = [{ task = "//:build:emscripten", args = ["{{usage.preset}}"] }]
-# The suite runs as a page in headless Chromium; see scripts/run-browser-test.mjs
-# for how a browser is located.
-tools = { emsdk = "{{vars.emsdk_version}}" }
-run = 'ctest --preset "$usage_preset"'
 
 [tasks."build:rust-emscripten"]
 description = "Build the Rust platform support library for the Emscripten target."
@@ -253,6 +277,8 @@ run = [
 description = "Build and run C API tests for a CMake preset."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+# The Emscripten suite runs as a page in headless Chromium; see
+# scripts/run-browser-test.mjs for how a browser is located.
 run = '''
 if [[ "$usage_preset" == ios-simulator-* ]]; then
   mise run //:ios-simulator:boot

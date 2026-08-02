@@ -428,7 +428,7 @@ jobs:
           save-toolchains: true
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-      - run: mise run test:emscripten emscripten-wasm32-webgl
+      - run: mise run test emscripten-wasm32-webgl
 
   target-emscripten-wasm32-webgpu:
     name: target / emscripten-wasm32-webgpu
@@ -445,7 +445,7 @@ jobs:
           gradle: false
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-      - run: mise run test:emscripten emscripten-wasm32-webgpu
+      - run: mise run test emscripten-wasm32-webgpu
 
   target-macos-arm64-metal:
     name: target / macos-arm64-metal
@@ -920,7 +920,7 @@ jobs:
           gradle: false
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-      - run: mise run //bindings/rust:build:ohos ohos-arm64-egl
+      - run: mise run //bindings/rust:build ohos-arm64-egl
 
   target-ohos-arm64-vulkan:
     name: target / ohos-arm64-vulkan
@@ -937,7 +937,7 @@ jobs:
           gradle: false
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-      - run: mise run //bindings/rust:build:ohos ohos-arm64-vulkan
+      - run: mise run //bindings/rust:build ohos-arm64-vulkan
 
   target-windows-x64-wgl:
     name: target / windows-x64-wgl

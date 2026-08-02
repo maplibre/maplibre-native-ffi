@@ -60,6 +60,38 @@ runs:
         New-Item -Path $reporting -Force | Out-Null
         Set-ItemProperty -Path $reporting -Name DontShowUI -Value 1 -Type DWord
 
+    # The repository pins a cross-compilation SDK per non-host target, and every job
+    # installs the root tools, so each job keeps only the SDK its target builds with.
+    # Android is disabled outright: the runner image ships an SDK and points
+    # ANDROID_HOME at it, which costs nothing to reuse.
+    - name: Scope the cross-compilation SDKs to the target (Unix)
+      if: runner.os != 'Windows'
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+      run: |
+        case "${TARGET}" in
+          emscripten-*) keep="emsdk" ;;
+          ohos-*) keep="ohos-sdk" ;;
+          *) keep="" ;;
+        esac
+        disabled=()
+        for tool in android-sdk emsdk ohos-sdk; do
+          if [[ "${tool}" != "${keep}" ]]; then
+            disabled+=("${tool}")
+          fi
+        done
+        printf 'MISE_DISABLE_TOOLS=%s\n' "$(IFS=,; echo "${disabled[*]}")" >> "$GITHUB_ENV"
+
+    # No Windows target cross-compiles, so every SDK is disabled here. Native
+    # PowerShell rather than Git Bash, which is x86_64 under Windows ARM64 emulation
+    # and can terminate with a native exception while spawning processes:
+    # https://github.com/actions/runner-images/issues/14052
+    - name: Scope the cross-compilation SDKs to the target (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: '"MISE_DISABLE_TOOLS=android-sdk,emsdk,ohos-sdk" >> $env:GITHUB_ENV'
+
     # The gitlink SHA is what decides the checkout, so key on it directly. A
     # tag file can be left behind by a pin bump; the recorded commit cannot.
     - name: Resolve the MapLibre Native pin
@@ -189,43 +221,6 @@ runs:
         restore-keys: |
           ${{ runner.os }}-${{ runner.arch }}-zig-packages-v2-
 
-    # Not cached: the SDK is large enough to compete with every other target for
-    # the shared repository cache, and re-fetching it costs less than the
-    # eviction pressure an entry that size adds.
-    - name: Setup OpenHarmony SDK
-      if: ${{ startsWith(inputs.target, 'ohos-') }}
-      shell: bash
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        sdk_root="$HOME/setup-ohos-sdk"
-        archive="ohos-sdk-windows_linux-public.tar.gz"
-
-        mkdir -p "$sdk_root"
-        cd "$sdk_root"
-        if [[ ! -f "$sdk_root/linux/native/build/cmake/ohos.toolchain.cmake" ]]; then
-          gh release download v6.1 \
-            --repo openharmony-rs/ohos-sdk \
-            --pattern "${archive}*"
-
-          # Stream the parts through sha256sum and tar; holding the parts, a
-          # joined copy, and the extracted tree at once overflows the disk,
-          # which kills the runner agent rather than failing the step.
-          expected_sha="b833b75a64ee46bbd7880921abbb49b733ec5c8171b6684c9b524d57f624cee0"
-          actual_sha="$(cat "${archive}".a* | sha256sum | awk '{print $1}')"
-          if [[ "$actual_sha" != "$expected_sha" ]]; then
-            echo "OHOS SDK archive hash mismatch: expected $expected_sha, got $actual_sha" >&2
-            exit 1
-          fi
-          # tar cannot sniff compression from a pipe, so -z is required here.
-          cat "${archive}".a* | tar -xzf -
-          rm -f "${archive}".a*
-          unzip -q linux/native-*.zip -d linux
-          rm -f linux/native-*.zip
-        fi
-
-        echo "OHOS_SDK_NATIVE=$sdk_root/linux/native" >> "$GITHUB_ENV"
-
     # Caches Gradle User Home and stops the daemons in its post-action, before
     # the cache is saved. Daemons that outlive the job keep Windows file locks
     # on `caches/*/**/*.lock`, which a plain archive step cannot read. The
@@ -343,8 +338,15 @@ runs:
         # mise keeps its data under LOCALAPPDATA on Windows and the XDG data
         # directory everywhere else. `core:rust` defers to rustup, which owns
         # ~/.rustup and the proxies in ~/.cargo/bin.
+        #
+        # The cross-compilation SDKs are excluded: one job installs each, and either
+        # is large enough to compete with every other target for the shared
+        # repository cache. Re-fetching one costs less than the eviction pressure an
+        # entry that size adds.
         path: |
           ~/.local/share/mise
+          !~/.local/share/mise/installs/emsdk
+          !~/.local/share/mise/installs/ohos-sdk
           ~/AppData/Local/mise
           ~/.rustup
           ~/.cargo/bin
@@ -398,8 +400,11 @@ runs:
       if: ${{ inputs.save-toolchains == 'true' && steps.toolchains.outputs.cache-hit != 'true' }}
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
+        # Matches the restore above, exclusions included.
         path: |
           ~/.local/share/mise
+          !~/.local/share/mise/installs/emsdk
+          !~/.local/share/mise/installs/ohos-sdk
           ~/AppData/Local/mise
           ~/.rustup
           ~/.cargo/bin

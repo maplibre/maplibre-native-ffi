@@ -19,6 +19,13 @@
 "github:xtool-org/xtool" = { version = "{{vars.xtool_version}}", os = ["linux"] }
 # END generated tools
 
+[settings]
+# The image carries the tools a binding, example, or docs project declares. The
+# cross-compilation SDKs the root config pins are several gigabytes together and
+# would dominate it, so a container that builds those targets installs the one it
+# needs by clearing this.
+disable_tools = ["android-sdk", "emsdk", "ohos-sdk"]
+
 [oci]
 from = "ubuntu:24.04"
 tag = "maplibre-native-ffi-devcontainer:local"

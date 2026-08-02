@@ -4,11 +4,29 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
-  cargo build \
+export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+
+# A host build lets cargo pick its own target and toolchain. An OpenHarmony build
+# names the target and points every tool that compiles or links at the SDK.
+if [[ "$usage_preset" == ohos-* ]]; then
+  sysroot="$OHOS_SDK_NATIVE/sysroot"
+  target_flags="--target=aarch64-linux-ohos --sysroot=$sysroot"
+  export BINDGEN_EXTRA_CLANG_ARGS_aarch64_unknown_linux_ohos="$target_flags -I$sysroot/usr/include/aarch64-linux-ohos"
+  export CC_aarch64_unknown_linux_ohos="$OHOS_SDK_NATIVE/llvm/bin/clang $target_flags"
+  export CXX_aarch64_unknown_linux_ohos="$OHOS_SDK_NATIVE/llvm/bin/clang++ $target_flags"
+  export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_OHOS_LINKER="$OHOS_SDK_NATIVE/llvm/bin/clang"
+  export RUSTFLAGS="-C link-arg=--target=aarch64-linux-ohos -C link-arg=--sysroot=$sysroot -C link-arg=-fuse-ld=lld"
+  exec cargo build \
     -p maplibre-native-ffi-sys \
     -p maplibre-native-ffi-core \
-    -p maplibre-native-ffi
+    -p maplibre-native-ffi \
+    --target aarch64-unknown-linux-ohos
+fi
+
+cargo build \
+  -p maplibre-native-ffi-sys \
+  -p maplibre-native-ffi-core \
+  -p maplibre-native-ffi
 '''
 run_windows = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
@@ -72,29 +90,3 @@ dir = "../.."
 # while the snapshot release publishes on its own schedule, so they stop
 # compiling whenever it lags a header change.
 run = 'env -u MAPLIBRE_NATIVE_C_INSTALL_DIR cargo test -p maplibre-native-ffi-sys'
-
-[tasks."build:ohos"]
-usage = '''
-arg "<preset>" {
-  choices "ohos-arm64-egl" "ohos-arm64-vulkan"
-}
-'''
-depends = [
-  { task = "//:build", args = ["{{usage.preset}}"] },
-]
-dir = "../.."
-run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-sysroot="$OHOS_SDK_NATIVE/sysroot"
-MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
-BINDGEN_EXTRA_CLANG_ARGS_aarch64_unknown_linux_ohos="--target=aarch64-linux-ohos --sysroot=$sysroot -I$sysroot/usr/include/aarch64-linux-ohos" \
-CC_aarch64_unknown_linux_ohos="$OHOS_SDK_NATIVE/llvm/bin/clang --target=aarch64-linux-ohos --sysroot=$sysroot" \
-CXX_aarch64_unknown_linux_ohos="$OHOS_SDK_NATIVE/llvm/bin/clang++ --target=aarch64-linux-ohos --sysroot=$sysroot" \
-CARGO_TARGET_AARCH64_UNKNOWN_LINUX_OHOS_LINKER="$OHOS_SDK_NATIVE/llvm/bin/clang" \
-RUSTFLAGS="-C link-arg=--target=aarch64-linux-ohos -C link-arg=--sysroot=$sysroot -C link-arg=-fuse-ld=lld" \
-cargo build \
-  -p maplibre-native-ffi-sys \
-  -p maplibre-native-ffi-core \
-  -p maplibre-native-ffi \
-  --target aarch64-unknown-linux-ohos
-'''
