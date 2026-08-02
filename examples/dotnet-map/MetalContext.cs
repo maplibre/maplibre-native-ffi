@@ -1,9 +1,9 @@
 using System.Runtime.InteropServices;
-using Maplibre.Native;
-using Maplibre.Native.Render;
+using Maplibre.NativeFfi;
+using Maplibre.NativeFfi.Render;
 using Silk.NET.GLFW;
 
-namespace Maplibre.Native.Examples.DotnetMap;
+namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal sealed unsafe class MetalContext : IGraphicsContext
 {

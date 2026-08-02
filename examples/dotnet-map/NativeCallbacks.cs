@@ -1,9 +1,9 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Maplibre.Native;
+using Maplibre.NativeFfi;
 using Silk.NET.GLFW;
 
-namespace Maplibre.Native.Examples.DotnetMap;
+namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal static unsafe class NativeCallbacks
 {

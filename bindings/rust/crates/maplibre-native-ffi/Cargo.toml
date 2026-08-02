@@ -1,0 +1,26 @@
+[package]
+name = "maplibre-native-ffi"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bitflags = "2.10.0"
+maplibre-native-ffi-core = { path = "../maplibre-native-ffi-core" }
+maplibre-native-ffi-sys = { path = "../maplibre-native-ffi-sys" }
+
+# Cargo enables a dependency's features only where that dependency is declared,
+# so the render backend has to be selectable from here for anyone depending on
+# this crate alone. See maplibre-native-ffi-sys for why at most one applies.
+[features]
+metal = ["maplibre-native-ffi-sys/metal"]
+opengl = ["maplibre-native-ffi-sys/opengl"]
+vulkan = ["maplibre-native-ffi-sys/vulkan"]
+
+[dev-dependencies]
+ash = "0.38.0"
+glow = "0.16.0"
+glutin_egl_sys = "0.7.1"
+libloading = "0.8.9"
+static_assertions = "1.1.0"

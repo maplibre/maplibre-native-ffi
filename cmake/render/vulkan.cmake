@@ -1,11 +1,12 @@
-function(mln_configure_render_dependencies target)
-  mln_add_license(${target} "${MLN_SOURCE_DIR}/vendor/Vulkan-Headers/LICENSE.md"
-                  "vulkan-headers.md")
-  mln_add_license(
-    ${target} "${MLN_SOURCE_DIR}/vendor/VulkanMemoryAllocator/LICENSE.txt"
+function(mln_ffi_configure_render_dependencies target)
+  mln_ffi_add_license(
+    ${target} "${MLN_FFI_SOURCE_DIR}/vendor/Vulkan-Headers/LICENSE.md"
+    "vulkan-headers.md")
+  mln_ffi_add_license(
+    ${target} "${MLN_FFI_SOURCE_DIR}/vendor/VulkanMemoryAllocator/LICENSE.txt"
     "vulkan-memory-allocator.txt")
-  mln_add_license(${target} "${MLN_SOURCE_DIR}/vendor/glslang/LICENSE.txt"
-                  "glslang.txt")
+  mln_ffi_add_license(
+    ${target} "${MLN_FFI_SOURCE_DIR}/vendor/glslang/LICENSE.txt" "glslang.txt")
 
   # glslang builds with the SPIR-V optimizer off, so no separately licensed
   # SPIRV-Tools code reaches the artifacts and the notices above cover the whole
@@ -97,19 +98,19 @@ function(mln_configure_render_dependencies target)
   endif()
 endfunction()
 
-function(mln_configure_renderer target)
+function(mln_ffi_configure_renderer target)
   target_compile_definitions(${target} PRIVATE MLN_RENDER_BACKEND_VULKAN=1)
 
   set(MLN_FFI_VENDOR_VULKAN_SOURCES
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/vulkan/headless_backend.cpp)
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/vulkan/headless_backend.cpp)
   set(MLN_FFI_VULKAN_SOURCES
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_dispatch.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_texture_session.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_texture_backend.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_surface_session.cpp)
 
-  mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_VULKAN_SOURCES})
-  mln_target_project_sources(${target} ${MLN_FFI_VULKAN_SOURCES})
+  mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_VULKAN_SOURCES})
+  mln_ffi_target_project_sources(${target} ${MLN_FFI_VULKAN_SOURCES})
 
   target_link_libraries(${target} PRIVATE MLN_FFI::RenderDependencies)
 endfunction()

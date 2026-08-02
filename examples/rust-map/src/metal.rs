@@ -1,4 +1,4 @@
-use maplibre_native::{
+use maplibre_native_ffi::{
     Error as MaplibreError, ErrorKind, MetalOwnedTextureFrameHandle, NativePointer,
 };
 use objc2::ClassType;
@@ -69,8 +69,8 @@ impl MetalContext {
         })
     }
 
-    pub fn context_descriptor(&self) -> maplibre_native::MetalContextDescriptor {
-        maplibre_native::MetalContextDescriptor::new(self.device_pointer())
+    pub fn context_descriptor(&self) -> maplibre_native_ffi::MetalContextDescriptor {
+        maplibre_native_ffi::MetalContextDescriptor::new(self.device_pointer())
     }
 
     pub fn layer_pointer(&self) -> NativePointer {
@@ -92,7 +92,7 @@ impl MetalContext {
 }
 
 impl MetalTextureCompositor {
-    pub fn new(context: &MetalContext) -> maplibre_native::Result<Self> {
+    pub fn new(context: &MetalContext) -> maplibre_native_ffi::Result<Self> {
         let queue = context
             .device
             .newCommandQueue()
@@ -108,7 +108,10 @@ impl MetalTextureCompositor {
         })
     }
 
-    pub fn draw(&mut self, frame: &MetalOwnedTextureFrameHandle) -> maplibre_native::Result<()> {
+    pub fn draw(
+        &mut self,
+        frame: &MetalOwnedTextureFrameHandle,
+    ) -> maplibre_native_ffi::Result<()> {
         let metadata = frame.frame()?;
         if metadata.width == 0 || metadata.height == 0 {
             return Err(metal_error("owned Metal frame has an empty extent"));
@@ -123,7 +126,7 @@ impl MetalTextureCompositor {
     pub fn draw_texture(
         &mut self,
         texture: &ProtocolObject<dyn MTLTexture>,
-    ) -> maplibre_native::Result<()> {
+    ) -> maplibre_native_ffi::Result<()> {
         // SAFETY: The layer, command queue, pipeline, and texture are live for this call.
         unsafe {
             let drawable = self
@@ -167,7 +170,7 @@ impl MetalTextureCompositor {
 }
 
 impl MetalBorrowedTexture {
-    pub fn new(context: &MetalContext, viewport: Viewport) -> maplibre_native::Result<Self> {
+    pub fn new(context: &MetalContext, viewport: Viewport) -> maplibre_native_ffi::Result<Self> {
         // SAFETY: The descriptor and texture are created on the live Metal device.
         let descriptor = unsafe {
             MTLTextureDescriptor::texture2DDescriptorWithPixelFormat_width_height_mipmapped(
@@ -197,7 +200,7 @@ impl MetalBorrowedTexture {
 
 fn create_pipeline(
     device: &ProtocolObject<dyn MTLDevice>,
-) -> maplibre_native::Result<Retained<ProtocolObject<dyn MTLRenderPipelineState>>> {
+) -> maplibre_native_ffi::Result<Retained<ProtocolObject<dyn MTLRenderPipelineState>>> {
     let library = device
         .newLibraryWithSource_options_error(
             ns_string!(include_str!("metal_texture_compositor/shader.metal")),

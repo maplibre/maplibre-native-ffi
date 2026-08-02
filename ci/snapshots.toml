@@ -71,7 +71,7 @@ shared = [
   "!pyproject.toml",
   "!uv.lock",
   "!Directory.Packages.props",
-  "!Maplibre.Native.slnx",
+  "!Maplibre.NativeFfi.slnx",
   "!.config/dotnet-tools.json",
   "!Package.swift",
   "!Package.resolved",
@@ -140,7 +140,7 @@ depends = ["native"]
 paths = [
   "bindings/dotnet/**",
   "Directory.Packages.props",
-  "Maplibre.Native.slnx",
+  "Maplibre.NativeFfi.slnx",
   ".config/dotnet-tools.json",
 ]
 
@@ -161,7 +161,7 @@ paths = [
   "pnpm-workspace.yaml",
   ".npmrc",
   "Directory.Packages.props",
-  "Maplibre.Native.slnx",
+  "Maplibre.NativeFfi.slnx",
   ".config/dotnet-tools.json",
   "Package.swift",
   "Package.resolved",

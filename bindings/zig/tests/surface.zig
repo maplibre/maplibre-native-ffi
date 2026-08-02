@@ -2,7 +2,7 @@ const std = @import("std");
 const build_options = @import("build_options");
 const testing = std.testing;
 
-const maplibre = @import("maplibre_native");
+const maplibre = @import("maplibre_native_ffi");
 const metal_support = @import("metal_support.zig");
 const support = @import("support.zig");
 

@@ -1,6 +1,6 @@
 const testing = @import("std").testing;
 
-const maplibre = @import("maplibre_native");
+const maplibre = @import("maplibre_native_ffi");
 
 comptime {
     _ = @import("diagnostics.zig");

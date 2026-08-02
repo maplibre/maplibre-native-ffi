@@ -12,9 +12,9 @@ import warnings
 
 import pytest
 
-import maplibre_native as mln
-from maplibre_native import _native
-from maplibre_native import (
+import maplibre_native_ffi as mln
+from maplibre_native_ffi import _native
+from maplibre_native_ffi import (
     camera,
     geo,
     json,
@@ -352,15 +352,15 @@ def test_public_type_hints_are_resolvable() -> None:
 
     map_hints = typing.get_type_hints(map_module.MapHandle.add_style_source_json)
     assert map_hints["source_json"] != typing.Any
-    assert "maplibre_native.json.JsonObject" in repr(map_hints["source_json"])
+    assert "maplibre_native_ffi.json.JsonObject" in repr(map_hints["source_json"])
 
     layer_hints = typing.get_type_hints(map_module.MapHandle.set_layer_property)
     assert layer_hints["value"] != typing.Any
-    assert "maplibre_native.json.JsonUInt" in repr(layer_hints["value"])
+    assert "maplibre_native_ffi.json.JsonUInt" in repr(layer_hints["value"])
 
     style_hints = typing.get_type_hints(map_module.MapHandle.get_style_layer_json)
     assert style_hints["return"] != typing.Any
-    assert "maplibre_native.json.JsonObject" in repr(style_hints["return"])
+    assert "maplibre_native_ffi.json.JsonObject" in repr(style_hints["return"])
 
     map_init_hints = typing.get_type_hints(map_module.MapHandle.__init__)
     assert map_init_hints["runtime"] is mln.RuntimeHandle
@@ -394,7 +394,7 @@ def test_public_type_hints_are_resolvable() -> None:
     assert extension_hints["feature"] is geo.Feature
     assert extension_hints["return"] is query.FeatureExtensionResult
     assert extension_hints["arguments"] != typing.Any
-    assert "maplibre_native.json.JsonObject" in repr(extension_hints["arguments"])
+    assert "maplibre_native_ffi.json.JsonObject" in repr(extension_hints["arguments"])
 
     rendered_hints = typing.get_type_hints(
         render.RenderSessionHandle.query_rendered_features
@@ -505,8 +505,8 @@ def test_pump_clears_the_wake_flag_it_returns_on() -> None:
 def test_closed_handle_finalizers_are_quiet_at_interpreter_shutdown() -> None:
     script = textwrap.dedent(
         """
-        import maplibre_native as mln
-        from maplibre_native import style
+        import maplibre_native_ffi as mln
+        from maplibre_native_ffi import style
 
         runtime = mln.RuntimeHandle()
         map_handle = runtime.create_map()

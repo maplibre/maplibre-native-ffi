@@ -2,7 +2,10 @@
   "metadata": [
     {
       "src": [
-        { "files": ["src/Maplibre.Native/Maplibre.Native.csproj"], "src": ".." }
+        {
+          "files": ["src/Maplibre.NativeFfi/Maplibre.NativeFfi.csproj"],
+          "src": ".."
+        }
       ],
       "dest": "../build/docfx-api",
       "filter": "filterConfig.yml",
@@ -20,7 +23,7 @@
     ],
     "dest": "../build/docfx",
     "globalMetadata": {
-      "_appTitle": "Maplibre.Native",
+      "_appTitle": "Maplibre.NativeFfi",
       "_enableSearch": true,
       "_disableContribution": true
     },

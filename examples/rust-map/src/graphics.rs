@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use maplibre_native::RenderBackendMask;
+use maplibre_native_ffi::RenderBackendMask;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::Window;
 use winit::window::WindowAttributes;

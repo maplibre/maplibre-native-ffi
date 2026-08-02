@@ -1,6 +1,6 @@
-using Maplibre.Native;
+using Maplibre.NativeFfi;
 
-namespace Maplibre.Native.Examples.DotnetMap;
+namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal sealed class MetalBorrowedTexture : IDisposable
 {

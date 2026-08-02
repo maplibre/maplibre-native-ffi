@@ -1,4 +1,4 @@
-import MaplibreNative
+import MaplibreNativeFFI
 
 func installCAPILogging() {
   do {

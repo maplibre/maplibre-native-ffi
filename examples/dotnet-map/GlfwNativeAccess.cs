@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using Silk.NET.GLFW;
 
-namespace Maplibre.Native.Examples.DotnetMap;
+namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal static unsafe partial class GlfwNativeAccess
 {

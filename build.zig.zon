@@ -1,5 +1,5 @@
 .{
-    .name = .maplibre_native,
+    .name = .maplibre_native_ffi,
     .version = "0.16.0",
     .dependencies = .{
         .zigglgen = .{
@@ -8,5 +8,5 @@
         },
     },
     .paths = .{""},
-    .fingerprint = 0xf39f1b6c19db75ea,
+    .fingerprint = 0x4a5753fe2d8d68d1,
 }

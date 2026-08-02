@@ -34,7 +34,7 @@ void mln_test_destroy_runtime(mln_runtime runtime);
 void mln_test_destroy_map(mln_map map);
 void mln_test_sleep_millisecond(void);
 
-// Reads a file under the directory named by the MLN_TEST_FIXTURE_DIR
+// Reads a file under the directory named by the MLN_FFI_TEST_FIXTURE_DIR
 // environment variable, which ctest sets, for tests that replay recorded tile
 // or style bytes through a resource provider. relative_path is joined onto that
 // directory. Returns malloc'd bytes the caller frees, or null when the file

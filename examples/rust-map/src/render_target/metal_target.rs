@@ -1,6 +1,6 @@
 use std::error::Error as StdError;
 
-use maplibre_native::{Error, ErrorKind, MapAttachRef, RenderSessionHandle};
+use maplibre_native_ffi::{Error, ErrorKind, MapAttachRef, RenderSessionHandle};
 
 use crate::graphics::GraphicsContext;
 use crate::metal::{MetalBorrowedTexture, MetalContext, MetalTextureCompositor};
@@ -28,7 +28,7 @@ impl RenderTarget {
         map: &MapAttachRef,
         graphics: &GraphicsContext,
         viewport: Viewport,
-    ) -> maplibre_native::Result<Self> {
+    ) -> maplibre_native_ffi::Result<Self> {
         let metal = graphics.metal();
         match mode {
             Mode::OwnedTexture => attach_owned_texture(map, metal, viewport),
@@ -47,13 +47,13 @@ impl RenderTarget {
         &mut self,
         graphics: &GraphicsContext,
         viewport: Viewport,
-    ) -> maplibre_native::Result<()> {
+    ) -> maplibre_native_ffi::Result<()> {
         match self {
             Self::BorrowedTexture {
                 session, texture, ..
             } => {
                 let replacement = MetalBorrowedTexture::new(graphics.metal(), viewport)?;
-                let descriptor = maplibre_native::MetalBorrowedTextureDescriptor::new(
+                let descriptor = maplibre_native_ffi::MetalBorrowedTextureDescriptor::new(
                     extent(viewport),
                     viewport.physical_width,
                     viewport.physical_height,
@@ -82,7 +82,10 @@ impl RenderTarget {
         }
     }
 
-    pub fn render_update(&mut self, _graphics: &GraphicsContext) -> maplibre_native::Result<bool> {
+    pub fn render_update(
+        &mut self,
+        _graphics: &GraphicsContext,
+    ) -> maplibre_native_ffi::Result<bool> {
         match self {
             Self::OwnedTexture {
                 session,
@@ -154,8 +157,8 @@ fn attach_owned_texture(
     map: &MapAttachRef,
     metal: &MetalContext,
     viewport: Viewport,
-) -> maplibre_native::Result<RenderTarget> {
-    let descriptor = maplibre_native::MetalOwnedTextureDescriptor::new(
+) -> maplibre_native_ffi::Result<RenderTarget> {
+    let descriptor = maplibre_native_ffi::MetalOwnedTextureDescriptor::new(
         extent(viewport),
         metal.context_descriptor(),
     );
@@ -180,9 +183,9 @@ fn attach_borrowed_texture(
     map: &MapAttachRef,
     metal: &MetalContext,
     viewport: Viewport,
-) -> maplibre_native::Result<RenderTarget> {
+) -> maplibre_native_ffi::Result<RenderTarget> {
     let texture = MetalBorrowedTexture::new(metal, viewport)?;
-    let descriptor = maplibre_native::MetalBorrowedTextureDescriptor::new(
+    let descriptor = maplibre_native_ffi::MetalBorrowedTextureDescriptor::new(
         extent(viewport),
         viewport.physical_width,
         viewport.physical_height,
@@ -210,8 +213,8 @@ fn attach_surface(
     map: &MapAttachRef,
     metal: &MetalContext,
     viewport: Viewport,
-) -> maplibre_native::Result<RenderTarget> {
-    let descriptor = maplibre_native::MetalSurfaceDescriptor::new(
+) -> maplibre_native_ffi::Result<RenderTarget> {
+    let descriptor = maplibre_native_ffi::MetalSurfaceDescriptor::new(
         extent(viewport),
         metal.context_descriptor(),
         metal.layer_pointer(),

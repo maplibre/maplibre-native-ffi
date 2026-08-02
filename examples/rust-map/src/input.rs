@@ -1,6 +1,6 @@
 use std::sync::mpsc::Sender;
 
-use maplibre_native::ScreenPoint;
+use maplibre_native_ffi::ScreenPoint;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::keyboard::{KeyCode, ModifiersState, PhysicalKey};
 

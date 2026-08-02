@@ -1,4 +1,4 @@
-function(mln_prepare_macos_angle out_var)
+function(mln_ffi_prepare_macos_angle out_var)
   set(angle_manifest "${PROJECT_SOURCE_DIR}/third_party/angle/manifest.json")
   file(READ "${angle_manifest}" angle_manifest_json)
   string(JSON angle_version GET "${angle_manifest_json}" version)
@@ -59,9 +59,9 @@ function(mln_prepare_macos_angle out_var)
   set(${out_var} "${angle_root}" PARENT_SCOPE)
 endfunction()
 
-function(mln_import_egl)
+function(mln_ffi_import_egl)
   if(APPLE AND NOT MLN_FFI_EGL_ROOT)
-    mln_prepare_macos_angle(MLN_FFI_EGL_ROOT)
+    mln_ffi_prepare_macos_angle(MLN_FFI_EGL_ROOT)
   endif()
   if(NOT MLN_FFI_EGL_ROOT)
     message(

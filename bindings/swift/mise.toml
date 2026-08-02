@@ -20,7 +20,7 @@ mkdir -p build
 swift package --scratch-path ".build/$usage_preset" \
   --allow-writing-to-directory build/docc \
   generate-documentation \
-  --target MaplibreNative \
+  --target MaplibreNativeFFI \
   --output-path build/docc \
   --transform-for-static-hosting \
   --hosting-base-path maplibre-native-ffi/reference/swift
@@ -36,7 +36,7 @@ export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:$
 source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
 swift_args=(--scratch-path ".build/$usage_preset")
 swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
-swift build --target MaplibreNative "${swift_args[@]}"
+swift build --target MaplibreNativeFFI "${swift_args[@]}"
 '''
 
 [tasks.test]
@@ -62,7 +62,7 @@ native_install_dir="$MISE_MONOREPO_ROOT/build/ios-simulator-arm64-metal/install"
 sdk="$(xcrun --sdk iphonesimulator --show-sdk-path)"
 PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
   swift build \
-    --product MaplibreNativeIOSSimulatorTests \
+    --product MaplibreNativeFFIIOSSimulatorTests \
     --scratch-path .build/ios-simulator \
     --sdk "$sdk" \
     --triple arm64-apple-ios14.3-simulator \
@@ -81,7 +81,7 @@ native_install_dir="$MISE_MONOREPO_ROOT/build/ios-arm64-metal/install"
 sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
 PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
   swift build \
-    --product MaplibreNative \
+    --product MaplibreNativeFFI \
     --scratch-path .build/ios \
     --sdk "$sdk" \
     --triple arm64-apple-ios14.3

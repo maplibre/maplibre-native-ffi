@@ -3,7 +3,7 @@ requires = ["maturin>=1.13,<2"]
 build-backend = "maturin"
 
 [project]
-name = "maplibre-native"
+name = "maplibre-native-ffi"
 version = "0.0.0"
 description = "Low-level Python bindings for MapLibre Native FFI"
 requires-python = ">=3.14"
@@ -30,6 +30,6 @@ docs = [
 ]
 
 [tool.maturin]
-module-name = "maplibre_native._native"
+module-name = "maplibre_native_ffi._native"
 python-source = "python"
 features = ["pyo3/extension-module"]

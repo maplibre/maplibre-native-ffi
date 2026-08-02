@@ -1,5 +1,5 @@
 import AppKit
-import MaplibreNative
+import MaplibreNativeFFI
 
 private let keyboardAnimationDurationMS = 160.0
 private let resetAnimationDurationMS = 220.0

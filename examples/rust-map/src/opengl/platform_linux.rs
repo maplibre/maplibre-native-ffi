@@ -5,7 +5,7 @@ use glutin::context::{AsRawContext, ContextApi, PossiblyCurrentContext, RawConte
 use glutin::display::{AsRawDisplay, GetGlDisplay, RawDisplay};
 use glutin::surface::{AsRawSurface, RawSurface, Surface, WindowSurface};
 use glutin_winit::ApiPreference;
-use maplibre_native::{EglContextDescriptor, NativePointer, OpenGLContextDescriptor};
+use maplibre_native_ffi::{EglContextDescriptor, NativePointer, OpenGLContextDescriptor};
 use winit::window::Window;
 
 pub struct OpenGLPlatformContext {

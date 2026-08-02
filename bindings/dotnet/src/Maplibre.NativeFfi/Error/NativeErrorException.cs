@@ -1,0 +1,13 @@
+namespace Maplibre.NativeFfi.Error;
+
+/// <summary>Exception for native MapLibre errors converted to C status.</summary>
+public sealed class NativeErrorException : MaplibreException
+{
+    public NativeErrorException(
+        MaplibreStatus status,
+        int? rawStatus,
+        string diagnostic,
+        Exception? innerException
+    )
+        : base(status, rawStatus, diagnostic, innerException) { }
+}

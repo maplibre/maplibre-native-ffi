@@ -1,4 +1,4 @@
-import MaplibreNative
+import MaplibreNativeFFI
 import Metal
 import os
 import QuartzCore

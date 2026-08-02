@@ -1,6 +1,6 @@
 include_guard(GLOBAL)
 
-function(mln_configure_apple_toolchain_defaults)
+function(mln_ffi_configure_apple_toolchain_defaults)
   if(DEFINED CMAKE_SYSTEM_NAME)
     if(NOT CMAKE_SYSTEM_NAME MATCHES "^(Darwin|iOS|tvOS|watchOS|visionOS)$")
       return()
@@ -22,7 +22,7 @@ function(mln_configure_apple_toolchain_defaults)
   endif()
 endfunction()
 
-function(mln_configure_platform_dependencies target)
+function(mln_ffi_configure_platform_dependencies target)
   target_link_libraries(
     ${target}
     INTERFACE
@@ -92,30 +92,31 @@ function(mln_configure_platform_dependencies target)
       MLN_FFI_ARCHIVE_FORMAT apple MLN_FFI_ARCHIVE_TOOL "${MLN_FFI_LIBTOOL}")
 endfunction()
 
-function(mln_configure_platform target)
+function(mln_ffi_configure_platform target)
   set(MLN_FFI_VENDOR_APPLE_SOURCES
-      ${MLN_SOURCE_DIR}/platform/qt/src/mbgl/bidi.cpp
-      ${MLN_SOURCE_DIR}/platform/darwin/core/async_task.cpp
-      ${MLN_SOURCE_DIR}/platform/darwin/core/collator.mm
+      ${MLN_FFI_SOURCE_DIR}/platform/qt/src/mbgl/bidi.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/async_task.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/collator.mm
       ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../../src/platform/apple/http_file_source.mm
-      ${MLN_SOURCE_DIR}/platform/darwin/core/image.mm
-      ${MLN_SOURCE_DIR}/platform/darwin/core/local_glyph_rasterizer.mm
-      ${MLN_SOURCE_DIR}/platform/darwin/core/native_apple_interface.m
-      ${MLN_SOURCE_DIR}/platform/darwin/core/number_format.mm
-      ${MLN_SOURCE_DIR}/platform/darwin/core/nsthread.mm
-      ${MLN_SOURCE_DIR}/platform/darwin/core/run_loop.cpp
-      ${MLN_SOURCE_DIR}/platform/darwin/core/string_nsstring.mm
-      ${MLN_SOURCE_DIR}/platform/darwin/core/timer.cpp)
+      ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/image.mm
+      ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/local_glyph_rasterizer.mm
+      ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/native_apple_interface.m
+      ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/number_format.mm
+      ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/nsthread.mm
+      ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/run_loop.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/string_nsstring.mm
+      ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/timer.cpp)
 
-  mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_APPLE_SOURCES})
+  mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_APPLE_SOURCES})
 
   target_include_directories(
     ${target}
     SYSTEM
     PRIVATE
-      ${MLN_SOURCE_DIR}/platform/darwin/core
-      ${MLN_SOURCE_DIR}/platform/darwin/include
-      ${MLN_SOURCE_DIR}/platform/darwin/src ${MLN_SOURCE_DIR}/vendor/icu/include)
+      ${MLN_FFI_SOURCE_DIR}/platform/darwin/core
+      ${MLN_FFI_SOURCE_DIR}/platform/darwin/include
+      ${MLN_FFI_SOURCE_DIR}/platform/darwin/src
+      ${MLN_FFI_SOURCE_DIR}/vendor/icu/include)
 
   target_link_libraries(
     ${target}

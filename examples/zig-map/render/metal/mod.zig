@@ -3,7 +3,7 @@ const objc = @import("objc");
 
 const c = @import("../../c.zig").c;
 const diagnostics = @import("../../diagnostics.zig");
-const maplibre = @import("maplibre_native");
+const maplibre = @import("maplibre_native_ffi");
 const render_target = @import("../../render_target.zig");
 const types = @import("../../types.zig");
 

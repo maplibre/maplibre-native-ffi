@@ -1,4 +1,4 @@
-const maplibre = @import("maplibre_native");
+const maplibre = @import("maplibre_native_ffi");
 const diagnostics = @import("diagnostics.zig");
 const types = @import("types.zig");
 

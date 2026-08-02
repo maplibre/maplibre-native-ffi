@@ -1,9 +1,9 @@
-using Maplibre.Native.Camera;
-using Maplibre.Native.Geo;
-using Maplibre.Native.Map;
-using Maplibre.Native.Runtime;
+using Maplibre.NativeFfi.Camera;
+using Maplibre.NativeFfi.Geo;
+using Maplibre.NativeFfi.Map;
+using Maplibre.NativeFfi.Runtime;
 
-namespace Maplibre.Native.Examples.DotnetMap;
+namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 /// <summary>Runtime and map, owned for their whole lifetime by the runtime loop thread.</summary>
 /// <remarks>

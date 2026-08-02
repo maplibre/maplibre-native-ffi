@@ -1,5 +1,5 @@
 const std = @import("std");
-const maplibre_build = @import("maplibre_native");
+const maplibre_build = @import("maplibre_native_ffi");
 
 const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
@@ -81,7 +81,7 @@ fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Comp
         .system_root = options.system_root,
     });
     addSdlTranslateC(b, example.root_module, options);
-    example.root_module.addImport("maplibre_native", maplibreNativeModule(b, options));
+    example.root_module.addImport("maplibre_native_ffi", maplibreNativeModule(b, options));
     maplibre_build.linkRenderBackend(b, example.root_module, .{
         .target = options.target,
         .render_backend = options.render_backend,

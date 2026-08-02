@@ -24,7 +24,7 @@ pub struct App {
     target: Option<RenderTarget>,
     /// Releases the runtime loop's parked pump, so a queued camera command is
     /// applied now rather than after its parking bound.
-    wake: Arc<maplibre_native::WakeSource>,
+    wake: Arc<maplibre_native_ffi::WakeSource>,
     runtime_thread: Option<JoinHandle<()>>,
     commands: Sender<CameraCommand>,
     shared: Arc<Shared>,

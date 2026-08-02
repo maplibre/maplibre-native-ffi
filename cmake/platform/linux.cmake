@@ -4,7 +4,7 @@
 # lets the distributed archive stand on its own.
 #
 # See cmake/toolchains/zig-linux.cmake and the Kotlin publishing doc.
-function(mln_configure_linux_archive_contents target)
+function(mln_ffi_configure_linux_archive_contents target)
   if(NOT MLN_FFI_CXX_RUNTIME_IS_BUNDLED)
     return()
   endif()
@@ -57,7 +57,7 @@ function(mln_configure_linux_archive_contents target)
   endif()
   set(zig_library_directory "${CMAKE_MATCH_1}")
   foreach(component libcxx libcxxabi libunwind)
-    mln_add_license(
+    mln_ffi_add_license(
       ${target} "${zig_library_directory}/${component}/LICENSE.TXT"
       "llvm-${component}.txt")
   endforeach()
@@ -84,7 +84,7 @@ function(mln_configure_linux_archive_contents target)
       "LINKER:--allow-shlib-undefined")
 endfunction()
 
-function(mln_configure_platform_dependencies target)
+function(mln_ffi_configure_platform_dependencies target)
   find_package(Threads REQUIRED)
 
   include(FetchContent)
@@ -106,12 +106,13 @@ function(mln_configure_platform_dependencies target)
       "SHA256=7f1db8ac368d89d1baf163bac1ea5fe5120697a73910c8ae6b2fffb3551d59fb"
     EXCLUDE_FROM_ALL)
   fetchcontent_makeavailable(mln_ffi_zlib_source mln_ffi_libuv_source)
-  mln_add_license(${target} "${mln_ffi_zlib_source_SOURCE_DIR}/LICENSE"
-                  "zlib.txt")
-  mln_add_license(${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE"
-                  "libuv.txt")
-  mln_add_license(${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE-extra"
-                  "libuv-extra.txt")
+  mln_ffi_add_license(${target} "${mln_ffi_zlib_source_SOURCE_DIR}/LICENSE"
+                      "zlib.txt")
+  mln_ffi_add_license(${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE"
+                      "libuv.txt")
+  mln_ffi_add_license(
+    ${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE-extra"
+    "libuv-extra.txt")
 
   target_link_libraries(
     ${target}
@@ -128,12 +129,12 @@ function(mln_configure_platform_dependencies target)
       MLN_FFI_ARCHIVE_FORMAT
       elf
       MLN_FFI_STATIC_ARCHIVES
-      "mbgl-vendor-icu;maplibre_native_platform_rust;zlibstatic;uv_a"
+      "mbgl-vendor-icu;mln_ffi_platform_rust;zlibstatic;uv_a"
       MLN_FFI_PKG_CONFIG_LIBS
       -ldl
       MLN_FFI_TEST_SUPPORTED
       TRUE)
-  mln_configure_linux_archive_contents(${target})
+  mln_ffi_configure_linux_archive_contents(${target})
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
     set_target_properties(
       ${target}
@@ -147,43 +148,43 @@ function(mln_configure_platform_dependencies target)
   endif()
 endfunction()
 
-function(mln_configure_platform target)
-  include(mln_rust)
+function(mln_ffi_configure_platform target)
+  include(mln_ffi_rust)
 
-  include("${MLN_SOURCE_DIR}/vendor/icu.cmake")
+  include("${MLN_FFI_SOURCE_DIR}/vendor/icu.cmake")
 
   set(MLN_FFI_VENDOR_LINUX_SOURCES
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/collator.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/text/bidi.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/text/local_glyph_rasterizer.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/async_task.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/png_writer.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/run_loop.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/string_stdlib.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/thread.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/timer.cpp)
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/i18n/collator.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/text/bidi.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/text/local_glyph_rasterizer.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/async_task.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/png_writer.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/run_loop.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/string_stdlib.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/thread.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/timer.cpp)
 
   set(MLN_FFI_LINUX_SOURCES
       ${PROJECT_SOURCE_DIR}/src/platform/rust/http_file_source.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp)
 
-  mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_LINUX_SOURCES})
-  mln_target_project_sources(${target} ${MLN_FFI_LINUX_SOURCES})
+  mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_LINUX_SOURCES})
+  mln_ffi_target_project_sources(${target} ${MLN_FFI_LINUX_SOURCES})
 
   set_source_files_properties(
-    ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
+    ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
     PROPERTIES COMPILE_DEFINITIONS MBGL_USE_BUILTIN_ICU)
 
   target_include_directories(
     ${target}
     SYSTEM
     BEFORE
-    PRIVATE ${MLN_SOURCE_DIR}/vendor/icu/include)
+    PRIVATE ${MLN_FFI_SOURCE_DIR}/vendor/icu/include)
 
   target_link_libraries(
     ${target}
     PRIVATE mbgl-vendor-icu MLN_FFI::PlatformDependencies)
 
-  mln_link_rust_platform(${target})
+  mln_ffi_link_rust_platform(${target})
 endfunction()

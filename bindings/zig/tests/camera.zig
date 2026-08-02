@@ -1,7 +1,7 @@
 const std = @import("std");
 const testing = std.testing;
 
-const maplibre = @import("maplibre_native");
+const maplibre = @import("maplibre_native_ffi");
 
 const center = maplibre.LatLng{ .latitude = 37.7749, .longitude = -122.4194 };
 

@@ -1,8 +1,8 @@
-function(mln_configure_render_dependencies target)
+function(mln_ffi_configure_render_dependencies target)
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
     if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR MLN_FFI_EGL_ROOT)
       include(render/egl)
-      mln_import_egl()
+      mln_ffi_import_egl()
       target_link_libraries(
         ${target}
         INTERFACE MLN_FFI::EGL MLN_FFI::GLESv2 ${CMAKE_DL_LIBS})
@@ -19,7 +19,7 @@ function(mln_configure_render_dependencies target)
           MLN_FFI_INCLUDE_DIRS "${MLN_FFI_EGL_INCLUDE_DIRS}"
           MLN_FFI_RUNTIME_DIRS "${MLN_FFI_EGL_LIBRARY_DIR}")
       if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-        mln_add_license(${target} "${MLN_FFI_EGL_ROOT}/LICENSE" "angle.txt")
+        mln_ffi_add_license(${target} "${MLN_FFI_EGL_ROOT}/LICENSE" "angle.txt")
         set_target_properties(
           ${target}
           PROPERTIES
@@ -66,11 +66,11 @@ function(mln_configure_render_dependencies target)
   endif()
 endfunction()
 
-function(mln_configure_renderer target)
+function(mln_ffi_configure_renderer target)
   target_compile_definitions(${target} PRIVATE MLN_RENDER_BACKEND_OPENGL=1)
 
   set(MLN_FFI_VENDOR_OPENGL_SOURCES
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/gl/headless_backend.cpp)
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/gl/headless_backend.cpp)
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
     # A browser host owns its WebGL context and hands it to a session, so
     # upstream's EGL headless host has nothing to do here.
@@ -80,12 +80,12 @@ function(mln_configure_renderer target)
   target_include_directories(
     ${target}
     SYSTEM
-    PRIVATE ${MLN_SOURCE_DIR}/vendor/unique_resource)
+    PRIVATE ${MLN_FFI_SOURCE_DIR}/vendor/unique_resource)
 
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
     target_compile_definitions(${target} PRIVATE MLN_FFI_OPENGL_PROVIDER_EGL=1)
     list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
-         ${MLN_SOURCE_DIR}/platform/linux/src/headless_backend_egl.cpp)
+         ${MLN_FFI_SOURCE_DIR}/platform/linux/src/headless_backend_egl.cpp)
     if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR MLN_FFI_EGL_ROOT)
       target_include_directories(
         ${target}
@@ -98,7 +98,7 @@ function(mln_configure_renderer target)
     # loader comes from the SDK, and the run-time resolver only knows how to
     # open a Linux client library.
     set(MLN_FFI_GL_FUNCTIONS_SOURCE
-        ${MLN_SOURCE_DIR}/platform/linux/src/gl_functions.cpp)
+        ${MLN_FFI_SOURCE_DIR}/platform/linux/src/gl_functions.cpp)
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
       set(MLN_FFI_GL_FUNCTIONS_GENERATED
           ${CMAKE_CURRENT_BINARY_DIR}/generated/gl_functions.cpp)
@@ -127,7 +127,7 @@ function(mln_configure_renderer target)
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
     target_compile_definitions(${target} PRIVATE MLN_FFI_OPENGL_PROVIDER_WGL=1)
     list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
-         ${MLN_SOURCE_DIR}/platform/windows/src/headless_backend_wgl.cpp)
+         ${MLN_FFI_SOURCE_DIR}/platform/windows/src/headless_backend_wgl.cpp)
     target_compile_definitions(${target} PRIVATE KHRONOS_STATIC)
     target_include_directories(
       ${target}
@@ -135,7 +135,7 @@ function(mln_configure_renderer target)
       PRIVATE ${PROJECT_SOURCE_DIR}/third_party/khronos/include)
 
     set_source_files_properties(
-      ${MLN_SOURCE_DIR}/platform/windows/src/headless_backend_wgl.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/windows/src/headless_backend_wgl.cpp
       PROPERTIES
         COMPILE_OPTIONS
         "/FI${PROJECT_SOURCE_DIR}/third_party/khronos/include/GLES3/gl3.h;/FI${PROJECT_SOURCE_DIR}/third_party/khronos/include/GL/wglext.h")
@@ -147,7 +147,7 @@ function(mln_configure_renderer target)
     # Emscripten resolves GLES entry points at link time, so this is upstream's
     # linked table rather than the run-time resolved one the Linux build uses.
     list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
-         ${MLN_SOURCE_DIR}/platform/linux/src/gl_functions.cpp)
+         ${MLN_FFI_SOURCE_DIR}/platform/linux/src/gl_functions.cpp)
     target_link_libraries(${target} PRIVATE MLN_FFI::RenderDependencies)
   else()
     message(
@@ -181,6 +181,6 @@ function(mln_configure_renderer target)
     ${MLN_FFI_OPENGL_SOURCES}
     PROPERTIES SKIP_LINTING TRUE)
 
-  mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_OPENGL_SOURCES})
-  mln_target_project_sources(${target} ${MLN_FFI_OPENGL_SOURCES})
+  mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_OPENGL_SOURCES})
+  mln_ffi_target_project_sources(${target} ${MLN_FFI_OPENGL_SOURCES})
 endfunction()

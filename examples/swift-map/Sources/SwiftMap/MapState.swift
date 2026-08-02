@@ -1,5 +1,5 @@
 import Foundation
-import MaplibreNative
+import MaplibreNativeFFI
 
 struct Viewport: Equatable {
   var logicalWidth: UInt32

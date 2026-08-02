@@ -83,7 +83,7 @@
       "name": "_emscripten-wasm32",
       "hidden": true,
       "inherits": "_single-config",
-      "toolchainFile": "${sourceDir}/cmake/emscripten-toolchain.cmake"
+      "toolchainFile": "${sourceDir}/cmake/toolchains/emscripten.cmake"
     },
     {
       "name": "_ohos-arm64",

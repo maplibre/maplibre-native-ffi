@@ -15,9 +15,12 @@ import urllib.request
 
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-MANAGED_PROJECT = ROOT / "bindings/dotnet/src/Maplibre.Native/Maplibre.Native.csproj"
+MANAGED_PROJECT = (
+    ROOT / "bindings/dotnet/src/Maplibre.NativeFfi/Maplibre.NativeFfi.csproj"
+)
 RUNTIME_PROJECT = (
-    ROOT / "bindings/dotnet/src/Maplibre.Native.Runtime/Maplibre.Native.Runtime.csproj"
+    ROOT
+    / "bindings/dotnet/src/Maplibre.NativeFfi.Runtime/Maplibre.NativeFfi.Runtime.csproj"
 )
 
 BACKENDS = {
@@ -96,7 +99,7 @@ def package(args: argparse.Namespace) -> None:
                 for library in libraries:
                     shutil.copy2(library, destination / library.name)
                 # The libraries bundle third-party code, so the notices
-                # `mln_install_licenses` puts in the archive travel with them.
+                # `mln_ffi_install_licenses` puts in the archive travel with them.
                 notices = next(extracted.glob("**/share/*/licenses"), None)
                 if notices is None:
                     raise SystemExit(f"{preset} archive carries no licenses")

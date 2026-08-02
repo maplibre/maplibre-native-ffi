@@ -1,7 +1,7 @@
-using Maplibre.Native;
+using Maplibre.NativeFfi;
 using Silk.NET.Vulkan;
 
-namespace Maplibre.Native.Examples.DotnetMap;
+namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal sealed unsafe class VulkanBorrowedImage : IDisposable
 {

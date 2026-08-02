@@ -1,11 +1,11 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
-use maplibre_native_core::{
+use maplibre_native_ffi_core::{
     self as maplibre_core, Error, ErrorKind, LogEvent, LogSeverity, NetworkStatus, RenderMode,
     ResourceErrorReason, ResourceResponseStatus, RuntimeEventPayload, RuntimeEventType,
     TileOperation,
 };
-use maplibre_native_sys as sys;
+use maplibre_native_ffi_sys as sys;
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
@@ -17,7 +17,7 @@ use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 
-/// Wire shape for `maplibre_native.camera.AnimationOptions`.
+/// Wire shape for `maplibre_native_ffi.camera.AnimationOptions`.
 ///
 /// Ordered as duration in milliseconds, velocity, minimum zoom, easing control
 /// points, and the caller-chosen transition ID.
@@ -30,12 +30,12 @@ type AnimationParts = (
 );
 
 mod py_errors {
-    pyo3::import_exception!(maplibre_native.errors, InvalidArgumentError);
-    pyo3::import_exception!(maplibre_native.errors, InvalidStateError);
-    pyo3::import_exception!(maplibre_native.errors, NativeError);
-    pyo3::import_exception!(maplibre_native.errors, UnknownStatusError);
-    pyo3::import_exception!(maplibre_native.errors, UnsupportedFeatureError);
-    pyo3::import_exception!(maplibre_native.errors, WrongThreadError);
+    pyo3::import_exception!(maplibre_native_ffi.errors, InvalidArgumentError);
+    pyo3::import_exception!(maplibre_native_ffi.errors, InvalidStateError);
+    pyo3::import_exception!(maplibre_native_ffi.errors, NativeError);
+    pyo3::import_exception!(maplibre_native_ffi.errors, UnknownStatusError);
+    pyo3::import_exception!(maplibre_native_ffi.errors, UnsupportedFeatureError);
+    pyo3::import_exception!(maplibre_native_ffi.errors, WrongThreadError);
 }
 
 #[pyclass(name = "_RuntimeHandle")]
@@ -6440,7 +6440,7 @@ fn required_dict_item<'py>(dict: &Bound<'py, PyDict>, key: &str) -> PyResult<Bou
 }
 
 fn json_value_to_py(py: Python<'_>, value: &maplibre_core::JsonValue) -> PyResult<Py<PyAny>> {
-    let json = py.import("maplibre_native.json")?;
+    let json = py.import("maplibre_native_ffi.json")?;
     match value {
         maplibre_core::JsonValue::Null => Ok(py.None()),
         maplibre_core::JsonValue::Bool(value) => {
@@ -6558,8 +6558,8 @@ fn feature_extension_result_to_py(
 }
 
 fn feature_to_py(py: Python<'_>, feature: &maplibre_core::Feature) -> PyResult<Py<PyAny>> {
-    let geo = py.import("maplibre_native.geo")?;
-    let json = py.import("maplibre_native.json")?;
+    let geo = py.import("maplibre_native_ffi.geo")?;
+    let json = py.import("maplibre_native_ffi.json")?;
     let properties = feature
         .properties
         .iter()
@@ -6586,7 +6586,7 @@ fn feature_identifier_to_py(
     py: Python<'_>,
     identifier: &maplibre_core::FeatureIdentifier,
 ) -> PyResult<Py<PyAny>> {
-    let geo = py.import("maplibre_native.geo")?;
+    let geo = py.import("maplibre_native_ffi.geo")?;
     match identifier {
         maplibre_core::FeatureIdentifier::Null => Ok(py.None()),
         maplibre_core::FeatureIdentifier::UInt(value) => Ok(geo
@@ -6614,7 +6614,7 @@ fn feature_identifier_to_py(
 }
 
 fn geometry_to_py(py: Python<'_>, geometry: &maplibre_core::Geometry) -> PyResult<Py<PyAny>> {
-    let geo = py.import("maplibre_native.geo")?;
+    let geo = py.import("maplibre_native_ffi.geo")?;
     match geometry {
         maplibre_core::Geometry::Empty => {
             Ok(geo.getattr("EmptyGeometry")?.call0()?.into_any().unbind())
@@ -6674,7 +6674,7 @@ fn geometry_to_py(py: Python<'_>, geometry: &maplibre_core::Geometry) -> PyResul
 
 fn geo_lat_lng_to_py(py: Python<'_>, coordinate: &maplibre_core::LatLng) -> PyResult<Py<PyAny>> {
     Ok(py
-        .import("maplibre_native.geo")?
+        .import("maplibre_native_ffi.geo")?
         .getattr("LatLng")?
         .call1((coordinate.latitude, coordinate.longitude))?
         .into_any()
@@ -7685,7 +7685,7 @@ fn map_size_by_id_for_test(py: Python<'_>, id: u64) -> PyResult<(u32, u32, f64)>
         } else {
             Err(map_error(Error::from_status_and_diagnostic(
                 status,
-                maplibre_native_core::error::capture_thread_diagnostic(),
+                maplibre_native_ffi_core::error::capture_thread_diagnostic(),
             )))
         }
     })
@@ -7703,7 +7703,7 @@ fn pump_runtime_with_map_id_for_test(py: Python<'_>, id: u64) -> PyResult<()> {
         } else {
             Err(map_error(Error::from_status_and_diagnostic(
                 status,
-                maplibre_native_core::error::capture_thread_diagnostic(),
+                maplibre_native_ffi_core::error::capture_thread_diagnostic(),
             )))
         }
     })
@@ -8411,7 +8411,7 @@ fn opengl_context_fields(
     }
 }
 
-/// Private PyO3 extension for the public maplibre_native package.
+/// Private PyO3 extension for the public maplibre_native_ffi package.
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<RuntimeHandle>()?;

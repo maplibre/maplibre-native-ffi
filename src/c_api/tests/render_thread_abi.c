@@ -100,7 +100,7 @@ static void a_second_thread_attaches_and_renders(void) {
   TEST_ASSERT_TRUE(probe.attached);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.render_status);
   TEST_ASSERT_TRUE(probe.rendered);
-#if defined(MLN_TEST_BACKEND_WEBGPU)
+#if defined(MLN_FFI_TEST_BACKEND_WEBGPU)
   // The WebGPU backend has no readStillImage() yet, so the session reports that
   // it cannot read back rather than returning a frame. Everything above this
   // still covers the cross-thread attach and the render itself.

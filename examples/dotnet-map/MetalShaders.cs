@@ -1,4 +1,4 @@
-namespace Maplibre.Native.Examples.DotnetMap;
+namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal static class MetalShaders
 {

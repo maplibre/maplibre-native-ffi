@@ -1,6 +1,6 @@
 use std::error::Error as StdError;
 
-use maplibre_native::{
+use maplibre_native_ffi::{
     Error, MapAttachRef, OpenGLBorrowedTextureDescriptor, OpenGLOwnedTextureDescriptor,
     OpenGLSurfaceDescriptor, RenderSessionHandle,
 };
@@ -31,7 +31,7 @@ impl RenderTarget {
         map: &MapAttachRef,
         graphics: &GraphicsContext,
         viewport: Viewport,
-    ) -> maplibre_native::Result<Self> {
+    ) -> maplibre_native_ffi::Result<Self> {
         let opengl = graphics.opengl();
         match mode {
             Mode::OwnedTexture => Self::attach_owned_texture(map, opengl, viewport),
@@ -44,7 +44,7 @@ impl RenderTarget {
         map: &MapAttachRef,
         opengl: &OpenGLContext,
         viewport: Viewport,
-    ) -> maplibre_native::Result<Self> {
+    ) -> maplibre_native_ffi::Result<Self> {
         let context = opengl.descriptor().map_err(|error| {
             compositor_error(format!("OpenGL context descriptor failed: {error}"))
         })?;
@@ -70,7 +70,7 @@ impl RenderTarget {
         map: &MapAttachRef,
         opengl: &OpenGLContext,
         viewport: Viewport,
-    ) -> maplibre_native::Result<Self> {
+    ) -> maplibre_native_ffi::Result<Self> {
         let context = opengl.descriptor().map_err(|error| {
             compositor_error(format!("OpenGL context descriptor failed: {error}"))
         })?;
@@ -114,7 +114,7 @@ impl RenderTarget {
         map: &MapAttachRef,
         opengl: &OpenGLContext,
         viewport: Viewport,
-    ) -> maplibre_native::Result<Self> {
+    ) -> maplibre_native_ffi::Result<Self> {
         let context = opengl.descriptor().map_err(|error| {
             compositor_error(format!("OpenGL context descriptor failed: {error}"))
         })?;
@@ -137,7 +137,7 @@ impl RenderTarget {
         &mut self,
         graphics: &GraphicsContext,
         viewport: Viewport,
-    ) -> maplibre_native::Result<()> {
+    ) -> maplibre_native_ffi::Result<()> {
         match self {
             Self::OwnedTexture {
                 session,
@@ -194,7 +194,10 @@ impl RenderTarget {
         }
     }
 
-    pub fn render_update(&mut self, graphics: &GraphicsContext) -> maplibre_native::Result<bool> {
+    pub fn render_update(
+        &mut self,
+        graphics: &GraphicsContext,
+    ) -> maplibre_native_ffi::Result<bool> {
         let opengl = graphics.opengl();
         match self {
             Self::OwnedTexture {
@@ -265,5 +268,5 @@ impl RenderTarget {
 }
 
 fn compositor_error(message: impl Into<String>) -> Error {
-    Error::new(maplibre_native::ErrorKind::NativeError, None, message)
+    Error::new(maplibre_native_ffi::ErrorKind::NativeError, None, message)
 }

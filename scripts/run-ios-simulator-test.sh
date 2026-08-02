@@ -31,8 +31,8 @@ fi
 # the prefix removed, so the fixture directory travels under that spelling. The
 # binding suites share this runner and read no fixtures, so the variable travels
 # when the caller set one and the C API suite reports its own absence.
-if [[ -n "${MLN_TEST_FIXTURE_DIR:-}" ]]; then
-  export SIMCTL_CHILD_MLN_TEST_FIXTURE_DIR="$MLN_TEST_FIXTURE_DIR"
+if [[ -n "${MLN_FFI_TEST_FIXTURE_DIR:-}" ]]; then
+  export SIMCTL_CHILD_MLN_FFI_TEST_FIXTURE_DIR="$MLN_FFI_TEST_FIXTURE_DIR"
 fi
 
 exec perl -e 'alarm shift; exec @ARGV' "$timeout_seconds" xcrun simctl spawn "$device" "$test_executable"

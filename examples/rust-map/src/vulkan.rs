@@ -3,7 +3,7 @@ use std::ffi::{CStr, CString};
 
 use ash::vk;
 use ash::vk::Handle;
-use maplibre_native::NativePointer;
+use maplibre_native_ffi::NativePointer;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::Window;
 

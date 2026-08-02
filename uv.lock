@@ -8,8 +8,8 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "maplibre-native",
     "maplibre-native-ffi",
+    "maplibre-native-ffi-workspace",
 ]
 
 [[package]]
@@ -102,7 +102,7 @@ wheels = [
 ]
 
 [[package]]
-name = "maplibre-native"
+name = "maplibre-native-ffi"
 version = "0.0.0"
 source = { editable = "bindings/python" }
 
@@ -135,7 +135,7 @@ dev = [
 docs = [{ name = "pdoc", specifier = ">=16,<17" }]
 
 [[package]]
-name = "maplibre-native-ffi"
+name = "maplibre-native-ffi-workspace"
 version = "0.0.0"
 source = { virtual = "." }
 

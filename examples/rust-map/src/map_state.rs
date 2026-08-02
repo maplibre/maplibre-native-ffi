@@ -11,7 +11,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 use std::time::Duration;
 
-use maplibre_native::{
+use maplibre_native_ffi::{
     AnimationOptions, CameraOptions, LatLng, MapAttachRef, MapHandle, MapMode, MapOptions,
     RuntimeEventPayload, RuntimeEventSource, RuntimeEventType, RuntimeHandle, RuntimeOptions,
 };
@@ -33,7 +33,7 @@ const PARK_TIMEOUT: Duration = Duration::from_millis(100);
 /// reference to attach against, and the wake source that releases its park.
 pub struct RuntimeLoopHandles {
     pub attach_ref: MapAttachRef,
-    pub wake: Arc<maplibre_native::WakeSource>,
+    pub wake: Arc<maplibre_native_ffi::WakeSource>,
 }
 
 /// Runs the runtime loop until the render loop asks for shutdown.
@@ -147,7 +147,10 @@ impl MapState {
     }
 
     /// Applies every queued camera command on the map's owner thread.
-    fn apply_commands(&self, commands: &Receiver<CameraCommand>) -> maplibre_native::Result<()> {
+    fn apply_commands(
+        &self,
+        commands: &Receiver<CameraCommand>,
+    ) -> maplibre_native_ffi::Result<()> {
         for command in commands.try_iter() {
             self.apply(command)?;
         }
@@ -157,7 +160,7 @@ impl MapState {
     /// Applies one decoded camera command. Runs on the map's owner thread,
     /// which is why the read-modify-write commands read the current camera here
     /// rather than on the render loop that produced them.
-    fn apply(&self, command: CameraCommand) -> maplibre_native::Result<()> {
+    fn apply(&self, command: CameraCommand) -> maplibre_native_ffi::Result<()> {
         let map = &self.map;
         match command {
             CameraCommand::CancelTransitions => map.cancel_transitions(),
@@ -199,12 +202,12 @@ impl MapState {
         }
     }
 
-    fn next_bearing(&self, delta: f64) -> maplibre_native::Result<f64> {
+    fn next_bearing(&self, delta: f64) -> maplibre_native_ffi::Result<f64> {
         Ok(self.map.camera()?.bearing.unwrap_or(0.0) + delta)
     }
 
     /// Drains runtime events, reporting whether the map wants another frame.
-    fn drain_events(&self) -> maplibre_native::Result<bool> {
+    fn drain_events(&self) -> maplibre_native_ffi::Result<bool> {
         let source = RuntimeEventSource::Map(self.map.id());
         let mut render_update_available = false;
         while let Some(event) = self.runtime.poll_event()? {
@@ -240,7 +243,7 @@ impl MapState {
     }
 }
 
-fn configure_map(map: &MapHandle) -> maplibre_native::Result<()> {
+fn configure_map(map: &MapHandle) -> maplibre_native_ffi::Result<()> {
     map.set_style_url(STYLE_URL)?;
     let mut camera = CameraOptions::default();
     camera.center = Some(LatLng::new(37.7749, -122.4194));

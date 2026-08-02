@@ -217,14 +217,14 @@ static void webgpu_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
 }
 
 static void configure_opengl_context(mln_opengl_context_descriptor* context) {
-#if defined(MLN_TEST_OPENGL_WGL)
+#if defined(MLN_FFI_TEST_OPENGL_WGL)
   context->platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL;
   context->data.wgl = (mln_wgl_context_descriptor){
     .size = sizeof(mln_wgl_context_descriptor),
     .device_context = fake_handle,
     .share_context = fake_handle,
   };
-#elif defined(MLN_TEST_OPENGL_WEBGL)
+#elif defined(MLN_FFI_TEST_OPENGL_WEBGL)
   context->platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
   context->data.webgl = (mln_webgl_context_descriptor){
     .size = sizeof(mln_webgl_context_descriptor),
@@ -242,18 +242,18 @@ static void configure_opengl_context(mln_opengl_context_descriptor* context) {
 #endif
 }
 static void shrink_opengl_context(mln_opengl_context_descriptor* context) {
-#if defined(MLN_TEST_OPENGL_WGL)
+#if defined(MLN_FFI_TEST_OPENGL_WGL)
   context->data.wgl.size = sizeof(mln_wgl_context_descriptor) - 1;
-#elif defined(MLN_TEST_OPENGL_WEBGL)
+#elif defined(MLN_FFI_TEST_OPENGL_WEBGL)
   context->data.webgl.size = sizeof(mln_webgl_context_descriptor) - 1;
 #else
   context->data.egl.size = sizeof(mln_egl_context_descriptor) - 1;
 #endif
 }
 static void clear_opengl_context(mln_opengl_context_descriptor* context) {
-#if defined(MLN_TEST_OPENGL_WGL)
+#if defined(MLN_FFI_TEST_OPENGL_WGL)
   context->data.wgl.share_context = NULL;
-#elif defined(MLN_TEST_OPENGL_WEBGL)
+#elif defined(MLN_FFI_TEST_OPENGL_WEBGL)
   context->data.webgl.context = 0;
 #else
   context->data.egl.share_context = NULL;

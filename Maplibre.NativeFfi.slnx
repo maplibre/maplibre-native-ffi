@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="bindings/dotnet/src/Maplibre.NativeFfi/Maplibre.NativeFfi.csproj" />
+  <Project Path="bindings/dotnet/tests/Maplibre.NativeFfi.Tests/Maplibre.NativeFfi.Tests.csproj" />
+  <Project Path="examples/dotnet-map/Maplibre.NativeFfi.Examples.DotnetMap.csproj" />
+</Solution>

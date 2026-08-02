@@ -1,8 +1,8 @@
-using Maplibre.Native.Camera;
-using Maplibre.Native.Geo;
+using Maplibre.NativeFfi.Camera;
+using Maplibre.NativeFfi.Geo;
 using Silk.NET.GLFW;
 
-namespace Maplibre.Native.Examples.DotnetMap;
+namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 /// <summary>Decodes host input into camera commands.</summary>
 /// <remarks>

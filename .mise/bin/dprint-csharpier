@@ -8,9 +8,9 @@ fi
 
 repo_root="${MISE_MONOREPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 
-if [[ "${MLN_DPRINT_SCOPED_TOOLS:-}" != "1" ]]; then
+if [[ "${MLN_FFI_DPRINT_SCOPED_TOOLS:-}" != "1" ]]; then
   exec mise -C "$repo_root/bindings/dotnet" x -- \
-    env MLN_DPRINT_SCOPED_TOOLS=1 "$repo_root/.mise/bin/dprint-csharpier" "$@"
+    env MLN_FFI_DPRINT_SCOPED_TOOLS=1 "$repo_root/.mise/bin/dprint-csharpier" "$@"
 fi
 
 cd "$repo_root"

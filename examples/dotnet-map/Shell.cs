@@ -1,7 +1,7 @@
-using Maplibre.Native.Render;
-using Maplibre.Native.Runtime;
+using Maplibre.NativeFfi.Render;
+using Maplibre.NativeFfi.Runtime;
 
-namespace Maplibre.Native.Examples.DotnetMap;
+namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 /// <summary>App shell: toolkit lifetime, the two loops, and shutdown ordering.</summary>
 internal static class Shell

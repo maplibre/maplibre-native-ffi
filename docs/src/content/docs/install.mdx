@@ -44,12 +44,12 @@ The other runtimes are `maplibre-native-ffi-runtime-opengl` and
 
 ## Rust
 
-Depend on the `maplibre-native` crate from Git and enable one backend feature.
+Depend on the `maplibre-native-ffi` crate from Git and enable one backend feature.
 The build script downloads the matching native artifact.
 
 ```toml title="Cargo.toml"
 [dependencies]
-maplibre-native = { git = "https://github.com/maplibre/maplibre-native-ffi", features = ["vulkan"] }
+maplibre-native-ffi = { git = "https://github.com/maplibre/maplibre-native-ffi", features = ["vulkan"] }
 ```
 
 The other features are `opengl` and `metal`.
@@ -64,7 +64,7 @@ index. The wheels contain the native library.
 
 ```toml title="pyproject.toml"
 [project]
-dependencies = ["maplibre-native-vulkan"]
+dependencies = ["maplibre-native-ffi-vulkan"]
 
 [[tool.uv.index]]
 name = "maplibre-snapshots"
@@ -72,14 +72,14 @@ url = "https://maplibre.github.io/maplibre-native-ffi/simple/"
 explicit = true
 
 [tool.uv.sources]
-maplibre-native-vulkan = { index = "maplibre-snapshots" }
+maplibre-native-ffi-vulkan = { index = "maplibre-snapshots" }
 ```
 
 This index configuration uses uv. The explicit index limits snapshot resolution
 to this package; all other dependencies continue to resolve from PyPI.
 
-The other distributions are `maplibre-native-opengl` and
-`maplibre-native-metal`.
+The other distributions are `maplibre-native-ffi-opengl` and
+`maplibre-native-ffi-metal`.
 
 ## .NET
 
@@ -95,13 +95,13 @@ Add the snapshot feed, then the binding and the runtime for your backend.
 
 ```xml title="MyApp.csproj"
 <ItemGroup>
-  <PackageReference Include="Maplibre.Native" />
-  <PackageReference Include="Maplibre.Native.Runtime.Vulkan" />
+  <PackageReference Include="Maplibre.NativeFfi" />
+  <PackageReference Include="Maplibre.NativeFfi.Runtime.Vulkan" />
 </ItemGroup>
 ```
 
-The other runtime packages are `Maplibre.Native.Runtime.OpenGL` and
-`Maplibre.Native.Runtime.Metal`.
+The other runtime packages are `Maplibre.NativeFfi.Runtime.OpenGL` and
+`Maplibre.NativeFfi.Runtime.Metal`.
 
 ## Dart
 
@@ -139,12 +139,12 @@ The package manifest at the repository root defines the Swift package.
 .package(url: "https://github.com/maplibre/maplibre-native-ffi", branch: "main")
 ```
 
-Depend on the `MaplibreNative` product. SwiftPM takes the package identity from
+Depend on the `MaplibreNativeFFI` product. SwiftPM takes the package identity from
 the repository name rather than from the manifest, so name it as
 `maplibre-native-ffi`.
 
 ```swift title="Package.swift"
-.product(name: "MaplibreNative", package: "maplibre-native-ffi")
+.product(name: "MaplibreNativeFFI", package: "maplibre-native-ffi")
 ```
 
 [Get the native library](#get-the-native-library), then export
