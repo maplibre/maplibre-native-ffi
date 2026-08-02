@@ -10,6 +10,10 @@
 //     with it.
 //
 // Usage: node scripts/run-browser-test.mjs <page.html> [--timeout-seconds N]
+//        [--browser-arg FLAG]...
+//
+// Backends need different things from the browser, so the flags they need come
+// from the build rather than being hardcoded here.
 
 import { spawn } from "node:child_process";
 import { createReadStream, existsSync, readdirSync, statSync } from "node:fs";
@@ -80,8 +84,10 @@ if (!pagePath)
 if (!existsSync(pagePath)) fail(`page does not exist: ${pagePath}`);
 
 let timeoutSeconds = 600;
+const extraBrowserArgs = [];
 for (let i = 0; i < rest.length; i += 1) {
   if (rest[i] === "--timeout-seconds") timeoutSeconds = Number(rest[i + 1]);
+  if (rest[i] === "--browser-arg") extraBrowserArgs.push(rest[i + 1]);
 }
 
 const root = path.dirname(path.resolve(pagePath));
@@ -142,9 +148,6 @@ const child = spawn(
   browser,
   [
     "--headless=new",
-    // The suite renders through WebGL2, which a runner without a GPU can only
-    // provide in software.
-    "--enable-unsafe-swiftshader",
     // Chromium's own logging carries the page console, so a run that hangs
     // still shows how far the suite got instead of only reporting the timeout.
     "--enable-logging=stderr",
@@ -153,12 +156,15 @@ const child = spawn(
     "--no-sandbox",
     "--disable-dev-shm-usage",
     `--user-data-dir=${profile}`,
+    ...extraBrowserArgs,
     pageUrl,
   ],
   { stdio: ["ignore", "pipe", "pipe"] },
 );
 child.stdout.on("data", (chunk) => process.stderr.write(`[browser] ${chunk}`));
 child.stderr.on("data", (chunk) => process.stderr.write(`[browser] ${chunk}`));
+
+let browserExited = false;
 
 const timer = setTimeout(() => {
   settle({
@@ -168,6 +174,7 @@ const timer = setTimeout(() => {
 }, timeoutSeconds * 1000);
 
 child.on("exit", (code, signal) => {
+  browserExited = true;
   settle({
     status: 2,
     output: `browser exited before reporting a result (code=${code} signal=${signal})`,
@@ -179,8 +186,9 @@ clearTimeout(timer);
 server.close();
 
 // Wait for the browser to actually be gone before removing its profile, or the
-// removal races the files it is still flushing.
-if (child.exitCode === null) {
+// removal races the files it is still flushing. A child killed by a signal
+// leaves exitCode null, so the flag is what says whether 'exit' already fired.
+if (!browserExited) {
   const exited = new Promise((resolve) => child.once("exit", resolve));
   child.kill("SIGKILL");
   await exited;

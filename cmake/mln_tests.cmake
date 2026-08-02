@@ -52,6 +52,25 @@ function(mln_configure_browser_c_api_test)
   # the suite got, kills the browser, and removes its profile, so letting CTest
   # kill it first costs the diagnosis and leaves the profile behind.
   set(runner_timeout_seconds 240)
+
+  # Chromium exposes WebGPU through Dawn on Vulkan, and the Vulkan feature is
+  # off by default on Linux; unsafe-webgpu then allows the software adapter
+  # SwiftShader provides. Both are needed and neither alone is enough --
+  # verified against a plain page, where without them navigator.gpu is present
+  # but requestAdapter() returns null, forceFallbackAdapter included. They stay
+  # off the WebGL run, which needs no Vulkan and gets its software GL from
+  # --enable-unsafe-swiftshader.
+  set(browser_args)
+  if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
+    list(APPEND browser_args --browser-arg --enable-unsafe-webgpu --browser-arg
+         --enable-features=Vulkan)
+  else()
+    # Software WebGL2 for a runner with no GPU. The WebGPU run does not get it,
+    # because it selects a software GL implementation and Dawn reaches the GPU
+    # through Vulkan.
+    list(APPEND browser_args --browser-arg --enable-unsafe-swiftshader)
+  endif()
+
   find_program(MLN_FFI_NODE_EXECUTABLE node REQUIRED)
   add_test(
     NAME c-api
@@ -59,7 +78,7 @@ function(mln_configure_browser_c_api_test)
       "${MLN_FFI_NODE_EXECUTABLE}"
       "${PROJECT_SOURCE_DIR}/scripts/run-browser-test.mjs"
       "$<TARGET_FILE:mln_c_api_tests>" --timeout-seconds
-      ${runner_timeout_seconds})
+      ${runner_timeout_seconds} ${browser_args})
 endfunction()
 
 function(mln_add_c_api_test)
@@ -197,6 +216,10 @@ function(mln_add_c_api_test)
     target_compile_definitions(
       mln_c_api_tests
       PRIVATE MLN_TEST_BACKEND_VULKAN=1)
+  elseif(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
+    target_compile_definitions(
+      mln_c_api_tests
+      PRIVATE MLN_TEST_BACKEND_WEBGPU=1)
   endif()
 
   if(NOT WIN32)

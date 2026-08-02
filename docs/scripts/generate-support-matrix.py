@@ -33,8 +33,13 @@ PLATFORM_LABELS = {
     "ohos": "OpenHarmony",
     "windows": "Windows",
 }
-BACKEND_LABELS = {"metal": "Metal", "opengl": "OpenGL", "vulkan": "Vulkan"}
-BACKEND_ORDER = ["vulkan", "opengl", "metal"]
+BACKEND_LABELS = {
+    "metal": "Metal",
+    "opengl": "OpenGL",
+    "vulkan": "Vulkan",
+    "webgpu": "WebGPU",
+}
+BACKEND_ORDER = ["vulkan", "opengl", "metal", "webgpu"]
 ENVIRONMENT_ORDER = [
     "linux-x64",
     "linux-arm64",

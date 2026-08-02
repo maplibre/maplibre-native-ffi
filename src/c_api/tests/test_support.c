@@ -2,6 +2,7 @@
 #define _POSIX_C_SOURCE 200809L
 #endif
 
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,6 +54,10 @@ EM_JS(void, mln_test_unregister_offscreen_canvas, (const char* name), {
 
 #if defined(MLN_TEST_BACKEND_VULKAN)
 #include <vulkan/vulkan.h>
+#endif
+
+#if defined(MLN_TEST_BACKEND_WEBGPU)
+#include <webgpu/webgpu.h>
 #endif
 
 // Per-thread record of the handles these helpers created. A failing assertion
@@ -269,9 +274,36 @@ uint64_t mln_test_monotonic_milliseconds(void) {
 #endif
 }
 
+// A thread that suspends cannot be joined on the browser WebGPU target, so the
+// harness waits on a flag the entry function sets instead of on thread exit.
+//
+// Requesting a WebGPU adapter or device suspends the calling thread through
+// Asyncify, and emscripten's -sASYNCIFY=1 cannot carry a pthread's entry point
+// across a suspension: invokeEntryPoint() runs its finish() step as soon as the
+// entry returns control, which a suspension does immediately, and skips
+// __emscripten_thread_exit() because Asyncify is holding a runtime keepalive at
+// that moment. When the entry later resumes and really does return, it returns
+// into Asyncify's rewind rather than back into invokeEntryPoint, so nothing
+// ever marks the thread exited and pthread_join blocks forever. Threads that
+// never suspend are unaffected, which is why only this target needs the flag.
+//
+// Waiting on the flag keeps what the tests actually need: once it is set the
+// entry function has returned, and the release/acquire pair publishes
+// everything the entry wrote.
+//
+// TODO(browser-webgpu): JSPI (-sASYNCIFY=2) is the upstream fix -- emscripten
+// awaits the entry point there -- but MapLibre Native pins -sASYNCIFY=1 in
+// vendor/dawn.cmake, so adopting it needs an upstream change first.
+#if defined(__EMSCRIPTEN__) && defined(MLN_TEST_BACKEND_WEBGPU)
+#define MLN_TEST_JOIN_ON_FLAG 1
+#endif
+
 struct mln_test_thread {
   void (*entry)(void*);
   void* argument;
+#if defined(MLN_TEST_JOIN_ON_FLAG)
+  atomic_bool entry_returned;
+#endif
 #if defined(_WIN32)
   HANDLE handle;
 #else
@@ -279,16 +311,26 @@ struct mln_test_thread {
 #endif
 };
 
+static void note_entry_returned(mln_test_thread* thread) {
+#if defined(MLN_TEST_JOIN_ON_FLAG)
+  atomic_store(&thread->entry_returned, true);
+#else
+  (void)thread;
+#endif
+}
+
 #if defined(_WIN32)
 static DWORD WINAPI thread_trampoline(LPVOID argument) {
   mln_test_thread* thread = argument;
   thread->entry(thread->argument);
+  note_entry_returned(thread);
   return 0;
 }
 #else
 static void* thread_trampoline(void* argument) {
   mln_test_thread* thread = argument;
   thread->entry(thread->argument);
+  note_entry_returned(thread);
   return NULL;
 }
 #endif
@@ -298,6 +340,9 @@ mln_test_thread* mln_test_thread_start(void (*entry)(void*), void* argument) {
   TEST_ASSERT_NOT_NULL(thread);
   thread->entry = entry;
   thread->argument = argument;
+#if defined(MLN_TEST_JOIN_ON_FLAG)
+  atomic_init(&thread->entry_returned, false);
+#endif
 #if defined(_WIN32)
   thread->handle = CreateThread(NULL, 0, thread_trampoline, thread, 0, NULL);
   TEST_ASSERT_NOT_NULL(thread->handle);
@@ -313,7 +358,17 @@ void mln_test_thread_join(mln_test_thread* thread) {
   if (thread == NULL) {
     return;
   }
-#if defined(_WIN32)
+#if defined(MLN_TEST_JOIN_ON_FLAG)
+  // Unbounded on purpose: this stands in for pthread_join, and a test that
+  // never finishes should hit the runner's timeout rather than carry on with a
+  // thread still running. Parking rather than spinning, because the thread
+  // being waited on needs the CPU to make progress.
+  while (!atomic_load(&thread->entry_returned)) {
+    mln_test_sleep_millisecond();
+  }
+  // Detached rather than joined, since nothing will ever report it as exited.
+  pthread_detach(thread->handle);
+#elif defined(_WIN32)
   WaitForSingleObject(thread->handle, INFINITE);
   CloseHandle(thread->handle);
 #else
@@ -478,6 +533,160 @@ static void destroy_backend_state(void* opaque_state) {
   eglTerminate(state->display);
   free(state);
 }
+
+#elif defined(MLN_TEST_BACKEND_WEBGPU)
+
+typedef struct webgpu_state {
+  WGPUInstance instance;
+  WGPUAdapter adapter;
+  WGPUDevice device;
+} webgpu_state;
+
+// A host owns the WebGPU device, so the suite stands in for one and requests
+// its own. Adapter and device requests are futures; the suite runs on a worker,
+// where waiting on them is legal, so this blocks rather than unwinding the test
+// into a callback.
+static bool await_future(WGPUInstance instance, WGPUFuture future) {
+  // Bounded, so a browser without a WebGPU adapter fails the fixture rather
+  // than hanging the suite until the runner's timeout. Software adapter and
+  // device creation is well under a second even on a contended runner, so this
+  // is generous rather than a performance assertion -- and it is paid once per
+  // thread, not once per fixture.
+  //
+  // A non-zero timeout is only legal on an instance that asked for timed waits;
+  // see create_webgpu_device().
+  const uint64_t timeout_ns = UINT64_C(5) * 1000U * 1000U * 1000U;
+  WGPUFutureWaitInfo wait = {.future = future, .completed = false};
+  const WGPUWaitStatus status =
+    wgpuInstanceWaitAny(instance, 1, &wait, timeout_ns);
+  if (status != WGPUWaitStatus_Success || !wait.completed) {
+    // Worth printing: emdawnwebgpu reports why it refused a wait through
+    // DEBUG_PRINTF, which an optimised build compiles out, so the status is the
+    // only thing that separates a timeout from a rejected wait.
+    fprintf(
+      stderr, "waiting on a WebGPU future failed (status %d, completed %d)\n",
+      (int)status, (int)wait.completed
+    );
+    return false;
+  }
+  return true;
+}
+
+static void on_adapter(
+  WGPURequestAdapterStatus status, WGPUAdapter adapter, WGPUStringView message,
+  void* user_data, void* unused
+) {
+  (void)message;
+  (void)unused;
+  if (status == WGPURequestAdapterStatus_Success) {
+    *(WGPUAdapter*)user_data = adapter;
+  }
+}
+
+static void on_device(
+  WGPURequestDeviceStatus status, WGPUDevice device, WGPUStringView message,
+  void* user_data, void* unused
+) {
+  (void)message;
+  (void)unused;
+  if (status == WGPURequestDeviceStatus_Success) {
+    *(WGPUDevice*)user_data = device;
+  }
+}
+
+// A host owns one device and hands it to every session it attaches, so the
+// suite holds one per thread rather than building a fresh software device for
+// each fixture. Per thread rather than per process because emdawnwebgpu keeps
+// WebGPU objects in the JS realm of the worker that created them, and the suite
+// attaches sessions from more than one thread.
+//
+// The device outlives every fixture on its thread and goes away with the
+// process, which is why destroy_backend_state() releases nothing.
+static _Thread_local webgpu_state thread_webgpu_state;
+static _Thread_local bool thread_webgpu_attempted;
+
+static bool create_webgpu_device(webgpu_state* state) {
+  // Waiting on a future with a timeout has to be asked for up front: otherwise
+  // wgpuInstanceWaitAny rejects every non-zero timeout instead of waiting, and
+  // the bound in await_future() becomes an immediate failure. The capability
+  // needs Asyncify, which the emdawnwebgpu port enables, and wgpuCreateInstance
+  // returns NULL when it is asked for without it.
+  WGPUInstanceDescriptor instance_descriptor = {
+    .capabilities = {.timedWaitAnyEnable = true},
+  };
+  state->instance = wgpuCreateInstance(&instance_descriptor);
+  if (state->instance == NULL) {
+    fprintf(
+      stderr, "creating a WebGPU instance with timed waits enabled failed\n"
+    );
+    return false;
+  }
+
+  WGPURequestAdapterOptions adapter_options = {0};
+  WGPURequestAdapterCallbackInfo adapter_info = {
+    .mode = WGPUCallbackMode_AllowProcessEvents,
+    .callback = on_adapter,
+    .userdata1 = &state->adapter,
+  };
+  if (
+    !await_future(
+      state->instance, wgpuInstanceRequestAdapter(
+                         state->instance, &adapter_options, adapter_info
+                       )
+    ) ||
+    state->adapter == NULL
+  ) {
+    fprintf(stderr, "requesting a WebGPU adapter failed\n");
+    wgpuInstanceRelease(state->instance);
+    return false;
+  }
+
+  WGPUDeviceDescriptor device_descriptor = {0};
+  WGPURequestDeviceCallbackInfo device_info = {
+    .mode = WGPUCallbackMode_AllowProcessEvents,
+    .callback = on_device,
+    .userdata1 = &state->device,
+  };
+  if (
+    !await_future(
+      state->instance,
+      wgpuAdapterRequestDevice(state->adapter, &device_descriptor, device_info)
+    ) ||
+    state->device == NULL
+  ) {
+    fprintf(stderr, "requesting a WebGPU device failed\n");
+    wgpuAdapterRelease(state->adapter);
+    wgpuInstanceRelease(state->instance);
+    return false;
+  }
+
+  return true;
+}
+
+static bool create_backend_state(void** out_state, void* out_context) {
+  if (!thread_webgpu_attempted) {
+    thread_webgpu_attempted = true;
+    if (!create_webgpu_device(&thread_webgpu_state)) {
+      thread_webgpu_state = (webgpu_state){0};
+    }
+  }
+  if (thread_webgpu_state.device == NULL) {
+    return false;
+  }
+
+  *(mln_webgpu_context_descriptor*)out_context =
+    (mln_webgpu_context_descriptor){
+      .size = sizeof(mln_webgpu_context_descriptor),
+      .instance = thread_webgpu_state.instance,
+      .device = thread_webgpu_state.device,
+      .queue = NULL,
+    };
+  // Borrowed from the thread's cache, so it outlives the fixture.
+  *out_state = &thread_webgpu_state;
+  return true;
+}
+
+static void destroy_backend_state(void* opaque_state) { (void)opaque_state; }
 
 #elif defined(MLN_TEST_BACKEND_OPENGL) && defined(MLN_TEST_OPENGL_WEBGL)
 
@@ -879,6 +1088,13 @@ bool mln_test_render_fixture_create(
   }
   mln_vulkan_owned_texture_descriptor descriptor =
     mln_vulkan_owned_texture_descriptor_default();
+#elif defined(MLN_TEST_BACKEND_WEBGPU)
+  mln_webgpu_context_descriptor context = {0};
+  if (!create_backend_state(&fixture->backend_state, &context)) {
+    return false;
+  }
+  mln_webgpu_owned_texture_descriptor descriptor =
+    mln_webgpu_owned_texture_descriptor_default();
 #endif
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
@@ -892,6 +1108,9 @@ bool mln_test_render_fixture_create(
 #elif defined(MLN_TEST_BACKEND_VULKAN)
   const mln_status status =
     mln_vulkan_owned_texture_attach(map, &descriptor, &fixture->session);
+#elif defined(MLN_TEST_BACKEND_WEBGPU)
+  const mln_status status =
+    mln_webgpu_owned_texture_attach(map, &descriptor, &fixture->session);
 #endif
   if (status != MLN_STATUS_OK || fixture->session == MLN_HANDLE_NULL) {
     destroy_backend_state(fixture->backend_state);

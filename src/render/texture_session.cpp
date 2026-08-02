@@ -444,6 +444,10 @@ auto texture_read_premultiplied_rgba8(
     set_thread_error("texture session does not support CPU readback");
     return MLN_STATUS_UNSUPPORTED;
   }
+  if (!live->texture.backend->supports_readback()) {
+    set_thread_error("render backend does not support CPU readback");
+    return MLN_STATUS_UNSUPPORTED;
+  }
   if (live->rendered_generation != live->generation) {
     set_thread_error("no rendered frame is available for this generation");
     return MLN_STATUS_INVALID_STATE;

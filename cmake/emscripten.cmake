@@ -27,11 +27,26 @@ add_link_options(
   "-sSTACK_SIZE=${MLN_EMSCRIPTEN_STACK_SIZE}")
 
 # MapLibre leans on exceptions, so the model is load-bearing rather than
-# incidental. Native Wasm exceptions cost far less than emulating them in
-# JavaScript, and every browser that ships WebGL2 supports them.
+# incidental, and it is not the same on both backends.
 #
-# TODO(browser-webgpu): emdawnwebgpu waits on promises through Asyncify, which
-# cannot mix with native Wasm exceptions. Adding the WebGPU backend means either
-# moving it to JSPI or giving that backend -fexceptions.
-add_compile_options(-fwasm-exceptions)
-add_link_options(-fwasm-exceptions)
+# Native Wasm exceptions cost far less than emulating them in JavaScript, so
+# WebGL uses them. WebGPU cannot: the emdawnwebgpu port turns on Asyncify to
+# implement emwgpuWaitAny, and wasm-opt aborts when asked to run the Asyncify
+# pass over a module using native exception handling. That only shows up at -O2
+# and above, where wasm-opt runs at all, so an unoptimised link is not evidence
+# either way.
+#
+# TODO(browser-webgpu): JSPI would let WebGPU keep native exceptions, and
+# emdawnwebgpu already accepts it -- its own validation asks for "Asyncify or
+# JSPI". What blocks it is upstream: MapLibre Native pins -sASYNCIFY=1 as an
+# interface link option in vendor/dawn.cmake, and an interface option lands
+# after
+# ours, so a -sJSPI here is overridden. Adopting JSPI needs that flag to become
+# configurable upstream first.
+if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
+  add_compile_options(-fexceptions)
+  add_link_options(-fexceptions)
+else()
+  add_compile_options(-fwasm-exceptions)
+  add_link_options(-fwasm-exceptions)
+endif()
