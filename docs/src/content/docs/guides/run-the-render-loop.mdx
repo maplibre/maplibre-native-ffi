@@ -1,0 +1,92 @@
+---
+title: Run the render loop
+description: Choose the runtime owner thread, then pump it and draw frames.
+sidebar:
+  order: 4
+---
+
+import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
+import frameLoop from "../../../../snippets/c/frame-loop.c?raw";
+import pumpThread from "../../../../snippets/c/pump-thread.c?raw";
+
+Pumping the runtime advances MapLibre Native. A pump drains queued map work and
+services network and database work. Drawing is separate: the map publishes a
+render update, and the render session draws it.
+
+Pump the runtime and drain its events on the runtime owner thread. Both
+operations report a wrong-thread status from another thread. Choose the owner
+thread before creating the runtime.
+
+## Choose the runtime owner thread
+
+Pump from the display thread when the host already has a frame callback and the
+map is the main work on that thread. The runtime, map, and render session then
+share one thread, and the loop needs no shared state. A pump drains to
+completion, and one call can span an entire style parse. Budget for variable
+work in the frame callback.
+
+Use a dedicated thread when a long pump would stall the display, the map must
+load while the display is idle, or the host draws no frames. That thread parks
+inside the pump, and runtime work sets the loop cadence. The display thread
+attaches the render session and draws. This design needs shared state and a wake
+source.
+
+## Pump from the frame callback
+
+Pass a timeout of zero. The call drains what is queued and returns, because the
+display already sets the pace.
+
+<Code code={region(frameLoop, "pump")} lang="c" title="frame-loop.c" />
+
+The helper compares each event's source against the map before interpreting the
+event. Every map in one runtime shares the queue. It requests a frame after a
+render update and after a finished frame with its repaint flag set. Repaint
+frames advance camera animations and label placement.
+
+A display-paced host stops pumping when it stops requesting frames. Request a
+frame after every map change. This lets an idle loop process the change.
+
+Draw a pending frame after draining events. When the render call reports that it
+drew no frame, keep the frame pending for the next turn. This result means that
+the map has not published an update for the session's extent. It is expected at
+startup and after an attach or resize.
+
+<Code code={region(frameLoop, "render")} lang="c" title="frame-loop.c" />
+
+## Pump on a thread of your own
+
+The pump thread owns the runtime and map. The display thread owns the render
+session. Each operation reports a wrong-thread status when called from the
+other thread.
+
+The two threads share a flag that the pump thread sets when a frame is due, a
+flag that the display thread sets to stop the loop, and a wake source.
+
+<Code code={region(pumpThread, "channel")} lang="c" title="pump-thread.c" />
+
+Acquire the wake source on the runtime owner thread before starting the loop.
+
+<Code code={region(pumpThread, "acquire")} lang="c" title="pump-thread.c" />
+
+Any thread may signal the source, and the signal releases a parked pump. The
+display thread signals it after it queues work for the map or asks the loop to
+stop.
+
+<Code code={region(pumpThread, "signal")} lang="c" title="pump-thread.c" />
+
+The loop parks until owner-thread work, a runtime event, or the wake source
+signals it. Use a positive timeout to reach the stop check even when no wake
+arrives. The runtime registers no timers of its own. This snippet parks for 100
+ms and checks for a stop at least ten times a second.
+
+<Code code={region(pumpThread, "loop")} lang="c" title="pump-thread.c" />
+
+Call a parking pump outside any lock that a signalling thread also acquires. The
+display thread reads the pending flag on its next frame and draws.
+
+Use a dedicated operating-system thread. The runtime records that specific
+thread at creation. Serial dispatch queues, actors, and pooled executors provide
+serialization but can move work between threads. Calls that move report a
+wrong-thread status.

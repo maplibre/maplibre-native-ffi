@@ -1,0 +1,49 @@
+---
+title: Capture logs
+description: Send MapLibre Native log records to the host logger and choose their delivery order.
+sidebar:
+  order: 17
+---
+
+import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
+import logCallback from "../../../../snippets/c/log-callback.c?raw";
+
+MapLibre Native sends records to the platform logger by default. Android and
+Apple platforms use the system log; other platforms use the console. Install a
+callback to send records to a host logger, file, crash reporter, or test.
+
+A record contains a severity, category, optional numeric code, and message. The
+callback return value either consumes the record or forwards it to the platform
+logger as well. Forward records while validating a new host logger.
+
+<Code code={region(logCallback, "callback")} lang="c" title="log-callback.c" />
+
+One callback serves the whole process rather than one runtime, and MapLibre
+stores it by reference. Install it before the first runtime exists to catch
+setup records, and keep it valid until you replace or clear it.
+
+<Code code={region(logCallback, "install")} lang="c" title="log-callback.c" />
+
+## The callback runs on MapLibre's threads
+
+MapLibre invokes the callback on the thread that produced the record, including
+worker and network threads. The callback can run while MapLibre holds logging
+locks.
+
+Make the callback thread-safe and return quickly. Do not call a MapLibre function
+from the callback; the call can deadlock. Copy and queue the record before
+returning when the host needs more processing.
+
+## Synchronous and asynchronous records
+
+Errors reach the callback synchronously. Informational and warning records may
+arrive after the work that produced them. Asynchronous delivery keeps MapLibre
+threads available while the host logger runs.
+
+Clear the mask when every record must be ordered with the call that produced it,
+such as in a log assertion. Production hosts usually keep the default because
+synchronous delivery blocks MapLibre threads on the host logger.
+
+<Code code={region(logCallback, "async")} lang="c" title="log-callback.c" />

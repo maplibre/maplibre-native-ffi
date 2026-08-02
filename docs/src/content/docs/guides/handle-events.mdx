@@ -1,0 +1,58 @@
+---
+title: Handle events
+description: Drain runtime events, match their sources, and read borrowed values before they expire.
+sidebar:
+  order: 5
+---
+
+import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
+import handleEvents from "../../../../snippets/c/handle-events.c?raw";
+
+Events report completed style loads, available frames, download progress, and
+resource failures. The runtime copies each event into a queue. The host drains
+that queue on the runtime owner thread.
+
+Draining is a loop rather than a single call. Poll until the queue reports that
+nothing is left, because one pump can produce many events.
+
+<Code code={region(handleEvents, "drain")} lang="c" title="handle-events.c" />
+
+## Match an event to its source
+
+One runtime serves every map created under it, and their events share one queue.
+Check the source before interpreting the event. This prevents one map from
+handling another map's event.
+
+<Code code={region(handleEvents, "match")} lang="c" title="handle-events.c" />
+
+Runtime events also use the queue. Check the source kind before comparing a map
+handle.
+
+## Read a payload by its type
+
+An event with structured data names the payload type and length. Check the type,
+then require at least the size that the host expects. A newer runtime can append
+fields to the payload.
+
+<Code code={region(handleEvents, "payload")} lang="c" title="handle-events.c" />
+
+## Handle essential events
+
+Most hosts begin with four event kinds.
+
+A style-loaded event means that the style parsed and its sources exist. Add
+host-owned sources and layers after this event.
+
+A render-update-available event means that the map published a new frame. A
+render-frame-finished event carries a repaint flag. Draw another frame when the
+flag is set. Additional frames advance camera animations and label placement.
+
+A loading-failed event carries the failure text for a style or resource request.
+
+Calls report synchronous failures through the binding's error idiom. Events
+report failures from work that completes later.
+
+Destroying a map discards that map's queued events immediately. Read any mirrored
+state that teardown needs while the map is live.

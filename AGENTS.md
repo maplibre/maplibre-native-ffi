@@ -97,27 +97,11 @@ the PR description if more detail is needed. More context:
 - We're currently in a prerelease state, so breaking API changes are allowed and
   encouraged over leaving backwards compatibility shims.
 
-### Prose
+### Writing
 
-Use positive wording for guidance. Use negative wording for real prohibitions,
-safety rules, and hard boundaries.
-
-- Prefer: "Examples stay small and focused."
-- Avoid: "Examples should not grow into full applications."
-- Prefer: "Higher-level adapters may add execution models above this layer."
-- Avoid: "This layer should not try to manage execution models for every
-  possible host."
-
-### Specifications
-
-For specification writing:
-
-- Standalone and testable: each requirement should be checkable on its own,
-  without pointing at an example or the current tree.
-- Add, don’t restate or hedge: link to other docs instead of copying them; avoid
-  “or equivalent”, unnamed MAYs, and vague outcomes.
-- Scope by constraint: family-wide sections state behavior; platform- or
-  API-specific rules belong in clearly labeled subsections.
+Follow the `docs-writing` skill in `.agents/skills/` for all prose: the
+documentation site, specifications, header comments, and this file. It covers
+sentence-level style, page structure, and project terminology.
 
 ### Testing
 

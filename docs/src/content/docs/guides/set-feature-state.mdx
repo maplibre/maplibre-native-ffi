@@ -1,0 +1,79 @@
+---
+title: Set feature state
+description: Set per-feature state, use it in style expressions, and read it back.
+sidebar:
+  order: 14
+---
+
+import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
+import featureState from "../../../../snippets/c/feature-state.c?raw";
+import featureStateRead from "../../../../snippets/c/feature-state-read.c?raw";
+
+Feature state is data that your host attaches to one feature at runtime and that
+style expressions read while the map draws. One styling rule then covers
+selection, hover, a live value, or a computed status, because each feature
+supplies its own input to that rule.
+
+Feature state belongs to the [render session](/maplibre-native-ffi/concepts/)
+and applies to its loaded tiles. Set state after the first render update that
+follows a style load. An earlier call reports an invalid-state status. Every
+feature-state call runs on the session's owner thread.
+
+## Set state on a feature
+
+A selector contains the source ID, the source-layer ID for a vector source, and
+the feature ID. Feature IDs match as text. Select a feature whose GeoJSON `id`
+is the number 7 with `"7"`.
+
+<Code code={region(featureState, "select")} lang="c" title="feature-state.c" />
+
+The state is a JSON object, and each state key holds one JSON value.
+
+<Code code={region(featureState, "value")} lang="c" title="feature-state.c" />
+
+Setting state writes the keys of the object that you pass, leaves the feature's
+other keys at their current values, and requests a repaint.
+
+<Code code={region(featureState, "set")} lang="c" title="feature-state.c" />
+
+An expression reads one key with `feature-state`, and its fallback value applies
+to every feature that has no value for that key. A circle layer that enlarges
+the selected feature reads
+`["case", ["boolean", ["feature-state", "selected"], false], 10, 5]` for
+`circle-radius`.
+
+Removal depends on how much of the selector you supply. A state key removes one
+entry, a feature ID alone removes that feature's whole state, and a selector
+with neither one removes the state of every feature in the source layer.
+
+<Code code={region(featureState, "remove")} lang="c" title="feature-state.c" />
+
+## Read state back
+
+Reading state copies the session's value into a snapshot handle that the host
+owns. The snapshot contains an empty object when the source or feature has no
+state.
+
+<Code code={region(featureStateRead, "get")} lang="c" title="feature-state-read.c" />
+
+The snapshot's root is a JSON object with one member per state key. Reading one
+value iterates over those members and compares each key against the one that you
+want.
+
+<Code code={region(featureStateRead, "member")} lang="c" title="feature-state-read.c" />
+
+The root value and everything under it point into the snapshot. Copy any value
+that you keep, because destroying the snapshot invalidates those pointers.
+
+<Code code={region(featureStateRead, "read")} lang="c" title="feature-state-read.c" />
+
+## How long state lives
+
+Feature state lives with a render session's rendering resources. A resize or an
+in-place target replacement preserves those resources, as
+[Attach a render target](/maplibre-native-ffi/guides/attach-a-render-target/)
+describes. Changing the scale factor recreates them. Destroying the session and
+attaching another does the same. Feature state starts empty after either change.
+To preserve it, keep a host copy and set it again after the next render update.

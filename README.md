@@ -29,8 +29,9 @@ returns `0`.
 Read the documentation site for concepts, usage guides, the generated C API
 reference, and contributor notes.
 
+- [Install](https://maplibre.org/maplibre-native-ffi/install/)
 - [Concepts](https://maplibre.org/maplibre-native-ffi/concepts/)
-- [Usage guides](https://maplibre.org/maplibre-native-ffi/guides/installation/)
+- [Usage guides](https://maplibre.org/maplibre-native-ffi/guides/create-a-map/)
 - [Reference](https://maplibre.org/maplibre-native-ffi/reference/c/)
 - [Development overview](https://maplibre.org/maplibre-native-ffi/development/overview/)
 - [Binding specification](https://maplibre.org/maplibre-native-ffi/development/binding-specification/)

@@ -1,0 +1,71 @@
+---
+title: Query a source
+description: Read the features that a source holds, and expand a cluster into the features under it.
+sidebar:
+  order: 13
+---
+
+import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
+import sourceFeatures from "../../../../snippets/c/query-source-features.c?raw";
+import clusterLeaves from "../../../../snippets/c/cluster-leaves.c?raw";
+
+A source query reports the loaded features in a source, including features that
+no layer draws. To find features at a screen position, use
+[Query a map](/maplibre-native-ffi/guides/query-a-map/).
+
+The query belongs to the render session and runs on the session's owner thread.
+Source queries become available after the first render update. An earlier query
+reports an invalid-state status.
+
+## Run the query
+
+A vector source needs source-layer IDs, because one vector tile holds several
+layers and MapLibre reads the layers that you name. A vector query with
+no source-layer ID returns zero features. A GeoJSON source holds a single layer
+and ignores the field.
+
+<Code code={region(sourceFeatures, "options")} lang="c" title="query-source-features.c" />
+
+Name the source itself by its style source ID. That ID is the query's second
+argument, and it differs from the source-layer IDs in the options.
+
+<Code code={region(sourceFeatures, "query")} lang="c" title="query-source-features.c" />
+
+A successful query can return an empty result for an unknown source ID. Check
+the result count when the host expects features.
+
+<Code code={region(sourceFeatures, "read")} lang="c" title="query-source-features.c" />
+
+A query covers the tiles that the source loaded for the current camera. Its
+result therefore changes as the camera moves and more tiles arrive. A source
+loads tiles only while a layer uses it.
+
+## Expand a cluster
+
+An extension query runs a named extension against one source feature. The
+`supercluster` extension reads a clustered GeoJSON source. Its `leaves` field
+returns the features under one cluster as a feature collection.
+
+`supercluster` matches numbers by exact JSON type. Build the `limit` and `offset`
+arguments as unsigned values.
+
+<Code code={region(clusterLeaves, "arguments")} lang="c" title="cluster-leaves.c" />
+
+The call names the source, the cluster feature, the extension, and the field
+within that extension.
+
+<Code code={region(clusterLeaves, "query")} lang="c" title="cluster-leaves.c" />
+
+An extension result identifies whether it contains a single value or a feature
+collection. Check the result kind before reading the value.
+
+<Code code={region(clusterLeaves, "leaves")} lang="c" title="cluster-leaves.c" />
+
+Pass the cluster feature to the extension query exactly as a source query
+returned it. `supercluster` also matches `cluster_id` by exact JSON type. A
+double or signed integer counts as absent. A feature descriptor copied from a
+query result preserves each property's JSON type. Rebuilding the feature through
+a JSON layer that stores every number as a double produces a successful query
+with an empty result.

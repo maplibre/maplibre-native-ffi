@@ -1,0 +1,46 @@
+---
+title: Load a style
+description: Load a base style from a URL or host text, then replay additions after later style loads.
+sidebar:
+  order: 2
+---
+
+import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
+import loadStyle from "../../../../snippets/c/load-style.c?raw";
+
+A style defines the tiles, layers, and drawing order of a map. Load one before
+rendering a new map.
+
+## Choose where the style comes from
+
+Set a style URL for a hosted base map. MapLibre fetches it through the resource
+system that also loads tiles. The request therefore uses the runtime's cache,
+offline regions, and resource transform.
+
+<Code code={region(loadStyle, "url")} lang="c" title="load-style.c" />
+
+Set style text when the host already has the document, such as a bundled base
+style or one composed at runtime. MapLibre parses and copies the text before the
+call returns.
+
+<Code code={region(loadStyle, "json")} lang="c" title="load-style.c" />
+
+Either call returns when the map accepts the request. Later pumps load the
+style, sources, glyphs, and first tiles. A style-loaded event reports that the
+style has parsed and its sources exist. A loading-failed event carries the
+failure text.
+[Handle events](/maplibre-native-ffi/guides/handle-events/) covers reading both.
+
+## Replay additions after a style load
+
+Sources, layers, images, and layer properties that your host adds belong to the
+style that was loaded when they were added. Loading another style discards all
+of them.
+
+A host adds its own data after the style-loaded event and repeats those changes
+after every later style load. A host that switches base maps keeps the changes
+that it needs to replay.
+
+Camera state survives a style load unchanged.

@@ -1,0 +1,106 @@
+---
+// Side view of the two animated camera commands, from a zoomed-out start to a
+// zoomed-in end. Height stands for zoom, so a higher line is a camera that has
+// pulled further back from the map.
+---
+
+<figure class="camera-paths not-content">
+  <div class="panel">
+    <svg
+      viewBox="0 0 320 96"
+      role="img"
+      aria-label="An eased move interpolates the zoom straight from the start value to the end value."
+    >
+      <line x1="24" y1="80" x2="296" y2="80" class="ground"></line>
+      <line x1="32" y1="80" x2="32" y2="34" class="riser"></line>
+      <line x1="288" y1="80" x2="288" y2="58" class="riser"></line>
+      <path d="M 32 34 L 288 58" class="track"></path>
+      <circle cx="32" cy="34" r="4" class="stop"></circle>
+      <circle cx="288" cy="58" r="4" class="stop"></circle>
+      <circle cx="32" cy="80" r="3" class="pin"></circle>
+      <circle cx="288" cy="80" r="3" class="pin"></circle>
+    </svg>
+    <p class="label">Ease</p>
+    <p class="note">
+      Zoom runs straight from the start value to the end value.
+    </p>
+  </div>
+
+  <div class="panel">
+    <svg
+      viewBox="0 0 320 96"
+      role="img"
+      aria-label="A flown move pulls the zoom back across the middle of the flight before it settles on the end value."
+    >
+      <line x1="24" y1="80" x2="296" y2="80" class="ground"></line>
+      <line x1="32" y1="80" x2="32" y2="34" class="riser"></line>
+      <line x1="288" y1="80" x2="288" y2="58" class="riser"></line>
+      <path d="M 32 34 Q 160 4 288 58" class="track"></path>
+      <circle cx="32" cy="34" r="4" class="stop"></circle>
+      <circle cx="288" cy="58" r="4" class="stop"></circle>
+      <circle cx="32" cy="80" r="3" class="pin"></circle>
+      <circle cx="288" cy="80" r="3" class="pin"></circle>
+    </svg>
+    <p class="label">Fly</p>
+    <p class="note">
+      Zoom pulls back across the middle, then settles on the end value.
+    </p>
+  </div>
+</figure>
+
+<style>
+.camera-paths {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem 1.5rem;
+  margin: 1.5rem 0;
+}
+
+.panel {
+  min-width: 0;
+  align-self: start;
+}
+
+.panel svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.label {
+  margin-top: 0.25rem;
+  font-weight: 600;
+}
+
+.note {
+  margin-top: 0.125rem;
+  font-size: var(--sl-text-sm);
+  color: var(--sl-color-gray-2);
+}
+
+.ground {
+  stroke: var(--sl-color-gray-4);
+  stroke-width: 1.5;
+}
+
+.riser {
+  stroke: var(--sl-color-gray-4);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.track {
+  fill: none;
+  stroke: var(--sl-color-text-accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.stop {
+  fill: var(--sl-color-text-accent);
+}
+
+.pin {
+  fill: var(--sl-color-gray-4);
+}
+</style>

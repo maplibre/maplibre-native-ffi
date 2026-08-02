@@ -1,35 +1,34 @@
 ---
 title: MapLibre Native FFI
-description: Project overview.
+description: A C API for direct host control of the MapLibre Native map and render session.
 ---
 
 import SupportMatrix from "../../components/SupportMatrix.astro";
 
-MapLibre Native FFI provides an experimental C API for
-[MapLibre Native](https://github.com/maplibre/maplibre-native). It targets
-low-level language bindings and host integrations that need a C boundary instead
-of direct C++ interop.
+MapLibre Native FFI is a C API for
+[MapLibre Native](https://github.com/maplibre/maplibre-native), an engine that
+draws vector and raster maps from a MapLibre style document. It exposes MapLibre
+Native concepts directly across a C ABI and language bindings. Use it for SDKs
+and custom integrations that need direct control of the map and render session.
 
-The API exposes MapLibre Native concepts directly. Framework concerns such as
-gestures, widgets, declarative UI, and application lifecycle integration belong
-in downstream adapters.
+The MapLibre [Android](https://maplibre.org/maplibre-native/android/api/) and
+[iOS](https://maplibre.org/maplibre-native/ios/latest/documentation/maplibre/)
+SDKs provide a map view that owns a window, a frame loop, and gesture handling.
+This API provides the map and render session. The host creates the window and
+graphics context, pumps the runtime, and decides when to draw each frame. A
+texture render target supports image export and compositing into a host scene.
 
-## Use the Docs
-
-* Start with [Concepts](/maplibre-native-ffi/concepts/) to understand the runtime, map, render target, ownership, threading, and host integration model.
-* Read the [Usage guides](/maplibre-native-ffi/guides/installation/) for integration tasks.
-* Consult the
-  [API Reference](/maplibre-native-ffi/reference/c/) for declarations, ownership rules, and status
-  values.
-* If you are contributing, read the
-  [Development overview](/maplibre-native-ffi/development/overview/) first.
+See the [examples](https://github.com/maplibre/maplibre-native-ffi/tree/main/examples)
+in the repository for complete integration examples for each language binding.
 
 ## Status
 
 MapLibre Native FFI is pre-1.0. The C ABI is unstable while `mln_c_version()`
-returns `0`.
+returns `0`, and headers, package coordinates, and behavior change between
+snapshots.
 
-The C API covers most of the MapLibre Native API surface. Advanced extension
-APIs, including custom layers and shader registry access, are not yet included.
+The C API covers most of the MapLibre Native API surface. Custom layers and
+shader registry access remain outside the current surface. Hosts that require
+custom draw calls or shaders must extend the native layer.
 
 <SupportMatrix />
