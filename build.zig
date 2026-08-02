@@ -423,7 +423,7 @@ pub fn dependency(b: *std.Build, options: DependencyOptions) *std.Build.Dependen
 }
 
 pub fn maplibreNativeModule(b: *std.Build, options: DependencyOptions) *std.Build.Module {
-    return dependency(b, options).module("maplibre_native");
+    return dependency(b, options).module("maplibre_native_ffi");
 }
 
 fn repoLinkOptions(options: BuildOptions) LinkOptions {
@@ -496,13 +496,13 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
 }
 
 fn addMaplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module {
-    const maplibre_native = b.addModule("maplibre_native", .{
-        .root_source_file = b.path("bindings/zig/src/maplibre_native.zig"),
+    const maplibre_native_ffi = b.addModule("maplibre_native_ffi", .{
+        .root_source_file = b.path("bindings/zig/src/maplibre_native_ffi.zig"),
         .target = options.target,
         .optimize = options.optimize,
     });
-    linkMaplibreNativeC(b, maplibre_native, repoLinkOptions(options));
-    return maplibre_native;
+    linkMaplibreNativeC(b, maplibre_native_ffi, repoLinkOptions(options));
+    return maplibre_native_ffi;
 }
 
 fn defaultDocIncludeDirs(b: *std.Build) []const std.Build.LazyPath {
@@ -516,7 +516,7 @@ fn addMaplibreNativeDocs(
     include_dirs: []const std.Build.LazyPath,
 ) void {
     const docs_module = b.createModule(.{
-        .root_source_file = b.path("bindings/zig/src/maplibre_native.zig"),
+        .root_source_file = b.path("bindings/zig/src/maplibre_native_ffi.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -527,7 +527,7 @@ fn addMaplibreNativeDocs(
     });
 
     const doc_compile = b.addObject(.{
-        .name = "maplibre_native_docs",
+        .name = "maplibre_native_ffi_docs",
         .root_module = docs_module,
     });
     const install_docs = b.addInstallDirectory(.{
@@ -555,9 +555,9 @@ fn addTestCompile(b: *std.Build, options: BuildOptions, root_source_file: std.Bu
     return tests;
 }
 
-fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.Build.Module) *std.Build.Step.Compile {
+fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *std.Build.Module) *std.Build.Step.Compile {
     const tests = addTestCompile(b, options, b.path("bindings/zig/tests/main.zig"));
-    tests.root_module.addImport("maplibre_native", maplibre_native);
+    tests.root_module.addImport("maplibre_native_ffi", maplibre_native_ffi);
     addRenderBackendOptions(b, tests.root_module, options.render_backend);
     addRenderBackendTranslateC(b, tests.root_module, .{
         .target = options.target,
@@ -651,7 +651,7 @@ pub fn build(b: *std.Build) void {
         .system_root = system_root,
     };
 
-    const maplibre_native = addMaplibreNativeModule(b, options);
+    const maplibre_native_ffi = addMaplibreNativeModule(b, options);
 
     const test_sources = [_]std.Build.LazyPath{
         b.path("bindings/zig/src/status.zig"),
@@ -662,7 +662,7 @@ pub fn build(b: *std.Build) void {
 
     const test_step = b.step("test", "Run Zig binding tests");
 
-    const binding_tests = addBindingTests(b, options, maplibre_native);
+    const binding_tests = addBindingTests(b, options, maplibre_native_ffi);
     b.default_step.dependOn(&binding_tests.step);
     const run_binding_tests = addTestRunStep(b, binding_tests, options.target, b.path("scripts/run-ios-simulator-test.sh"));
     test_step.dependOn(&run_binding_tests.step);

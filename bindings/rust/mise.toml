@@ -6,17 +6,17 @@ run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
   cargo build \
-    -p maplibre-native-sys \
-    -p maplibre-native-core \
-    -p maplibre-native
+    -p maplibre-native-ffi-sys \
+    -p maplibre-native-ffi-core \
+    -p maplibre-native-ffi
 '''
 run_windows = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
   cargo build \
-    -p maplibre-native-sys \
-    -p maplibre-native-core \
-    -p maplibre-native
+    -p maplibre-native-ffi-sys \
+    -p maplibre-native-ffi-core \
+    -p maplibre-native-ffi
 '''
 
 [tasks.test]
@@ -38,14 +38,14 @@ export LD_LIBRARY_PATH="$lib_dirs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export DYLD_LIBRARY_PATH="$lib_dirs${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
 export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
 cargo test \
-  -p maplibre-native-sys \
-  -p maplibre-native-core \
-  -p maplibre-native \
+  -p maplibre-native-ffi-sys \
+  -p maplibre-native-ffi-core \
+  -p maplibre-native-ffi \
   -- --test-threads=1
 cargo clippy \
-  -p maplibre-native-sys \
-  -p maplibre-native-core \
-  -p maplibre-native \
+  -p maplibre-native-ffi-sys \
+  -p maplibre-native-ffi-core \
+  -p maplibre-native-ffi \
   --all-targets -- -D warnings
 '''
 run_windows = '''
@@ -53,25 +53,25 @@ native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
 cargo test \
-  -p maplibre-native-sys \
-  -p maplibre-native-core \
-  -p maplibre-native \
+  -p maplibre-native-ffi-sys \
+  -p maplibre-native-ffi-core \
+  -p maplibre-native-ffi \
   -- --test-threads=1
 cargo clippy \
-  -p maplibre-native-sys \
-  -p maplibre-native-core \
-  -p maplibre-native \
+  -p maplibre-native-ffi-sys \
+  -p maplibre-native-ffi-core \
+  -p maplibre-native-ffi \
   --all-targets -- -D warnings
 '''
 
 [tasks."test:download"]
 description = "Test the sys crate against a downloaded native snapshot archive."
 dir = "../.."
-# Stops at maplibre-native-sys on purpose. Only the build script's acquisition
+# Stops at maplibre-native-ffi-sys on purpose. Only the build script's acquisition
 # path is under test, and the crates above it track the C API at this commit
 # while the snapshot release publishes on its own schedule, so they stop
 # compiling whenever it lags a header change.
-run = 'env -u MAPLIBRE_NATIVE_C_INSTALL_DIR cargo test -p maplibre-native-sys'
+run = 'env -u MAPLIBRE_NATIVE_C_INSTALL_DIR cargo test -p maplibre-native-ffi-sys'
 
 [tasks."build:ohos"]
 usage = '''
@@ -93,8 +93,8 @@ CXX_aarch64_unknown_linux_ohos="$OHOS_SDK_NATIVE/llvm/bin/clang++ --target=aarch
 CARGO_TARGET_AARCH64_UNKNOWN_LINUX_OHOS_LINKER="$OHOS_SDK_NATIVE/llvm/bin/clang" \
 RUSTFLAGS="-C link-arg=--target=aarch64-linux-ohos -C link-arg=--sysroot=$sysroot -C link-arg=-fuse-ld=lld" \
 cargo build \
-  -p maplibre-native-sys \
-  -p maplibre-native-core \
-  -p maplibre-native \
+  -p maplibre-native-ffi-sys \
+  -p maplibre-native-ffi-core \
+  -p maplibre-native-ffi \
   --target aarch64-unknown-linux-ohos
 '''

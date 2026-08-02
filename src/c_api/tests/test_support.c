@@ -19,7 +19,7 @@
 #include <time.h>
 #endif
 
-#if defined(MLN_TEST_BACKEND_OPENGL) && defined(MLN_TEST_OPENGL_WEBGL)
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_WEBGL)
 #include <emscripten.h>
 #include <emscripten/html5.h>
 
@@ -47,16 +47,16 @@ EM_JS(void, mln_test_unregister_offscreen_canvas, (const char* name), {
 
 #endif
 
-#if defined(MLN_TEST_BACKEND_OPENGL) && defined(MLN_TEST_OPENGL_EGL)
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_EGL)
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #endif
 
-#if defined(MLN_TEST_BACKEND_VULKAN)
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
 #include <vulkan/vulkan.h>
 #endif
 
-#if defined(MLN_TEST_BACKEND_WEBGPU)
+#if defined(MLN_FFI_TEST_BACKEND_WEBGPU)
 #include <webgpu/webgpu.h>
 #endif
 
@@ -67,12 +67,12 @@ EM_JS(void, mln_test_unregister_offscreen_canvas, (const char* name), {
 // like a suite-wide outage. Tracking is thread local so the owner thread's
 // teardown leaves a worker thread's runtime alone.
 #if defined(_MSC_VER) && !defined(__clang__)
-#define MLN_TEST_THREAD_LOCAL __declspec(thread)
+#define MLN_FFI_TEST_THREAD_LOCAL __declspec(thread)
 #else
-#define MLN_TEST_THREAD_LOCAL _Thread_local
+#define MLN_FFI_TEST_THREAD_LOCAL _Thread_local
 #endif
 
-#define MLN_TEST_TRACKED_CAPACITY 8
+#define MLN_FFI_TEST_TRACKED_CAPACITY 8
 
 // Sessions are tracked by value. The caller's fixture usually lives on the test
 // stack frame, which an aborting assertion unwinds before teardown runs, so a
@@ -82,21 +82,22 @@ typedef struct tracked_session {
   void* backend_state;
 } tracked_session;
 
-static MLN_TEST_THREAD_LOCAL mln_runtime tracked_runtime;
-static MLN_TEST_THREAD_LOCAL mln_map tracked_maps[MLN_TEST_TRACKED_CAPACITY];
-static MLN_TEST_THREAD_LOCAL size_t tracked_map_count;
-static MLN_TEST_THREAD_LOCAL tracked_session
-  tracked_sessions[MLN_TEST_TRACKED_CAPACITY];
-static MLN_TEST_THREAD_LOCAL size_t tracked_session_count;
+static MLN_FFI_TEST_THREAD_LOCAL mln_runtime tracked_runtime;
+static MLN_FFI_TEST_THREAD_LOCAL mln_map
+  tracked_maps[MLN_FFI_TEST_TRACKED_CAPACITY];
+static MLN_FFI_TEST_THREAD_LOCAL size_t tracked_map_count;
+static MLN_FFI_TEST_THREAD_LOCAL tracked_session
+  tracked_sessions[MLN_FFI_TEST_TRACKED_CAPACITY];
+static MLN_FFI_TEST_THREAD_LOCAL size_t tracked_session_count;
 
 // Fails before the caller creates the handle. Dropping an overflow silently
 // would leave a live map outside teardown, and failing after creation would
 // strand the very handle that overflowed, so both cascade the same way.
 static void reserve_map_slot(void) {
-  if (tracked_map_count >= MLN_TEST_TRACKED_CAPACITY) {
+  if (tracked_map_count >= MLN_FFI_TEST_TRACKED_CAPACITY) {
     TEST_FAIL_MESSAGE(
       "This test holds more live maps than the suite can track. Destroy maps "
-      "as the test finishes with them, or raise MLN_TEST_TRACKED_CAPACITY."
+      "as the test finishes with them, or raise MLN_FFI_TEST_TRACKED_CAPACITY."
     );
   }
 }
@@ -118,11 +119,11 @@ static void untrack_map(const mln_map map) {
 
 // Fails before the caller attaches, for the same reason as reserve_map_slot().
 static void reserve_session_slot(void) {
-  if (tracked_session_count >= MLN_TEST_TRACKED_CAPACITY) {
+  if (tracked_session_count >= MLN_FFI_TEST_TRACKED_CAPACITY) {
     TEST_FAIL_MESSAGE(
       "This test holds more live render sessions than the suite can track. "
       "Destroy sessions as the test finishes with them, or raise "
-      "MLN_TEST_TRACKED_CAPACITY."
+      "MLN_FFI_TEST_TRACKED_CAPACITY."
     );
   }
 }
@@ -205,10 +206,10 @@ uint8_t* mln_test_read_fixture(const char* relative_path, size_t* out_size) {
   // objects. See mln_configure_browser_c_api_test().
   const char* fixture_dir = "/fixtures";
 #else
-  const char* fixture_dir = getenv("MLN_TEST_FIXTURE_DIR");
+  const char* fixture_dir = getenv("MLN_FFI_TEST_FIXTURE_DIR");
   TEST_ASSERT_TRUE_MESSAGE(
     fixture_dir != NULL && fixture_dir[0] != '\0',
-    "MLN_TEST_FIXTURE_DIR is unset; run the suite through ctest"
+    "MLN_FFI_TEST_FIXTURE_DIR is unset; run the suite through ctest"
   );
 #endif
 
@@ -294,14 +295,14 @@ uint64_t mln_test_monotonic_milliseconds(void) {
 // TODO(browser-webgpu): JSPI (-sASYNCIFY=2) is the upstream fix -- emscripten
 // awaits the entry point there -- but MapLibre Native pins -sASYNCIFY=1 in
 // vendor/dawn.cmake, so adopting it needs an upstream change first.
-#if defined(__EMSCRIPTEN__) && defined(MLN_TEST_BACKEND_WEBGPU)
-#define MLN_TEST_JOIN_ON_FLAG 1
+#if defined(__EMSCRIPTEN__) && defined(MLN_FFI_TEST_BACKEND_WEBGPU)
+#define MLN_FFI_TEST_JOIN_ON_FLAG 1
 #endif
 
 struct mln_test_thread {
   void (*entry)(void*);
   void* argument;
-#if defined(MLN_TEST_JOIN_ON_FLAG)
+#if defined(MLN_FFI_TEST_JOIN_ON_FLAG)
   atomic_bool entry_returned;
 #endif
 #if defined(_WIN32)
@@ -312,7 +313,7 @@ struct mln_test_thread {
 };
 
 static void note_entry_returned(mln_test_thread* thread) {
-#if defined(MLN_TEST_JOIN_ON_FLAG)
+#if defined(MLN_FFI_TEST_JOIN_ON_FLAG)
   atomic_store(&thread->entry_returned, true);
 #else
   (void)thread;
@@ -340,7 +341,7 @@ mln_test_thread* mln_test_thread_start(void (*entry)(void*), void* argument) {
   TEST_ASSERT_NOT_NULL(thread);
   thread->entry = entry;
   thread->argument = argument;
-#if defined(MLN_TEST_JOIN_ON_FLAG)
+#if defined(MLN_FFI_TEST_JOIN_ON_FLAG)
   atomic_init(&thread->entry_returned, false);
 #endif
 #if defined(_WIN32)
@@ -358,7 +359,7 @@ void mln_test_thread_join(mln_test_thread* thread) {
   if (thread == NULL) {
     return;
   }
-#if defined(MLN_TEST_JOIN_ON_FLAG)
+#if defined(MLN_FFI_TEST_JOIN_ON_FLAG)
   // Unbounded on purpose: this stands in for pthread_join, and a test that
   // never finishes should hit the runner's timeout rather than carry on with a
   // thread still running. Parking rather than spinning, because the thread
@@ -377,7 +378,7 @@ void mln_test_thread_join(mln_test_thread* thread) {
   free(thread);
 }
 
-#if defined(MLN_TEST_BACKEND_METAL)
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
 
 extern void* MTLCreateSystemDefaultDevice(void);
 
@@ -404,7 +405,7 @@ static bool create_backend_state(void** out_state, void* out_context) {
 
 static void destroy_backend_state(void* opaque_state) { free(opaque_state); }
 
-#elif defined(MLN_TEST_BACKEND_OPENGL) && defined(MLN_TEST_OPENGL_EGL)
+#elif defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_EGL)
 
 typedef struct egl_state {
   EGLDisplay display;
@@ -534,7 +535,7 @@ static void destroy_backend_state(void* opaque_state) {
   free(state);
 }
 
-#elif defined(MLN_TEST_BACKEND_WEBGPU)
+#elif defined(MLN_FFI_TEST_BACKEND_WEBGPU)
 
 typedef struct webgpu_state {
   WGPUInstance instance;
@@ -688,7 +689,7 @@ static bool create_backend_state(void** out_state, void* out_context) {
 
 static void destroy_backend_state(void* opaque_state) { (void)opaque_state; }
 
-#elif defined(MLN_TEST_BACKEND_OPENGL) && defined(MLN_TEST_OPENGL_WEBGL)
+#elif defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_WEBGL)
 
 typedef struct webgl_state {
   EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
@@ -776,7 +777,7 @@ static void destroy_backend_state(void* opaque_state) {
   free(state);
 }
 
-#elif defined(MLN_TEST_BACKEND_OPENGL) && defined(MLN_TEST_OPENGL_WGL)
+#elif defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_WGL)
 
 typedef struct wgl_state {
   HINSTANCE instance;
@@ -870,7 +871,7 @@ static void destroy_backend_state(void* opaque_state) {
   free(state);
 }
 
-#elif defined(MLN_TEST_BACKEND_VULKAN)
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
 
 typedef struct vulkan_state {
   VkInstance instance;
@@ -1067,28 +1068,28 @@ bool mln_test_render_fixture_create(
   }
   reserve_session_slot();
   *fixture = (mln_test_render_fixture){0};
-#if defined(MLN_TEST_BACKEND_METAL)
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
   mln_metal_context_descriptor context = {0};
   if (!create_backend_state(&fixture->backend_state, &context)) {
     return false;
   }
   mln_metal_owned_texture_descriptor descriptor =
     mln_metal_owned_texture_descriptor_default();
-#elif defined(MLN_TEST_BACKEND_OPENGL)
+#elif defined(MLN_FFI_TEST_BACKEND_OPENGL)
   mln_opengl_context_descriptor context = {0};
   if (!create_backend_state(&fixture->backend_state, &context)) {
     return false;
   }
   mln_opengl_owned_texture_descriptor descriptor =
     mln_opengl_owned_texture_descriptor_default();
-#elif defined(MLN_TEST_BACKEND_VULKAN)
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
   mln_vulkan_context_descriptor context = {0};
   if (!create_backend_state(&fixture->backend_state, &context)) {
     return false;
   }
   mln_vulkan_owned_texture_descriptor descriptor =
     mln_vulkan_owned_texture_descriptor_default();
-#elif defined(MLN_TEST_BACKEND_WEBGPU)
+#elif defined(MLN_FFI_TEST_BACKEND_WEBGPU)
   mln_webgpu_context_descriptor context = {0};
   if (!create_backend_state(&fixture->backend_state, &context)) {
     return false;
@@ -1099,16 +1100,16 @@ bool mln_test_render_fixture_create(
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
   descriptor.context = context;
-#if defined(MLN_TEST_BACKEND_METAL)
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
   const mln_status status =
     mln_metal_owned_texture_attach(map, &descriptor, &fixture->session);
-#elif defined(MLN_TEST_BACKEND_OPENGL)
+#elif defined(MLN_FFI_TEST_BACKEND_OPENGL)
   const mln_status status =
     mln_opengl_owned_texture_attach(map, &descriptor, &fixture->session);
-#elif defined(MLN_TEST_BACKEND_VULKAN)
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
   const mln_status status =
     mln_vulkan_owned_texture_attach(map, &descriptor, &fixture->session);
-#elif defined(MLN_TEST_BACKEND_WEBGPU)
+#elif defined(MLN_FFI_TEST_BACKEND_WEBGPU)
   const mln_status status =
     mln_webgpu_owned_texture_attach(map, &descriptor, &fixture->session);
 #endif

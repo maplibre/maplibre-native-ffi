@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let Some(mode) = parse_args(std::env::args().skip(1))? else {
         return Ok(());
     };
-    let backends = maplibre_native::supported_render_backends();
+    let backends = maplibre_native_ffi::supported_render_backends();
     println!("native render backends: {}", render_backend_label(backends));
     if !supports_usable_backend(backends) {
         return Err(
@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .into(),
         );
     }
-    maplibre_native::set_log_callback(|record| {
+    maplibre_native_ffi::set_log_callback(|record| {
         eprintln!(
             "MapLibre {:?} {:?} {}: {}",
             record.severity, record.event, record.code, record.message
@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     struct ClearLogCallback;
     impl Drop for ClearLogCallback {
         fn drop(&mut self) {
-            let _ = maplibre_native::clear_log_callback();
+            let _ = maplibre_native_ffi::clear_log_callback();
         }
     }
     let _clear_log_callback = ClearLogCallback;
@@ -89,15 +89,15 @@ fn print_usage() {
     );
 }
 
-fn render_backend_label(backends: maplibre_native::RenderBackendMask) -> String {
+fn render_backend_label(backends: maplibre_native_ffi::RenderBackendMask) -> String {
     let mut labels = Vec::new();
-    if backends.contains(maplibre_native::RenderBackendMask::METAL) {
+    if backends.contains(maplibre_native_ffi::RenderBackendMask::METAL) {
         labels.push("metal");
     }
-    if backends.contains(maplibre_native::RenderBackendMask::OPENGL) {
+    if backends.contains(maplibre_native_ffi::RenderBackendMask::OPENGL) {
         labels.push("opengl");
     }
-    if backends.contains(maplibre_native::RenderBackendMask::VULKAN) {
+    if backends.contains(maplibre_native_ffi::RenderBackendMask::VULKAN) {
         labels.push("vulkan");
     }
     if labels.is_empty() {
@@ -107,6 +107,6 @@ fn render_backend_label(backends: maplibre_native::RenderBackendMask) -> String 
     }
 }
 
-fn supports_usable_backend(backends: maplibre_native::RenderBackendMask) -> bool {
+fn supports_usable_backend(backends: maplibre_native_ffi::RenderBackendMask) -> bool {
     backends.contains(graphics::required_backend())
 }

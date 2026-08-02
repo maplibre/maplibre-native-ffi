@@ -7,8 +7,8 @@ import time
 
 import pytest
 
-import maplibre_native as mln
-from maplibre_native import camera, geo, json, query, render
+import maplibre_native_ffi as mln
+from maplibre_native_ffi import camera, geo, json, query, render
 
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,

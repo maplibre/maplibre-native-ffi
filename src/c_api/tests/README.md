@@ -30,8 +30,8 @@ The build enforces this rather than trusting review:
 - `-Werror=missing-prototypes` keeps that net closed by rejecting a test written
   without `static`, since `abi_tests.h` and `test_support.h` declare everything
   the suite legitimately exports.
-- A configure-time check in `cmake/mln_tests.cmake` fails with a clear message
-  when a globbed `*_abi.c` has no matching call in `main.c`.
+- A configure-time check in `cmake/mln_ffi_tests.cmake` fails with a clear
+  message when a globbed `*_abi.c` has no matching call in `main.c`.
 
 The compiler carries this instead of Unity's `generate_test_runner.rb` (Ruby is
 outside this repo's toolchain) or a regex checker (`render_backend_abi.c` guards

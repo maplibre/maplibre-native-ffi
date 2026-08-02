@@ -5,7 +5,7 @@ import PackageDescription
 
 let xtoolBuild = ProcessInfo.processInfo.environment["MLN_FFI_XTOOL_BUILD"] == "1"
 let swiftMapIOSDependencies: [Target.Dependency] = [
-  .product(name: "MaplibreNative", package: "maplibre-native-swift"),
+  .product(name: "MaplibreNativeFFI", package: "maplibre-native-ffi"),
 ]
 let swiftMapIOSLinkerSettings: [LinkerSetting] = [
   .linkedFramework("Metal"),
@@ -34,13 +34,13 @@ let package = Package(
       : .executable(name: "swift-map-ios", targets: ["SwiftMapIOS"]),
   ],
   dependencies: [
-    .package(name: "maplibre-native-swift", path: "../.."),
+    .package(name: "maplibre-native-ffi", path: "../.."),
   ],
   targets: [
     .executableTarget(
       name: "SwiftMap",
       dependencies: [
-        .product(name: "MaplibreNative", package: "maplibre-native-swift"),
+        .product(name: "MaplibreNativeFFI", package: "maplibre-native-ffi"),
       ],
       linkerSettings: [
         .linkedFramework("AppKit"),

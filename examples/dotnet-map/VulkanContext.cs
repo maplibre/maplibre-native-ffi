@@ -1,11 +1,11 @@
 using System.Runtime.InteropServices;
-using Maplibre.Native;
-using Maplibre.Native.Render;
+using Maplibre.NativeFfi;
+using Maplibre.NativeFfi.Render;
 using Silk.NET.Core.Native;
 using Silk.NET.GLFW;
 using Silk.NET.Vulkan;
 
-namespace Maplibre.Native.Examples.DotnetMap;
+namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal sealed unsafe partial class VulkanContext : IGraphicsContext
 {

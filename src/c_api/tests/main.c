@@ -40,7 +40,7 @@ int main(void) {
   run_runtime_wake_abi_tests();
   run_style_values_abi_tests();
   const int failures = UNITY_END();
-#if defined(__EMSCRIPTEN__) && defined(MLN_TEST_BACKEND_WEBGPU)
+#if defined(__EMSCRIPTEN__) && defined(MLN_FFI_TEST_BACKEND_WEBGPU)
   // Returning is not enough to exit here. main() runs on a pthread under
   // -sPROXY_TO_PTHREAD, and requesting a WebGPU device suspends that thread
   // through Asyncify, which leaves emscripten unable to carry the entry point
@@ -48,7 +48,7 @@ int main(void) {
   // returns, and skips the exit because a keepalive is held at that moment. The
   // suite would then print its summary and hang instead of reporting a status.
   // Forcing the exit is what turns a finished run into a result. See the note
-  // on MLN_TEST_JOIN_ON_FLAG in test_support.c for the whole mechanism.
+  // on MLN_FFI_TEST_JOIN_ON_FLAG in test_support.c for the whole mechanism.
   // Forcing the exit skips the usual teardown, so anything still buffered has
   // to go out first or the run loses the report it just produced.
   fflush(NULL);

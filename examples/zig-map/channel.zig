@@ -7,7 +7,7 @@
 //! publishes the map once so the render loop can attach its own session.
 
 const std = @import("std");
-const maplibre = @import("maplibre_native");
+const maplibre = @import("maplibre_native_ffi");
 
 /// A camera change decoded on the render loop and applied on the map's owner
 /// thread.

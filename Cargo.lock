@@ -1009,7 +1009,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "maplibre-native"
+name = "maplibre-native-ffi"
 version = "0.0.0"
 dependencies = [
  "ash",
@@ -1017,42 +1017,30 @@ dependencies = [
  "glow",
  "glutin_egl_sys",
  "libloading",
- "maplibre-native-core",
- "maplibre-native-sys",
+ "maplibre-native-ffi-core",
+ "maplibre-native-ffi-sys",
  "static_assertions",
 ]
 
 [[package]]
-name = "maplibre-native-core"
+name = "maplibre-native-ffi-core"
 version = "0.0.0"
 dependencies = [
  "bitflags 2.13.0",
- "maplibre-native-sys",
+ "maplibre-native-ffi-sys",
 ]
 
 [[package]]
-name = "maplibre-native-platform"
-version = "0.1.0"
-dependencies = [
- "http",
- "image",
- "jni 0.21.1",
- "rustls-platform-verifier",
- "threadpool",
- "ureq",
-]
-
-[[package]]
-name = "maplibre-native-python"
+name = "maplibre-native-ffi-python"
 version = "0.0.0"
 dependencies = [
- "maplibre-native-core",
- "maplibre-native-sys",
+ "maplibre-native-ffi-core",
+ "maplibre-native-ffi-sys",
  "pyo3",
 ]
 
 [[package]]
-name = "maplibre-native-sys"
+name = "maplibre-native-ffi-sys"
 version = "0.0.0"
 dependencies = [
  "bindgen",
@@ -1093,6 +1081,18 @@ checksum = "1fa76a2c86f704bdb222d66965fb3d63269ce38518b83cb0575fca855ebb6316"
 dependencies = [
  "adler2",
  "simd-adler32",
+]
+
+[[package]]
+name = "mln-ffi-platform"
+version = "0.1.0"
+dependencies = [
+ "http",
+ "image",
+ "jni 0.21.1",
+ "rustls-platform-verifier",
+ "threadpool",
+ "ureq",
 ]
 
 [[package]]
@@ -1821,7 +1821,7 @@ dependencies = [
  "glow",
  "glutin",
  "glutin-winit",
- "maplibre-native",
+ "maplibre-native-ffi",
  "objc2 0.5.2",
  "objc2-app-kit 0.2.2",
  "objc2-foundation 0.2.2",

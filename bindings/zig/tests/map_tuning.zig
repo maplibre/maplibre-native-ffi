@@ -1,7 +1,7 @@
 const std = @import("std");
 const testing = std.testing;
 
-const maplibre = @import("maplibre_native");
+const maplibre = @import("maplibre_native_ffi");
 
 test "map debug options round trip and diagnostics toggles" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);

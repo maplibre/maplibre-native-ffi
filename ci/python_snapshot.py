@@ -21,7 +21,10 @@ import zipfile
 
 
 BACKENDS = {"vulkan", "opengl", "metal"}
-NAME = "maplibre-native"
+NAME = "maplibre-native-ffi"
+# Wheel filenames and dist-info directories use the escaped distribution name,
+# so derive it rather than spelling it twice and letting the two drift.
+WHEEL_NAME = NAME.replace("-", "_")
 VERSION = re.compile(r"0\.1\.0\.dev\d{12}\Z")
 
 
@@ -54,7 +57,7 @@ def relabel(
     if len(metadata) != 1:
         raise SystemExit("wheel must contain exactly one dist-info/METADATA file")
     old_info = metadata[0].split("/", 1)[0]
-    new_info = f"maplibre_native_{backend}-{version}.dist-info"
+    new_info = f"{WHEEL_NAME}_{backend}-{version}.dist-info"
     rewritten = {}
     for name, data in files.items():
         new_name = (
@@ -80,7 +83,7 @@ def relabel(
     rewritten[record_name] = record.getvalue().encode()
 
     tags = wheel.name.split("-", 2)[2]
-    destination = output / f"maplibre_native_{backend}-{version}-{tags}"
+    destination = output / f"{WHEEL_NAME}_{backend}-{version}-{tags}"
     output.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for name, data in sorted(rewritten.items()):

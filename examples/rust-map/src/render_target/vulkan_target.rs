@@ -1,6 +1,6 @@
 use std::error::Error as StdError;
 
-use maplibre_native::{
+use maplibre_native_ffi::{
     Error, ErrorKind, MapAttachRef, RenderSessionHandle, VulkanBorrowedTextureDescriptor,
     VulkanContextDescriptor, VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
 };
@@ -32,7 +32,7 @@ impl RenderTarget {
         map: &MapAttachRef,
         graphics: &GraphicsContext,
         viewport: Viewport,
-    ) -> maplibre_native::Result<Self> {
+    ) -> maplibre_native_ffi::Result<Self> {
         let vulkan = graphics.vulkan();
         match mode {
             Mode::OwnedTexture => attach_owned_texture(map, vulkan, viewport),
@@ -51,7 +51,7 @@ impl RenderTarget {
         &mut self,
         graphics: &GraphicsContext,
         viewport: Viewport,
-    ) -> maplibre_native::Result<()> {
+    ) -> maplibre_native_ffi::Result<()> {
         match self {
             Self::OwnedTexture {
                 session,
@@ -119,7 +119,10 @@ impl RenderTarget {
         }
     }
 
-    pub fn render_update(&mut self, _graphics: &GraphicsContext) -> maplibre_native::Result<bool> {
+    pub fn render_update(
+        &mut self,
+        _graphics: &GraphicsContext,
+    ) -> maplibre_native_ffi::Result<bool> {
         match self {
             Self::OwnedTexture {
                 session,
@@ -212,7 +215,7 @@ fn attach_owned_texture(
     map: &MapAttachRef,
     vulkan: &VulkanContext,
     viewport: Viewport,
-) -> maplibre_native::Result<RenderTarget> {
+) -> maplibre_native_ffi::Result<RenderTarget> {
     let descriptor =
         VulkanOwnedTextureDescriptor::new(extent(viewport), context_descriptor(vulkan));
     let session = map.attach_vulkan_owned_texture(&descriptor)?;
@@ -236,7 +239,7 @@ fn attach_borrowed_texture(
     map: &MapAttachRef,
     vulkan: &VulkanContext,
     viewport: Viewport,
-) -> maplibre_native::Result<RenderTarget> {
+) -> maplibre_native_ffi::Result<RenderTarget> {
     let image = BorrowedImage::new(vulkan, viewport).map_err(|error| {
         compositor_error(format!("Vulkan borrowed image creation failed: {error:?}"))
     })?;
@@ -273,7 +276,7 @@ fn attach_surface(
     map: &MapAttachRef,
     vulkan: &VulkanContext,
     viewport: Viewport,
-) -> maplibre_native::Result<RenderTarget> {
+) -> maplibre_native_ffi::Result<RenderTarget> {
     let descriptor = VulkanSurfaceDescriptor::new(
         extent(viewport),
         context_descriptor(vulkan),

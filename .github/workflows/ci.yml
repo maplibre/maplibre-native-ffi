@@ -760,7 +760,7 @@ jobs:
       - run: mise run //bindings/zig:test:ios-simulator
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: bash scripts/run-ios-simulator-test.sh .build/ios-simulator/arm64-apple-ios-simulator/debug/MaplibreNativeIOSSimulatorTests 120
+      - run: bash scripts/run-ios-simulator-test.sh .build/ios-simulator/arm64-apple-ios-simulator/debug/MaplibreNativeFFIIOSSimulatorTests 120
       - run: mise run //examples/swift-map:build:ios-simulator
         env:
           MISE_TASK_SKIP: "//:build"

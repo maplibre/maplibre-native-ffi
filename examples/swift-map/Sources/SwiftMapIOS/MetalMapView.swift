@@ -1,4 +1,4 @@
-import MaplibreNative
+import MaplibreNativeFFI
 import Metal
 import os
 import QuartzCore
@@ -467,7 +467,7 @@ final class MetalMapView: UIView {
       let location = recognizer.location(in: self)
       commands.push(.zoomToNextStep(
         anchor: screenPoint(location),
-        animation: MaplibreNative.AnimationOptions(durationMilliseconds: 160)
+        animation: MaplibreNativeFFI.AnimationOptions(durationMilliseconds: 160)
       ))
       return true
     }

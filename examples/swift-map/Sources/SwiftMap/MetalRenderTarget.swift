@@ -1,5 +1,5 @@
 import Foundation
-import MaplibreNative
+import MaplibreNativeFFI
 import Metal
 import QuartzCore
 

@@ -1,7 +1,7 @@
-using Maplibre.Native.Map;
-using Maplibre.Native.Render;
+using Maplibre.NativeFfi.Map;
+using Maplibre.NativeFfi.Render;
 
-namespace Maplibre.Native.Examples.DotnetMap;
+namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal interface IRenderTarget : IDisposable
 {

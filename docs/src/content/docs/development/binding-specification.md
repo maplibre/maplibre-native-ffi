@@ -89,8 +89,8 @@ release. Bindings whose ecosystem does not MUST document the manual install
 instead; Go has no such hook by design, and SwiftPM sandboxes plugins away from
 the network.
 
-Rust implements this in `bindings/rust/crates/maplibre-native-sys/build.rs` and
-Dart in `bindings/dart/hook/build.dart`.
+Rust implements this in `bindings/rust/crates/maplibre-native-ffi-sys/build.rs`
+and Dart in `bindings/dart/hook/build.dart`.
 
 Requirements for a binding that acquires the library:
 

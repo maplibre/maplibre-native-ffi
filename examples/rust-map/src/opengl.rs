@@ -10,7 +10,7 @@ use glutin::display::{GetGlDisplay, GlDisplay};
 use glutin::prelude::*;
 use glutin::surface::{Surface, SurfaceAttributesBuilder, WindowSurface};
 use glutin_winit::DisplayBuilder;
-use maplibre_native::{NativePointer, OpenGLContextDescriptor, OpenGLOwnedTextureFrameHandle};
+use maplibre_native_ffi::{NativePointer, OpenGLContextDescriptor, OpenGLOwnedTextureFrameHandle};
 use raw_window_handle::HasWindowHandle;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowAttributes};
@@ -189,7 +189,7 @@ impl OpenGLTextureCompositor {
         &self,
         context: &OpenGLContext,
         frame: &OpenGLOwnedTextureFrameHandle,
-    ) -> maplibre_native::Result<()> {
+    ) -> maplibre_native_ffi::Result<()> {
         let metadata = frame.frame()?;
         if metadata.width == 0 || metadata.height == 0 {
             return Err(compositor_error("owned OpenGL frame has an empty extent"));
@@ -208,7 +208,7 @@ impl OpenGLTextureCompositor {
         &self,
         context: &OpenGLContext,
         texture: u32,
-    ) -> maplibre_native::Result<()> {
+    ) -> maplibre_native_ffi::Result<()> {
         context
             .make_current()
             .map_err(|error| compositor_error(format!("OpenGL make-current failed: {error}")))?;
@@ -439,8 +439,8 @@ fn check_gl_error(gl: &glow::Context, operation: &str) -> Result<(), Box<dyn Err
     }
 }
 
-fn compositor_error(message: impl Into<String>) -> maplibre_native::Error {
-    maplibre_native::Error::new(maplibre_native::ErrorKind::NativeError, None, message)
+fn compositor_error(message: impl Into<String>) -> maplibre_native_ffi::Error {
+    maplibre_native_ffi::Error::new(maplibre_native_ffi::ErrorKind::NativeError, None, message)
 }
 
 struct GlCleanupGuard<T> {

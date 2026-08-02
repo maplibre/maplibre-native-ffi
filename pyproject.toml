@@ -1,5 +1,5 @@
 [project]
-name = "maplibre-native-ffi"
+name = "maplibre-native-ffi-workspace"
 version = "0.0.0"
 requires-python = ">=3.14"
 dependencies = []

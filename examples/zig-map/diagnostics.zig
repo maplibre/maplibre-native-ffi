@@ -1,5 +1,5 @@
 const std = @import("std");
-const maplibre = @import("maplibre_native");
+const maplibre = @import("maplibre_native_ffi");
 
 pub fn logError(
     message: []const u8,

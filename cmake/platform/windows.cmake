@@ -1,4 +1,4 @@
-function(mln_configure_platform_dependencies target)
+function(mln_ffi_configure_platform_dependencies target)
   include(FetchContent)
   # The Windows presets set CMAKE_TRY_COMPILE_TARGET_TYPE to STATIC_LIBRARY so
   # compiler-flag probes skip the link step. zlib's fseeko probe is the one here
@@ -23,12 +23,13 @@ function(mln_configure_platform_dependencies target)
       "SHA256=7f1db8ac368d89d1baf163bac1ea5fe5120697a73910c8ae6b2fffb3551d59fb"
     EXCLUDE_FROM_ALL)
   fetchcontent_makeavailable(mln_ffi_zlib_source mln_ffi_libuv_source)
-  mln_add_license(${target} "${mln_ffi_zlib_source_SOURCE_DIR}/LICENSE"
-                  "zlib.txt")
-  mln_add_license(${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE"
-                  "libuv.txt")
-  mln_add_license(${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE-extra"
-                  "libuv-extra.txt")
+  mln_ffi_add_license(${target} "${mln_ffi_zlib_source_SOURCE_DIR}/LICENSE"
+                      "zlib.txt")
+  mln_ffi_add_license(${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE"
+                      "libuv.txt")
+  mln_ffi_add_license(
+    ${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE-extra"
+    "libuv-extra.txt")
 
   target_link_libraries(${target} INTERFACE zlibstatic uv_a ntdll ws2_32)
   set_target_properties(
@@ -45,7 +46,7 @@ function(mln_configure_platform_dependencies target)
       MLN_FFI_STATIC_BASE_OUTPUT_NAME
       maplibre-native-c-static-base
       MLN_FFI_STATIC_ARCHIVES
-      "mbgl-vendor-icu;maplibre_native_platform_rust;zlibstatic;uv_a"
+      "mbgl-vendor-icu;mln_ffi_platform_rust;zlibstatic;uv_a"
       MLN_FFI_TEST_SUPPORTED
       TRUE
       MLN_FFI_TEST_LIBRARY_PATH_VARIABLE
@@ -67,45 +68,45 @@ function(mln_configure_platform_dependencies target)
   endif()
 endfunction()
 
-function(mln_configure_platform target)
-  include(mln_rust)
+function(mln_ffi_configure_platform target)
+  include(mln_ffi_rust)
 
-  include("${MLN_SOURCE_DIR}/vendor/icu.cmake")
+  include("${MLN_FFI_SOURCE_DIR}/vendor/icu.cmake")
 
   set(MLN_FFI_VENDOR_WINDOWS_SOURCES
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/collator.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/text/bidi.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/text/local_glyph_rasterizer.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/async_task.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/png_writer.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/run_loop.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/string_stdlib.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/timer.cpp
-      ${MLN_SOURCE_DIR}/platform/windows/src/thread.cpp
-      ${MLN_SOURCE_DIR}/platform/windows/src/thread_local.cpp)
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/i18n/collator.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/text/bidi.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/text/local_glyph_rasterizer.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/async_task.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/png_writer.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/run_loop.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/string_stdlib.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/timer.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/windows/src/thread.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/windows/src/thread_local.cpp)
 
   set(MLN_FFI_WINDOWS_SOURCES
       ${PROJECT_SOURCE_DIR}/src/platform/rust/http_file_source.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp)
 
-  mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_WINDOWS_SOURCES})
-  mln_target_project_sources(${target} ${MLN_FFI_WINDOWS_SOURCES})
+  mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_WINDOWS_SOURCES})
+  mln_ffi_target_project_sources(${target} ${MLN_FFI_WINDOWS_SOURCES})
 
   set_source_files_properties(
-    ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
+    ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
     PROPERTIES COMPILE_DEFINITIONS MBGL_USE_BUILTIN_ICU)
 
   target_include_directories(
     ${target}
     SYSTEM
     BEFORE
-    PRIVATE ${MLN_SOURCE_DIR}/vendor/icu/include)
+    PRIVATE ${MLN_FFI_SOURCE_DIR}/vendor/icu/include)
 
   target_include_directories(
     ${target}
     SYSTEM
-    PRIVATE ${MLN_SOURCE_DIR}/platform/windows/include)
+    PRIVATE ${MLN_FFI_SOURCE_DIR}/platform/windows/include)
 
   target_compile_definitions(
     ${target}
@@ -118,5 +119,5 @@ function(mln_configure_platform target)
     ${target}
     PRIVATE mbgl-vendor-icu MLN_FFI::PlatformDependencies)
 
-  mln_link_rust_platform(${target})
+  mln_ffi_link_rust_platform(${target})
 endfunction()

@@ -1,7 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const build_options = @import("build_options");
-const maplibre = @import("maplibre_native");
+const maplibre = @import("maplibre_native_ffi");
 
 extern "c" fn MTLCreateSystemDefaultDevice() ?*anyopaque;
 

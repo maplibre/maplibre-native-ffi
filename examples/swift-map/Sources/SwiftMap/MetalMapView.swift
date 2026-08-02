@@ -1,5 +1,5 @@
 import AppKit
-import MaplibreNative
+import MaplibreNativeFFI
 import QuartzCore
 
 /// The display-paced render loop.

@@ -10,7 +10,7 @@
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use maplibre_native::ScreenPoint;
+use maplibre_native_ffi::ScreenPoint;
 
 /// A camera change decoded on the render loop and applied on the map's owner
 /// thread.

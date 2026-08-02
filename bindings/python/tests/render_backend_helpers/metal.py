@@ -6,7 +6,7 @@ from typing import Any
 import Metal
 import Quartz
 
-from maplibre_native import render
+from maplibre_native_ffi import render
 
 
 class MetalUnavailableError(RuntimeError):

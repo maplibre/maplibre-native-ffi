@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/platform/apple.cmake")
-mln_configure_apple_toolchain_defaults()
+mln_ffi_configure_apple_toolchain_defaults()
 
 project(maplibre_native_c VERSION 0.1.0 LANGUAGES C CXX)
 
@@ -42,31 +42,35 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
-include(mln_options)
-include(mln_maplibre_native)
-include(mln_c_api)
-include(mln_licenses)
-include(mln_install)
+include(mln_ffi_options)
+include(mln_ffi_maplibre_native)
+include(mln_ffi_c_api)
+include(mln_ffi_licenses)
+include(mln_ffi_install)
 
-include(emscripten)
-mln_configure_options()
-mln_validate_platform()
-mln_add_maplibre_native()
-mln_select_platform()
+include(mln_ffi_emscripten)
+mln_ffi_configure_options()
+mln_ffi_validate_platform()
+mln_ffi_add_maplibre_native()
+mln_ffi_select_platform()
 # Before the render backend, which only looks for a graphics loader when the
 # test harness that links it is being built.
 include(CTest)
 
-mln_select_render_backend()
-mln_add_c_api_library(maplibre_native_c)
-mln_add_core_licenses(maplibre_native_c)
-mln_install_c_api_library(maplibre_native_c)
+mln_ffi_select_render_backend()
+mln_ffi_add_c_api_library(maplibre_native_c)
+mln_ffi_add_core_licenses(maplibre_native_c)
+mln_ffi_install_c_api_library(maplibre_native_c)
 
+# The namespace is the repository, not the target: `maplibre_native_c` is the C
+# component of `maplibre-native-ffi`, the same split the other bindings publish
+# under. Consumers that add this repository as a subdirectory link the alias so
+# they never depend on the bare target name.
 add_library(maplibre_native_ffi::c ALIAS maplibre_native_c)
 
 if(BUILD_TESTING AND MLN_FFI_ARTIFACT_NAME)
-  include(cmake/mln_tests.cmake)
-  mln_add_c_api_test()
+  include(cmake/mln_ffi_tests.cmake)
+  mln_ffi_add_c_api_test()
 endif()
 
 if(MLN_FFI_ARTIFACT_NAME)

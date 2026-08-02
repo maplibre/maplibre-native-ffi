@@ -17,7 +17,7 @@ run = '''
 rm -rf docs/public/reference/rust
 mkdir -p docs/public/reference
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/{{vars.host_native_preset}}/install" \
-  cargo doc -p maplibre-native --no-deps
+  cargo doc -p maplibre-native-ffi --no-deps
 cp -a target/doc/. docs/public/reference/rust/
 '''
 

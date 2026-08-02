@@ -58,7 +58,7 @@ export default defineConfig({
             },
             {
               label: "Rust API",
-              link: "/reference/rust/maplibre_native/",
+              link: "/reference/rust/maplibre_native_ffi/",
               attrs: { target: "_blank", rel: "noopener noreferrer" },
             },
             {
@@ -93,7 +93,7 @@ export default defineConfig({
             },
             {
               label: "Swift API",
-              link: "/reference/swift/documentation/maplibrenative/",
+              link: "/reference/swift/documentation/maplibrenativeffi/",
               attrs: { target: "_blank", rel: "noopener noreferrer" },
             },
           ],

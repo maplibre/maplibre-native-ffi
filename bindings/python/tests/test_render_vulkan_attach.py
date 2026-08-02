@@ -5,8 +5,8 @@ from contextlib import contextmanager
 
 import pytest
 
-import maplibre_native as mln
-from maplibre_native import render
+import maplibre_native_ffi as mln
+from maplibre_native_ffi import render
 
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,

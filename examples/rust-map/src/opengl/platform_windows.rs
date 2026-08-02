@@ -4,7 +4,7 @@ use glutin::config::{Config, ConfigTemplateBuilder};
 use glutin::context::{AsRawContext, ContextApi, PossiblyCurrentContext, RawContext, Version};
 use glutin::surface::{Surface, WindowSurface};
 use glutin_winit::ApiPreference;
-use maplibre_native::{NativePointer, OpenGLContextDescriptor, WglContextDescriptor};
+use maplibre_native_ffi::{NativePointer, OpenGLContextDescriptor, WglContextDescriptor};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use windows_sys::Win32::Foundation::HWND;
 use windows_sys::Win32::Graphics::Gdi::{GetDC, HDC, ReleaseDC};

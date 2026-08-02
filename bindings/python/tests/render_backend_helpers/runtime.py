@@ -5,8 +5,8 @@ import time
 
 import pytest
 
-import maplibre_native as mln
-from maplibre_native import camera, geo, json, query, render, style
+import maplibre_native_ffi as mln
+from maplibre_native_ffi import camera, geo, json, query, render, style
 
 EMPTY_STYLE_JSON = '{"version":8,"sources":{},"layers":[]}'
 

@@ -35,7 +35,7 @@ if sys.platform == "darwin":
 from OpenGL import EGL
 from OpenGL import GLES3 as GL
 
-from maplibre_native import render
+from maplibre_native_ffi import render
 
 
 class EglUnavailableError(RuntimeError):

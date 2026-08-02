@@ -4,7 +4,7 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 binding_dir="$(cd "$script_dir/.." && pwd)"
 repo_root="$(cd "$binding_dir/../.." && pwd)"
-output_dir="$binding_dir/src/Maplibre.Native/Generated"
+output_dir="$binding_dir/src/Maplibre.NativeFfi/Generated"
 tmp_output_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_output_dir"' EXIT
 

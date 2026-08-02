@@ -12,7 +12,7 @@ ash-window = "0.13.0"
 glow = "0.16.0"
 glutin = "0.32.3"
 glutin-winit = "0.5.0"
-maplibre-native = { path = "../../bindings/rust/crates/maplibre-native" }
+maplibre-native-ffi = { path = "../../bindings/rust/crates/maplibre-native-ffi" }
 raw-window-handle = "0.6.2"
 winit = { version = "0.30.13", features = ["rwh_06"] }
 

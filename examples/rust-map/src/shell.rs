@@ -13,7 +13,10 @@ use crate::render_target::Mode;
 const INITIAL_WIDTH: u32 = 960;
 const INITIAL_HEIGHT: u32 = 640;
 
-pub fn run(mode: Mode, backends: maplibre_native::RenderBackendMask) -> Result<(), Box<dyn Error>> {
+pub fn run(
+    mode: Mode,
+    backends: maplibre_native_ffi::RenderBackendMask,
+) -> Result<(), Box<dyn Error>> {
     let event_loop = EventLoop::new()?;
     let mut shell = Shell::new(mode, backends);
     let run_result = event_loop.run_app(&mut shell);
@@ -25,13 +28,13 @@ pub fn run(mode: Mode, backends: maplibre_native::RenderBackendMask) -> Result<(
 
 struct Shell {
     mode: Mode,
-    backends: maplibre_native::RenderBackendMask,
+    backends: maplibre_native_ffi::RenderBackendMask,
     app: Option<App>,
     startup_error: Option<Box<dyn Error>>,
 }
 
 impl Shell {
-    fn new(mode: Mode, backends: maplibre_native::RenderBackendMask) -> Self {
+    fn new(mode: Mode, backends: maplibre_native_ffi::RenderBackendMask) -> Self {
         Self {
             mode,
             backends,

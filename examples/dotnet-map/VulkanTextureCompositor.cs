@@ -1,10 +1,10 @@
 using System.Runtime.InteropServices;
-using Maplibre.Native.Render;
+using Maplibre.NativeFfi.Render;
 using Silk.NET.Core;
 using Silk.NET.Vulkan;
 using VulkanSemaphore = Silk.NET.Vulkan.Semaphore;
 
-namespace Maplibre.Native.Examples.DotnetMap;
+namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal sealed unsafe partial class VulkanTextureCompositor : ITextureCompositor
 {

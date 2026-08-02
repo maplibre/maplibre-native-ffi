@@ -1,5 +1,5 @@
 const std = @import("std");
-const maplibre_build = @import("maplibre_native");
+const maplibre_build = @import("maplibre_native_ffi");
 const zigglgen = @import("zigglgen");
 
 const BuildOptions = struct {
@@ -85,7 +85,7 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
         .c_macros = maplibre_build.sdlTranslateCMacros(options.target),
         .system_root = options.system_root,
     }));
-    root_module.addImport("maplibre_native", maplibreNativeModule(b, options));
+    root_module.addImport("maplibre_native_ffi", maplibreNativeModule(b, options));
     if (options.render_backend == .opengl) {
         const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)
             .{ .api = .gles, .version = .@"3.0" }

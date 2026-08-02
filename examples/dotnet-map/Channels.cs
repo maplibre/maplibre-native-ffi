@@ -1,12 +1,12 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
-using Maplibre.Native.Camera;
-using Maplibre.Native.Geo;
-using Maplibre.Native.Map;
-using Maplibre.Native.Runtime;
+using Maplibre.NativeFfi.Camera;
+using Maplibre.NativeFfi.Geo;
+using Maplibre.NativeFfi.Map;
+using Maplibre.NativeFfi.Runtime;
 
-namespace Maplibre.Native.Examples.DotnetMap;
+namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 /// <summary>A camera change decoded on the render loop and applied on the map's owner thread.</summary>
 /// <remarks>

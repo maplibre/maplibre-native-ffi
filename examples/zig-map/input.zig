@@ -1,5 +1,5 @@
 const std = @import("std");
-const maplibre = @import("maplibre_native");
+const maplibre = @import("maplibre_native_ffi");
 
 const c = @import("c.zig").c;
 const channel = @import("channel.zig");

@@ -1,6 +1,6 @@
 const testing = @import("std").testing;
 
-const maplibre = @import("maplibre_native");
+const maplibre = @import("maplibre_native_ffi");
 
 test "diagnostics capture public lifecycle failures and keep copied messages" {
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);

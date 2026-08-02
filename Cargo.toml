@@ -2,9 +2,9 @@
 resolver = "3"
 members = [
   "bindings/python",
-  "bindings/rust/crates/maplibre-native",
-  "bindings/rust/crates/maplibre-native-core",
-  "bindings/rust/crates/maplibre-native-sys",
+  "bindings/rust/crates/maplibre-native-ffi",
+  "bindings/rust/crates/maplibre-native-ffi-core",
+  "bindings/rust/crates/maplibre-native-ffi-sys",
   "examples/rust-map",
   "src/platform/rust",
 ]

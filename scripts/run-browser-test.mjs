@@ -40,10 +40,10 @@ function fail(message) {
 // Chromium comes from the environment where CI provides one, and otherwise from
 // whatever is on PATH or in a local Playwright cache.
 function findBrowser() {
-  const explicit = process.env.MLN_TEST_BROWSER ?? process.env.CHROME_PATH;
+  const explicit = process.env.MLN_FFI_TEST_BROWSER ?? process.env.CHROME_PATH;
   if (explicit) {
     if (!existsSync(explicit))
-      fail(`MLN_TEST_BROWSER is not a file: ${explicit}`);
+      fail(`MLN_FFI_TEST_BROWSER is not a file: ${explicit}`);
     return explicit;
   }
   const names = [
@@ -74,7 +74,7 @@ function findBrowser() {
     }
   }
   fail(
-    "no Chromium found; set MLN_TEST_BROWSER to a Chrome or Chromium binary",
+    "no Chromium found; set MLN_FFI_TEST_BROWSER to a Chrome or Chromium binary",
   );
 }
 

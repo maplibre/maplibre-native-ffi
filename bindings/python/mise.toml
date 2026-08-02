@@ -8,7 +8,7 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 # Wheel repair rewrites the extension's dependency names in place. Recompile it
 # so a previous wheel cannot feed those private names into the next repair.
-cargo clean --package maplibre-native-python
+cargo clean --package maplibre-native-ffi-python
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   uv run --project . --no-sync maturin build --release --auditwheel repair
 '''
@@ -20,11 +20,11 @@ usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 # See `build`: repaired extension artifacts are outputs, never compiler inputs.
-cargo clean --package maplibre-native-python
+cargo clean --package maplibre-native-ffi-python
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   uv run --project . --no-sync maturin build --out dist
 uv pip install --python "$MISE_MONOREPO_ROOT/.venv" --reinstall --no-index --find-links dist \
-  "maplibre-native==0.0.0"
+  "maplibre-native-ffi==0.0.0"
 '''
 
 [tasks.api]
@@ -39,13 +39,13 @@ mkdir -p build/pdoc
 modules="$(
   MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
     uv run --project . --group docs --no-sync python -c '
-import maplibre_native
+import maplibre_native_ffi
 import pkgutil
 
-names = ["maplibre_native"]
-for module in pkgutil.iter_modules(maplibre_native.__path__):
+names = ["maplibre_native_ffi"]
+for module in pkgutil.iter_modules(maplibre_native_ffi.__path__):
   if not module.name.startswith("_"):
-    names.append(f"maplibre_native.{module.name}")
+    names.append(f"maplibre_native_ffi.{module.name}")
 print(" ".join(names))
 '
 )"
@@ -61,13 +61,13 @@ export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 modules="$(
   MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
     uv run --project . --group docs --no-sync python -c '
-import maplibre_native
+import maplibre_native_ffi
 import pkgutil
 
-names = ["maplibre_native"]
-for module in pkgutil.iter_modules(maplibre_native.__path__):
+names = ["maplibre_native_ffi"]
+for module in pkgutil.iter_modules(maplibre_native_ffi.__path__):
   if not module.name.startswith("_"):
-    names.append(f"maplibre_native.{module.name}")
+    names.append(f"maplibre_native_ffi.{module.name}")
 print(" ".join(names))
 '
 )"

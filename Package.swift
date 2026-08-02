@@ -8,34 +8,34 @@
 import PackageDescription
 
 let testDependencies: [Target.Dependency] = [
-  "MaplibreNative",
+  "MaplibreNativeFFI",
   "CMaplibreNativeC",
 ]
 
 let testSourceFiles = [
-  "MaplibreNativeTests/CameraAdvancedTests.swift",
-  "MaplibreNativeTests/HandleIdentityTests.swift",
-  "MaplibreNativeTests/LoggingTests.swift",
-  "MaplibreNativeTests/MapHandleTests.swift",
-  "MaplibreNativeTests/MaplibreTests.swift",
-  "MaplibreNativeTests/NativeHandleLeakTestSupport.swift",
-  "MaplibreNativeTests/OfflineTests.swift",
-  "MaplibreNativeTests/ProjectionTests.swift",
-  "MaplibreNativeTests/QueryTests.swift",
-  "MaplibreNativeTests/RenderTests.swift",
-  "MaplibreNativeTests/RuntimeTests.swift",
-  "MaplibreNativeTests/StyleTests.swift",
-  "MaplibreNativeTests/SupportHelperTests.swift",
-  "MaplibreNativeTests/SyntheticHandles.swift",
-  "MaplibreNativeTests/ValueTests.swift",
-  "MaplibreNativeTests/WakeSourceTests.swift",
+  "MaplibreNativeFFITests/CameraAdvancedTests.swift",
+  "MaplibreNativeFFITests/HandleIdentityTests.swift",
+  "MaplibreNativeFFITests/LoggingTests.swift",
+  "MaplibreNativeFFITests/MapHandleTests.swift",
+  "MaplibreNativeFFITests/MaplibreTests.swift",
+  "MaplibreNativeFFITests/NativeHandleLeakTestSupport.swift",
+  "MaplibreNativeFFITests/OfflineTests.swift",
+  "MaplibreNativeFFITests/ProjectionTests.swift",
+  "MaplibreNativeFFITests/QueryTests.swift",
+  "MaplibreNativeFFITests/RenderTests.swift",
+  "MaplibreNativeFFITests/RuntimeTests.swift",
+  "MaplibreNativeFFITests/StyleTests.swift",
+  "MaplibreNativeFFITests/SupportHelperTests.swift",
+  "MaplibreNativeFFITests/SyntheticHandles.swift",
+  "MaplibreNativeFFITests/ValueTests.swift",
+  "MaplibreNativeFFITests/WakeSourceTests.swift",
 ]
 
 let products: [Product] = [
-  .library(name: "MaplibreNative", targets: ["MaplibreNative"]),
+  .library(name: "MaplibreNativeFFI", targets: ["MaplibreNativeFFI"]),
   .executable(
-    name: "MaplibreNativeIOSSimulatorTests",
-    targets: ["MaplibreNativeIOSSimulatorTests"]
+    name: "MaplibreNativeFFIIOSSimulatorTests",
+    targets: ["MaplibreNativeFFIIOSSimulatorTests"]
   ),
 ]
 
@@ -46,9 +46,9 @@ let targets: [Target] = [
     pkgConfig: "maplibre-native-c"
   ),
   .target(
-    name: "MaplibreNative",
+    name: "MaplibreNativeFFI",
     dependencies: ["CMaplibreNativeC"],
-    path: "bindings/swift/Sources/MaplibreNative",
+    path: "bindings/swift/Sources/MaplibreNativeFFI",
     linkerSettings: [
       .linkedLibrary("c++", .when(platforms: [.iOS])),
       .linkedLibrary("objc", .when(platforms: [.iOS])),
@@ -65,29 +65,29 @@ let targets: [Target] = [
     ]
   ),
   .target(
-    name: "MaplibreNativeTestCases",
+    name: "MaplibreNativeFFITestCases",
     dependencies: testDependencies,
     path: "bindings/swift/Tests",
     exclude: [
-      "MaplibreNativeIOSSimulatorTests",
-      "MaplibreNativeTestsHost",
+      "MaplibreNativeFFIIOSSimulatorTests",
+      "MaplibreNativeFFITestsHost",
     ],
     sources: testSourceFiles
   ),
   .testTarget(
-    name: "MaplibreNativeTests",
-    dependencies: ["MaplibreNativeTestCases"],
-    path: "bindings/swift/Tests/MaplibreNativeTestsHost"
+    name: "MaplibreNativeFFITests",
+    dependencies: ["MaplibreNativeFFITestCases"],
+    path: "bindings/swift/Tests/MaplibreNativeFFITestsHost"
   ),
   .executableTarget(
-    name: "MaplibreNativeIOSSimulatorTests",
-    dependencies: ["MaplibreNativeTestCases"],
-    path: "bindings/swift/Tests/MaplibreNativeIOSSimulatorTests"
+    name: "MaplibreNativeFFIIOSSimulatorTests",
+    dependencies: ["MaplibreNativeFFITestCases"],
+    path: "bindings/swift/Tests/MaplibreNativeFFIIOSSimulatorTests"
   ),
 ]
 
 let package = Package(
-  name: "maplibre-native-swift",
+  name: "maplibre-native-ffi",
   platforms: [.macOS("14.3"), .iOS("14.3")],
   products: products,
   dependencies: [

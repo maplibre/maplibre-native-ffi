@@ -1,5 +1,5 @@
 import Foundation
-import MaplibreNative
+import MaplibreNativeFFI
 import os
 
 /// The runtime loop.

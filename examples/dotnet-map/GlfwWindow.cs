@@ -1,6 +1,6 @@
 using Silk.NET.GLFW;
 
-namespace Maplibre.Native.Examples.DotnetMap;
+namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal sealed unsafe class GlfwWindow : IDisposable
 {

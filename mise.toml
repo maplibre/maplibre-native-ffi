@@ -102,7 +102,7 @@ swiftformat = { version = "{{vars.swiftformat_version}}", backend = "github:nick
 # The native CMake build compiles the Rust platform support library, so Rust is
 # part of the repository-wide native toolchain. `rust-src` is for the Emscripten
 # target alone: rustup ships no `std` for `wasm32-unknown-emscripten` built with
-# atomics, so that target rebuilds `std` from source. See cmake/mln_rust.cmake.
+# atomics, so that target rebuilds `std` from source. See cmake/mln_ffi_rust.cmake.
 "core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy,rust-src", targets = "aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc,wasm32-unknown-emscripten" }
 
 # The native CMake build compiles the Linux targets with `zig cc`, so Zig joins
@@ -224,7 +224,7 @@ env.RUSTFLAGS = "-C target-feature=+atomics,+bulk-memory -C panic=abort"
 run = '''
 cargo build \
   --manifest-path src/platform/rust/Cargo.toml \
-  --package maplibre-native-platform \
+  --package mln-ffi-platform \
   --target wasm32-unknown-emscripten \
   --release \
   -Z build-std=std,panic_abort
@@ -262,7 +262,7 @@ ctest --preset "$usage_preset"
 
 [tasks.check]
 tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }
-env = { MLN_DPRINT_SCOPED_TOOLS = "1" }
+env = { MLN_FFI_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
 mise -C bindings/dotnet deps install dotnet-tools
 mise run //docs:install
@@ -271,7 +271,7 @@ hk check --all
 
 [tasks.fix]
 tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }
-env = { MLN_DPRINT_SCOPED_TOOLS = "1" }
+env = { MLN_FFI_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
 mise -C bindings/dotnet deps install dotnet-tools
 mise run //docs:install

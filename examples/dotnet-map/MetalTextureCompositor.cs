@@ -1,6 +1,6 @@
-using Maplibre.Native.Render;
+using Maplibre.NativeFfi.Render;
 
-namespace Maplibre.Native.Examples.DotnetMap;
+namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal sealed class MetalTextureCompositor : ITextureCompositor
 {

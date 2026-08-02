@@ -9,7 +9,7 @@ from typing import Any
 import sys
 import types
 
-from maplibre_native import render
+from maplibre_native_ffi import render
 
 
 class VulkanUnavailableError(RuntimeError):

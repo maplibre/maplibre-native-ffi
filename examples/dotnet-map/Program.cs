@@ -1,8 +1,8 @@
-using Maplibre.Native;
-using Maplibre.Native.Log;
-using Maplibre.Native.Render;
+using Maplibre.NativeFfi;
+using Maplibre.NativeFfi.Log;
+using Maplibre.NativeFfi.Render;
 
-namespace Maplibre.Native.Examples.DotnetMap;
+namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal static class Program
 {

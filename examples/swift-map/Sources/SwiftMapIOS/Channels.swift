@@ -1,5 +1,5 @@
 import Foundation
-import MaplibreNative
+import MaplibreNativeFFI
 
 /// A camera change decoded on the render loop and applied on the map's owner
 /// thread.

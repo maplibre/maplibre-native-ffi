@@ -1,7 +1,7 @@
 const std = @import("std");
 const testing = std.testing;
 
-const maplibre = @import("maplibre_native");
+const maplibre = @import("maplibre_native_ffi");
 const support = @import("support.zig");
 
 fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {

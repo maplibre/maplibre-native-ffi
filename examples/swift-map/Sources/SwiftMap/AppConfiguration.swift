@@ -1,6 +1,6 @@
 import Darwin
 import Foundation
-import MaplibreNative
+import MaplibreNativeFFI
 
 let swiftMapConfiguration = AppConfiguration.loadOrExit()
 

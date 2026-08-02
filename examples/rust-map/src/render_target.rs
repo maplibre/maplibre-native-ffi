@@ -12,7 +12,7 @@ pub use opengl_target::RenderTarget;
 #[cfg(maplibre_render_backend = "vulkan")]
 pub use vulkan_target::RenderTarget;
 
-use maplibre_native::RenderTargetExtent;
+use maplibre_native_ffi::RenderTargetExtent;
 
 use crate::viewport::Viewport;
 

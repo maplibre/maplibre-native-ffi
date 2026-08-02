@@ -8,7 +8,7 @@ dir = "../.."
 run = '''
 MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   dotnet build \
-    examples/dotnet-map/Maplibre.Native.Examples.DotnetMap.csproj \
+    examples/dotnet-map/Maplibre.NativeFfi.Examples.DotnetMap.csproj \
     -p:Platform="Any CPU"
 '''
 
@@ -23,7 +23,7 @@ arg "[render-target]" default="owned-texture" {
 run = '''
 MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/{{vars.host_native_preset}}/install" \
   dotnet run \
-    --project examples/dotnet-map/Maplibre.Native.Examples.DotnetMap.csproj \
+    --project examples/dotnet-map/Maplibre.NativeFfi.Examples.DotnetMap.csproj \
     -p:Platform="Any CPU" \
     -- "{{ usage.render_target }}"
 '''
