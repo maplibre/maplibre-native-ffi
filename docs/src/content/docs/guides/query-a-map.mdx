@@ -1,0 +1,59 @@
+---
+title: Query a Map
+description: Read the features that the renderer drew at a screen position, and copy what your host keeps before the result is destroyed.
+sidebar:
+  order: 12
+---
+
+import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
+import querySnippet from "../../../../snippets/c/query-rendered-features.c?raw";
+
+A rendered feature query reports what the renderer drew at a screen position,
+which is what a hit test needs. To read what a source holds instead, including
+the features that no layer draws, use a source query, described in
+[Query a Source](/maplibre-native-ffi/guides/query-a-source/).
+
+A rendered query belongs to the render session and runs on the session's owner
+thread, because it reads the frame that the renderer produced. The session
+builds its renderer during the first render update, and a query before that returns an invalid-state status.
+
+The query answers against the last frame that the session drew, so render again
+after a camera move or a style change when the answer has to match the new
+state. A query over an area whose tiles are still loading finds nothing, and the
+same query finds features once those tiles arrive and render.
+
+Screen coordinates are logical map pixels measured from the top-left of the
+viewport, the same space that the map's coordinate-to-pixel query reports. A
+host that
+tracks positions in physical device pixels divides them by the scale factor of
+the render session.
+
+The geometry states where to search. A point matches the exact position, and a
+box matches a rectangle around it. A hit test uses a box with a few logical
+pixels of tolerance around the position, because symbols and thin lines are
+small targets. Box corners come in any order, and MapLibre clips the box to the
+viewport.
+
+<Code code={region(querySnippet, "geometry")} lang="c" title="query-rendered-features.c" />
+
+Naming the layer IDs that your host treats as selectable keeps background and
+land fills out of the result.
+
+<Code code={region(querySnippet, "layers")} lang="c" title="query-rendered-features.c" />
+
+On success, the query returns a result handle that the caller owns.
+Destroy it once your host has copied
+everything that it keeps.
+
+<Code code={region(querySnippet, "query")} lang="c" title="query-rendered-features.c" />
+
+Reading an entry produces a queried feature that reports which of its optional
+members are present, because a feature carries an ID, a source layer, or a state
+object only when the source supplied one. Each member holds a view into storage
+that the result owns. Copy every string, property value, and geometry
+that your host keeps past the query, because those views stay valid only until
+the result is destroyed.
+
+<Code code={region(querySnippet, "read")} lang="c" title="query-rendered-features.c" />

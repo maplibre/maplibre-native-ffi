@@ -1,8 +1,8 @@
 ---
-title: Sign or Rewrite Resource Requests
-description: Attach credentials to network URLs with a resource transform, or serve resource bytes yourself with a resource provider.
+title: Intercept Network Requests
+description: Rewrite a resource URL before the request is sent, or answer the request with bytes that you supply.
 sidebar:
-  order: 12
+  order: 16
 ---
 
 import { Code } from "@astrojs/starlight/components";
@@ -19,9 +19,10 @@ runtime, from the runtime owner thread.
 Every value that a callback reads must be safe to read from several threads at
 once, because MapLibre may invoke either callback on a network or worker thread
 instead of the runtime owner thread. Return from each callback quickly, because
-the resource request waits for it. A transform callback calls one C API
-function, `mln_resource_transform_response_set_url`. A provider callback calls
+the resource request waits for it. A transform callback calls one function, which sets the replacement URL on the response. A provider callback calls
 the request handle functions, and only for the handle that it received.
+
+## Rewrite a URL with a transform
 
 Rewrite the URL when a request needs a credential, a signature, or a different
 host. The transform runs for every resource that MapLibre fetches over the
@@ -34,17 +35,17 @@ style names glyphs, sprites, and tiles on origins that you do not control.
 
 <Code code={region(transformSnippet, "match")} lang="c" title="resource-transform.c" />
 
-Build the replacement URL in host storage, then pass it to
-`mln_resource_transform_response_set_url`. A callback that returns a non-OK
-status leaves the request unchanged.
+Build the replacement URL in host storage, then set it on the response. A
+callback that returns a non-OK status leaves the request unchanged.
 
 <Code code={region(transformSnippet, "rewrite")} lang="c" title="resource-transform.c" />
 
-Registering a transform replaces any previous one. When
-`mln_runtime_set_resource_transform` returns, no in-flight request can invoke
+Registering a transform replaces any previous one. When the registration call returns, no in-flight request can invoke
 the transform that it replaced.
 
 <Code code={region(transformSnippet, "install")} lang="c" title="resource-transform.c" />
+
+## Serve the bytes with a provider
 
 Supply the bytes yourself when MapLibre cannot load a resource on its own, such
 as an archive inside your application package or a scheme of your own. Such a
@@ -54,15 +55,13 @@ reaches the transform, because the provider runs before MapLibre's online file
 source.
 
 Match the requests that your host serves, and pass every other request through
-to MapLibre's network stack. Fetch `resolved_url`, which includes the tile
-server normalization and the API key that the runtime applies. `requested_url`
-is the logical identity that the cache stores.
+to MapLibre's network stack. Fetch the resolved URL, which includes the tile
+server normalization and the API key that the runtime applies. The requested URL is the logical identity that the cache stores.
 
 <Code code={region(providerSnippet, "match")} lang="c" title="resource-provider.c" />
 
 A provider that already holds the bytes completes the request inside the
-callback, releases the handle, and reports
-`MLN_RESOURCE_PROVIDER_DECISION_HANDLE`.
+callback, releases the handle, and reports that it handled the request.
 
 <Code code={region(providerSnippet, "complete")} lang="c" title="resource-provider.c" />
 
@@ -71,18 +70,16 @@ provider took stay valid. Complete and release each of them as usual.
 
 <Code code={region(providerSnippet, "install")} lang="c" title="resource-provider.c" />
 
-A provider that owns an I/O pool returns
-`MLN_RESOURCE_PROVIDER_DECISION_HANDLE`, keeps the handle, and calls
-`mln_resource_request_complete` from any thread once the bytes arrive. Check
-`mln_resource_request_cancelled` before expensive work, because MapLibre cancels
-requests whose resources it no longer needs. Release each handle exactly once
-with `mln_resource_request_release`, after you complete the request or decide
-against completing it.
+A provider that owns an I/O pool reports the same decision, keeps the handle, and completes the request from any thread once the bytes arrive. Check
+whether the request was cancelled before expensive work, because MapLibre
+cancels requests whose resources it no longer needs. Release each handle exactly
+once, after you complete the request or decide against completing it.
 
-The runtime stores each callback and its `user_data` by reference. Keep any host
+## Keep callback state reachable
+
+The runtime stores each callback and its user data by reference. Keep any host
 state that a callback reads reachable until you register a replacement, clear
 the callback, or destroy the runtime. Each of those calls waits for in-flight
 callbacks to return. Free that state after one of those calls returns. Release
-any host lock that a callback also acquires before you call
-`mln_runtime_destroy`, because a callback blocked on that lock cannot return,
+any host lock that a callback also acquires before you destroy the runtime, because a callback blocked on that lock cannot return,
 and neither can the destroy call.

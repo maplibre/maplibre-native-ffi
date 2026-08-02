@@ -1,1 +1,4 @@
-{ "plugins": ["remark-gfm", ["remark-frontmatter", ["yaml"]]] }
+{
+  "plugins": ["remark-gfm", ["remark-frontmatter", ["yaml"]]],
+  "settings": { "bullet": "-" }
+}

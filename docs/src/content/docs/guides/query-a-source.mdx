@@ -1,8 +1,8 @@
 ---
-title: Read Features from a Source
-description: Query the features that a source holds, and expand a cluster into the features under it.
+title: Query a Source
+description: Read the features that a source holds, and expand a cluster into the features under it.
 sidebar:
-  order: 9
+  order: 13
 ---
 
 import { Code } from "@astrojs/starlight/components";
@@ -12,10 +12,14 @@ import sourceFeatures from "../../../../snippets/c/query-source-features.c?raw";
 import clusterLeaves from "../../../../snippets/c/cluster-leaves.c?raw";
 
 A source query reports the features that a source holds, including the features
-that no layer draws. The query belongs to the render session and runs on the
-session's owner thread. The session builds its renderer during the first
-`mln_render_session_render_update`, and a query before that render update
-returns `MLN_STATUS_INVALID_STATE`.
+that no layer draws. To find what a reader can see at a screen position instead,
+use a rendered query, described in
+[Query a Map](/maplibre-native-ffi/guides/query-a-map/).
+
+The query belongs to the render session and runs on the
+session's owner thread. The session builds its renderer during the first render update, and a query before that returns an invalid-state status.
+
+## Run the query
 
 A vector source needs source-layer IDs, because one vector tile holds several
 layers and MapLibre reads the layers that you name. A vector query with
@@ -30,7 +34,7 @@ argument, and it differs from the source-layer IDs in the options.
 <Code code={region(sourceFeatures, "query")} lang="c" title="query-source-features.c" />
 
 Read the result count rather than the status when you expect features, because
-an unknown source ID also produces an empty result with `MLN_STATUS_OK`.
+an unknown source ID also produces an empty result with a success status.
 
 <Code code={region(sourceFeatures, "read")} lang="c" title="query-source-features.c" />
 
@@ -39,8 +43,9 @@ covers the tiles that the source has loaded for the current camera. Tiles that
 arrive later appear in the next query, and a source that no layer uses loads no
 tiles at all.
 
-Expanding a cluster is a source read as well.
-`mln_render_session_query_feature_extensions` runs a named extension against one
+## Expand a cluster
+
+An extension query runs a named extension against one
 feature of one source. The `supercluster` extension reads a GeoJSON source that
 has clustering enabled, and its `leaves` field returns the features under one
 cluster as a feature collection.
@@ -55,8 +60,8 @@ within that extension.
 
 <Code code={region(clusterLeaves, "query")} lang="c" title="cluster-leaves.c" />
 
-The result carries a type tag. Read the tag before you read the union, because
-an extension can return a value instead of a feature collection.
+An extension can answer with a single value instead of a feature collection, so
+the result states which of the two it holds. Check that before reading it.
 
 <Code code={region(clusterLeaves, "leaves")} lang="c" title="cluster-leaves.c" />
 

@@ -1,59 +1,115 @@
 ---
 title: Move the Camera
-description: Position the map camera instantly, animate it over a duration, or fit it to geographic bounds.
+description: Choose whether the camera jumps, eases, or flies, and compute a camera that fits geographic bounds.
 sidebar:
-  order: 2
+  order: 6
 ---
 
 import { Code } from "@astrojs/starlight/components";
+import CameraPaths from "../../../components/CameraPaths.astro";
 import { region } from "../../../snippets";
 
 import cameraSnippet from "../../../../snippets/c/camera.c?raw";
 import fitBoundsSnippet from "../../../../snippets/c/camera-fit-bounds.c?raw";
+import gestureSnippet from "../../../../snippets/c/camera-gesture.c?raw";
 
 The camera belongs to the map. A camera call needs a live map and the map's
 owner thread, and it works before any render session exists.
 
-Camera options pair a field mask with values. MapLibre applies the fields that
-you flag and leaves every other field at its current value.
+Every command takes the same camera options. Set the fields that you want to
+change, and MapLibre leaves every other field at its current value.
 
 <Code code={region(cameraSnippet, "camera")} lang="c" title="camera.c" />
 
-Three commands apply a camera, and they differ in timing. `mln_map_jump_to`
-applies the camera immediately.
+## Choose how the camera moves
+
+Three commands apply that camera, and they differ only in timing.
+
+`mln_map_jump_to` applies it at once. Use it to place the camera rather than to
+move it: the first position of a session, a position restored from saved state,
+or a camera that your host recomputes every frame from a drag or a pinch.
 
 <Code code={region(cameraSnippet, "jump")} lang="c" title="camera.c" />
 
-`mln_map_ease_to` interpolates to the camera over `duration_ms` along a cubic
-easing curve. The duration defaults to zero, so an ease that omits `duration_ms`
-applies the camera immediately as well. A duration measures host time across
-many frames, because an animated transition advances while the host pumps the
-runtime and the map renders.
+`mln_map_ease_to` interpolates every field that you set, zoom included, straight
+from its current value to the new one over the duration that you set, along a cubic easing
+curve. It suits a short move that the reader follows. The duration defaults to
+zero, so an ease that omits it applies the camera at once.
 
 <Code code={region(cameraSnippet, "ease")} lang="c" title="camera.c" />
 
 `mln_map_fly_to` takes the same animation options and follows a curved flight
-path. When you set no duration, it derives one from the flight distance and a
-velocity of 1.2 screenfuls per second.
+path, which suits a long move. It pulls the zoom back across the middle of the
+flight, so the camera crosses the distance at a low zoom rather than travelling
+through every high-zoom tile between the two positions. When you set no
+duration, it derives one from the flight distance and a velocity of 1.2
+screenfuls per second.
+
+<CameraPaths />
+
+An animated transition advances only while the host pumps the runtime and draws
+frames, so a duration is wall-clock time and a host that stops pumping stalls
+the animation partway. A host that pumps on demand keeps pumping until the
+transition ends, which is what the repaint flag in
+[Run the Render Loop](/maplibre-native-ffi/guides/run-the-render-loop/)
+signals.
+
+## Move by a gesture
+
+The three commands above take a destination. A gesture does not have one: a drag
+knows how far a finger moved, and a pinch knows a scale factor about a point on
+screen. Relative moves take those directly, applied to wherever the camera is
+when they run.
+
+Set the gesture flag when the interaction starts, and MapLibre treats the map as
+moving until you clear it. A drag that crosses the antimeridian then keeps
+scrolling the same way, rather than taking the shorter way round the world as it
+would for a camera you set outright. Cancel any running transition at the same
+time, or an animation and the user both move the camera at once.
+
+<Code code={region(gestureSnippet, "bracket")} lang="c" title="camera-gesture.c" />
+
+A drag applies screen-space deltas in logical pixels. Send the movement since
+the last frame rather than a running total, because each call composes with the
+camera it finds.
+
+<Code code={region(gestureSnippet, "drag")} lang="c" title="camera-gesture.c" />
+
+A pinch scales about an anchor, which stays under the fingers while everything
+else moves around it.
+
+<Code code={region(gestureSnippet, "pinch")} lang="c" title="camera-gesture.c" />
+
+Clear the flag when the interaction ends, and pair every set with a clear,
+including on a cancelled gesture. The animated variants carry momentum
+afterwards, and they take the same animation options as an ease.
+
+<Code code={region(gestureSnippet, "release")} lang="c" title="camera-gesture.c" />
+
+Every one of these calls needs the map's owner thread. A host that reads
+gestures on a different thread sends the deltas across to that one, and deltas
+survive the trip in a way an absolute camera does not: a camera computed from
+what was on screen is already stale when the owner thread applies it.
+
+## Fit the camera to bounds
 
 To frame a region rather than a point, compute the camera for it first.
-`mln_map_camera_for_lat_lng_bounds` reports the camera that fits the bounds
-inside the current viewport, inset by the padding that you pass in logical
-pixels.
+A bounds query reports the camera that fits those bounds inside the current
+viewport, inset by the padding that you pass in logical pixels.
 
 <Code code={region(fitBoundsSnippet, "padding")} lang="c" title="camera-fit-bounds.c" />
 
-The query reports a camera and leaves the map unchanged. Apply the result with
-whichever of the three commands matches the timing that you want. This example
-uses `mln_map_fly_to`.
+The query reports a camera and leaves the map unchanged, so apply the result
+with whichever of the three commands matches the timing that you want.
 
 <Code code={region(fitBoundsSnippet, "fit")} lang="c" title="camera-fit-bounds.c" />
 
-Set `transition_id` on the animation options when the host needs to know that a
-transition ended. The runtime queues one
-`MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED` event that carries that
+## Know when a transition ends
+
+Set a transition ID on the animation options when the host needs to know that a
+transition ended. The runtime queues one transition-finished event that carries that
 value, whether the transition ran to completion, was superseded by a later
-camera command, or was cancelled by `mln_map_cancel_transitions`. Drain the
+camera command, or was cancelled. Drain the
 event from the runtime that owns the map, as described in
 [Concepts](/maplibre-native-ffi/concepts/).
 

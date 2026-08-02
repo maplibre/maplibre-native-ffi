@@ -1,26 +1,19 @@
 ---
 title: Install
 description: Add MapLibre Native FFI to a project in your language, and get the native library where your language needs it.
-sidebar:
-  order: 1
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 
-<Aside type="caution" title="Snapshots only">
-  Everything below works today, and nothing below is pinned. Each channel is a
-  floating snapshot that moves whenever `main` does, so package names,
-  coordinates, and the C ABI change under you.
+<Aside type="caution" title="Prerelease only">
+  Tagged releases are not yet available. Each channel is a floating snapshot
+  that moves whenever `main` does, so package names, coordinates, and the
+  C ABI change under you.
 </Aside>
 
-Choose a render backend first, because it names the package or feature you
-depend on. Choose Metal on Apple platforms, Vulkan where the target has a
-loader, and OpenGL elsewhere. The
-[support matrix](/maplibre-native-ffi/#status) records which combinations are
-tested.
-
-Then find your language below. Some bindings fetch the native library
-themselves; the rest send you to
+Choose a render backend first. Metal is recommended for Apple platforms, OpenGL
+for emulators and VMs, and Vulkan for other platforms. Then find your language
+below. Some bindings fetch the native library themselves; the rest send you to
 [Get the native library](#get-the-native-library).
 
 ## Kotlin
@@ -46,6 +39,9 @@ On Android, call `MaplibreAndroid.initialize(context)` before you create a
 runtime. The runtime AAR carries the platform TLS component already, so a
 Kotlin app needs nothing further.
 
+The other runtimes are `maplibre-native-ffi-runtime-opengl` and
+`maplibre-native-ffi-runtime-metal`.
+
 ## Rust
 
 Depend on the `maplibre-native` crate from Git and enable one backend feature.
@@ -56,19 +52,32 @@ The build script downloads the matching native artifact.
 maplibre-native = { git = "https://github.com/maplibre/maplibre-native-ffi", features = ["vulkan"] }
 ```
 
+The other features are `opengl` and `metal`.
+
 Set `MAPLIBRE_NATIVE_C_INSTALL_DIR` to an install prefix to use your own build
 instead.
 
 ## Python
 
-Install from the snapshot index, choosing the distribution for your backend.
-The wheels contain the native library.
+Depend on the distribution for your backend and resolve it from the snapshot
+index. The wheels contain the native library.
 
-```bash frame="terminal"
-python -m pip install \
-  --index-url https://maplibre.github.io/maplibre-native-ffi/simple/ \
-  maplibre-native-vulkan
+```toml title="pyproject.toml"
+[project]
+dependencies = ["maplibre-native-vulkan"]
+
+[[tool.uv.index]]
+name = "maplibre-snapshots"
+url = "https://maplibre.github.io/maplibre-native-ffi/simple/"
+explicit = true
+
+[tool.uv.sources]
+maplibre-native-vulkan = { index = "maplibre-snapshots" }
 ```
+
+The index configuration above is uv's. Marking the index explicit keeps every
+other dependency on PyPI, so only this package resolves from the snapshot
+index.
 
 The other distributions are `maplibre-native-opengl` and
 `maplibre-native-metal`.
@@ -92,10 +101,13 @@ Add the snapshot feed, then the binding and the runtime for your backend.
 </ItemGroup>
 ```
 
+The other runtime packages are `Maplibre.Native.Runtime.OpenGL` and
+`Maplibre.Native.Runtime.Metal`.
+
 ## Dart
 
-Depend on the package from Git. The build hook downloads the matching native
-artifact.
+Depend on the package from Git. The build hook downloads a native artifact for
+your target when you build.
 
 ```yaml title="pubspec.yaml"
 dependencies:
@@ -103,6 +115,16 @@ dependencies:
     git:
       url: https://github.com/maplibre/maplibre-native-ffi
       path: bindings/dart
+```
+
+The hook chooses the default backend from the target. Name a different one
+in your application's pubspec to override that.
+
+```yaml title="pubspec.yaml"
+hooks:
+  user_defines:
+    maplibre_native_ffi:
+      backend: vulkan
 ```
 
 Write an install prefix into `.dart_tool/maplibre_native_install_dir` to use
@@ -149,9 +171,7 @@ export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
 cc -std=c23 main.c $(pkg-config --cflags --libs maplibre-native-c) -o main
 ```
 
-The pkg-config file supplies `-DMLN_STATIC` when you link the static archive.
-On Windows the DLL lands in `<prefix>/bin`, which stays off the search path, so
-add it to `PATH` or copy the DLL beside your executable.
+On Windows, add `<prefix>/bin` to `PATH` or copy the DLL beside your executable.
 
 ## Get the native library
 
@@ -161,13 +181,14 @@ and unpack it. The directory you unpack to is the install prefix.
 
 A preset is spelled `<platform>-<arch>-<backend>`, as in `macos-arm64-metal` or
 `linux-x64-vulkan`. OpenGL presets name their context provider in place of the
-backend: `egl` on Linux, macOS, Android, and OpenHarmony, and `wgl` on Windows.
+backend: `wgl` on Windows and `egl` elsewhere.
 
 To build a prefix yourself, install [mise](https://mise.jdx.dev/) and prepare
 the toolchain as the
 [development overview](/maplibre-native-ffi/development/overview/) describes:
 
 ```bash frame="terminal"
+mise bootstrap
 mise run build macos-arm64-metal  # prefix at build/macos-arm64-metal/install
 ```
 

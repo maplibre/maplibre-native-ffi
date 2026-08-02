@@ -1,0 +1,57 @@
+---
+title: Capture Logs
+description: Take MapLibre Native's log records into your host's own logger, and choose which severities arrive synchronously.
+sidebar:
+  order: 17
+---
+
+import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
+import logCallback from "../../../../snippets/c/log-callback.c?raw";
+
+MapLibre Native already logs. Records reach the platform logger by default,
+which is the system log on Android and Apple platforms and the console
+elsewhere. Install a callback to take them into your host's own logger, a file,
+a crash reporter, or a test that asserts on them.
+
+A record carries a severity, a category, an optional numeric code, and the
+message text. The return value decides whether MapLibre is finished with the
+record: consume it and MapLibre stops there, decline it and the platform logger
+prints it as well. Declining is the safer choice while your own logging is new.
+
+<Code code={region(logCallback, "callback")} lang="c" title="log-callback.c" />
+
+One callback serves the whole process rather than one runtime, and MapLibre
+stores it by reference. Install it before the first runtime exists to catch
+setup records, and keep it valid until you replace or clear it.
+
+<Code code={region(logCallback, "install")} lang="c" title="log-callback.c" />
+
+## The callback runs on MapLibre's threads
+
+MapLibre invokes the callback from whichever thread produced the record,
+including its worker and network threads, and it can do so while holding its own
+logging locks.
+
+Make the callback safe to run on several threads at once, and return from it
+quickly. Call neither this API nor any other MapLibre function from inside it. A
+host that wants to do real work with a record copies the text, queues it, and
+returns.
+
+Bindings for managed runtimes marshal records before your code sees them, so a
+handler written against one of those runs on a host thread and carries none of
+this.
+
+## Synchronous and asynchronous records
+
+Errors reach the callback synchronously. Informational and warning records may
+arrive asynchronously, slightly after the work that produced them, which keeps
+MapLibre's threads moving while your logger runs.
+
+Clear the mask to make every record synchronous, so that each one is ordered
+against the call that produced it. A test asserting on log output wants that
+ordering. A production host usually keeps the default, because synchronous
+dispatch blocks MapLibre's threads on the host logger.
+
+<Code code={region(logCallback, "async")} lang="c" title="log-callback.c" />

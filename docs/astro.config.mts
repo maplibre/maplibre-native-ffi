@@ -1,16 +1,20 @@
 // @ts-check
 
+import { publicDirectoryIndex } from "./src/integrations/public-directory-index";
 import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
 import starlightCopyButton from "starlight-copy-button";
 import starlightLinksValidator from "starlight-links-validator";
 import starlightLlmsTxt from "starlight-llms-txt";
 
+const base = "/maplibre-native-ffi";
+
 // https://astro.build/config
 export default defineConfig({
   site: "https://maplibre.org",
-  base: "/maplibre-native-ffi",
+  base,
   integrations: [
+    publicDirectoryIndex(base),
     starlight({
       title: "MapLibre Native FFI",
       logo: {
@@ -26,7 +30,7 @@ export default defineConfig({
         starlightCopyButton(),
         starlightLlmsTxt({ exclude: ["reference/**"] }),
         starlightLinksValidator({
-          exclude: ["/maplibre-native-ffi/reference/**"],
+          exclude: [`${base}/reference/**`],
         }),
       ],
       social: [
@@ -38,10 +42,7 @@ export default defineConfig({
       ],
       sidebar: [
         { label: "Overview", link: "/" },
-        {
-          label: "Get started",
-          items: [{ autogenerate: { directory: "start" } }],
-        },
+        { label: "Install", slug: "install" },
         { label: "Concepts", slug: "concepts" },
         {
           label: "Guides",

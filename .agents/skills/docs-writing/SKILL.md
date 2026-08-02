@@ -142,6 +142,39 @@ Reader-facing navigation labels stay natural: "Get started", "Guides",
 
 A specification is reference, with the two extra rules below.
 
+## Headings mark sections, not paragraphs
+
+A heading earns its place when a reader can jump to that section or skip it: a
+distinct sub-task, a second mechanism that serves the same need, or a rule that
+applies to everything above it. Two or three headings usually cover a page.
+
+A page that walks one task from start to finish stays flat. Headings over each
+paragraph of a linear narrative offer navigation for a path that has no forks.
+
+Paragraphs before the first heading are the lead, and they carry what holds for
+every section below.
+
+Write a heading in sentence case, and name the task rather than the API.
+
+## Lead a guide with the decision
+
+A reader arrives with a choice to make, not with a function to call. Name the
+choice, give the two or three shapes it takes, and say what each shape costs.
+The implementation follows the choice, one section per shape.
+
+Only when there is a fork. A task with one main path leads with that path, and
+options that serve special cases follow under their own heading. Promoting an
+option to a decision the reader never arrived with delays the thing they came
+for.
+
+Values and flags belong to the decision they serve. A section that lists what a
+parameter accepts, before the reader knows why the parameter exists, is
+reference material in the wrong place.
+
+Keep the implementation light. The API reference states every behavior exactly,
+so a guide draws a rough map: enough of the route to walk it, and the traps that
+a reader cannot see from the code.
+
 ## A guide covers a task, not an API surface
 
 Finish the task and stop. Leave the rest of the domain alone.
@@ -170,8 +203,17 @@ are looking at and what to substitute.
 - Prefer conceptual phrasing where it reads as clearly: "set the style URL",
   "pump the runtime".
 - Name a C function when the name earns its place, and write it in full:
-  `mln_map_set_style_url`. Readers map it to their own binding's spelling
-  without difficulty.
+  `mln_map_set_style_url`. A name earns its place when the reader is choosing
+  between calls, or when a call is an exception to the pattern around it.
+- The same test applies to status codes, event types, constants, fields, and
+  arguments, which are C spellings as much as function names are. Prefer "a
+  style-loaded event", "an invalid-state status", "the repaint flag", and "the
+  duration" over the C identifiers. A reader on any binding then reads prose
+  that matches their own API, and the reference carries the exact spelling.
+- Describe options as fields that a caller sets, rather than as a bit mask. The
+  C API pairs a mask with values, and other bindings use optional fields, so
+  "set the fields that you want to change" holds everywhere and "set its bit in
+  `fields`" holds in one place.
 - Divergence between bindings lives on that binding's own page. Mention it in
   shared prose only when a reader following the prose would otherwise write
   broken code, and then as a one-line pointer rather than an explanation.
@@ -266,6 +308,7 @@ into.
 - Sentence-level rules hold throughout.
 - Nothing is restated that a link would cover.
 - The page serves one mode.
+- A guide names the reader's choice before it shows an implementation.
 - A guide finishes its task and skips the rest of the domain.
 - Prose reads correctly for a reader on any binding.
 - Terminology matches the tables above.

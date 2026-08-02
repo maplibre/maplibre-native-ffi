@@ -30,13 +30,6 @@ static mln_json_value json_object(
   };
 }
 
-// #region style-loaded
-bool style_is_loaded(const mln_runtime_event* event, mln_map map) {
-  return event->type == MLN_RUNTIME_EVENT_MAP_STYLE_LOADED &&
-         event->source == map;
-}
-// #endregion style-loaded
-
 mln_status show_earthquakes(mln_map map, const char* geojson_url) {
   // #region options
   // Each value applies when its field bit is set.

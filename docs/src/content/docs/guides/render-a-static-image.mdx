@@ -1,0 +1,53 @@
+---
+title: Render a Static Image
+description: Create a map in static mode, request one image, and read the finished pixels into host memory.
+sidebar:
+  order: 7
+---
+
+import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
+import stillImage from "../../../../snippets/c/still-image.c?raw";
+
+A static map renders one image per request rather than redrawing as data and
+camera state change. A tile service, a thumbnail job, or an export asks for an
+image, waits for it, and reads the pixels into host memory.
+
+Static mode is fixed when the map is created, so a host that produces images
+creates a map for that, as
+[Create a Map](/maplibre-native-ffi/guides/create-a-map/) describes. Reading
+pixels back also requires a session-owned texture, because that is the one
+target kind the map allocates and can copy out of.
+
+## Request one image
+
+Create the map at the size that the render target uses. A session attached at a
+different size sets the map size on the map's owner thread, and the map keeps
+its previous size until the next pump, so a request made before the new size
+reaches the map produces an update that renders nothing.
+
+<Code code={region(stillImage, "create")} lang="c" title="still-image.c" />
+
+The render session allocates the texture at the extent that the descriptor
+names. Each render backend has its own descriptor type and attach function, and
+this snippet uses OpenGL through EGL.
+
+<Code code={region(stillImage, "attach")} lang="c" title="still-image.c" />
+
+Render on every turn of the loop, because a static map advances its loading
+through the render calls themselves. The runtime reports a still-image-finished
+event from the map's run loop, and that event can arrive before or after the
+render call that produced the pixels. The image is ready once the event has
+arrived and a render call has reported a frame, which is why the loop waits for
+both.
+
+<Code code={region(stillImage, "await")} lang="c" title="still-image.c" />
+
+## Read the pixels
+
+Probe for the size first, because the extent in physical pixels depends on the
+scale factor that the descriptor set. The copy is premultiplied RGBA8, laid out
+with the row stride that the probe reports.
+
+<Code code={region(stillImage, "read")} lang="c" title="still-image.c" />

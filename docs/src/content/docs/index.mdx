@@ -8,9 +8,9 @@ import SupportMatrix from "../../components/SupportMatrix.astro";
 MapLibre Native FFI is a C API for
 [MapLibre Native](https://github.com/maplibre/maplibre-native), an engine that
 draws vector and raster maps from a MapLibre style document. It exposes MapLibre
-Native concepts directly across a C ABI. A language binding or a host
-integration calls MapLibre Native through that boundary instead of through C++
-interop.
+Native concepts directly across a C ABI and many language bindings. It's intended
+for SDKs and custom host integrations that prefer to control the map and render
+session directly.
 
 The MapLibre [Android](https://maplibre.org/maplibre-native/android/api/) and
 [iOS](https://maplibre.org/maplibre-native/ios/latest/documentation/maplibre/)
@@ -20,10 +20,8 @@ the host creates the window and the graphics context, pumps the runtime, and
 decides when each frame is drawn. The same API renders into a texture target for
 image export or for compositing into a scene that the host already draws.
 
-That division suits integration with a cross-platform UI framework, an offscreen
-image service, or a binding for a language that has no MapLibre SDK yet.
-Gestures, widgets, declarative UI, and application lifecycle integration belong
-in adapters above this layer.
+See the [examples](https://github.com/maplibre/maplibre-native-ffi/tree/main/examples)
+in the repository for complete integration examples for each language binding.
 
 ## Status
 

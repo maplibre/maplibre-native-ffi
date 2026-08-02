@@ -1,8 +1,8 @@
 ---
-title: Style a Layer by Its Data
+title: Style Layers by Data
 description: Set a layer's paint and layout properties from each feature's own data, and filter which features the layer draws.
 sidebar:
-  order: 6
+  order: 10
 ---
 
 import { Code } from "@astrojs/starlight/components";
@@ -12,16 +12,15 @@ import styleByData from "../../../../snippets/c/style-by-data.c?raw";
 
 A layer property holds either a constant or an expression. An expression reads
 the feature that the layer is drawing, so one rule styles every feature from its
-own data. Set a property after the map reports
-`MLN_RUNTIME_EVENT_MAP_STYLE_LOADED`, and set it again after every later style
-load, because a property value belongs to the style that was loaded when you set
-it.
+own data. A property value belongs to the style that was loaded when you set it,
+so set it again after every later style load, as
+[Load a Style](/maplibre-native-ffi/guides/load-a-style/) describes.
 
-A value is a style-spec JSON value descriptor: a tree of `mln_json_value` nodes.
+A value is a style-spec JSON value descriptor: a tree of JSON nodes.
 A constant is a scalar node, and an expression is an array node whose first
 element names the operator and whose remaining elements are its arguments. The
 snippet builds each node with a small constructor, one per JSON type, and the
-array constructor points at a caller-owned array of child nodes.
+array constructor references a caller-owned array of child nodes.
 
 <Code code={region(styleByData, "node")} lang="c" title="style-by-data.c" />
 
@@ -36,14 +35,14 @@ that scale a circle from 4 pixels at magnitude 1 to 24 pixels at magnitude 6.
 
 <Code code={region(styleByData, "property")} lang="c" title="style-by-data.c" />
 
-`mln_map_set_layer_property` sets one property of one layer. The property name
-is the one that the style specification defines for the layer's type.
+Setting a property takes one layer and one property name, and the name is the
+one that the style specification defines for that layer's type.
 
 <Code code={region(styleByData, "set")} lang="c" title="style-by-data.c" />
 
 A filter chooses which of the source's features the layer draws, and a filter is
-an expression that returns a boolean. `mln_map_set_layer_filter` takes the same
-kind of descriptor, and a null filter clears the layer's filter. The snippet
+an expression that returns a boolean. Setting a filter takes the same kind of
+descriptor, and an empty filter clears the layer's. The snippet
 reuses the `magnitude` node in this second value.
 
 <Code code={region(styleByData, "filter")} lang="c" title="style-by-data.c" />

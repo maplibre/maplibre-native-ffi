@@ -1,8 +1,8 @@
 ---
-title: Attach State to Individual Features
-description: Set per-feature state that style expressions read, so one feature draws differently from its neighbours.
+title: Set Feature State
+description: Attach per-feature state that style expressions read, so one feature draws differently from its neighbours.
 sidebar:
-  order: 10
+  order: 14
 ---
 
 import { Code } from "@astrojs/starlight/components";
@@ -18,10 +18,12 @@ supplies its own input to that rule.
 
 Feature state belongs to the [render session](/maplibre-native-ffi/concepts/),
 because the session's renderer owns the tiles that the state applies to. That
-renderer exists after the first `mln_render_session_render_update` that follows
+renderer exists after the first render update that follows
 a style load. Render once before you set state; a call made earlier returns
-`MLN_STATUS_INVALID_STATE`. Every feature-state call runs on the session's owner
+an invalid-state status. Every feature-state call runs on the session's owner
 thread.
+
+## Set state on a feature
 
 A selector names what the state belongs to: the source ID, the source layer ID
 for a vector source, and the feature ID. Feature IDs match as text, so a feature
@@ -50,7 +52,9 @@ with neither one removes the state of every feature in the source layer.
 
 <Code code={region(featureState, "remove")} lang="c" title="feature-state.c" />
 
-`mln_render_session_get_feature_state` copies the state that the session holds
+## Read state back
+
+Reading the state back copies what the session holds
 into a snapshot handle that you own. The snapshot holds an empty object when the
 source or the feature has no state.
 
@@ -67,10 +71,10 @@ that you keep, because destroying the snapshot invalidates those pointers.
 
 <Code code={region(featureStateRead, "read")} lang="c" title="feature-state-read.c" />
 
+## How long state lives
+
 The state lives as long as the session's renderer. A resize keeps that renderer,
-and so does replacing the render target through
-`mln_<backend>_surface_set_target` or
-`mln_<backend>_borrowed_texture_set_target`. A renderer compiles its shaders for
+and so does replacing the render target in place, as [Attach a Render Target](/maplibre-native-ffi/guides/attach-a-render-target/) describes. A renderer compiles its shaders for
 a fixed pixel ratio, so a call that changes the scale factor builds a new
 renderer, and so does destroying a session and attaching another. Feature state
 starts empty on a new renderer. A host that needs the state to survive one keeps

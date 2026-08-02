@@ -2,7 +2,7 @@
 title: Work Offline
 description: Download an offline region so the map keeps drawing without a network, and read the regions that the cache database already holds.
 sidebar:
-  order: 11
+  order: 15
 ---
 
 import { Code } from "@astrojs/starlight/components";
@@ -11,8 +11,8 @@ import { region } from "../../../snippets";
 import offlineRegion from "../../../../snippets/c/offline-region.c?raw";
 import offlineStorage from "../../../../snippets/c/offline-storage.c?raw";
 
-One database holds everything that a runtime caches, and `cache_path` in the
-runtime options sets that database's path. The field defaults to `:memory:`, so
+One database holds everything that a runtime caches, and the cache path in the
+runtime options sets where it lives. The field defaults to `:memory:`, so
 pass a writable filesystem path to keep the cached resources across runs of the
 host.
 
@@ -23,14 +23,14 @@ every resource that a defined area needs, and keeps those resources outside the
 ambient budget. Download a region when the application must draw a known area
 without a network.
 
-Database calls are asynchronous, and they share one shape. A `_start` function
-validates its arguments, returns an operation ID, and queues the work. The
-runtime later queues one `MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED` event
+Database calls are asynchronous, and they share one shape. A start call validates its
+arguments, returns an operation ID, and queues the work. The
+runtime later queues one operation-completed event
 that carries the ID and the operation's own result status. That result status is
-separate from the status that the `_start` call returned. An operation that
-produces a value holds that value until the matching `_take_result` call
+separate from the status that the start call returned. An operation that
+produces a value holds that value until a matching take-result call
 consumes it, and every operation holds runtime state until a take or
-`mln_runtime_offline_operation_discard` releases it.
+a discard call releases it.
 
 ## Download a region
 
@@ -62,23 +62,22 @@ The region ID is the part of the record that the remaining calls need.
 
 <Code code={region(offlineRegion, "region-id")} lang="c" title="offline-region.c" />
 
-The runtime queues progress and error events for observed regions only, so call
-`mln_runtime_offline_region_set_observed_start` for the new region ID first.
+The runtime queues progress and error events for observed regions only, so mark the new region as observed first.
 Setting the download state to active then starts the download, and MapLibre
 fetches the region's resources while the host pumps the runtime.
 
 <Code code={region(offlineRegion, "download")} lang="c" title="offline-region.c" />
 
-`MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED` carries resource counts, tile
+A status-changed event carries resource counts, tile
 counts, and stored bytes for every change.
-`MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR` reports one resource that
+A response-error event reports one resource that
 failed while the rest of the download continues. Drain both from the runtime
 that owns the region, as described in
 [Concepts](/maplibre-native-ffi/concepts/).
 
 <Code code={region(offlineRegion, "progress")} lang="c" title="offline-region.c" />
 
-Setting the download state to `MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE` pauses a
+Setting the download state to inactive pauses a
 download, and setting it active again resumes from the resources that MapLibre
 already stored.
 

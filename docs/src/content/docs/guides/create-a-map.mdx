@@ -1,0 +1,55 @@
+---
+title: Create a Map
+description: Create a runtime and a map, choose the options that are fixed for the map's life, and release the two in order.
+sidebar:
+  order: 1
+---
+
+import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
+import createMap from "../../../../snippets/c/create-map.c?raw";
+
+A map belongs to a runtime, and the runtime belongs to the thread that created
+it. That thread becomes the owner thread for the runtime and for every map under
+it, so create both on the thread that will pump them.
+
+One runtime serves any number of maps and holds the shared work: the scheduler,
+the event queue, the network stack, and one cache database.
+
+<Code code={region(createMap, "runtime")} lang="c" title="create-map.c" />
+
+## Choose the options that outlive the call
+
+Most map options can be changed later. Three cannot, and getting them wrong
+means creating the map again.
+
+The scale factor is fixed for the map's life. It chooses which sprites, glyphs,
+and raster tiles the map downloads, so pass the display density that the map
+will render at. A render target carries its own scale factor for geometry, and
+attaching one that disagrees logs a warning and keeps serving imagery at the
+map's density.
+
+<Code code={region(createMap, "map")} lang="c" title="create-map.c" />
+
+The width and height are the exception that looks like a rule. They set the
+viewport only until the first render target attaches, after which the target's
+extent replaces them. They still matter before that point, because camera and
+projection queries answer against them.
+
+The map mode is fixed as well. A continuous map redraws as data arrives and as
+the camera moves, which is what an on-screen map needs. A static map produces
+one image per request, and a tile map produces one image for a single tile.
+
+<Code code={region(createMap, "mode")} lang="c" title="create-map.c" />
+
+The last fixed option is FastPFOR decoding, which applies to every MapLibre
+Tiles source that the map loads. Enable it at creation when your tile sets use
+that encoding.
+
+## Release in order
+
+Destroy a map before the runtime that owns it. A runtime with live maps reports
+an invalid-state status.
+
+<Code code={region(createMap, "release")} lang="c" title="create-map.c" />

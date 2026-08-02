@@ -55,9 +55,9 @@ backend lifecycle outside the map object.
 A render session records its own owner thread, which is the thread that attached
 it, and that thread stays fixed for the session's lifetime. Attaching requires
 only a live map, so the attaching thread can differ from the map's owner thread.
-A host therefore attaches on the thread that owns its window, graphics context,
-and display refresh callback, while it pumps the runtime and map on another
-thread. A session call from any other thread reports the owner-thread status.
+A host therefore attaches on the thread that owns its graphics context and draws
+the frames, while it pumps the runtime and map on another thread. A session call
+from any other thread reports the owner-thread status.
 
 ## Events
 
@@ -76,6 +76,18 @@ Queued events belong to their source. Destroying a map discards that map's
 queued events immediately, so host state mirrored from events stays only as
 current as the last drain before teardown. A host that needs such state at
 teardown reads it synchronously while the map is live.
+
+## Failures
+
+Every call reports whether it succeeded, and each binding surfaces that in its
+own idiom: an exception, a result type, or an error return. Failures that
+MapLibre detects at the call, such as a wrong thread or an argument it cannot
+use, arrive that way.
+
+A failure that happens later has no call to return to and arrives as an event
+instead: a style that never loaded, a resource that could not be fetched, a
+still image that failed. A host that checks only return values sees those as
+silence.
 
 ## Language bindings
 

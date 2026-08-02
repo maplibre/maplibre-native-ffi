@@ -1,0 +1,61 @@
+---
+title: Update Data
+description: Publish a new feature collection to a GeoJSON source that is already on the style, as data arrives.
+sidebar:
+  order: 11
+---
+
+import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
+import liveUpdates from "../../../../snippets/c/geojson-live-updates.c?raw";
+
+A GeoJSON source that is already on the style accepts new data through
+`mln_map_set_geojson_source_data`, which takes descriptors inline, or
+`mln_map_set_geojson_source_url`, which names a new URL. Both run on the map's
+owner thread, and both replace the whole dataset. A host that tracks individual
+features therefore keeps its own collection and publishes that collection on
+every change.
+
+Add the source once with an empty feature collection, before the feed delivers
+anything. Every later update names the same source ID, so the layers that draw
+it keep drawing.
+
+<Code code={region(liveUpdates, "add")} lang="c" title="geojson-live-updates.c" />
+
+On every change the host builds one geometry and one feature descriptor for each
+item in its own collection. A point geometry carries a single coordinate.
+
+<Code code={region(liveUpdates, "geometry")} lang="c" title="geojson-live-updates.c" />
+
+The geometries and the features occupy two parallel arrays, sized for the
+largest collection that the host publishes.
+
+<Code code={region(liveUpdates, "features")} lang="c" title="geojson-live-updates.c" />
+
+A feature collection holds those descriptors, and one call publishes it to the
+source.
+
+<Code code={region(liveUpdates, "publish")} lang="c" title="geojson-live-updates.c" />
+
+Every update re-tiles the whole dataset. When a feed delivers faster than the
+display refreshes, collect the messages that arrive between frames and publish
+once per frame.
+
+## Synchronous updates
+
+MapLibre tiles updated data on a worker thread, so new features appear in one of
+the frames that follow the update. That suits most feeds, and the update call
+returns without extending any frame.
+
+Set the synchronous-update option when an update has to reach the very next
+frame, as it does for a simulation that advances in lockstep with rendering, or
+for a still image captured immediately after an update. Tiling then runs inline
+during the render call, on the render session's owner thread, so a large dataset
+extends that frame.
+
+<Code code={region(liveUpdates, "options")} lang="c" title="geojson-live-updates.c" />
+
+The option belongs to the source options, so choose it when you add the source.
+Changing it later needs a fresh source, which means removing every layer that
+draws the old one first.
