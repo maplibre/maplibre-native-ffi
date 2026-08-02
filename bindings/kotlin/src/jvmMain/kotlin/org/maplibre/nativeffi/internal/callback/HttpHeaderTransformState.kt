@@ -1,0 +1,100 @@
+package org.maplibre.nativeffi.internal.callback
+
+import java.lang.foreign.Arena
+import java.lang.foreign.Linker
+import java.lang.foreign.MemorySegment
+import java.lang.foreign.ValueLayout
+import java.lang.invoke.MethodHandles
+import java.lang.invoke.MethodType
+import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.internal.c.mln_http_header_transform
+import org.maplibre.nativeffi.internal.c.mln_http_header_transform_callback
+import org.maplibre.nativeffi.internal.c.mln_http_header_transform_response
+import org.maplibre.nativeffi.internal.loader.NativeAccess
+import org.maplibre.nativeffi.resource.HttpHeaderTransformCallback
+import org.maplibre.nativeffi.resource.HttpHeaderTransformRequest
+import org.maplibre.nativeffi.resource.ResourceKind
+
+internal class HttpHeaderTransformState(private val callback: HttpHeaderTransformCallback) :
+  AutoCloseable {
+  private val arena = Arena.ofShared()
+  private val gate = CallbackGate("HTTP header transform callbacks") { arena.close() }
+  private val descriptor: MemorySegment
+
+  init {
+    val method =
+      MethodHandles.lookup()
+        .findVirtual(
+          HttpHeaderTransformState::class.java,
+          "invoke",
+          MethodType.methodType(
+            Int::class.javaPrimitiveType,
+            MemorySegment::class.java,
+            Int::class.javaPrimitiveType,
+            MemorySegment::class.java,
+            MemorySegment::class.java,
+          ),
+        )
+        .bindTo(this)
+    val stub =
+      Linker.nativeLinker()
+        .upcallStub(method, mln_http_header_transform_callback.descriptor(), arena)
+    descriptor = mln_http_header_transform.allocate(arena)
+    mln_http_header_transform.size(descriptor, mln_http_header_transform.sizeof().toInt())
+    mln_http_header_transform.callback(descriptor, stub)
+    mln_http_header_transform.user_data(descriptor, MemorySegment.NULL)
+  }
+
+  fun descriptor(): MemorySegment = descriptor
+
+  fun invoke(
+    userData: MemorySegment,
+    rawKind: Int,
+    url: MemorySegment,
+    response: MemorySegment,
+  ): Int {
+    if (response == MemorySegment.NULL) return MaplibreStatus.INVALID_ARGUMENT.nativeCode
+    val lease = gate.enter() ?: return MaplibreStatus.INVALID_ARGUMENT.nativeCode
+    return try {
+      mln_http_header_transform_response.size(
+        response,
+        mln_http_header_transform_response.sizeof().toInt(),
+      )
+      val headers =
+        callback.transform(
+          HttpHeaderTransformRequest(ResourceKind.fromNative(rawKind), copyCString(url))
+        )
+      if (headers.map { it.name.lowercase() }.toSet().size != headers.size) {
+        return MaplibreStatus.INVALID_ARGUMENT.nativeCode
+      }
+      headers.forEach { header ->
+        if ('\u0000' in header.name || '\u0000' in header.value) {
+          return MaplibreStatus.INVALID_ARGUMENT.nativeCode
+        }
+        val status =
+          NativeAccess.setHttpHeaderTransformResponse(response, header.name, header.value)
+        if (status != MaplibreStatus.OK.nativeCode) return status
+      }
+      MaplibreStatus.OK.nativeCode
+    } catch (_: IllegalArgumentException) {
+      MaplibreStatus.INVALID_ARGUMENT.nativeCode
+    } catch (_: Throwable) {
+      MaplibreStatus.NATIVE_ERROR.nativeCode
+    } finally {
+      lease.close()
+    }
+  }
+
+  fun checkCanClose() = gate.checkCanClose()
+
+  override fun close() = gate.close()
+
+  private fun copyCString(address: MemorySegment): String {
+    if (address == MemorySegment.NULL) return ""
+    var length = 0L
+    while (
+      address.reinterpret(length + 1).get(ValueLayout.JAVA_BYTE, length) != 0.toByte()
+    ) length++
+    return String(address.reinterpret(length).toArray(ValueLayout.JAVA_BYTE), Charsets.UTF_8)
+  }
+}

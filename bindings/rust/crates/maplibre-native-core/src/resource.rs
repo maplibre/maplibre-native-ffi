@@ -274,6 +274,43 @@ pub fn resource_transform_descriptor(
     }
 }
 
+pub type HttpHeaderTransformCallbackFn = unsafe extern "C" fn(
+    *mut c_void,
+    u32,
+    *const c_char,
+    *mut sys::mln_http_header_transform_response,
+) -> sys::mln_status;
+
+pub fn http_header_transform_descriptor(
+    callback: Option<HttpHeaderTransformCallbackFn>,
+    user_data: *mut c_void,
+) -> sys::mln_http_header_transform {
+    sys::mln_http_header_transform {
+        size: std::mem::size_of::<sys::mln_http_header_transform>() as u32,
+        callback,
+        user_data,
+    }
+}
+
+/// Initializes an HTTP header transform callback response.
+///
+/// # Safety
+///
+/// `out_response` must be null or point to writable callback-duration storage.
+pub unsafe fn initialize_http_header_transform_response(
+    out_response: *mut sys::mln_http_header_transform_response,
+) -> sys::mln_status {
+    if out_response.is_null() {
+        return sys::MLN_STATUS_INVALID_ARGUMENT;
+    }
+    // SAFETY: The caller promised writable callback-duration storage.
+    unsafe {
+        (*out_response).size =
+            std::mem::size_of::<sys::mln_http_header_transform_response>() as u32;
+    }
+    sys::MLN_STATUS_OK
+}
+
 /// Initializes a resource transform callback response to an empty replacement.
 ///
 /// # Safety
@@ -536,6 +573,50 @@ pub struct ResourceTransformRequest {
     pub kind: ResourceKind,
     pub raw_kind: u32,
     pub url: String,
+}
+
+/// Copied request passed to an outgoing HTTP header transform callback.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct HttpHeaderTransformRequest {
+    pub kind: ResourceKind,
+    pub raw_kind: u32,
+    pub url: String,
+}
+
+/// One owned outgoing HTTP request header.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct HttpHeader {
+    pub name: String,
+    pub value: String,
+}
+
+impl HttpHeader {
+    pub fn new(name: impl Into<String>, value: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            value: value.into(),
+        }
+    }
+}
+
+/// Copies an HTTP header transform request into owned Rust data.
+///
+/// # Safety
+///
+/// `url` must point to a valid NUL-terminated string for this call.
+pub unsafe fn copy_http_header_transform_request(
+    raw_kind: u32,
+    url: *const c_char,
+) -> Result<HttpHeaderTransformRequest> {
+    // SAFETY: The caller promises url follows the C callback contract.
+    let request_url = unsafe { crate::string::copy_c_string(url) }?;
+    Ok(HttpHeaderTransformRequest {
+        kind: resource_kind_from_raw(raw_kind),
+        raw_kind,
+        url: request_url,
+    })
 }
 
 /// Copies a resource transform callback request into owned Rust data.

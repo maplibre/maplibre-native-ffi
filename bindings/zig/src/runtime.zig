@@ -30,6 +30,7 @@ const RuntimeState = struct {
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     registry: ?*RuntimeRegistry,
     resource_transform: ?*ResourceTransform,
+    http_header_transform: ?*HttpHeaderTransform,
     resource_provider: ?*ResourceProviderState,
     active_leases: std.atomic.Value(usize),
     closing: bool,
@@ -377,6 +378,26 @@ pub const ResourceTransformHandler = *const fn (
 
 pub const ResourceTransform = struct {
     handler: ResourceTransformHandler,
+    context: ?*anyopaque = null,
+};
+
+pub const HttpHeaderTransformRequest = struct {
+    kind: ResourceKind,
+    url: []const u8,
+};
+
+pub const HttpHeader = struct {
+    name: []const u8,
+    value: []const u8,
+};
+
+pub const HttpHeaderTransformHandler = *const fn (
+    context: ?*anyopaque,
+    request: HttpHeaderTransformRequest,
+) []const HttpHeader;
+
+pub const HttpHeaderTransform = struct {
+    handler: HttpHeaderTransformHandler,
     context: ?*anyopaque = null,
 };
 
@@ -1532,6 +1553,39 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         }
     }
 
+    /// Registers, replaces, or clears headers added to built-in HTTP requests.
+    pub fn setHttpHeaderTransform(self: *RuntimeHandle, transform: ?HttpHeaderTransform) status.Error!void {
+        const runtime_lease = try lease(self);
+        defer runtime_lease.release();
+        const runtime_state = runtime_lease.state;
+        if (transform) |value| {
+            const replacement = try std.heap.smp_allocator.create(HttpHeaderTransform);
+            errdefer std.heap.smp_allocator.destroy(replacement);
+            replacement.* = value;
+            var native_transform = c.mln_http_header_transform{
+                .size = @sizeOf(c.mln_http_header_transform),
+                .callback = httpHeaderTransformTrampoline,
+                .user_data = replacement,
+            };
+            try status.checkStatus(
+                c.mln_runtime_set_http_header_transform(runtime_lease.native, &native_transform),
+                runtime_lease.diagnostic_store,
+            );
+            const previous = runtime_state.http_header_transform;
+            runtime_state.http_header_transform = replacement;
+            if (previous) |old| std.heap.smp_allocator.destroy(old);
+            return;
+        }
+        try status.checkStatus(
+            c.mln_runtime_clear_http_header_transform(runtime_lease.native),
+            runtime_lease.diagnostic_store,
+        );
+        if (runtime_state.http_header_transform) |old| {
+            runtime_state.http_header_transform = null;
+            std.heap.smp_allocator.destroy(old);
+        }
+    }
+
     pub fn close(self: *RuntimeHandle) status.Error!void {
         const runtime_close = try beginRuntimeClose(self.*) orelse return;
         status.checkStatus(c.mln_runtime_destroy(runtime_close.native), runtime_close.diagnostic_store) catch |err| {
@@ -1540,6 +1594,10 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         };
         if (runtime_close.state.resource_transform) |old| {
             runtime_close.state.resource_transform = null;
+            std.heap.smp_allocator.destroy(old);
+        }
+        if (runtime_close.state.http_header_transform) |old| {
+            runtime_close.state.http_header_transform = null;
             std.heap.smp_allocator.destroy(old);
         }
         if (runtime_close.state.resource_provider) |old| {
@@ -1580,6 +1638,7 @@ fn createNative(
         .diagnostic_store = diagnostic_store,
         .registry = runtime_registry,
         .resource_transform = null,
+        .http_header_transform = null,
         .resource_provider = null,
         .active_leases = std.atomic.Value(usize).init(0),
         .closing = false,
@@ -1685,6 +1744,37 @@ fn resourceTransformTrampoline(
             replacement_url.ptr,
             replacement_url.len,
         );
+    }
+    return c.MLN_STATUS_OK;
+}
+
+fn httpHeaderTransformTrampoline(
+    user_data: ?*anyopaque,
+    kind: u32,
+    url: [*c]const u8,
+    out_response: [*c]c.mln_http_header_transform_response,
+) callconv(.c) c.mln_status {
+    const transform: *HttpHeaderTransform = @ptrCast(@alignCast(user_data orelse return c.MLN_STATUS_INVALID_ARGUMENT));
+    const native_response = out_response orelse return c.MLN_STATUS_INVALID_ARGUMENT;
+    native_response.*.size = @sizeOf(c.mln_http_header_transform_response);
+    const copied_url = std.heap.smp_allocator.dupe(u8, if (url == null) "" else std.mem.span(url)) catch return c.MLN_STATUS_NATIVE_ERROR;
+    defer std.heap.smp_allocator.free(copied_url);
+    const headers = transform.handler(transform.context, .{
+        .kind = ResourceKind.fromRaw(kind),
+        .url = copied_url,
+    });
+    for (headers, 0..) |header, index| {
+        for (headers[0..index]) |previous| {
+            if (std.ascii.eqlIgnoreCase(previous.name, header.name)) return c.MLN_STATUS_INVALID_ARGUMENT;
+        }
+        const native_status = c.mln_http_header_transform_response_set(
+            native_response,
+            header.name.ptr,
+            header.name.len,
+            header.value.ptr,
+            header.value.len,
+        );
+        if (native_status != c.MLN_STATUS_OK) return native_status;
     }
     return c.MLN_STATUS_OK;
 }

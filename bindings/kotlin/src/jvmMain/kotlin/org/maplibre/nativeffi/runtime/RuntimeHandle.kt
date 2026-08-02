@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.runtime
 
 import java.lang.ref.WeakReference
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.internal.callback.HttpHeaderTransformState
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
@@ -15,6 +16,7 @@ import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
+import org.maplibre.nativeffi.resource.HttpHeaderTransformCallback
 import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
@@ -29,6 +31,7 @@ public actual class RuntimeHandle private constructor(private val handle: Native
 
   private var resourceProviderState: ResourceProviderState? = null
   private var resourceTransformState: ResourceTransformState? = null
+  private var httpHeaderTransformState: HttpHeaderTransformState? = null
   private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
 
   public actual val isClosed: Boolean
@@ -314,6 +317,33 @@ public actual class RuntimeHandle private constructor(private val handle: Native
     releaseCallbackRoot(previous)
   }
 
+  public actual fun setHttpHeaderTransform(callback: HttpHeaderTransformCallback) {
+    NativeAccess.ensureLoaded()
+    httpHeaderTransformState?.checkCanClose()
+    val replacement = HttpHeaderTransformState(callback)
+    try {
+      Status.check(
+        NativeAccess.setHttpHeaderTransform(requireLiveHandle(), replacement.descriptor())
+      )
+    } catch (error: Throwable) {
+      closeAndSuppress(error, replacement)
+      throw error
+    }
+    val previous = httpHeaderTransformState
+    httpHeaderTransformState = replacement
+    HandleLeakCleaner.retainNativeCallbackRoot(replacement)
+    releaseCallbackRoot(previous)
+  }
+
+  public actual fun clearHttpHeaderTransform() {
+    NativeAccess.ensureLoaded()
+    httpHeaderTransformState?.checkCanClose()
+    Status.check(NativeAccess.clearHttpHeaderTransform(requireLiveHandle()))
+    val previous = httpHeaderTransformState
+    httpHeaderTransformState = null
+    releaseCallbackRoot(previous)
+  }
+
   public actual fun pollEvent(): RuntimeEvent? {
     NativeAccess.ensureLoaded()
     return NativeAccess.pollRuntimeEvent(requireLiveHandle())?.toRuntimeEvent()
@@ -322,6 +352,7 @@ public actual class RuntimeHandle private constructor(private val handle: Native
   public actual override fun close() {
     resourceProviderState?.checkCanClose()
     resourceTransformState?.checkCanClose()
+    httpHeaderTransformState?.checkCanClose()
     core.closeOnce(
       destroy = { NativeAccess.destroyRuntime(handle) },
       afterSuccess = {
@@ -329,6 +360,8 @@ public actual class RuntimeHandle private constructor(private val handle: Native
         resourceProviderState = null
         releaseCallbackRoot(resourceTransformState)
         resourceTransformState = null
+        releaseCallbackRoot(httpHeaderTransformState)
+        httpHeaderTransformState = null
         liveMaps.clear()
       },
     )

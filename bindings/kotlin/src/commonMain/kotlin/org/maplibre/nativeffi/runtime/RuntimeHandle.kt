@@ -4,6 +4,7 @@ import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
+import org.maplibre.nativeffi.resource.HttpHeaderTransformCallback
 import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
@@ -120,6 +121,10 @@ public expect class RuntimeHandle : AutoCloseable {
   public fun setResourceTransform(callback: ResourceTransformCallback)
 
   public fun clearResourceTransform()
+
+  public fun setHttpHeaderTransform(callback: HttpHeaderTransformCallback)
+
+  public fun clearHttpHeaderTransform()
 
   /**
    * Removes and returns one queued runtime event, or null when the queue is empty.

@@ -235,6 +235,31 @@ final class ResourceUrlRewriteRule {
   final String replacementUrl;
 }
 
+/// One owned outgoing HTTP request header.
+final class HttpHeader {
+  /// Creates a header name/value pair.
+  const HttpHeader({required this.name, required this.value});
+
+  final String name;
+  final String value;
+}
+
+/// Native-owned route supplying headers for matching transformed URLs.
+final class HttpHeaderTransformRule {
+  /// Creates an exact or prefix route.
+  const HttpHeaderTransformRule({
+    this.kind,
+    required this.url,
+    this.matchPrefix = false,
+    required this.headers,
+  });
+
+  final ResourceKind? kind;
+  final String url;
+  final bool matchPrefix;
+  final List<HttpHeader> headers;
+}
+
 /// Copied resource request delivered to a Dart resource provider.
 final class ResourceRequest {
   /// Creates a copied resource request.

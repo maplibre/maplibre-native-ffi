@@ -11,7 +11,11 @@ import weakref
 
 from . import _native
 from .errors import InvalidArgumentError
-from .resource import ResourceProviderCallback, ResourceTransformCallback
+from .resource import (
+    HttpHeaderTransformCallback,
+    ResourceProviderCallback,
+    ResourceTransformCallback,
+)
 
 
 class NetworkStatus(UnknownIntEnum):
@@ -571,6 +575,24 @@ class RuntimeHandle(NativeHandleMixin):
     def clear_resource_transform(self) -> None:
         """Clear the runtime-scoped network URL transform."""
         self._native.clear_resource_transform()
+
+    def set_http_header_transform(
+        self,
+        callback: HttpHeaderTransformCallback,
+        *,
+        max_pending_callbacks: int = 64,
+    ) -> None:
+        """Install or replace the outgoing HTTP header transform."""
+        from .resource import _adapt_http_header_transform_callback
+
+        self._native.set_http_header_transform(
+            _adapt_http_header_transform_callback(callback),
+            max_pending_callbacks,
+        )
+
+    def clear_http_header_transform(self) -> None:
+        """Clear the outgoing HTTP header transform."""
+        self._native.clear_http_header_transform()
 
     def set_resource_provider(
         self,

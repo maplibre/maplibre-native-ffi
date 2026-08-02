@@ -504,6 +504,61 @@ typedef struct mln_resource_transform {
   void* user_data;
 } mln_resource_transform;
 
+typedef struct mln_http_header_transform_response {
+  uint32_t size;
+  /** C API-managed callback context. Callback implementations leave unchanged.
+   */
+  void* context;
+} mln_http_header_transform_response;
+
+/**
+ * Sets one outgoing HTTP request header for the current transform invocation.
+ *
+ * The function copies name and value before returning. A later call using the
+ * same case-insensitive name replaces the earlier value.
+ *
+ * Returns MLN_STATUS_INVALID_ARGUMENT when response is null, response->size is
+ * too small, a pointer is null with a non-zero size, name is not a valid HTTP
+ * field name, value is not valid UTF-8, value contains a disallowed control
+ * byte, or name identifies a header managed by MapLibre or the platform
+ * transport. A diagnostic for a rejected header names the header but never
+ * includes its value.
+ * Returns MLN_STATUS_INVALID_STATE when called outside an active HTTP header
+ * transform callback.
+ * Returns MLN_STATUS_NATIVE_ERROR when native allocation fails.
+ */
+MLN_API mln_status mln_http_header_transform_response_set(
+  mln_http_header_transform_response* response, const char* name,
+  size_t name_size, const char* value, size_t value_size
+) MLN_NOEXCEPT;
+
+/**
+ * Adds end-to-end headers to one outgoing HTTP request attempt.
+ *
+ * MapLibre invokes the callback synchronously on a worker or network thread
+ * after resource URL transformation and immediately before the platform HTTP
+ * transport starts the attempt. kind is one mln_resource_kind value and url is
+ * the transformed URL that the transport will request.
+ *
+ * The callback and user_data must be thread-safe and remain valid until the
+ * transform is replaced, cleared, or the runtime is destroyed. Those calls
+ * wait for in-flight callbacks before returning. url and out_response are
+ * borrowed for the callback duration. Callback implementations call only
+ * mln_http_header_transform_response_set() and return promptly. A non-OK
+ * result discards every header collected during the invocation and lets the
+ * request proceed unchanged.
+ */
+typedef mln_status (*mln_http_header_transform_callback)(
+  void* user_data, uint32_t kind, const char* url,
+  mln_http_header_transform_response* out_response
+);
+
+typedef struct mln_http_header_transform {
+  uint32_t size;
+  mln_http_header_transform_callback callback;
+  void* user_data;
+} mln_http_header_transform;
+
 typedef struct mln_resource_request {
   uint32_t size;
   /**
@@ -785,6 +840,45 @@ MLN_API mln_status
 mln_runtime_clear_resource_transform(mln_runtime runtime) MLN_NOEXCEPT;
 
 /**
+ * Registers or replaces the runtime-scoped outgoing HTTP header transform.
+ *
+ * The transform applies only to requests that reach the built-in HTTP client,
+ * including online and offline requests and nested network-backed PMTiles
+ * range requests. Cache hits, non-HTTP schemes, and provider-handled requests
+ * do not invoke it. Replacement waits for in-flight callbacks before the old
+ * callback and user_data become unreferenced.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, transform is
+ *   null, transform->size is too small, or callback is null.
+ * - MLN_STATUS_UNSUPPORTED on OpenHarmony, whose platform HTTP client cannot
+ *   prevent transformed headers from following a cross-origin redirect.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
+ *   owner thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_runtime_set_http_header_transform(
+  mln_runtime runtime, const mln_http_header_transform* transform
+) MLN_NOEXCEPT;
+
+/**
+ * Clears the runtime-scoped outgoing HTTP header transform.
+ *
+ * When this call returns, no in-flight request can still invoke the previous
+ * callback and the C API holds no reference to its user_data.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
+ *   owner thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status
+mln_runtime_clear_http_header_transform(mln_runtime runtime) MLN_NOEXCEPT;
+
+/**
  * Starts a MapLibre ambient cache maintenance operation for this runtime.
  *
  * When runtime options omit cache_path, this operates on MapLibre's default
@@ -860,6 +954,9 @@ MLN_API mln_status mln_runtime_offline_operation_discard(
  * on mln_resource_transform_callback keeps that wait short: the callback
  * returns quickly and calls no C API function other than
  * mln_resource_transform_response_set_url().
+ * Registered HTTP header transforms have the same retirement guarantee and
+ * remain valid until every in-flight mln_http_header_transform_callback
+ * returns.
  *
  * A registered resource provider is waited on the same way: this call blocks
  * until every in-flight mln_resource_provider_callback invocation returns,
@@ -870,7 +967,8 @@ MLN_API mln_status mln_runtime_offline_operation_discard(
  *
  * Both waits run with no runtime-internal lock that other runtimes need, so a
  * slow callback delays only this runtime. Do not call this while holding a
- * host lock that a provider or transform callback also acquires; the callback
+ * host lock that a provider, URL transform, or HTTP header transform callback
+ * also acquires; the callback
  * cannot finish, and this call cannot return.
  *
  * Returns:

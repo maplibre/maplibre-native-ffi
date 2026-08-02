@@ -119,6 +119,10 @@ public sealed record ResourceRequest
 
 public sealed record ResourceTransformRequest(ResourceKind Kind, string Url);
 
+public sealed record HttpHeaderTransformRequest(ResourceKind Kind, string Url);
+
+public sealed record HttpHeader(string Name, string Value);
+
 /// <summary>Mutable descriptor used to complete a resource provider request.</summary>
 public sealed class ResourceResponse
 {
@@ -155,3 +159,6 @@ public delegate ResourceProviderDecision ResourceProviderCallback(
     ResourceRequestHandle handle
 );
 public delegate string? ResourceTransformCallback(ResourceTransformRequest request);
+public delegate IReadOnlyList<HttpHeader> HttpHeaderTransformCallback(
+    HttpHeaderTransformRequest request
+);

@@ -15,7 +15,7 @@ use crate::events::{
 };
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::map::MapState;
-use crate::resource::{ResourceProviderState, ResourceTransformState};
+use crate::resource::{HttpHeaderTransformState, ResourceProviderState, ResourceTransformState};
 use crate::{
     Error, ErrorKind, HandleOperationError, OfflineOperationTakeError, ResourceProviderDecision,
     Result,
@@ -35,6 +35,7 @@ pub(crate) struct RuntimeState {
     // drives style-loaded custom geometry cleanup.
     map_states: RefCell<HashMap<MapId, Weak<MapState>>>,
     resource_transform: RefCell<Option<Box<ResourceTransformState>>>,
+    http_header_transform: RefCell<Option<Box<HttpHeaderTransformState>>>,
     resource_provider: RefCell<Option<Box<ResourceProviderState>>>,
 }
 
@@ -49,6 +50,7 @@ impl RuntimeState {
             handle,
             map_states: RefCell::new(HashMap::new()),
             resource_transform: RefCell::new(None),
+            http_header_transform: RefCell::new(None),
             resource_provider: RefCell::new(None),
         })
     }
@@ -66,6 +68,7 @@ impl RuntimeState {
     fn close(&self) -> Result<()> {
         self.handle.close()?;
         self.resource_transform.borrow_mut().take();
+        self.http_header_transform.borrow_mut().take();
         self.resource_provider.borrow_mut().take();
         Ok(())
     }
@@ -158,6 +161,29 @@ impl RuntimeState {
         // callbacks before returning, so dropping Rust callback state below is safe.
         maplibre_core::check(unsafe { sys::mln_runtime_clear_resource_transform(runtime) })?;
         self.resource_transform.borrow_mut().take();
+        Ok(())
+    }
+
+    fn set_http_header_transform<F>(&self, callback: F) -> Result<()>
+    where
+        F: Fn(crate::HttpHeaderTransformRequest) -> Vec<crate::HttpHeader> + Send + Sync + 'static,
+    {
+        let runtime = self.native()?;
+        let replacement = HttpHeaderTransformState::new(callback);
+        let descriptor = replacement.descriptor();
+        // SAFETY: descriptor retains replacement through native registration.
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_set_http_header_transform(runtime, &descriptor)
+        })?;
+        self.http_header_transform.borrow_mut().replace(replacement);
+        Ok(())
+    }
+
+    fn clear_http_header_transform(&self) -> Result<()> {
+        let runtime = self.native()?;
+        // SAFETY: native waits for in-flight callbacks before returning.
+        maplibre_core::check(unsafe { sys::mln_runtime_clear_http_header_transform(runtime) })?;
+        self.http_header_transform.borrow_mut().take();
         Ok(())
     }
 
@@ -568,6 +594,24 @@ impl RuntimeHandle {
     /// so this method can release Rust callback state after a successful clear.
     pub fn clear_resource_transform(&self) -> Result<()> {
         self.inner.clear_resource_transform()
+    }
+
+    /// Installs or replaces the runtime-scoped outgoing HTTP header transform.
+    ///
+    /// Native invokes the closure synchronously on worker or network threads
+    /// after URL transformation. Returned headers are copied before the closure
+    /// returns. Panics, duplicate names, and invalid headers leave the request
+    /// unchanged.
+    pub fn set_http_header_transform<F>(&self, callback: F) -> Result<()>
+    where
+        F: Fn(crate::HttpHeaderTransformRequest) -> Vec<crate::HttpHeader> + Send + Sync + 'static,
+    {
+        self.inner.set_http_header_transform(callback)
+    }
+
+    /// Clears the runtime-scoped outgoing HTTP header transform.
+    pub fn clear_http_header_transform(&self) -> Result<()> {
+        self.inner.clear_http_header_transform()
     }
 
     fn start_operation<T>(
@@ -1032,6 +1076,133 @@ mod tests {
             }
         });
         (base_url, receiver, handle)
+    }
+
+    fn spawn_recording_style_server(
+        request_count: usize,
+    ) -> (
+        String,
+        std::sync::mpsc::Receiver<String>,
+        std::thread::JoinHandle<()>,
+    ) {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let base_url = format!("http://{}", listener.local_addr().unwrap());
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let handle = std::thread::spawn(move || {
+            for _ in 0..request_count {
+                let (mut stream, _) = listener.accept().unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(5)))
+                    .unwrap();
+                let mut bytes = [0; 4096];
+                let count = stream.read(&mut bytes).unwrap();
+                sender
+                    .send(String::from_utf8_lossy(&bytes[..count]).into_owned())
+                    .unwrap();
+                let body = PROVIDER_STYLE_JSON.as_bytes();
+                write!(
+                    stream,
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                )
+                .unwrap();
+                stream.write_all(body).unwrap();
+            }
+        });
+        (base_url, receiver, handle)
+    }
+
+    fn spawn_redirect_style_servers() -> (
+        String,
+        std::sync::mpsc::Receiver<(String, bool)>,
+        Vec<std::thread::JoinHandle<()>>,
+    ) {
+        let origin = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let destination = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let origin_url = format!("http://{}", origin.local_addr().unwrap());
+        let destination_url = format!("http://{}", destination.local_addr().unwrap());
+        let (sender, receiver) = std::sync::mpsc::channel();
+
+        let origin_sender = sender.clone();
+        let origin_destination_url = destination_url.clone();
+        let origin_server = std::thread::spawn(move || {
+            for _ in 0..3 {
+                let (mut stream, _) = origin.accept().unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(5)))
+                    .unwrap();
+                let mut bytes = [0; 4096];
+                let count = stream.read(&mut bytes).unwrap();
+                let request = String::from_utf8_lossy(&bytes[..count]);
+                let path = request
+                    .lines()
+                    .next()
+                    .and_then(|line| line.split_whitespace().nth(1))
+                    .unwrap_or("")
+                    .to_owned();
+                let has_header = request
+                    .lines()
+                    .any(|line| line.eq_ignore_ascii_case("X-Map-Token: secret"));
+                origin_sender.send((path.clone(), has_header)).unwrap();
+
+                if path == "/same-start.json" {
+                    write!(
+                        stream,
+                        "HTTP/1.1 302 Found\r\nLocation: /same-final.json\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    )
+                    .unwrap();
+                } else if path == "/cross-start.json" {
+                    write!(
+                        stream,
+                        "HTTP/1.1 302 Found\r\nLocation: {origin_destination_url}/cross-final.json\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    )
+                    .unwrap();
+                } else {
+                    let body = PROVIDER_STYLE_JSON.as_bytes();
+                    write!(
+                        stream,
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        body.len()
+                    )
+                    .unwrap();
+                    stream.write_all(body).unwrap();
+                }
+            }
+        });
+
+        let destination_server = std::thread::spawn(move || {
+            let (mut stream, _) = destination.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut bytes = [0; 4096];
+            let count = stream.read(&mut bytes).unwrap();
+            let request = String::from_utf8_lossy(&bytes[..count]);
+            let path = request
+                .lines()
+                .next()
+                .and_then(|line| line.split_whitespace().nth(1))
+                .unwrap_or("")
+                .to_owned();
+            let has_header = request
+                .lines()
+                .any(|line| line.eq_ignore_ascii_case("X-Map-Token: secret"));
+            sender.send((path, has_header)).unwrap();
+            let body = PROVIDER_STYLE_JSON.as_bytes();
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            )
+            .unwrap();
+            stream.write_all(body).unwrap();
+        });
+
+        (
+            origin_url,
+            receiver,
+            vec![origin_server, destination_server],
+        )
     }
 
     fn wait_for_operation<T>(
@@ -1989,6 +2160,121 @@ mod tests {
         map.close().unwrap();
         runtime.close().unwrap();
         server.join().unwrap();
+    }
+
+    #[test]
+    // Spec coverage: BND-158 and BND-159.
+    fn http_header_transform_reaches_requests_and_clear_stops_it() {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let (base_url, requests, server) = spawn_recording_style_server(2);
+        runtime
+            .set_http_header_transform(|request| {
+                assert_eq!(request.kind, ResourceKind::Style);
+                vec![crate::HttpHeader::new("X-Map-Token", "secret")]
+            })
+            .unwrap();
+
+        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+        map.set_style_url(&format!("{base_url}/with-header.json"))
+            .unwrap();
+        assert!(wait_for_runtime_event(
+            &runtime,
+            RuntimeEventType::MapStyleLoaded
+        ));
+        let first = requests.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert!(
+            first
+                .lines()
+                .any(|line| line.eq_ignore_ascii_case("X-Map-Token: secret"))
+        );
+
+        runtime.clear_http_header_transform().unwrap();
+        map.set_style_url(&format!("{base_url}/after-clear.json"))
+            .unwrap();
+        assert!(wait_for_runtime_event(
+            &runtime,
+            RuntimeEventType::MapStyleLoaded
+        ));
+        let second = requests.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert!(
+            !second
+                .lines()
+                .any(|line| line.to_ascii_lowercase().starts_with("x-map-token:"))
+        );
+
+        map.close().unwrap();
+        runtime.close().unwrap();
+        server.join().unwrap();
+    }
+
+    #[test]
+    // Spec coverage: BND-158.
+    fn http_header_transform_skips_non_http_urls() {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        runtime.set_resource_transform(|_| None).unwrap();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let callback_calls = Arc::clone(&calls);
+        runtime
+            .set_http_header_transform(move |_| {
+                callback_calls.fetch_add(1, Ordering::SeqCst);
+                Vec::new()
+            })
+            .unwrap();
+        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+
+        map.set_style_url("jar:file:/packaged/style.json").unwrap();
+        let _ = wait_for_map_loading_failure(&runtime);
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    // Spec coverage: BND-159.
+    fn http_header_transform_preserves_same_origin_and_strips_cross_origin_redirects() {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let (origin_url, requests, servers) = spawn_redirect_style_servers();
+        runtime
+            .set_http_header_transform(|_| vec![crate::HttpHeader::new("X-Map-Token", "secret")])
+            .unwrap();
+        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+
+        map.set_style_url(&format!("{origin_url}/same-start.json"))
+            .unwrap();
+        assert!(wait_for_runtime_event(
+            &runtime,
+            RuntimeEventType::MapStyleLoaded
+        ));
+        assert_eq!(
+            requests.recv_timeout(Duration::from_secs(5)).unwrap(),
+            ("/same-start.json".to_owned(), true)
+        );
+        assert_eq!(
+            requests.recv_timeout(Duration::from_secs(5)).unwrap(),
+            ("/same-final.json".to_owned(), true)
+        );
+
+        map.set_style_url(&format!("{origin_url}/cross-start.json"))
+            .unwrap();
+        assert!(wait_for_runtime_event(
+            &runtime,
+            RuntimeEventType::MapStyleLoaded
+        ));
+        assert_eq!(
+            requests.recv_timeout(Duration::from_secs(5)).unwrap(),
+            ("/cross-start.json".to_owned(), true)
+        );
+        assert_eq!(
+            requests.recv_timeout(Duration::from_secs(5)).unwrap(),
+            ("/cross-final.json".to_owned(), false)
+        );
+
+        map.close().unwrap();
+        runtime.close().unwrap();
+        for server in servers {
+            server.join().unwrap();
+        }
     }
 
     #[test]

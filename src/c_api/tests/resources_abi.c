@@ -211,6 +211,16 @@ static mln_status resource_transform_stub(
   return MLN_STATUS_OK;
 }
 
+static mln_status http_header_transform_stub(
+  void* user_data, uint32_t kind, const char* url,
+  mln_http_header_transform_response* out_response
+) {
+  (void)user_data;
+  (void)kind;
+  (void)url;
+  return out_response == NULL ? MLN_STATUS_INVALID_ARGUMENT : MLN_STATUS_OK;
+}
+
 // This verifies null request-handle behavior for release, cancellation, and
 // completion below binding wrappers.
 static void custom_provider_request_handles_reject_raw_null_handles(void) {
@@ -402,6 +412,62 @@ static void resource_transform_rejects_raw_invalid_descriptors(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_runtime_set_resource_transform(runtime, &transform)
+  );
+  mln_test_destroy_runtime(runtime);
+}
+
+static void http_header_transform_rejects_raw_invalid_inputs(void) {
+  static const char invalid_utf8[] = {'b', 'a', 'd', (char)0xFF};
+  mln_runtime runtime = mln_test_create_runtime();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_runtime_clear_http_header_transform(MLN_HANDLE_NULL)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_runtime_set_http_header_transform(runtime, NULL)
+  );
+  mln_http_header_transform transform = {
+    .size = 0, .callback = http_header_transform_stub
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_runtime_set_http_header_transform(runtime, &transform)
+  );
+  transform.size = sizeof(mln_http_header_transform);
+  transform.callback = NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_runtime_set_http_header_transform(runtime, &transform)
+  );
+
+  mln_http_header_transform_response response = {
+    .size = sizeof(mln_http_header_transform_response),
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_STATE,
+    mln_http_header_transform_response_set(&response, "X-Test", 6, "value", 5)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_http_header_transform_response_set(&response, "Bad Name", 8, "value", 5)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_http_header_transform_response_set(
+      &response, "Authorization", 13, "bad\r\nvalue", 10
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_http_header_transform_response_set(
+                                   &response, "Range", 5, "bytes=0-1", 9
+                                 )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_http_header_transform_response_set(
+      &response, "Authorization", 13, invalid_utf8, sizeof(invalid_utf8)
+    )
   );
   mln_test_destroy_runtime(runtime);
 }
@@ -1133,6 +1199,7 @@ void run_resources_abi_tests(void) {
   RUN_TEST(offline_database_merge_rejects_raw_null_path);
   RUN_TEST(offline_take_rejects_mismatched_result_kind);
   RUN_TEST(resource_transform_rejects_raw_invalid_descriptors);
+  RUN_TEST(http_header_transform_rejects_raw_invalid_inputs);
   RUN_TEST(runtime_teardown_leaves_other_runtimes_responsive);
   RUN_TEST(resource_transform_lookup_leaves_other_runtimes_responsive);
   RUN_TEST(resource_provider_rejects_raw_invalid_descriptors);

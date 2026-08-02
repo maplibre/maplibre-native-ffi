@@ -12,8 +12,8 @@ use maplibre_native_sys as sys;
 use crate::Result;
 
 pub use maplibre_core::resource::{
-    ByteRange, ResourceProviderDecision, ResourceRequest, ResourceResponse,
-    ResourceTransformRequest,
+    ByteRange, HttpHeader, HttpHeaderTransformRequest, ResourceProviderDecision, ResourceRequest,
+    ResourceResponse, ResourceTransformRequest,
 };
 
 use maplibre_core::resource::{
@@ -255,6 +255,102 @@ unsafe extern "C" fn resource_transform_trampoline(
     // SAFETY: user_data is installed from ResourceTransformState::descriptor
     // and remains valid until the runtime replaces/clears the transform or is
     // destroyed. The callback state itself is Send + Sync.
+    unsafe { state.as_ref() }.invoke(kind, url, out_response)
+}
+
+type HttpHeaderTransformCallback =
+    dyn Fn(HttpHeaderTransformRequest) -> Vec<HttpHeader> + Send + Sync + 'static;
+
+pub(crate) struct HttpHeaderTransformState {
+    callback: Box<HttpHeaderTransformCallback>,
+}
+
+impl fmt::Debug for HttpHeaderTransformState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HttpHeaderTransformState")
+            .finish_non_exhaustive()
+    }
+}
+
+impl HttpHeaderTransformState {
+    pub(crate) fn new<F>(callback: F) -> Box<Self>
+    where
+        F: Fn(HttpHeaderTransformRequest) -> Vec<HttpHeader> + Send + Sync + 'static,
+    {
+        Box::new(Self {
+            callback: Box::new(callback),
+        })
+    }
+
+    pub(crate) fn descriptor(&self) -> sys::mln_http_header_transform {
+        maplibre_core::resource::http_header_transform_descriptor(
+            Some(http_header_transform_trampoline),
+            ptr::from_ref(self).cast_mut().cast::<c_void>(),
+        )
+    }
+
+    fn invoke(
+        &self,
+        raw_kind: u32,
+        url: *const c_char,
+        out_response: *mut sys::mln_http_header_transform_response,
+    ) -> sys::mln_status {
+        // SAFETY: native supplies writable callback-duration response storage.
+        let status = unsafe {
+            maplibre_core::resource::initialize_http_header_transform_response(out_response)
+        };
+        if status != sys::MLN_STATUS_OK {
+            return status;
+        }
+        // SAFETY: url is borrowed for the callback duration.
+        let request = match unsafe {
+            maplibre_core::resource::copy_http_header_transform_request(raw_kind, url)
+        } {
+            Ok(request) => request,
+            Err(error) => return maplibre_core::resource::status_for_error(&error),
+        };
+        let headers = match catch_unwind(AssertUnwindSafe(|| (self.callback)(request))) {
+            Ok(headers) => headers,
+            Err(_) => return sys::MLN_STATUS_NATIVE_ERROR,
+        };
+
+        let mut names = Vec::<String>::with_capacity(headers.len());
+        for header in headers {
+            if names
+                .iter()
+                .any(|name| name.eq_ignore_ascii_case(&header.name))
+            {
+                return sys::MLN_STATUS_INVALID_ARGUMENT;
+            }
+            names.push(header.name.clone());
+            // SAFETY: native copies both strings during this call.
+            let status = unsafe {
+                sys::mln_http_header_transform_response_set(
+                    out_response,
+                    header.name.as_ptr().cast(),
+                    header.name.len(),
+                    header.value.as_ptr().cast(),
+                    header.value.len(),
+                )
+            };
+            if status != sys::MLN_STATUS_OK {
+                return status;
+            }
+        }
+        sys::MLN_STATUS_OK
+    }
+}
+
+unsafe extern "C" fn http_header_transform_trampoline(
+    user_data: *mut c_void,
+    kind: u32,
+    url: *const c_char,
+    out_response: *mut sys::mln_http_header_transform_response,
+) -> sys::mln_status {
+    let Some(state) = ptr::NonNull::new(user_data.cast::<HttpHeaderTransformState>()) else {
+        return sys::MLN_STATUS_INVALID_ARGUMENT;
+    };
+    // SAFETY: native retains user_data through callback retirement.
     unsafe { state.as_ref() }.invoke(kind, url, out_response)
 }
 

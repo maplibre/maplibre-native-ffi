@@ -60,6 +60,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
     private readonly NativeHandleState<MlnRuntime> state;
     private ResourceProviderState? resourceProviderState;
     private ResourceTransformState? resourceTransformState;
+    private HttpHeaderTransformState? httpHeaderTransformState;
 
     private RuntimeHandle(MlnRuntime handle)
     {
@@ -122,6 +123,30 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 NativeStatus.Check(SetResourceTransformNative(Handle, &descriptor));
                 var previous = resourceTransformState;
                 resourceTransformState = replacement;
+                previous?.Dispose();
+            }
+            catch (Exception error)
+            {
+                DisposeAndSuppress(error, replacement);
+                throw;
+            }
+        }
+    }
+
+    /// <summary>Installs or replaces headers added to built-in HTTP requests.</summary>
+    public void SetHttpHeaderTransform(HttpHeaderTransformCallback callback)
+    {
+        var replacement = new HttpHeaderTransformState(callback);
+        lock (callbackGate)
+        {
+            try
+            {
+                var descriptor = replacement.Descriptor;
+                NativeStatus.Check(
+                    NativeMethods.mln_runtime_set_http_header_transform(Handle, &descriptor)
+                );
+                var previous = httpHeaderTransformState;
+                httpHeaderTransformState = replacement;
                 previous?.Dispose();
             }
             catch (Exception error)
@@ -208,6 +233,18 @@ public sealed unsafe class RuntimeHandle : IDisposable
             NativeStatus.Check(NativeMethods.mln_runtime_clear_resource_transform(Handle));
             var previous = resourceTransformState;
             resourceTransformState = null;
+            previous?.Dispose();
+        }
+    }
+
+    /// <summary>Clears headers added to built-in HTTP requests.</summary>
+    public void ClearHttpHeaderTransform()
+    {
+        lock (callbackGate)
+        {
+            NativeStatus.Check(NativeMethods.mln_runtime_clear_http_header_transform(Handle));
+            var previous = httpHeaderTransformState;
+            httpHeaderTransformState = null;
             previous?.Dispose();
         }
     }
@@ -730,10 +767,13 @@ public sealed unsafe class RuntimeHandle : IDisposable
         {
             var provider = resourceProviderState;
             var transform = resourceTransformState;
+            var headerTransform = httpHeaderTransformState;
             resourceProviderState = null;
             resourceTransformState = null;
+            httpHeaderTransformState = null;
             provider?.Dispose();
             transform?.Dispose();
+            headerTransform?.Dispose();
         }
     }
 

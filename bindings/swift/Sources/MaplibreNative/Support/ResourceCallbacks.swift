@@ -391,6 +391,90 @@ final class NativeResourceTransformState: @unchecked Sendable {
   }
 }
 
+private final class NativeHttpHeaderTransformBox: @unchecked Sendable {
+  private let callback: @Sendable (HttpHeaderTransformRequest) -> [HttpHeader]
+
+  init(_ callback: @escaping @Sendable (HttpHeaderTransformRequest)
+    -> [HttpHeader])
+  {
+    self.callback = callback
+  }
+
+  func invoke(
+    kind: UInt32,
+    url: UnsafePointer<CChar>?,
+    outResponse: UnsafeMutablePointer<mln_http_header_transform_response>?
+  ) -> mln_status {
+    guard let outResponse else { return MLN_STATUS_INVALID_ARGUMENT }
+    outResponse.pointee
+      .size = UInt32(MemoryLayout<mln_http_header_transform_response>.size)
+    guard let url else { return MLN_STATUS_INVALID_ARGUMENT }
+    let headers = callback(HttpHeaderTransformRequest(
+      kind: kind,
+      url: String(cString: url)
+    ))
+    var names = Set<String>()
+    for header in headers {
+      let foldedName = header.name.lowercased()
+      guard names.insert(foldedName).inserted,
+            !header.name.utf8.contains(0), !header.value.utf8.contains(0)
+      else {
+        return MLN_STATUS_INVALID_ARGUMENT
+      }
+      let status = header.name.withCString { name in
+        header.value.withCString { value in
+          mln_http_header_transform_response_set(
+            outResponse,
+            name,
+            header.name.utf8.count,
+            value,
+            header.value.utf8.count
+          )
+        }
+      }
+      guard status == MLN_STATUS_OK else { return status }
+    }
+    return MLN_STATUS_OK
+  }
+}
+
+private func httpHeaderTransformTrampoline(
+  userData: UnsafeMutableRawPointer?,
+  kind: UInt32,
+  url: UnsafePointer<CChar>?,
+  outResponse: UnsafeMutablePointer<mln_http_header_transform_response>?
+) -> mln_status {
+  guard let userData else { return MLN_STATUS_INVALID_ARGUMENT }
+  return Unmanaged<NativeHttpHeaderTransformBox>.fromOpaque(userData)
+    .takeUnretainedValue().invoke(
+      kind: kind,
+      url: url,
+      outResponse: outResponse
+    )
+}
+
+final class NativeHttpHeaderTransformState: @unchecked Sendable {
+  private let retainedBox: Unmanaged<NativeHttpHeaderTransformBox>
+
+  init(_ callback: @escaping @Sendable (HttpHeaderTransformRequest)
+    -> [HttpHeader])
+  {
+    retainedBox = Unmanaged.passRetained(NativeHttpHeaderTransformBox(callback))
+  }
+
+  deinit { retainedBox.release() }
+
+  func withDescriptor<Result>(
+    _ body: (UnsafePointer<mln_http_header_transform>) throws -> Result
+  ) throws -> Result {
+    var transform = mln_http_header_transform()
+    transform.size = UInt32(MemoryLayout<mln_http_header_transform>.size)
+    transform.callback = httpHeaderTransformTrampoline
+    transform.user_data = retainedBox.toOpaque()
+    return try withUnsafePointer(to: &transform, body)
+  }
+}
+
 private final class NativeResourceProviderBox: @unchecked Sendable {
   private let callback: @Sendable (
     NativeResourceRequest,

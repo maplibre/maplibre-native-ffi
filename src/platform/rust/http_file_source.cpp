@@ -4,6 +4,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -20,11 +21,15 @@
 #include <mbgl/util/string.hpp>
 #include <mbgl/util/url.hpp>
 
+#include "maplibre_native_c.h"
+#include "runtime/runtime.hpp"
+
 extern "C" {
 
 struct MlnRustHttpHeader {
   const char* name;
   const char* value;
+  bool sensitive;
 };
 
 struct MlnRustHttpResponse {
@@ -69,6 +74,24 @@ auto hasSuffix(const std::string& value, const std::string& suffix) -> bool {
   return value.ends_with(suffix);
 }
 
+auto isHTTPURL(const std::string& url) -> bool {
+  const auto parsed = mbgl::util::URL{url};
+  const auto scheme =
+    std::string_view{url}.substr(parsed.scheme.first, parsed.scheme.second);
+  auto equalsIgnoringASCIICase = [scheme](std::string_view expected) {
+    if (scheme.size() != expected.size()) return false;
+    for (std::size_t index = 0; index < scheme.size(); ++index) {
+      const auto actual = static_cast<unsigned char>(scheme[index]);
+      const auto lowered = static_cast<char>(
+        actual >= 'A' && actual <= 'Z' ? actual + ('a' - 'A') : actual
+      );
+      if (lowered != expected[index]) return false;
+    }
+    return true;
+  };
+  return equalsIgnoringASCIICase("http") || equalsIgnoringASCIICase("https");
+}
+
 auto isValidMapboxEndpoint(const std::string& url) -> bool {
   const auto parsed = mbgl::util::URL{url};
   const auto host = url.substr(parsed.domain.first, parsed.domain.second);
@@ -96,6 +119,28 @@ auto offlineURL(const mbgl::Resource& resource) -> std::string {
     std::string{separator} + "offline=true"
   );
   return url;
+}
+
+auto resourceKindToAbi(mbgl::Resource::Kind kind) -> std::uint32_t {
+  switch (kind) {
+    case mbgl::Resource::Kind::Style:
+      return MLN_RESOURCE_KIND_STYLE;
+    case mbgl::Resource::Kind::Source:
+      return MLN_RESOURCE_KIND_SOURCE;
+    case mbgl::Resource::Kind::Tile:
+      return MLN_RESOURCE_KIND_TILE;
+    case mbgl::Resource::Kind::Glyphs:
+      return MLN_RESOURCE_KIND_GLYPHS;
+    case mbgl::Resource::Kind::SpriteImage:
+      return MLN_RESOURCE_KIND_SPRITE_IMAGE;
+    case mbgl::Resource::Kind::SpriteJSON:
+      return MLN_RESOURCE_KIND_SPRITE_JSON;
+    case mbgl::Resource::Kind::Image:
+      return MLN_RESOURCE_KIND_IMAGE;
+    case mbgl::Resource::Kind::Unknown:
+    default:
+      return MLN_RESOURCE_KIND_UNKNOWN;
+  }
 }
 
 class RustHttpResponse {
@@ -319,14 +364,17 @@ class HTTPRequestState : public std::enable_shared_from_this<HTTPRequestState> {
 
 class HTTPRequest : public AsyncRequest {
  public:
-  HTTPRequest(const Resource& resource, FileSource::Callback callback)
+  HTTPRequest(
+    const Resource& resource, void* platformContext,
+    FileSource::Callback callback
+  )
       : state(
           std::make_shared<HTTPRequestState>(resource, std::move(callback))
         ) {
     state->startAsyncTask();
 
-    auto headers = makeHeaders(resource);
     auto url = offlineURL(resource);
+    auto headers = makeHeaders(resource, url, platformContext);
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     auto* stateForCallback = new std::shared_ptr<HTTPRequestState>{state};
     handle =
@@ -344,8 +392,9 @@ class HTTPRequest : public AsyncRequest {
   ~HTTPRequest() override { state->cancel(); }
 
  private:
-  static auto makeHeaders(const Resource& resource)
-    -> std::vector<MlnRustHttpHeader> {
+  static auto makeHeaders(
+    const Resource& resource, const std::string& url, void* platformContext
+  ) -> std::vector<MlnRustHttpHeader> {
     header_storage.clear();
     auto headers = std::vector<MlnRustHttpHeader>{};
 
@@ -367,9 +416,24 @@ class HTTPRequest : public AsyncRequest {
 
     header_storage.emplace_back("User-Agent", "MapLibreNative/1.0");
 
+    auto transformed =
+      isHTTPURL(url)
+        ? mln::core::invoke_http_header_transform(
+            platformContext, resourceKindToAbi(resource.kind), url.c_str()
+          )
+        : mln::core::HttpHeaders{};
+    const auto nativeHeaderCount = header_storage.size();
+    header_storage.reserve(header_storage.size() + transformed.size());
+    for (auto& header : transformed) {
+      header_storage.push_back(std::move(header));
+    }
+
     headers.reserve(header_storage.size());
-    for (const auto& [name, value] : header_storage) {
-      headers.push_back({name.c_str(), value.c_str()});
+    for (std::size_t index = 0; index < header_storage.size(); ++index) {
+      const auto& [name, value] = header_storage[index];
+      headers.push_back(
+        {name.c_str(), value.c_str(), index >= nativeHeaderCount}
+      );
     }
 
     return headers;
@@ -402,7 +466,9 @@ HTTPFileSource::~HTTPFileSource() = default;
 
 auto HTTPFileSource::request(const Resource& resource, Callback callback)
   -> std::unique_ptr<AsyncRequest> {
-  return std::make_unique<HTTPRequest>(resource, std::move(callback));
+  return std::make_unique<HTTPRequest>(
+    resource, impl->getResourceOptions().platformContext(), std::move(callback)
+  );
 }
 
 void HTTPFileSource::setResourceOptions(ResourceOptions options) {

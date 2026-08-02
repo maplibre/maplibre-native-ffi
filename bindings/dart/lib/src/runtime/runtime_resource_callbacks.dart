@@ -37,6 +37,99 @@ final class _ResourceTransformState {
   }
 }
 
+final class _HttpHeaderTransformState {
+  _HttpHeaderTransformState(List<HttpHeaderTransformRule> rules) {
+    for (final rule in rules) {
+      _checkNativeCString(rule.url);
+      final names = <String>{};
+      for (final header in rule.headers) {
+        _validateHttpHeader(header);
+        final folded = header.name.toLowerCase();
+        if (!names.add(folded)) {
+          throwInvalidArgument(
+            'HTTP header names must be unique ignoring case: ${header.name}',
+          );
+        }
+      }
+    }
+    pointer = calloc<raw.mln_adapter_http_header_transform_rules>();
+    pointer.ref.count = rules.length;
+    pointer.ref.rules = rules.isEmpty
+        ? nullptr.cast<raw.mln_adapter_http_header_transform_rule>()
+        : calloc<raw.mln_adapter_http_header_transform_rule>(rules.length);
+    for (var ruleIndex = 0; ruleIndex < rules.length; ruleIndex += 1) {
+      final rule = rules[ruleIndex];
+      final nativeRule = pointer.ref.rules[ruleIndex];
+      nativeRule.kind = rule.kind?.rawValue ?? _resourceKindWildcard;
+      nativeRule.flags = rule.matchPrefix
+          ? raw
+                .mln_adapter_http_header_route_flags
+                .MLN_ADAPTER_HTTP_HEADER_ROUTE_MATCH_PREFIX
+                .value
+          : raw
+                .mln_adapter_http_header_route_flags
+                .MLN_ADAPTER_HTTP_HEADER_ROUTE_FLAGS_NONE
+                .value;
+      nativeRule.url = _nativeOwnedCString(rule.url);
+      nativeRule.header_count = rule.headers.length;
+      nativeRule.headers = rule.headers.isEmpty
+          ? nullptr.cast<raw.mln_adapter_http_header>()
+          : calloc<raw.mln_adapter_http_header>(rule.headers.length);
+      for (
+        var headerIndex = 0;
+        headerIndex < rule.headers.length;
+        headerIndex += 1
+      ) {
+        final header = rule.headers[headerIndex];
+        nativeRule.headers[headerIndex].name = _nativeOwnedCString(header.name);
+        nativeRule.headers[headerIndex].value = _nativeOwnedCString(
+          header.value,
+        );
+      }
+    }
+  }
+
+  late final Pointer<raw.mln_adapter_http_header_transform_rules> pointer;
+
+  void close() {
+    final rules = pointer.ref.rules;
+    for (var ruleIndex = 0; ruleIndex < pointer.ref.count; ruleIndex += 1) {
+      final rule = rules[ruleIndex];
+      for (
+        var headerIndex = 0;
+        headerIndex < rule.header_count;
+        headerIndex += 1
+      ) {
+        calloc.free(rule.headers[headerIndex].name);
+        calloc.free(rule.headers[headerIndex].value);
+      }
+      if (rule.headers != nullptr) {
+        calloc.free(rule.headers);
+      }
+      calloc.free(rule.url);
+    }
+    if (rules != nullptr) {
+      calloc.free(rules);
+    }
+    calloc.free(pointer);
+  }
+}
+
+void _validateHttpHeader(HttpHeader header) {
+  _checkNativeCString(header.name);
+  _checkNativeCString(header.value);
+  withNativeArena((arena) {
+    final name = nativeUtf8CString(header.name, arena);
+    final value = nativeUtf8CString(header.value, arena);
+    _check(
+      raw.mln_adapter_http_header_validate(
+        name.pointer.cast<Char>(),
+        value.pointer.cast<Char>(),
+      ),
+    );
+  });
+}
+
 final class _ResourceProviderRulesState {
   _ResourceProviderRulesState(List<ResourceProviderRule> rules) {
     for (final rule in rules) {

@@ -53,6 +53,23 @@ external int mln_resource_transform_response_set_url(
   int url_size,
 );
 
+@ffi.Native<
+  ffi.Int32 Function(
+    ffi.Pointer<mln_http_header_transform_response>,
+    ffi.Pointer<ffi.Char>,
+    ffi.Size,
+    ffi.Pointer<ffi.Char>,
+    ffi.Size,
+  )
+>()
+external int mln_http_header_transform_response_set(
+  ffi.Pointer<mln_http_header_transform_response> response,
+  ffi.Pointer<ffi.Char> name,
+  int name_size,
+  ffi.Pointer<ffi.Char> value,
+  int value_size,
+);
+
 @ffi.Native<mln_runtime_options Function()>()
 external mln_runtime_options mln_runtime_options_default();
 
@@ -110,6 +127,17 @@ external int mln_runtime_set_resource_transform(
 
 @ffi.Native<ffi.Int32 Function(mln_runtime)>()
 external int mln_runtime_clear_resource_transform(int runtime);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_http_header_transform>)
+>()
+external int mln_runtime_set_http_header_transform(
+  int runtime,
+  ffi.Pointer<mln_http_header_transform> transform,
+);
+
+@ffi.Native<ffi.Int32 Function(mln_runtime)>()
+external int mln_runtime_clear_http_header_transform(int runtime);
 
 @ffi.Native<
   ffi.Int32 Function(
@@ -2342,6 +2370,27 @@ external int mln_adapter_resource_transform_rewrite_callback(
 );
 
 @ffi.Native<
+  ffi.Int32 Function(
+    ffi.Pointer<ffi.Void>,
+    ffi.Uint32,
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<mln_http_header_transform_response>,
+  )
+>()
+external int mln_adapter_http_header_transform_callback(
+  ffi.Pointer<ffi.Void> user_data,
+  int kind,
+  ffi.Pointer<ffi.Char> url,
+  ffi.Pointer<mln_http_header_transform_response> out_response,
+);
+
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>)>()
+external int mln_adapter_http_header_validate(
+  ffi.Pointer<ffi.Char> name,
+  ffi.Pointer<ffi.Char> value,
+);
+
+@ffi.Native<
   ffi.Uint32 Function(
     ffi.Pointer<ffi.Void>,
     ffi.Pointer<mln_resource_request>,
@@ -3135,6 +3184,39 @@ final class mln_resource_transform extends ffi.Struct {
   external int size;
 
   external mln_resource_transform_callback callback;
+
+  external ffi.Pointer<ffi.Void> user_data;
+}
+
+final class mln_http_header_transform_response extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  external ffi.Pointer<ffi.Void> context;
+}
+
+typedef mln_http_header_transform_callbackFunction =
+    ffi.Int32 Function(
+      ffi.Pointer<ffi.Void> user_data,
+      ffi.Uint32 kind,
+      ffi.Pointer<ffi.Char> url,
+      ffi.Pointer<mln_http_header_transform_response> out_response,
+    );
+typedef Dartmln_http_header_transform_callbackFunction =
+    int Function(
+      ffi.Pointer<ffi.Void> user_data,
+      int kind,
+      ffi.Pointer<ffi.Char> url,
+      ffi.Pointer<mln_http_header_transform_response> out_response,
+    );
+typedef mln_http_header_transform_callback =
+    ffi.Pointer<ffi.NativeFunction<mln_http_header_transform_callbackFunction>>;
+
+final class mln_http_header_transform extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  external mln_http_header_transform_callback callback;
 
   external ffi.Pointer<ffi.Void> user_data;
 }
@@ -5379,6 +5461,51 @@ final class mln_adapter_resource_rewrite_rule extends ffi.Struct {
 
 final class mln_adapter_resource_rewrite_rules extends ffi.Struct {
   external ffi.Pointer<mln_adapter_resource_rewrite_rule> rules;
+
+  @ffi.Size()
+  external int count;
+}
+
+enum mln_adapter_http_header_route_flags {
+  MLN_ADAPTER_HTTP_HEADER_ROUTE_FLAGS_NONE(0),
+  MLN_ADAPTER_HTTP_HEADER_ROUTE_MATCH_PREFIX(1);
+
+  final int value;
+  const mln_adapter_http_header_route_flags(this.value);
+
+  static mln_adapter_http_header_route_flags fromValue(int value) =>
+      switch (value) {
+        0 => MLN_ADAPTER_HTTP_HEADER_ROUTE_FLAGS_NONE,
+        1 => MLN_ADAPTER_HTTP_HEADER_ROUTE_MATCH_PREFIX,
+        _ => throw ArgumentError(
+          'Unknown value for mln_adapter_http_header_route_flags: $value',
+        ),
+      };
+}
+
+final class mln_adapter_http_header extends ffi.Struct {
+  external ffi.Pointer<ffi.Char> name;
+
+  external ffi.Pointer<ffi.Char> value;
+}
+
+final class mln_adapter_http_header_transform_rule extends ffi.Struct {
+  @ffi.Uint32()
+  external int kind;
+
+  @ffi.Uint32()
+  external int flags;
+
+  external ffi.Pointer<ffi.Char> url;
+
+  external ffi.Pointer<mln_adapter_http_header> headers;
+
+  @ffi.Size()
+  external int header_count;
+}
+
+final class mln_adapter_http_header_transform_rules extends ffi.Struct {
+  external ffi.Pointer<mln_adapter_http_header_transform_rule> rules;
 
   @ffi.Size()
   external int count;

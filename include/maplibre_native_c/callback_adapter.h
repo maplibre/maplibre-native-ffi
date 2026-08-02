@@ -75,6 +75,41 @@ typedef struct mln_adapter_resource_rewrite_rules {
   size_t count;
 } mln_adapter_resource_rewrite_rules;
 
+/** How an HTTP header transform rule compares its URL. */
+typedef enum mln_adapter_http_header_route_flags : uint32_t {
+  MLN_ADAPTER_HTTP_HEADER_ROUTE_FLAGS_NONE = 0U,
+  MLN_ADAPTER_HTTP_HEADER_ROUTE_MATCH_PREFIX = 1U << 0U,
+} mln_adapter_http_header_route_flags;
+
+/** One borrowed header supplied by an HTTP header transform rule. */
+typedef struct mln_adapter_http_header {
+  const char* name;
+  const char* value;
+} mln_adapter_http_header;
+
+/**
+ * One native-owned matching rule for an HTTP header transform.
+ *
+ * kind is one mln_resource_kind value or MLN_ADAPTER_RESOURCE_KIND_ANY. With
+ * no flags, url matches the complete transformed URL. MATCH_PREFIX selects a
+ * literal, case-sensitive prefix comparison. Unknown flags and a null url make
+ * the rule non-matching. The first matching rule supplies its complete header
+ * list. Every pointer is borrowed and must outlive the registration.
+ */
+typedef struct mln_adapter_http_header_transform_rule {
+  uint32_t kind;
+  uint32_t flags;
+  const char* url;
+  const mln_adapter_http_header* headers;
+  size_t header_count;
+} mln_adapter_http_header_transform_rule;
+
+/** A borrowed table of HTTP header transform rules. */
+typedef struct mln_adapter_http_header_transform_rules {
+  const mln_adapter_http_header_transform_rule* rules;
+  size_t count;
+} mln_adapter_http_header_transform_rules;
+
 /**
  * One exact-URL resource provider rule.
  *
@@ -293,6 +328,29 @@ MLN_API void mln_adapter_log_record_destroy(void* record) MLN_NOEXCEPT;
 MLN_API mln_status mln_adapter_resource_transform_rewrite_callback(
   void* user_data, uint32_t kind, const char* url,
   mln_resource_transform_response* out_response
+) MLN_NOEXCEPT;
+
+/**
+ * The mln_http_header_transform_callback implementation for native rules.
+ *
+ * The first rule whose kind and transformed URL match supplies all its headers.
+ * A request with no matching rule proceeds unchanged. The callback returns the
+ * first non-OK status from mln_http_header_transform_response_set().
+ */
+MLN_API mln_status mln_adapter_http_header_transform_callback(
+  void* user_data, uint32_t kind, const char* url,
+  mln_http_header_transform_response* out_response
+) MLN_NOEXCEPT;
+
+/**
+ * Validates one null-terminated HTTP header from an adapter-owned rule table.
+ *
+ * This applies the C API's field-name, UTF-8 field-value, control-byte, and
+ * transport-managed-name rules without requiring an active transform callback.
+ * A diagnostic for a rejected header never includes its value.
+ */
+MLN_API mln_status mln_adapter_http_header_validate(
+  const char* name, const char* value
 ) MLN_NOEXCEPT;
 
 /**

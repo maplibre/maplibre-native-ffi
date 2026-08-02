@@ -95,6 +95,32 @@ auto mln_runtime_clear_resource_transform(mln_runtime runtime) noexcept
   });
 }
 
+auto mln_runtime_set_http_header_transform(
+  mln_runtime runtime, const mln_http_header_transform* transform
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::set_http_header_transform(runtime, transform);
+  });
+}
+
+auto mln_http_header_transform_response_set(
+  mln_http_header_transform_response* response, const char* name,
+  size_t name_size, const char* value, size_t value_size
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::http_header_transform_response_set(
+      response, name, name_size, value, value_size
+    );
+  });
+}
+
+auto mln_runtime_clear_http_header_transform(mln_runtime runtime) noexcept
+  -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::clear_http_header_transform(runtime);
+  });
+}
+
 auto mln_runtime_run_ambient_cache_operation_start(
   mln_runtime runtime, uint32_t operation,
   mln_offline_operation_id* out_operation_id

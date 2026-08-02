@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -229,6 +230,22 @@ auto lease_resource_transform_state(void* platform_context) noexcept
     return nullptr;
   }
   return runtime->resource_transform_state;
+}
+
+auto lease_http_header_transform_state(void* platform_context) noexcept
+  -> std::shared_ptr<mln::core::HttpHeaderTransformState> {
+  if (platform_context == nullptr) {
+    return nullptr;
+  }
+
+  auto& table = mln::core::handle_table<mln::core::RuntimeObject>();
+  const std::scoped_lock registry_lock(table.mutex());
+  const auto* runtime =
+    table.try_resolve_locked(runtime_from_platform_context(platform_context));
+  if (runtime == nullptr) {
+    return nullptr;
+  }
+  return runtime->http_header_transform_state;
 }
 
 // Leases the resource provider registration, matching the transform lookup:
@@ -1089,6 +1106,8 @@ auto create_runtime(
   owned_runtime->offline_operation_state->alive = true;
   owned_runtime->resource_transform_state =
     std::make_shared<ResourceTransformState>();
+  owned_runtime->http_header_transform_state =
+    std::make_shared<HttpHeaderTransformState>();
   owned_runtime->resource_provider_state =
     std::make_shared<ResourceProviderState>();
   auto* published = owned_runtime.get();
@@ -1195,6 +1214,263 @@ auto clear_resource_transform(mln_runtime runtime) -> mln_status {
   }
 
   auto& state = *live->resource_transform_state;
+  const std::unique_lock lock(state.mutex);
+  state.callback = nullptr;
+  state.user_data = nullptr;
+  return MLN_STATUS_OK;
+}
+
+auto set_http_header_transform(
+  mln_runtime runtime, const mln_http_header_transform* transform
+) -> mln_status {
+  RuntimeObject* live = nullptr;
+  const auto status = validate_runtime(runtime, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (transform == nullptr) {
+    set_thread_error("HTTP header transform must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (transform->size < sizeof(mln_http_header_transform)) {
+    set_thread_error("mln_http_header_transform.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (transform->callback == nullptr) {
+    set_thread_error("HTTP header transform callback must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+#if defined(OHOS_PLATFORM)
+  set_thread_error(
+    "HTTP header transforms are unsupported on OpenHarmony because its HTTP "
+    "client cannot prevent transformed headers from crossing origins"
+  );
+  return MLN_STATUS_UNSUPPORTED;
+#endif
+
+  auto& state = *live->http_header_transform_state;
+  const std::unique_lock lock(state.mutex);
+  state.callback = transform->callback;
+  state.user_data = transform->user_data;
+  return MLN_STATUS_OK;
+}
+
+namespace {
+
+auto http_header_names_equal(std::string_view left, std::string_view right)
+  -> bool {
+  const auto ascii_lower = [](unsigned char character) -> unsigned char {
+    return character >= 'A' && character <= 'Z'
+             ? static_cast<unsigned char>(character + ('a' - 'A'))
+             : character;
+  };
+  return std::ranges::equal(
+    left, right, [&](char left_character, char right_character) -> bool {
+      return ascii_lower(static_cast<unsigned char>(left_character)) ==
+             ascii_lower(static_cast<unsigned char>(right_character));
+    }
+  );
+}
+
+auto is_valid_utf8(const char* value, std::size_t size) -> bool {
+  const auto bytes = reinterpret_cast<const unsigned char*>(value);
+  std::size_t index = 0;
+  const auto continuation = [&](std::size_t offset) -> bool {
+    return index + offset < size && bytes[index + offset] >= 0x80U &&
+           bytes[index + offset] <= 0xBFU;
+  };
+  while (index < size) {
+    const auto first = bytes[index];
+    if (first <= 0x7FU) {
+      ++index;
+      continue;
+    }
+    if (first >= 0xC2U && first <= 0xDFU && continuation(1)) {
+      index += 2;
+      continue;
+    }
+    if (
+      first == 0xE0U && index + 2 < size && bytes[index + 1] >= 0xA0U &&
+      bytes[index + 1] <= 0xBFU && continuation(2)
+    ) {
+      index += 3;
+      continue;
+    }
+    if (
+      ((first >= 0xE1U && first <= 0xECU) ||
+       (first >= 0xEEU && first <= 0xEFU)) &&
+      continuation(1) && continuation(2)
+    ) {
+      index += 3;
+      continue;
+    }
+    if (
+      first == 0xEDU && index + 2 < size && bytes[index + 1] >= 0x80U &&
+      bytes[index + 1] <= 0x9FU && continuation(2)
+    ) {
+      index += 3;
+      continue;
+    }
+    if (
+      first == 0xF0U && index + 3 < size && bytes[index + 1] >= 0x90U &&
+      bytes[index + 1] <= 0xBFU && continuation(2) && continuation(3)
+    ) {
+      index += 4;
+      continue;
+    }
+    if (
+      first >= 0xF1U && first <= 0xF3U && continuation(1) && continuation(2) &&
+      continuation(3)
+    ) {
+      index += 4;
+      continue;
+    }
+    if (
+      first == 0xF4U && index + 3 < size && bytes[index + 1] >= 0x80U &&
+      bytes[index + 1] <= 0x8FU && continuation(2) && continuation(3)
+    ) {
+      index += 4;
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
+}  // namespace
+
+auto validate_http_header(
+  const char* name, size_t name_size, const char* value, size_t value_size
+) -> mln_status {
+  if (name == nullptr && name_size != 0) {
+    set_thread_error("HTTP header name must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (value == nullptr && value_size != 0) {
+    set_thread_error("HTTP header value must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto is_field_name_character = [](unsigned char character) -> bool {
+    return (character >= '0' && character <= '9') ||
+           (character >= 'A' && character <= 'Z') ||
+           (character >= 'a' && character <= 'z') || character == '!' ||
+           character == '#' || character == '$' || character == '%' ||
+           character == '&' || character == '\'' || character == '*' ||
+           character == '+' || character == '-' || character == '.' ||
+           character == '^' || character == '_' || character == '`' ||
+           character == '|' || character == '~';
+  };
+  if (
+    name_size == 0 ||
+    !std::all_of(name, name + name_size, [&](char character) -> bool {
+      return is_field_name_character(static_cast<unsigned char>(character));
+    })
+  ) {
+    set_thread_error("HTTP header name is not a valid field name");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  if (
+    value_size != 0 &&
+    !std::all_of(value, value + value_size, [](char character) -> bool {
+      const auto byte = static_cast<unsigned char>(character);
+      return byte == '\t' || (byte >= 0x20U && byte != 0x7FU);
+    })
+  ) {
+    set_thread_error("HTTP header value contains a disallowed control byte");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  if (value_size != 0 && !is_valid_utf8(value, value_size)) {
+    set_thread_error("HTTP header value must be valid UTF-8");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  const auto name_view = std::string_view{name, name_size};
+  constexpr auto ManagedHeaders = std::array<std::string_view, 15>{
+    "Host",
+    "Content-Length",
+    "Transfer-Encoding",
+    "Connection",
+    "Proxy-Connection",
+    "Proxy-Authorization",
+    "Keep-Alive",
+    "TE",
+    "Trailer",
+    "Upgrade",
+    "Range",
+    "If-None-Match",
+    "If-Modified-Since",
+    "Accept-Encoding",
+    "User-Agent",
+  };
+  const auto managed = std::ranges::find_if(
+    ManagedHeaders, [&](std::string_view candidate) -> bool {
+      return http_header_names_equal(name_view, candidate);
+    }
+  );
+  if (managed != ManagedHeaders.end()) {
+    const auto diagnostic =
+      "HTTP header \"" + std::string{name_view} +
+      "\" is managed by MapLibre or the platform transport";
+    set_thread_error(diagnostic.c_str());
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto http_header_transform_response_set(
+  mln_http_header_transform_response* response, const char* name,
+  size_t name_size, const char* value, size_t value_size
+) -> mln_status {
+  if (response == nullptr) {
+    set_thread_error("HTTP header transform response must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (response->size < sizeof(mln_http_header_transform_response)) {
+    set_thread_error("mln_http_header_transform_response.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto validation =
+    validate_http_header(name, name_size, value, value_size);
+  if (validation != MLN_STATUS_OK) {
+    return validation;
+  }
+  const auto name_view = std::string_view{name, name_size};
+
+  auto* const headers = static_cast<HttpHeaders*>(response->context);
+  if (headers == nullptr) {
+    set_thread_error(
+      "HTTP headers can only be set during an HTTP header transform callback"
+    );
+    return MLN_STATUS_INVALID_STATE;
+  }
+
+  auto existing =
+    std::ranges::find_if(*headers, [&](const HttpHeader& header) -> bool {
+      return http_header_names_equal(header.first, name_view);
+    });
+  auto copied = HttpHeader{
+    std::string{name_view},
+    value_size == 0 ? std::string{} : std::string{value, value_size},
+  };
+  if (existing == headers->end()) {
+    headers->push_back(std::move(copied));
+  } else {
+    *existing = std::move(copied);
+  }
+  return MLN_STATUS_OK;
+}
+
+auto clear_http_header_transform(mln_runtime runtime) -> mln_status {
+  RuntimeObject* live = nullptr;
+  const auto status = validate_runtime(runtime, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+
+  auto& state = *live->http_header_transform_state;
   const std::unique_lock lock(state.mutex);
   state.callback = nullptr;
   state.user_data = nullptr;
@@ -2547,6 +2823,13 @@ auto destroy_runtime(mln_runtime runtime) -> mln_status {
     transform_state.user_data = nullptr;
   }
 
+  {
+    auto& transform_state = *owned_runtime->http_header_transform_state;
+    const std::unique_lock transform_lock(transform_state.mutex);
+    transform_state.callback = nullptr;
+    transform_state.user_data = nullptr;
+  }
+
   // A resource provider callback that leased the provider before the erase
   // above holds a shared provider lock, so this wait covers every callback that
   // can still observe the runtime.
@@ -2862,6 +3145,35 @@ auto invoke_resource_transform(
     return status;
   } catch (...) {
     return MLN_STATUS_NATIVE_ERROR;
+  }
+}
+
+auto invoke_http_header_transform(
+  void* platform_context, uint32_t kind, const char* url
+) noexcept -> HttpHeaders {
+  const auto state = lease_http_header_transform_state(platform_context);
+  if (state == nullptr) {
+    return {};
+  }
+
+  const std::shared_lock transform_lock(state->mutex);
+  const auto callback = state->callback;
+  if (callback == nullptr) {
+    return {};
+  }
+
+  auto headers = HttpHeaders{};
+  auto response = mln_http_header_transform_response{
+    .size = sizeof(mln_http_header_transform_response),
+    .context = &headers,
+  };
+  try {
+    if (callback(state->user_data, kind, url, &response) != MLN_STATUS_OK) {
+      return {};
+    }
+    return headers;
+  } catch (...) {
+    return {};
   }
 }
 

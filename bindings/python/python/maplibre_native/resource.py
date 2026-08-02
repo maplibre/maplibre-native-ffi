@@ -147,6 +147,26 @@ class ResourceTransformRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class HttpHeaderTransformRequest:
+    """Copied request passed to an outgoing HTTP header transform."""
+
+    kind: ResourceKind
+    url: str
+
+    @classmethod
+    def _from_native(cls, raw: dict[str, Any]) -> "HttpHeaderTransformRequest":
+        return cls(kind=ResourceKind(raw["kind"]), url=raw["url"])
+
+
+@dataclass(frozen=True, slots=True)
+class HttpHeader:
+    """One owned outgoing HTTP request header."""
+
+    name: str
+    value: str
+
+
+@dataclass(frozen=True, slots=True)
 class ResourceResponse:
     """Response used to complete a handled resource request."""
 
@@ -234,6 +254,7 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
 
 
 ResourceTransformCallback = Callable[[ResourceTransformRequest], str | None]
+HttpHeaderTransformCallback = Callable[[HttpHeaderTransformRequest], list[HttpHeader]]
 ResourceProviderCallback = Callable[
     [ResourceRequest, ResourceRequestHandle], ResourceProviderDecision
 ]
@@ -246,6 +267,18 @@ def _adapt_resource_transform_callback(
 
     def adapted(raw_request: dict[str, Any]) -> str | None:
         return callback(ResourceTransformRequest._from_native(raw_request))
+
+    return adapted
+
+
+def _adapt_http_header_transform_callback(
+    callback: HttpHeaderTransformCallback,
+) -> Callable[[dict[str, Any]], list[dict[str, str]]]:
+    def adapted(raw_request: dict[str, Any]) -> list[dict[str, str]]:
+        return [
+            {"name": header.name, "value": header.value}
+            for header in callback(HttpHeaderTransformRequest._from_native(raw_request))
+        ]
 
     return adapted
 
@@ -274,6 +307,9 @@ def _adapt_resource_provider_callback(
 
 __all__ = [
     "ByteRange",
+    "HttpHeader",
+    "HttpHeaderTransformCallback",
+    "HttpHeaderTransformRequest",
     "ResourceErrorReason",
     "ResourceKind",
     "ResourceLoadingMethod",

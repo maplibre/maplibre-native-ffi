@@ -55,6 +55,11 @@ final class MaplibreNativeCApi {
     generated.mln_adapter_resource_transform_rewrite_callback,
   );
 
+  /// Native adapter callback for routed HTTP header transforms.
+  Pointer<NativeFunction<generated.mln_http_header_transform_callbackFunction>>
+  adapterHttpHeaderTransformCallback() =>
+      Native.addressOf(generated.mln_adapter_http_header_transform_callback);
+
   /// Destroys a copied adapter resource request record.
   void adapterResourceProviderRequestDestroy(Pointer<Void> request) =>
       generated.mln_adapter_resource_provider_request_destroy(request);
