@@ -11,6 +11,7 @@
 "conda:sdl3" = { version = "3.2", os = ["linux"] }
 "core:dart" = "{{vars.dart_version}}"
 "core:dotnet" = "{{vars.dotnet_version}}"
+"core:flutter" = { version = "{{vars.flutter_version}}", os = ["linux/x64", "macos/arm64", "windows/x64"] }
 "core:go" = "{{vars.go_version}}"
 "core:java" = "{{vars.java_version}}"
 "core:swift" = { version = "{{vars.swift_version}}", os = ["linux/x64"] }
