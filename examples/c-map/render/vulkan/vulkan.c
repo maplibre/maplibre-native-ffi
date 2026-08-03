@@ -43,6 +43,8 @@ typedef struct vulkan_compositor {
   vulkan_swapchain swapchain;
   vulkan_pipeline pipeline;
   vulkan_commands commands;
+  viewport current_viewport;
+  bool swapchain_stale;
 } vulkan_compositor;
 
 static void vulkan_compositor_deinit(vulkan_compositor* compositor) {
@@ -78,6 +80,7 @@ static app_error vulkan_compositor_init(
   vulkan_compositor* compositor, SDL_Window* window, viewport current_viewport
 ) {
   *compositor = (vulkan_compositor){};
+  compositor->current_viewport = current_viewport;
   const app_error error =
     vulkan_compositor_create(compositor, window, current_viewport);
   if (error != APP_OK) {
@@ -86,13 +89,29 @@ static app_error vulkan_compositor_init(
   return error;
 }
 
-static app_error vulkan_compositor_resize(
+/// Notes a resized window without touching the swapchain.
+///
+/// The swapchain the window displays stays live until the present that
+/// replaces its content: destroying it here would blank the window for as
+/// long as the map takes to render at the new extent, because the compositor
+/// only presents when a map frame is ready. Presenting through the stale
+/// swapchain scales the old content in the meantime, which is what a resized
+/// native surface shows too.
+static void vulkan_compositor_resize(
   vulkan_compositor* compositor, viewport current_viewport
 ) {
+  compositor->current_viewport = current_viewport;
+  compositor->swapchain_stale = true;
+}
+
+static app_error vulkan_compositor_recreate_swapchain(
+  vulkan_compositor* compositor
+) {
+  vulkan_context_wait_idle(&compositor->context);
   const VkFormat previous_format = compositor->swapchain.format;
   vulkan_swapchain_deinit(&compositor->swapchain, compositor->context.device);
   MAP_TRY(vulkan_swapchain_init(
-    &compositor->swapchain, &compositor->context, current_viewport
+    &compositor->swapchain, &compositor->context, compositor->current_viewport
   ));
 
   if (compositor->swapchain.format != previous_format) {
@@ -130,12 +149,20 @@ static app_error vulkan_compositor_present_image_view(
 
   MAP_TRY(vulkan_compositor_wait_for_frame(compositor));
 
+  // The frame about to present is the first content the resized swapchain
+  // could show, so this is the moment the stale one is replaced.
+  if (compositor->swapchain_stale) {
+    MAP_TRY(vulkan_compositor_recreate_swapchain(compositor));
+    compositor->swapchain_stale = false;
+  }
+
   uint32_t image_index = 0;
   const VkResult acquire = vkAcquireNextImageKHR(
     compositor->context.device, compositor->swapchain.handle, UINT64_MAX,
     compositor->commands.image_available, VK_NULL_HANDLE, &image_index
   );
   if (acquire == VK_ERROR_OUT_OF_DATE_KHR) {
+    compositor->swapchain_stale = true;
     return APP_OK;
   }
   MAP_TRY(expect_vk_or_suboptimal(acquire));
@@ -165,6 +192,7 @@ static app_error vulkan_compositor_present_image_view(
     // Nothing reached the screen. The sampling pass was submitted, so wait it
     // out before the caller releases its frame, and report no present so the
     // render request is set again.
+    compositor->swapchain_stale = true;
     (void)vulkan_compositor_wait_for_frame(compositor);
     return APP_OK;
   }
@@ -485,9 +513,7 @@ static app_error resize_borrowed(
     return APP_ERROR_TEXTURE_RESIZE_FAILED;
   }
   vulkan_context_wait_idle(&target->as.borrowed.compositor.context);
-  MAP_TRY(
-    vulkan_compositor_resize(&target->as.borrowed.compositor, current_viewport)
-  );
+  vulkan_compositor_resize(&target->as.borrowed.compositor, current_viewport);
 
   borrowed_image previous = target->as.borrowed.image;
   borrowed_image replacement;
@@ -526,9 +552,7 @@ app_error render_target_resize(
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
       vulkan_context_wait_idle(&target->as.owned.compositor.context);
       release_pending_frame(target);
-      MAP_TRY(
-        vulkan_compositor_resize(&target->as.owned.compositor, current_viewport)
-      );
+      vulkan_compositor_resize(&target->as.owned.compositor, current_viewport);
       return render_session_resize(&target->session, current_viewport);
     case RENDER_TARGET_MODE_BORROWED_TEXTURE:
       return resize_borrowed(target, current_viewport);
