@@ -36,8 +36,6 @@ Install the platform prerequisites:
   analogous to those listed in `mise.linux.toml`. The Linux presets compile with
   `zig cc`, which mise installs, so the distribution compiler builds only the
   tooling around them; see `cmake/toolchains/zig-linux.cmake`.
-- For Android, install the Android SDK packages pinned in `mise.toml`.
-- For OpenHarmony, install the native component of an API 24 SDK.
 
 On Windows, run these commands from PowerShell:
 
@@ -65,18 +63,31 @@ Mise installs them automatically when a namespaced project task runs, so the
 initial bootstrap stays focused on tools used across the repository. The
 published devcontainer image bakes the complete tool union for fast startup.
 
-Android and OpenHarmony builds require their SDK paths in environment variables.
-Put the absolute paths in the Git-ignored `mise.local.toml` at the repository
-root:
+The bootstrap includes the Android, Emscripten, and OpenHarmony SDKs, because
+`mise.toml` pins them like every other tool. Each exports the paths its CMake
+preset reads, so building for one of those targets needs no further setup.
+
+Together they are several gigabytes. To leave one out, name it in the
+Git-ignored `mise.local.toml` at the repository root:
 
 ```toml
-[env]
-ANDROID_HOME = "/home/you/Android/Sdk"
-OHOS_SDK_NATIVE = "/home/you/HarmonyOS/command-line-tools/sdk/default/openharmony/native"
+[settings]
+disable_tools = ["android-sdk", "emsdk", "ohos-sdk"]
 ```
 
-Mise loads `mise.local.toml` automatically. The Android tool versions are
-environment variables in `mise.toml` and may also be overridden locally.
+To build against an SDK installed elsewhere on the machine, disable the tool and
+give the path mise would have set:
+
+```toml
+[settings]
+disable_tools = ["android-sdk"]
+
+[env]
+ANDROID_HOME = "/home/you/Android/Sdk"
+```
+
+Mise loads `mise.local.toml` automatically. The Android package versions are
+`mise.toml` variables and may be overridden the same way.
 
 Run the headless Zig readback example:
 
@@ -122,17 +133,18 @@ mise run //docs:build
 
 This repository spans native code, language bindings, examples, tests, and
 documentation. Each tool owns the layer where it has the clearest dependency
-model. Platform SDKs such as Xcode, Visual Studio, and the Android SDK are host
-toolchain inputs.
+model. Xcode and Visual Studio are host toolchain inputs.
 
 [`mise`](https://mise.jdx.dev/) is the contributor entrypoint. It pins shared
 and project-specific tools, installs system packages and Git hooks, and runs
 repository tasks. Root configuration owns tools used across the repository;
 bindings, examples, and docs declare additional tools in their own `mise.toml`
-files. CMake presets define native targets and render backends. CMake uses
-platform SDKs and system libraries where available, and acquires pinned native
-libraries that are not available from system package managers. Gradle selects
-CMake presets and packages Android applications.
+files. Root configuration also pins the cross-compilation SDKs, which an
+environment that builds fewer targets narrows with `disable_tools`. CMake
+presets define native targets and render backends. CMake uses platform SDKs and
+system libraries where available, and acquires pinned native libraries that are
+not available from system package managers. Gradle selects CMake presets and
+packages Android applications.
 
 Native installs and CPack archives carry the notices for redistributed
 dependencies under `share/maplibre-native-c/licenses`. CMake collects notice

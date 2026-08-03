@@ -488,6 +488,25 @@ checksum = "sha256:07fb14713c4bc62e2533a2e23a363abfb0e65650681fba0ae4c840e221935
 url = "https://conda.anaconda.org/conda-forge/win-64/vcomp14-14.51.36247-habf1de7_41.conda"
 checksum = "sha256:731e043390c9457299484d39e427221fc868a9249540a498a5a4f6456c7744d1"
 
+[[tools.android-sdk]]
+version = "22.0"
+backend = "vfox:mise-plugins/vfox-android-sdk"
+
+[tools.android-sdk."platforms.linux-arm64"]
+url = "https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip"
+
+[tools.android-sdk."platforms.linux-x64"]
+url = "https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip"
+
+[tools.android-sdk."platforms.macos-arm64"]
+url = "https://dl.google.com/android/repository/commandlinetools-mac_arm64-15859902_latest.zip"
+
+[tools.android-sdk."platforms.windows-arm64"]
+url = "https://dl.google.com/android/repository/commandlinetools-win-15859902_latest.zip"
+
+[tools.android-sdk."platforms.windows-x64"]
+url = "https://dl.google.com/android/repository/commandlinetools-win-15859902_latest.zip"
+
 [[tools."aqua:Kitware/CMake"]]
 version = "4.3.3"
 backend = "aqua:Kitware/CMake"
@@ -1064,6 +1083,25 @@ url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.
 version = "10.0.203"
 backend = "core:dotnet"
 
+[[tools.emsdk]]
+version = "4.0.10"
+backend = "vfox:emsdk"
+
+[tools.emsdk."platforms.linux-arm64"]
+url = "https://github.com/emscripten-core/emsdk/archive/refs/heads/main.tar.gz"
+
+[tools.emsdk."platforms.linux-x64"]
+url = "https://github.com/emscripten-core/emsdk/archive/refs/heads/main.tar.gz"
+
+[tools.emsdk."platforms.macos-arm64"]
+url = "https://github.com/emscripten-core/emsdk/archive/refs/heads/main.tar.gz"
+
+[tools.emsdk."platforms.windows-arm64"]
+url = "https://github.com/emscripten-core/emsdk/archive/refs/heads/main.tar.gz"
+
+[tools.emsdk."platforms.windows-x64"]
+url = "https://github.com/emscripten-core/emsdk/archive/refs/heads/main.tar.gz"
+
 [[tools."github:EmbarkStudios/cargo-about"]]
 version = "0.9.1"
 backend = "github:EmbarkStudios/cargo-about"
@@ -1280,6 +1318,16 @@ url = "https://nodejs.org/dist/v24.11.0/node-v24.11.0-win-arm64.zip"
 [tools.node."platforms.windows-x64"]
 checksum = "sha256:1054540bce22b54ec7e50ebc078ec5d090700a77657607a58f6a64df21f49fdd"
 url = "https://nodejs.org/dist/v24.11.0/node-v24.11.0-win-x64.zip"
+
+[[tools.ohos-sdk]]
+version = "6.1"
+backend = "vfox:ohos-sdk"
+
+[tools.ohos-sdk."platforms.linux-x64"]
+url = "https://repo.huaweicloud.com/openharmony/os/6.1-Release/ohos-sdk-windows_linux-public.tar.gz"
+
+[tools.ohos-sdk."platforms.macos-arm64"]
+url = "https://repo.huaweicloud.com/openharmony/os/6.1-Release/L2-SDK-MAC-M1-PUBLIC.tar.gz"
 
 [[tools.python]]
 version = "3.14.4"

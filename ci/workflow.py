@@ -93,13 +93,9 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
 def native_commands(preset: str, tested: set[str]) -> list[str]:
     target_platform = platform(preset)
     if target_platform == "ohos":
-        return [f"mise run //bindings/rust:build:ohos {preset}"]
-    # The Emscripten toolchain is a task-scoped tool, so Emscripten presets go
-    # through the task that declares it rather than the shared `build` task.
-    if target_platform == "emscripten":
-        return [
-            f"mise run {'test:emscripten' if preset in tested else 'build:emscripten'} {preset}"
-        ]
+        # Builds the C API as a dependency, and the Rust binding is the only
+        # consumer this target has.
+        return [f"mise run //bindings/rust:build {preset}"]
     commands = [f"mise run {'test' if preset in tested else 'build'} {preset}"]
     if target_platform == "linux":
         commands.append(f"mise run check-glibc-floor {preset}")
