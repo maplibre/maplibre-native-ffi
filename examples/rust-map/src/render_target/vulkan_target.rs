@@ -135,9 +135,9 @@ impl RenderTarget {
                 let draw_result = compositor.draw(&frame);
                 let close_result = frame.close().map_err(|error| error.into_error());
                 match (draw_result, close_result) {
-                    (Ok(()), Ok(())) => Ok(true),
+                    (Ok(presented), Ok(())) => Ok(presented),
                     (Err(draw_error), Ok(())) => Err(draw_error),
-                    (Ok(()), Err(close_error)) => Err(close_error),
+                    (Ok(_), Err(close_error)) => Err(close_error),
                     (Err(draw_error), Err(close_error)) => Err(Error::new(
                         draw_error.kind(),
                         draw_error.raw_status(),
@@ -155,8 +155,7 @@ impl RenderTarget {
                 }
                 compositor.draw_image_view(image.view()).map_err(|error| {
                     compositor_error(format!("Vulkan texture compositor draw failed: {error:?}"))
-                })?;
-                Ok(true)
+                })
             }
             Self::Surface { session } => session.render_update(),
         }

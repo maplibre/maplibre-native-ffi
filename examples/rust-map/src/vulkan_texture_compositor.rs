@@ -115,7 +115,7 @@ impl VulkanTextureCompositor {
     pub fn draw(
         &mut self,
         frame: &VulkanOwnedTextureFrameHandle,
-    ) -> maplibre_native_ffi::Result<()> {
+    ) -> maplibre_native_ffi::Result<bool> {
         let metadata = frame.frame()?;
         if metadata.width == 0 || metadata.height == 0 {
             return Err(compositor_error("owned Vulkan frame has an empty extent"));
@@ -195,7 +195,14 @@ impl VulkanTextureCompositor {
         Ok(())
     }
 
-    pub(crate) fn draw_image_view(&mut self, image_view: vk::ImageView) -> Result<(), vk::Result> {
+    /// Samples the image view into the swapchain, reporting whether the frame
+    /// reached the screen. A swapchain the surface has outgrown presents
+    /// nothing, so the caller keeps its redraw pending and draws again once the
+    /// replacement is built.
+    pub(crate) fn draw_image_view(
+        &mut self,
+        image_view: vk::ImageView,
+    ) -> Result<bool, vk::Result> {
         // SAFETY: the fence belongs to this live device.
         unsafe {
             self.device
@@ -222,7 +229,7 @@ impl VulkanTextureCompositor {
                     // The surface outgrew this swapchain, so nothing reaches
                     // the screen until the replacement is built.
                     self.swapchain_stale = true;
-                    return Ok(());
+                    return Ok(false);
                 }
                 Err(error) => return Err(error),
             };
@@ -261,11 +268,11 @@ impl VulkanTextureCompositor {
                     if present_suboptimal {
                         self.swapchain_stale = true;
                     }
-                    Ok(())
+                    Ok(true)
                 }
                 Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
                     self.swapchain_stale = true;
-                    Ok(())
+                    Ok(false)
                 }
                 Err(error) => Err(error),
             }

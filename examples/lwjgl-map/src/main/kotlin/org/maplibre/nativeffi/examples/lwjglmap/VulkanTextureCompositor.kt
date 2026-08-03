@@ -66,8 +66,14 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
     recreateSwapchain()
   }
 
-  fun drawImageView(imageView: Long) {
-    MemoryStack.stackPush().use { stack ->
+  /**
+   * Samples the image view into the swapchain, reporting whether the frame reached the screen.
+   *
+   * A swapchain the surface has outgrown presents nothing, so the caller keeps its redraw pending
+   * and draws again once the replacement is built.
+   */
+  fun drawImageView(imageView: Long): Boolean {
+    return MemoryStack.stackPush().use { stack ->
       check(vkWaitForFences(context.device(), inFlight, true, Long.MAX_VALUE), "vkWaitForFences")
       // The frame about to present is the first content a replacement could show, so this is the
       // moment a stale swapchain is replaced.
@@ -89,7 +95,7 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
         // The surface outgrew this swapchain, so nothing reaches the screen until the replacement
         // is built.
         swapchainStale = true
-        return
+        return@use false
       }
       if (acquire == VK_SUBOPTIMAL_KHR) {
         // Still presentable, but the surface has moved on; replace the swapchain before the next
@@ -666,7 +672,8 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
     check(vkQueueSubmit(context.graphicsQueue(), submitInfo, inFlight), "vkQueueSubmit")
   }
 
-  private fun present(stack: MemoryStack, imageIndex: Int) {
+  /** Presents the acquired image, reporting whether it reached the screen. */
+  private fun present(stack: MemoryStack, imageIndex: Int): Boolean {
     val indices = stack.ints(imageIndex)
     val presentInfo =
       VkPresentInfoKHR.calloc(stack)
@@ -685,6 +692,7 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
       error("vkQueuePresentKHR failed with Vulkan status $status")
     }
     check(vkQueueWaitIdle(context.graphicsQueue()), "vkQueueWaitIdle")
+    return status != VK_ERROR_OUT_OF_DATE_KHR
   }
 
   private fun destroySwapchainDependents() {
