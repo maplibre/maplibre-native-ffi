@@ -9,6 +9,7 @@
 import type { AnimationOptions, CameraOptions } from "./camera.ts";
 import { MapIdentity, NamedValue } from "./events.ts";
 import { HandleState } from "./internal/handle.ts";
+import { stringView, writeJsonValue } from "./internal/json-encode.ts";
 import type { Native } from "./internal/native.ts";
 import { asRawEnum, asUint32 } from "./internal/numbers.ts";
 import {
@@ -24,6 +25,7 @@ import {
   writeCameraOptions,
 } from "./internal/struct.ts";
 import type { Ptr } from "./internal/transport.ts";
+import type { JsonValue } from "./json.ts";
 import { MapProjection } from "./projection.ts";
 import { EP } from "./raw/entrypoints.ts";
 import { MLN_MAP_MODE } from "./raw/enums.ts";
@@ -290,6 +292,98 @@ export class Map {
     return native.scope((scope) => {
       const out = scope.allocateZeroed(1);
       native.checked(scope, EP.mln_map_is_gesture_in_progress, [id, out]);
+      return native.memory.bytes(out, 1)[0] !== 0;
+    });
+  }
+
+  /**
+   * Adds a source to the loaded style.
+   *
+   * The source descriptor is a structured JSON value, because MapLibre holds it
+   * as one: an object member's order and an integer's alternative both matter to
+   * what the style means.
+   */
+  addStyleSource(sourceId: string, source: JsonValue): void {
+    const id = this.#state.use("Map.addStyleSource");
+    const native = this.#state.native;
+    native.scope((scope) => {
+      native.checked(scope, EP.mln_map_add_style_source_json, [
+        id,
+        stringView(native, scope, sourceId),
+        writeJsonValue(native, scope, source),
+      ]);
+    });
+  }
+
+  /** Reports whether the loaded style has this source. */
+  hasStyleSource(sourceId: string): boolean {
+    return this.#styleMemberCheck(
+      "Map.hasStyleSource",
+      EP.mln_map_style_source_exists,
+      sourceId,
+    );
+  }
+
+  /** Removes a source, reporting whether there was one to remove. */
+  removeStyleSource(sourceId: string): boolean {
+    return this.#styleMemberCheck(
+      "Map.removeStyleSource",
+      EP.mln_map_remove_style_source,
+      sourceId,
+    );
+  }
+
+  /**
+   * Adds a layer to the loaded style.
+   *
+   * `beforeLayerId` names the layer this one goes under; omitting it puts the
+   * layer on top.
+   */
+  addStyleLayer(layer: JsonValue, beforeLayerId?: string): void {
+    const id = this.#state.use("Map.addStyleLayer");
+    const native = this.#state.native;
+    native.scope((scope) => {
+      native.checked(scope, EP.mln_map_add_style_layer_json, [
+        id,
+        writeJsonValue(native, scope, layer),
+        stringView(native, scope, beforeLayerId ?? ""),
+      ]);
+    });
+  }
+
+  /** Reports whether the loaded style has this layer. */
+  hasStyleLayer(layerId: string): boolean {
+    return this.#styleMemberCheck(
+      "Map.hasStyleLayer",
+      EP.mln_map_style_layer_exists,
+      layerId,
+    );
+  }
+
+  /** Removes a layer, reporting whether there was one to remove. */
+  removeStyleLayer(layerId: string): boolean {
+    return this.#styleMemberCheck(
+      "Map.removeStyleLayer",
+      EP.mln_map_remove_style_layer,
+      layerId,
+    );
+  }
+
+  /** Runs one of the style entry points that answers with a boolean. */
+  #styleMemberCheck(
+    operation: string,
+    entrypoint: number,
+    memberId: string,
+  ): boolean {
+    const id = this.#state.use(operation);
+    const native = this.#state.native;
+    return native.scope((scope) => {
+      const out = scope.allocateZeroed(1);
+      native.checked(scope, entrypoint, [
+        id,
+        stringView(native, scope, memberId),
+        out,
+      ]);
       return native.memory.bytes(out, 1)[0] !== 0;
     });
   }

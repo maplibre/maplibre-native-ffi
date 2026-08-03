@@ -55,6 +55,20 @@ export {
   NetworkStatus,
   type RenderBackends,
 } from "./maplibre.ts";
+export {
+  jsonArray,
+  jsonBool,
+  jsonDouble,
+  jsonEquals,
+  jsonFrom,
+  jsonInt,
+  type JsonMember,
+  jsonNull,
+  jsonObject,
+  jsonString,
+  jsonUint,
+  type JsonValue,
+} from "./json.ts";
 export { MapProjection } from "./projection.ts";
 export {
   ResourceErrorReason,
