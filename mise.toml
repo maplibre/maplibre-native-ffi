@@ -277,7 +277,9 @@ elif [[ "$usage_preset" == ohos-x64-egl ]]; then
   fixture_dir="$MISE_MONOREPO_ROOT/build/ohos-emulator/c-api-fixtures"
   while IFS= read -r -d '' fixture; do
     relative_path=${fixture#"$fixture_source"/}
-    install -Dm644 "$fixture" "$fixture_dir/$relative_path"
+    destination="$fixture_dir/$relative_path"
+    mkdir -p "$(dirname "$destination")"
+    install -m 644 "$fixture" "$destination"
   done < <(find "$fixture_source" -type f -name '*.mlt' -print0)
   MLN_FFI_TEST_FIXTURE_DIR="$fixture_dir" \
     bash "$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator-test.sh" \

@@ -48,7 +48,7 @@ if [[ "$usage_preset" == ohos-* ]]; then
   sysroot="$OHOS_SDK_NATIVE/sysroot"
   target_flags="--target=$compiler_target --sysroot=$sysroot"
   target_env="${cargo_target//-/_}"
-  target_env_upper="${target_env^^}"
+  target_env_upper=$(printf '%s' "$target_env" | tr '[:lower:]' '[:upper:]')
   export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=$target_flags -I$sysroot/usr/include/$compiler_target"
   export "CC_$target_env=$OHOS_SDK_NATIVE/llvm/bin/clang $target_flags"
   export "CXX_$target_env=$OHOS_SDK_NATIVE/llvm/bin/clang++ $target_flags"
@@ -148,7 +148,19 @@ cargo test --no-run \
   -p maplibre-native-ffi \
   --target "$cargo_target" \
   --message-format=json |
-  jq -r 'select(.reason == "compiler-artifact" and .profile.test and .executable != null) | .executable' \
+  python3 -c '
+import json
+import sys
+
+for line in sys.stdin:
+    message = json.loads(line)
+    if (
+        message.get("reason") == "compiler-artifact"
+        and message.get("profile", {}).get("test")
+        and message.get("executable") is not None
+    ):
+        print(message["executable"])
+' \
     > "$test_manifest"
 cargo clippy \
   -p maplibre-native-ffi-sys \

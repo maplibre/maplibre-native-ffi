@@ -15,7 +15,7 @@ for image in bzImage ramdisk.img updater.img system.img vendor.img userdata.img;
   fi
 done
 if ! command -v "$qemu_bin" >/dev/null 2>&1; then
-  echo "qemu-system-x86_64 is unavailable. Run 'mise bootstrap --yes' first." >&2
+  echo "qemu-system-x86_64 is unavailable. Install QEMU through your system package manager and retry." >&2
   exit 2
 fi
 
