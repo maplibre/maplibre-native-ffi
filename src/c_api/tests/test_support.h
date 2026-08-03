@@ -56,4 +56,11 @@ bool mln_test_pump_until(mln_runtime runtime, atomic_bool* flag);
 // through assertions, which would longjmp out of teardown.
 bool mln_test_reclaim_thread_resources(void);
 
+// Releases the graphics device this thread cached, which a thread has to do
+// before its entry function returns. On the browser WebGPU target a live
+// GPUDevice pins an Emscripten runtime keepalive, and a thread that still holds
+// one is never reported as exited, so pthread_join on it blocks forever. A
+// no-op wherever the backend caches nothing per thread.
+void mln_test_release_thread_gpu_resources(void);
+
 #endif

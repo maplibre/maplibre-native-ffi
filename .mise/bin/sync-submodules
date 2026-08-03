@@ -51,6 +51,52 @@ mlt_vendor_paths=(
   cpp/vendor/fsst # MLT string compression
 )
 
+# Changes we carry against the pinned commit until they land upstream. They are
+# applied to the worktree rather than tracked as a fork, so the submodule keeps
+# pointing at maplibre/maplibre-native. See patches/maplibre-native/README.md.
+mln_patches=(
+  "$repo_root/patches/maplibre-native/0001-configurable-emdawnwebgpu-suspension.patch"
+)
+
+# A patch counts as applied when it reverses cleanly, which is also what makes
+# applying idempotent: a sync that changes nothing leaves the worktree alone.
+mln_patch_applied() {
+  git -C "$mln_path" apply --reverse --check "$1" >/dev/null 2>&1
+}
+
+mln_patches_applied() {
+  local patch
+  for patch in "${mln_patches[@]}"; do
+    mln_patch_applied "$patch" || return 1
+  done
+}
+
+apply_mln_patches() {
+  local patch
+  for patch in "${mln_patches[@]}"; do
+    if ! mln_patch_applied "$patch"; then
+      git -C "$mln_path" apply "$patch"
+    fi
+  done
+}
+
+# `submodule update --checkout` refuses to move a worktree carrying local
+# changes, so anything applied comes back off before the checkout and goes on
+# again after. Only the files a patch touches are restored, so an unrelated
+# local edit is left where it is and fails the checkout as it would have anyway.
+revert_mln_patches() {
+  local patch
+  if [[ ! -e "$mln_path/.git" ]]; then
+    return 0
+  fi
+  for ((index = ${#mln_patches[@]} - 1; index >= 0; index -= 1)); do
+    patch="${mln_patches[index]}"
+    if mln_patch_applied "$patch"; then
+      git -C "$mln_path" apply --reverse "$patch"
+    fi
+  done
+}
+
 # Skipped by design (full MapLibre tree only): googletest, benchmark, cpp-httplib, args,
 # zip-archive, webgpu-cpp, wgpu-native, docs/doxygen, platform/windows/vendor/vcpkg, and
 # other nested .mason / test fixture / glfw submodules under the paths above.
@@ -64,17 +110,22 @@ if [[ "$top_status" == " "* ]]; then
     mlt_status="$(git -C "$mlt_path" submodule status "${mlt_vendor_paths[@]}" 2>/dev/null || true)"
     mlt_count="$(printf '%s\n' "$mlt_status" | sed '/^$/d' | wc -l | tr -d ' ')"
     if [[ "$mlt_count" == "${#mlt_vendor_paths[@]}" ]] &&
-      ! grep -qE '^[+-U]' <<<"$mlt_status"; then
+      ! grep -qE '^[+-U]' <<<"$mlt_status" &&
+      mln_patches_applied; then
       exit 0
     fi
   fi
 fi
+
+revert_mln_patches
 
 git -c submodule.recurse=false submodule sync "$mln_path"
 # .gitmodules marks this submodule `update = none` so that Cargo and SwiftPM
 # skip it when resolving a git dependency on this repository. --checkout is the
 # opt back in for the builds that do need the source.
 git -c submodule.recurse=false submodule update --init --checkout --depth 1 "$mln_path"
+
+apply_mln_patches
 
 git -C "$mln_path" -c submodule.recurse=false submodule sync "${vendor_paths[@]}"
 git -C "$mln_path" -c submodule.recurse=false submodule update --init --depth 1 "${vendor_paths[@]}"

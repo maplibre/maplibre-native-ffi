@@ -58,6 +58,10 @@ EM_JS(void, mln_test_unregister_offscreen_canvas, (const char* name), {
 
 #if defined(MLN_FFI_TEST_BACKEND_WEBGPU)
 #include <webgpu/webgpu.h>
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/emscripten.h>
+#include <emscripten/eventloop.h>
+#endif
 #endif
 
 // Per-thread record of the handles these helpers created. A failing assertion
@@ -275,36 +279,9 @@ uint64_t mln_test_monotonic_milliseconds(void) {
 #endif
 }
 
-// A thread that suspends cannot be joined on the browser WebGPU target, so the
-// harness waits on a flag the entry function sets instead of on thread exit.
-//
-// Requesting a WebGPU adapter or device suspends the calling thread through
-// Asyncify, and emscripten's -sASYNCIFY=1 cannot carry a pthread's entry point
-// across a suspension: invokeEntryPoint() runs its finish() step as soon as the
-// entry returns control, which a suspension does immediately, and skips
-// __emscripten_thread_exit() because Asyncify is holding a runtime keepalive at
-// that moment. When the entry later resumes and really does return, it returns
-// into Asyncify's rewind rather than back into invokeEntryPoint, so nothing
-// ever marks the thread exited and pthread_join blocks forever. Threads that
-// never suspend are unaffected, which is why only this target needs the flag.
-//
-// Waiting on the flag keeps what the tests actually need: once it is set the
-// entry function has returned, and the release/acquire pair publishes
-// everything the entry wrote.
-//
-// TODO(browser-webgpu): JSPI (-sASYNCIFY=2) is the upstream fix -- emscripten
-// awaits the entry point there -- but MapLibre Native pins -sASYNCIFY=1 in
-// vendor/dawn.cmake, so adopting it needs an upstream change first.
-#if defined(__EMSCRIPTEN__) && defined(MLN_FFI_TEST_BACKEND_WEBGPU)
-#define MLN_FFI_TEST_JOIN_ON_FLAG 1
-#endif
-
 struct mln_test_thread {
   void (*entry)(void*);
   void* argument;
-#if defined(MLN_FFI_TEST_JOIN_ON_FLAG)
-  atomic_bool entry_returned;
-#endif
 #if defined(_WIN32)
   HANDLE handle;
 #else
@@ -312,26 +289,21 @@ struct mln_test_thread {
 #endif
 };
 
-static void note_entry_returned(mln_test_thread* thread) {
-#if defined(MLN_FFI_TEST_JOIN_ON_FLAG)
-  atomic_store(&thread->entry_returned, true);
-#else
-  (void)thread;
-#endif
-}
-
+// The release has to happen here rather than in each entry function: a thread
+// that returns still holding its graphics device is not reported as exited on
+// the browser WebGPU target, so every thread the suite starts owes it.
 #if defined(_WIN32)
 static DWORD WINAPI thread_trampoline(LPVOID argument) {
   mln_test_thread* thread = argument;
   thread->entry(thread->argument);
-  note_entry_returned(thread);
+  mln_test_release_thread_gpu_resources();
   return 0;
 }
 #else
 static void* thread_trampoline(void* argument) {
   mln_test_thread* thread = argument;
   thread->entry(thread->argument);
-  note_entry_returned(thread);
+  mln_test_release_thread_gpu_resources();
   return NULL;
 }
 #endif
@@ -341,9 +313,6 @@ mln_test_thread* mln_test_thread_start(void (*entry)(void*), void* argument) {
   TEST_ASSERT_NOT_NULL(thread);
   thread->entry = entry;
   thread->argument = argument;
-#if defined(MLN_FFI_TEST_JOIN_ON_FLAG)
-  atomic_init(&thread->entry_returned, false);
-#endif
 #if defined(_WIN32)
   thread->handle = CreateThread(NULL, 0, thread_trampoline, thread, 0, NULL);
   TEST_ASSERT_NOT_NULL(thread->handle);
@@ -359,17 +328,7 @@ void mln_test_thread_join(mln_test_thread* thread) {
   if (thread == NULL) {
     return;
   }
-#if defined(MLN_FFI_TEST_JOIN_ON_FLAG)
-  // Unbounded on purpose: this stands in for pthread_join, and a test that
-  // never finishes should hit the runner's timeout rather than carry on with a
-  // thread still running. Parking rather than spinning, because the thread
-  // being waited on needs the CPU to make progress.
-  while (!atomic_load(&thread->entry_returned)) {
-    mln_test_sleep_millisecond();
-  }
-  // Detached rather than joined, since nothing will ever report it as exited.
-  pthread_detach(thread->handle);
-#elif defined(_WIN32)
+#if defined(_WIN32)
   WaitForSingleObject(thread->handle, INFINITE);
   CloseHandle(thread->handle);
 #else
@@ -1057,6 +1016,58 @@ static void destroy_backend_state(void* opaque_state) {
   vkDestroyInstance(state->instance, NULL);
   free(state);
 }
+
+#endif
+
+#if defined(MLN_FFI_TEST_BACKEND_WEBGPU)
+
+void mln_test_release_thread_gpu_resources(void) {
+  if (thread_webgpu_state.device != NULL) {
+    // Destroy rather than only release: emdawnwebgpu takes a runtime keepalive
+    // when the device is created and returns it when device.lost settles, which
+    // destroying is what resolves. Releasing alone drops the handle and leaves
+    // the keepalive standing, and on this target a thread holding one is never
+    // reported as exited.
+    wgpuDeviceDestroy(thread_webgpu_state.device);
+    wgpuDeviceRelease(thread_webgpu_state.device);
+  }
+  if (thread_webgpu_state.adapter != NULL) {
+    wgpuAdapterRelease(thread_webgpu_state.adapter);
+  }
+  if (thread_webgpu_state.instance != NULL) {
+    wgpuInstanceRelease(thread_webgpu_state.instance);
+  }
+  thread_webgpu_state = (webgpu_state){0};
+  thread_webgpu_attempted = false;
+#if defined(__EMSCRIPTEN__)
+  // device.lost resolves through the JS job queue, and the keepalive comes back
+  // in its continuation, so the thread has to reach its event loop before the
+  // count settles. emscripten_sleep() suspends and resumes through a task,
+  // which is what lets those jobs run; the ordinary sleep helper blocks the
+  // thread with Atomics.wait instead and would never let them run at all.
+  //
+  // Waiting on the count rather than on a fixed number of yields, because what
+  // matters is that it reached zero: the thread is reported as exited only if
+  // it does, and a thread that is never reported leaves its joiner blocked for
+  // good. Bounded so a keepalive that never comes back fails the run here,
+  // where the cause is named, instead of at the runner's timeout.
+  for (unsigned int attempt = 0;
+       attempt < 1000 && emscripten_runtime_keepalive_check(); attempt += 1) {
+    emscripten_sleep(1);
+  }
+  if (emscripten_runtime_keepalive_check()) {
+    fprintf(
+      stderr,
+      "a runtime keepalive outlived this thread's graphics device; the thread "
+      "will not be reported as exited and joining it will block\n"
+    );
+  }
+#endif
+}
+
+#else
+
+void mln_test_release_thread_gpu_resources(void) {}
 
 #endif
 
