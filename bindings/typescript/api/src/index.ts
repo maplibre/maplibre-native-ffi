@@ -41,10 +41,7 @@ export {
   type ScreenPoint,
   screenPointEquals,
 } from "./geo.ts";
-export {
-  AbiMismatchError,
-  type NodeApiAddon,
-} from "./internal/node-transport.ts";
+export { AbiMismatchError } from "./internal/node-transport.ts";
 export { Map, MapMode, type MapOptions, type MapSize } from "./map.ts";
 export {
   type LogCallbackOptions,
@@ -63,4 +60,5 @@ export {
   Runtime,
   type RuntimeOptions,
   WakeSource,
+  WakeSourceTransfer,
 } from "./runtime.ts";

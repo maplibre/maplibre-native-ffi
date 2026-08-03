@@ -10,6 +10,8 @@ import type { AnimationOptions, CameraOptions } from "./camera.ts";
 import { NamedValue } from "./events.ts";
 import { HandleState } from "./internal/handle.ts";
 import type { Native } from "./internal/native.ts";
+import { asRawEnum, asUint32 } from "./internal/numbers.ts";
+import { attachHandleState, handleStateOf } from "./internal/private.ts";
 import {
   copyOutText,
   readCameraOptions,
@@ -73,10 +75,10 @@ export interface MapSize {
 export class Map {
   readonly #state: HandleState;
 
-  /** @internal */
   private constructor(native: Native, id: bigint, runtime: HandleState) {
     this.#state = new HandleState(native, "Map", id, runtime);
     this.#state.watchForLeaks(this);
+    attachHandleState(this, this.#state);
   }
 
   /** @internal */
@@ -87,13 +89,25 @@ export class Map {
       native.structValue(scope, EP.mln_map_options_default, storage);
       const view = native.memory.view(storage, layout.size);
       const fields = layout.fields;
-      view.setUint32(fields.width!.offset, options.width, true);
-      view.setUint32(fields.height!.offset, options.height, true);
+      view.setUint32(
+        fields.width!.offset,
+        asUint32(options.width, "width"),
+        true,
+      );
+      view.setUint32(
+        fields.height!.offset,
+        asUint32(options.height, "height"),
+        true,
+      );
       if (options.scaleFactor !== undefined) {
         view.setFloat64(fields.scale_factor!.offset, options.scaleFactor, true);
       }
       if (options.mode !== undefined) {
-        view.setUint32(fields.map_mode!.offset, options.mode.rawValue, true);
+        view.setUint32(
+          fields.map_mode!.offset,
+          asRawEnum(options.mode.rawValue, "map mode"),
+          true,
+        );
       }
       if (options.fastPforEnabled !== undefined) {
         view.setUint8(
@@ -103,13 +117,20 @@ export class Map {
       }
       const outMap = scope.allocateZeroed(8);
       native.checked(scope, EP.mln_map_create, [
-        runtime.state.use("Maplibre.createMap"),
+        handleStateOf(runtime).use("Runtime.createMap"),
         storage,
         outMap,
       ]);
       return native.memory.view(outMap, 8).getBigUint64(0, true);
     });
-    return new Map(native, id, runtime.state);
+    try {
+      return new Map(native, id, handleStateOf(runtime));
+    } catch (error) {
+      native.scope((scope) => {
+        native.raw(scope, EP.mln_map_destroy, [id]);
+      });
+      throw error;
+    }
   }
 
   /** The map's logical viewport size and its pixel ratio. */

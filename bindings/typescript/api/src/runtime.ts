@@ -12,6 +12,8 @@ import type { RuntimeEvent } from "./events.ts";
 import { decodeEvent } from "./internal/event-decode.ts";
 import { HandleState } from "./internal/handle.ts";
 import type { Native } from "./internal/native.ts";
+import { asInt64 } from "./internal/numbers.ts";
+import { attachHandleState } from "./internal/private.ts";
 import type { Ptr } from "./internal/transport.ts";
 import { Map, type MapOptions } from "./map.ts";
 import { EP } from "./raw/entrypoints.ts";
@@ -42,10 +44,15 @@ export type PumpTimeout = number | "untilWake";
 export class WakeSource {
   readonly #state: HandleState;
 
-  /** @internal */
-  constructor(native: Native, id: bigint) {
+  private constructor(native: Native, id: bigint) {
     this.#state = new HandleState(native, "WakeSource", id);
     this.#state.watchForLeaks(this);
+    attachHandleState(this, this.#state);
+  }
+
+  /** Builds a wrapper for an id the caller just acquired. */
+  static own(native: Native, id: bigint): WakeSource {
+    return new WakeSource(native, id);
   }
 
   /**
@@ -69,32 +76,38 @@ export class WakeSource {
    * carrier, and this wrapper is closed for further use as soon as the token is
    * issued.
    */
-  transfer(): ArrayBuffer {
+  transfer(): WakeSourceTransfer {
+    const native = this.#state.native;
     const id = this.#state.use("WakeSource.transfer");
-    const token = this.#state.native.transport.transferIssue(id);
+    const token = native.transport.transferIssue(id);
     if (token === 0n) {
       throw new MaplibreError(
         "invalidState",
         "no transfer token was available; a host may hold at most 256 unclaimed transfers",
       );
     }
-    // The wrapper stops being an owner here rather than when the receiver
-    // adopts, so the sending context cannot keep using it in the meantime.
-    this.#state.close(() => {});
-    const carrier = new ArrayBuffer(8);
-    new DataView(carrier).setBigUint64(0, token, true);
-    return carrier;
+    try {
+      // The wrapper stops being an owner here rather than when the receiver
+      // adopts, so the sending context cannot keep using it meanwhile.
+      this.#state.close(() => {});
+    } catch (error) {
+      // Nothing owns the handle if this fails, so the token goes back before
+      // the failure surfaces.
+      native.transport.transferDiscard(token);
+      throw error;
+    }
+    return WakeSourceTransfer.issue(native, token);
   }
 
   /** Adopts a wake source another context transferred. */
-  static adopt(native: Native, carrier: ArrayBuffer): WakeSource {
-    if (carrier.byteLength !== 8) {
-      throw new MaplibreError(
-        "invalidInput",
-        "a wake source carrier is eight bytes",
-      );
-    }
-    const token = new DataView(carrier).getBigUint64(0, true);
+  static adopt(
+    native: Native,
+    carrier: WakeSourceTransfer | ArrayBuffer,
+  ): WakeSource {
+    const token =
+      carrier instanceof WakeSourceTransfer
+        ? carrier.take()
+        : readCarrierToken(carrier);
     const id = native.transport.transferClaim(token);
     if (id === 0n) {
       throw new MaplibreError(
@@ -102,7 +115,16 @@ export class WakeSource {
         "this carrier names no unclaimed transfer, so it was already adopted or discarded",
       );
     }
-    return new WakeSource(native, id);
+    try {
+      return new WakeSource(native, id);
+    } catch (error) {
+      // The claim already consumed the token, so a wrapper that cannot be built
+      // would leave the handle with no owner at all.
+      native.scope((scope) => {
+        native.raw(scope, EP.mln_wake_source_destroy, [id]);
+      });
+      throw error;
+    }
   }
 
   /** Releases the wake source. Closing twice succeeds. */
@@ -119,15 +141,116 @@ export class WakeSource {
   }
 }
 
+/**
+ * A wake source in transit between host contexts.
+ *
+ * The carrier holds a token the native library issued rather than the handle
+ * id, so a host that copies its bytes still cannot produce a second owner. It is
+ * owned: a transfer nobody adopts is discarded rather than leaving the wake
+ * source with no owner, and a carrier the host drops reports the loss.
+ */
+export class WakeSourceTransfer {
+  readonly #native: Native;
+  #token: bigint;
+
+  private constructor(native: Native, token: bigint) {
+    this.#native = native;
+    this.#token = token;
+  }
+
+  /** @internal */
+  static issue(native: Native, token: bigint): WakeSourceTransfer {
+    const transfer = new WakeSourceTransfer(native, token);
+    abandonedTransfers.register(transfer, { native, token }, transfer);
+    return transfer;
+  }
+
+  /** The bytes a host posts to the receiving context. */
+  get bytes(): ArrayBuffer {
+    if (this.#token === 0n) {
+      throw new MaplibreError(
+        "closedHandle",
+        "this transfer was already consumed",
+      );
+    }
+    const carrier = new ArrayBuffer(8);
+    new DataView(carrier).setBigUint64(0, this.#token, true);
+    return carrier;
+  }
+
+  /** @internal Consumes the token, so exactly one adoption can use it. */
+  take(): bigint {
+    const token = this.#token;
+    if (token === 0n) {
+      throw new MaplibreError(
+        "closedHandle",
+        "this transfer was already consumed",
+      );
+    }
+    this.#token = 0n;
+    abandonedTransfers.unregister(this);
+    return token;
+  }
+
+  /**
+   * Cancels a transfer nobody adopted, releasing the wake source.
+   *
+   * A transfer that is never posted, or whose receiver never adopts it, would
+   * otherwise hold the handle with no owner to close it.
+   */
+  discard(): void {
+    if (this.#token === 0n) {
+      return;
+    }
+    const token = this.take();
+    releaseTransferredWakeSource(this.#native, token);
+  }
+}
+
+/** Releases a wake source whose transfer nobody claimed. */
+function releaseTransferredWakeSource(native: Native, token: bigint): void {
+  const id = native.transport.transferDiscard(token);
+  if (id === 0n) {
+    return;
+  }
+  native.scope((scope) => {
+    native.raw(scope, EP.mln_wake_source_destroy, [id]);
+  });
+}
+
+/**
+ * Recovers a transfer the host dropped.
+ *
+ * The handle has no owner at this point, and the wake source is not
+ * thread-affine, so releasing it here is safe where releasing a runtime would
+ * not be.
+ */
+const abandonedTransfers = new FinalizationRegistry<{
+  native: Native;
+  token: bigint;
+}>(({ native, token }) => {
+  releaseTransferredWakeSource(native, token);
+});
+
+function readCarrierToken(carrier: ArrayBuffer): bigint {
+  if (carrier.byteLength !== 8) {
+    throw new MaplibreError(
+      "invalidInput",
+      "a wake source carrier is eight bytes",
+    );
+  }
+  return new DataView(carrier).getBigUint64(0, true);
+}
+
 export class Runtime {
   readonly #state: HandleState;
   readonly #eventStorage: Ptr;
   readonly #hasEventStorage: Ptr;
 
-  /** @internal */
-  constructor(native: Native, id: bigint) {
+  private constructor(native: Native, id: bigint) {
     this.#state = new HandleState(native, "Runtime", id);
     this.#state.watchForLeaks(this);
+    attachHandleState(this, this.#state);
     // Poll storage belongs to the runtime rather than to each call: the C API
     // fills the same shape every time, and a per-call allocation would churn
     // through the allocator for the hottest call in the binding.
@@ -158,7 +281,16 @@ export class Runtime {
       native.checked(scope, EP.mln_runtime_create, [storage, outRuntime]);
       return native.memory.view(outRuntime, 8).getBigUint64(0, true);
     });
-    return new Runtime(native, id);
+    try {
+      return new Runtime(native, id);
+    } catch (error) {
+      // The native handle exists and nothing owns it, so it is released here
+      // rather than left for a leak report that names no wrapper.
+      native.scope((scope) => {
+        native.raw(scope, EP.mln_runtime_destroy, [id]);
+      });
+      throw error;
+    }
   }
 
   /**
@@ -177,7 +309,9 @@ export class Runtime {
     }
     const id = this.#state.use("Runtime.pump");
     const milliseconds =
-      timeout === "untilWake" ? -1n : BigInt(Math.trunc(timeout));
+      timeout === "untilWake"
+        ? -1n
+        : asInt64(BigInt(Math.trunc(timeout)), "pump timeout");
     this.#state.native.scope((scope) => {
       this.#state.native.checked(scope, EP.mln_runtime_pump, [
         id,
@@ -232,7 +366,7 @@ export class Runtime {
       ]);
       return native.memory.view(outSource, 8).getBigUint64(0, true);
     });
-    return new WakeSource(native, source);
+    return WakeSource.own(native, source);
   }
 
   /** Releases the runtime. Closing twice succeeds. */
@@ -254,10 +388,5 @@ export class Runtime {
 
   get isClosed(): boolean {
     return this.#state.isClosed;
-  }
-
-  /** @internal The state child handles retain. */
-  get state(): HandleState {
-    return this.#state;
   }
 }

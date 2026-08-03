@@ -49,8 +49,8 @@ export interface AnimationOptions {
   /**
    * Identifies the transition, so the event that reports its end names it.
    *
-   * A caller that never sets one still gets the event; it just carries the id
-   * MapLibre chose.
+   * Set one to receive the transition-finished event; a transition without an
+   * id reports no terminal event.
    */
   readonly transitionId?: bigint;
 }

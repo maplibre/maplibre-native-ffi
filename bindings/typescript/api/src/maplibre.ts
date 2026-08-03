@@ -14,6 +14,8 @@ import {
   type NodeApiAddon,
   nodeApiTransport,
 } from "./internal/node-transport.ts";
+import { asRawEnum } from "./internal/numbers.ts";
+import { attachNative } from "./internal/private.ts";
 import type { Ptr, Transport } from "./internal/transport.ts";
 import {
   LogEvent,
@@ -23,7 +25,12 @@ import {
 } from "./logging.ts";
 import { EP } from "./raw/entrypoints.ts";
 import { MLN_NETWORK_STATUS, MLN_RENDER_BACKEND_FLAG } from "./raw/enums.ts";
-import { Runtime, type RuntimeOptions, WakeSource } from "./runtime.ts";
+import {
+  Runtime,
+  type RuntimeOptions,
+  WakeSource,
+  WakeSourceTransfer,
+} from "./runtime.ts";
 
 /** Whether MapLibre may start network requests. */
 export class NetworkStatus extends NamedValue {
@@ -74,6 +81,7 @@ export class Maplibre {
 
   private constructor(native: Native) {
     this.#native = native;
+    attachNative(this, native);
     this.#callbacks = new CallbackRegistry(native);
     // Records arrive on MapLibre's threads and wait until this context can run
     // them. The signal is installed once and drains everything queued.
@@ -194,7 +202,9 @@ export class Maplibre {
 
   /** @internal Wraps a transport a test or another loader built. */
   static fromTransport(transport: Transport): Maplibre {
-    return new Maplibre(new Native(transport));
+    const native = new Native(transport);
+    checkAbiVersion(native);
+    return new Maplibre(native);
   }
 
   /** The C ABI contract version this library reports. */
@@ -239,7 +249,7 @@ export class Maplibre {
   setNetworkStatus(status: NetworkStatus): void {
     this.#native.scope((scope) => {
       this.#native.checked(scope, EP.mln_network_status_set, [
-        BigInt(status.rawValue),
+        BigInt(asRawEnum(status.rawValue, "network status")),
       ]);
     });
   }
@@ -254,7 +264,7 @@ export class Maplibre {
   }
 
   /** Adopts a wake source another host context transferred. */
-  adoptWakeSource(carrier: ArrayBuffer): WakeSource {
+  adoptWakeSource(carrier: WakeSourceTransfer | ArrayBuffer): WakeSource {
     return WakeSource.adopt(this.#native, carrier);
   }
 
@@ -274,10 +284,27 @@ export class Maplibre {
       return this.#native.transport.readForeignCString(pointer) ?? "";
     });
   }
+}
 
-  /** @internal */
-  get native(): Native {
-    return this.#native;
+/**
+ * The C ABI contract version this binding was generated against.
+ *
+ * The value is zero while the ABI is unstable and increments on each SemVer
+ * major release, so a payload reporting another one describes a library this
+ * package cannot call.
+ */
+const EXPECTED_C_VERSION = 0;
+
+function checkAbiVersion(native: Native): void {
+  const reported = native.scope((scope) =>
+    Number(native.raw(scope, EP.mln_c_version, []) & 0xffff_ffffn),
+  );
+  if (reported !== EXPECTED_C_VERSION) {
+    throw new MaplibreError(
+      "abiMismatch",
+      `the installed runtime reports C ABI version ${reported}, and this package ` +
+        `was built against ${EXPECTED_C_VERSION}`,
+    );
   }
 }
 

@@ -16,6 +16,7 @@ import {
 } from "../raw/enums.ts";
 import type { Scope } from "./memory.ts";
 import type { Native } from "./native.ts";
+import { asUint64 } from "./numbers.ts";
 import type { Ptr } from "./transport.ts";
 
 /** Writes an `mln_camera_options` a camera command reads. */
@@ -154,7 +155,7 @@ export function writeAnimationOptions(
   if (animation.transitionId !== undefined) {
     view.setBigUint64(
       fields.transition_id!.offset,
-      animation.transitionId,
+      asUint64(animation.transitionId, "transitionId"),
       true,
     );
     mask |= MLN_ANIMATION_OPTION_FIELD.MLN_ANIMATION_OPTION_TRANSITION_ID;
