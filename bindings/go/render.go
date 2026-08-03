@@ -893,9 +893,8 @@ func (session *RenderSessionHandle) setTarget(call func(nativeRenderSession) int
 // calls re-render it and report true again; use this to redraw on demand
 // after resize or surface expose, and gate frame loops on
 // render-update-available events instead of the return value. It reports
-// false when no frame was rendered, because the map has not published an
-// update yet or the renderer skipped the frame; both are normal during
-// startup, so keep pumping the runtime until an update is reported.
+// false when no frame was rendered. That is a normal transient: call again
+// on the next frame rather than wait for another render-update event.
 func (session *RenderSessionHandle) RenderUpdate() (bool, error) {
 	ptr, release, err := session.ptr()
 	if err != nil {
