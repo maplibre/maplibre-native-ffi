@@ -11,8 +11,8 @@ interop or the popular MapLibre Android/iOS SDKs.
   (Vulkan, Metal, OpenGL) and the Zig test support shim.
 - `bindings/` — Language bindings (Kotlin, Rust, Swift, Zig, .NET, Python, Go,
   Dart) that wrap the C API in idiomatic target-language interfaces.
-- `examples/` — Small demo apps per language/backend (`zig-map`, `rust-map`,
-  `zig-readback`, `lwjgl-map`, `swift-map`).
+- `examples/` — Small demo apps per language/backend (`c-map`, `zig-map`,
+  `rust-map`, `zig-readback`, `lwjgl-map`, `swift-map`).
 - `third_party/` — Vendored dependencies, primarily the MapLibre Native git
   submodule.
 - `docs/` — Astro/Starlight documentation site and generated API reference.

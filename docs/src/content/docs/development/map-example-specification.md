@@ -25,6 +25,7 @@ Implement a mobile example by reading Shared baseline and Mobile profile.
 
 | Example                | Profile | Binding    | Toolkit         | Platforms             | Backends              |
 | ---------------------- | ------- | ---------- | --------------- | --------------------- | --------------------- |
+| `examples/c-map`       | Desktop | C          | SDL3            | Linux                 | Vulkan, OpenGL        |
 | `examples/zig-map`     | Desktop | Zig        | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
 | `examples/go-map`      | Desktop | Go         | SDL3            | Linux                 | OpenGL                |
 | `examples/rust-map`    | Desktop | Rust       | winit           | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
@@ -186,6 +187,7 @@ the only thread that makes it current.
 
 | Example       | Render loop thread                                 | Runtime loop thread |
 | ------------- | -------------------------------------------------- | ------------------- |
+| `c-map`       | process main thread (SDL window, graphics context) | spawned thread      |
 | `zig-map`     | process main thread (SDL window, graphics context) | spawned thread      |
 | `go-map`      | process main thread (SDL window, graphics context) | pinned goroutine    |
 | `rust-map`    | winit event-loop thread                            | spawned thread      |
