@@ -34,6 +34,8 @@ native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
 cargo build -p mln-ts-addon
 bindings/typescript/scripts/stage-runtime.sh "$usage_preset"
+# One TypeScript source, published as both module formats.
+pnpm --filter @maplibre/native-ffi run build
 '''
 
 [tasks.test]

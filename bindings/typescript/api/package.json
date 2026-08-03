@@ -12,19 +12,22 @@
   },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
     }
   },
   "files": ["dist"],
   "scripts": {
     "build": "vp pack src/index.ts --format esm --format cjs",
-    "test": "vp test run"
+    "test": "vitest run"
   },
   "devDependencies": {
     "@maplibre/native-ffi-runtime-node": "workspace:*",
     "@types/node": "^24.10.1",
     "vitest": "^4.1.10"
-  }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts"
 }
