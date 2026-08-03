@@ -115,6 +115,12 @@ String _clangExecutable() {
     if (normalized.contains('/mise/shims/')) {
       continue;
     }
+    // The Emscripten SDK ships a clang whose builtin headers expect its own
+    // sysroot, so parsing host headers with it fails on <stdint.h>. The
+    // repository's bootstrap installs that SDK, so it is often on PATH.
+    if (normalized.contains('/emsdk/')) {
+      continue;
+    }
     // Resource-directory discovery needs the compiler itself: an inactive
     // mise shim or ccache wrapper resolves another command through PATH.
     final resolved = candidate.resolveSymbolicLinksSync().replaceAll('\\', '/');

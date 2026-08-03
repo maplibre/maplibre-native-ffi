@@ -178,8 +178,15 @@ typedef struct mln_adapter_queued_resource_provider_route {
  * The listener returns void and may be invoked from any MapLibre thread. It
  * takes ownership of the record and releases it with
  * mln_adapter_resource_provider_request_destroy() once the host has read it.
+ *
+ * listener_data is the registration's own listener_data, borrowed. A host whose
+ * listener is one C function for every registration needs it to tell them
+ * apart, because a retirement arrives as a null request and a replacement's
+ * deliveries can overlap the old registration's.
  */
-typedef void (*mln_adapter_queued_resource_request_listener)(void* request);
+typedef void (*mln_adapter_queued_resource_request_listener)(
+  void* listener_data, void* request
+);
 
 /**
  * A provider that hands matching requests to a host listener.
@@ -191,6 +198,8 @@ typedef struct mln_adapter_queued_resource_provider {
   const mln_adapter_queued_resource_provider_route* routes;
   size_t route_count;
   mln_adapter_queued_resource_request_listener listener;
+  /** Passed to every listener invocation. Borrowed; may be null. */
+  void* listener_data;
 } mln_adapter_queued_resource_provider;
 
 /**
@@ -238,8 +247,15 @@ typedef struct mln_adapter_queued_resource_request {
  * The listener returns void and may be invoked from any MapLibre logging or
  * worker thread. It takes ownership of the record and releases it with
  * mln_adapter_log_record_destroy() once the host has read it.
+ *
+ * listener_data is the registration's own listener_data, borrowed. A retirement
+ * arrives as a null record and can be delivered after a replacement is already
+ * installed, so a host whose listener is one C function for every registration
+ * needs it to know which registration retired.
  */
-typedef void (*mln_adapter_log_record_listener)(void* record);
+typedef void (*mln_adapter_log_record_listener)(
+  void* listener_data, void* record
+);
 
 /**
  * Registration state for an adapted log callback.
@@ -252,6 +268,8 @@ typedef void (*mln_adapter_log_record_listener)(void* record);
 typedef struct mln_adapter_log_callback_state {
   mln_adapter_log_record_listener listener;
   uint32_t consume;
+  /** Passed to every listener invocation. Borrowed; may be null. */
+  void* listener_data;
 } mln_adapter_log_callback_state;
 
 /**

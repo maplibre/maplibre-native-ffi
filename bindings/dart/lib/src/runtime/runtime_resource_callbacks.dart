@@ -198,7 +198,7 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
     callback =
         NativeCallable<
           raw.mln_adapter_queued_resource_request_listenerFunction
-        >.listener((Pointer<Void> request) {
+        >.listener((Pointer<Void> listenerData, Pointer<Void> request) {
           if (request == nullptr) {
             close();
             return;

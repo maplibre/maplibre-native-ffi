@@ -30,9 +30,15 @@ static size_t queued_requests;
 static bool last_requested_url_null;
 static bool last_requested_url_empty;
 
-static void count_queued_request(void* request) {
+// The listener context this registration passes, so a delivery proves the
+// adapter hands back the registration's own pointer rather than any other.
+static int listener_context;
+static const void* last_listener_data;
+
+static void count_queued_request(void* listener_data, void* request) {
   const mln_adapter_queued_resource_request* record = request;
   queued_requests += 1;
+  last_listener_data = listener_data;
   last_requested_url_null = record->requested_url == NULL;
   last_requested_url_empty =
     !last_requested_url_null && record->requested_url[0] == '\0';
@@ -62,6 +68,7 @@ static uint32_t route_decision(
     .routes = &route,
     .route_count = 1,
     .listener = count_queued_request,
+    .listener_data = &listener_context,
   };
   return mln_adapter_queued_resource_provider_callback(
     &provider, request, unissued_handle
@@ -77,6 +84,9 @@ static void assert_claims(
     MLN_RESOURCE_PROVIDER_DECISION_HANDLE, route_decision(route, request)
   );
   TEST_ASSERT_EQUAL_size_t(before + 1, queued_requests);
+  // The listener is one C function for every registration, so the delivery has
+  // to name which registration it belongs to.
+  TEST_ASSERT_EQUAL_PTR(&listener_context, last_listener_data);
 }
 
 static void assert_passes_through(

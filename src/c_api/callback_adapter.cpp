@@ -61,6 +61,7 @@ struct AdapterLogRecord {
 
 struct AdapterLogCallbackEntry {
   mln_adapter_log_record_listener listener = nullptr;
+  void* listener_data = nullptr;
   std::uint32_t consume = 0;
   std::size_t in_flight = 0;
   bool retired = false;
@@ -240,12 +241,14 @@ void destroy_log_record(AdapterLogRecordView* record) noexcept {
   static_cast<void>(std::unique_ptr<AdapterLogRecord>{owner});
 }
 
-void queue_log_retirement(mln_adapter_log_record_listener listener) noexcept {
+void queue_log_retirement(
+  mln_adapter_log_record_listener listener, void* listener_data
+) noexcept {
   if (listener == nullptr) {
     return;
   }
   try {
-    listener(nullptr);
+    listener(listener_data, nullptr);
   } catch (...) {
     // The callback has already been removed from native dispatch. Listener
     // delivery is notification-only at this boundary.
@@ -306,6 +309,7 @@ extern "C" MLN_API auto mln_adapter_log_callback(
     return 0;
   }
   mln_adapter_log_record_listener listener = nullptr;
+  void* listener_data = nullptr;
   std::uint32_t consume = 0;
   {
     const auto lock = std::scoped_lock{log_state_mutex};
@@ -314,17 +318,19 @@ extern "C" MLN_API auto mln_adapter_log_callback(
       return 0;
     }
     listener = iterator->second.listener;
+    listener_data = iterator->second.listener_data;
     consume = iterator->second.consume;
     ++iterator->second.in_flight;
   }
   if (listener != nullptr) {
     try {
-      listener(copy_log_record(severity, event, code, message));
+      listener(listener_data, copy_log_record(severity, event, code, message));
     } catch (...) {
       // Logging callbacks are notification-only at the host boundary.
     }
   }
   mln_adapter_log_record_listener retirement_listener = nullptr;
+  void* retirement_data = nullptr;
   {
     const auto lock = std::scoped_lock{log_state_mutex};
     const auto iterator = log_callbacks.find(user_data);
@@ -332,11 +338,12 @@ extern "C" MLN_API auto mln_adapter_log_callback(
       --iterator->second.in_flight;
       if (iterator->second.retired && iterator->second.in_flight == 0) {
         retirement_listener = iterator->second.listener;
+        retirement_data = iterator->second.listener_data;
         log_callbacks.erase(iterator);
       }
     }
   }
-  queue_log_retirement(retirement_listener);
+  queue_log_retirement(retirement_listener, retirement_data);
   return consume;
 }
 
@@ -348,6 +355,7 @@ extern "C" MLN_API auto mln_adapter_log_set_callback(
     const auto state_lock = std::scoped_lock{log_state_mutex};
     log_callbacks[state] = AdapterLogCallbackEntry{
       .listener = state->listener,
+      .listener_data = state->listener_data,
       .consume = state->consume,
     };
   }
@@ -362,6 +370,7 @@ extern "C" MLN_API auto mln_adapter_log_set_callback(
     return status;
   }
   mln_adapter_log_record_listener retirement_listener = nullptr;
+  void* retirement_data = nullptr;
   {
     const auto state_lock = std::scoped_lock{log_state_mutex};
     auto* retired_state = active_log_callback;
@@ -372,12 +381,13 @@ extern "C" MLN_API auto mln_adapter_log_set_callback(
         iterator->second.retired = true;
         if (iterator->second.in_flight == 0) {
           retirement_listener = iterator->second.listener;
+          retirement_data = iterator->second.listener_data;
           log_callbacks.erase(iterator);
         }
       }
     }
   }
-  queue_log_retirement(retirement_listener);
+  queue_log_retirement(retirement_listener, retirement_data);
   return MLN_STATUS_OK;
 }
 
@@ -509,7 +519,7 @@ extern "C" MLN_API auto mln_adapter_queued_resource_provider_callback(
 
   try {
     auto* queued_request = copy_request(*request, handle);
-    provider.listener(queued_request);
+    provider.listener(provider.listener_data, queued_request);
     return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
   } catch (...) {
     auto response = mln_resource_response{
@@ -546,7 +556,7 @@ extern "C" MLN_API void mln_adapter_queued_resource_provider_retire(
   mln_adapter_queued_resource_provider* provider
 ) noexcept {
   if (provider != nullptr && provider->listener != nullptr) {
-    provider->listener(nullptr);
+    provider->listener(provider->listener_data, nullptr);
   }
 }
 

@@ -16,6 +16,10 @@ final class _LogCallbackState extends RetainedCallbackState {
   _LogCallbackState(LogCallback callback, {required bool consume}) {
     listener =
         NativeCallable<raw.mln_adapter_log_record_listenerFunction>.listener((
+          // The adapter passes each registration's own listener_data. Dart
+          // mints one native callback per registration, so identity is already
+          // in the closure and this argument is unused here.
+          Pointer<Void> listenerData,
           Pointer<Void> record,
         ) {
           if (record == nullptr) {

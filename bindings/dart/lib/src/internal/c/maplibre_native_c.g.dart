@@ -5711,9 +5711,15 @@ final class mln_adapter_queued_resource_provider_route extends ffi.Struct {
 }
 
 typedef mln_adapter_queued_resource_request_listenerFunction =
-    ffi.Void Function(ffi.Pointer<ffi.Void> request);
+    ffi.Void Function(
+      ffi.Pointer<ffi.Void> listener_data,
+      ffi.Pointer<ffi.Void> request,
+    );
 typedef Dartmln_adapter_queued_resource_request_listenerFunction =
-    void Function(ffi.Pointer<ffi.Void> request);
+    void Function(
+      ffi.Pointer<ffi.Void> listener_data,
+      ffi.Pointer<ffi.Void> request,
+    );
 typedef mln_adapter_queued_resource_request_listener =
     ffi.Pointer<
       ffi.NativeFunction<mln_adapter_queued_resource_request_listenerFunction>
@@ -5726,6 +5732,8 @@ final class mln_adapter_queued_resource_provider extends ffi.Struct {
   external int route_count;
 
   external mln_adapter_queued_resource_request_listener listener;
+
+  external ffi.Pointer<ffi.Void> listener_data;
 }
 
 final class mln_adapter_queued_resource_request extends ffi.Struct {
@@ -5783,9 +5791,15 @@ final class mln_adapter_queued_resource_request extends ffi.Struct {
 }
 
 typedef mln_adapter_log_record_listenerFunction =
-    ffi.Void Function(ffi.Pointer<ffi.Void> record);
+    ffi.Void Function(
+      ffi.Pointer<ffi.Void> listener_data,
+      ffi.Pointer<ffi.Void> record,
+    );
 typedef Dartmln_adapter_log_record_listenerFunction =
-    void Function(ffi.Pointer<ffi.Void> record);
+    void Function(
+      ffi.Pointer<ffi.Void> listener_data,
+      ffi.Pointer<ffi.Void> record,
+    );
 typedef mln_adapter_log_record_listener =
     ffi.Pointer<ffi.NativeFunction<mln_adapter_log_record_listenerFunction>>;
 
@@ -5794,6 +5808,8 @@ final class mln_adapter_log_callback_state extends ffi.Struct {
 
   @ffi.Uint32()
   external int consume;
+
+  external ffi.Pointer<ffi.Void> listener_data;
 }
 
 final class mln_adapter_log_record extends ffi.Struct {
