@@ -13,6 +13,16 @@
 
 typedef struct render_target render_target;
 
+/// The mln_render_backend_flag bit the active backend requires the native
+/// library to support.
+uint32_t render_target_backend_flag(void);
+
+/// Applies the SDL hints the active backend needs before SDL_Init.
+void render_target_apply_sdl_hints(void);
+
+/// Configures backend video state after SDL_Init and before window creation.
+[[nodiscard]] app_error render_target_configure_video(void);
+
 /// The SDL window flag the active backend's surface needs.
 SDL_WindowFlags render_target_window_flags(void);
 

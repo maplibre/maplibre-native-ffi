@@ -2,52 +2,49 @@
 
 #include "util.h"
 
-app_error vulkan_commands_init(
+static app_error commands_create(
   vulkan_commands* commands, VkDevice device, uint32_t queue_family_index
 ) {
-  *commands = (vulkan_commands){};
-
   const VkCommandPoolCreateInfo pool_info = {
     .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
     .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
     .queueFamilyIndex = queue_family_index,
   };
-  app_error error = expect_vk(
+  MAP_TRY(expect_vk(
     vkCreateCommandPool(device, &pool_info, nullptr, &commands->command_pool)
-  );
-  if (error == APP_OK) {
-    const VkCommandBufferAllocateInfo alloc_info = {
-      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-      .commandPool = commands->command_pool,
-      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-      .commandBufferCount = 1,
-    };
-    error = expect_vk(
-      vkAllocateCommandBuffers(device, &alloc_info, &commands->command_buffer)
-    );
-  }
+  ));
+  const VkCommandBufferAllocateInfo alloc_info = {
+    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+    .commandPool = commands->command_pool,
+    .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+    .commandBufferCount = 1,
+  };
+  MAP_TRY(expect_vk(
+    vkAllocateCommandBuffers(device, &alloc_info, &commands->command_buffer)
+  ));
   const VkSemaphoreCreateInfo semaphore_info = {
     .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
   };
-  if (error == APP_OK) {
-    error = expect_vk(vkCreateSemaphore(
-      device, &semaphore_info, nullptr, &commands->image_available
-    ));
-  }
-  if (error == APP_OK) {
-    error = expect_vk(vkCreateSemaphore(
-      device, &semaphore_info, nullptr, &commands->render_finished
-    ));
-  }
-  if (error == APP_OK) {
-    const VkFenceCreateInfo fence_info = {
-      .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-      .flags = VK_FENCE_CREATE_SIGNALED_BIT,
-    };
-    error = expect_vk(
-      vkCreateFence(device, &fence_info, nullptr, &commands->in_flight)
-    );
-  }
+  MAP_TRY(expect_vk(vkCreateSemaphore(
+    device, &semaphore_info, nullptr, &commands->image_available
+  )));
+  MAP_TRY(expect_vk(vkCreateSemaphore(
+    device, &semaphore_info, nullptr, &commands->render_finished
+  )));
+  const VkFenceCreateInfo fence_info = {
+    .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+    .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+  };
+  return expect_vk(
+    vkCreateFence(device, &fence_info, nullptr, &commands->in_flight)
+  );
+}
+
+app_error vulkan_commands_init(
+  vulkan_commands* commands, VkDevice device, uint32_t queue_family_index
+) {
+  *commands = (vulkan_commands){};
+  const app_error error = commands_create(commands, device, queue_family_index);
   if (error != APP_OK) {
     vulkan_commands_deinit(commands, device);
   }

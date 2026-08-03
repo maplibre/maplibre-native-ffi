@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 
 #include "channel.h"
+
+#include "util.h"
 
 void command_list_deinit(command_list* list) {
   free(list->items);
@@ -49,7 +50,9 @@ void command_queue_drain_into(command_queue* queue, command_list* out) {
 }
 
 void render_request_init(render_request* request) {
-  atomic_store_explicit(&request->value, true, memory_order_release);
+  // Starts set, so the render loop draws a first frame without waiting for
+  // the runtime loop to request one.
+  render_request_set(request);
 }
 
 void render_request_set(render_request* request) {
@@ -116,7 +119,7 @@ bool map_channel_shutdown_requested(map_channel* channel) {
 
 void map_channel_await_shutdown(map_channel* channel) {
   while (!map_channel_shutdown_requested(channel)) {
-    thrd_sleep(&(struct timespec){.tv_nsec = 1000 * 1000}, nullptr);
+    sleep_milliseconds(1);
   }
 }
 

@@ -11,6 +11,7 @@
 #include "../../diagnostics.h"
 #include "../../render_target.h"
 #include "../../types.h"
+#include "../../util.h"
 #include "../render.h"
 #include "commands.h"
 #include "context.h"
@@ -52,35 +53,33 @@ static void vulkan_compositor_deinit(vulkan_compositor* compositor) {
   vulkan_context_deinit(&compositor->context);
 }
 
+static app_error vulkan_compositor_create(
+  vulkan_compositor* compositor, SDL_Window* window, viewport current_viewport
+) {
+  MAP_TRY(vulkan_context_init(&compositor->context, window));
+  MAP_TRY(vulkan_swapchain_init(
+    &compositor->swapchain, &compositor->context, current_viewport
+  ));
+  MAP_TRY(vulkan_pipeline_init(
+    &compositor->pipeline, compositor->context.device,
+    compositor->swapchain.format
+  ));
+  MAP_TRY(vulkan_swapchain_create_framebuffers(
+    &compositor->swapchain, compositor->context.device,
+    compositor->pipeline.render_pass
+  ));
+  return vulkan_commands_init(
+    &compositor->commands, compositor->context.device,
+    compositor->context.queue_family_index
+  );
+}
+
 static app_error vulkan_compositor_init(
   vulkan_compositor* compositor, SDL_Window* window, viewport current_viewport
 ) {
   *compositor = (vulkan_compositor){};
-  app_error error = vulkan_context_init(&compositor->context, window);
-  if (error != APP_OK) {
-    return error;
-  }
-  error = vulkan_swapchain_init(
-    &compositor->swapchain, &compositor->context, current_viewport
-  );
-  if (error == APP_OK) {
-    error = vulkan_pipeline_init(
-      &compositor->pipeline, compositor->context.device,
-      compositor->swapchain.format
-    );
-  }
-  if (error == APP_OK) {
-    error = vulkan_swapchain_create_framebuffers(
-      &compositor->swapchain, compositor->context.device,
-      compositor->pipeline.render_pass
-    );
-  }
-  if (error == APP_OK) {
-    error = vulkan_commands_init(
-      &compositor->commands, compositor->context.device,
-      compositor->context.queue_family_index
-    );
-  }
+  const app_error error =
+    vulkan_compositor_create(compositor, window, current_viewport);
   if (error != APP_OK) {
     vulkan_compositor_deinit(compositor);
   }
@@ -166,8 +165,7 @@ static app_error vulkan_compositor_present_image_view(
     present != VK_SUCCESS && present != VK_SUBOPTIMAL_KHR &&
     present != VK_ERROR_OUT_OF_DATE_KHR
   ) {
-    app_error wait_error = vulkan_compositor_wait_for_frame(compositor);
-    (void)wait_error;
+    (void)vulkan_compositor_wait_for_frame(compositor);
     return expect_vk(present);
   }
   *out_presented = true;
@@ -216,12 +214,10 @@ static app_error find_memory_type(
   return APP_ERROR_BACKEND_SETUP_FAILED;
 }
 
-static app_error borrowed_image_init(
+static app_error borrowed_image_create(
   borrowed_image* image, const vulkan_context* context,
   viewport current_viewport
 ) {
-  *image = (borrowed_image){};
-
   const VkImageCreateInfo image_info = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
     .imageType = VK_IMAGE_TYPE_2D,
@@ -240,61 +236,41 @@ static app_error borrowed_image_init(
     .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
     .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
   };
-  app_error error = expect_vk(
+  MAP_TRY(expect_vk(
     vkCreateImage(context->device, &image_info, nullptr, &image->image)
+  ));
+
+  VkMemoryRequirements requirements;
+  vkGetImageMemoryRequirements(context->device, image->image, &requirements);
+  uint32_t memory_type_index = 0;
+  MAP_TRY(find_memory_type(
+    context->physical_device, requirements.memoryTypeBits,
+    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &memory_type_index
+  ));
+  const VkMemoryAllocateInfo allocate_info = {
+    .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+    .allocationSize = requirements.size,
+    .memoryTypeIndex = memory_type_index,
+  };
+  MAP_TRY(expect_vk(
+    vkAllocateMemory(context->device, &allocate_info, nullptr, &image->memory)
+  ));
+  MAP_TRY(expect_vk(
+    vkBindImageMemory(context->device, image->image, image->memory, 0)
+  ));
+
+  return vulkan_create_image_view(
+    context->device, image->image, borrowed_image_format, &image->view
   );
+}
 
-  if (error == APP_OK) {
-    VkMemoryRequirements requirements;
-    vkGetImageMemoryRequirements(context->device, image->image, &requirements);
-    uint32_t memory_type_index = 0;
-    error = find_memory_type(
-      context->physical_device, requirements.memoryTypeBits,
-      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &memory_type_index
-    );
-    if (error == APP_OK) {
-      const VkMemoryAllocateInfo allocate_info = {
-        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .allocationSize = requirements.size,
-        .memoryTypeIndex = memory_type_index,
-      };
-      error = expect_vk(vkAllocateMemory(
-        context->device, &allocate_info, nullptr, &image->memory
-      ));
-    }
-    if (error == APP_OK) {
-      error = expect_vk(
-        vkBindImageMemory(context->device, image->image, image->memory, 0)
-      );
-    }
-  }
-
-  if (error == APP_OK) {
-    const VkImageViewCreateInfo view_info = {
-      .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-      .image = image->image,
-      .viewType = VK_IMAGE_VIEW_TYPE_2D,
-      .format = borrowed_image_format,
-      .components =
-        {
-          .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-          .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-          .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-          .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-        },
-      .subresourceRange = {
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        .baseMipLevel = 0,
-        .levelCount = 1,
-        .baseArrayLayer = 0,
-        .layerCount = 1,
-      },
-    };
-    error = expect_vk(
-      vkCreateImageView(context->device, &view_info, nullptr, &image->view)
-    );
-  }
-
+static app_error borrowed_image_init(
+  borrowed_image* image, const vulkan_context* context,
+  viewport current_viewport
+) {
+  *image = (borrowed_image){};
+  const app_error error =
+    borrowed_image_create(image, context, current_viewport);
   if (error != APP_OK) {
     borrowed_image_deinit(image, context->device);
   }
@@ -303,24 +279,30 @@ static app_error borrowed_image_init(
 
 struct render_target {
   render_target_mode mode;
+  render_session session;
   union {
     struct {
       vulkan_compositor compositor;
-      render_session session;
       mln_vulkan_owned_texture_frame pending_frame;
       bool has_pending_frame;
     } owned;
     struct {
       vulkan_compositor compositor;
-      render_session session;
       borrowed_image image;
     } borrowed;
     struct {
       vulkan_context context;
-      render_session session;
     } surface;
   } as;
 };
+
+uint32_t render_target_backend_flag(void) {
+  return MLN_RENDER_BACKEND_FLAG_VULKAN;
+}
+
+void render_target_apply_sdl_hints(void) {}
+
+app_error render_target_configure_video(void) { return APP_OK; }
 
 SDL_WindowFlags render_target_window_flags(void) { return SDL_WINDOW_VULKAN; }
 
@@ -372,7 +354,7 @@ static void release_pending_frame(render_target* target) {
     return;
   }
   const mln_status status = mln_vulkan_owned_texture_release_frame(
-    target->as.owned.session.handle, &target->as.owned.pending_frame
+    target->session.handle, &target->as.owned.pending_frame
   );
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("Vulkan texture release failed", status);
@@ -415,7 +397,7 @@ app_error render_target_attach(
         diagnostics_log_status("Vulkan texture attach failed", status);
         return APP_ERROR_TEXTURE_ATTACH_FAILED;
       }
-      target->as.owned.session =
+      target->session =
         (render_session){.kind = RENDER_SESSION_TEXTURE, .handle = session};
       return APP_OK;
     }
@@ -428,7 +410,7 @@ app_error render_target_attach(
         diagnostics_log_status("Vulkan borrowed texture attach failed", status);
         return APP_ERROR_TEXTURE_ATTACH_FAILED;
       }
-      target->as.borrowed.session =
+      target->session =
         (render_session){.kind = RENDER_SESSION_TEXTURE, .handle = session};
       return APP_OK;
     }
@@ -445,7 +427,7 @@ app_error render_target_attach(
         diagnostics_log_status("Vulkan surface attach failed", status);
         return APP_ERROR_SURFACE_ATTACH_FAILED;
       }
-      target->as.surface.session =
+      target->session =
         (render_session){.kind = RENDER_SESSION_SURFACE, .handle = session};
       return APP_OK;
     }
@@ -461,12 +443,12 @@ void render_target_deinit(render_target* target) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
       vulkan_context_wait_idle(&target->as.owned.compositor.context);
       release_pending_frame(target);
-      render_session_close(&target->as.owned.session);
+      render_session_close(&target->session);
       vulkan_compositor_deinit(&target->as.owned.compositor);
       break;
     case RENDER_TARGET_MODE_BORROWED_TEXTURE:
       vulkan_context_wait_idle(&target->as.borrowed.compositor.context);
-      render_session_close(&target->as.borrowed.session);
+      render_session_close(&target->session);
       borrowed_image_deinit(
         &target->as.borrowed.image,
         target->as.borrowed.compositor.context.device
@@ -475,7 +457,7 @@ void render_target_deinit(render_target* target) {
       break;
     case RENDER_TARGET_MODE_NATIVE_SURFACE:
       vulkan_context_wait_idle(&target->as.surface.context);
-      render_session_close(&target->as.surface.session);
+      render_session_close(&target->session);
       vulkan_context_deinit(&target->as.surface.context);
       break;
   }
@@ -491,7 +473,7 @@ void render_target_deinit(render_target* target) {
 static app_error resize_borrowed(
   render_target* target, viewport current_viewport
 ) {
-  if (target->as.borrowed.session.kind != RENDER_SESSION_TEXTURE) {
+  if (target->session.kind != RENDER_SESSION_TEXTURE) {
     return APP_ERROR_TEXTURE_RESIZE_FAILED;
   }
   vulkan_context_wait_idle(&target->as.borrowed.compositor.context);
@@ -499,7 +481,7 @@ static app_error resize_borrowed(
     vulkan_compositor_resize(&target->as.borrowed.compositor, current_viewport)
   );
 
-  const borrowed_image previous = target->as.borrowed.image;
+  borrowed_image previous = target->as.borrowed.image;
   borrowed_image replacement;
   MAP_TRY(borrowed_image_init(
     &replacement, &target->as.borrowed.compositor.context, current_viewport
@@ -507,14 +489,13 @@ static app_error resize_borrowed(
   target->as.borrowed.image = replacement;
   const mln_vulkan_borrowed_texture_descriptor descriptor =
     borrowed_image_descriptor(target, current_viewport);
-  const mln_status status = mln_vulkan_borrowed_texture_set_target(
-    target->as.borrowed.session.handle, &descriptor
-  );
+  const mln_status status =
+    mln_vulkan_borrowed_texture_set_target(target->session.handle, &descriptor);
   if (status != MLN_STATUS_OK) {
     // A native error may mean the session took the replacement before
     // failing, and nothing here can tell that apart from a rejection that
     // came first, so detach before either target is released.
-    mln_render_session_detach(target->as.borrowed.session.handle);
+    mln_render_session_detach(target->session.handle);
     diagnostics_log_status("Vulkan borrowed texture set target failed", status);
     target->as.borrowed.image = previous;
     borrowed_image_deinit(
@@ -524,8 +505,9 @@ static app_error resize_borrowed(
   }
   // Only once the session has taken the replacement, so a rejected one leaves
   // this target on the image it already had.
-  borrowed_image old = previous;
-  borrowed_image_deinit(&old, target->as.borrowed.compositor.context.device);
+  borrowed_image_deinit(
+    &previous, target->as.borrowed.compositor.context.device
+  );
   return APP_OK;
 }
 
@@ -539,13 +521,11 @@ app_error render_target_resize(
       MAP_TRY(
         vulkan_compositor_resize(&target->as.owned.compositor, current_viewport)
       );
-      return render_session_resize(&target->as.owned.session, current_viewport);
+      return render_session_resize(&target->session, current_viewport);
     case RENDER_TARGET_MODE_BORROWED_TEXTURE:
       return resize_borrowed(target, current_viewport);
     case RENDER_TARGET_MODE_NATIVE_SURFACE:
-      return render_session_resize(
-        &target->as.surface.session, current_viewport
-      );
+      return render_session_resize(&target->session, current_viewport);
   }
   return APP_ERROR_BACKEND_SETUP_FAILED;
 }
@@ -571,15 +551,14 @@ static app_error render_update_owned(
   render_target* target, bool* out_rendered
 ) {
   bool rendered = false;
-  MAP_TRY(render_session_render_update(&target->as.owned.session, &rendered));
+  MAP_TRY(render_session_render_update(&target->session, &rendered));
   if (!rendered) {
     return APP_OK;
   }
 
   mln_vulkan_owned_texture_frame frame = {.size = sizeof(frame)};
-  const mln_status status = mln_vulkan_owned_texture_acquire_frame(
-    target->as.owned.session.handle, &frame
-  );
+  const mln_status status =
+    mln_vulkan_owned_texture_acquire_frame(target->session.handle, &frame);
   if (status == MLN_STATUS_INVALID_STATE) {
     return APP_OK;
   }
@@ -593,9 +572,8 @@ static app_error render_update_owned(
     &target->as.owned.compositor, frame.image_view, &presented
   );
   if (error != APP_OK || !presented) {
-    const mln_status release_status = mln_vulkan_owned_texture_release_frame(
-      target->as.owned.session.handle, &frame
-    );
+    const mln_status release_status =
+      mln_vulkan_owned_texture_release_frame(target->session.handle, &frame);
     if (release_status != MLN_STATUS_OK) {
       diagnostics_log_status("Vulkan texture release failed", release_status);
     }
@@ -620,9 +598,7 @@ app_error render_target_render_update(
       return render_update_owned(target, out_rendered);
     case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
       bool rendered = false;
-      MAP_TRY(
-        render_session_render_update(&target->as.borrowed.session, &rendered)
-      );
+      MAP_TRY(render_session_render_update(&target->session, &rendered));
       if (!rendered) {
         return APP_OK;
       }
@@ -632,9 +608,7 @@ app_error render_target_render_update(
       );
     }
     case RENDER_TARGET_MODE_NATIVE_SURFACE:
-      return render_session_render_update(
-        &target->as.surface.session, out_rendered
-      );
+      return render_session_render_update(&target->session, out_rendered);
   }
   return APP_ERROR_BACKEND_SETUP_FAILED;
 }

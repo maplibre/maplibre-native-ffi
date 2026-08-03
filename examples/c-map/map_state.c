@@ -1,6 +1,7 @@
 #include "map_state.h"
 
 #include "diagnostics.h"
+#include "util.h"
 
 static double clamp(double value, double min, double max) {
   if (value < min) {
@@ -93,10 +94,7 @@ static app_error apply_camera_command(mln_map map, camera_command command) {
       );
     case CAMERA_COMMAND_ADJUST_BEARING: {
       mln_camera_options camera;
-      const app_error error = current_camera(map, &camera);
-      if (error != APP_OK) {
-        return error;
-      }
+      MAP_TRY(current_camera(map, &camera));
       const double bearing =
         (camera.fields & MLN_CAMERA_OPTION_BEARING) != 0 ? camera.bearing : 0;
       mln_camera_options target = mln_camera_options_default();
@@ -108,10 +106,7 @@ static app_error apply_camera_command(mln_map map, camera_command command) {
     }
     case CAMERA_COMMAND_ADJUST_BEARING_ANIMATED: {
       mln_camera_options camera;
-      const app_error error = current_camera(map, &camera);
-      if (error != APP_OK) {
-        return error;
-      }
+      MAP_TRY(current_camera(map, &camera));
       const double bearing =
         (camera.fields & MLN_CAMERA_OPTION_BEARING) != 0 ? camera.bearing : 0;
       mln_camera_options target = mln_camera_options_default();
@@ -125,10 +120,7 @@ static app_error apply_camera_command(mln_map map, camera_command command) {
     }
     case CAMERA_COMMAND_ADJUST_PITCH_ANIMATED: {
       mln_camera_options camera;
-      const app_error error = current_camera(map, &camera);
-      if (error != APP_OK) {
-        return error;
-      }
+      MAP_TRY(current_camera(map, &camera));
       const double pitch =
         (camera.fields & MLN_CAMERA_OPTION_PITCH) != 0 ? camera.pitch : 0;
       mln_camera_options target = mln_camera_options_default();

@@ -28,6 +28,38 @@ static mln_screen_point logical_point(
   };
 }
 
+static camera_command pan_animated(double dx, double dy) {
+  return (camera_command){
+    .kind = CAMERA_COMMAND_MOVE_BY_ANIMATED,
+    .as.move_by_animated = {
+      .dx = dx, .dy = dy, .duration_ms = keyboard_animation_ms
+    },
+  };
+}
+
+static camera_command zoom_animated(double scale, mln_screen_point anchor) {
+  return (camera_command){
+    .kind = CAMERA_COMMAND_SCALE_BY_ANIMATED,
+    .as.scale_by_animated = {
+      .scale = scale, .anchor = anchor, .duration_ms = keyboard_animation_ms
+    },
+  };
+}
+
+static camera_command rotate_animated(double delta) {
+  return (camera_command){
+    .kind = CAMERA_COMMAND_ADJUST_BEARING_ANIMATED,
+    .as.animated_delta = {.delta = delta, .duration_ms = keyboard_animation_ms},
+  };
+}
+
+static camera_command pitch_animated(double delta) {
+  return (camera_command){
+    .kind = CAMERA_COMMAND_ADJUST_PITCH_ANIMATED,
+    .as.animated_delta = {.delta = delta, .duration_ms = keyboard_animation_ms},
+  };
+}
+
 static drag_mode drag_mode_for_button(uint8_t button) {
   if (button == SDL_BUTTON_RIGHT) {
     return DRAG_MODE_ROTATE;
@@ -119,20 +151,24 @@ static input_result handle_mouse_motion(
   input_controller* controller, const SDL_MouseMotionEvent* motion,
   command_queue* commands, viewport current_viewport
 ) {
+  if (controller->drag_mode == DRAG_MODE_NONE) {
+    return (input_result){};
+  }
+
   const mln_screen_point cursor =
     logical_point(motion->x, motion->y, current_viewport);
   const double dx = cursor.x - controller->last_x;
   const double dy = cursor.y - controller->last_y;
   controller->last_x = cursor.x;
   controller->last_y = cursor.y;
+  if (dx == 0 && dy == 0) {
+    return (input_result){.handled = true};
+  }
 
   switch (controller->drag_mode) {
     case DRAG_MODE_NONE:
-      return (input_result){};
+      break;
     case DRAG_MODE_PAN:
-      if (dx == 0 && dy == 0) {
-        return (input_result){.handled = true};
-      }
       command_queue_push(
         commands, (camera_command){
                     .kind = CAMERA_COMMAND_MOVE_BY,
@@ -141,9 +177,6 @@ static input_result handle_mouse_motion(
       );
       break;
     case DRAG_MODE_ROTATE:
-      if (dx == 0 && dy == 0) {
-        return (input_result){.handled = true};
-      }
       command_queue_push(
         commands, (camera_command){
                     .kind = CAMERA_COMMAND_ADJUST_BEARING,
@@ -199,93 +232,39 @@ static input_result handle_key_down(
   switch (key->scancode) {
     case SDL_SCANCODE_LEFT:
     case SDL_SCANCODE_A:
-      command = (camera_command){
-        .kind = CAMERA_COMMAND_MOVE_BY_ANIMATED,
-        .as.move_by_animated = {
-          .dx = pan_step, .dy = 0, .duration_ms = keyboard_animation_ms
-        },
-      };
+      command = pan_animated(pan_step, 0);
       break;
     case SDL_SCANCODE_RIGHT:
     case SDL_SCANCODE_D:
-      command = (camera_command){
-        .kind = CAMERA_COMMAND_MOVE_BY_ANIMATED,
-        .as.move_by_animated = {
-          .dx = -pan_step, .dy = 0, .duration_ms = keyboard_animation_ms
-        },
-      };
+      command = pan_animated(-pan_step, 0);
       break;
     case SDL_SCANCODE_UP:
     case SDL_SCANCODE_W:
-      command = (camera_command){
-        .kind = CAMERA_COMMAND_MOVE_BY_ANIMATED,
-        .as.move_by_animated = {
-          .dx = 0, .dy = pan_step, .duration_ms = keyboard_animation_ms
-        },
-      };
+      command = pan_animated(0, pan_step);
       break;
     case SDL_SCANCODE_DOWN:
     case SDL_SCANCODE_S:
-      command = (camera_command){
-        .kind = CAMERA_COMMAND_MOVE_BY_ANIMATED,
-        .as.move_by_animated = {
-          .dx = 0, .dy = -pan_step, .duration_ms = keyboard_animation_ms
-        },
-      };
+      command = pan_animated(0, -pan_step);
       break;
     case SDL_SCANCODE_EQUALS:
     case SDL_SCANCODE_KP_PLUS:
-      command = (camera_command){
-        .kind = CAMERA_COMMAND_SCALE_BY_ANIMATED,
-        .as.scale_by_animated = {
-          .scale = zoom_step,
-          .anchor = center,
-          .duration_ms = keyboard_animation_ms
-        },
-      };
+      command = zoom_animated(zoom_step, center);
       break;
     case SDL_SCANCODE_MINUS:
     case SDL_SCANCODE_KP_MINUS:
-      command = (camera_command){
-        .kind = CAMERA_COMMAND_SCALE_BY_ANIMATED,
-        .as.scale_by_animated = {
-          .scale = 1.0 / zoom_step,
-          .anchor = center,
-          .duration_ms = keyboard_animation_ms
-        },
-      };
+      command = zoom_animated(1.0 / zoom_step, center);
       break;
     case SDL_SCANCODE_Q:
-      command = (camera_command){
-        .kind = CAMERA_COMMAND_ADJUST_BEARING_ANIMATED,
-        .as.animated_delta = {
-          .delta = -bearing_step, .duration_ms = keyboard_animation_ms
-        },
-      };
+      command = rotate_animated(-bearing_step);
       break;
     case SDL_SCANCODE_E:
-      command = (camera_command){
-        .kind = CAMERA_COMMAND_ADJUST_BEARING_ANIMATED,
-        .as.animated_delta = {
-          .delta = bearing_step, .duration_ms = keyboard_animation_ms
-        },
-      };
+      command = rotate_animated(bearing_step);
       break;
     case SDL_SCANCODE_RIGHTBRACKET:
-      command = (camera_command){
-        .kind = CAMERA_COMMAND_ADJUST_PITCH_ANIMATED,
-        .as.animated_delta = {
-          .delta = pitch_step, .duration_ms = keyboard_animation_ms
-        },
-      };
+      command = pitch_animated(pitch_step);
       break;
     case SDL_SCANCODE_LEFTBRACKET:
-      command = (camera_command){
-        .kind = CAMERA_COMMAND_ADJUST_PITCH_ANIMATED,
-        .as.animated_delta = {
-          .delta = -pitch_step, .duration_ms = keyboard_animation_ms
-        },
-      };
+      command = pitch_animated(-pitch_step);
       break;
     case SDL_SCANCODE_0:
       command = (camera_command){

@@ -6,12 +6,6 @@ const char* app_error_name(app_error error) {
   switch (error) {
     case APP_OK:
       return "ok";
-    case APP_ERROR_INVALID_ARGUMENTS:
-      return "invalid arguments";
-    case APP_ERROR_SDL_INIT_FAILED:
-      return "SDL init failed";
-    case APP_ERROR_WINDOW_CREATE_FAILED:
-      return "window create failed";
     case APP_ERROR_RUNTIME_CREATE_FAILED:
       return "runtime create failed";
     case APP_ERROR_MAP_CREATE_FAILED:
@@ -53,17 +47,12 @@ const char* app_error_name(app_error error) {
 }
 
 bool render_target_mode_parse(const char* value, render_target_mode* out_mode) {
-  if (strcmp(value, "owned-texture") == 0) {
-    *out_mode = RENDER_TARGET_MODE_OWNED_TEXTURE;
-    return true;
-  }
-  if (strcmp(value, "borrowed-texture") == 0) {
-    *out_mode = RENDER_TARGET_MODE_BORROWED_TEXTURE;
-    return true;
-  }
-  if (strcmp(value, "native-surface") == 0) {
-    *out_mode = RENDER_TARGET_MODE_NATIVE_SURFACE;
-    return true;
+  for (render_target_mode mode = RENDER_TARGET_MODE_OWNED_TEXTURE;
+       mode <= RENDER_TARGET_MODE_NATIVE_SURFACE; mode += 1) {
+    if (strcmp(value, render_target_mode_label(mode)) == 0) {
+      *out_mode = mode;
+      return true;
+    }
   }
   return false;
 }

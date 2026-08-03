@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <threads.h>
-#include <time.h>
 
 #include "channel.h"
 #include "diagnostics.h"
@@ -15,6 +14,7 @@
 #include "map_state.h"
 #include "render/render.h"
 #include "types.h"
+#include "util.h"
 #include "viewport.h"
 
 /// Backstop for the runtime loop's park. The render loop's wake source is what
@@ -27,12 +27,6 @@ typedef struct runtime_loop_args {
   render_request* request;
   map_channel* channel;
 } runtime_loop_args;
-
-static void sleep_milliseconds(long milliseconds) {
-  thrd_sleep(
-    &(struct timespec){.tv_nsec = milliseconds * 1000 * 1000}, nullptr
-  );
-}
 
 static app_error runtime_loop_body(runtime_loop_args* args, map_state* state) {
   // The render loop signals this to release the parked pump, so a camera
@@ -208,43 +202,31 @@ static app_error render_loop(
   return APP_OK;
 }
 
-static void append_backend_label(
-  char* buffer, size_t buffer_size, bool* has_backend, const char* label
-) {
-  if (*has_backend) {
-    strncat(buffer, ",", buffer_size - strlen(buffer) - 1);
-  }
-  strncat(buffer, label, buffer_size - strlen(buffer) - 1);
-  *has_backend = true;
-}
-
 static app_error validate_native_render_backend(void) {
-  const uint32_t support = mln_supported_render_backend_mask();
-  char label[64] = "";
-  bool has_backend = false;
-  if ((support & MLN_RENDER_BACKEND_FLAG_METAL) != 0) {
-    append_backend_label(label, sizeof(label), &has_backend, "metal");
-  }
-  if ((support & MLN_RENDER_BACKEND_FLAG_OPENGL) != 0) {
-    append_backend_label(label, sizeof(label), &has_backend, "opengl");
-  }
-  if ((support & MLN_RENDER_BACKEND_FLAG_VULKAN) != 0) {
-    append_backend_label(label, sizeof(label), &has_backend, "vulkan");
-  }
-  if ((support & MLN_RENDER_BACKEND_FLAG_WEBGPU) != 0) {
-    append_backend_label(label, sizeof(label), &has_backend, "webgpu");
-  }
-  printf("native render backends: %s\n", has_backend ? label : "none");
+  static const struct {
+    uint32_t flag;
+    const char* name;
+  } backends[] = {
+    {MLN_RENDER_BACKEND_FLAG_METAL, "metal"},
+    {MLN_RENDER_BACKEND_FLAG_OPENGL, "opengl"},
+    {MLN_RENDER_BACKEND_FLAG_VULKAN, "vulkan"},
+    {MLN_RENDER_BACKEND_FLAG_WEBGPU, "webgpu"},
+  };
 
-#if defined(MAP_EXAMPLE_BACKEND_OPENGL)
-  if ((support & MLN_RENDER_BACKEND_FLAG_OPENGL) == 0) {
+  const uint32_t support = mln_supported_render_backend_mask();
+  printf("native render backends:");
+  bool has_backend = false;
+  for (size_t i = 0; i < sizeof(backends) / sizeof(backends[0]); i += 1) {
+    if ((support & backends[i].flag) != 0) {
+      printf(has_backend ? ",%s" : " %s", backends[i].name);
+      has_backend = true;
+    }
+  }
+  puts(has_backend ? "" : " none");
+
+  if ((support & render_target_backend_flag()) == 0) {
     return APP_ERROR_RENDER_BACKEND_MISMATCH;
   }
-#elif defined(MAP_EXAMPLE_BACKEND_VULKAN)
-  if ((support & MLN_RENDER_BACKEND_FLAG_VULKAN) == 0) {
-    return APP_ERROR_RENDER_BACKEND_MISMATCH;
-  }
-#endif
   return APP_OK;
 }
 
@@ -283,27 +265,18 @@ int main(int argc, char** argv) {
 
   int exit_code = EXIT_FAILURE;
 
-#if defined(MAP_EXAMPLE_BACKEND_OPENGL)
-  SDL_SetHint(SDL_HINT_VIDEO_FORCE_EGL, "1");
-#endif
+  render_target_apply_sdl_hints();
 
   if (!SDL_Init(SDL_INIT_VIDEO)) {
     fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
     goto out_log_callback;
   }
 
-#if defined(MAP_EXAMPLE_BACKEND_OPENGL)
-  if (
-    !SDL_GL_SetAttribute(
-      SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES
-    ) ||
-    !SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3) ||
-    !SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0)
-  ) {
-    fprintf(stderr, "SDL_GL_SetAttribute failed: %s\n", SDL_GetError());
+  error = render_target_configure_video();
+  if (error != APP_OK) {
+    fprintf(stderr, "c-map failed: %s\n", app_error_name(error));
     goto out_sdl;
   }
-#endif
 
   const SDL_WindowFlags window_flags = render_target_window_flags() |
                                        SDL_WINDOW_RESIZABLE |

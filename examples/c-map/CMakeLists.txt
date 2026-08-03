@@ -53,14 +53,12 @@ target_link_libraries(c-map PRIVATE PkgConfig::MAPLIBRE PkgConfig::SDL3 m)
 
 if(MLN_RENDER_BACKEND STREQUAL "opengl")
   target_sources(c-map PRIVATE render/opengl/opengl.c)
-  target_compile_definitions(c-map PRIVATE MAP_EXAMPLE_BACKEND_OPENGL=1)
 elseif(MLN_RENDER_BACKEND STREQUAL "vulkan")
   target_sources(
     c-map
     PRIVATE
       render/vulkan/commands.c render/vulkan/context.c render/vulkan/pipeline.c
       render/vulkan/swapchain.c render/vulkan/util.c render/vulkan/vulkan.c)
-  target_compile_definitions(c-map PRIVATE MAP_EXAMPLE_BACKEND_VULKAN=1)
 
   if(NOT MLN_DEPENDENCY_INCLUDE_DIR)
     message(

@@ -12,10 +12,10 @@ void render_session_close(render_session* session) {
 app_error render_session_resize(
   render_session* session, viewport current_viewport
 ) {
-  const bool is_surface = session->kind == RENDER_SESSION_SURFACE;
   if (session->kind == RENDER_SESSION_NONE) {
     return APP_ERROR_TEXTURE_RESIZE_FAILED;
   }
+  const bool is_surface = session->kind == RENDER_SESSION_SURFACE;
   const mln_status status = mln_render_session_resize(
     session->handle, current_viewport.logical_width,
     current_viewport.logical_height, current_viewport.scale_factor

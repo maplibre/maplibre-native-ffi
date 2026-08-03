@@ -160,20 +160,18 @@ static app_error create_device(vulkan_context* context) {
   return APP_OK;
 }
 
+static app_error context_create(vulkan_context* context, SDL_Window* window) {
+  MAP_TRY(create_instance(context));
+  MAP_TRY(expect_sdl(SDL_Vulkan_CreateSurface(
+    window, context->instance, nullptr, &context->surface
+  )));
+  MAP_TRY(pick_device(context));
+  return create_device(context);
+}
+
 app_error vulkan_context_init(vulkan_context* context, SDL_Window* window) {
   *context = (vulkan_context){};
-  app_error error = create_instance(context);
-  if (error == APP_OK) {
-    error = expect_sdl(SDL_Vulkan_CreateSurface(
-      window, context->instance, nullptr, &context->surface
-    ));
-  }
-  if (error == APP_OK) {
-    error = pick_device(context);
-  }
-  if (error == APP_OK) {
-    error = create_device(context);
-  }
+  const app_error error = context_create(context, window);
   if (error != APP_OK) {
     vulkan_context_deinit(context);
   }
