@@ -61,6 +61,7 @@ PROJECT_LABELS = {
     "bindings-kotlin-android": "Kotlin/Android",
     "bindings-kotlin-jvm": "Kotlin/JVM",
     "bindings-kotlin-native": "Kotlin/Native",
+    "bindings-typescript": "TypeScript",
 }
 
 

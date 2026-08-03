@@ -150,6 +150,28 @@ the repository name rather than from the manifest, so name it as
 [Get the native library](#get-the-native-library), then export
 `PKG_CONFIG_PATH` before you build.
 
+## TypeScript
+
+Depend on the facade and one runtime payload. The facade owns every public
+name; the payload carries one compiled artifact for one target and render
+backend.
+
+```bash frame="terminal"
+pnpm add @maplibre/native-ffi @maplibre/native-ffi-runtime-linux-x64-vulkan
+```
+
+```ts
+import { Maplibre } from "@maplibre/native-ffi";
+
+const maplibre = await Maplibre.load();
+const runtime = maplibre.createRuntime();
+const map = runtime.createMap({ width: 512, height: 512 });
+```
+
+Both module formats come from one build, so `require()` reaches the same API.
+Installing more than one compatible payload makes `load()` ask which one to
+use, because the binding picks no runtime for you.
+
 ## Go
 
 ```bash frame="terminal"
