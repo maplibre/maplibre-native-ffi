@@ -1,0 +1,30 @@
+{
+  "name": "@maplibre/native-ffi",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Low-level TypeScript binding for the MapLibre Native C API.",
+  "license": "BSD-2-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maplibre/maplibre-native-ffi.git",
+    "directory": "bindings/typescript/api"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "vp pack src/index.ts --format esm --format cjs",
+    "test": "vp test run"
+  },
+  "devDependencies": {
+    "@maplibre/native-ffi-runtime-node": "workspace:*",
+    "@types/node": "^24.10.1",
+    "vitest": "^4.1.10"
+  }
+}

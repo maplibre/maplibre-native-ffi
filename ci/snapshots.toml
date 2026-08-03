@@ -155,6 +155,7 @@ paths = [
   "bindings/dart/**",
   "bindings/go/**",
   "bindings/swift/**",
+  "bindings/typescript/**",
   "bindings/zig/**",
   "package.json",
   "pnpm-lock.yaml",

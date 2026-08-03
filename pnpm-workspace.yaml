@@ -1,4 +1,5 @@
 packages:
+  - bindings/typescript/*
   - docs
 
 allowBuilds:

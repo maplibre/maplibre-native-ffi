@@ -35,3 +35,9 @@ bindings/openharmony/library/BuildProfile.ets
 .kotlin
 .devcontainer/mise-oci/
 .devcontainer/mise-oci.tar
+
+# Staged Node-API runtime payload contents. The package is checked in; the
+# artifact it carries is built per target.
+/bindings/typescript/runtime-node/*.node
+/bindings/typescript/runtime-node/lib/
+/bindings/typescript/runtime-node/runtime.json

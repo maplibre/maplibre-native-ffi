@@ -183,16 +183,6 @@ fn collect_function(entity: &Entity, parsed: &mut Parsed) -> Result<(), String> 
     if !name.starts_with("mln_") {
         return Ok(());
     }
-    let header = entity
-        .get_location()
-        .and_then(|location| location.get_file_location().file)
-        .and_then(|file| {
-            file.get_path()
-                .file_name()
-                .map(|component| component.to_string_lossy().into_owned())
-        })
-        .unwrap_or_default();
-
     let mut params = Vec::new();
     for (index, argument) in entity
         .get_arguments()
@@ -222,7 +212,6 @@ fn collect_function(entity: &Entity, parsed: &mut Parsed) -> Result<(), String> 
         .ok_or_else(|| format!("{name}: no result type"))?;
     parsed.entrypoints.push(Entrypoint {
         name: name.clone(),
-        header,
         params,
         result_spelling: result_type.get_display_name(),
         result: slot_of(&result_type).ok_or_else(|| {
@@ -347,11 +336,7 @@ fn collect_enum(entity: &Entity, parsed: &mut Parsed) {
             ));
         }
     }
-    parsed.enums.push(EnumType {
-        name,
-        signed,
-        members,
-    });
+    parsed.enums.push(EnumType { name, members });
 }
 
 fn collect_macro(entity: &Entity, parsed: &mut Parsed) {
@@ -405,14 +390,14 @@ fn evaluate_integer_macro(body: &str) -> Option<String> {
 /// the handle typedefs canonicalize to integers whose meaning the ABI needs to
 /// keep apart.
 pub fn slot_of(ty: &Type) -> Option<SlotKind> {
-    if let Some(declaration) = ty.get_declaration() {
-        if let Some(name) = declaration.get_name() {
-            if HANDLE_TYPEDEFS.contains(&name.as_str()) {
-                return Some(SlotKind::Handle);
-            }
-            if name == "size_t" {
-                return Some(SlotKind::Usize);
-            }
+    if let Some(declaration) = ty.get_declaration()
+        && let Some(name) = declaration.get_name()
+    {
+        if HANDLE_TYPEDEFS.contains(&name.as_str()) {
+            return Some(SlotKind::Handle);
+        }
+        if name == "size_t" {
+            return Some(SlotKind::Usize);
         }
     }
     let display = ty.get_display_name();

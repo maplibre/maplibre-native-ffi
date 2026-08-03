@@ -1,0 +1,51 @@
+[tools]
+"core:node" = "{{vars.node_version}}"
+
+[tasks.generate]
+description = "Regenerate the raw layer and the normalized C dispatch from the public headers."
+dir = "../.."
+sources = [
+  "include/maplibre_native_c.h",
+  "include/maplibre_native_c/**/*.h",
+  "bindings/typescript/codegen/src/**/*.rs",
+  "bindings/typescript/codegen/Cargo.toml",
+]
+outputs = [
+  "bindings/typescript/api/src/raw/*.ts",
+  "bindings/typescript/host-support/generated/*",
+]
+# dprint owns formatting for every file in the repository, generated or not, so
+# the generator's output is formatted here. Otherwise the checked-in files and a
+# fresh generation differ by whitespace and the CI regeneration check fails.
+run = '''
+cargo run --quiet -p mln-ts-codegen -- include bindings/typescript
+dprint fmt --allow-no-files \
+  "bindings/typescript/api/src/raw/**/*" \
+  "bindings/typescript/host-support/generated/**/*"
+'''
+
+[tasks.build]
+description = "Build the Node-API addon and the TypeScript packages."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }, "generate"]
+dir = "../.."
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+cargo build -p mln-ts-addon
+bindings/typescript/scripts/stage-runtime.sh "$usage_preset"
+'''
+
+[tasks.test]
+description = "Run the TypeScript binding tests."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "build", args = ["{{usage.preset}}"] }]
+dir = "../.."
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+export LD_LIBRARY_PATH="$native_install_dir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export DYLD_LIBRARY_PATH="$native_install_dir/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+cargo clippy -p mln-ts-addon -p mln-ts-codegen --all-targets -- -D warnings
+pnpm --filter @maplibre/native-ffi exec vitest run
+'''

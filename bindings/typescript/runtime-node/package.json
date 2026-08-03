@@ -1,0 +1,13 @@
+{
+  "name": "@maplibre/native-ffi-runtime-node",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Node-API runtime payload for the MapLibre Native TypeScript binding.",
+  "license": "BSD-2-Clause",
+  "exports": {
+    ".": { "types": "./index.d.ts", "import": "./index.js" },
+    "./runtime.json": "./runtime.json"
+  },
+  "files": ["index.js", "index.d.ts", "runtime.json", "*.node", "lib"]
+}

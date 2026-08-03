@@ -55,7 +55,6 @@ pub struct Param {
 #[derive(Clone, Debug)]
 pub struct Entrypoint {
     pub name: String,
-    pub header: String,
     pub params: Vec<Param>,
     /// The return type as written.
     pub result_spelling: String,
@@ -63,34 +62,8 @@ pub struct Entrypoint {
 }
 
 #[derive(Clone, Debug)]
-pub struct Field {
-    pub name: String,
-    pub spelling: String,
-    pub offsets: AbiPair,
-    pub sizes: AbiPair,
-}
-
-/// A value measured once per ABI class.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct AbiPair {
-    pub native64: u64,
-    pub wasm32: u64,
-}
-
-#[derive(Clone, Debug)]
-pub struct Record {
-    pub name: String,
-    pub is_union: bool,
-    pub sizes: AbiPair,
-    pub aligns: AbiPair,
-    pub fields: Vec<Field>,
-}
-
-#[derive(Clone, Debug)]
 pub struct EnumType {
     pub name: String,
-    /// True when the enum's underlying type is signed.
-    pub signed: bool,
     pub members: Vec<(String, i64)>,
 }
 
@@ -104,13 +77,4 @@ pub struct Constant {
 #[derive(Clone, Debug)]
 pub struct Symbol {
     pub name: String,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct Api {
-    pub entrypoints: Vec<Entrypoint>,
-    pub records: Vec<Record>,
-    pub enums: Vec<EnumType>,
-    pub constants: Vec<Constant>,
-    pub symbols: Vec<Symbol>,
 }

@@ -51,14 +51,16 @@ fn main() {
 
 /// Compares the artifact's headers against the digest the generation recorded.
 fn check_header_digest(include_dir: &Path, fingerprint_header: &Path) {
-    let recorded = std::fs::read_to_string(fingerprint_header)
-        .expect("the generated fingerprint header is present")
-        .lines()
-        .find_map(|line| {
-            line.strip_prefix("#define MLN_ABI_HEADER_DIGEST \"")
-                .and_then(|rest| rest.strip_suffix('"'))
-                .map(str::to_owned)
-        })
+    // The macro's value can sit on the next line, because the formatter wraps a
+    // long define, so this reads the first quoted string after the name rather
+    // than assuming one line.
+    let header = std::fs::read_to_string(fingerprint_header)
+        .expect("the generated fingerprint header is present");
+    let recorded = header
+        .split_once("MLN_ABI_HEADER_DIGEST")
+        .and_then(|(_, rest)| rest.split_once('"'))
+        .and_then(|(_, rest)| rest.split_once('"'))
+        .map(|(value, _)| value.to_owned())
         .expect("the generated fingerprint header records a header digest");
 
     let mut paths = Vec::new();
