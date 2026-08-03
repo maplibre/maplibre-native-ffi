@@ -1,5 +1,6 @@
 [tools]
 "core:dart" = "{{vars.dart_version}}"
+"core:flutter" = { version = "{{vars.flutter_version}}", os = ["linux/x64", "macos/arm64", "windows/x64"] }
 
 # The built-in provider runs `dart pub get` and tracks pubspec.yaml/pubspec.lock
 # against .dart_tool/package_config.json. Use `dart pub upgrade` to move the
@@ -72,9 +73,8 @@ depends = [
   { task = ":_native-prefix", args = ["{{usage.preset}}"] },
 ]
 run = '''
-flutter=(mise x core:flutter@{{vars.flutter_version}} -- flutter)
 app=.dart_tool/flutter_smoke
-"${flutter[@]}" create \
+flutter create \
   --empty \
   --no-pub \
   --org org.maplibre.native_ffi \
@@ -84,20 +84,20 @@ app=.dart_tool/flutter_smoke
 cp tool/flutter_smoke/pubspec.yaml "$app/pubspec.yaml"
 cp tool/flutter_smoke/lib/main.dart "$app/lib/main.dart"
 cd "$app"
-"${flutter[@]}" pub get
+flutter pub get
 
 case "$usage_preset" in
   android-arm64-*)
-    "${flutter[@]}" build apk --release --target-platform android-arm64
+    flutter build apk --release --target-platform android-arm64
     ;;
   android-x64-*)
-    "${flutter[@]}" build apk --release --target-platform android-x64
+    flutter build apk --release --target-platform android-x64
     ;;
   ios-arm64-*)
-    "${flutter[@]}" build ios --release --no-codesign
+    flutter build ios --release --no-codesign
     ;;
   ios-simulator-arm64-*)
-    "${flutter[@]}" build ios --debug --simulator --no-codesign
+    flutter build ios --debug --simulator --no-codesign
     ;;
 esac
 '''

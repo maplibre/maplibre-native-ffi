@@ -180,14 +180,6 @@ def uses_gradle(commands: list[str]) -> bool:
     )
 
 
-def uses_flutter(commands: list[str]) -> bool:
-    """Whether a row builds the Dart binding through a Flutter mobile host."""
-    return any(
-        command.startswith("mise run //bindings/dart:build:mobile")
-        for command in commands
-    )
-
-
 def preset_sets(
     presets: dict[str, object],
 ) -> tuple[list[str], set[str], set[str], set[str]]:
@@ -234,7 +226,6 @@ def target_rows(
             "package": preset in packaged,
             "zig": uses_zig(native + consumers),
             "gradle": uses_gradle(native + consumers),
-            "flutter": uses_flutter(native + consumers),
             "save_toolchains": row_runner not in claimed_runners,
             "native_commands": native if preset in packaged else native + consumers,
         }

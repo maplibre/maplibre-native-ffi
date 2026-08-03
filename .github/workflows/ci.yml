@@ -687,8 +687,6 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: ios-arm64-metal
-          flutter: true
-          flutter-version: 3.44.8
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run build ios-arm64-metal
@@ -730,8 +728,6 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: ios-simulator-arm64-metal
-          flutter: true
-          flutter-version: 3.44.8
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test ios-simulator-arm64-metal
@@ -777,8 +773,6 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: android-arm64-egl
-          flutter: true
-          flutter-version: 3.44.8
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run build android-arm64-egl
@@ -817,8 +811,6 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: android-arm64-vulkan
-          flutter: true
-          flutter-version: 3.44.8
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run build android-arm64-vulkan
@@ -854,8 +846,6 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: android-x64-egl
-          flutter: true
-          flutter-version: 3.44.8
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run build android-x64-egl
@@ -894,8 +884,6 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: android-x64-vulkan
-          flutter: true
-          flutter-version: 3.44.8
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run build android-x64-vulkan

@@ -7,7 +7,6 @@ import difflib
 import pathlib
 import re
 import sys
-import tomllib
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
@@ -34,10 +33,6 @@ def android_compile_sdk() -> str:
     return match.group(1)
 
 
-def flutter_version() -> str:
-    with (ROOT / "mise.toml").open("rb") as file:
-        return str(tomllib.load(file)["vars"]["flutter_version"])
-
 # Environment secrets for R2 writes live in the GitHub Environment `sccache`
 # (main only). PRs omit the environment and fall back to public read-only.
 SCCACHE_ENVIRONMENT = (
@@ -53,7 +48,6 @@ def setup(
     target: str | None = None,
     zig: bool = False,
     gradle: bool = True,
-    flutter: bool = False,
     save_toolchains: bool = False,
 ) -> list[str]:
     lines = [
@@ -71,13 +65,6 @@ def setup(
         lines.append("          zig: true")
     if not gradle:
         lines.append("          gradle: false")
-    if flutter:
-        lines.extend(
-            [
-                "          flutter: true",
-                f"          flutter-version: {flutter_version()}",
-            ]
-        )
     if save_toolchains:
         lines.append("          save-toolchains: true")
     lines.extend(
@@ -119,7 +106,6 @@ def target_job(row: dict[str, object]) -> list[str]:
             preset,
             zig=zig,
             gradle=bool(row["gradle"]),
-            flutter=bool(row["flutter"]),
             save_toolchains=bool(row["save_toolchains"]),
         ),
     ]
