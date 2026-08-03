@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <threads.h>
 
 #include "channel.h"
 #include "diagnostics.h"
@@ -104,6 +103,76 @@ static int runtime_loop(void* userdata) {
   return 0;
 }
 
+/// One render-loop iteration: input, resize handling, and at most one
+/// consumed render request. Runs inside the frame scope the active backend
+/// opened, so every early return still closes it.
+static app_error render_loop_iteration(
+  SDL_Window* window, render_target* target, viewport* current_viewport,
+  command_queue* commands, render_request* request, map_channel* channel,
+  input_controller* controller, bool* running
+) {
+  app_error failure;
+  if (map_channel_failure(channel, &failure)) {
+    return failure;
+  }
+
+  SDL_Event event;
+  while (SDL_PollEvent(&event)) {
+    switch (event.type) {
+      case SDL_EVENT_QUIT:
+      case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+        *running = false;
+        break;
+      case SDL_EVENT_WINDOW_RESIZED:
+      case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+      case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+        *current_viewport = viewport_get(window);
+        viewport_log("resized viewport", *current_viewport);
+        // Every mode follows a resize without losing its session: the ones
+        // the session sizes resize in place, and a caller-owned target
+        // allocates a replacement and hands it over.
+        MAP_TRY(render_target_resize(target, *current_viewport));
+        // The session resize enqueued the new extent to the map's owner
+        // thread, so release its parked pump the way an input command does.
+        map_channel_wake_runtime_loop(channel);
+        render_request_set(request);
+        break;
+      default: {
+        const input_result result = input_controller_handle_event(
+          controller, &event, commands, *current_viewport
+        );
+        if (result.handled) {
+          // Release the runtime loop's parked pump so the command just
+          // queued is applied on this frame rather than after the parking
+          // bound.
+          map_channel_wake_runtime_loop(channel);
+        }
+        if (result.camera_changed) {
+          render_request_set(request);
+        }
+        break;
+      }
+    }
+  }
+
+  MAP_TRY(render_target_finish_frame(target));
+
+  // Consume before rendering, so a request the runtime loop publishes
+  // during the render call is not discarded.
+  if (render_request_consume(request)) {
+    bool rendered = false;
+    MAP_TRY(render_target_render_update(target, *current_viewport, &rendered));
+    if (!rendered) {
+      render_request_set(request);
+    }
+  }
+
+  // Stand-in for a display-refresh subscription until the host loop is
+  // display-paced; see the frame loop section of the example spec.
+  sleep_milliseconds(8);
+  return APP_OK;
+}
+
 /// The display-paced render loop. Owns the window, input, and the render
 /// session once it adopts it.
 static app_error render_loop(
@@ -133,74 +202,15 @@ static app_error render_loop(
   bool running = true;
   input_controller controller = {};
   while (running) {
-    app_error failure;
-    if (map_channel_failure(channel, &failure)) {
-      return failure;
-    }
-
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-      switch (event.type) {
-        case SDL_EVENT_QUIT:
-        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-          running = false;
-          break;
-        case SDL_EVENT_WINDOW_RESIZED:
-        case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-        case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
-          *current_viewport = viewport_get(window);
-          viewport_log("resized viewport", *current_viewport);
-          // Every mode follows a resize without losing its session: the ones
-          // the session sizes resize in place, and a caller-owned target
-          // allocates a replacement and hands it over.
-          error = render_target_resize(target, *current_viewport);
-          if (error != APP_OK) {
-            return error;
-          }
-          // The session resize enqueued the new extent to the map's owner
-          // thread, so release its parked pump the way an input command does.
-          map_channel_wake_runtime_loop(channel);
-          render_request_set(request);
-          break;
-        default: {
-          const input_result result = input_controller_handle_event(
-            &controller, &event, commands, *current_viewport
-          );
-          if (result.handled) {
-            // Release the runtime loop's parked pump so the command just
-            // queued is applied on this frame rather than after the parking
-            // bound.
-            map_channel_wake_runtime_loop(channel);
-          }
-          if (result.camera_changed) {
-            render_request_set(request);
-          }
-          break;
-        }
-      }
-    }
-
-    error = render_target_finish_frame(target);
+    void* frame_scope = render_target_frame_scope_open();
+    error = render_loop_iteration(
+      window, target, current_viewport, commands, request, channel, &controller,
+      &running
+    );
+    render_target_frame_scope_close(frame_scope);
     if (error != APP_OK) {
       return error;
     }
-
-    // Consume before rendering, so a request the runtime loop publishes
-    // during the render call is not discarded.
-    if (render_request_consume(request)) {
-      bool rendered = false;
-      error = render_target_render_update(target, *current_viewport, &rendered);
-      if (error != APP_OK) {
-        return error;
-      }
-      if (!rendered) {
-        render_request_set(request);
-      }
-    }
-
-    // Stand-in for a display-refresh subscription until the host loop is
-    // display-paced; see the frame loop section of the example spec.
-    sleep_milliseconds(8);
   }
   return APP_OK;
 }
@@ -319,8 +329,9 @@ int main(int argc, char** argv) {
     .request = &request,
     .channel = &channel,
   };
-  thrd_t runtime_thread;
-  if (thrd_create(&runtime_thread, runtime_loop, &args) != thrd_success) {
+  SDL_Thread* runtime_thread =
+    SDL_CreateThread(runtime_loop, "runtime-loop", &args);
+  if (runtime_thread == nullptr) {
     fprintf(
       stderr, "c-map failed: %s\n",
       app_error_name(APP_ERROR_THREAD_SPAWN_FAILED)
@@ -337,7 +348,7 @@ int main(int argc, char** argv) {
   // an attached session cannot be destroyed.
   render_target_deinit(target);
   map_channel_request_shutdown(&channel);
-  thrd_join(runtime_thread, nullptr);
+  SDL_WaitThread(runtime_thread, nullptr);
 
   app_error failure = APP_OK;
   if (error == APP_OK && map_channel_failure(&channel, &failure)) {

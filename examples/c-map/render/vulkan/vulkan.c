@@ -310,6 +310,10 @@ app_error render_target_configure_video(void) { return APP_OK; }
 
 SDL_WindowFlags render_target_window_flags(void) { return SDL_WINDOW_VULKAN; }
 
+void* render_target_frame_scope_open(void) { return nullptr; }
+
+void render_target_frame_scope_close(void* scope) { (void)scope; }
+
 app_error render_target_init(
   render_target** out_target, SDL_Window* window, viewport current_viewport,
   render_target_mode mode

@@ -26,6 +26,14 @@ void render_target_apply_sdl_hints(void);
 /// The SDL window flag the active backend's surface needs.
 SDL_WindowFlags render_target_window_flags(void);
 
+/// Opens the scope one render-loop iteration runs inside. Metal returns an
+/// autorelease pool that collects the iteration's presentation objects; the
+/// other backends return null.
+void* render_target_frame_scope_open(void);
+
+/// Closes a scope returned by render_target_frame_scope_open().
+void render_target_frame_scope_close(void* scope);
+
 /// Creates the graphics context and the mode's presentation resources on the
 /// calling thread, which must be the render loop thread that owns the window.
 [[nodiscard]] app_error render_target_init(

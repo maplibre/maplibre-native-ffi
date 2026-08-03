@@ -2,7 +2,8 @@
 // EGL handles, a GL ES 3.0 fullscreen-triangle compositor, and the three
 // render-target modes behind the uniform interface in render.h.
 //
-// This build targets EGL on Linux; the WGL arm returns with Windows support.
+// This build targets EGL on Linux and macOS, where ANGLE provides the EGL
+// implementation; the WGL arm returns with Windows support.
 
 #include <GLES3/gl3.h>
 #include <SDL3/SDL.h>
@@ -502,6 +503,10 @@ app_error render_target_configure_video(void) {
 }
 
 SDL_WindowFlags render_target_window_flags(void) { return SDL_WINDOW_OPENGL; }
+
+void* render_target_frame_scope_open(void) { return nullptr; }
+
+void render_target_frame_scope_close(void* scope) { (void)scope; }
 
 app_error render_target_init(
   render_target** out_target, SDL_Window* window, viewport current_viewport,

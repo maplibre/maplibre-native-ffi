@@ -25,7 +25,7 @@ Implement a mobile example by reading Shared baseline and Mobile profile.
 
 | Example                | Profile | Binding    | Toolkit         | Platforms             | Backends              |
 | ---------------------- | ------- | ---------- | --------------- | --------------------- | --------------------- |
-| `examples/c-map`       | Desktop | C          | SDL3            | Linux                 | Vulkan, OpenGL        |
+| `examples/c-map`       | Desktop | C          | SDL3            | Linux, macOS          | Vulkan, Metal, OpenGL |
 | `examples/zig-map`     | Desktop | Zig        | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
 | `examples/go-map`      | Desktop | Go         | SDL3            | Linux                 | OpenGL                |
 | `examples/rust-map`    | Desktop | Rust       | winit           | Linux, macOS, Windows | Vulkan, Metal, OpenGL |

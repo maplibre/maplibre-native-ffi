@@ -51,8 +51,36 @@ set_target_properties(
 target_compile_options(c-map PRIVATE -Wall -Wextra)
 target_link_libraries(c-map PRIVATE PkgConfig::MAPLIBRE PkgConfig::SDL3 m)
 
-if(MLN_RENDER_BACKEND STREQUAL "opengl")
+if(MLN_RENDER_BACKEND STREQUAL "metal")
+  target_sources(c-map PRIVATE render/metal/metal.c)
+  find_library(MLN_METAL_FRAMEWORK Metal REQUIRED)
+  find_library(MLN_QUARTZCORE_FRAMEWORK QuartzCore REQUIRED)
+  find_library(MLN_FOUNDATION_FRAMEWORK Foundation REQUIRED)
+  target_link_libraries(
+    c-map
+    PRIVATE
+      objc "${MLN_METAL_FRAMEWORK}" "${MLN_QUARTZCORE_FRAMEWORK}"
+      "${MLN_FOUNDATION_FRAMEWORK}")
+elseif(MLN_RENDER_BACKEND STREQUAL "opengl")
   target_sources(c-map PRIVATE render/opengl/opengl.c)
+  if(APPLE)
+    # SDL's EGL loader resolves ANGLE's libraries by leaf name against images
+    # already loaded into the process, so link the installed ANGLE libraries
+    # directly.
+    find_library(
+      MLN_EGL_LIBRARY
+      NAMES EGL
+      HINTS "${MLN_NATIVE_INSTALL_DIR}/lib"
+      REQUIRED NO_DEFAULT_PATH)
+    find_library(
+      MLN_GLESV2_LIBRARY
+      NAMES GLESv2
+      HINTS "${MLN_NATIVE_INSTALL_DIR}/lib"
+      REQUIRED NO_DEFAULT_PATH)
+    target_link_libraries(
+      c-map
+      PRIVATE "${MLN_EGL_LIBRARY}" "${MLN_GLESV2_LIBRARY}")
+  endif()
 elseif(MLN_RENDER_BACKEND STREQUAL "vulkan")
   target_sources(
     c-map
@@ -67,7 +95,12 @@ elseif(MLN_RENDER_BACKEND STREQUAL "vulkan")
         "directory for the vulkan render backend")
   endif()
   target_include_directories(c-map PRIVATE "${MLN_DEPENDENCY_INCLUDE_DIR}")
-  find_library(MLN_VULKAN_LOADER_LIBRARY vulkan REQUIRED)
+  # On macOS the loader is Homebrew's keg-only vulkan-loader; the repository
+  # mise environment names its lib directory.
+  find_library(
+    MLN_VULKAN_LOADER_LIBRARY vulkan
+    HINTS ENV MLN_FFI_VULKAN_LOADER_DIR
+    REQUIRED)
   target_link_libraries(c-map PRIVATE "${MLN_VULKAN_LOADER_LIBRARY}")
 
   # The compositor shaders compile to C headers holding SPIR-V words, so the
