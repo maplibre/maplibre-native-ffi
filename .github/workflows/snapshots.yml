@@ -32,7 +32,7 @@ jobs:
   plan:
     name: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 135
+    timeout-minutes: 240
     permissions:
       actions: read
       checks: read
@@ -68,17 +68,28 @@ jobs:
             exit 1
           fi
 
-          runs="$(gh run list \
-            --repo "$GITHUB_REPOSITORY" \
-            --workflow CI \
-            --branch main \
-            --commit "$GITHUB_SHA" \
-            --event push \
-            --limit 1 \
-            --json databaseId,url)"
+          runs='[]'
+          for attempt in {1..30}; do
+            runs="$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow CI \
+              --branch main \
+              --commit "$GITHUB_SHA" \
+              --event push \
+              --limit 1 \
+              --json databaseId,url)"
+
+            if jq -e 'length > 0' <<<"$runs" >/dev/null; then
+              break
+            fi
+
+            if (( attempt < 30 )); then
+              sleep 10
+            fi
+          done
 
           if [[ "$(jq 'length' <<<"$runs")" -eq 0 ]]; then
-            echo "no main CI run found for $GITHUB_SHA" >&2
+            echo "no main CI run appeared for $GITHUB_SHA within five minutes" >&2
             exit 1
           fi
 
@@ -103,6 +114,19 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
+      # A queued run can outlive a force-push that removes its commit from main.
+      # Publishing remains limited to commits that the current main contains.
+      - name: Verify the source commit remains on main
+        env:
+          SNAPSHOT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor "$SNAPSHOT_SHA" origin/main; then
+            echo "$SNAPSHOT_SHA is not an ancestor of main; refusing to publish" >&2
+            exit 1
+          fi
       # The gate reads Git history and the scope config, so it needs Python
       # rather than the native toolchain the publish jobs use. `--no-deps` on
       # the task keeps mise from preparing the submodule and package
