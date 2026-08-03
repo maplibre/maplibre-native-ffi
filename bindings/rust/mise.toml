@@ -120,6 +120,71 @@ cargo clippy \
   --all-targets -- -D warnings
 '''
 
+[tasks."test:android-emulator"]
+description = "Run the Rust binding tests in the Android emulator."
+depends = [{ task = "//:build", args = ["android-x64-egl"] }]
+dir = "../.."
+run = '''
+set -euo pipefail
+native_install_dir="$MISE_MONOREPO_ROOT/build/android-x64-egl/install"
+export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+cargo_target=x86_64-linux-android
+compiler_prefix=x86_64-linux-android
+target_env=x86_64_linux_android
+target_env_upper=X86_64_LINUX_ANDROID
+ndk_bin="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
+sysroot="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=--target=$compiler_prefix --sysroot=$sysroot"
+export "CC_$target_env=$ndk_bin/${compiler_prefix}24-clang"
+export "CXX_$target_env=$ndk_bin/${compiler_prefix}24-clang++"
+export "CARGO_TARGET_${target_env_upper}_LINKER=$ndk_bin/${compiler_prefix}24-clang"
+
+test_manifest=$(mktemp)
+trap 'find "$test_manifest" -delete' EXIT
+cargo test --no-run \
+  -p maplibre-native-ffi-sys \
+  -p maplibre-native-ffi-core \
+  -p maplibre-native-ffi \
+  --target "$cargo_target" \
+  --message-format=json |
+  python3 -c '
+import json
+import sys
+
+for line in sys.stdin:
+    message = json.loads(line)
+    if (
+        message.get("reason") == "compiler-artifact"
+        and message.get("profile", {}).get("test")
+        and message.get("executable") is not None
+    ):
+        print(message["executable"])
+' \
+    > "$test_manifest"
+cargo clippy \
+  -p maplibre-native-ffi-sys \
+  -p maplibre-native-ffi-core \
+  -p maplibre-native-ffi \
+  --target "$cargo_target" \
+  --all-targets -- -D warnings
+
+mise run //:android-emulator:boot
+found_test=false
+while IFS= read -r test_binary; do
+  [[ -n "$test_binary" ]] || continue
+  found_test=true
+  bash "$MISE_MONOREPO_ROOT/scripts/run-android-emulator-test.sh" \
+    "$test_binary" \
+    "$native_install_dir/lib/libmaplibre-native-c.so" \
+    180 \
+    --test-threads=1
+done < "$test_manifest"
+if [[ "$found_test" != true ]]; then
+  echo "The Rust build produced no Android test executables." >&2
+  exit 1
+fi
+'''
+
 [tasks."test:ohos-emulator"]
 description = "Run the Rust binding tests in the OpenHarmony emulator."
 depends = [{ task = "//:build", args = ["ohos-x64-egl"] }]

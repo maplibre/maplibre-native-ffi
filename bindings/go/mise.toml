@@ -113,6 +113,41 @@ go test ./...
 go vet ./...
 '''
 
+[tasks."test:android-emulator"]
+description = "Run the Go binding tests in the Android emulator."
+depends = [{ task = "//:build", args = ["android-x64-egl"] }]
+run = '''
+set -euo pipefail
+native_install_dir="$MISE_MONOREPO_ROOT/build/android-x64-egl/install"
+test_dir="$MISE_MONOREPO_ROOT/build/android-emulator/go"
+mkdir -p "$test_dir"
+find "$test_dir" -maxdepth 1 -type f -name '*.test' -delete
+
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+ndk_bin="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
+export GOOS=android GOARCH=amd64 CGO_ENABLED=1
+export CC="$ndk_bin/x86_64-linux-android24-clang"
+export CXX="$ndk_bin/x86_64-linux-android24-clang++"
+go test -c -o "$test_dir/" ./...
+go vet ./...
+
+mise run //:android-emulator:boot
+shopt -s nullglob
+found_test=false
+for test_binary in "$test_dir"/*.test; do
+  found_test=true
+  bash "$MISE_MONOREPO_ROOT/scripts/run-android-emulator-test.sh" \
+    "$test_binary" \
+    "$native_install_dir/lib/libmaplibre-native-c.so" \
+    180 \
+    -test.v
+done
+if [[ "$found_test" != true ]]; then
+  echo "The Go build produced no Android test executables." >&2
+  exit 1
+fi
+'''
+
 [tasks."test:ohos-emulator"]
 description = "Run the Go binding tests in the OpenHarmony emulator."
 depends = [{ task = "//:build", args = ["ohos-x64-egl"] }]

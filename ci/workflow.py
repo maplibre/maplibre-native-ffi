@@ -7,6 +7,16 @@ import tomllib
 
 DESKTOP = {"linux", "macos", "windows"}
 
+# Targets whose suite runs on an emulator instead of through ctest. CMake
+# registers no test preset for them, because the `test` mise task boots the
+# emulator and drives the device shell itself.
+EMULATOR_TESTED = {"android-x64-egl", "ohos-x64-egl"}
+
+
+def runtime_tested(preset: str, tested: set[str]) -> bool:
+    """Whether CI executes this target's C API suite rather than only building it."""
+    return preset in tested or preset in EMULATOR_TESTED
+
 
 def load_configuration(
     root: pathlib.Path,
@@ -84,11 +94,23 @@ def suite_commands(source: dict[str, object], preset: str) -> list[str]:
 def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
     render_backend = "opengl" if backend(preset) == "egl" else backend(preset)
     arguments = f"{render_backend} {abi}"
-    commands = [
-        f"mise run //bindings/kotlin:androidBuild {arguments} --prebuilt",
-        f"mise run //bindings/go:build {preset}",
-        f"mise run //bindings/rust:build {preset}",
-    ]
+    commands = [f"mise run //bindings/kotlin:androidBuild {arguments} --prebuilt"]
+    if preset in EMULATOR_TESTED:
+        # Each emulator task cross-compiles the same artifact the build task
+        # would before it runs anything, so it stands in for that command.
+        commands.extend(
+            [
+                "mise run //bindings/go:test:android-emulator",
+                "mise run //bindings/rust:test:android-emulator",
+            ]
+        )
+    else:
+        commands.extend(
+            [
+                f"mise run //bindings/go:build {preset}",
+                f"mise run //bindings/rust:build {preset}",
+            ]
+        )
     if build_map:
         commands.append(f"mise run //examples/android-map:build {arguments} --prebuilt")
     commands.append(f"mise run //bindings/dart:build:mobile {preset}")
@@ -98,7 +120,7 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
 def native_commands(preset: str, tested: set[str]) -> list[str]:
     target_platform = platform(preset)
     if target_platform == "ohos":
-        if preset == "ohos-x64-egl":
+        if preset in EMULATOR_TESTED:
             return [
                 f"mise run test {preset}",
                 "mise run //bindings/rust:test:ohos-emulator",
@@ -110,7 +132,9 @@ def native_commands(preset: str, tested: set[str]) -> list[str]:
             f"mise run //bindings/rust:build {preset}",
             f"mise run //bindings/go:build {preset}",
         ]
-    commands = [f"mise run {'test' if preset in tested else 'build'} {preset}"]
+    commands = [
+        f"mise run {'test' if runtime_tested(preset, tested) else 'build'} {preset}"
+    ]
     if target_platform == "linux":
         commands.append(f"mise run check-glibc-floor {preset}")
     return commands

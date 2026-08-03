@@ -2,7 +2,7 @@ use std::cell::Cell;
 use std::error::Error as StdError;
 #[cfg(target_os = "windows")]
 use std::ffi::c_char;
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "windows"))]
 use std::ffi::c_void;
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
@@ -14,11 +14,11 @@ use std::time::{Duration, Instant};
 use ash::vk;
 use ash::vk::Handle;
 use glow::HasContext;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use glutin_egl_sys::egl;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use glutin_egl_sys::egl::types::{EGLConfig, EGLContext, EGLDisplay, EGLSurface, EGLint};
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use libloading::Library;
 use static_assertions::assert_not_impl_any;
 
@@ -80,7 +80,7 @@ fn has_opengl_test_context_backend() -> bool {
         return false;
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     {
         crate::supported_opengl_context_providers().contains(OpenGLContextProviderMask::EGL)
     }
@@ -88,7 +88,7 @@ fn has_opengl_test_context_backend() -> bool {
     {
         crate::supported_opengl_context_providers().contains(OpenGLContextProviderMask::WGL)
     }
-    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    #[cfg(not(any(target_os = "linux", target_os = "android", target_os = "windows")))]
     {
         // The Rust test helper only implements Linux EGL and Windows WGL.
         // macOS EGL remains covered by bindings that can create a test context
@@ -278,13 +278,13 @@ struct OpenGLTestContext {
     descriptor: OpenGLContextDescriptor,
     surface_handle: NativePointer,
     gl: glow::Context,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     platform: EglTestContext,
     #[cfg(target_os = "windows")]
     platform: WglTestContext,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 struct EglTestContext {
     egl: egl::Egl,
     _lib: Library,
@@ -294,16 +294,19 @@ struct EglTestContext {
     context: EGLContext,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl EglTestContext {
     fn new() -> std::result::Result<Self, Box<dyn StdError>> {
         let lib = load_egl_library()?;
         let egl = load_egl_bindings(&lib)?;
-        #[cfg(target_env = "ohos")]
+        // Mesa's surfaceless platform is what a desktop Linux run without a
+        // display server draws on. The device EGL implementations ship no such
+        // platform and hand out the default display instead.
+        #[cfg(any(target_env = "ohos", target_os = "android"))]
         let display = unsafe { egl.GetDisplay(egl::DEFAULT_DISPLAY as *mut c_void) };
-        #[cfg(target_env = "ohos")]
+        #[cfg(any(target_env = "ohos", target_os = "android"))]
         let display_operation = "eglGetDisplay";
-        #[cfg(not(target_env = "ohos"))]
+        #[cfg(not(any(target_env = "ohos", target_os = "android")))]
         let display = {
             const EGL_PLATFORM_SURFACELESS_MESA: u32 = 0x31DD;
             if !egl.GetPlatformDisplayEXT.is_loaded() {
@@ -317,7 +320,7 @@ impl EglTestContext {
                 )
             }
         };
-        #[cfg(not(target_env = "ohos"))]
+        #[cfg(not(any(target_env = "ohos", target_os = "android")))]
         let display_operation = "eglGetPlatformDisplayEXT";
         if display == egl::NO_DISPLAY {
             return Err(format!("{display_operation} failed with 0x{:x}", unsafe {
@@ -474,7 +477,7 @@ impl EglTestContext {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 impl Drop for EglTestContext {
     fn drop(&mut self) {
         unsafe {
@@ -491,14 +494,14 @@ impl Drop for EglTestContext {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn load_egl_library() -> std::result::Result<Library, Box<dyn StdError>> {
     unsafe { Library::new("libEGL.so.1") }
         .or_else(|_| unsafe { Library::new("libEGL.so") })
         .map_err(|error| format!("failed to load libEGL: {error}").into())
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn load_egl_bindings(lib: &Library) -> std::result::Result<egl::Egl, Box<dyn StdError>> {
     type EglGetProcAddress = unsafe extern "system" fn(*const c_void) -> *const c_void;
 
@@ -825,7 +828,7 @@ impl OpenGLTestContext {
         Self::new_platform(width, height)
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     fn new_platform(_width: u32, _height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
         let platform = EglTestContext::new()?;
         let gl = unsafe {
@@ -865,7 +868,7 @@ impl OpenGLTestContext {
         })
     }
 
-    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    #[cfg(not(any(target_os = "linux", target_os = "android", target_os = "windows")))]
     fn new_platform(_width: u32, _height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
         Err("OpenGL test context is only available on Windows WGL and Linux EGL".into())
     }
@@ -879,7 +882,7 @@ impl OpenGLTestContext {
     }
 
     fn make_current(&self) -> std::result::Result<(), Box<dyn StdError>> {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         {
             self.platform.make_current()?;
             Ok(())
@@ -889,7 +892,7 @@ impl OpenGLTestContext {
             self.platform.make_current()?;
             Ok(())
         }
-        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+        #[cfg(not(any(target_os = "linux", target_os = "android", target_os = "windows")))]
         {
             Ok(())
         }

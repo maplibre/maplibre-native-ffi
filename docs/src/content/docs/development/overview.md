@@ -90,6 +90,23 @@ ANDROID_HOME = "/home/you/Android/Sdk"
 Mise loads `mise.local.toml` automatically. The Android package versions are
 `mise.toml` variables and may be overridden the same way.
 
+The Android emulator and its system image are Android SDK packages rather than
+mise tools. `//:android-emulator:boot` installs them into `ANDROID_HOME` the
+first time it runs. Both emulators boot on demand and keep running until
+stopped:
+
+```bash
+mise run test android-x64-egl
+mise run //:android-emulator:stop
+
+mise run test ohos-x64-egl
+mise run //:ohos-emulator:stop
+```
+
+Both emulators take their hardware acceleration from KVM on Linux. A host whose
+user can read and write `/dev/kvm` boots one in a few minutes. Every other host
+runs the guest in software, where a boot takes an hour or more.
+
 Run the headless Zig readback example:
 
 ```bash
