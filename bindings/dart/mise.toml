@@ -97,6 +97,9 @@ case "$usage_preset" in
     flutter build ios --release --no-codesign
     ;;
   ios-simulator-arm64-*)
+    # Flutter prepares native assets for every standard simulator architecture
+    # before Xcode narrows a debug build to the active architecture.
+    printf '\nARCHS = arm64\n' >>ios/Flutter/Debug.xcconfig
     flutter build ios --debug --simulator --no-codesign
     ;;
 esac
