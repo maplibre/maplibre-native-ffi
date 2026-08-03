@@ -260,7 +260,7 @@ export class Maplibre {
    * Each owner thread may hold one live runtime.
    */
   createRuntime(options?: RuntimeOptions): Runtime {
-    return Runtime.create(this.#native, options);
+    return Runtime.create(this.#native, this.#callbacks, options);
   }
 
   /** Adopts a wake source another host context transferred. */

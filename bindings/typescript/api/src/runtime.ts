@@ -9,16 +9,27 @@
 
 import { MaplibreError } from "./errors.ts";
 import type { RuntimeEvent } from "./events.ts";
-import { RuleTable } from "./internal/callbacks.ts";
+import {
+  type CallbackRegistry,
+  ProviderRegistration,
+  RuleTable,
+} from "./internal/callbacks.ts";
 import { decodeEvent } from "./internal/event-decode.ts";
 import { HandleState } from "./internal/handle.ts";
 import type { Native } from "./internal/native.ts";
 import { asInt64 } from "./internal/numbers.ts";
 import { attachHandleState, mapForId } from "./internal/private.ts";
+import { readQueuedRequest } from "./internal/queued-request.ts";
 import type { Ptr } from "./internal/transport.ts";
 import { Map, type MapOptions } from "./map.ts";
 import { EP } from "./raw/entrypoints.ts";
-import { ANY_RESOURCE_KIND, type ResourceRewriteRule } from "./resources.ts";
+import type { ResourceRequest } from "./resource-request.ts";
+import {
+  ANY_RESOURCE_KIND,
+  type ResourceRewriteRule,
+  type ResourceRoute,
+  routeFlags,
+} from "./resources.ts";
 
 /** How a runtime is configured at creation. */
 export interface RuntimeOptions {
@@ -248,11 +259,15 @@ export class Runtime {
   readonly #state: HandleState;
   readonly #eventStorage: Ptr;
   #rewriteRules: RuleTable | undefined;
+  #provider: ProviderRegistration | undefined;
   readonly #hasEventStorage: Ptr;
 
-  private constructor(native: Native, id: bigint) {
+  readonly #callbacks: CallbackRegistry;
+
+  private constructor(native: Native, id: bigint, callbacks: CallbackRegistry) {
     this.#state = new HandleState(native, "Runtime", id);
     this.#state.watchForLeaks(this);
+    this.#callbacks = callbacks;
     attachHandleState(this, this.#state);
     // Poll storage belongs to the runtime rather than to each call: the C API
     // fills the same shape every time, and a per-call allocation would churn
@@ -263,7 +278,11 @@ export class Runtime {
   }
 
   /** @internal */
-  static create(native: Native, options: RuntimeOptions = {}): Runtime {
+  static create(
+    native: Native,
+    callbacks: CallbackRegistry,
+    options: RuntimeOptions = {},
+  ): Runtime {
     const id = native.scope((scope) => {
       const layout = native.layout("mln_runtime_options");
       const storage = scope.allocateZeroed(layout.size);
@@ -285,7 +304,7 @@ export class Runtime {
       return native.memory.view(outRuntime, 8).getBigUint64(0, true);
     });
     try {
-      return new Runtime(native, id);
+      return new Runtime(native, id, callbacks);
     } catch (error) {
       // The native handle exists and nothing owns it, so it is released here
       // rather than left for a leak report that names no wrapper.
@@ -426,6 +445,96 @@ export class Runtime {
     this.#rewriteRules = table;
   }
 
+  /**
+   * Serves resources this host claims.
+   *
+   * The routes are evaluated in native code the moment MapLibre asks, so a
+   * request no route matches passes straight through to the native loader. A
+   * claimed request is copied and handed to the handler on this execution
+   * context, and the handler answers it whenever it can.
+   *
+   * Installing a provider replaces the previous one.
+   */
+  setResourceProvider(
+    routes: readonly ResourceRoute[],
+    handler: (request: ResourceRequest) => void,
+  ): void {
+    const id = this.#state.use("Runtime.setResourceProvider");
+    const native = this.#state.native;
+    const registration = new ProviderRegistration(
+      native,
+      this.#callbacks,
+      routes.map((route) => ({
+        kind: route.kind?.rawValue ?? ANY_RESOURCE_KIND,
+        flags: routeFlags(route),
+        url: route.url,
+      })),
+      (record) => {
+        handler(readQueuedRequest(native, record));
+      },
+    );
+    try {
+      native.scope((scope) => {
+        const layout = native.layout("mln_resource_provider");
+        const provider = scope.allocateZeroed(layout.size, layout.align);
+        native.memory
+          .view(provider, layout.size)
+          .setUint32(layout.fields.size!.offset, layout.size, true);
+        native.memory.writePointer(
+          (provider + BigInt(layout.fields.callback!.offset)) as Ptr,
+          native.transport.symbol(
+            EP.mln_adapter_queued_resource_provider_callback,
+          ),
+        );
+        native.memory.writePointer(
+          (provider + BigInt(layout.fields.user_data!.offset)) as Ptr,
+          registration.provider,
+        );
+        native.checked(scope, EP.mln_runtime_set_resource_provider, [
+          id,
+          provider,
+        ]);
+      });
+    } catch (error) {
+      registration.retire();
+      throw error;
+    }
+    this.#retireProvider();
+    this.#provider = registration;
+  }
+
+  /** Stops serving resources from this host. */
+  clearResourceProvider(): void {
+    const id = this.#state.use("Runtime.clearResourceProvider");
+    const native = this.#state.native;
+    native.scope((scope) => {
+      native.checked(scope, EP.mln_runtime_clear_resource_provider, [id]);
+    });
+    this.#retireProvider();
+  }
+
+  /**
+   * Retires the installed provider.
+   *
+   * The C call that replaced or cleared it has returned, so native code can no
+   * longer reach the registration. Asking the adapter to deliver its retirement
+   * record is what releases the host state behind it, after the records already
+   * queued for it drain.
+   */
+  #retireProvider(): void {
+    const provider = this.#provider;
+    if (provider === undefined) {
+      return;
+    }
+    this.#provider = undefined;
+    const native = this.#state.native;
+    native.scope((scope) => {
+      native.raw(scope, EP.mln_adapter_queued_resource_provider_retire, [
+        provider.provider,
+      ]);
+    });
+  }
+
   /** Stops rewriting resource URLs. */
   clearResourceRewriteRules(): void {
     const id = this.#state.use("Runtime.clearResourceRewriteRules");
@@ -450,6 +559,7 @@ export class Runtime {
     });
     // Storage is returned only once the native handle is gone, so a failed
     // destroy leaves the runtime usable for a retry.
+    this.#retireProvider();
     this.#rewriteRules?.release();
     this.#rewriteRules = undefined;
     native.memory.free(this.#eventStorage);

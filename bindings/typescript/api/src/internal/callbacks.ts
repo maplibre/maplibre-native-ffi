@@ -324,3 +324,105 @@ export function writeSize(native: Native, address: Ptr, value: number): void {
   }
   view.setUint32(0, value, true);
 }
+
+/**
+ * A queued resource provider registration.
+ *
+ * The routes decide in native code, at the moment MapLibre asks, whether a
+ * request is this provider's. A claimed request is copied and queued; everything
+ * else passes through to the native loader untouched.
+ */
+export class ProviderRegistration implements Registration {
+  readonly kind = RecordKind.resourceRequest;
+  readonly #native: Native;
+  readonly #allocations: Ptr[] = [];
+  readonly #handler: (request: Ptr) => void;
+  readonly provider: Ptr;
+  readonly id: bigint;
+
+  constructor(
+    native: Native,
+    registry: CallbackRegistry,
+    routes: readonly { kind: number; flags: number; url: string }[],
+    handler: (request: Ptr) => void,
+  ) {
+    this.#native = native;
+    this.#handler = handler;
+    const allocate = (size: number, alignment?: number): Ptr => {
+      const address = native.memory.allocate(size, alignment);
+      this.#allocations.push(address);
+      native.memory.bytes(address, size).fill(0);
+      return address;
+    };
+
+    try {
+      const routeLayout = native.layout(
+        "mln_adapter_queued_resource_provider_route",
+      );
+      const providerLayout = native.layout(
+        "mln_adapter_queued_resource_provider",
+      );
+      const array = allocate(
+        Math.max(routeLayout.size * routes.length, 1),
+        routeLayout.align,
+      );
+      routes.forEach((route, index) => {
+        const base = (array + BigInt(index * routeLayout.size)) as Ptr;
+        const view = native.memory.view(base, routeLayout.size);
+        view.setUint32(routeLayout.fields.kind!.offset, route.kind, true);
+        view.setUint32(routeLayout.fields.flags!.offset, route.flags, true);
+        const bytes = new TextEncoder().encode(route.url);
+        if (bytes.includes(0)) {
+          throw new MaplibreError(
+            "invalidInput",
+            "a route url contains an embedded NUL, which a C string cannot carry",
+          );
+        }
+        const url = allocate(bytes.length + 1, 1);
+        native.memory.bytes(url, bytes.length + 1).set(bytes);
+        native.memory.writePointer(
+          (base + BigInt(routeLayout.fields.url!.offset)) as Ptr,
+          url,
+        );
+      });
+
+      this.provider = allocate(providerLayout.size, providerLayout.align);
+      native.memory.writePointer(
+        (this.provider + BigInt(providerLayout.fields.routes!.offset)) as Ptr,
+        array,
+      );
+      writeSize(
+        native,
+        (this.provider +
+          BigInt(providerLayout.fields.route_count!.offset)) as Ptr,
+        routes.length,
+      );
+      native.memory.writePointer(
+        (this.provider + BigInt(providerLayout.fields.listener!.offset)) as Ptr,
+        native.transport.listenerAddress(RecordKind.resourceRequest),
+      );
+      this.id = registry.register(this);
+      native.memory.writePointer(
+        (this.provider +
+          BigInt(providerLayout.fields.listener_data!.offset)) as Ptr,
+        this.id as Ptr,
+      );
+    } catch (error) {
+      for (const address of this.#allocations) {
+        native.memory.free(address);
+      }
+      throw error;
+    }
+  }
+
+  deliver(request: Ptr): void {
+    this.#handler(request);
+  }
+
+  retire(): void {
+    for (const address of this.#allocations) {
+      this.#native.memory.free(address);
+    }
+    this.#allocations.length = 0;
+  }
+}

@@ -56,6 +56,13 @@ export {
   type RenderBackends,
 } from "./maplibre.ts";
 export {
+  ResourceErrorReason,
+  ResourceRequest,
+  type ResourceRequestInfo,
+  type ResourceResponse,
+  ResourceResponseStatus,
+} from "./resource-request.ts";
+export {
   ANY_RESOURCE_KIND,
   ResourceKind,
   type ResourceRewriteRule,
