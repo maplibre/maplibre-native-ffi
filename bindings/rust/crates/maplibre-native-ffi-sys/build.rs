@@ -38,6 +38,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     // `links` key turns this into DEP_MAPLIBRE_NATIVE_C_RUNTIME_DIR for the
     // crates that need it.
     println!("cargo:runtime-dir={}", runtime_dir.display());
+    // The TypeScript binding compiles its own C against these headers, so it
+    // needs the prefix this build script resolved rather than resolving one of
+    // its own and risking a different artifact.
+    println!("cargo:include-dir={}", include_dir.display());
     println!("cargo:rerun-if-env-changed=LIBCLANG_PATH");
     println!("cargo:rerun-if-env-changed=BINDGEN_EXTRA_CLANG_ARGS");
     println!("cargo:rerun-if-env-changed=SDKROOT");

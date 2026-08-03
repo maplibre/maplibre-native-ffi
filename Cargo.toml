@@ -5,6 +5,8 @@ members = [
   "bindings/rust/crates/maplibre-native-ffi",
   "bindings/rust/crates/maplibre-native-ffi-core",
   "bindings/rust/crates/maplibre-native-ffi-sys",
+  "bindings/typescript/addon",
+  "bindings/typescript/codegen",
   "examples/rust-map",
   "src/platform/rust",
 ]
