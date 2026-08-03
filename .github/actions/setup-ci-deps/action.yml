@@ -22,6 +22,14 @@ inputs:
     description: Set up Gradle and its user-home cache; jobs that run no Gradle build leave this off
     required: false
     default: "true"
+  flutter:
+    description: Install and cache Flutter for a mobile Dart binding build
+    required: false
+    default: "false"
+  flutter-version:
+    description: Flutter version to install when Flutter is enabled
+    required: false
+    default: ""
   save-toolchains:
     description: >-
       Save the toolchain cache when this job misses it. One job per runner label
@@ -345,6 +353,7 @@ runs:
         # entry that size adds.
         path: |
           ~/.local/share/mise
+          !~/.local/share/mise/installs/flutter
           !~/.local/share/mise/installs/emsdk
           !~/.local/share/mise/installs/ohos-sdk
           ~/AppData/Local/mise
@@ -361,6 +370,18 @@ runs:
       with:
         cache: false
         bootstrap: true
+
+    - name: Cache Flutter SDK
+      if: ${{ inputs.flutter == 'true' }}
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.local/share/mise/installs/flutter/${{ inputs.flutter-version }}
+        key: ${{ runner.os }}-${{ runner.arch }}-flutter-${{ inputs.flutter-version }}
+
+    - name: Install Flutter
+      if: ${{ inputs.flutter == 'true' }}
+      shell: bash
+      run: MISE_NO_HOOKS=1 mise install core:flutter@${{ inputs.flutter-version }}
 
     # `mise bootstrap` above installs the root config's tools; `--monorepo` adds
     # every `[monorepo].config_roots` entry, which is what the jobs run against.
@@ -403,6 +424,7 @@ runs:
         # Matches the restore above, exclusions included.
         path: |
           ~/.local/share/mise
+          !~/.local/share/mise/installs/flutter
           !~/.local/share/mise/installs/emsdk
           !~/.local/share/mise/installs/ohos-sdk
           ~/AppData/Local/mise

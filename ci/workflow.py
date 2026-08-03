@@ -87,6 +87,7 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
     commands = [f"mise run //bindings/kotlin:androidBuild {arguments} --prebuilt"]
     if build_map:
         commands.append(f"mise run //examples/android-map:build {arguments} --prebuilt")
+    commands.append(f"mise run //bindings/dart:build:mobile {preset}")
     return commands
 
 
@@ -114,6 +115,7 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
                 f"mise run //bindings/kotlin:iosBuild {preset}",
                 "mise run //bindings/swift:build:ios",
                 "mise run //examples/swift-map:build:ios",
+                f"mise run //bindings/dart:build:mobile {preset}",
             ]
         )
     elif target_platform == "ios-simulator":
@@ -124,6 +126,7 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
                 "mise run //bindings/zig:test:ios-simulator",
                 "bash scripts/run-ios-simulator-test.sh .build/ios-simulator/arm64-apple-ios-simulator/debug/MaplibreNativeFFIIOSSimulatorTests 120",
                 "mise run //examples/swift-map:build:ios-simulator",
+                f"mise run //bindings/dart:build:mobile {preset}",
             ]
         )
     elif target_platform in DESKTOP:
@@ -177,6 +180,14 @@ def uses_gradle(commands: list[str]) -> bool:
     )
 
 
+def uses_flutter(commands: list[str]) -> bool:
+    """Whether a row builds the Dart binding through a Flutter mobile host."""
+    return any(
+        command.startswith("mise run //bindings/dart:build:mobile")
+        for command in commands
+    )
+
+
 def preset_sets(
     presets: dict[str, object],
 ) -> tuple[list[str], set[str], set[str], set[str]]:
@@ -223,6 +234,7 @@ def target_rows(
             "package": preset in packaged,
             "zig": uses_zig(native + consumers),
             "gradle": uses_gradle(native + consumers),
+            "flutter": uses_flutter(native + consumers),
             "save_toolchains": row_runner not in claimed_runners,
             "native_commands": native if preset in packaged else native + consumers,
         }

@@ -13,7 +13,7 @@ dependencies:
   code_assets: ^1.2.1
   crypto: ^3.0.7
   ffi: ^2.1.4
-  hooks: ^2.1.0
+  hooks: ^2.0.2
 
 dev_dependencies:
   ffigen: ^20.0.0

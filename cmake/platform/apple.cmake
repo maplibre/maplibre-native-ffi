@@ -45,9 +45,7 @@ function(mln_ffi_configure_platform_dependencies target)
           MLN_FFI_TARGET_PLATFORM ios-simulator-arm64 MLN_FFI_ZIG_TARGET
           aarch64-ios-simulator MLN_FFI_TEST_SUPPORTED TRUE)
     else()
-      set_target_properties(
-        ${target}
-        PROPERTIES MLN_FFI_SHARED_SUPPORTED FALSE MLN_FFI_TEST_SUPPORTED FALSE)
+      set_target_properties(${target} PROPERTIES MLN_FFI_TEST_SUPPORTED FALSE)
     endif()
   else()
     set_target_properties(
