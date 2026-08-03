@@ -210,6 +210,10 @@ fn renderLoop(
                     // caller-owned target allocates a replacement and hands it
                     // over.
                     try target.resize(current_viewport.*);
+                    // The session resize enqueued the new extent to the map's
+                    // owner thread, so release its parked pump the way an
+                    // input command does.
+                    map_channel.wakeRuntimeLoop();
                     render_request.set();
                 },
                 else => {

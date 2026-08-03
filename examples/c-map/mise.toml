@@ -1,0 +1,38 @@
+[tools]
+"conda:sdl3" = { version = "3.2", os = ["linux"] }
+
+[tasks.build]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+sdl_prefix="$(mise where conda:sdl3@3.2)"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig:$sdl_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+cmake -S . -B "$MISE_MONOREPO_ROOT/build/$usage_preset/c-map" -G Ninja \
+  -DMLN_NATIVE_INSTALL_DIR="$native_install_dir" \
+  -DMLN_DEPENDENCY_INCLUDE_DIR="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
+cmake --build "$MISE_MONOREPO_ROOT/build/$usage_preset/c-map"
+'''
+
+[tasks.run]
+depends = [{ task = ":build", args = ["{{vars.host_native_preset}}"] }]
+usage = '''
+arg "[render-target]" default="owned-texture" {
+  choices "owned-texture" "borrowed-texture" "native-surface"
+}
+'''
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/{{vars.host_native_preset}}/install"
+sdl_prefix="$(mise where conda:sdl3@3.2)"
+export LD_LIBRARY_PATH="$native_install_dir/lib:$sdl_prefix/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+"$MISE_MONOREPO_ROOT/build/{{vars.host_native_preset}}/c-map/c-map" "{{ usage.render_target }}"
+'''
+
+[tasks."run:owned-texture"]
+run = [{ task = "run", args = ["owned-texture"] }]
+
+[tasks."run:borrowed-texture"]
+run = [{ task = "run", args = ["borrowed-texture"] }]
+
+[tasks."run:native-surface"]
+run = [{ task = "run", args = ["native-surface"] }]

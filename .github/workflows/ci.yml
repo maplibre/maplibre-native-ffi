@@ -125,6 +125,9 @@ jobs:
       - run: mise run //examples/go-map:check linux-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/c-map:build linux-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/python:test linux-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
@@ -213,6 +216,9 @@ jobs:
       - run: mise run //bindings/go:test linux-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/c-map:build linux-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/python:test linux-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
@@ -296,6 +302,9 @@ jobs:
       - run: mise run //examples/go-map:check linux-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/c-map:build linux-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/python:test linux-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
@@ -373,6 +382,9 @@ jobs:
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/go:test linux-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/c-map:build linux-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/python:test linux-arm64-vulkan

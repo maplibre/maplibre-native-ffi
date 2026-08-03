@@ -87,9 +87,8 @@ const VulkanTextureCompositor = struct {
         allocator: std.mem.Allocator,
         window: *c.SDL_Window,
         viewport: types.Viewport,
-        exportable_textures: bool,
     ) !VulkanTextureCompositor {
-        var context = try Context.init(allocator, window, exportable_textures);
+        var context = try Context.init(allocator, window);
         errdefer context.deinit();
 
         var swapchain = try Swapchain.init(allocator, &context, viewport);
@@ -188,10 +187,14 @@ const VulkanTextureCompositor = struct {
             .pResults = null,
         };
         const present = c.vkQueuePresentKHR(self.context.queue, &present_info);
-        if (present != c.VK_SUCCESS and
-            present != c.VK_SUBOPTIMAL_KHR and
-            present != c.VK_ERROR_OUT_OF_DATE_KHR)
-        {
+        if (present == c.VK_ERROR_OUT_OF_DATE_KHR) {
+            // Nothing reached the screen. The sampling pass was submitted, so
+            // wait it out before the caller releases its frame, and report no
+            // present so the render request is set again.
+            self.waitForFrame() catch {};
+            return false;
+        }
+        if (present != c.VK_SUCCESS and present != c.VK_SUBOPTIMAL_KHR) {
             self.waitForFrame() catch {};
             try util.expectVk(present);
         }
@@ -210,7 +213,7 @@ const VulkanOwnedTextureBackend = struct {
         viewport: types.Viewport,
     ) !VulkanOwnedTextureBackend {
         var self = VulkanOwnedTextureBackend{
-            .compositor = try VulkanTextureCompositor.init(allocator, window, viewport, false),
+            .compositor = try VulkanTextureCompositor.init(allocator, window, viewport),
             .session = .none,
             .pending_frame = null,
         };
@@ -387,7 +390,7 @@ const VulkanBorrowedTextureBackend = struct {
         window: *c.SDL_Window,
         viewport: types.Viewport,
     ) !VulkanBorrowedTextureBackend {
-        var compositor = try VulkanTextureCompositor.init(allocator, window, viewport, false);
+        var compositor = try VulkanTextureCompositor.init(allocator, window, viewport);
         errdefer compositor.deinit();
         var self = VulkanBorrowedTextureBackend{
             .borrowed_image = try BorrowedImage.init(&compositor.context, viewport),
@@ -496,7 +499,7 @@ const VulkanSurfaceBackend = struct {
         _: types.Viewport,
     ) !VulkanSurfaceBackend {
         var self = VulkanSurfaceBackend{
-            .context = try Context.init(allocator, window, false),
+            .context = try Context.init(allocator, window),
             .session = .none,
         };
         errdefer self.deinit();

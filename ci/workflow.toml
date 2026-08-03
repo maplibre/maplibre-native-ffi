@@ -58,6 +58,10 @@ commands = [
 ]
 
 [[suites]]
+platforms = ["linux"]
+commands = [{ task = "//examples/c-map:build" }]
+
+[[suites]]
 platforms = ["linux", "macos", "windows"]
 commands = [{ task = "//bindings/python:test" }]
 
