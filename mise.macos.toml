@@ -6,6 +6,7 @@ host_native_preset = "macos-arm64-metal"
 "brew:glslang" = "latest"
 "brew:molten-vk" = "latest"
 "brew:pkgconf" = "latest"
+"brew:qemu" = "latest"
 "brew:vulkan-loader" = "latest"
 
 [env]

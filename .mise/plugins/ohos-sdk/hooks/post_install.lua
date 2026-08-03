@@ -3,8 +3,9 @@ local file = require("file")
 
 -- The archive holds one directory per host, each a set of component archives, and
 -- mise leaves whatever prefix the publisher used above them in place. Reduce that
--- to the components for this host, then unpack the one component a native build
--- needs, so the install directory looks the same whichever archive produced it.
+-- to the components for this host, then unpack the native and device-tool
+-- components, so the install directory looks the same whichever archive produced
+-- it.
 
 local function quote(path)
   return "'" .. path:gsub("'", "'\\''") .. "'"
@@ -62,28 +63,41 @@ function PLUGIN:PostInstall(ctx)
       .. quote(staging)
   )
 
-  local archives = lines(
-    run("find " .. quote(root) .. " -maxdepth 1 -name 'native-*.zip'")
-  )
-  if #archives ~= 1 then
-    error("expected one native component archive, found " .. #archives)
+  local archives = {}
+  for _, component in ipairs({ "native", "toolchains" }) do
+    local matches = lines(
+      run(
+        "find "
+          .. quote(root)
+          .. " -maxdepth 1 -name "
+          .. quote(component .. "-*.zip")
+      )
+    )
+    if #matches ~= 1 then
+      error("expected one " .. component .. " component archive, found " .. #matches)
+    end
+    table.insert(archives, matches[1])
   end
 
   -- lib/extract_zip.py explains why the built-in extractor is not used here.
-  run(
-    "python3 "
-      .. quote(RUNTIME.pluginDirPath .. "/lib/extract_zip.py")
-      .. " "
-      .. quote(archives[1])
-      .. " "
-      .. quote(root)
-      .. "; rm -f "
-      .. quote(root)
-      .. "/*.zip"
-  )
+  for _, archive in ipairs(archives) do
+    run(
+      "python3 "
+        .. quote(RUNTIME.pluginDirPath .. "/lib/extract_zip.py")
+        .. " "
+        .. quote(archive)
+        .. " "
+        .. quote(root)
+    )
+  end
+  run("rm -f " .. quote(root) .. "/*.zip")
 
   local toolchain = root .. "/native/build/cmake/ohos.toolchain.cmake"
   if not file.exists(toolchain) then
     error("the installed SDK has no CMake toolchain file at " .. toolchain)
+  end
+  local hdc = root .. "/toolchains/hdc"
+  if not file.exists(hdc) then
+    error("the installed SDK has no device connector at " .. hdc)
   end
 end

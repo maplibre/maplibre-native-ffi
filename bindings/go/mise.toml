@@ -64,10 +64,18 @@ case "$usage_preset" in
     goarch=amd64
     compiler_prefix=x86_64-linux-android
     ;;
-  ohos-*)
+  ohos-arm64-*)
     export GOOS=linux GOARCH=arm64 CGO_ENABLED=1
     sysroot="$OHOS_SDK_NATIVE/sysroot"
     target_flags="--target=aarch64-linux-ohos --sysroot=$sysroot"
+    export CC="$OHOS_SDK_NATIVE/llvm/bin/clang $target_flags"
+    export CXX="$OHOS_SDK_NATIVE/llvm/bin/clang++ $target_flags"
+    exec go test -c -o /dev/null .
+    ;;
+  ohos-x64-*)
+    export GOOS=linux GOARCH=amd64 CGO_ENABLED=1
+    sysroot="$OHOS_SDK_NATIVE/sysroot"
+    target_flags="--target=x86_64-linux-ohos --sysroot=$sysroot"
     export CC="$OHOS_SDK_NATIVE/llvm/bin/clang $target_flags"
     export CXX="$OHOS_SDK_NATIVE/llvm/bin/clang++ $target_flags"
     exec go test -c -o /dev/null .
@@ -103,4 +111,41 @@ export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 go test ./...
 go vet ./...
+'''
+
+[tasks."test:ohos-emulator"]
+description = "Run the Go binding tests in the OpenHarmony emulator."
+depends = [{ task = "//:build", args = ["ohos-x64-egl"] }]
+run = '''
+set -euo pipefail
+native_install_dir="$MISE_MONOREPO_ROOT/build/ohos-x64-egl/install"
+test_dir="$MISE_MONOREPO_ROOT/build/ohos-emulator/go"
+mkdir -p "$test_dir"
+find "$test_dir" -maxdepth 1 -type f -name '*.test' -delete
+
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+export GOOS=linux GOARCH=amd64 CGO_ENABLED=1
+sysroot="$OHOS_SDK_NATIVE/sysroot"
+target_flags="--target=x86_64-linux-ohos --sysroot=$sysroot"
+export CC="$OHOS_SDK_NATIVE/llvm/bin/clang $target_flags"
+export CXX="$OHOS_SDK_NATIVE/llvm/bin/clang++ $target_flags"
+go test -c -o "$test_dir/" ./...
+go vet ./...
+
+mise run //:ohos-emulator:boot
+shopt -s nullglob
+found_test=false
+for test_binary in "$test_dir"/*.test; do
+  found_test=true
+  bash "$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator-test.sh" \
+    "$test_binary" \
+    "$native_install_dir/lib/libmaplibre-native-c.so" \
+    "$OHOS_SDK_NATIVE/llvm/lib/x86_64-linux-ohos/libc++_shared.so" \
+    180 \
+    -test.v
+done
+if [[ "$found_test" != true ]]; then
+  echo "The Go build produced no OpenHarmony test executables." >&2
+  exit 1
+fi
 '''

@@ -1078,6 +1078,7 @@ mod tests {
         (base_url, receiver, handle)
     }
 
+    #[cfg(not(target_env = "ohos"))]
     fn spawn_recording_style_server(
         request_count: usize,
     ) -> (
@@ -1112,6 +1113,7 @@ mod tests {
         (base_url, receiver, handle)
     }
 
+    #[cfg(not(target_env = "ohos"))]
     fn spawn_redirect_style_servers() -> (
         String,
         std::sync::mpsc::Receiver<(String, bool)>,
@@ -2162,6 +2164,7 @@ mod tests {
         server.join().unwrap();
     }
 
+    #[cfg(not(target_env = "ohos"))]
     #[test]
     // Spec coverage: BND-158 and BND-159.
     fn http_header_transform_reaches_requests_and_clear_stops_it() {
@@ -2207,6 +2210,7 @@ mod tests {
         server.join().unwrap();
     }
 
+    #[cfg(not(target_env = "ohos"))]
     #[test]
     // Spec coverage: BND-158.
     fn http_header_transform_skips_non_http_urls() {
@@ -2230,6 +2234,7 @@ mod tests {
         runtime.close().unwrap();
     }
 
+    #[cfg(not(target_env = "ohos"))]
     #[test]
     // Spec coverage: BND-159.
     fn http_header_transform_preserves_same_origin_and_strips_cross_origin_redirects() {
@@ -2275,6 +2280,17 @@ mod tests {
         for server in servers {
             server.join().unwrap();
         }
+    }
+
+    #[cfg(target_env = "ohos")]
+    #[test]
+    fn http_header_transform_reports_unsupported_on_openharmony() {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let error = runtime
+            .set_http_header_transform(|_| Vec::new())
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::Unsupported);
+        runtime.close().unwrap();
     }
 
     #[test]

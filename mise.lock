@@ -1258,6 +1258,30 @@ url = "https://dl.google.com/go/go1.26.3.windows-arm64.zip"
 checksum = "sha256:20d2ceafb4ed41b96b879010927b28bc92a5be57a7c1801ce365a9ca51d3224a"
 url = "https://dl.google.com/go/go1.26.3.windows-amd64.zip"
 
+[[tools."http:oniro-emulator"]]
+version = "6.1"
+backend = "http:oniro-emulator"
+
+[tools."http:oniro-emulator"."platforms.linux-arm64"]
+checksum = "sha256:a30e01f1b161e0fdcd91263f30f29cc92bfa49c1776d5ee2c46caefef055b2da"
+url = "https://github.com/eclipse-oniro4openharmony/device_board_oniro/releases/download/v6.1/oniro_emulator.zip"
+
+[tools."http:oniro-emulator"."platforms.linux-x64"]
+checksum = "sha256:a30e01f1b161e0fdcd91263f30f29cc92bfa49c1776d5ee2c46caefef055b2da"
+url = "https://github.com/eclipse-oniro4openharmony/device_board_oniro/releases/download/v6.1/oniro_emulator.zip"
+
+[tools."http:oniro-emulator"."platforms.macos-arm64"]
+checksum = "sha256:a30e01f1b161e0fdcd91263f30f29cc92bfa49c1776d5ee2c46caefef055b2da"
+url = "https://github.com/eclipse-oniro4openharmony/device_board_oniro/releases/download/v6.1/oniro_emulator.zip"
+
+[tools."http:oniro-emulator"."platforms.windows-arm64"]
+checksum = "sha256:a30e01f1b161e0fdcd91263f30f29cc92bfa49c1776d5ee2c46caefef055b2da"
+url = "https://github.com/eclipse-oniro4openharmony/device_board_oniro/releases/download/v6.1/oniro_emulator.zip"
+
+[tools."http:oniro-emulator"."platforms.windows-x64"]
+checksum = "sha256:a30e01f1b161e0fdcd91263f30f29cc92bfa49c1776d5ee2c46caefef055b2da"
+url = "https://github.com/eclipse-oniro4openharmony/device_board_oniro/releases/download/v6.1/oniro_emulator.zip"
+
 [[tools.java]]
 version = "zulu-25.34.17.0"
 backend = "core:java"
@@ -1382,6 +1406,15 @@ backend = "core:rust"
 components = "clippy,rust-src,rustfmt"
 profile = "minimal"
 targets = "aarch64-linux-android,aarch64-pc-windows-msvc,aarch64-unknown-linux-ohos,wasm32-unknown-emscripten,x86_64-linux-android,x86_64-pc-windows-msvc"
+
+[[tools.rust]]
+version = "1.95.0"
+backend = "core:rust"
+
+[tools.rust.options]
+components = "clippy,rust-src,rustfmt"
+profile = "minimal"
+targets = "aarch64-linux-android,aarch64-pc-windows-msvc,aarch64-unknown-linux-ohos,wasm32-unknown-emscripten,x86_64-linux-android,x86_64-pc-windows-msvc,x86_64-unknown-linux-ohos"
 
 [[tools.sccache]]
 version = "0.16.0"

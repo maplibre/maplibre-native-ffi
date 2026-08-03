@@ -979,6 +979,43 @@ jobs:
       - run: mise run //bindings/rust:build ohos-arm64-vulkan
       - run: mise run //bindings/go:build ohos-arm64-vulkan
 
+  target-ohos-x64-egl:
+    name: target / ohos-x64-egl
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: ohos-x64-egl
+          gradle: false
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test ohos-x64-egl
+      - run: mise run //bindings/rust:test:ohos-emulator
+      - run: mise run //bindings/go:test:ohos-emulator
+
+  target-ohos-x64-vulkan:
+    name: target / ohos-x64-vulkan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: ohos-x64-vulkan
+          gradle: false
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run //bindings/rust:build ohos-x64-vulkan
+      - run: mise run //bindings/go:build ohos-x64-vulkan
+
   target-windows-x64-wgl:
     name: target / windows-x64-wgl
     runs-on: windows-2022
@@ -1284,6 +1321,8 @@ jobs:
       - target-android-x64-vulkan
       - target-ohos-arm64-egl
       - target-ohos-arm64-vulkan
+      - target-ohos-x64-egl
+      - target-ohos-x64-vulkan
       - target-windows-x64-wgl
       - target-windows-x64-vulkan
       - target-windows-arm64-wgl

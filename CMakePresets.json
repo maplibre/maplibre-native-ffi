@@ -97,6 +97,17 @@
       }
     },
     {
+      "name": "_ohos-x64",
+      "hidden": true,
+      "inherits": "_single-config",
+      "toolchainFile": "$env{OHOS_SDK_NATIVE}/build/cmake/ohos.toolchain.cmake",
+      "cacheVariables": {
+        "OHOS_ARCH": "x86_64",
+        "OHOS_STL": "c++_shared",
+        "MLN_FFI_ENABLE_CLANG_TIDY": false
+      }
+    },
+    {
       "name": "_windows",
       "hidden": true,
       "inherits": "_single-config",
@@ -255,6 +266,16 @@
       "inherits": ["_ohos-arm64", "_vulkan"]
     },
     {
+      "name": "ohos-x64-egl",
+      "displayName": "OHOS x64 EGL",
+      "inherits": ["_ohos-x64", "_egl"]
+    },
+    {
+      "name": "ohos-x64-vulkan",
+      "displayName": "OHOS x64 Vulkan",
+      "inherits": ["_ohos-x64", "_vulkan"]
+    },
+    {
       "name": "windows-x64-wgl",
       "displayName": "Windows x64 WGL",
       "inherits": ["_windows-x64", "_wgl"]
@@ -375,6 +396,18 @@
     {
       "name": "ohos-arm64-vulkan",
       "configurePreset": "ohos-arm64-vulkan",
+      "targets": ["install"],
+      "jobs": 0
+    },
+    {
+      "name": "ohos-x64-egl",
+      "configurePreset": "ohos-x64-egl",
+      "targets": ["install"],
+      "jobs": 0
+    },
+    {
+      "name": "ohos-x64-vulkan",
+      "configurePreset": "ohos-x64-vulkan",
       "targets": ["install"],
       "jobs": 0
     },
@@ -712,6 +745,20 @@
       "steps": [
         { "type": "configure", "name": "ohos-arm64-vulkan" },
         { "type": "build", "name": "ohos-arm64-vulkan" }
+      ]
+    },
+    {
+      "name": "ohos-x64-egl",
+      "steps": [
+        { "type": "configure", "name": "ohos-x64-egl" },
+        { "type": "build", "name": "ohos-x64-egl" }
+      ]
+    },
+    {
+      "name": "ohos-x64-vulkan",
+      "steps": [
+        { "type": "configure", "name": "ohos-x64-vulkan" },
+        { "type": "build", "name": "ohos-x64-vulkan" }
       ]
     },
     {

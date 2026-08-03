@@ -64,7 +64,8 @@ initial bootstrap stays focused on tools used across the repository. The
 published devcontainer image bakes the complete tool union for fast startup.
 
 The bootstrap includes the Android, Emscripten, and OpenHarmony SDKs, because
-`mise.toml` pins them like every other tool. Each exports the paths its CMake
+`mise.toml` pins them like every other tool. It also installs the Oniro emulator
+image that matches the OpenHarmony SDK. Each SDK exports the paths its CMake
 preset reads, so building for one of those targets needs no further setup.
 
 Together they are several gigabytes. To leave one out, name it in the
@@ -72,7 +73,7 @@ Git-ignored `mise.local.toml` at the repository root:
 
 ```toml
 [settings]
-disable_tools = ["android-sdk", "emsdk", "ohos-sdk"]
+disable_tools = ["android-sdk", "emsdk", "ohos-sdk", "http:oniro-emulator"]
 ```
 
 To build against an SDK installed elsewhere on the machine, disable the tool and

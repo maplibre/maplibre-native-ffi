@@ -62,6 +62,7 @@ runs:
 
     # The repository pins a cross-compilation SDK per non-host target, and every job
     # installs the root tools, so each job keeps only the SDK its target builds with.
+    # Emulator jobs enable the Oniro image explicitly when they start running here.
     # Android is disabled outright: the runner image ships an SDK and points
     # ANDROID_HOME at it, which costs nothing to reuse.
     - name: Scope the cross-compilation SDKs to the target (Unix)
@@ -75,9 +76,13 @@ runs:
           ohos-*) keep="ohos-sdk" ;;
           *) keep="" ;;
         esac
+        case "${TARGET}" in
+          ohos-x64-egl) keep_emulator="http:oniro-emulator" ;;
+          *) keep_emulator="" ;;
+        esac
         disabled=()
-        for tool in android-sdk emsdk ohos-sdk; do
-          if [[ "${tool}" != "${keep}" ]]; then
+        for tool in android-sdk emsdk ohos-sdk http:oniro-emulator; do
+          if [[ "${tool}" != "${keep}" && "${tool}" != "${keep_emulator}" ]]; then
             disabled+=("${tool}")
           fi
         done
@@ -90,7 +95,7 @@ runs:
     - name: Scope the cross-compilation SDKs to the target (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
-      run: '"MISE_DISABLE_TOOLS=android-sdk,emsdk,ohos-sdk" >> $env:GITHUB_ENV'
+      run: '"MISE_DISABLE_TOOLS=android-sdk,emsdk,ohos-sdk,http:oniro-emulator" >> $env:GITHUB_ENV'
 
     # The gitlink SHA is what decides the checkout, so key on it directly. A
     # tag file can be left behind by a pin bump; the recorded commit cannot.
@@ -137,6 +142,30 @@ runs:
           echo "EGL_PLATFORM=surfaceless"
           echo "LIBGL_ALWAYS_SOFTWARE=true"
         } >> "$GITHUB_ENV"
+
+    # The hosted runner image has Android build tools and KVM, but no system
+    # QEMU. Keep the emulator dependency out of every other job and the dev
+    # container.
+    - name: Install the OpenHarmony emulator host
+      if: ${{ runner.os == 'Linux' && inputs.target == 'ohos-x64-egl' }}
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends --yes qemu-system-x86
+
+    # Match the Android emulator setup: the hosted runner exposes /dev/kvm,
+    # and this rule grants the runner process access to hardware acceleration.
+    - name: Enable KVM for the OpenHarmony emulator
+      if: ${{ runner.os == 'Linux' && inputs.target == 'ohos-x64-egl' }}
+      shell: bash
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+        sudo udevadm settle --timeout=10
+        ls -l /dev/kvm
+        test -r /dev/kvm
+        test -w /dev/kvm
 
     - name: Use Windows Vulkan software driver
       if: ${{ runner.os == 'Windows' && endsWith(inputs.target, '-vulkan') }}
@@ -346,6 +375,7 @@ runs:
         path: |
           ~/.local/share/mise
           !~/.local/share/mise/installs/emsdk
+          !~/.local/share/mise/installs/http-oniro-emulator
           !~/.local/share/mise/installs/ohos-sdk
           ~/AppData/Local/mise
           ~/.rustup
@@ -404,6 +434,7 @@ runs:
         path: |
           ~/.local/share/mise
           !~/.local/share/mise/installs/emsdk
+          !~/.local/share/mise/installs/http-oniro-emulator
           !~/.local/share/mise/installs/ohos-sdk
           ~/AppData/Local/mise
           ~/.rustup
