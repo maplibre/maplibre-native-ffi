@@ -143,14 +143,27 @@ runs:
           echo "LIBGL_ALWAYS_SOFTWARE=true"
         } >> "$GITHUB_ENV"
 
-    # The hosted runner image has Android build tools but no system QEMU. Keep
-    # the emulator dependency out of every other job and the dev container.
+    # The hosted runner image has Android build tools and KVM, but no system
+    # QEMU. Keep the emulator dependency out of every other job and the dev
+    # container.
     - name: Install the OpenHarmony emulator host
       if: ${{ runner.os == 'Linux' && inputs.target == 'ohos-x64-egl' }}
       shell: bash
       run: |
         sudo apt-get update
         sudo apt-get install --no-install-recommends --yes qemu-system-x86
+
+    # Match the Android emulator setup: the hosted runner exposes /dev/kvm,
+    # and this rule grants the runner process access to hardware acceleration.
+    - name: Enable KVM for the OpenHarmony emulator
+      if: ${{ runner.os == 'Linux' && inputs.target == 'ohos-x64-egl' }}
+      shell: bash
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+        test -r /dev/kvm
+        test -w /dev/kvm
 
     - name: Use Windows Vulkan software driver
       if: ${{ runner.os == 'Windows' && endsWith(inputs.target, '-vulkan') }}
