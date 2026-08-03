@@ -21,6 +21,7 @@ from ci.workflow import (  # noqa: E402
     native_commands,
     platform,
     preset_sets,
+    runtime_tested,
 )
 
 
@@ -52,6 +53,7 @@ ENVIRONMENT_ORDER = [
     "ios-arm64",
     "ios-simulator-arm64",
     "ohos-arm64",
+    "ohos-x64",
 ]
 STATUS_LABELS = {"tested": "Tested in CI", "build-only": "Built only"}
 PROJECT_LABELS = {
@@ -114,7 +116,16 @@ def command_support(command: str) -> tuple[str, str] | None:
 
     status = (
         "tested"
-        if action in {"test", "jvmTest", "nativeTest", "run", "test:ios-simulator"}
+        if action
+        in {
+            "test",
+            "jvmTest",
+            "nativeTest",
+            "run",
+            "test:android-emulator",
+            "test:ios-simulator",
+            "test:ohos-emulator",
+        }
         else "build-only"
     )
     return project_id, status
@@ -217,7 +228,9 @@ def support_matrix() -> dict[str, Any]:
     configured, _, tested, _ = preset_sets(presets)
     native = environment_rows(
         [
-            coverage_from_preset(preset, "tested" if preset in tested else "build-only")
+            coverage_from_preset(
+                preset, "tested" if runtime_tested(preset, tested) else "build-only"
+            )
             for preset in configured
         ]
     )
