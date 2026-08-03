@@ -26,27 +26,33 @@ add_link_options(
   "-sINITIAL_MEMORY=${MLN_FFI_EMSCRIPTEN_INITIAL_MEMORY}"
   "-sSTACK_SIZE=${MLN_FFI_EMSCRIPTEN_STACK_SIZE}")
 
-# MapLibre leans on exceptions, so the model is load-bearing rather than
-# incidental, and it is not the same on both backends.
+# WebGPU is asynchronous in a browser and MapLibre calls it synchronously, so
+# the emdawnwebgpu port implements emwgpuWaitAny by suspending the calling
+# thread. Emscripten offers two mechanisms for that, and the choice reaches
+# further than it looks: it decides the exception model and whether a thread
+# that waits on WebGPU can be joined.
 #
-# Native Wasm exceptions cost far less than emulating them in JavaScript, so
-# WebGL uses them. WebGPU cannot: the emdawnwebgpu port turns on Asyncify to
-# implement emwgpuWaitAny, and wasm-opt aborts when asked to run the Asyncify
-# pass over a module using native exception handling. That only shows up at -O2
-# and above, where wasm-opt runs at all, so an unoptimised link is not evidence
-# either way.
+# JSPI suspends in the VM. Nothing rewrites the module, so native Wasm
+# exceptions stay available, and emscripten's pthread glue awaits the entry
+# point, which is what marks a suspended thread exited so pthread_join returns.
 #
-# TODO(browser-webgpu): JSPI would let WebGPU keep native exceptions, and
-# emdawnwebgpu already accepts it -- its own validation asks for "Asyncify or
-# JSPI". What blocks it is upstream: MapLibre Native pins -sASYNCIFY=1 as an
-# interface link option in vendor/dawn.cmake, and an interface option lands
-# after
-# ours, so a -sJSPI here is overridden. Adopting JSPI needs that flag to become
-# configurable upstream first.
+# Asyncify instead rewrites the module through wasm-opt, which costs size and
+# speed, aborts outright over a module built with native exception handling
+# (only at -O2 and above, where wasm-opt runs at all, so an unoptimised link is
+# not evidence either way), and cannot carry a pthread entry point across a
+# suspension: invokeEntryPoint decides whether to exit the moment the entry
+# yields, which a suspension does immediately, and skips the exit because
+# Asyncify holds a runtime keepalive right then. Nothing ever reports the
+# thread as exited.
+#
+# So the browser WebGPU build selects JSPI, which restricts it to Chrome 137
+# and Firefox 139 or newer -- Safari has not shipped JSPI. WebGL suspends
+# nothing and is unaffected.
 if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
-  add_compile_options(-fexceptions)
-  add_link_options(-fexceptions)
-else()
-  add_compile_options(-fwasm-exceptions)
-  add_link_options(-fwasm-exceptions)
+  set(MLN_WEBGPU_EMDAWN_SUSPEND "-sJSPI"
+      CACHE
+        STRING
+        "Emscripten suspension link option for emdawnwebgpu (-sASYNCIFY=1 or -sJSPI)")
 endif()
+add_compile_options(-fwasm-exceptions)
+add_link_options(-fwasm-exceptions)
