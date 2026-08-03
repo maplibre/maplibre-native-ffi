@@ -32,9 +32,10 @@ jobs:
   plan:
     name: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 240
     permissions:
       actions: read
+      checks: read
       contents: read
     env:
       # The repository's postinstall hook installs the Git hooks through `hk`,
@@ -42,7 +43,7 @@ jobs:
       MISE_NO_HOOKS: "1"
     outputs:
       run_id: ${{ steps.source.outputs.run_id }}
-      sha: ${{ steps.source.outputs.sha }}
+      sha: ${{ github.sha }}
       ci_run_url: ${{ steps.source.outputs.ci_run_url }}
       snapshot_version: ${{ steps.version.outputs.value }}
       dotnet_snapshot_version: ${{ steps.version.outputs.dotnet }}
@@ -52,14 +53,9 @@ jobs:
       publish_dotnet: ${{ steps.plan.outputs.publish_dotnet }}
       publish_docs: ${{ steps.plan.outputs.publish_docs }}
     steps:
-      # The artifacts every publish job downloads come from one CI run, so that
-      # run's commit is what this workflow publishes and hashes.
-      #
-      # CI also runs on pull requests, where the run's head branch is the pull
-      # request's own branch. A branch filter alone would therefore match a run
-      # from an unmerged branch named `main`, and the jobs below would check
-      # that code out holding the publishing credentials. Only pushes reach
-      # `main`, so the event filter is what keeps this to merged commits.
+      # Publish this workflow's main commit after its CI run succeeds. A manual
+      # dispatch can overlap CI, so wait for that run instead of selecting an
+      # older successful commit.
       - name: Resolve the source CI run
         id: source
         env:
@@ -67,38 +63,62 @@ jobs:
         run: |
           set -euo pipefail
 
-          run="$(gh run list \
-            --repo "$GITHUB_REPOSITORY" \
-            --workflow CI \
-            --branch main \
-            --event push \
-            --status success \
-            --limit 1 \
-            --json databaseId,headSha,url)"
-
-          if [[ "$(jq 'length' <<<"$run")" -eq 0 ]]; then
-            echo "no successful CI run on main to publish from" >&2
+          if [[ "$GITHUB_REF" != refs/heads/main ]]; then
+            echo "snapshots publish only from main; dispatch this workflow on main" >&2
             exit 1
           fi
 
+          runs='[]'
+          for attempt in {1..30}; do
+            runs="$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow CI \
+              --branch main \
+              --commit "$GITHUB_SHA" \
+              --event push \
+              --limit 1 \
+              --json databaseId,url)"
+
+            if jq -e 'length > 0' <<<"$runs" >/dev/null; then
+              break
+            fi
+
+            if (( attempt < 30 )); then
+              sleep 10
+            fi
+          done
+
+          if [[ "$(jq 'length' <<<"$runs")" -eq 0 ]]; then
+            echo "no main CI run appeared for $GITHUB_SHA within five minutes" >&2
+            exit 1
+          fi
+
+          run="$(jq '.[0]' <<<"$runs")"
+          run_id="$(jq -r '.databaseId' <<<"$run")"
+          echo "waiting for CI run $run_id to succeed"
+          gh run watch \
+            --repo "$GITHUB_REPOSITORY" \
+            --compact \
+            --exit-status \
+            --interval 30 \
+            "$run_id"
+
           {
-            echo "run_id=$(jq -r '.[0].databaseId' <<<"$run")"
-            echo "sha=$(jq -r '.[0].headSha' <<<"$run")"
-            echo "ci_run_url=$(jq -r '.[0].url' <<<"$run")"
+            echo "run_id=$run_id"
+            echo "ci_run_url=$(jq -r '.url' <<<"$run")"
           } >> "$GITHUB_OUTPUT"
       # The gate digests each component at this commit and at the one its state
       # tag names, so it needs the history and tags behind both.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ steps.source.outputs.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      # Assert the property the event filter above is chosen for, rather than
-      # trusting the filter. Every later job checks this commit out with
-      # publishing credentials in scope, so it has to be one that reached main.
-      - name: Verify the source commit reached main
+      # A queued run can outlive a force-push that removes its commit from main.
+      # Publishing remains limited to commits that the current main contains.
+      - name: Verify the source commit remains on main
         env:
-          SNAPSHOT_SHA: ${{ steps.source.outputs.sha }}
+          SNAPSHOT_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
