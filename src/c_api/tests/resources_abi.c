@@ -427,7 +427,7 @@ static void http_header_transform_registration_follows_the_transport(void) {
     .size = sizeof(mln_http_header_transform),
     .callback = http_header_transform_stub,
   };
-#if defined(__EMSCRIPTEN__)
+#if defined(__EMSCRIPTEN__) || defined(__OHOS__)
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_UNSUPPORTED,
     mln_runtime_set_http_header_transform(runtime, &transform)

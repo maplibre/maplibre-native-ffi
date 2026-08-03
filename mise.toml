@@ -7,11 +7,16 @@ min_version = "2026.7.15"
 
 [settings]
 lockfile = true
-# The cross-compilation SDKs install when asked for, through `mise bootstrap` or
+# The large platform tools install when asked for, through `mise bootstrap` or
 # `mise install`, and never on the way to something else. Otherwise a lint task or a
 # Git hook pulls in gigabytes, and a machine that cannot install one of them cannot
 # run any task at all.
-auto_install_disable_tools = ["android-sdk", "emsdk", "ohos-sdk"]
+auto_install_disable_tools = [
+  "android-sdk",
+  "emsdk",
+  "ohos-sdk",
+  "http:oniro-emulator",
+]
 # The submodules provider checks Git state directly and intentionally runs on
 # every dependency pass, so suppress its perpetual shell stale warning.
 status.show_deps_stale = false
@@ -117,7 +122,7 @@ swiftformat = { version = "{{vars.swiftformat_version}}", backend = "github:nick
 # part of the repository-wide native toolchain. `rust-src` is for the Emscripten
 # target alone: rustup ships no `std` for `wasm32-unknown-emscripten` built with
 # atomics, so that target rebuilds `std` from source. See cmake/mln_ffi_rust.cmake.
-"core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy,rust-src", targets = "aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc,wasm32-unknown-emscripten" }
+"core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy,rust-src", targets = "aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos,x86_64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc,wasm32-unknown-emscripten" }
 
 # The native CMake build compiles the Linux targets with `zig cc`, so Zig joins
 # the native toolchain there. See cmake/toolchains/zig-linux.cmake. The Zig
@@ -144,6 +149,9 @@ emsdk = { version = "{{vars.emsdk_version}}", depends = ["python"] }
 # plugin the hook below registers. Its unpacking step needs a POSIX shell, which is
 # why Windows is left out.
 ohos-sdk = { version = "{{vars.ohos_sdk_version}}", os = ["linux", "macos"] }
+# Oniro publishes its emulator image against the corresponding OpenHarmony
+# release. Keep both tools on the same version so their system ABI stays aligned.
+"http:oniro-emulator" = { version = "{{vars.ohos_sdk_version}}", url = "https://github.com/eclipse-oniro4openharmony/device_board_oniro/releases/download/v{{ version }}/oniro_emulator.zip", checksum = "sha256:a30e01f1b161e0fdcd91263f30f29cc92bfa49c1776d5ee2c46caefef055b2da", size = "1449068188", bin_path = ".", os = ["linux", "macos"] }
 
 [env]
 EMSDK_PYTHON = { value = "{{ tools.python.path }}/{% if os() == 'windows' %}python.exe{% else %}bin/python3{% endif %}", tools = true }
@@ -263,8 +271,109 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 if [[ "$usage_preset" == ios-simulator-* ]]; then
   mise run //:ios-simulator:boot
+elif [[ "$usage_preset" == ohos-x64-egl ]]; then
+  mise run //:ohos-emulator:boot
+  fixture_source="$MISE_MONOREPO_ROOT/third_party/maplibre-native/test/fixtures"
+  fixture_dir="$MISE_MONOREPO_ROOT/build/ohos-emulator/c-api-fixtures"
+  while IFS= read -r -d '' fixture; do
+    relative_path=${fixture#"$fixture_source"/}
+    install -Dm644 "$fixture" "$fixture_dir/$relative_path"
+  done < <(find "$fixture_source" -type f -name '*.mlt' -print0)
+  MLN_FFI_TEST_FIXTURE_DIR="$fixture_dir" \
+    bash "$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator-test.sh" \
+      "$MISE_MONOREPO_ROOT/build/$usage_preset/mln_ffi_c_api_tests" \
+      "$MISE_MONOREPO_ROOT/build/$usage_preset/install/lib/libmaplibre-native-c.so" \
+      "$OHOS_SDK_NATIVE/llvm/lib/x86_64-linux-ohos/libc++_shared.so" \
+      300
+  exit
 fi
 ctest --preset "$usage_preset"
+'''
+
+[tasks."ohos-emulator:boot"]
+description = "Boot the OpenHarmony emulator and wait until it is ready."
+run = '''
+connect_key=127.0.0.1:55555
+state_dir="$MISE_MONOREPO_ROOT/build/ohos-emulator"
+pid_file="$state_dir/qemu.pid"
+log_file="$state_dir/qemu.log"
+
+if hdc tconn "$connect_key" >/dev/null 2>&1 &&
+  hdc -t "$connect_key" shell echo ready 2>/dev/null | tr -d '\r' | grep -qx ready; then
+  echo "OpenHarmony emulator is ready at $connect_key."
+  exit 0
+fi
+
+mkdir -p "$state_dir"
+if [[ -f "$pid_file" ]]; then
+  pid=$(<"$pid_file")
+  if [[ "$pid" =~ ^[0-9]+$ ]] &&
+    kill -0 "$pid" 2>/dev/null &&
+    ps -p "$pid" -o args= | grep -q qemu-system-x86_64; then
+    echo "Waiting for OpenHarmony emulator process $pid."
+  else
+    rm -f "$pid_file"
+  fi
+fi
+
+if [[ ! -f "$pid_file" ]]; then
+  emulator_dir="$(mise where 'http:oniro-emulator@{{vars.ohos_sdk_version}}')/images"
+  launcher=("$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator.sh" "$emulator_dir")
+  if command -v setsid >/dev/null 2>&1; then
+    nohup setsid "${launcher[@]}" </dev/null >"$log_file" 2>&1 &
+  else
+    nohup "${launcher[@]}" </dev/null >"$log_file" 2>&1 &
+  fi
+  pid=$!
+  printf '%s\n' "$pid" >"$pid_file"
+  echo "Started OpenHarmony emulator process $pid."
+fi
+
+pid=$(<"$pid_file")
+for ((attempt = 0; attempt < 300; attempt++)); do
+  if ! kill -0 "$pid" 2>/dev/null; then
+    echo "OpenHarmony emulator exited before it became ready." >&2
+    tail -100 "$log_file" >&2
+    rm -f "$pid_file"
+    exit 1
+  fi
+  if hdc tconn "$connect_key" >/dev/null 2>&1 &&
+    hdc -t "$connect_key" shell echo ready 2>/dev/null | tr -d '\r' | grep -qx ready; then
+    echo "OpenHarmony emulator is ready at $connect_key."
+    exit 0
+  fi
+  sleep 1
+done
+
+echo "OpenHarmony emulator did not become ready within 300 seconds." >&2
+tail -100 "$log_file" >&2
+exit 1
+'''
+
+[tasks."ohos-emulator:stop"]
+description = "Stop the OpenHarmony emulator started by mise."
+run = '''
+pid_file="$MISE_MONOREPO_ROOT/build/ohos-emulator/qemu.pid"
+if [[ ! -f "$pid_file" ]]; then
+  echo "No mise-managed OpenHarmony emulator is running."
+  exit 0
+fi
+
+pid=$(<"$pid_file")
+if [[ "$pid" =~ ^[0-9]+$ ]] &&
+  kill -0 "$pid" 2>/dev/null &&
+  ps -p "$pid" -o args= | grep -q qemu-system-x86_64; then
+  kill "$pid"
+  for ((attempt = 0; attempt < 30; attempt++)); do
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 1
+  done
+  if kill -0 "$pid" 2>/dev/null; then
+    kill -KILL "$pid"
+  fi
+fi
+rm -f "$pid_file"
+hdc tconn 127.0.0.1:55555 -remove >/dev/null 2>&1 || true
 '''
 
 [tasks.check]

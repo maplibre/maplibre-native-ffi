@@ -35,18 +35,30 @@ if [[ "$usage_preset" == android-* ]]; then
 fi
 
 if [[ "$usage_preset" == ohos-* ]]; then
+  case "$usage_preset" in
+    ohos-arm64-*)
+      cargo_target=aarch64-unknown-linux-ohos
+      compiler_target=aarch64-linux-ohos
+      ;;
+    ohos-x64-*)
+      cargo_target=x86_64-unknown-linux-ohos
+      compiler_target=x86_64-linux-ohos
+      ;;
+  esac
   sysroot="$OHOS_SDK_NATIVE/sysroot"
-  target_flags="--target=aarch64-linux-ohos --sysroot=$sysroot"
-  export BINDGEN_EXTRA_CLANG_ARGS_aarch64_unknown_linux_ohos="$target_flags -I$sysroot/usr/include/aarch64-linux-ohos"
-  export CC_aarch64_unknown_linux_ohos="$OHOS_SDK_NATIVE/llvm/bin/clang $target_flags"
-  export CXX_aarch64_unknown_linux_ohos="$OHOS_SDK_NATIVE/llvm/bin/clang++ $target_flags"
-  export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_OHOS_LINKER="$OHOS_SDK_NATIVE/llvm/bin/clang"
-  export RUSTFLAGS="-C link-arg=--target=aarch64-linux-ohos -C link-arg=--sysroot=$sysroot -C link-arg=-fuse-ld=lld"
+  target_flags="--target=$compiler_target --sysroot=$sysroot"
+  target_env="${cargo_target//-/_}"
+  target_env_upper="${target_env^^}"
+  export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=$target_flags -I$sysroot/usr/include/$compiler_target"
+  export "CC_$target_env=$OHOS_SDK_NATIVE/llvm/bin/clang $target_flags"
+  export "CXX_$target_env=$OHOS_SDK_NATIVE/llvm/bin/clang++ $target_flags"
+  export "CARGO_TARGET_${target_env_upper}_LINKER=$OHOS_SDK_NATIVE/llvm/bin/clang"
+  export RUSTFLAGS="-C link-arg=--target=$compiler_target -C link-arg=--sysroot=$sysroot -C link-arg=-fuse-ld=lld"
   exec cargo build \
     -p maplibre-native-ffi-sys \
     -p maplibre-native-ffi-core \
     -p maplibre-native-ffi \
-    --target aarch64-unknown-linux-ohos
+    --target "$cargo_target"
 fi
 
 cargo build \
@@ -106,6 +118,61 @@ cargo clippy \
   -p maplibre-native-ffi-core \
   -p maplibre-native-ffi \
   --all-targets -- -D warnings
+'''
+
+[tasks."test:ohos-emulator"]
+description = "Run the Rust binding tests in the OpenHarmony emulator."
+depends = [{ task = "//:build", args = ["ohos-x64-egl"] }]
+dir = "../.."
+run = '''
+set -euo pipefail
+native_install_dir="$MISE_MONOREPO_ROOT/build/ohos-x64-egl/install"
+export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+cargo_target=x86_64-unknown-linux-ohos
+compiler_target=x86_64-linux-ohos
+sysroot="$OHOS_SDK_NATIVE/sysroot"
+target_flags="--target=$compiler_target --sysroot=$sysroot"
+target_env=x86_64_unknown_linux_ohos
+target_env_upper=X86_64_UNKNOWN_LINUX_OHOS
+export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=$target_flags -I$sysroot/usr/include/$compiler_target"
+export "CC_$target_env=$OHOS_SDK_NATIVE/llvm/bin/clang $target_flags"
+export "CXX_$target_env=$OHOS_SDK_NATIVE/llvm/bin/clang++ $target_flags"
+export "CARGO_TARGET_${target_env_upper}_LINKER=$OHOS_SDK_NATIVE/llvm/bin/clang"
+export RUSTFLAGS="-C link-arg=--target=$compiler_target -C link-arg=--sysroot=$sysroot -C link-arg=-fuse-ld=lld"
+
+test_manifest=$(mktemp)
+trap 'find "$test_manifest" -delete' EXIT
+cargo test --no-run \
+  -p maplibre-native-ffi-sys \
+  -p maplibre-native-ffi-core \
+  -p maplibre-native-ffi \
+  --target "$cargo_target" \
+  --message-format=json |
+  jq -r 'select(.reason == "compiler-artifact" and .profile.test and .executable != null) | .executable' \
+    > "$test_manifest"
+cargo clippy \
+  -p maplibre-native-ffi-sys \
+  -p maplibre-native-ffi-core \
+  -p maplibre-native-ffi \
+  --target "$cargo_target" \
+  --all-targets -- -D warnings
+
+mise run //:ohos-emulator:boot
+found_test=false
+while IFS= read -r test_binary; do
+  [[ -n "$test_binary" ]] || continue
+  found_test=true
+  bash "$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator-test.sh" \
+    "$test_binary" \
+    "$native_install_dir/lib/libmaplibre-native-c.so" \
+    "$OHOS_SDK_NATIVE/llvm/lib/x86_64-linux-ohos/libc++_shared.so" \
+    180 \
+    --test-threads=1
+done < "$test_manifest"
+if [[ "$found_test" != true ]]; then
+  echo "The Rust build produced no OpenHarmony test executables." >&2
+  exit 1
+fi
 '''
 
 [tasks."test:download"]

@@ -297,27 +297,33 @@ struct EglTestContext {
 #[cfg(target_os = "linux")]
 impl EglTestContext {
     fn new() -> std::result::Result<Self, Box<dyn StdError>> {
-        const EGL_PLATFORM_SURFACELESS_MESA: u32 = 0x31DD;
-
         let lib = load_egl_library()?;
         let egl = load_egl_bindings(&lib)?;
-        if !egl.GetPlatformDisplayEXT.is_loaded() {
-            return Err("eglGetPlatformDisplayEXT is unavailable".into());
-        }
-        let display = unsafe {
-            egl.GetPlatformDisplayEXT(
-                EGL_PLATFORM_SURFACELESS_MESA,
-                egl::DEFAULT_DISPLAY as *mut c_void,
-                [egl::NONE as EGLint].as_ptr(),
-            )
+        #[cfg(target_env = "ohos")]
+        let display = unsafe { egl.GetDisplay(egl::DEFAULT_DISPLAY as *mut c_void) };
+        #[cfg(target_env = "ohos")]
+        let display_operation = "eglGetDisplay";
+        #[cfg(not(target_env = "ohos"))]
+        let display = {
+            const EGL_PLATFORM_SURFACELESS_MESA: u32 = 0x31DD;
+            if !egl.GetPlatformDisplayEXT.is_loaded() {
+                return Err("eglGetPlatformDisplayEXT is unavailable".into());
+            }
+            unsafe {
+                egl.GetPlatformDisplayEXT(
+                    EGL_PLATFORM_SURFACELESS_MESA,
+                    egl::DEFAULT_DISPLAY as *mut c_void,
+                    [egl::NONE as EGLint].as_ptr(),
+                )
+            }
         };
+        #[cfg(not(target_env = "ohos"))]
+        let display_operation = "eglGetPlatformDisplayEXT";
         if display == egl::NO_DISPLAY {
-            return Err(
-                format!("eglGetPlatformDisplayEXT failed with 0x{:x}", unsafe {
-                    egl.GetError()
-                })
-                .into(),
-            );
+            return Err(format!("{display_operation} failed with 0x{:x}", unsafe {
+                egl.GetError()
+            })
+            .into());
         }
 
         let mut major = 0;

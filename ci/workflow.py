@@ -98,8 +98,14 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
 def native_commands(preset: str, tested: set[str]) -> list[str]:
     target_platform = platform(preset)
     if target_platform == "ohos":
-        # Both bindings build the C API as a dependency and link against each
-        # backend-specific native artifact.
+        if preset == "ohos-x64-egl":
+            return [
+                f"mise run test {preset}",
+                "mise run //bindings/rust:test:ohos-emulator",
+                "mise run //bindings/go:test:ohos-emulator",
+            ]
+        # The emulator executes x64 EGL. Other OpenHarmony targets still prove
+        # that each binding links against its backend-specific native artifact.
         return [
             f"mise run //bindings/rust:build {preset}",
             f"mise run //bindings/go:build {preset}",

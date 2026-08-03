@@ -62,6 +62,7 @@ runs:
 
     # The repository pins a cross-compilation SDK per non-host target, and every job
     # installs the root tools, so each job keeps only the SDK its target builds with.
+    # Emulator jobs enable the Oniro image explicitly when they start running here.
     # Android is disabled outright: the runner image ships an SDK and points
     # ANDROID_HOME at it, which costs nothing to reuse.
     - name: Scope the cross-compilation SDKs to the target (Unix)
@@ -75,9 +76,13 @@ runs:
           ohos-*) keep="ohos-sdk" ;;
           *) keep="" ;;
         esac
+        case "${TARGET}" in
+          ohos-x64-egl) keep_emulator="http:oniro-emulator" ;;
+          *) keep_emulator="" ;;
+        esac
         disabled=()
-        for tool in android-sdk emsdk ohos-sdk; do
-          if [[ "${tool}" != "${keep}" ]]; then
+        for tool in android-sdk emsdk ohos-sdk http:oniro-emulator; do
+          if [[ "${tool}" != "${keep}" && "${tool}" != "${keep_emulator}" ]]; then
             disabled+=("${tool}")
           fi
         done
@@ -90,7 +95,7 @@ runs:
     - name: Scope the cross-compilation SDKs to the target (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
-      run: '"MISE_DISABLE_TOOLS=android-sdk,emsdk,ohos-sdk" >> $env:GITHUB_ENV'
+      run: '"MISE_DISABLE_TOOLS=android-sdk,emsdk,ohos-sdk,http:oniro-emulator" >> $env:GITHUB_ENV'
 
     # The gitlink SHA is what decides the checkout, so key on it directly. A
     # tag file can be left behind by a pin bump; the recorded commit cannot.
@@ -346,6 +351,7 @@ runs:
         path: |
           ~/.local/share/mise
           !~/.local/share/mise/installs/emsdk
+          !~/.local/share/mise/installs/http-oniro-emulator
           !~/.local/share/mise/installs/ohos-sdk
           ~/AppData/Local/mise
           ~/.rustup
@@ -404,6 +410,7 @@ runs:
         path: |
           ~/.local/share/mise
           !~/.local/share/mise/installs/emsdk
+          !~/.local/share/mise/installs/http-oniro-emulator
           !~/.local/share/mise/installs/ohos-sdk
           ~/AppData/Local/mise
           ~/.rustup

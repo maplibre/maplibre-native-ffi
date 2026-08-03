@@ -3,9 +3,20 @@ function(mln_ffi_configure_platform_dependencies target)
   if(NOT CMAKE_SYSROOT)
     message(FATAL_ERROR "The OHOS toolchain must define CMAKE_SYSROOT")
   endif()
-  if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    set(ohos_target_platform ohos-arm64)
+    set(ohos_target_triple aarch64-linux-ohos)
+  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(AMD64|x86_64)$")
+    set(ohos_target_platform ohos-x64)
+    set(ohos_target_triple x86_64-linux-ohos)
+  else()
     message(
       FATAL_ERROR "Unsupported OHOS architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+  endif()
+  set(ohos_test_supported FALSE)
+  if(ohos_target_platform STREQUAL "ohos-x64"
+     AND MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
+    set(ohos_test_supported TRUE)
   endif()
   foreach(
     library
@@ -37,17 +48,17 @@ function(mln_ffi_configure_platform_dependencies target)
       MLN_FFI_STATIC_ARCHIVES
       mbgl-vendor-icu
       MLN_FFI_TEST_SUPPORTED
-      FALSE
+      ${ohos_test_supported}
       MLN_FFI_TARGET_PLATFORM
-      ohos-arm64
+      ${ohos_target_platform}
       MLN_FFI_ZIG_TARGET
-      aarch64-linux-ohos
+      ${ohos_target_triple}
       MLN_FFI_ZIG_LIBC_SYSROOT
       "${CMAKE_SYSROOT}"
       MLN_FFI_ZIG_LIBC_INCLUDE_DIR
-      "${CMAKE_SYSROOT}/usr/include/aarch64-linux-ohos"
+      "${CMAKE_SYSROOT}/usr/include/${ohos_target_triple}"
       MLN_FFI_ZIG_LIBC_CRT_DIR
-      "${CMAKE_SYSROOT}/usr/lib/aarch64-linux-ohos")
+      "${CMAKE_SYSROOT}/usr/lib/${ohos_target_triple}")
 endfunction()
 
 function(mln_ffi_configure_platform target)
