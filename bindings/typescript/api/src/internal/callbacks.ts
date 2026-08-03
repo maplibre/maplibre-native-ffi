@@ -219,3 +219,108 @@ export class LogRegistration implements Registration {
     }
   }
 }
+
+/**
+ * A native-owned rule table.
+ *
+ * The C API borrows a rule table for as long as the registration lives, so the
+ * table, the rule array, and every string in it are allocated here and released
+ * only when the registration is replaced or cleared.
+ */
+export class RuleTable {
+  readonly #native: Native;
+  readonly #allocations: Ptr[] = [];
+  readonly table: Ptr;
+
+  private constructor(native: Native, table: Ptr, allocations: readonly Ptr[]) {
+    this.#native = native;
+    this.table = table;
+    this.#allocations.push(...allocations);
+  }
+
+  /** Builds the rewrite-rule table a resource transform reads. */
+  static rewriteRules(
+    native: Native,
+    rules: readonly { kind: number; url: string; replacementUrl?: string }[],
+  ): RuleTable {
+    const allocations: Ptr[] = [];
+    const allocate = (size: number, alignment?: number): Ptr => {
+      const address = native.memory.allocate(size, alignment);
+      allocations.push(address);
+      native.memory.bytes(address, size).fill(0);
+      return address;
+    };
+    const persist = (value: string, what: string): Ptr => {
+      const bytes = new TextEncoder().encode(value);
+      if (bytes.includes(0)) {
+        throw new MaplibreError(
+          "invalidInput",
+          `${what} contains an embedded NUL, which a null-terminated C string cannot carry`,
+        );
+      }
+      const address = allocate(bytes.length + 1, 1);
+      const target = native.memory.bytes(address, bytes.length + 1);
+      target.set(bytes);
+      return address;
+    };
+
+    try {
+      const ruleLayout = native.layout("mln_adapter_resource_rewrite_rule");
+      const tableLayout = native.layout("mln_adapter_resource_rewrite_rules");
+      const array = allocate(
+        Math.max(ruleLayout.size * rules.length, 1),
+        ruleLayout.align,
+      );
+      rules.forEach((rule, index) => {
+        const base = (array + BigInt(index * ruleLayout.size)) as Ptr;
+        const view = native.memory.view(base, ruleLayout.size);
+        view.setUint32(ruleLayout.fields.kind!.offset, rule.kind, true);
+        native.memory.writePointer(
+          (base + BigInt(ruleLayout.fields.url!.offset)) as Ptr,
+          persist(rule.url, "rule url"),
+        );
+        if (rule.replacementUrl !== undefined) {
+          native.memory.writePointer(
+            (base + BigInt(ruleLayout.fields.replacement_url!.offset)) as Ptr,
+            persist(rule.replacementUrl, "rule replacementUrl"),
+          );
+        }
+      });
+
+      const table = allocate(tableLayout.size, tableLayout.align);
+      native.memory.writePointer(
+        (table + BigInt(tableLayout.fields.rules!.offset)) as Ptr,
+        array,
+      );
+      writeSize(
+        native,
+        (table + BigInt(tableLayout.fields.count!.offset)) as Ptr,
+        rules.length,
+      );
+      return new RuleTable(native, table, allocations);
+    } catch (error) {
+      for (const address of allocations) {
+        native.memory.free(address);
+      }
+      throw error;
+    }
+  }
+
+  /** Releases the table once native code can no longer read it. */
+  release(): void {
+    for (const address of this.#allocations) {
+      this.#native.memory.free(address);
+    }
+    this.#allocations.length = 0;
+  }
+}
+
+/** Writes a `size_t` field at the transport's pointer width. */
+export function writeSize(native: Native, address: Ptr, value: number): void {
+  const view = native.memory.view(address, native.transport.pointerSize);
+  if (native.transport.pointerSize === 8) {
+    view.setBigUint64(0, BigInt(value), true);
+    return;
+  }
+  view.setUint32(0, value, true);
+}

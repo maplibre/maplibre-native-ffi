@@ -9,6 +9,7 @@
 
 import { MaplibreError } from "./errors.ts";
 import type { RuntimeEvent } from "./events.ts";
+import { RuleTable } from "./internal/callbacks.ts";
 import { decodeEvent } from "./internal/event-decode.ts";
 import { HandleState } from "./internal/handle.ts";
 import type { Native } from "./internal/native.ts";
@@ -17,6 +18,7 @@ import { attachHandleState, mapForId } from "./internal/private.ts";
 import type { Ptr } from "./internal/transport.ts";
 import { Map, type MapOptions } from "./map.ts";
 import { EP } from "./raw/entrypoints.ts";
+import { ANY_RESOURCE_KIND, type ResourceRewriteRule } from "./resources.ts";
 
 /** How a runtime is configured at creation. */
 export interface RuntimeOptions {
@@ -245,6 +247,7 @@ function readCarrierToken(carrier: ArrayBuffer): bigint {
 export class Runtime {
   readonly #state: HandleState;
   readonly #eventStorage: Ptr;
+  #rewriteRules: RuleTable | undefined;
   readonly #hasEventStorage: Ptr;
 
   private constructor(native: Native, id: bigint) {
@@ -369,6 +372,71 @@ export class Runtime {
     return WakeSource.own(native, source);
   }
 
+  /**
+   * Rewrites resource URLs through a table of rules.
+   *
+   * MapLibre asks what a URL should become on its own threads, with the answer
+   * due at once, so the rules are evaluated in native code rather than handed to
+   * JavaScript. The first matching rule replaces the URL; a request that matches
+   * nothing is unchanged.
+   *
+   * Installing a table replaces the previous one.
+   */
+  setResourceRewriteRules(rules: readonly ResourceRewriteRule[]): void {
+    const id = this.#state.use("Runtime.setResourceRewriteRules");
+    const native = this.#state.native;
+    const table = RuleTable.rewriteRules(
+      native,
+      rules.map((rule) => ({
+        kind: rule.kind?.rawValue ?? ANY_RESOURCE_KIND,
+        url: rule.url,
+        ...(rule.replacementUrl !== undefined && {
+          replacementUrl: rule.replacementUrl,
+        }),
+      })),
+    );
+    try {
+      native.scope((scope) => {
+        const layout = native.layout("mln_resource_transform");
+        const transform = scope.allocateZeroed(layout.size, layout.align);
+        native.memory
+          .view(transform, layout.size)
+          .setUint32(layout.fields.size!.offset, layout.size, true);
+        native.memory.writePointer(
+          (transform + BigInt(layout.fields.callback!.offset)) as Ptr,
+          native.transport.symbol(
+            EP.mln_adapter_resource_transform_rewrite_callback,
+          ),
+        );
+        native.memory.writePointer(
+          (transform + BigInt(layout.fields.user_data!.offset)) as Ptr,
+          table.table,
+        );
+        native.checked(scope, EP.mln_runtime_set_resource_transform, [
+          id,
+          transform,
+        ]);
+      });
+    } catch (error) {
+      table.release();
+      throw error;
+    }
+    // The C call has returned, so native code no longer reads the old table.
+    this.#rewriteRules?.release();
+    this.#rewriteRules = table;
+  }
+
+  /** Stops rewriting resource URLs. */
+  clearResourceRewriteRules(): void {
+    const id = this.#state.use("Runtime.clearResourceRewriteRules");
+    const native = this.#state.native;
+    native.scope((scope) => {
+      native.checked(scope, EP.mln_runtime_clear_resource_transform, [id]);
+    });
+    this.#rewriteRules?.release();
+    this.#rewriteRules = undefined;
+  }
+
   /** Releases the runtime. Closing twice succeeds. */
   close(): void {
     if (this.#state.isClosed) {
@@ -380,8 +448,10 @@ export class Runtime {
         native.checked(scope, EP.mln_runtime_destroy, [id]);
       });
     });
-    // Poll storage is returned only once the native handle is gone, so a failed
+    // Storage is returned only once the native handle is gone, so a failed
     // destroy leaves the runtime usable for a retry.
+    this.#rewriteRules?.release();
+    this.#rewriteRules = undefined;
     native.memory.free(this.#eventStorage);
     native.memory.free(this.#hasEventStorage);
   }

@@ -56,6 +56,12 @@ export {
   type RenderBackends,
 } from "./maplibre.ts";
 export {
+  ANY_RESOURCE_KIND,
+  ResourceKind,
+  type ResourceRewriteRule,
+  type ResourceRoute,
+} from "./resources.ts";
+export {
   type PumpTimeout,
   Runtime,
   type RuntimeOptions,
