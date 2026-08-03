@@ -63,7 +63,7 @@ export function nodeApiTransport(addon: NodeApiAddon): Transport {
   // Slabs are retained here for the transport's life. A backing store does not
   // move, so the address stays valid; letting one be collected would leave
   // native code holding a freed address.
-  const slabs: Slab[] = [];
+  const slabs = new Map<bigint, Slab>();
 
   return {
     abi: "native64",
@@ -74,8 +74,15 @@ export function nodeApiTransport(addon: NodeApiAddon): Transport {
     addSlab(byteLength: number): Slab {
       const buffer = new ArrayBuffer(byteLength);
       const slab: Slab = { base: addon.registerSlab(buffer), buffer };
-      slabs.push(slab);
+      slabs.set(slab.base, slab);
       return slab;
+    },
+
+    releaseSlab(base: Ptr): void {
+      // Dropping the reference is the whole retirement: the backing store goes
+      // when the collector reaches it, and no native code holds its address
+      // once the allocator says the slab is empty.
+      slabs.delete(base);
     },
 
     call(entrypoint, slots, diagnostic, diagnosticCapacity, diagnosticLength) {

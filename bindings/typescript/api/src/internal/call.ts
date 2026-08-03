@@ -9,6 +9,7 @@
  */
 
 import { ENTRYPOINTS } from "../raw/entrypoints.ts";
+import { LAYOUTS, type RecordLayout } from "../raw/layouts.ts";
 import type { Memory, Scope } from "./memory.ts";
 import { AbiCallStatus, type Ptr, type Transport } from "./transport.ts";
 
@@ -70,6 +71,7 @@ export function statusFromSlot(raw: bigint): number {
 export class Caller {
   readonly #transport: Transport;
   readonly #memory: Memory;
+  readonly #layouts: Readonly<Record<string, RecordLayout>>;
   readonly #diagnostic: Ptr;
   readonly #diagnosticLength: Ptr;
   readonly #decoder = new TextDecoder();
@@ -77,6 +79,7 @@ export class Caller {
   constructor(transport: Transport, memory: Memory) {
     this.#transport = transport;
     this.#memory = memory;
+    this.#layouts = LAYOUTS[transport.abi];
     // One buffer per transport, reused by every call. A transport belongs to one
     // host execution context, and the C API's diagnostic is per thread, so no
     // two calls share it concurrently.
@@ -103,6 +106,23 @@ export class Caller {
         `entrypoint ${entrypoint}`,
         AbiCallStatus.unknownEntrypoint,
       );
+    }
+    // A struct return is stored through slot 0. Storage that is absent or too
+    // small would be a write into whatever else lives at that address, so the
+    // requirement is checked here rather than discovered afterwards.
+    if (info.resultRecord !== undefined) {
+      const required = this.#layouts[info.resultRecord]?.size ?? 0;
+      const available =
+        returnStorage === undefined
+          ? 0
+          : (this.#memory.allocationSize(returnStorage) ?? 0);
+      if (available < required) {
+        throw new AbiCallError(
+          entrypoint,
+          info.name,
+          AbiCallStatus.badResultStorage,
+        );
+      }
     }
     if (args.length !== info.params.length) {
       throw new AbiCallError(

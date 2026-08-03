@@ -292,3 +292,115 @@ describe("the ABI handshake", () => {
 
 // Referenced so the unused-import rule sees the shared type alias in use.
 export type { Transport };
+
+describe("handle transfer", () => {
+  it("claims a token once, whatever a host does with the carrier", () => {
+    // A tagged Android-style pointer is the value a number could not carry, so
+    // the token path is exercised with one rather than with a small integer.
+    const handle = 0xb4_00_7f_12_34_56_78_90n;
+    const token = transport.transferIssue(handle);
+    expect(token).toBeGreaterThan(0n);
+    expect(transport.transferClaim(token)).toBe(handle);
+    expect(transport.transferClaim(token)).toBe(0n);
+    expect(transport.transferDiscard(token)).toBe(0n);
+  });
+
+  it("reports exhaustion rather than losing a handle", () => {
+    const tokens: bigint[] = [];
+    // The table is fixed, so issuing beyond it has to fail rather than evict.
+    for (let attempt = 0; attempt < 256; attempt += 1) {
+      const token = transport.transferIssue(BigInt(attempt + 1));
+      if (token === 0n) {
+        break;
+      }
+      tokens.push(token);
+    }
+    expect(tokens.length).toBeGreaterThan(0);
+    expect(transport.transferIssue(1n)).toBe(0n);
+    for (const [index, token] of tokens.entries()) {
+      expect(transport.transferDiscard(token)).toBe(BigInt(index + 1));
+    }
+    // The table is usable again once the outstanding transfers are discarded.
+    const token = transport.transferIssue(7n);
+    expect(token).toBeGreaterThan(0n);
+    expect(transport.transferClaim(token)).toBe(7n);
+  });
+
+  it("refuses to issue a token for the null handle", () => {
+    expect(transport.transferIssue(0n)).toBe(0n);
+  });
+});
+
+describe("struct-return storage", () => {
+  it("refuses a call whose caller storage is absent or too small", () => {
+    withCaller(({ memory, caller }) => {
+      memory.scope((scope) => {
+        expect(() =>
+          caller.invoke(scope, EP.mln_runtime_options_default, []),
+        ).toThrow(AbiCallError);
+        const tooSmall = scope.allocateZeroed(4);
+        expect(() =>
+          caller.invoke(scope, EP.mln_runtime_options_default, [], tooSmall),
+        ).toThrow(AbiCallError);
+      });
+    });
+  });
+
+  it("agrees with the linked library about every self-describing struct", () => {
+    withCaller(({ memory, caller }) => {
+      // Each of these C structs carries its own size, so the library reports
+      // what the generated table claims and a wrong offset table cannot hide.
+      const defaults = [
+        ["mln_runtime_options", EP.mln_runtime_options_default],
+        ["mln_map_options", EP.mln_map_options_default],
+        ["mln_camera_options", EP.mln_camera_options_default],
+        ["mln_animation_options", EP.mln_animation_options_default],
+        ["mln_bound_options", EP.mln_bound_options_default],
+        ["mln_map_tile_options", EP.mln_map_tile_options_default],
+        ["mln_style_image_info", EP.mln_style_image_info_default],
+      ] as const;
+      for (const [record, entrypoint] of defaults) {
+        const layout = layouts[record]!;
+        const reported = memory.scope((scope) => {
+          const storage = scope.allocateZeroed(layout.size);
+          caller.invoke(scope, entrypoint, [], storage);
+          return memory
+            .view(storage, layout.size)
+            .getUint32(layout.fields.size!.offset, true);
+        });
+        expect(`${record}=${reported}`).toBe(`${record}=${layout.size}`);
+      }
+    });
+  });
+});
+
+describe("slab lifetime", () => {
+  it("adds a slab for an oversized request and retires it when it empties", () => {
+    const memory = new Memory(transport);
+    const baseline = memory.allocate(8);
+    const large = memory.allocate(1 << 20);
+    expect(memory.owns(large)).toBe(true);
+    memory.free(large);
+    // The slab that carried it is gone, so a burst of large temporaries does
+    // not become permanent memory.
+    expect(memory.owns(large)).toBe(false);
+    // The first slab stays, because a binding that allocates and frees in a
+    // loop would otherwise ask the transport for one every time.
+    expect(memory.owns(baseline)).toBe(true);
+    memory.free(baseline);
+    expect(memory.owns(baseline)).toBe(true);
+  });
+
+  it("coalesces neighbouring free blocks", () => {
+    const memory = new Memory(transport);
+    const first = memory.allocate(64);
+    const second = memory.allocate(64);
+    const third = memory.allocate(64);
+    memory.free(first);
+    memory.free(third);
+    memory.free(second);
+    // The three blocks became one, so a request none of them could satisfy on
+    // its own now fits where they were.
+    expect(memory.allocate(192)).toBe(first);
+  });
+});

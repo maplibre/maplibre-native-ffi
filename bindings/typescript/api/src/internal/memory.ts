@@ -89,6 +89,33 @@ export class Memory {
     }
     this.#live.delete(address);
     insertFree(entry.slab.free, entry.block);
+    this.#retireIfEmpty(entry.slab);
+  }
+
+  /**
+   * Retires a slab that holds nothing.
+   *
+   * One slab stays for the transport's life, because a binding that allocates
+   * and frees in a loop would otherwise ask the transport for a new one each
+   * time. Every slab beyond it goes back as soon as it empties, so a burst of
+   * large temporary allocations does not become permanent memory.
+   */
+  #retireIfEmpty(managed: ManagedSlab): void {
+    if (this.#slabs.length <= 1 || this.#slabs[0] === managed) {
+      return;
+    }
+    if (
+      managed.free.length !== 1 ||
+      managed.free[0]!.size !== managed.byteLength
+    ) {
+      return;
+    }
+    const index = this.#slabs.indexOf(managed);
+    if (index < 0) {
+      return;
+    }
+    this.#slabs.splice(index, 1);
+    this.#transport.releaseSlab(managed.slab.base);
   }
 
   /**
@@ -109,6 +136,11 @@ export class Memory {
   /** Reports whether an address names memory this binding allocated. */
   owns(address: Ptr): boolean {
     return this.#find(address) !== undefined;
+  }
+
+  /** Reports the size of a live allocation, or `undefined` when there is none. */
+  allocationSize(address: Ptr): number | undefined {
+    return this.#live.get(address)?.block.size;
   }
 
   /**

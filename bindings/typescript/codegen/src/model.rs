@@ -59,6 +59,8 @@ pub struct Entrypoint {
     /// The return type as written.
     pub result_spelling: String,
     pub result: SlotKind,
+    /// The record a by-value struct return lands in, when there is one.
+    pub result_record: Option<String>,
 }
 
 #[derive(Clone, Debug)]

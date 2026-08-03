@@ -48,6 +48,14 @@ export interface Transport {
   addSlab(byteLength: number): Slab;
 
   /**
+   * Retires a slab that holds no live allocation.
+   *
+   * A transport keeps every slab reachable until this is called, because native
+   * code holds addresses into them.
+   */
+  releaseSlab(base: Ptr): void;
+
+  /**
    * Calls one entrypoint through the shared normalized dispatch.
    *
    * The diagnostic is copied inside a failing call, before any host code runs,
@@ -88,4 +96,5 @@ export const AbiCallStatus = {
   unknownEntrypoint: 1,
   nullSlots: 2,
   misalignedSlots: 3,
+  badResultStorage: 4,
 } as const;

@@ -17,7 +17,12 @@ pub const C_BANNER: &str =
 ///
 /// The facade refuses to call a runtime payload whose fingerprint differs, so
 /// this rendering is what decides whether two builds agree about the ABI.
-pub fn canonical_schema(native: &Parsed, wasm: &Parsed, header_digest: &str) -> String {
+pub fn canonical_schema(
+    native: &Parsed,
+    wasm: &Parsed,
+    header_digest: &str,
+    support_digest: &str,
+) -> String {
     let mut text = String::new();
     let _ = writeln!(text, "schema 2");
     // The linked library is the third party to this ABI. Slot kinds alone would
@@ -25,6 +30,7 @@ pub fn canonical_schema(native: &Parsed, wasm: &Parsed, header_digest: &str) -> 
     // signature changed would still link, so the concrete C spellings and the
     // header bytes they came from are part of what the handshake compares.
     let _ = writeln!(text, "headers sha256={header_digest}");
+    let _ = writeln!(text, "support sha256={support_digest}");
     for (index, entrypoint) in native.entrypoints.iter().enumerate() {
         let _ = writeln!(
             text,
@@ -91,7 +97,11 @@ pub fn entrypoints_ts(native: &Parsed) -> String {
          | \"u64\"\n  | \"f32\"\n  | \"f64\"\n  | \"usize\"\n  | \"ptr\"\n  | \"handle\"\n  | \"struct\";\n\n\
          /** One public C entrypoint, as the shim's dispatch table sees it. */\n\
          export interface EntrypointInfo {\n  readonly name: string;\n  \
-         readonly result: SlotKind;\n  readonly params: readonly SlotKind[];\n}\n\n",
+         readonly result: SlotKind;\n  readonly params: readonly SlotKind[];\n  \
+         /**\n   * The record a by-value struct return lands in.\n   *\n   \
+         * The caller supplies storage for it, so the size the storage must have\n   \
+         * is part of the call's contract rather than something a caller guesses.\n   */\n  \
+         readonly resultRecord?: string;\n}\n\n",
     );
 
     let _ = writeln!(
@@ -111,9 +121,14 @@ pub fn entrypoints_ts(native: &Parsed) -> String {
             .map(|param| format!("\"{}\"", param.slot.as_str()))
             .collect::<Vec<_>>()
             .join(", ");
+        let record = entrypoint
+            .result_record
+            .as_ref()
+            .map(|name| format!(", resultRecord: \"{name}\""))
+            .unwrap_or_default();
         let _ = writeln!(
             text,
-            "  {{ name: \"{}\", result: \"{}\", params: [{params}] }},",
+            "  {{ name: \"{}\", result: \"{}\", params: [{params}]{record} }},",
             entrypoint.name,
             entrypoint.result.as_str()
         );
@@ -327,6 +342,27 @@ pub fn entrypoint_names_inc(native: &Parsed) -> String {
     let mut text = String::from(C_BANNER);
     for entrypoint in &native.entrypoints {
         let _ = writeln!(text, "\"{}\",", entrypoint.name);
+    }
+    text
+}
+
+/// The alignment each struct-returning entrypoint's caller storage needs.
+///
+/// The dispatch assigns through slot 0 for these, so a null or misaligned
+/// address has to be rejected before the store rather than trapped after it.
+pub fn result_struct_align_inc(
+    native: &Parsed,
+    records: &BTreeMap<String, RecordLayout>,
+) -> String {
+    let mut text = String::from(C_BANNER);
+    for entrypoint in &native.entrypoints {
+        let alignment = entrypoint
+            .result_record
+            .as_ref()
+            .and_then(|name| records.get(name))
+            .map(|record| record.align)
+            .unwrap_or(0);
+        let _ = writeln!(text, "{alignment}, /* {} */", entrypoint.name);
     }
     text
 }

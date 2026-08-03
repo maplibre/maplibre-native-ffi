@@ -17,10 +17,14 @@ MINGW* | MSYS* | CYGWIN*) library_name="maplibre-native-c.dll" addon_name="mln_t
 *) library_name="libmaplibre-native-c.so" addon_name="libmln_ts_addon.so" ;;
 esac
 
-# The preset names the target and the render backend, which is exactly the pair
-# a payload package is identified by.
+# The preset names the target and how the build reaches its renderer. A payload
+# is identified by the public render backend instead, so the context providers
+# map onto the backend they drive.
 target="${preset%-*}"
-backend="${preset##*-}"
+case "${preset##*-}" in
+egl | wgl | glx) backend=opengl ;;
+*) backend="${preset##*-}" ;;
+esac
 
 mkdir -p "$package/lib"
 cp "$root/target/debug/$addon_name" "$package/maplibre-native-ffi.node"

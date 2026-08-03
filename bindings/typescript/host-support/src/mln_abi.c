@@ -54,6 +54,12 @@ static const unsigned char mln_abi_result_is_status[] = {
 #include "result_is_status.inc"
 };
 
+/* The alignment each struct-returning entrypoint's caller storage needs, and
+ * zero for every entrypoint that returns something else. */
+static const uint64_t mln_abi_result_struct_align[] = {
+#include "result_struct_align.inc"
+};
+
 const char* mln_abi_fingerprint(void) { return MLN_ABI_FINGERPRINT_VALUE; }
 
 const char* mln_abi_header_digest(void) { return MLN_ABI_HEADER_DIGEST; }
@@ -113,6 +119,15 @@ int32_t mln_abi_call(
   }
 
   uint64_t* slots = (uint64_t*)slots_storage;
+  /* A struct return is stored through slot 0, so caller storage that is absent
+   * or misaligned is reported rather than dereferenced. */
+  const uint64_t result_align = mln_abi_result_struct_align[entrypoint];
+  if (result_align != 0U) {
+    const uintptr_t storage = (uintptr_t)slots[0];
+    if (storage == 0U || (storage & (uintptr_t)(result_align - 1U)) != 0U) {
+      return MLN_ABI_CALL_BAD_RESULT_STORAGE;
+    }
+  }
   (void)slots;
   (void)mln_abi_read_f32;
   (void)mln_abi_read_f64;
@@ -189,10 +204,15 @@ uint64_t mln_abi_transfer_issue(uint64_t handle) {
   }
   uint64_t token = 0U;
   mln_abi_transfer_acquire();
+  /* Tokens never repeat, so a stale carrier cannot claim a later transfer that
+   * reuses its slot. Issuance stops at the end of the sequence rather than
+   * wrapping onto a token that is still outstanding. */
+  if (mln_abi_transfer_sequence == UINT64_MAX) {
+    mln_abi_transfer_release();
+    return 0U;
+  }
   for (uint32_t index = 0U; index < MLN_ABI_TRANSFER_SLOTS; ++index) {
     if (mln_abi_transfers[index].token == 0U) {
-      /* Tokens never repeat, so a stale carrier cannot claim a later
-       * transfer that happens to reuse this slot. */
       token = ++mln_abi_transfer_sequence;
       mln_abi_transfers[index].token = token;
       mln_abi_transfers[index].handle = handle;

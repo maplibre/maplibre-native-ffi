@@ -20,6 +20,13 @@ export interface EntrypointInfo {
   readonly name: string;
   readonly result: SlotKind;
   readonly params: readonly SlotKind[];
+  /**
+   * The record a by-value struct return lands in.
+   *
+   * The caller supplies storage for it, so the size the storage must have
+   * is part of the call's contract rather than something a caller guesses.
+   */
+  readonly resultRecord?: string;
 }
 
 /** Entrypoint ids, which are the indexes the shim dispatches on. */
@@ -364,15 +371,36 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     params: ["ptr", "u32", "ptr", "ptr"],
   },
   { name: "mln_android_init", result: "i32", params: ["ptr", "ptr", "ptr"] },
-  { name: "mln_animation_options_default", result: "struct", params: [] },
-  { name: "mln_bound_options_default", result: "struct", params: [] },
+  {
+    name: "mln_animation_options_default",
+    result: "struct",
+    params: [],
+    resultRecord: "mln_animation_options",
+  },
+  {
+    name: "mln_bound_options_default",
+    result: "struct",
+    params: [],
+    resultRecord: "mln_bound_options",
+  },
   { name: "mln_c_version", result: "u32", params: [] },
-  { name: "mln_camera_fit_options_default", result: "struct", params: [] },
-  { name: "mln_camera_options_default", result: "struct", params: [] },
+  {
+    name: "mln_camera_fit_options_default",
+    result: "struct",
+    params: [],
+    resultRecord: "mln_camera_fit_options",
+  },
+  {
+    name: "mln_camera_options_default",
+    result: "struct",
+    params: [],
+    resultRecord: "mln_camera_options",
+  },
   {
     name: "mln_custom_geometry_source_options_default",
     result: "struct",
     params: [],
+    resultRecord: "mln_custom_geometry_source_options",
   },
   {
     name: "mln_feature_extension_result_destroy",
@@ -399,8 +427,18 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     result: "i32",
     params: ["handle", "usize", "ptr"],
   },
-  { name: "mln_free_camera_options_default", result: "struct", params: [] },
-  { name: "mln_geojson_source_options_default", result: "struct", params: [] },
+  {
+    name: "mln_free_camera_options_default",
+    result: "struct",
+    params: [],
+    resultRecord: "mln_free_camera_options",
+  },
+  {
+    name: "mln_geojson_source_options_default",
+    result: "struct",
+    params: [],
+    resultRecord: "mln_geojson_source_options",
+  },
   {
     name: "mln_http_header_transform_response_set",
     result: "i32",
@@ -722,7 +760,12 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     result: "i32",
     params: ["handle", "struct", "struct"],
   },
-  { name: "mln_map_options_default", result: "struct", params: [] },
+  {
+    name: "mln_map_options_default",
+    result: "struct",
+    params: [],
+    resultRecord: "mln_map_options",
+  },
   { name: "mln_map_pitch_by", result: "i32", params: ["handle", "f64"] },
   {
     name: "mln_map_pitch_by_animated",
@@ -966,8 +1009,18 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     result: "i32",
     params: ["handle", "struct", "ptr"],
   },
-  { name: "mln_map_tile_options_default", result: "struct", params: [] },
-  { name: "mln_map_viewport_options_default", result: "struct", params: [] },
+  {
+    name: "mln_map_tile_options_default",
+    result: "struct",
+    params: [],
+    resultRecord: "mln_map_tile_options",
+  },
+  {
+    name: "mln_map_viewport_options_default",
+    result: "struct",
+    params: [],
+    resultRecord: "mln_map_viewport_options",
+  },
   {
     name: "mln_metal_borrowed_texture_attach",
     result: "i32",
@@ -977,6 +1030,7 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     name: "mln_metal_borrowed_texture_descriptor_default",
     result: "struct",
     params: [],
+    resultRecord: "mln_metal_borrowed_texture_descriptor",
   },
   {
     name: "mln_metal_borrowed_texture_set_target",
@@ -997,6 +1051,7 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     name: "mln_metal_owned_texture_descriptor_default",
     result: "struct",
     params: [],
+    resultRecord: "mln_metal_owned_texture_descriptor",
   },
   {
     name: "mln_metal_owned_texture_release_frame",
@@ -1012,6 +1067,7 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     name: "mln_metal_surface_descriptor_default",
     result: "struct",
     params: [],
+    resultRecord: "mln_metal_surface_descriptor",
   },
   {
     name: "mln_metal_surface_set_target",
@@ -1054,6 +1110,7 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     name: "mln_opengl_borrowed_texture_descriptor_default",
     result: "struct",
     params: [],
+    resultRecord: "mln_opengl_borrowed_texture_descriptor",
   },
   {
     name: "mln_opengl_borrowed_texture_set_target",
@@ -1074,6 +1131,7 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     name: "mln_opengl_owned_texture_descriptor_default",
     result: "struct",
     params: [],
+    resultRecord: "mln_opengl_owned_texture_descriptor",
   },
   {
     name: "mln_opengl_owned_texture_release_frame",
@@ -1094,6 +1152,7 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     name: "mln_opengl_surface_descriptor_default",
     result: "struct",
     params: [],
+    resultRecord: "mln_opengl_surface_descriptor",
   },
   {
     name: "mln_opengl_surface_set_target",
@@ -1104,13 +1163,19 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     name: "mln_premultiplied_rgba8_image_default",
     result: "struct",
     params: [],
+    resultRecord: "mln_premultiplied_rgba8_image",
   },
   {
     name: "mln_projected_meters_for_lat_lng",
     result: "i32",
     params: ["struct", "ptr"],
   },
-  { name: "mln_projection_mode_default", result: "struct", params: [] },
+  {
+    name: "mln_projection_mode_default",
+    result: "struct",
+    params: [],
+    resultRecord: "mln_projection_mode",
+  },
   { name: "mln_render_session_clear_data", result: "i32", params: ["handle"] },
   { name: "mln_render_session_destroy", result: "i32", params: ["handle"] },
   { name: "mln_render_session_detach", result: "i32", params: ["handle"] },
@@ -1173,21 +1238,25 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     name: "mln_rendered_feature_query_options_default",
     result: "struct",
     params: [],
+    resultRecord: "mln_rendered_feature_query_options",
   },
   {
     name: "mln_rendered_query_geometry_box",
     result: "struct",
     params: ["struct"],
+    resultRecord: "mln_rendered_query_geometry",
   },
   {
     name: "mln_rendered_query_geometry_line_string",
     result: "struct",
     params: ["ptr", "usize"],
+    resultRecord: "mln_rendered_query_geometry",
   },
   {
     name: "mln_rendered_query_geometry_point",
     result: "struct",
     params: ["struct"],
+    resultRecord: "mln_rendered_query_geometry",
   },
   {
     name: "mln_resource_request_cancelled",
@@ -1312,7 +1381,12 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     result: "i32",
     params: ["handle", "u64", "ptr"],
   },
-  { name: "mln_runtime_options_default", result: "struct", params: [] },
+  {
+    name: "mln_runtime_options_default",
+    result: "struct",
+    params: [],
+    resultRecord: "mln_runtime_options",
+  },
   {
     name: "mln_runtime_poll_event",
     result: "i32",
@@ -1353,6 +1427,7 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     name: "mln_source_feature_query_options_default",
     result: "struct",
     params: [],
+    resultRecord: "mln_source_feature_query_options",
   },
   { name: "mln_style_id_list_count", result: "i32", params: ["handle", "ptr"] },
   { name: "mln_style_id_list_destroy", result: "void", params: ["handle"] },
@@ -1361,20 +1436,37 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     result: "i32",
     params: ["handle", "usize", "ptr"],
   },
-  { name: "mln_style_image_info_default", result: "struct", params: [] },
-  { name: "mln_style_image_options_default", result: "struct", params: [] },
+  {
+    name: "mln_style_image_info_default",
+    result: "struct",
+    params: [],
+    resultRecord: "mln_style_image_info",
+  },
+  {
+    name: "mln_style_image_options_default",
+    result: "struct",
+    params: [],
+    resultRecord: "mln_style_image_options",
+  },
   {
     name: "mln_style_tile_source_options_default",
     result: "struct",
     params: [],
+    resultRecord: "mln_style_tile_source_options",
   },
   {
     name: "mln_style_transition_options_default",
     result: "struct",
     params: [],
+    resultRecord: "mln_style_transition_options",
   },
   { name: "mln_supported_render_backend_mask", result: "u32", params: [] },
-  { name: "mln_texture_image_info_default", result: "struct", params: [] },
+  {
+    name: "mln_texture_image_info_default",
+    result: "struct",
+    params: [],
+    resultRecord: "mln_texture_image_info",
+  },
   {
     name: "mln_texture_read_premultiplied_rgba8",
     result: "i32",
@@ -1391,6 +1483,7 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     name: "mln_vulkan_borrowed_texture_descriptor_default",
     result: "struct",
     params: [],
+    resultRecord: "mln_vulkan_borrowed_texture_descriptor",
   },
   {
     name: "mln_vulkan_borrowed_texture_set_target",
@@ -1411,6 +1504,7 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     name: "mln_vulkan_owned_texture_descriptor_default",
     result: "struct",
     params: [],
+    resultRecord: "mln_vulkan_owned_texture_descriptor",
   },
   {
     name: "mln_vulkan_owned_texture_release_frame",
@@ -1426,6 +1520,7 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     name: "mln_vulkan_surface_descriptor_default",
     result: "struct",
     params: [],
+    resultRecord: "mln_vulkan_surface_descriptor",
   },
   {
     name: "mln_vulkan_surface_set_target",
@@ -1443,6 +1538,7 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     name: "mln_webgpu_borrowed_texture_descriptor_default",
     result: "struct",
     params: [],
+    resultRecord: "mln_webgpu_borrowed_texture_descriptor",
   },
   {
     name: "mln_webgpu_borrowed_texture_set_target",
@@ -1463,6 +1559,7 @@ export const ENTRYPOINTS: readonly EntrypointInfo[] = [
     name: "mln_webgpu_owned_texture_descriptor_default",
     result: "struct",
     params: [],
+    resultRecord: "mln_webgpu_owned_texture_descriptor",
   },
   {
     name: "mln_webgpu_owned_texture_release_frame",

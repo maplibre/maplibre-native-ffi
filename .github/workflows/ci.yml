@@ -34,6 +34,7 @@ jobs:
       - run: mise run --force //bindings/dart:ffigen
       - run: mise run --force //bindings/dotnet:generate
       - run: mise run --force //bindings/kotlin:generate
+      - run: mise run --force //bindings/typescript:generate
       - run: dprint output-resolved-config > /dev/null
       - run: mise run fix
       - name: Check generated and formatted files
@@ -214,6 +215,9 @@ jobs:
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/go:test linux-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/typescript:test linux-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/c-map:build linux-x64-vulkan

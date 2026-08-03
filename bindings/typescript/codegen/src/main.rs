@@ -63,7 +63,12 @@ fn run() -> Result<Vec<PathBuf>, String> {
     check_agreement(&native, &wasm)?;
 
     let header_digest = digest_headers(&include_dir)?;
-    let schema = emit::canonical_schema(&native, &wasm, &header_digest);
+    // The support contract is the third thing a payload and this package must
+    // agree about: a transport that changed `call` or slab registration would
+    // otherwise pass a handshake built only from the public C headers.
+    let support_header = binding_dir.join("host-support/include/mln_abi.h");
+    let support_digest = digest_file(&support_header)?;
+    let schema = emit::canonical_schema(&native, &wasm, &header_digest, &support_digest);
     let fingerprint = emit::fingerprint(&schema);
 
     let raw = binding_dir.join("api/src/raw");
@@ -91,6 +96,10 @@ fn run() -> Result<Vec<PathBuf>, String> {
         (
             generated.join("result_is_status.inc"),
             emit::result_is_status_inc(&native),
+        ),
+        (
+            generated.join("result_struct_align.inc"),
+            emit::result_struct_align_inc(&native, &native.records),
         ),
         (
             generated.join("fingerprint.h"),
@@ -149,6 +158,18 @@ fn digest_headers(include_dir: &Path) -> Result<String, String> {
         );
         hasher.update([0]);
     }
+    Ok(hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect())
+}
+
+fn digest_file(path: &Path) -> Result<String, String> {
+    let mut hasher = Sha256::new();
+    hasher.update(
+        std::fs::read(path).map_err(|error| format!("reading {}: {error}", path.display()))?,
+    );
     Ok(hasher
         .finalize()
         .iter()

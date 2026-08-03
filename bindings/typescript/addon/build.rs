@@ -42,10 +42,21 @@ fn main() {
     let link_dir = install_dir.join("lib");
     println!("cargo:rustc-link-search=native={}", link_dir.display());
     println!("cargo:rustc-link-lib=dylib=maplibre-native-c");
-    if cfg!(unix) {
+    // Two rpaths, because the addon runs from two places. The build prefix
+    // serves a developer running against the tree; the payload-relative one is
+    // what a staged or installed package finds, where the native library sits
+    // in the package's own lib directory.
+    let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    if target_os == "macos" || target_os == "ios" {
         let runtime_dir = std::env::var("DEP_MAPLIBRE_NATIVE_C_RUNTIME_DIR")
             .unwrap_or_else(|_| link_dir.display().to_string());
         println!("cargo:rustc-link-arg=-Wl,-rpath,{runtime_dir}");
+        println!("cargo:rustc-link-arg=-Wl,-rpath,@loader_path/lib");
+    } else if cfg!(unix) {
+        let runtime_dir = std::env::var("DEP_MAPLIBRE_NATIVE_C_RUNTIME_DIR")
+            .unwrap_or_else(|_| link_dir.display().to_string());
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{runtime_dir}");
+        println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN/lib");
     }
 }
 

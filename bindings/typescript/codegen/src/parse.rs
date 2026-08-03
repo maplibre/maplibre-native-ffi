@@ -210,11 +210,17 @@ fn collect_function(entity: &Entity, parsed: &mut Parsed) -> Result<(), String> 
     let result_type = entity
         .get_result_type()
         .ok_or_else(|| format!("{name}: no result type"))?;
+    let result_slot = slot_of(&result_type);
     parsed.entrypoints.push(Entrypoint {
         name: name.clone(),
         params,
+        result_record: if result_slot == Some(SlotKind::Struct) {
+            Some(result_type.get_display_name())
+        } else {
+            None
+        },
         result_spelling: result_type.get_display_name(),
-        result: slot_of(&result_type).ok_or_else(|| {
+        result: result_slot.ok_or_else(|| {
             format!(
                 "{name}: unsupported result type {}",
                 result_type.get_display_name()

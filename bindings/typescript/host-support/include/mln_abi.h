@@ -37,6 +37,11 @@ enum mln_abi_call_status {
   MLN_ABI_CALL_NULL_SLOTS = 2,
   /** The slot array was not eight-byte aligned. */
   MLN_ABI_CALL_MISALIGNED_SLOTS = 3,
+  /**
+   * The entrypoint returns a struct by value and slot 0 named no suitably
+   * aligned caller storage for it.
+   */
+  MLN_ABI_CALL_BAD_RESULT_STORAGE = 4,
 };
 
 /** Reports the schema fingerprint this build's dispatch was generated from. */
