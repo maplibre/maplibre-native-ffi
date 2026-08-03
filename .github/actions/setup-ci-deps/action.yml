@@ -143,6 +143,15 @@ runs:
           echo "LIBGL_ALWAYS_SOFTWARE=true"
         } >> "$GITHUB_ENV"
 
+    # The hosted runner image has Android build tools but no system QEMU. Keep
+    # the emulator dependency out of every other job and the dev container.
+    - name: Install the OpenHarmony emulator host
+      if: ${{ runner.os == 'Linux' && inputs.target == 'ohos-x64-egl' }}
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends --yes qemu-system-x86
+
     - name: Use Windows Vulkan software driver
       if: ${{ runner.os == 'Windows' && endsWith(inputs.target, '-vulkan') }}
       uses: ./.github/actions/setup-windows-vulkan-software
