@@ -24,7 +24,11 @@ import {
 import type { Native } from "./native.ts";
 import type { Ptr } from "./transport.ts";
 
-export function decodeEvent(native: Native, event: Ptr): RuntimeEvent {
+export function decodeEvent(
+  native: Native,
+  event: Ptr,
+  resolveMap: (id: bigint) => object | undefined,
+): RuntimeEvent {
   const layout = native.layout("mln_runtime_event");
   const view = native.memory.view(event, layout.size);
   const fields = layout.fields;
@@ -33,6 +37,10 @@ export function decodeEvent(native: Native, event: Ptr): RuntimeEvent {
     view.getUint32(fields.source_type!.offset, true),
   );
   const source = view.getBigUint64(fields.source!.offset, true);
+  const isMapSource =
+    sourceType.rawValue ===
+      MLN_RUNTIME_EVENT_SOURCE_TYPE.MLN_RUNTIME_EVENT_SOURCE_MAP &&
+    source !== 0n;
   const messagePointer = native.memory.readPointer(
     (event + BigInt(fields.message!.offset)) as Ptr,
   );
@@ -51,12 +59,10 @@ export function decodeEvent(native: Native, event: Ptr): RuntimeEvent {
       view.getUint32(fields.type!.offset, true),
     ),
     sourceType,
-    source:
-      sourceType.rawValue ===
-        MLN_RUNTIME_EVENT_SOURCE_TYPE.MLN_RUNTIME_EVENT_SOURCE_MAP &&
-      source !== 0n
-        ? new MapIdentity(source)
-        : undefined,
+    source: isMapSource ? new MapIdentity(source) : undefined,
+    // A map an event names may already be closed, in which case the event
+    // carries its identity and no wrapper rather than a stale one.
+    map: isMapSource ? (resolveMap(source) as RuntimeEvent["map"]) : undefined,
     code: view.getInt32(fields.code!.offset, true),
     message: native.foreignString(messagePointer, messageSize),
     payload: decodePayload(

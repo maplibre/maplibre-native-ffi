@@ -363,12 +363,27 @@ export type RuntimeEventPayload =
       readonly bytes: Uint8Array;
     };
 
+/**
+ * The public map an event resolves to.
+ *
+ * Spelled as a type-only import so the value modules stay acyclic: `map.ts`
+ * imports the values here at run time, and this reference is erased.
+ */
+type MapHandle = import("./map.ts").Map;
+
 /** One queued runtime event, copied out of native storage. */
 export interface RuntimeEvent {
   readonly type: RuntimeEventType;
   readonly sourceType: RuntimeEventSourceType;
   /** The map an event came from, when its source is a map. */
   readonly source: MapIdentity | undefined;
+  /**
+   * The live public map this event came from.
+   *
+   * Absent when the event came from the runtime, and when the map it names has
+   * already been closed: an event never carries a wrapper for a released map.
+   */
+  readonly map: MapHandle | undefined;
   readonly code: number;
   readonly message: string;
   readonly payload: RuntimeEventPayload;

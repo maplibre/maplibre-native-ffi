@@ -7,11 +7,16 @@
  */
 
 import type { AnimationOptions, CameraOptions } from "./camera.ts";
-import { NamedValue } from "./events.ts";
+import { MapIdentity, NamedValue } from "./events.ts";
 import { HandleState } from "./internal/handle.ts";
 import type { Native } from "./internal/native.ts";
 import { asRawEnum, asUint32 } from "./internal/numbers.ts";
-import { attachHandleState, handleStateOf } from "./internal/private.ts";
+import {
+  attachHandleState,
+  handleStateOf,
+  registerMap,
+  unregisterMap,
+} from "./internal/private.ts";
 import {
   copyOutText,
   readCameraOptions,
@@ -74,11 +79,31 @@ export interface MapSize {
 
 export class Map {
   readonly #state: HandleState;
+  readonly #identity: MapIdentity;
+  readonly #runtime: object;
 
-  private constructor(native: Native, id: bigint, runtime: HandleState) {
-    this.#state = new HandleState(native, "Map", id, runtime);
+  private constructor(
+    native: Native,
+    id: bigint,
+    runtimeState: HandleState,
+    runtime: object,
+  ) {
+    this.#state = new HandleState(native, "Map", id, runtimeState);
     this.#state.watchForLeaks(this);
+    this.#identity = new MapIdentity(id);
+    this.#runtime = runtime;
     attachHandleState(this, this.#state);
+    registerMap(runtime, id, this);
+  }
+
+  /**
+   * This map's identity, which an event it produced carries.
+   *
+   * The value compares and keys by the native object it names, and carries no
+   * operations, so it cannot become a second owner.
+   */
+  get identity(): MapIdentity {
+    return this.#identity;
   }
 
   /** @internal */
@@ -124,7 +149,7 @@ export class Map {
       return native.memory.view(outMap, 8).getBigUint64(0, true);
     });
     try {
-      return new Map(native, id, handleStateOf(runtime));
+      return new Map(native, id, handleStateOf(runtime), runtime);
     } catch (error) {
       native.scope((scope) => {
         native.raw(scope, EP.mln_map_destroy, [id]);
@@ -270,11 +295,17 @@ export class Map {
 
   /** Releases the map. Closing twice succeeds. */
   close(): void {
+    if (this.#state.isClosed) {
+      return;
+    }
     const native = this.#state.native;
     this.#state.close((id) => {
       native.scope((scope) => {
         native.checked(scope, EP.mln_map_destroy, [id]);
       });
+      // The id stops naming this map only once native release succeeds, so a
+      // failed destroy leaves the event path resolving it as before.
+      unregisterMap(this.#runtime, id);
     });
   }
 

@@ -11,6 +11,7 @@ import {
   type Map,
   MapMode,
   type Runtime,
+  type RuntimeEvent,
   RuntimeEventType,
 } from "../src/index.ts";
 import { afterEach, describe, expect, it } from "vitest";
@@ -94,6 +95,51 @@ describe("a map", () => {
     created.close();
     expect(created.isClosed).toBe(true);
     runtime = undefined;
+  });
+
+  it("names the live map a style-loaded event came from", () => {
+    const { runtime: created, map } = open();
+    const other = created.createMap({ width: 64, height: 64 });
+    maps.push(other);
+    map.setStyleJson(EMPTY_STYLE);
+
+    let loaded: RuntimeEvent | undefined;
+    for (let attempt = 0; attempt < 200 && loaded === undefined; attempt += 1) {
+      created.pump(25);
+      for (
+        let event = created.pollEvent();
+        event !== undefined;
+        event = created.pollEvent()
+      ) {
+        if (event.type.equals(RuntimeEventType.mapStyleLoaded)) {
+          loaded = event;
+          break;
+        }
+      }
+    }
+
+    expect(loaded).toBeDefined();
+    // Two maps are live, so the event has to name the one that produced it.
+    expect(loaded!.map).toBe(map);
+    expect(loaded!.map).not.toBe(other);
+    expect(loaded!.source?.equals(map.identity)).toBe(true);
+    expect(loaded!.source?.equals(other.identity)).toBe(false);
+  });
+
+  it("carries no wrapper for a map that has already closed", () => {
+    const { runtime: created, map } = open();
+    map.setStyleJson(EMPTY_STYLE);
+    // Pump once so the load starts, then close before draining the events it
+    // produced. An event for a released map names its identity and no wrapper.
+    created.pump(25);
+    map.close();
+    for (
+      let event = created.pollEvent();
+      event !== undefined;
+      event = created.pollEvent()
+    ) {
+      expect(event.map).toBeUndefined();
+    }
   });
 
   it("loads a style document and reads it back byte for byte", () => {

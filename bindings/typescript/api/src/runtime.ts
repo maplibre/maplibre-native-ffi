@@ -13,7 +13,7 @@ import { decodeEvent } from "./internal/event-decode.ts";
 import { HandleState } from "./internal/handle.ts";
 import type { Native } from "./internal/native.ts";
 import { asInt64 } from "./internal/numbers.ts";
-import { attachHandleState } from "./internal/private.ts";
+import { attachHandleState, mapForId } from "./internal/private.ts";
 import type { Ptr } from "./internal/transport.ts";
 import { Map, type MapOptions } from "./map.ts";
 import { EP } from "./raw/entrypoints.ts";
@@ -340,7 +340,7 @@ export class Runtime {
     if (native.memory.bytes(this.#hasEventStorage, 1)[0] === 0) {
       return undefined;
     }
-    return decodeEvent(native, this.#eventStorage);
+    return decodeEvent(native, this.#eventStorage, (id) => mapForId(this, id));
   }
 
   /**

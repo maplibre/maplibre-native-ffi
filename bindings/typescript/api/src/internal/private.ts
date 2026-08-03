@@ -41,3 +41,39 @@ export function nativeOf(wrapper: object): Native {
   }
   return native;
 }
+
+/**
+ * The live maps one runtime owns, by their native identity.
+ *
+ * A map-sourced event carries the id of the map that produced it, and the
+ * specification asks the binding to resolve it to the public wrapper when it can
+ * prove one is live. The references are weak: a host that drops a map without
+ * closing it has leaked it, and holding it here would hide that.
+ */
+const liveMaps = new WeakMap<object, globalThis.Map<bigint, WeakRef<object>>>();
+
+export function registerMap(runtime: object, id: bigint, map: object): void {
+  let maps = liveMaps.get(runtime);
+  if (maps === undefined) {
+    maps = new globalThis.Map();
+    liveMaps.set(runtime, maps);
+  }
+  maps.set(id, new WeakRef(map));
+}
+
+export function unregisterMap(runtime: object, id: bigint): void {
+  liveMaps.get(runtime)?.delete(id);
+}
+
+/** Reports the live map an id names, or `undefined` when none can be proven. */
+export function mapForId(runtime: object, id: bigint): object | undefined {
+  const reference = liveMaps.get(runtime)?.get(id);
+  if (reference === undefined) {
+    return undefined;
+  }
+  const map = reference.deref();
+  if (map === undefined) {
+    liveMaps.get(runtime)?.delete(id);
+  }
+  return map;
+}
