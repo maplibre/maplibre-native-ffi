@@ -84,7 +84,11 @@ def suite_commands(source: dict[str, object], preset: str) -> list[str]:
 def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
     render_backend = "opengl" if backend(preset) == "egl" else backend(preset)
     arguments = f"{render_backend} {abi}"
-    commands = [f"mise run //bindings/kotlin:androidBuild {arguments} --prebuilt"]
+    commands = [
+        f"mise run //bindings/kotlin:androidBuild {arguments} --prebuilt",
+        f"mise run //bindings/go:build {preset}",
+        f"mise run //bindings/rust:build {preset}",
+    ]
     if build_map:
         commands.append(f"mise run //examples/android-map:build {arguments} --prebuilt")
     commands.append(f"mise run //bindings/dart:build:mobile {preset}")
@@ -94,9 +98,12 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
 def native_commands(preset: str, tested: set[str]) -> list[str]:
     target_platform = platform(preset)
     if target_platform == "ohos":
-        # Builds the C API as a dependency, and the Rust binding is the only
-        # consumer this target has.
-        return [f"mise run //bindings/rust:build {preset}"]
+        # Both bindings build the C API as a dependency and link against each
+        # backend-specific native artifact.
+        return [
+            f"mise run //bindings/rust:build {preset}",
+            f"mise run //bindings/go:build {preset}",
+        ]
     commands = [f"mise run {'test' if preset in tested else 'build'} {preset}"]
     if target_platform == "linux":
         commands.append(f"mise run check-glibc-floor {preset}")

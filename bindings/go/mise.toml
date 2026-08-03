@@ -50,8 +50,36 @@ PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CO
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
-PKG_CONFIG_PATH="$MISE_MONOREPO_ROOT/build/$usage_preset/install/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
-  go test ./...
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+
+case "$usage_preset" in
+  android-arm64-*)
+    goos=android
+    goarch=arm64
+    compiler_prefix=aarch64-linux-android
+    ;;
+  android-x64-*)
+    goos=android
+    goarch=amd64
+    compiler_prefix=x86_64-linux-android
+    ;;
+  ohos-*)
+    export GOOS=linux GOARCH=arm64 CGO_ENABLED=1
+    sysroot="$OHOS_SDK_NATIVE/sysroot"
+    target_flags="--target=aarch64-linux-ohos --sysroot=$sysroot"
+    export CC="$OHOS_SDK_NATIVE/llvm/bin/clang $target_flags"
+    export CXX="$OHOS_SDK_NATIVE/llvm/bin/clang++ $target_flags"
+    exec go test -c -o /dev/null .
+    ;;
+  *) exec go test ./... ;;
+esac
+
+ndk_bin="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
+export GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=1
+export CC="$ndk_bin/${compiler_prefix}24-clang"
+export CXX="$ndk_bin/${compiler_prefix}24-clang++"
+exec go test -c -o /dev/null .
 '''
 run_windows = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
