@@ -6,8 +6,34 @@ run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
 
-# A host build lets cargo pick its own target and toolchain. An OpenHarmony build
-# names the target and points every tool that compiles or links at the SDK.
+# A host build lets cargo pick its own target and toolchain. Cross builds name
+# the target and point every tool that compiles or links at the platform SDK.
+if [[ "$usage_preset" == android-* ]]; then
+  case "$usage_preset" in
+    android-arm64-*)
+      cargo_target=aarch64-linux-android
+      compiler_prefix=aarch64-linux-android
+      ;;
+    android-x64-*)
+      cargo_target=x86_64-linux-android
+      compiler_prefix=x86_64-linux-android
+      ;;
+  esac
+  target_env="${cargo_target//-/_}"
+  target_env_upper="${target_env^^}"
+  ndk_bin="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
+  sysroot="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+  export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=--target=$compiler_prefix --sysroot=$sysroot"
+  export "CC_$target_env=$ndk_bin/${compiler_prefix}24-clang"
+  export "CXX_$target_env=$ndk_bin/${compiler_prefix}24-clang++"
+  export "CARGO_TARGET_${target_env_upper}_LINKER=$ndk_bin/${compiler_prefix}24-clang"
+  exec cargo build \
+    -p maplibre-native-ffi-sys \
+    -p maplibre-native-ffi-core \
+    -p maplibre-native-ffi \
+    --target "$cargo_target"
+fi
+
 if [[ "$usage_preset" == ohos-* ]]; then
   sysroot="$OHOS_SDK_NATIVE/sysroot"
   target_flags="--target=aarch64-linux-ohos --sysroot=$sysroot"

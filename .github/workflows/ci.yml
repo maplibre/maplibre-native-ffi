@@ -798,6 +798,12 @@ jobs:
       - run: mise run //bindings/kotlin:androidBuild opengl arm64-v8a --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/go:build android-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/rust:build android-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/android-map:build opengl arm64-v8a --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"
@@ -836,6 +842,12 @@ jobs:
       - run: mise run //bindings/kotlin:androidBuild vulkan arm64-v8a --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/go:build android-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/rust:build android-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/dart:build:mobile android-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
@@ -869,6 +881,12 @@ jobs:
           android-x64-egl
           build/packages/native/dist/maplibre-native-c-android-x64-egl.tar.gz
       - run: mise run //bindings/kotlin:androidBuild opengl x86_64 --prebuilt
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/go:build android-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/rust:build android-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/android-map:build opengl x86_64 --prebuilt
@@ -909,6 +927,12 @@ jobs:
       - run: mise run //bindings/kotlin:androidBuild vulkan x86_64 --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/go:build android-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/rust:build android-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/dart:build:mobile android-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
@@ -935,6 +959,7 @@ jobs:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run //bindings/rust:build ohos-arm64-egl
+      - run: mise run //bindings/go:build ohos-arm64-egl
 
   target-ohos-arm64-vulkan:
     name: target / ohos-arm64-vulkan
@@ -952,6 +977,7 @@ jobs:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run //bindings/rust:build ohos-arm64-vulkan
+      - run: mise run //bindings/go:build ohos-arm64-vulkan
 
   target-windows-x64-wgl:
     name: target / windows-x64-wgl
