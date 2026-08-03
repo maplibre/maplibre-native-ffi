@@ -7,6 +7,36 @@
  */
 
 export {
+  type ErrorKind,
+  MaplibreError,
+  type MaplibreErrorOptions,
+} from "./errors.ts";
+export {
+  CameraChangeMode,
+  MapIdentity,
+  NamedValue,
+  RenderMode,
+  type RenderingStats,
+  type RuntimeEvent,
+  type RuntimeEventPayload,
+  RuntimeEventSourceType,
+  RuntimeEventType,
+  type TileId,
+  TileOperation,
+} from "./events.ts";
+export {
   AbiMismatchError,
   type NodeApiAddon,
 } from "./internal/node-transport.ts";
+export {
+  type LoadOptions,
+  Maplibre,
+  NetworkStatus,
+  type RenderBackends,
+} from "./maplibre.ts";
+export {
+  type PumpTimeout,
+  Runtime,
+  type RuntimeOptions,
+  WakeSource,
+} from "./runtime.ts";
