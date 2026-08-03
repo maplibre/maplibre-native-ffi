@@ -229,31 +229,6 @@ sources = [
 outputs = { auto = true }
 run = '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"'
 
-[tasks."build:rust-emscripten"]
-description = "Build the Rust platform support library for the Emscripten target."
-# Emscripten rejects mixing objects that carry atomics with objects that do not
-# under shared memory, and rustup ships no `wasm32-unknown-emscripten` `std`
-# built with atomics, so `std` is rebuilt from source here. `-Zbuild-std` is
-# nightly-only, and this is the one place the repository reaches for a nightly
-# feature: RUSTC_BOOTSTRAP unlocks it on the pinned stable toolchain, which
-# keeps the rest of the workspace, and every artifact we ship, on stable.
-#
-# Building the staticlib needs no linker, so this runs without emsdk. The
-# Emscripten CMake target links it, and will reach cargo the same way every other
-# target does.
-sources = ["Cargo.lock", "Cargo.toml", "src/platform/rust/**/*"]
-outputs = { auto = true }
-env.RUSTC_BOOTSTRAP = "1"
-env.RUSTFLAGS = "-C target-feature=+atomics,+bulk-memory -C panic=abort"
-run = '''
-cargo build \
-  --manifest-path src/platform/rust/Cargo.toml \
-  --package mln-ffi-platform \
-  --target wasm32-unknown-emscripten \
-  --release \
-  -Z build-std=std,panic_abort
-'''
-
 [tasks.clean]
 description = "Remove one native preset build tree."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'

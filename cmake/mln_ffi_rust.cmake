@@ -117,9 +117,9 @@ function(mln_ffi_link_rust_platform target)
   # Emscripten rejects mixing objects that carry atomics with objects that do
   # not under shared memory, and rustup ships no wasm32-unknown-emscripten std
   # built with atomics, so std is rebuilt from source. -Zbuild-std is
-  # nightly-only; RUSTC_BOOTSTRAP unlocks it on the pinned stable toolchain,
-  # which keeps every artifact we ship on stable. Mirrors the standalone
-  # `build:rust-emscripten` task.
+  # nightly-only, and this is the one place the repository reaches for a nightly
+  # feature: RUSTC_BOOTSTRAP unlocks it on the pinned stable toolchain, which
+  # keeps the rest of the workspace, and every artifact we ship, on stable.
   set(rust_extra_args)
   if(EMSCRIPTEN)
     list(APPEND rust_environment "RUSTC_BOOTSTRAP=1"
