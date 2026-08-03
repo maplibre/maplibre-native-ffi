@@ -473,6 +473,10 @@ Requirements:
 - After a session resize, the map applies its logical size on the runtime loop's
   next `pump`, so `render_update` reports no update until then. The render loop
   MUST keep pacing and retry rather than treating it as a failure.
+- A compositor that cannot present the frame it was handed MUST report that as
+  no frame rendered, and the render loop MUST set the render request again. A
+  minimized or occluded window produces this, and so does a swapchain awaiting
+  its rebuild. The map retains the update, so the retry draws it.
 
 Texture modes: after `render_update` reports an update was rendered, MUST run
 the compositor pass to copy the map texture into the host swapchain before
@@ -683,6 +687,20 @@ binary targets. Implement only the modes required by the active profile
 - `native-surface`: surface / swapchain presentation descriptor for the host
   `VkSurfaceKHR`.
 
+A host swapchain in the texture modes MUST:
+
+- Name the outgoing swapchain as `oldSwapchain` when it builds the replacement,
+  and destroy the retired one after that call returns. Destroying first leaves
+  the surface without images, and the window goes black until the replacement
+  presents.
+- Hold one present-wait semaphore per swapchain image and wait on the one that
+  belongs to the acquired image. A semaphore shared across images lets one
+  frame's submit signal it while another frame's present still waits on it,
+  which Vulkan forbids and which presents half-drawn frames.
+- Rebuild after `VK_SUBOPTIMAL_KHR` from acquire or present, as it rebuilds
+  after `VK_ERROR_OUT_OF_DATE_KHR`. A suboptimal swapchain presents frames that
+  no longer match the surface, and it stays suboptimal until it is rebuilt.
+
 #### Metal
 
 - `native-surface`: Metal surface descriptor for the host `CAMetalLayer`.
@@ -690,6 +708,10 @@ binary targets. Implement only the modes required by the active profile
   handles required by the C API.
 - `borrowed-texture`: exportable Metal texture sized to the viewport;
   borrowed-texture descriptor.
+
+A host compositor MUST treat a `CAMetalLayer` that hands out no drawable as a
+frame to retry. A minimized or occluded window has none to give, and the
+drawable pool empties under load.
 
 #### OpenGL / EGL / WGL
 

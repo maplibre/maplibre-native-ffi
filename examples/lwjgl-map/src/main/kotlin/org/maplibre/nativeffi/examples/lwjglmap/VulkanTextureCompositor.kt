@@ -29,17 +29,28 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
   private var commandPool = NULL
   private var commandBuffer: VkCommandBuffer? = null
   private var imageAvailable = NULL
-  private var renderFinished = NULL
+
+  /**
+   * One present-wait semaphore per swapchain image, indexed by the acquired image.
+   *
+   * The frame fence proves a submit finished, but only the next acquire of the same image proves
+   * its present consumed the semaphore, so a single reused semaphore is a race the presentation
+   * engine may lose.
+   */
+  private var renderFinished = LongArray(0)
   private var inFlight = NULL
+  private var currentViewport = viewport
+  private var swapchainStale = false
 
   init {
     try {
-      createSwapchain(viewport)
+      createSwapchain(NULL)
       createRenderPass()
       createDescriptorState()
       createPipeline()
       createFramebuffers()
       createCommands()
+      createPresentSemaphores()
     } catch (error: RuntimeException) {
       try {
         close()
@@ -51,15 +62,19 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
   }
 
   fun resize(viewport: Viewport) {
-    context.waitIdle()
-    destroySwapchainDependents()
-    createSwapchain(viewport)
-    createFramebuffers()
+    currentViewport = viewport
+    recreateSwapchain()
   }
 
   fun drawImageView(imageView: Long) {
     MemoryStack.stackPush().use { stack ->
       check(vkWaitForFences(context.device(), inFlight, true, Long.MAX_VALUE), "vkWaitForFences")
+      // The frame about to present is the first content a replacement could show, so this is the
+      // moment a stale swapchain is replaced.
+      if (swapchainStale) {
+        recreateSwapchain()
+        swapchainStale = false
+      }
       val imageIndex = stack.mallocInt(1)
       val acquire =
         vkAcquireNextImageKHR(
@@ -71,7 +86,15 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
           imageIndex,
         )
       if (acquire == VK_ERROR_OUT_OF_DATE_KHR) {
+        // The surface outgrew this swapchain, so nothing reaches the screen until the replacement
+        // is built.
+        swapchainStale = true
         return
+      }
+      if (acquire == VK_SUBOPTIMAL_KHR) {
+        // Still presentable, but the surface has moved on; replace the swapchain before the next
+        // frame.
+        swapchainStale = true
       }
       if (acquire != VK_SUCCESS && acquire != VK_SUBOPTIMAL_KHR) {
         error("vkAcquireNextImageKHR failed with Vulkan status $acquire")
@@ -80,13 +103,39 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
 
       updateDescriptor(imageView)
       record(imageIndex[0])
-      submit(stack)
+      submit(stack, imageIndex[0])
       check(vkWaitForFences(context.device(), inFlight, true, Long.MAX_VALUE), "vkWaitForFences")
       present(stack, imageIndex[0])
     }
   }
 
-  private fun createSwapchain(viewport: Viewport) {
+  /**
+   * Replaces the swapchain and the state sized to it.
+   *
+   * The replacement is created before the retired swapchain is destroyed and names it as
+   * oldSwapchain, so the presentation engine hands the surface over directly. Destroying it first
+   * leaves a gap that MoltenVK fills with presents that succeed but reach no drawable the window
+   * still shows.
+   */
+  private fun recreateSwapchain() {
+    context.waitIdle()
+    val retiredSwapchain = swapchain
+    val retiredImageViews = imageViews
+    val retiredFramebuffers = framebuffers
+    swapchain = NULL
+    imageViews = LongArray(0)
+    framebuffers = LongArray(0)
+    destroyPresentSemaphores()
+    try {
+      createSwapchain(retiredSwapchain)
+    } finally {
+      destroySwapchainObjects(retiredSwapchain, retiredImageViews, retiredFramebuffers)
+    }
+    createFramebuffers()
+    createPresentSemaphores()
+  }
+
+  private fun createSwapchain(oldSwapchain: Long) {
     MemoryStack.stackPush().use { stack ->
       val capabilities = VkSurfaceCapabilitiesKHR.calloc(stack)
       check(
@@ -130,9 +179,10 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
         }
       }
       swapchainFormat = chosen.format()
-      extentWidth = chooseExtentDimension(capabilities, viewport.framebufferWidth(), width = true)
+      extentWidth =
+        chooseExtentDimension(capabilities, currentViewport.framebufferWidth(), width = true)
       extentHeight =
-        chooseExtentDimension(capabilities, viewport.framebufferHeight(), width = false)
+        chooseExtentDimension(capabilities, currentViewport.framebufferHeight(), width = false)
       var imageCount = capabilities.minImageCount() + 1
       if (capabilities.maxImageCount() > 0 && imageCount > capabilities.maxImageCount()) {
         imageCount = capabilities.maxImageCount()
@@ -152,7 +202,7 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
           .compositeAlpha(VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)
           .presentMode(VK_PRESENT_MODE_FIFO_KHR)
           .clipped(true)
-          .oldSwapchain(NULL)
+          .oldSwapchain(oldSwapchain)
       val out = stack.mallocLong(1)
       check(vkCreateSwapchainKHR(context.device(), createInfo, null, out), "vkCreateSwapchainKHR")
       swapchain = out[0]
@@ -500,11 +550,6 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
         "vkCreateSemaphore(imageAvailable)",
       )
       imageAvailable = out[0]
-      check(
-        vkCreateSemaphore(context.device(), semaphoreInfo, null, out),
-        "vkCreateSemaphore(renderFinished)",
-      )
-      renderFinished = out[0]
       val fenceInfo =
         VkFenceCreateInfo.calloc(stack)
           .sType(VK_STRUCTURE_TYPE_FENCE_CREATE_INFO)
@@ -512,6 +557,32 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
       check(vkCreateFence(context.device(), fenceInfo, null, out), "vkCreateFence")
       inFlight = out[0]
     }
+  }
+
+  /** Sizes the present-wait semaphores to the swapchain, on creation and on every replacement. */
+  private fun createPresentSemaphores() {
+    renderFinished = LongArray(imageViews.size)
+    MemoryStack.stackPush().use { stack ->
+      val semaphoreInfo =
+        VkSemaphoreCreateInfo.calloc(stack).sType(VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO)
+      val out = stack.mallocLong(1)
+      for (index in renderFinished.indices) {
+        check(
+          vkCreateSemaphore(context.device(), semaphoreInfo, null, out),
+          "vkCreateSemaphore(renderFinished)",
+        )
+        renderFinished[index] = out[0]
+      }
+    }
+  }
+
+  private fun destroyPresentSemaphores() {
+    for (semaphore in renderFinished) {
+      if (semaphore != NULL) {
+        vkDestroySemaphore(context.device(), semaphore, null)
+      }
+    }
+    renderFinished = LongArray(0)
   }
 
   private fun updateDescriptor(imageView: Long) {
@@ -583,7 +654,7 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
     }
   }
 
-  private fun submit(stack: MemoryStack) {
+  private fun submit(stack: MemoryStack, imageIndex: Int) {
     val waitStages = stack.ints(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
     val submitInfo =
       VkSubmitInfo.calloc(stack)
@@ -591,7 +662,7 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
         .pWaitSemaphores(stack.longs(imageAvailable))
         .pWaitDstStageMask(waitStages)
         .pCommandBuffers(stack.pointers(commandBuffer()))
-        .pSignalSemaphores(stack.longs(renderFinished))
+        .pSignalSemaphores(stack.longs(renderFinished[imageIndex]))
     check(vkQueueSubmit(context.graphicsQueue(), submitInfo, inFlight), "vkQueueSubmit")
   }
 
@@ -600,11 +671,16 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
     val presentInfo =
       VkPresentInfoKHR.calloc(stack)
         .sType(VK_STRUCTURE_TYPE_PRESENT_INFO_KHR)
-        .pWaitSemaphores(stack.longs(renderFinished))
+        .pWaitSemaphores(stack.longs(renderFinished[imageIndex]))
         .swapchainCount(1)
         .pSwapchains(stack.longs(swapchain))
         .pImageIndices(indices)
     val status = vkQueuePresentKHR(context.graphicsQueue(), presentInfo)
+    if (status == VK_SUBOPTIMAL_KHR || status == VK_ERROR_OUT_OF_DATE_KHR) {
+      // A suboptimal frame reached the screen and an out-of-date one did not, and either way the
+      // surface has moved on; replace the swapchain before the next frame.
+      swapchainStale = true
+    }
     if (status != VK_SUCCESS && status != VK_SUBOPTIMAL_KHR && status != VK_ERROR_OUT_OF_DATE_KHR) {
       error("vkQueuePresentKHR failed with Vulkan status $status")
     }
@@ -612,21 +688,30 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
   }
 
   private fun destroySwapchainDependents() {
-    for (framebuffer in framebuffers) {
+    destroyPresentSemaphores()
+    destroySwapchainObjects(swapchain, imageViews, framebuffers)
+    framebuffers = LongArray(0)
+    imageViews = LongArray(0)
+    swapchain = NULL
+  }
+
+  private fun destroySwapchainObjects(
+    swapchainHandle: Long,
+    swapchainImageViews: LongArray,
+    swapchainFramebuffers: LongArray,
+  ) {
+    for (framebuffer in swapchainFramebuffers) {
       if (framebuffer != NULL) {
         vkDestroyFramebuffer(context.device(), framebuffer, null)
       }
     }
-    framebuffers = LongArray(0)
-    for (imageView in imageViews) {
+    for (imageView in swapchainImageViews) {
       if (imageView != NULL) {
         vkDestroyImageView(context.device(), imageView, null)
       }
     }
-    imageViews = LongArray(0)
-    if (swapchain != NULL) {
-      vkDestroySwapchainKHR(context.device(), swapchain, null)
-      swapchain = NULL
+    if (swapchainHandle != NULL) {
+      vkDestroySwapchainKHR(context.device(), swapchainHandle, null)
     }
   }
 
@@ -635,10 +720,6 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
     if (inFlight != NULL) {
       vkDestroyFence(context.device(), inFlight, null)
       inFlight = NULL
-    }
-    if (renderFinished != NULL) {
-      vkDestroySemaphore(context.device(), renderFinished, null)
-      renderFinished = NULL
     }
     if (imageAvailable != NULL) {
       vkDestroySemaphore(context.device(), imageAvailable, null)

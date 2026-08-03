@@ -193,9 +193,10 @@ impl App {
             .expect("render target is open")
             .render_update(&self.graphics)?
         {
-            // The map applies a new logical size on the runtime loop's next
-            // `pump`, so an attach or resize leaves nothing to render until
-            // then. Keep the request and retry.
+            // Nothing reached the screen. The map applies a new logical size on
+            // the runtime loop's next `pump`, so an attach or resize leaves
+            // nothing to render until then, and a host swapchain with no image
+            // to present into skips the frame. Keep the request and retry.
             self.shared.request_render();
         }
         Ok(())

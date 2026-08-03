@@ -17,12 +17,21 @@ internal class MetalTextureCompositor(graphicsContext: GraphicsContext) : AutoCl
     }
   }
 
-  fun drawTexture(texture: Long) {
+  /**
+   * Samples the texture into the layer's next drawable, and reports whether it presented.
+   *
+   * A minimized or occluded window has no drawable to hand out, and the drawable pool is
+   * momentarily empty under load. Both are transient, so the frame is skipped rather than failed:
+   * the caller's render request stays pending and the draw retries once a drawable is available.
+   */
+  fun drawTexture(texture: Long): Boolean {
     var passDescriptor = NULL
     try {
-      MacObjectiveC.autoreleasePool().use {
+      return MacObjectiveC.autoreleasePool().use {
         val drawable = context.nextDrawable()
-        check(drawable != NULL) { "CAMetalLayer returned no drawable" }
+        if (drawable == NULL) {
+          return@use false
+        }
         passDescriptor = MacObjectiveC.allocInit("MTLRenderPassDescriptor")
         val attachment =
           MacObjectiveC.sendPointer(
@@ -56,6 +65,7 @@ internal class MetalTextureCompositor(graphicsContext: GraphicsContext) : AutoCl
         MacObjectiveC.sendVoid(commandBuffer, "presentDrawable:", drawable)
         MacObjectiveC.sendVoid(commandBuffer, "commit")
         MacObjectiveC.sendVoid(commandBuffer, "waitUntilCompleted")
+        true
       }
     } finally {
       MacObjectiveC.release(passDescriptor)

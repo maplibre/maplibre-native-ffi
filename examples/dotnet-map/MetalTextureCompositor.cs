@@ -42,11 +42,15 @@ internal sealed class MetalTextureCompositor : ITextureCompositor
             );
         }
 
-        DrawTexture(frame.Texture.Address);
-        return true;
+        return DrawTexture(frame.Texture.Address);
     }
 
-    public void DrawTexture(nint texture)
+    /// <summary>
+    /// Samples the texture into the layer's next drawable. Reports false without presenting when
+    /// the layer has no drawable to hand out, which a minimized or occluded window legitimately has
+    /// not; the caller's redraw stays pending and the draw retries once one is available.
+    /// </summary>
+    public bool DrawTexture(nint texture)
     {
         nint passDescriptor = 0;
         try
@@ -55,7 +59,7 @@ internal sealed class MetalTextureCompositor : ITextureCompositor
             var drawable = context.NextDrawable();
             if (drawable == 0)
             {
-                throw new InvalidOperationException("CAMetalLayer returned no drawable.");
+                return false;
             }
 
             passDescriptor = MacObjectiveC.AllocInit("MTLRenderPassDescriptor");
@@ -99,6 +103,7 @@ internal sealed class MetalTextureCompositor : ITextureCompositor
             MacObjectiveC.SendVoid(commandBuffer, "presentDrawable:", drawable);
             MacObjectiveC.SendVoid(commandBuffer, "commit");
             MacObjectiveC.SendVoid(commandBuffer, "waitUntilCompleted");
+            return true;
         }
         finally
         {

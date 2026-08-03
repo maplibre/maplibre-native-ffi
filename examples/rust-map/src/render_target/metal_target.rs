@@ -98,9 +98,11 @@ impl RenderTarget {
                 let draw_result = compositor.draw(&frame);
                 let close_result = frame.close().map_err(|error| error.into_error());
                 match (draw_result, close_result) {
-                    (Ok(()), Ok(())) => Ok(true),
+                    // A draw that presented nothing reports no frame rendered.
+                    // The render request stays pending and the frame retries.
+                    (Ok(presented), Ok(())) => Ok(presented),
                     (Err(draw_error), Ok(())) => Err(draw_error),
-                    (Ok(()), Err(close_error)) => Err(close_error),
+                    (Ok(_), Err(close_error)) => Err(close_error),
                     (Err(draw_error), Err(close_error)) => Err(Error::new(
                         draw_error.kind(),
                         draw_error.raw_status(),
@@ -116,8 +118,7 @@ impl RenderTarget {
                 if !session.render_update()? {
                     return Ok(false);
                 }
-                compositor.draw_texture(texture.texture())?;
-                Ok(true)
+                compositor.draw_texture(texture.texture())
             }
             Self::Surface { session } => session.render_update(),
         }

@@ -270,7 +270,7 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
         {
             case MetalBorrowedTexture metalTexture
                 when compositor is MetalTextureCompositor metalCompositor:
-                metalCompositor.DrawTexture(metalTexture.Texture);
+                presented = metalCompositor.DrawTexture(metalTexture.Texture);
                 break;
             case VulkanBorrowedImage vulkanImage
                 when compositor is VulkanTextureCompositor vulkanCompositor:
