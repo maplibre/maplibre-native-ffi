@@ -8,8 +8,13 @@
 #include "../../types.h"
 #include "../../util.h"
 
-[[nodiscard]] app_error expect_vk(VkResult result);
-[[nodiscard]] app_error expect_vk_or_suboptimal(VkResult result);
+[[nodiscard]] app_error expect_vk_named(VkResult result, const char* what);
+[[nodiscard]] app_error expect_vk_or_suboptimal_named(
+  VkResult result, const char* what
+);
+#define expect_vk(expr) expect_vk_named((expr), #expr)
+#define expect_vk_or_suboptimal(expr) \
+  expect_vk_or_suboptimal_named((expr), #expr)
 [[nodiscard]] app_error expect_sdl(bool ok);
 
 /// Creates a 2D color image view with identity swizzle over one mip and one

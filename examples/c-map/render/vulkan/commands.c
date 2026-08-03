@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #include "commands.h"
 
 #include "util.h"
@@ -28,9 +30,6 @@ static app_error commands_create(
   MAP_TRY(expect_vk(vkCreateSemaphore(
     device, &semaphore_info, nullptr, &commands->image_available
   )));
-  MAP_TRY(expect_vk(vkCreateSemaphore(
-    device, &semaphore_info, nullptr, &commands->render_finished
-  )));
   const VkFenceCreateInfo fence_info = {
     .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
     .flags = VK_FENCE_CREATE_SIGNALED_BIT,
@@ -51,12 +50,44 @@ app_error vulkan_commands_init(
   return error;
 }
 
+app_error vulkan_commands_create_present_semaphores(
+  vulkan_commands* commands, VkDevice device, uint32_t image_count
+) {
+  commands->render_finished = calloc(image_count, sizeof(VkSemaphore));
+  if (commands->render_finished == nullptr) {
+    return APP_ERROR_BACKEND_SETUP_FAILED;
+  }
+  commands->render_finished_count = image_count;
+  const VkSemaphoreCreateInfo semaphore_info = {
+    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+  };
+  for (uint32_t i = 0; i < image_count; i += 1) {
+    MAP_TRY(expect_vk(vkCreateSemaphore(
+      device, &semaphore_info, nullptr, &commands->render_finished[i]
+    )));
+  }
+  return APP_OK;
+}
+
+void vulkan_commands_destroy_present_semaphores(
+  vulkan_commands* commands, VkDevice device
+) {
+  if (commands->render_finished != nullptr) {
+    for (uint32_t i = 0; i < commands->render_finished_count; i += 1) {
+      if (commands->render_finished[i] != VK_NULL_HANDLE) {
+        vkDestroySemaphore(device, commands->render_finished[i], nullptr);
+      }
+    }
+    free(commands->render_finished);
+  }
+  commands->render_finished = nullptr;
+  commands->render_finished_count = 0;
+}
+
 void vulkan_commands_deinit(vulkan_commands* commands, VkDevice device) {
+  vulkan_commands_destroy_present_semaphores(commands, device);
   if (commands->in_flight != VK_NULL_HANDLE) {
     vkDestroyFence(device, commands->in_flight, nullptr);
-  }
-  if (commands->render_finished != VK_NULL_HANDLE) {
-    vkDestroySemaphore(device, commands->render_finished, nullptr);
   }
   if (commands->image_available != VK_NULL_HANDLE) {
     vkDestroySemaphore(device, commands->image_available, nullptr);
@@ -132,7 +163,9 @@ app_error vulkan_commands_record(
   return expect_vk(vkEndCommandBuffer(commands->command_buffer));
 }
 
-app_error vulkan_commands_submit(vulkan_commands* commands, VkQueue queue) {
+app_error vulkan_commands_submit(
+  vulkan_commands* commands, VkQueue queue, uint32_t image_index
+) {
   const VkPipelineStageFlags wait_stages[] = {
     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
   };
@@ -144,7 +177,7 @@ app_error vulkan_commands_submit(vulkan_commands* commands, VkQueue queue) {
     .commandBufferCount = 1,
     .pCommandBuffers = &commands->command_buffer,
     .signalSemaphoreCount = 1,
-    .pSignalSemaphores = &commands->render_finished,
+    .pSignalSemaphores = &commands->render_finished[image_index],
   };
   return expect_vk(vkQueueSubmit(queue, 1, &submit_info, commands->in_flight));
 }

@@ -50,7 +50,7 @@ static VkExtent2D choose_extent(
 
 static app_error swapchain_create(
   vulkan_swapchain* swapchain, const vulkan_context* context,
-  viewport current_viewport
+  viewport current_viewport, VkSwapchainKHR old_swapchain
 ) {
   VkSurfaceCapabilitiesKHR capabilities;
   MAP_TRY(expect_vk(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
@@ -100,7 +100,7 @@ static app_error swapchain_create(
     .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
     .presentMode = VK_PRESENT_MODE_FIFO_KHR,
     .clipped = VK_TRUE,
-    .oldSwapchain = VK_NULL_HANDLE,
+    .oldSwapchain = old_swapchain,
   };
   MAP_TRY(expect_vk(vkCreateSwapchainKHR(
     context->device, &create_info, nullptr, &swapchain->handle
@@ -130,11 +130,11 @@ static app_error swapchain_create(
 
 app_error vulkan_swapchain_init(
   vulkan_swapchain* swapchain, const vulkan_context* context,
-  viewport current_viewport
+  viewport current_viewport, VkSwapchainKHR old_swapchain
 ) {
   *swapchain = (vulkan_swapchain){.format = VK_FORMAT_UNDEFINED};
   const app_error error =
-    swapchain_create(swapchain, context, current_viewport);
+    swapchain_create(swapchain, context, current_viewport, old_swapchain);
   if (error != APP_OK) {
     vulkan_swapchain_deinit(swapchain, context->device);
   }

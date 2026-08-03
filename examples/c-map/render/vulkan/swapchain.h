@@ -19,9 +19,12 @@ typedef struct vulkan_swapchain {
   VkFramebuffer* framebuffers;
 } vulkan_swapchain;
 
+/// Creates the swapchain. A replacement passes the swapchain it retires as
+/// old_swapchain, so the presentation engine hands the surface over without a
+/// gap; the caller destroys the retired one after this returns.
 [[nodiscard]] app_error vulkan_swapchain_init(
   vulkan_swapchain* swapchain, const vulkan_context* context,
-  viewport current_viewport
+  viewport current_viewport, VkSwapchainKHR old_swapchain
 );
 void vulkan_swapchain_deinit(vulkan_swapchain* swapchain, VkDevice device);
 

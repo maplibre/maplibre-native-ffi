@@ -82,6 +82,8 @@ const VulkanTextureCompositor = struct {
     swapchain: Swapchain,
     pipeline: Pipeline,
     commands: Commands,
+    current_viewport: types.Viewport,
+    swapchain_stale: bool = false,
 
     fn init(
         allocator: std.mem.Allocator,
@@ -91,21 +93,23 @@ const VulkanTextureCompositor = struct {
         var context = try Context.init(allocator, window);
         errdefer context.deinit();
 
-        var swapchain = try Swapchain.init(allocator, &context, viewport);
+        var swapchain = try Swapchain.init(allocator, &context, viewport, null);
         errdefer swapchain.deinit(context.device);
 
         var pipeline = try Pipeline.init(allocator, context.device, swapchain.format);
         errdefer pipeline.deinit(context.device);
         try swapchain.createFramebuffers(context.device, pipeline.render_pass);
 
-        var commands = try Commands.init(context.device, context.queue_family_index);
+        var commands = try Commands.init(allocator, context.device, context.queue_family_index);
         errdefer commands.deinit(context.device);
+        try commands.createPresentSemaphores(context.device, @intCast(swapchain.images.len));
 
         return .{
             .context = context,
             .swapchain = swapchain,
             .pipeline = pipeline,
             .commands = commands,
+            .current_viewport = viewport,
         };
     }
 
@@ -121,14 +125,36 @@ const VulkanTextureCompositor = struct {
         self.context.waitIdle();
     }
 
-    fn resize(self: *VulkanTextureCompositor, viewport: types.Viewport) !void {
-        const previous_format = self.swapchain.format;
-        self.swapchain.deinit(self.context.device);
-        self.swapchain = try Swapchain.init(
-            self.swapchain.allocator,
+    /// Notes a resized window without touching the swapchain.
+    ///
+    /// The swapchain the window displays stays live until the present that
+    /// replaces its content: destroying it here would blank the window for as
+    /// long as the map takes to render at the new extent, because the
+    /// compositor only presents when a map frame is ready. Presenting through
+    /// the stale swapchain scales the old content in the meantime, which is
+    /// what a resized native surface shows too.
+    fn resize(self: *VulkanTextureCompositor, viewport: types.Viewport) void {
+        self.current_viewport = viewport;
+        self.swapchain_stale = true;
+    }
+
+    fn recreateSwapchain(self: *VulkanTextureCompositor) !void {
+        self.context.waitIdle();
+        // The replacement is created before the retired swapchain is
+        // destroyed and names it as oldSwapchain, so the presentation engine
+        // hands the surface over directly. Destroying it first leaves a gap
+        // that MoltenVK fills with presents that succeed but reach no
+        // drawable the window still shows.
+        var previous = self.swapchain;
+        const previous_format = previous.format;
+        const replacement = Swapchain.init(
+            previous.allocator,
             &self.context,
-            viewport,
+            self.current_viewport,
+            previous.handle,
         );
+        previous.deinit(self.context.device);
+        self.swapchain = try replacement;
 
         if (self.swapchain.format != previous_format) {
             self.pipeline.deinit(self.context.device);
@@ -141,6 +167,11 @@ const VulkanTextureCompositor = struct {
         try self.swapchain.createFramebuffers(
             self.context.device,
             self.pipeline.render_pass,
+        );
+        self.commands.destroyPresentSemaphores(self.context.device);
+        try self.commands.createPresentSemaphores(
+            self.context.device,
+            @intCast(self.swapchain.images.len),
         );
     }
 
@@ -155,6 +186,14 @@ const VulkanTextureCompositor = struct {
 
         try self.waitForFrame();
 
+        // The frame about to present is the first content the resized
+        // swapchain could show, so this is the moment the stale one is
+        // replaced.
+        if (self.swapchain_stale) {
+            try self.recreateSwapchain();
+            self.swapchain_stale = false;
+        }
+
         var image_index: u32 = 0;
         const acquire = c.vkAcquireNextImageKHR(
             self.context.device,
@@ -164,7 +203,15 @@ const VulkanTextureCompositor = struct {
             null,
             &image_index,
         );
-        if (acquire == c.VK_ERROR_OUT_OF_DATE_KHR) return false;
+        if (acquire == c.VK_ERROR_OUT_OF_DATE_KHR) {
+            self.swapchain_stale = true;
+            return false;
+        }
+        if (acquire == c.VK_SUBOPTIMAL_KHR) {
+            // Still presentable, but the surface has moved on; replace the
+            // swapchain before the next frame.
+            self.swapchain_stale = true;
+        }
         try util.expectVkOrSuboptimal(acquire);
         try self.commands.resetFence(self.context.device);
 
@@ -174,13 +221,13 @@ const VulkanTextureCompositor = struct {
             &self.pipeline,
             image_index,
         );
-        try self.commands.submit(self.context.queue);
+        try self.commands.submit(self.context.queue, image_index);
 
         const present_info = c.VkPresentInfoKHR{
             .sType = c.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
             .pNext = null,
             .waitSemaphoreCount = 1,
-            .pWaitSemaphores = &self.commands.render_finished,
+            .pWaitSemaphores = &self.commands.render_finished[image_index],
             .swapchainCount = 1,
             .pSwapchains = &self.swapchain.handle,
             .pImageIndices = &image_index,
@@ -191,12 +238,16 @@ const VulkanTextureCompositor = struct {
             // Nothing reached the screen. The sampling pass was submitted, so
             // wait it out before the caller releases its frame, and report no
             // present so the render request is set again.
+            self.swapchain_stale = true;
             self.waitForFrame() catch {};
             return false;
         }
         if (present != c.VK_SUCCESS and present != c.VK_SUBOPTIMAL_KHR) {
             self.waitForFrame() catch {};
             try util.expectVk(present);
+        }
+        if (present == c.VK_SUBOPTIMAL_KHR) {
+            self.swapchain_stale = true;
         }
         return true;
     }
@@ -237,7 +288,7 @@ const VulkanOwnedTextureBackend = struct {
     fn resize(self: *VulkanOwnedTextureBackend, viewport: types.Viewport) !void {
         self.compositor.waitIdle();
         self.releasePendingFrame();
-        try self.compositor.resize(viewport);
+        self.compositor.resize(viewport);
         try self.session.resize(viewport, null);
     }
 
@@ -423,7 +474,7 @@ const VulkanBorrowedTextureBackend = struct {
     fn resize(self: *VulkanBorrowedTextureBackend, viewport: types.Viewport) !void {
         const session = try self.session.textureHandle();
         self.compositor.waitIdle();
-        try self.compositor.resize(viewport);
+        self.compositor.resize(viewport);
 
         var replacement = try BorrowedImage.init(&self.compositor.context, viewport);
         errdefer replacement.deinit(self.compositor.context.device);

@@ -60,7 +60,8 @@ static app_error vulkan_compositor_create(
 ) {
   MAP_TRY(vulkan_context_init(&compositor->context, window));
   MAP_TRY(vulkan_swapchain_init(
-    &compositor->swapchain, &compositor->context, current_viewport
+    &compositor->swapchain, &compositor->context, current_viewport,
+    VK_NULL_HANDLE
   ));
   MAP_TRY(vulkan_pipeline_init(
     &compositor->pipeline, compositor->context.device,
@@ -70,9 +71,13 @@ static app_error vulkan_compositor_create(
     &compositor->swapchain, compositor->context.device,
     compositor->pipeline.render_pass
   ));
-  return vulkan_commands_init(
+  MAP_TRY(vulkan_commands_init(
     &compositor->commands, compositor->context.device,
     compositor->context.queue_family_index
+  ));
+  return vulkan_commands_create_present_semaphores(
+    &compositor->commands, compositor->context.device,
+    compositor->swapchain.image_count
   );
 }
 
@@ -108,11 +113,18 @@ static app_error vulkan_compositor_recreate_swapchain(
   vulkan_compositor* compositor
 ) {
   vulkan_context_wait_idle(&compositor->context);
-  const VkFormat previous_format = compositor->swapchain.format;
-  vulkan_swapchain_deinit(&compositor->swapchain, compositor->context.device);
-  MAP_TRY(vulkan_swapchain_init(
-    &compositor->swapchain, &compositor->context, compositor->current_viewport
-  ));
+  // The replacement is created before the retired swapchain is destroyed and
+  // names it as oldSwapchain, so the presentation engine hands the surface
+  // over directly. Destroying it first leaves a gap that MoltenVK fills with
+  // presents that succeed but reach no drawable the window still shows.
+  vulkan_swapchain previous = compositor->swapchain;
+  const VkFormat previous_format = previous.format;
+  const app_error error = vulkan_swapchain_init(
+    &compositor->swapchain, &compositor->context, compositor->current_viewport,
+    previous.handle
+  );
+  vulkan_swapchain_deinit(&previous, compositor->context.device);
+  MAP_TRY(error);
 
   if (compositor->swapchain.format != previous_format) {
     vulkan_pipeline_deinit(&compositor->pipeline, compositor->context.device);
@@ -121,9 +133,16 @@ static app_error vulkan_compositor_recreate_swapchain(
       compositor->swapchain.format
     ));
   }
-  return vulkan_swapchain_create_framebuffers(
+  MAP_TRY(vulkan_swapchain_create_framebuffers(
     &compositor->swapchain, compositor->context.device,
     compositor->pipeline.render_pass
+  ));
+  vulkan_commands_destroy_present_semaphores(
+    &compositor->commands, compositor->context.device
+  );
+  return vulkan_commands_create_present_semaphores(
+    &compositor->commands, compositor->context.device,
+    compositor->swapchain.image_count
   );
 }
 
@@ -165,6 +184,11 @@ static app_error vulkan_compositor_present_image_view(
     compositor->swapchain_stale = true;
     return APP_OK;
   }
+  if (acquire == VK_SUBOPTIMAL_KHR) {
+    // Still presentable, but the surface has moved on; replace the swapchain
+    // before the next frame.
+    compositor->swapchain_stale = true;
+  }
   MAP_TRY(expect_vk_or_suboptimal(acquire));
   MAP_TRY(vulkan_commands_reset_fence(
     &compositor->commands, compositor->context.device
@@ -174,14 +198,14 @@ static app_error vulkan_compositor_present_image_view(
     &compositor->commands, &compositor->swapchain, &compositor->pipeline,
     image_index
   ));
-  MAP_TRY(
-    vulkan_commands_submit(&compositor->commands, compositor->context.queue)
-  );
+  MAP_TRY(vulkan_commands_submit(
+    &compositor->commands, compositor->context.queue, image_index
+  ));
 
   const VkPresentInfoKHR present_info = {
     .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
     .waitSemaphoreCount = 1,
-    .pWaitSemaphores = &compositor->commands.render_finished,
+    .pWaitSemaphores = &compositor->commands.render_finished[image_index],
     .swapchainCount = 1,
     .pSwapchains = &compositor->swapchain.handle,
     .pImageIndices = &image_index,
@@ -199,6 +223,9 @@ static app_error vulkan_compositor_present_image_view(
   if (present != VK_SUCCESS && present != VK_SUBOPTIMAL_KHR) {
     (void)vulkan_compositor_wait_for_frame(compositor);
     return expect_vk(present);
+  }
+  if (present == VK_SUBOPTIMAL_KHR) {
+    compositor->swapchain_stale = true;
   }
   *out_presented = true;
   return APP_OK;

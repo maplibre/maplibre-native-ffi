@@ -14,10 +14,14 @@ pub const Swapchain = struct {
     views: []c.VkImageView,
     framebuffers: []c.VkFramebuffer,
 
+    /// Creates the swapchain. A replacement passes the swapchain it retires
+    /// as old_swapchain, so the presentation engine hands the surface over
+    /// without a gap; the caller destroys the retired one after this returns.
     pub fn init(
         allocator: std.mem.Allocator,
         context: *const Context,
         viewport: types.Viewport,
+        old_swapchain: c.VkSwapchainKHR,
     ) !Swapchain {
         var self = Swapchain{
             .allocator = allocator,
@@ -30,7 +34,7 @@ pub const Swapchain = struct {
         };
         errdefer self.deinit(context.device);
 
-        try self.create(context, viewport);
+        try self.create(context, viewport, old_swapchain);
         return self;
     }
 
@@ -80,7 +84,12 @@ pub const Swapchain = struct {
         }
     }
 
-    fn create(self: *Swapchain, context: *const Context, viewport: types.Viewport) !void {
+    fn create(
+        self: *Swapchain,
+        context: *const Context,
+        viewport: types.Viewport,
+        old_swapchain: c.VkSwapchainKHR,
+    ) !void {
         var capabilities: c.VkSurfaceCapabilitiesKHR = undefined;
         try util.expectVk(c.vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
             context.physical_device,
@@ -132,7 +141,7 @@ pub const Swapchain = struct {
             .compositeAlpha = c.VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
             .presentMode = c.VK_PRESENT_MODE_FIFO_KHR,
             .clipped = c.VK_TRUE,
-            .oldSwapchain = null,
+            .oldSwapchain = old_swapchain,
         };
         try util.expectVk(c.vkCreateSwapchainKHR(
             context.device,
