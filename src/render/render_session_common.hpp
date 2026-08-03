@@ -72,6 +72,16 @@ class SurfaceSessionBackend {
   virtual auto renderer_backend() -> mbgl::gfx::RendererBackend& = 0;
   virtual void resize(uint32_t physical_width, uint32_t physical_height) = 0;
 
+  // Whether the surface can take a frame right now. A false report makes the
+  // render update skip the frame and report nothing rendered, which is how a
+  // minimized or occluded window's surface, with no target to hand out, stays
+  // a retry rather than a failure. The default reports ready, for surfaces
+  // that never run dry.
+  virtual auto prepare_frame(bool& out_ready) -> mln_status {
+    out_ready = true;
+    return MLN_STATUS_OK;
+  }
+
   // Presents through a new host surface, keeping the graphics context and every
   // resource the renderer holds against it. The descriptor names the same
   // context as the one this session attached with; a backend rejects anything

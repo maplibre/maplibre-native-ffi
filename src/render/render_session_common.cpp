@@ -1356,6 +1356,21 @@ auto render_session_render_update(
 
   if (live->kind == RenderSessionKind::Texture) {
     live->texture.backend->prepare_render_resources();
+  } else {
+    bool surface_ready = true;
+    try {
+      const auto prepare_status =
+        live->surface.backend->prepare_frame(surface_ready);
+      if (prepare_status != MLN_STATUS_OK) {
+        return prepare_status;
+      }
+    } catch (const std::exception& exception) {
+      set_native_stage_error("preparing surface frame", exception);
+      return MLN_STATUS_NATIVE_ERROR;
+    }
+    if (!surface_ready) {
+      return MLN_STATUS_OK;
+    }
   }
   if (live->renderer == nullptr) {
     try {

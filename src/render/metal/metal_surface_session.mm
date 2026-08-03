@@ -75,14 +75,18 @@ class MetalSurfaceBackend final : public mbgl::mtl::RendererBackend,
       setSize(size_);
     }
 
-    void bind() override {
+    // Acquires the frame's drawable, command buffer, and render pass, and
+    // reports whether the layer had a drawable to hand out. A minimized or
+    // occluded window's layer legitimately has none, so the render update
+    // asks here first and skips the frame; bind() cannot proceed without one.
+    auto try_bind() -> bool {
       if (drawable && commandBuffer && renderPassDescriptor) {
-        return;
+        return true;
       }
 
       auto* next_drawable = layer->nextDrawable();
       if (next_drawable == nullptr) {
-        throw std::runtime_error("Metal surface did not provide a drawable");
+        return false;
       }
       drawable = NS::RetainPtr(next_drawable);
 
@@ -154,6 +158,13 @@ class MetalSurfaceBackend final : public mbgl::mtl::RendererBackend,
           static_cast<mbgl::mtl::Texture2D*>(stencilTexture.get())
             ->getMetalTexture()
         );
+      }
+      return true;
+    }
+
+    void bind() override {
+      if (!try_bind()) {
+        throw std::runtime_error("Metal surface did not provide a drawable");
       }
     }
 
@@ -236,6 +247,10 @@ class MetalSurfaceBackend final : public mbgl::mtl::RendererBackend,
     getResource<MetalSurfaceRenderableResource>().set_layer(layer_, size_);
   }
 
+  auto try_bind() -> bool {
+    return getResource<MetalSurfaceRenderableResource>().try_bind();
+  }
+
   // A null device in a descriptor names no device at all, which every session
   // satisfies; the session keeps the one it attached with either way.
   [[nodiscard]] auto has_device(MTL::Device* other) const -> bool {
@@ -261,6 +276,11 @@ class MetalSurfaceSessionBackend final
 
   void resize(uint32_t physical_width, uint32_t physical_height) override {
     backend_.setSize(mbgl::Size{physical_width, physical_height});
+  }
+
+  auto prepare_frame(bool& out_ready) -> mln_status override {
+    out_ready = backend_.try_bind();
+    return MLN_STATUS_OK;
   }
 
   auto set_metal_target(const mln_metal_surface_descriptor& descriptor)
