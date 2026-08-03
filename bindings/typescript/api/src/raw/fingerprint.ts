@@ -7,7 +7,7 @@
  * disagrees, because the call ABI indexes entrypoints rather than naming them.
  */
 export const ABI_FINGERPRINT =
-  "1caa4c67b70a8ff4b0b9552b133cc9b377ee8534934c3fe6313150e718eb9fb5";
+  "dcb7f18b460bde2e70dfd12a7d40fd541964a40d9034595eafabdd4cabc6ad53";
 
 /**
  * Digest of the public header bytes the generation ran against.

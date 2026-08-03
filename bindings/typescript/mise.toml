@@ -9,6 +9,9 @@ sources = [
   "include/maplibre_native_c/**/*.h",
   "bindings/typescript/codegen/src/**/*.rs",
   "bindings/typescript/codegen/Cargo.toml",
+  # The support contract is part of the schema the fingerprint covers, so a
+  # change to it has to regenerate just as a header change does.
+  "bindings/typescript/host-support/include/mln_abi.h",
 ]
 outputs = [
   "bindings/typescript/api/src/raw/*.ts",
