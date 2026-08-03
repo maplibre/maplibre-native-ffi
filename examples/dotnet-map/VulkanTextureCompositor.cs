@@ -33,9 +33,14 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
     private CommandPool commandPool;
     private CommandBuffer commandBuffer;
     private VulkanSemaphore imageAvailable;
-    private VulkanSemaphore renderFinished;
+
+    // One semaphore per swapchain image. Each present waits on the semaphore that its own submit
+    // signalled, so a later submit never signals one that a pending present still waits on. Vulkan
+    // forbids that overlap, and it shows as half-drawn frames.
+    private VulkanSemaphore[] renderFinished = [];
     private Fence inFlight;
     private Viewport viewport;
+    private bool swapchainStale;
 
     public VulkanTextureCompositor(VulkanContext context, Viewport viewport)
     {
@@ -88,6 +93,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
         }
 
         CreateFramebuffers();
+        swapchainStale = false;
     }
 
     public bool Draw(VulkanOwnedTextureFrame frame)
@@ -121,6 +127,14 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
             vk.WaitForFences(context.Device, 1, &fence, true, ulong.MaxValue),
             "vkWaitForFences"
         );
+
+        // A suboptimal swapchain still presents, so the frame that reported it reaches the screen
+        // and the replacement is built here, ahead of the next draw.
+        if (swapchainStale)
+        {
+            RecreateSwapchain();
+        }
+
         var imageIndex = 0u;
         var acquire = vkAcquireNextImageKHR(
             context.Device.Handle,
@@ -136,7 +150,12 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
             return false;
         }
 
-        if (acquire != Result.Success && acquire != Result.SuboptimalKhr)
+        if (acquire == Result.SuboptimalKhr)
+        {
+            // Still presentable, but the surface has moved on; rebuild before the next frame.
+            swapchainStale = true;
+        }
+        else if (acquire != Result.Success)
         {
             VulkanContext.Check(acquire, "vkAcquireNextImageKHR");
         }
@@ -144,7 +163,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
         UpdateDescriptor(imageView);
         Record(imageIndex);
         VulkanContext.Check(vk.ResetFences(context.Device, 1, &fence), "vkResetFences");
-        Submit();
+        Submit(imageIndex);
         fence = inFlight;
         VulkanContext.Check(
             vk.WaitForFences(context.Device, 1, &fence, true, ulong.MaxValue),
@@ -156,6 +175,11 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
         {
             RecreateSwapchain();
             return false;
+        }
+
+        if (present == Result.SuboptimalKhr)
+        {
+            swapchainStale = true;
         }
 
         return true;
@@ -172,12 +196,6 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
         {
             vk.DestroyFence(context.Device, inFlight, null);
             inFlight = default;
-        }
-
-        if (renderFinished.Handle != 0)
-        {
-            vk.DestroySemaphore(context.Device, renderFinished, null);
-            renderFinished = default;
         }
 
         if (imageAvailable.Handle != 0)
@@ -316,11 +334,17 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
             "vkGetSwapchainImagesKHR"
         );
         imageViews = new ImageView[actualCount];
+        renderFinished = new VulkanSemaphore[actualCount];
+        var semaphoreInfo = new SemaphoreCreateInfo { SType = StructureType.SemaphoreCreateInfo };
         try
         {
             for (var i = 0; i < actualCount; i++)
             {
                 imageViews[i] = CreateImageView(images[i], swapchainFormat);
+                VulkanContext.Check(
+                    vk.CreateSemaphore(context.Device, &semaphoreInfo, null, out renderFinished[i]),
+                    "vkCreateSemaphore(renderFinished)"
+                );
             }
         }
         catch
@@ -634,10 +658,6 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
             vk.CreateSemaphore(context.Device, &semaphoreInfo, null, out imageAvailable),
             "vkCreateSemaphore(imageAvailable)"
         );
-        VulkanContext.Check(
-            vk.CreateSemaphore(context.Device, &semaphoreInfo, null, out renderFinished),
-            "vkCreateSemaphore(renderFinished)"
-        );
         var fenceInfo = new FenceCreateInfo
         {
             SType = StructureType.FenceCreateInfo,
@@ -721,11 +741,11 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
         VulkanContext.Check(vk.EndCommandBuffer(commandBuffer), "vkEndCommandBuffer");
     }
 
-    private void Submit()
+    private void Submit(uint imageIndex)
     {
         var waitStage = PipelineStageFlags.ColorAttachmentOutputBit;
         var waitSemaphore = imageAvailable;
-        var signalSemaphore = renderFinished;
+        var signalSemaphore = renderFinished[imageIndex];
         var buffer = commandBuffer;
         var submitInfo = new SubmitInfo
         {
@@ -751,7 +771,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
 
     private Result Present(uint imageIndex)
     {
-        var waitSemaphore = renderFinished;
+        var waitSemaphore = renderFinished[imageIndex];
         var swapchainHandle = swapchain;
         var presentInfo = new PresentInfoKHR
         {
@@ -861,6 +881,15 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
         }
 
         imageViews = [];
+        foreach (var semaphore in renderFinished)
+        {
+            if (semaphore.Handle != 0)
+            {
+                vk.DestroySemaphore(context.Device, semaphore, null);
+            }
+        }
+
+        renderFinished = [];
     }
 
     private void DestroyPipeline()

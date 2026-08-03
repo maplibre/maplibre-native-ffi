@@ -3,8 +3,7 @@
 #ifndef C_MAP_UTIL_H
 #define C_MAP_UTIL_H
 
-#include <threads.h>
-#include <time.h>
+#include <SDL3/SDL.h>
 
 #include "types.h"
 
@@ -19,9 +18,7 @@
   } while (0)
 
 static inline void sleep_milliseconds(long milliseconds) {
-  thrd_sleep(
-    &(struct timespec){.tv_nsec = milliseconds * 1000 * 1000}, nullptr
-  );
+  SDL_Delay((Uint32)milliseconds);
 }
 
 #endif  // C_MAP_UTIL_H

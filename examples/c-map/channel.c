@@ -12,18 +12,19 @@ void command_list_deinit(command_list* list) {
 
 void command_queue_init(command_queue* queue) {
   *queue = (command_queue){};
-  if (mtx_init(&queue->lock, mtx_plain) != thrd_success) {
+  queue->lock = SDL_CreateMutex();
+  if (queue->lock == nullptr) {
     abort();
   }
 }
 
 void command_queue_deinit(command_queue* queue) {
   command_list_deinit(&queue->pending);
-  mtx_destroy(&queue->lock);
+  SDL_DestroyMutex(queue->lock);
 }
 
 void command_queue_push(command_queue* queue, camera_command command) {
-  mtx_lock(&queue->lock);
+  SDL_LockMutex(queue->lock);
   command_list* pending = &queue->pending;
   if (pending->len == pending->cap) {
     const size_t cap = pending->cap == 0 ? 16 : pending->cap * 2;
@@ -37,16 +38,16 @@ void command_queue_push(command_queue* queue, camera_command command) {
     pending->cap = cap;
   }
   pending->items[pending->len++] = command;
-  mtx_unlock(&queue->lock);
+  SDL_UnlockMutex(queue->lock);
 }
 
 void command_queue_drain_into(command_queue* queue, command_list* out) {
   out->len = 0;
-  mtx_lock(&queue->lock);
+  SDL_LockMutex(queue->lock);
   const command_list drained = queue->pending;
   queue->pending = *out;
   *out = drained;
-  mtx_unlock(&queue->lock);
+  SDL_UnlockMutex(queue->lock);
 }
 
 void render_request_init(render_request* request) {
@@ -68,41 +69,44 @@ void map_channel_init(map_channel* channel) {
     .map = MLN_HANDLE_NULL,
     .wake = MLN_HANDLE_NULL,
   };
-  if (mtx_init(&channel->lock, mtx_plain) != thrd_success) {
+  channel->lock = SDL_CreateMutex();
+  if (channel->lock == nullptr) {
     abort();
   }
 }
 
-void map_channel_deinit(map_channel* channel) { mtx_destroy(&channel->lock); }
+void map_channel_deinit(map_channel* channel) {
+  SDL_DestroyMutex(channel->lock);
+}
 
 void map_channel_publish(
   map_channel* channel, mln_map map, mln_wake_source wake
 ) {
-  mtx_lock(&channel->lock);
+  SDL_LockMutex(channel->lock);
   channel->map = map;
   channel->wake = wake;
   atomic_store_explicit(&channel->published, true, memory_order_release);
-  mtx_unlock(&channel->lock);
+  SDL_UnlockMutex(channel->lock);
 }
 
 void map_channel_wake_runtime_loop(map_channel* channel) {
   if (!atomic_load_explicit(&channel->published, memory_order_acquire)) {
     return;
   }
-  mtx_lock(&channel->lock);
+  SDL_LockMutex(channel->lock);
   if (channel->wake != MLN_HANDLE_NULL) {
     mln_wake_source_signal(channel->wake);
   }
-  mtx_unlock(&channel->lock);
+  SDL_UnlockMutex(channel->lock);
 }
 
 bool map_channel_try_map(map_channel* channel, mln_map* out_map) {
   if (!atomic_load_explicit(&channel->published, memory_order_acquire)) {
     return false;
   }
-  mtx_lock(&channel->lock);
+  SDL_LockMutex(channel->lock);
   *out_map = channel->map;
-  mtx_unlock(&channel->lock);
+  SDL_UnlockMutex(channel->lock);
   return *out_map != MLN_HANDLE_NULL;
 }
 
@@ -124,20 +128,20 @@ void map_channel_await_shutdown(map_channel* channel) {
 }
 
 void map_channel_fail(map_channel* channel, app_error error) {
-  mtx_lock(&channel->lock);
+  SDL_LockMutex(channel->lock);
   if (channel->failure == APP_OK) {
     channel->failure = error;
   }
   atomic_store_explicit(&channel->failed, true, memory_order_release);
-  mtx_unlock(&channel->lock);
+  SDL_UnlockMutex(channel->lock);
 }
 
 bool map_channel_failure(map_channel* channel, app_error* out_error) {
   if (!atomic_load_explicit(&channel->failed, memory_order_acquire)) {
     return false;
   }
-  mtx_lock(&channel->lock);
+  SDL_LockMutex(channel->lock);
   *out_error = channel->failure;
-  mtx_unlock(&channel->lock);
+  SDL_UnlockMutex(channel->lock);
   return true;
 }

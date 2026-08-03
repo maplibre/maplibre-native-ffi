@@ -8,7 +8,7 @@
 "aqua:mvdan/gofumpt" = "{{vars.gofumpt_version}}"
 "conda:doxygen" = { version = "{{vars.doxygen_version}}", os = ["linux", "macos", "windows/x64"] }
 "conda:libxml2" = { version = "{{vars.libxml2_version}}", os = ["linux/x64"] }
-"conda:sdl3" = { version = "3.2", os = ["linux"] }
+"conda:sdl3" = { version = "3.2", os = ["linux", "macos"] }
 "core:dart" = "{{vars.dart_version}}"
 "core:dotnet" = "{{vars.dotnet_version}}"
 "core:flutter" = { version = "{{vars.flutter_version}}", os = ["linux/x64", "macos/arm64", "windows/x64"] }

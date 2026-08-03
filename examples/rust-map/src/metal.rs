@@ -108,10 +108,12 @@ impl MetalTextureCompositor {
         })
     }
 
+    /// Samples the frame's texture into the layer's next drawable, and reports
+    /// whether it presented.
     pub fn draw(
         &mut self,
         frame: &MetalOwnedTextureFrameHandle,
-    ) -> maplibre_native_ffi::Result<()> {
+    ) -> maplibre_native_ffi::Result<bool> {
         let metadata = frame.frame()?;
         if metadata.width == 0 || metadata.height == 0 {
             return Err(metal_error("owned Metal frame has an empty extent"));
@@ -123,16 +125,21 @@ impl MetalTextureCompositor {
         self.draw_texture(texture)
     }
 
+    /// Samples texture into the layer's next drawable, and reports whether it
+    /// presented.
+    ///
+    /// A minimized or occluded window has no drawable to hand out, so the frame
+    /// is skipped rather than failed; the caller's render request stays pending
+    /// and the draw retries once one is available.
     pub fn draw_texture(
         &mut self,
         texture: &ProtocolObject<dyn MTLTexture>,
-    ) -> maplibre_native_ffi::Result<()> {
+    ) -> maplibre_native_ffi::Result<bool> {
         // SAFETY: The layer, command queue, pipeline, and texture are live for this call.
         unsafe {
-            let drawable = self
-                .layer
-                .nextDrawable()
-                .ok_or_else(|| metal_error("CAMetalLayer returned no drawable"))?;
+            let Some(drawable) = self.layer.nextDrawable() else {
+                return Ok(false);
+            };
             let drawable_texture = drawable.texture();
             let pass_descriptor = MTLRenderPassDescriptor::renderPassDescriptor();
             let color_attachment = pass_descriptor
@@ -165,7 +172,7 @@ impl MetalTextureCompositor {
             command_buffer.commit();
             command_buffer.waitUntilCompleted();
         }
-        Ok(())
+        Ok(true)
     }
 }
 

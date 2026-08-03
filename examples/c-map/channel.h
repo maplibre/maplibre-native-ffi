@@ -9,10 +9,10 @@
 #ifndef C_MAP_CHANNEL_H
 #define C_MAP_CHANNEL_H
 
+#include <SDL3/SDL.h>
 #include <maplibre_native_c.h>
 #include <stdatomic.h>
 #include <stddef.h>
-#include <threads.h>
 
 #include "types.h"
 
@@ -90,7 +90,7 @@ void command_list_deinit(command_list* list);
 /// attributed to no gesture. Growing does not block the render loop either,
 /// and only a stalled runtime loop grows it at all.
 typedef struct command_queue {
-  mtx_t lock;
+  SDL_Mutex* lock;
   command_list pending;
 } command_queue;
 
@@ -131,7 +131,7 @@ bool render_request_consume(render_request* request);
 /// source is signalled from this side to release the runtime loop's parked
 /// pump.
 typedef struct map_channel {
-  mtx_t lock;
+  SDL_Mutex* lock;
   mln_map map;
   mln_wake_source wake;
   atomic_bool published;

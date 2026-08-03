@@ -144,6 +144,31 @@ pub const Context = struct {
         return types.AppError.BackendSetupFailed;
     }
 
+    fn hasDeviceExtension(self: *Context, name: []const u8) !bool {
+        var count: u32 = 0;
+        try util.expectVk(c.vkEnumerateDeviceExtensionProperties(
+            self.physical_device,
+            null,
+            &count,
+            null,
+        ));
+        const properties = try self.allocator.alloc(c.VkExtensionProperties, count);
+        defer self.allocator.free(properties);
+        try util.expectVk(c.vkEnumerateDeviceExtensionProperties(
+            self.physical_device,
+            null,
+            &count,
+            properties.ptr,
+        ));
+
+        for (properties[0..@intCast(count)]) |property| {
+            if (std.mem.eql(u8, std.mem.span(@as([*:0]const u8, @ptrCast(&property.extensionName))), name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     fn createDevice(self: *Context) !void {
         var priority: f32 = 1.0;
         const queue_info = c.VkDeviceQueueCreateInfo{
@@ -154,8 +179,15 @@ pub const Context = struct {
             .queueCount = 1,
             .pQueuePriorities = &priority,
         };
-        const base_extensions = [_][*:0]const u8{c.VK_KHR_SWAPCHAIN_EXTENSION_NAME};
-        const extensions = base_extensions[0..];
+        // A device that exposes the portability subset requires enabling it.
+        // The name is spelled out because its declaration lives behind the
+        // provisional vulkan_beta.h header.
+        const extensions = [_][*:0]const u8{
+            c.VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+            "VK_KHR_portability_subset",
+        };
+        const extension_count: u32 =
+            if (try self.hasDeviceExtension("VK_KHR_portability_subset")) 2 else 1;
         var features = std.mem.zeroes(c.VkPhysicalDeviceFeatures);
         c.vkGetPhysicalDeviceFeatures(self.physical_device, &features);
         const create_info = c.VkDeviceCreateInfo{
@@ -166,8 +198,8 @@ pub const Context = struct {
             .pQueueCreateInfos = &queue_info,
             .enabledLayerCount = 0,
             .ppEnabledLayerNames = null,
-            .enabledExtensionCount = @intCast(extensions.len),
-            .ppEnabledExtensionNames = extensions.ptr,
+            .enabledExtensionCount = extension_count,
+            .ppEnabledExtensionNames = &extensions,
             .pEnabledFeatures = &features,
         };
         try util.expectVk(c.vkCreateDevice(

@@ -4,6 +4,7 @@ use std::fs;
 use std::io;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::Duration;
 
 use flate2::read::GzDecoder;
@@ -39,13 +40,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:runtime-dir={}", runtime_dir.display());
     println!("cargo:rerun-if-env-changed=LIBCLANG_PATH");
     println!("cargo:rerun-if-env-changed=BINDGEN_EXTRA_CLANG_ARGS");
+    println!("cargo:rerun-if-env-changed=SDKROOT");
     print_rerun_if_changed(&include_dir);
 
-    let bindings = bindgen::Builder::default()
+    let mut builder = bindgen::Builder::default()
         .header(header.display().to_string())
         .clang_arg("-xc")
         .clang_arg("-std=c23")
-        .clang_arg(format!("-I{}", include_dir.display()))
+        .clang_arg(format!("-I{}", include_dir.display()));
+
+    // bindgen parses through libclang, which has none of the clang driver's
+    // logic for locating an Apple SDK, and these headers include the SDK's
+    // stdint.h. Ask the toolchain where that SDK is. An SDKROOT the caller set
+    // already reaches libclang, so this fills in only when one is absent.
+    if env::var_os("SDKROOT").is_none() {
+        let target = env::var("TARGET")?;
+        if let Some(sdk_path) = apple_sdk_name(&target_os, &target).and_then(apple_sdk_path) {
+            builder = builder.clang_arg(format!("-isysroot{sdk_path}"));
+        }
+    }
+
+    let bindings = builder
         .allowlist_function("^mln_.*")
         .allowlist_type("^mln_.*")
         .allowlist_var("^MLN_.*")
@@ -99,6 +114,33 @@ fn native_library_dir(install_dir: &Path) -> PathBuf {
         }
     }
     install_dir.join("lib")
+}
+
+/// The SDK that xcrun knows this target by, or None for a target that needs no
+/// Apple SDK.
+fn apple_sdk_name(target_os: &str, target: &str) -> Option<&'static str> {
+    let simulator = target.ends_with("-sim");
+    match target_os {
+        "macos" => Some("macosx"),
+        "ios" if simulator => Some("iphonesimulator"),
+        "ios" => Some("iphoneos"),
+        _ => None,
+    }
+}
+
+/// Where the installed Xcode command line tools keep that SDK. Reports None on
+/// a host without them, leaving libclang to its own header search.
+fn apple_sdk_path(sdk_name: &str) -> Option<String> {
+    let output = Command::new("xcrun")
+        .args(["--sdk", sdk_name, "--show-sdk-path"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let path = String::from_utf8(output.stdout).ok()?;
+    let path = path.trim().to_owned();
+    if path.is_empty() { None } else { Some(path) }
 }
 
 fn require_dir(path: &Path, label: &str) -> Result<(), Box<dyn Error>> {

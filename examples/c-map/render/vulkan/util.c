@@ -3,17 +3,17 @@
 
 #include "util.h"
 
-app_error expect_vk(VkResult result) {
+app_error expect_vk_named(VkResult result, const char* what) {
   if (result != VK_SUCCESS) {
-    fprintf(stderr, "Vulkan call failed: %d\n", (int)result);
+    fprintf(stderr, "Vulkan call failed: %d in %s\n", (int)result, what);
     return APP_ERROR_BACKEND_SETUP_FAILED;
   }
   return APP_OK;
 }
 
-app_error expect_vk_or_suboptimal(VkResult result) {
+app_error expect_vk_or_suboptimal_named(VkResult result, const char* what) {
   if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-    fprintf(stderr, "Vulkan call failed: %d\n", (int)result);
+    fprintf(stderr, "Vulkan call failed: %d in %s\n", (int)result, what);
     return APP_ERROR_BACKEND_SETUP_FAILED;
   }
   return APP_OK;

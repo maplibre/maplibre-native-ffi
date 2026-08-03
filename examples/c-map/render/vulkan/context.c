@@ -132,6 +132,34 @@ static app_error pick_device(vulkan_context* context) {
   return error;
 }
 
+static app_error has_device_extension(
+  VkPhysicalDevice device, const char* name, bool* out_found
+) {
+  *out_found = false;
+  uint32_t count = 0;
+  MAP_TRY(expect_vk(
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &count, nullptr)
+  ));
+  VkExtensionProperties* properties =
+    calloc(count, sizeof(VkExtensionProperties));
+  if (properties == nullptr) {
+    return APP_ERROR_BACKEND_SETUP_FAILED;
+  }
+  const app_error error = expect_vk(
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &count, properties)
+  );
+  if (error == APP_OK) {
+    for (uint32_t i = 0; i < count; i += 1) {
+      if (strcmp(properties[i].extensionName, name) == 0) {
+        *out_found = true;
+        break;
+      }
+    }
+  }
+  free(properties);
+  return error;
+}
+
 static app_error create_device(vulkan_context* context) {
   const float priority = 1.0f;
   const VkDeviceQueueCreateInfo queue_info = {
@@ -140,14 +168,24 @@ static app_error create_device(vulkan_context* context) {
     .queueCount = 1,
     .pQueuePriorities = &priority,
   };
-  const char* const extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+  // A device that exposes the portability subset requires enabling it. The
+  // name is spelled out because its declaration lives behind the provisional
+  // vulkan_beta.h header.
+  bool needs_portability = false;
+  MAP_TRY(has_device_extension(
+    context->physical_device, "VK_KHR_portability_subset", &needs_portability
+  ));
+  const char* extensions[] = {
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+    "VK_KHR_portability_subset",
+  };
   VkPhysicalDeviceFeatures features;
   vkGetPhysicalDeviceFeatures(context->physical_device, &features);
   const VkDeviceCreateInfo create_info = {
     .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
     .queueCreateInfoCount = 1,
     .pQueueCreateInfos = &queue_info,
-    .enabledExtensionCount = 1,
+    .enabledExtensionCount = needs_portability ? 2 : 1,
     .ppEnabledExtensionNames = extensions,
     .pEnabledFeatures = &features,
   };

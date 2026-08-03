@@ -152,7 +152,10 @@ const MetalTextureCompositor = struct {
 
     fn drawMetalTexture(self: *MetalTextureCompositor, metal_texture: *anyopaque) !bool {
         const drawable = self.view.layer.msgSend(objc.Object, "nextDrawable", .{});
-        if (drawable.value == null) return types.AppError.BackendDrawFailed;
+        // A minimized or occluded window has no drawable to hand out, so the
+        // frame is skipped rather than failed; the caller's render request
+        // stays pending and the draw retries once one is available.
+        if (drawable.value == null) return false;
 
         const drawable_texture = drawable.getProperty(objc.Object, "texture");
         const pass_descriptor = objc.getClass("MTLRenderPassDescriptor").?

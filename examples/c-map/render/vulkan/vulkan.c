@@ -43,6 +43,8 @@ typedef struct vulkan_compositor {
   vulkan_swapchain swapchain;
   vulkan_pipeline pipeline;
   vulkan_commands commands;
+  viewport current_viewport;
+  bool swapchain_stale;
 } vulkan_compositor;
 
 static void vulkan_compositor_deinit(vulkan_compositor* compositor) {
@@ -58,7 +60,8 @@ static app_error vulkan_compositor_create(
 ) {
   MAP_TRY(vulkan_context_init(&compositor->context, window));
   MAP_TRY(vulkan_swapchain_init(
-    &compositor->swapchain, &compositor->context, current_viewport
+    &compositor->swapchain, &compositor->context, current_viewport,
+    VK_NULL_HANDLE
   ));
   MAP_TRY(vulkan_pipeline_init(
     &compositor->pipeline, compositor->context.device,
@@ -68,9 +71,13 @@ static app_error vulkan_compositor_create(
     &compositor->swapchain, compositor->context.device,
     compositor->pipeline.render_pass
   ));
-  return vulkan_commands_init(
+  MAP_TRY(vulkan_commands_init(
     &compositor->commands, compositor->context.device,
     compositor->context.queue_family_index
+  ));
+  return vulkan_commands_create_present_semaphores(
+    &compositor->commands, compositor->context.device,
+    compositor->swapchain.image_count
   );
 }
 
@@ -78,6 +85,7 @@ static app_error vulkan_compositor_init(
   vulkan_compositor* compositor, SDL_Window* window, viewport current_viewport
 ) {
   *compositor = (vulkan_compositor){};
+  compositor->current_viewport = current_viewport;
   const app_error error =
     vulkan_compositor_create(compositor, window, current_viewport);
   if (error != APP_OK) {
@@ -86,14 +94,37 @@ static app_error vulkan_compositor_init(
   return error;
 }
 
-static app_error vulkan_compositor_resize(
+/// Notes a resized window without touching the swapchain.
+///
+/// The swapchain the window displays stays live until the present that
+/// replaces its content: destroying it here would blank the window for as
+/// long as the map takes to render at the new extent, because the compositor
+/// only presents when a map frame is ready. Presenting through the stale
+/// swapchain scales the old content in the meantime, which is what a resized
+/// native surface shows too.
+static void vulkan_compositor_resize(
   vulkan_compositor* compositor, viewport current_viewport
 ) {
-  const VkFormat previous_format = compositor->swapchain.format;
-  vulkan_swapchain_deinit(&compositor->swapchain, compositor->context.device);
-  MAP_TRY(vulkan_swapchain_init(
-    &compositor->swapchain, &compositor->context, current_viewport
-  ));
+  compositor->current_viewport = current_viewport;
+  compositor->swapchain_stale = true;
+}
+
+static app_error vulkan_compositor_recreate_swapchain(
+  vulkan_compositor* compositor
+) {
+  vulkan_context_wait_idle(&compositor->context);
+  // The replacement is created before the retired swapchain is destroyed and
+  // names it as oldSwapchain, so the presentation engine hands the surface
+  // over directly. Destroying it first leaves a gap that MoltenVK fills with
+  // presents that succeed but reach no drawable the window still shows.
+  vulkan_swapchain previous = compositor->swapchain;
+  const VkFormat previous_format = previous.format;
+  const app_error error = vulkan_swapchain_init(
+    &compositor->swapchain, &compositor->context, compositor->current_viewport,
+    previous.handle
+  );
+  vulkan_swapchain_deinit(&previous, compositor->context.device);
+  MAP_TRY(error);
 
   if (compositor->swapchain.format != previous_format) {
     vulkan_pipeline_deinit(&compositor->pipeline, compositor->context.device);
@@ -102,9 +133,16 @@ static app_error vulkan_compositor_resize(
       compositor->swapchain.format
     ));
   }
-  return vulkan_swapchain_create_framebuffers(
+  MAP_TRY(vulkan_swapchain_create_framebuffers(
     &compositor->swapchain, compositor->context.device,
     compositor->pipeline.render_pass
+  ));
+  vulkan_commands_destroy_present_semaphores(
+    &compositor->commands, compositor->context.device
+  );
+  return vulkan_commands_create_present_semaphores(
+    &compositor->commands, compositor->context.device,
+    compositor->swapchain.image_count
   );
 }
 
@@ -122,13 +160,23 @@ static app_error vulkan_compositor_present_image_view(
   vulkan_compositor* compositor, VkImageView image_view, bool* out_presented
 ) {
   *out_presented = false;
+  MAP_TRY(vulkan_compositor_wait_for_frame(compositor));
+
+  // The frame about to present is the first content the resized swapchain
+  // could show, so this is the moment the stale one is replaced.
+  if (compositor->swapchain_stale) {
+    MAP_TRY(vulkan_compositor_recreate_swapchain(compositor));
+    compositor->swapchain_stale = false;
+  }
+
+  // After the fence wait, so no in-flight commands read the descriptor set,
+  // and after the replacement, whose format change rebuilds the pipeline
+  // around an unwritten descriptor set that this check then populates.
   if (image_view != compositor->pipeline.descriptor_image_view) {
     vulkan_pipeline_update_descriptor(
       &compositor->pipeline, compositor->context.device, image_view
     );
   }
-
-  MAP_TRY(vulkan_compositor_wait_for_frame(compositor));
 
   uint32_t image_index = 0;
   const VkResult acquire = vkAcquireNextImageKHR(
@@ -136,7 +184,13 @@ static app_error vulkan_compositor_present_image_view(
     compositor->commands.image_available, VK_NULL_HANDLE, &image_index
   );
   if (acquire == VK_ERROR_OUT_OF_DATE_KHR) {
+    compositor->swapchain_stale = true;
     return APP_OK;
+  }
+  if (acquire == VK_SUBOPTIMAL_KHR) {
+    // Still presentable, but the surface has moved on; replace the swapchain
+    // before the next frame.
+    compositor->swapchain_stale = true;
   }
   MAP_TRY(expect_vk_or_suboptimal(acquire));
   MAP_TRY(vulkan_commands_reset_fence(
@@ -147,14 +201,14 @@ static app_error vulkan_compositor_present_image_view(
     &compositor->commands, &compositor->swapchain, &compositor->pipeline,
     image_index
   ));
-  MAP_TRY(
-    vulkan_commands_submit(&compositor->commands, compositor->context.queue)
-  );
+  MAP_TRY(vulkan_commands_submit(
+    &compositor->commands, compositor->context.queue, image_index
+  ));
 
   const VkPresentInfoKHR present_info = {
     .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
     .waitSemaphoreCount = 1,
-    .pWaitSemaphores = &compositor->commands.render_finished,
+    .pWaitSemaphores = &compositor->commands.render_finished[image_index],
     .swapchainCount = 1,
     .pSwapchains = &compositor->swapchain.handle,
     .pImageIndices = &image_index,
@@ -165,12 +219,16 @@ static app_error vulkan_compositor_present_image_view(
     // Nothing reached the screen. The sampling pass was submitted, so wait it
     // out before the caller releases its frame, and report no present so the
     // render request is set again.
+    compositor->swapchain_stale = true;
     (void)vulkan_compositor_wait_for_frame(compositor);
     return APP_OK;
   }
   if (present != VK_SUCCESS && present != VK_SUBOPTIMAL_KHR) {
     (void)vulkan_compositor_wait_for_frame(compositor);
     return expect_vk(present);
+  }
+  if (present == VK_SUBOPTIMAL_KHR) {
+    compositor->swapchain_stale = true;
   }
   *out_presented = true;
   return APP_OK;
@@ -309,6 +367,10 @@ void render_target_apply_sdl_hints(void) {}
 app_error render_target_configure_video(void) { return APP_OK; }
 
 SDL_WindowFlags render_target_window_flags(void) { return SDL_WINDOW_VULKAN; }
+
+void* render_target_frame_scope_open(void) { return nullptr; }
+
+void render_target_frame_scope_close(void* scope) { (void)scope; }
 
 app_error render_target_init(
   render_target** out_target, SDL_Window* window, viewport current_viewport,
@@ -481,9 +543,7 @@ static app_error resize_borrowed(
     return APP_ERROR_TEXTURE_RESIZE_FAILED;
   }
   vulkan_context_wait_idle(&target->as.borrowed.compositor.context);
-  MAP_TRY(
-    vulkan_compositor_resize(&target->as.borrowed.compositor, current_viewport)
-  );
+  vulkan_compositor_resize(&target->as.borrowed.compositor, current_viewport);
 
   borrowed_image previous = target->as.borrowed.image;
   borrowed_image replacement;
@@ -522,9 +582,7 @@ app_error render_target_resize(
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
       vulkan_context_wait_idle(&target->as.owned.compositor.context);
       release_pending_frame(target);
-      MAP_TRY(
-        vulkan_compositor_resize(&target->as.owned.compositor, current_viewport)
-      );
+      vulkan_compositor_resize(&target->as.owned.compositor, current_viewport);
       return render_session_resize(&target->session, current_viewport);
     case RENDER_TARGET_MODE_BORROWED_TEXTURE:
       return resize_borrowed(target, current_viewport);

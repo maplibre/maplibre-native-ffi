@@ -157,8 +157,9 @@ internal static class Shell
                 // render call is not discarded.
                 if (graphics.CanRenderFrame && renderRequest.Consume() && !Render(graphics, target))
                 {
-                    // The map applies its logical size on the runtime loop's next Pump, so no
-                    // update is rendered until then. Ask again rather than dropping the frame.
+                    // Nothing reached the screen. The map applies its logical size on the runtime
+                    // loop's next Pump, and a presentation target hands out no drawable while the
+                    // window is minimized. Ask again rather than dropping the frame.
                     renderRequest.Set();
                 }
 

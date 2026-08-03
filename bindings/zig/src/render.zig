@@ -552,10 +552,9 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
     /// latest update, so repeated calls re-render it and return true again;
     /// use this to redraw on demand after resize or surface expose, and gate
     /// frame loops on render-update-available events instead of the return
-    /// value. Returns false when no frame was rendered, because the map has
-    /// not published an update yet or the renderer skipped the frame; both are
-    /// normal during startup, so keep pumping the runtime until an update is
-    /// reported.
+    /// value. Returns false when no frame was rendered. That is a normal
+    /// transient: call again on the next frame rather than wait for another
+    /// render-update event.
     pub fn renderUpdate(self: *RenderSessionHandle) status.Error!bool {
         const lease = try renderSessionLease(self.*);
         defer lease.release();

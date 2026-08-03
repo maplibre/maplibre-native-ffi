@@ -33,8 +33,16 @@ pub struct VulkanTextureCompositor {
     command_pool: vk::CommandPool,
     command_buffer: vk::CommandBuffer,
     image_available: vk::Semaphore,
-    render_finished: vk::Semaphore,
+    /// One present-wait semaphore per swapchain image, indexed by the acquired
+    /// image. The frame fence proves a submit finished, but only the next
+    /// acquire of the same image proves its present consumed the semaphore, so
+    /// a single reused semaphore is a race the presentation engine may lose.
+    render_finished: Vec<vk::Semaphore>,
     in_flight: vk::Fence,
+    viewport: Viewport,
+    /// Set when the surface reports the swapchain no longer matches it. The
+    /// next frame rebuilds the swapchain before it draws.
+    swapchain_stale: bool,
     closed: bool,
 }
 
@@ -69,8 +77,10 @@ impl VulkanTextureCompositor {
             command_pool: vk::CommandPool::null(),
             command_buffer: vk::CommandBuffer::null(),
             image_available: vk::Semaphore::null(),
-            render_finished: vk::Semaphore::null(),
+            render_finished: Vec::new(),
             in_flight: vk::Fence::null(),
+            viewport,
+            swapchain_stale: false,
             closed: false,
         };
         compositor.create_swapchain(viewport, vk::SwapchainKHR::null())?;
@@ -82,22 +92,30 @@ impl VulkanTextureCompositor {
         Ok(compositor)
     }
 
+    /// Rebuilds the swapchain at a new size.
+    ///
+    /// The replacement is created before the retired swapchain is destroyed and
+    /// names it as `old_swapchain`, so the presentation engine hands the surface
+    /// over directly. Destroying it first leaves a gap that MoltenVK fills with
+    /// presents that succeed but reach no drawable the window still shows.
     pub fn resize(&mut self, viewport: Viewport) -> Result<(), vk::Result> {
         self.wait_idle()?;
         self.destroy_swapchain_dependents();
         let old_swapchain = self.swapchain;
+        self.viewport = viewport;
         self.create_swapchain(viewport, old_swapchain)?;
         if old_swapchain != vk::SwapchainKHR::null() {
             unsafe { self.swapchain_loader.destroy_swapchain(old_swapchain, None) };
         }
         self.create_framebuffers()?;
+        self.swapchain_stale = false;
         Ok(())
     }
 
     pub fn draw(
         &mut self,
         frame: &VulkanOwnedTextureFrameHandle,
-    ) -> maplibre_native_ffi::Result<()> {
+    ) -> maplibre_native_ffi::Result<bool> {
         let metadata = frame.frame()?;
         if metadata.width == 0 || metadata.height == 0 {
             return Err(compositor_error("owned Vulkan frame has an empty extent"));
@@ -127,10 +145,6 @@ impl VulkanTextureCompositor {
             if self.in_flight != vk::Fence::null() {
                 self.device.destroy_fence(self.in_flight, None);
                 self.in_flight = vk::Fence::null();
-            }
-            if self.render_finished != vk::Semaphore::null() {
-                self.device.destroy_semaphore(self.render_finished, None);
-                self.render_finished = vk::Semaphore::null();
             }
             if self.image_available != vk::Semaphore::null() {
                 self.device.destroy_semaphore(self.image_available, None);
@@ -181,22 +195,49 @@ impl VulkanTextureCompositor {
         Ok(())
     }
 
-    pub(crate) fn draw_image_view(&mut self, image_view: vk::ImageView) -> Result<(), vk::Result> {
+    /// Samples the image view into the swapchain, reporting whether the frame
+    /// reached the screen. A swapchain the surface has outgrown presents
+    /// nothing, so the caller keeps its redraw pending and draws again once the
+    /// replacement is built.
+    pub(crate) fn draw_image_view(
+        &mut self,
+        image_view: vk::ImageView,
+    ) -> Result<bool, vk::Result> {
+        // SAFETY: the fence belongs to this live device.
+        unsafe {
+            self.device
+                .wait_for_fences(&[self.in_flight], true, u64::MAX)?
+        };
+
+        // The frame about to present is the first content a replacement
+        // swapchain could show, so this is the moment a stale one is rebuilt.
+        if self.swapchain_stale {
+            self.resize(self.viewport)?;
+        }
+
         unsafe {
             let device = &self.device;
-            device.wait_for_fences(&[self.in_flight], true, u64::MAX)?;
-
             self.update_descriptor(image_view);
-            let image_index = match self.swapchain_loader.acquire_next_image(
+            let (image_index, suboptimal) = match self.swapchain_loader.acquire_next_image(
                 self.swapchain,
                 u64::MAX,
                 self.image_available,
                 vk::Fence::null(),
             ) {
-                Ok((image_index, _suboptimal)) => image_index,
-                Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => return Ok(()),
+                Ok(acquired) => acquired,
+                Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                    // The surface outgrew this swapchain, so nothing reaches
+                    // the screen until the replacement is built.
+                    self.swapchain_stale = true;
+                    return Ok(false);
+                }
                 Err(error) => return Err(error),
             };
+            if suboptimal {
+                // Still presentable, but the surface has moved on; rebuild the
+                // swapchain before the next frame.
+                self.swapchain_stale = true;
+            }
 
             self.record(image_index)?;
             device.reset_fences(&[self.in_flight])?;
@@ -204,7 +245,7 @@ impl VulkanTextureCompositor {
             let wait_semaphores = [self.image_available];
             let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
             let command_buffers = [self.command_buffer];
-            let signal_semaphores = [self.render_finished];
+            let signal_semaphores = [self.render_finished[image_index as usize]];
             let submit_info = [vk::SubmitInfo::default()
                 .wait_semaphores(&wait_semaphores)
                 .wait_dst_stage_mask(&wait_stages)
@@ -223,7 +264,16 @@ impl VulkanTextureCompositor {
                 .swapchain_loader
                 .queue_present(self.graphics_queue, &present_info)
             {
-                Ok(_) | Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => Ok(()),
+                Ok(present_suboptimal) => {
+                    if present_suboptimal {
+                        self.swapchain_stale = true;
+                    }
+                    Ok(true)
+                }
+                Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                    self.swapchain_stale = true;
+                    Ok(false)
+                }
                 Err(error) => Err(error),
             }
         }
@@ -283,10 +333,28 @@ impl VulkanTextureCompositor {
                     }
                 }
             }
+            let mut render_finished = Vec::with_capacity(image_views.len());
+            let semaphore_info = vk::SemaphoreCreateInfo::default();
+            for _ in &image_views {
+                match self.device.create_semaphore(&semaphore_info, None) {
+                    Ok(semaphore) => render_finished.push(semaphore),
+                    Err(error) => {
+                        for semaphore in render_finished {
+                            self.device.destroy_semaphore(semaphore, None);
+                        }
+                        for view in image_views {
+                            self.device.destroy_image_view(view, None);
+                        }
+                        self.swapchain_loader.destroy_swapchain(swapchain, None);
+                        return Err(error);
+                    }
+                }
+            }
             self.swapchain = swapchain;
             self.swapchain_format = swapchain_format;
             self.extent = extent;
             self.image_views = image_views;
+            self.render_finished = render_finished;
             Ok(())
         }
     }
@@ -472,7 +540,6 @@ impl VulkanTextureCompositor {
             self.command_buffer = self.device.allocate_command_buffers(&alloc_info)?[0];
             let semaphore_info = vk::SemaphoreCreateInfo::default();
             self.image_available = self.device.create_semaphore(&semaphore_info, None)?;
-            self.render_finished = self.device.create_semaphore(&semaphore_info, None)?;
             let fence_info = vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED);
             self.in_flight = self.device.create_fence(&fence_info, None)?;
             Ok(())
@@ -559,6 +626,10 @@ impl VulkanTextureCompositor {
         for view in self.image_views.drain(..) {
             // SAFETY: image view belongs to this live device and no framebuffer references it now.
             unsafe { device.destroy_image_view(view, None) };
+        }
+        for semaphore in self.render_finished.drain(..) {
+            // SAFETY: semaphore belongs to this live device and no present waits on it after waits.
+            unsafe { device.destroy_semaphore(semaphore, None) };
         }
     }
 }

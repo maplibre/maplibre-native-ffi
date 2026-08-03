@@ -130,7 +130,7 @@ internal object VulkanRenderTarget {
       if (!session.renderUpdate()) {
         return false
       }
-      session.acquireVulkanOwnedTextureFrame().use { frameHandle ->
+      return session.acquireVulkanOwnedTextureFrame().use { frameHandle ->
         val frame = frameHandle.frame()
         check(frame.width() > 0 && frame.height() > 0) {
           "MapLibre returned an empty Vulkan owned texture frame"
@@ -140,7 +140,6 @@ internal object VulkanRenderTarget {
         }
         compositor.drawImageView(frame.imageView().address)
       }
-      return true
     }
 
     override fun close() {
@@ -182,8 +181,7 @@ internal object VulkanRenderTarget {
       if (!session.renderUpdate()) {
         return false
       }
-      compositor.drawImageView(image.view())
-      return true
+      return compositor.drawImageView(image.view())
     }
 
     override fun close() {

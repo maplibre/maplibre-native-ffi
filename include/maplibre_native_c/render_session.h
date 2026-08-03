@@ -61,29 +61,20 @@ MLN_API mln_status mln_render_session_resize(
 ) MLN_NOEXCEPT;
 
 /**
- * Processes the latest map render update for an attached render session.
+ * Renders the map's latest render update into the session's render target.
  *
- * Surface sessions render and present through their native surface. Texture
- * sessions render into their texture target.
+ * A surface session presents the frame. A texture session writes it into the
+ * target texture.
  *
- * On success, *out_rendered reports whether the latest available map render
- * update was rendered. The map retains its latest update, so repeated calls
- * re-render it and report true again; hosts use this to redraw on demand
- * after resize or surface expose, and gate frame-driven loops on
- * MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE instead of the return value.
- * *out_rendered is false when no frame was rendered: the map has not
- * published a render update yet, or the renderer skipped producing a frame
- * for the latest update (for example the Metal texture backend before content
- * is ready), or the map has yet to apply a size this session asked for. All are
- * normal during startup; keep pumping the runtime and call again when an update
- * is reported.
+ * *out_rendered reports whether this call rendered a frame. The map retains its
+ * latest update, so a host redraws on demand after a resize or a surface expose
+ * and gates a frame loop on MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE. A
+ * false report is a normal transient: call again on the next frame rather than
+ * wait for another update event.
  *
- * The last of those needs care in MLN_MAP_MODE_STATIC. A session applies its
- * extent on the map's owner thread, so the map still carries the previous size
- * until it is pumped, and an update built for that size renders nothing here. A
- * still-image request made before the resize lands is spent on that discarded
- * update, and a static map publishes no further update on its own. Pump the
- * resize through before requesting the still image.
+ * In MLN_MAP_MODE_STATIC, pump a resize through the map before requesting the
+ * still image. The session applies its extent on the map's owner thread, and a
+ * still image requested before that lands renders nothing.
  *
  * Returns:
  * - MLN_STATUS_OK on success, with *out_rendered set.

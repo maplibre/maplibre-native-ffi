@@ -117,14 +117,13 @@ internal object MetalRenderTarget {
       if (!session.renderUpdate()) {
         return false
       }
-      session.acquireMetalOwnedTextureFrame().use { frameHandle ->
+      return session.acquireMetalOwnedTextureFrame().use { frameHandle ->
         val frame = frameHandle.frame()
         check(frame.width() != 0 && frame.height() != 0 && !frame.texture().isNull) {
           "owned Metal frame has an empty extent or null texture"
         }
         compositor.drawTexture(frame.texture().address)
       }
-      return true
     }
 
     override fun close() {
@@ -167,8 +166,7 @@ internal object MetalRenderTarget {
       if (!session.renderUpdate()) {
         return false
       }
-      compositor.drawTexture(texture.texture())
-      return true
+      return compositor.drawTexture(texture.texture())
     }
 
     override fun close() {

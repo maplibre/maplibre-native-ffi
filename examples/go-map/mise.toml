@@ -1,7 +1,7 @@
 [tools]
 "core:go" = "{{vars.go_version}}"
 "aqua:mvdan/gofumpt" = "{{vars.gofumpt_version}}"
-"conda:sdl3" = { version = "3.2", os = ["linux"] }
+"conda:sdl3" = { version = "3.2", os = ["linux", "macos"] }
 
 [tasks.build]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'

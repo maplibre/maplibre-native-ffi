@@ -6,18 +6,29 @@ const Swapchain = @import("swapchain.zig").Swapchain;
 const util = @import("util.zig");
 
 pub const Commands = struct {
+    allocator: std.mem.Allocator,
     command_pool: c.VkCommandPool,
     command_buffer: c.VkCommandBuffer,
     image_available: c.VkSemaphore,
-    render_finished: c.VkSemaphore,
+    /// One present-wait semaphore per swapchain image, indexed by the
+    /// acquired image. The frame fence proves a submit finished, but only the
+    /// next acquire of the same image proves its present consumed the
+    /// semaphore, so a single reused semaphore is a race the presentation
+    /// engine may lose.
+    render_finished: []c.VkSemaphore,
     in_flight: c.VkFence,
 
-    pub fn init(device: c.VkDevice, queue_family_index: u32) !Commands {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        device: c.VkDevice,
+        queue_family_index: u32,
+    ) !Commands {
         var self = Commands{
+            .allocator = allocator,
             .command_pool = null,
             .command_buffer = null,
             .image_available = null,
-            .render_finished = null,
+            .render_finished = &.{},
             .in_flight = null,
         };
         errdefer self.deinit(device);
@@ -57,12 +68,6 @@ pub const Commands = struct {
             null,
             &self.image_available,
         ));
-        try util.expectVk(c.vkCreateSemaphore(
-            device,
-            &semaphore_info,
-            null,
-            &self.render_finished,
-        ));
         const fence_info = c.VkFenceCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
             .pNext = null,
@@ -73,16 +78,46 @@ pub const Commands = struct {
     }
 
     pub fn deinit(self: *Commands, device: c.VkDevice) void {
+        self.destroyPresentSemaphores(device);
         if (self.in_flight != null) c.vkDestroyFence(device, self.in_flight, null);
-        if (self.render_finished != null) {
-            c.vkDestroySemaphore(device, self.render_finished, null);
-        }
         if (self.image_available != null) {
             c.vkDestroySemaphore(device, self.image_available, null);
         }
         if (self.command_pool != null) {
             c.vkDestroyCommandPool(device, self.command_pool, null);
         }
+    }
+
+    /// Sizes the present-wait semaphores to the swapchain, on creation and on
+    /// every replacement. The caller waits the device idle first.
+    pub fn createPresentSemaphores(
+        self: *Commands,
+        device: c.VkDevice,
+        image_count: u32,
+    ) !void {
+        self.render_finished = try self.allocator.alloc(c.VkSemaphore, image_count);
+        @memset(self.render_finished, null);
+        const semaphore_info = c.VkSemaphoreCreateInfo{
+            .sType = c.VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+            .pNext = null,
+            .flags = 0,
+        };
+        for (self.render_finished) |*semaphore| {
+            try util.expectVk(c.vkCreateSemaphore(
+                device,
+                &semaphore_info,
+                null,
+                semaphore,
+            ));
+        }
+    }
+
+    pub fn destroyPresentSemaphores(self: *Commands, device: c.VkDevice) void {
+        for (self.render_finished) |semaphore| {
+            if (semaphore != null) c.vkDestroySemaphore(device, semaphore, null);
+        }
+        self.allocator.free(self.render_finished);
+        self.render_finished = &.{};
     }
 
     pub fn waitForFrameFence(self: *Commands, device: c.VkDevice) !void {
@@ -99,7 +134,9 @@ pub const Commands = struct {
         try util.expectVk(c.vkResetFences(device, 1, &self.in_flight));
     }
 
-    pub fn submit(self: *Commands, queue: c.VkQueue) !void {
+    /// Submits the recorded commands, signaling the acquired image's
+    /// present-wait semaphore.
+    pub fn submit(self: *Commands, queue: c.VkQueue, image_index: u32) !void {
         const wait_stages = [_]c.VkPipelineStageFlags{
             c.VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         };
@@ -112,7 +149,7 @@ pub const Commands = struct {
             .commandBufferCount = 1,
             .pCommandBuffers = &self.command_buffer,
             .signalSemaphoreCount = 1,
-            .pSignalSemaphores = &self.render_finished,
+            .pSignalSemaphores = &self.render_finished[image_index],
         };
         try util.expectVk(c.vkQueueSubmit(queue, 1, &submit_info, self.in_flight));
     }

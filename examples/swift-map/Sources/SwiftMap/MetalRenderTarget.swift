@@ -150,19 +150,21 @@ enum MetalRenderTarget {
     }
   }
 
-  /// Renders the latest map update, reporting whether a frame was drawn.
+  /// Renders the latest map update, reporting whether a frame was presented.
   ///
   /// The map applies a new logical size on the runtime loop's next `pump`,
   /// so this reports no update for a few iterations after attach or resize.
-  /// That is normal: the render loop keeps pacing and asks again.
+  /// The compositor paths also report false when the layer hands out no
+  /// drawable. That is normal: the render loop keeps pacing and asks again.
   func renderUpdate() throws -> Bool {
     switch self {
     case let .ownedTexture(session, compositor):
       guard try session.renderUpdate() else { return false }
       let frame = try session.acquireMetalOwnedTextureFrame()
+      var presented = false
       var firstError: Error?
       do {
-        try compositor.draw(frame: frame)
+        presented = try compositor.draw(frame: frame)
       } catch {
         firstError = error
       }
@@ -174,11 +176,10 @@ enum MetalRenderTarget {
       if let firstError {
         throw firstError
       }
-      return true
+      return presented
     case let .borrowedTexture(session, compositor, texture):
       guard try session.renderUpdate() else { return false }
-      try compositor.draw(texture: texture.texture)
-      return true
+      return try compositor.draw(texture: texture.texture)
     case let .nativeSurface(session):
       return try session.renderUpdate()
     }
@@ -287,18 +288,25 @@ final class MetalTextureCompositor {
     )
   }
 
-  func draw(frame: MetalOwnedTextureFrameHandle) throws {
+  func draw(frame: MetalOwnedTextureFrameHandle) throws -> Bool {
+    var presented = false
     try frame.withBackendPointers { view in
       let address = try view.texture.addressBitPattern
       let texture = try metalTexture(address: address)
-      try draw(texture: texture)
+      presented = try draw(texture: texture)
     }
+    return presented
   }
 
-  func draw(texture: any MTLTexture) throws {
-    guard let drawable = layer.nextDrawable() else {
-      throw metalError("CAMetalLayer returned no drawable")
-    }
+  /// Samples the texture into the layer's next drawable, reporting whether the
+  /// frame was presented.
+  ///
+  /// A minimized or occluded window legitimately has no drawable, and the
+  /// drawable pool can be momentarily empty, so this reports false instead of
+  /// failing the frame. The caller keeps its render request pending and draws
+  /// again once a drawable is available.
+  func draw(texture: any MTLTexture) throws -> Bool {
+    guard let drawable = layer.nextDrawable() else { return false }
     let passDescriptor = MTLRenderPassDescriptor()
     guard let colorAttachment = passDescriptor.colorAttachments[0] else {
       throw metalError("Metal render pass color attachment 0 is unavailable")
@@ -327,6 +335,7 @@ final class MetalTextureCompositor {
     encoder.endEncoding()
     commandBuffer.present(drawable)
     commandBuffer.commit()
+    return true
   }
 
   private static func makePipeline(
