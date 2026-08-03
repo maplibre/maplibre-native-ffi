@@ -32,6 +32,11 @@ export interface NodeApiAddon {
   symbol(entrypoint: number): bigint;
   readForeign(pointer: bigint, length: number): Uint8Array;
   readForeignCString(pointer: bigint): string | null;
+  listenerAddress(kind: number): bigint;
+  drainRecords(records: bigint, capacity: number): number;
+  recordDepth(): number;
+  startRecordNotifications(callback: () => void): void;
+  stopRecordNotifications(): void;
   transferIssue(handle: bigint): bigint;
   transferClaim(token: bigint): bigint;
   transferDiscard(token: bigint): bigint;
@@ -109,6 +114,17 @@ export function nodeApiTransport(addon: NodeApiAddon): Transport {
 
     entrypointName(entrypoint: number): string | null {
       return addon.entrypointName(entrypoint);
+    },
+
+    listenerAddress: (kind: number): Ptr => addon.listenerAddress(kind),
+    drainRecords: (records: Ptr, capacity: number) =>
+      addon.drainRecords(records, capacity),
+    recordDepth: () => addon.recordDepth(),
+    startRecordNotifications: (drain: () => void) => {
+      addon.startRecordNotifications(drain);
+    },
+    stopRecordNotifications: () => {
+      addon.stopRecordNotifications();
     },
 
     transferIssue: (handle) => addon.transferIssue(handle),

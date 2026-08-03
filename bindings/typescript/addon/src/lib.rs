@@ -17,6 +17,7 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 
 use napi::bindgen_prelude::*;
+use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi_derive::napi;
 
 unsafe extern "C" {
@@ -32,6 +33,17 @@ unsafe extern "C" {
         diagnostic_length: *mut u32,
     ) -> i32;
     fn mln_abi_symbol(entrypoint: u32) -> *mut std::ffi::c_void;
+    fn mln_abi_log_listener(listener_data: *mut std::ffi::c_void, record: *mut std::ffi::c_void);
+    fn mln_abi_resource_request_listener(
+        listener_data: *mut std::ffi::c_void,
+        request: *mut std::ffi::c_void,
+    );
+    fn mln_abi_queue_set_notifier(
+        notify: Option<unsafe extern "C" fn(*mut std::ffi::c_void)>,
+        user_data: *mut std::ffi::c_void,
+    );
+    fn mln_abi_queue_drain(records: *mut std::ffi::c_void, capacity: u32) -> u32;
+    fn mln_abi_queue_depth() -> u32;
     fn mln_abi_transfer_issue(handle: u64) -> u64;
     fn mln_abi_transfer_claim(token: u64) -> u64;
     fn mln_abi_transfer_discard(token: u64) -> u64;
@@ -179,4 +191,84 @@ pub fn transfer_discard(token: BigInt) -> Result<BigInt> {
     Ok(BigInt::from(unsafe {
         mln_abi_transfer_discard(address(token, "token")?)
     }))
+}
+
+/// The addresses of the listeners a registration installs.
+///
+/// The C API stores these in a struct field, so the host needs their addresses
+/// rather than a way to call them.
+#[napi]
+pub fn listener_address(kind: u32) -> BigInt {
+    let address = match kind {
+        1 => mln_abi_log_listener as *const () as usize,
+        2 => mln_abi_resource_request_listener as *const () as usize,
+        _ => 0,
+    };
+    BigInt::from(address as u64)
+}
+
+/// Drains queued callback records into host storage.
+#[napi]
+pub fn drain_records(records: BigInt, capacity: u32) -> Result<u32> {
+    let records = address(records, "records")? as usize as *mut std::ffi::c_void;
+    if records.is_null() {
+        return Err(Error::new(
+            Status::InvalidArg,
+            "records must name host storage".to_owned(),
+        ));
+    }
+    Ok(unsafe { mln_abi_queue_drain(records, capacity) })
+}
+
+/// Reports how many records are waiting.
+#[napi]
+pub fn record_depth() -> u32 {
+    unsafe { mln_abi_queue_depth() }
+}
+
+/// Wakes the JavaScript context when a record is queued.
+///
+/// MapLibre produces records on its own threads, so the notifier cannot run
+/// user code. It signals a non-blocking thread-safe function, and the callback
+/// that function runs on the JavaScript context drains the queue.
+struct RecordNotifier {
+    callback: ThreadsafeFunction<(), (), (), Status, false>,
+}
+
+unsafe extern "C" fn notify_records(user_data: *mut std::ffi::c_void) {
+    if user_data.is_null() {
+        return;
+    }
+    let notifier = unsafe { &*(user_data as *const RecordNotifier) };
+    // Non-blocking: a producer thread never waits on the JavaScript context,
+    // and a full queue coalesces into the drain that is already scheduled.
+    notifier
+        .callback
+        .call((), ThreadsafeFunctionCallMode::NonBlocking);
+}
+
+static NOTIFIER: std::sync::Mutex<Option<Box<RecordNotifier>>> = std::sync::Mutex::new(None);
+
+/// Installs the drain signal for this host context.
+#[napi]
+pub fn start_record_notifications(
+    callback: ThreadsafeFunction<(), (), (), Status, false>,
+) -> Result<()> {
+    let notifier = Box::new(RecordNotifier { callback });
+    let pointer = (&*notifier as *const RecordNotifier) as *mut std::ffi::c_void;
+    let mut slot = NOTIFIER.lock().unwrap();
+    // The previous notifier is cleared from native first, so no producer can be
+    // inside it while it is dropped.
+    unsafe { mln_abi_queue_set_notifier(None, std::ptr::null_mut()) };
+    *slot = Some(notifier);
+    unsafe { mln_abi_queue_set_notifier(Some(notify_records), pointer) };
+    Ok(())
+}
+
+/// Removes the drain signal, leaving queued records for an explicit drain.
+#[napi]
+pub fn stop_record_notifications() {
+    let mut slot = NOTIFIER.lock().unwrap();
+    unsafe { mln_abi_queue_set_notifier(None, std::ptr::null_mut()) };
+    *slot = None;
 }

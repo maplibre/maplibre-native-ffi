@@ -14,7 +14,7 @@ crate-type = ["cdylib"]
 # consumer in this repository, so the addon takes the prefix it resolved rather
 # than resolving a second one.
 maplibre-native-ffi-sys = { path = "../../rust/crates/maplibre-native-ffi-sys" }
-napi = { version = "3.12.0", default-features = false, features = ["napi8"] }
+napi = { version = "3.12.0", default-features = false, features = ["napi8", "tokio_rt"] }
 napi-derive = "3.6.2"
 
 [build-dependencies]

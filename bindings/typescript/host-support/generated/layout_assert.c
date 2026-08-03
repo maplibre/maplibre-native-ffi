@@ -71,7 +71,7 @@ static_assert(
   "mln_adapter_http_header_transform_rules.count offset"
 );
 static_assert(
-  sizeof(mln_adapter_log_callback_state) == 8,
+  sizeof(mln_adapter_log_callback_state) == 12,
   "mln_adapter_log_callback_state size"
 );
 static_assert(
@@ -85,6 +85,10 @@ static_assert(
 static_assert(
   offsetof(mln_adapter_log_callback_state, consume) == 4,
   "mln_adapter_log_callback_state.consume offset"
+);
+static_assert(
+  offsetof(mln_adapter_log_callback_state, listener_data) == 8,
+  "mln_adapter_log_callback_state.listener_data offset"
 );
 static_assert(
   sizeof(mln_adapter_log_record) == 32, "mln_adapter_log_record size"
@@ -117,7 +121,7 @@ static_assert(
   "mln_adapter_log_record.message offset"
 );
 static_assert(
-  sizeof(mln_adapter_queued_resource_provider) == 12,
+  sizeof(mln_adapter_queued_resource_provider) == 16,
   "mln_adapter_queued_resource_provider size"
 );
 static_assert(
@@ -135,6 +139,10 @@ static_assert(
 static_assert(
   offsetof(mln_adapter_queued_resource_provider, listener) == 8,
   "mln_adapter_queued_resource_provider.listener offset"
+);
+static_assert(
+  offsetof(mln_adapter_queued_resource_provider, listener_data) == 12,
+  "mln_adapter_queued_resource_provider.listener_data offset"
 );
 static_assert(
   sizeof(mln_adapter_queued_resource_provider_route) == 12,
@@ -2836,7 +2844,7 @@ static_assert(
   "mln_adapter_http_header_transform_rules.count offset"
 );
 static_assert(
-  sizeof(mln_adapter_log_callback_state) == 16,
+  sizeof(mln_adapter_log_callback_state) == 24,
   "mln_adapter_log_callback_state size"
 );
 static_assert(
@@ -2850,6 +2858,10 @@ static_assert(
 static_assert(
   offsetof(mln_adapter_log_callback_state, consume) == 8,
   "mln_adapter_log_callback_state.consume offset"
+);
+static_assert(
+  offsetof(mln_adapter_log_callback_state, listener_data) == 16,
+  "mln_adapter_log_callback_state.listener_data offset"
 );
 static_assert(
   sizeof(mln_adapter_log_record) == 40, "mln_adapter_log_record size"
@@ -2882,7 +2894,7 @@ static_assert(
   "mln_adapter_log_record.message offset"
 );
 static_assert(
-  sizeof(mln_adapter_queued_resource_provider) == 24,
+  sizeof(mln_adapter_queued_resource_provider) == 32,
   "mln_adapter_queued_resource_provider size"
 );
 static_assert(
@@ -2900,6 +2912,10 @@ static_assert(
 static_assert(
   offsetof(mln_adapter_queued_resource_provider, listener) == 16,
   "mln_adapter_queued_resource_provider.listener offset"
+);
+static_assert(
+  offsetof(mln_adapter_queued_resource_provider, listener_data) == 24,
+  "mln_adapter_queued_resource_provider.listener_data offset"
 );
 static_assert(
   sizeof(mln_adapter_queued_resource_provider_route) == 16,

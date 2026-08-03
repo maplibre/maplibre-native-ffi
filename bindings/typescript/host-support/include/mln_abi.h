@@ -82,6 +82,59 @@ int32_t mln_abi_call(
  */
 void* mln_abi_symbol(uint32_t entrypoint);
 
+/** Which callback family a queued record came from. */
+enum mln_abi_record_kind {
+  MLN_ABI_RECORD_LOG = 1,
+  MLN_ABI_RECORD_RESOURCE_REQUEST = 2,
+};
+
+/**
+ * One record a MapLibre thread handed to this layer.
+ *
+ * `registration` is the listener_data the host gave the registration, so a
+ * delivery names which registration it belongs to. `record` is the
+ * adapter-owned record the host reads and then destroys, and is null for the
+ * retirement the adapter delivers once a registration can no longer be reached.
+ */
+typedef struct mln_abi_record {
+  uint32_t kind;
+  uint64_t registration;
+  uint64_t record;
+} mln_abi_record;
+
+/**
+ * The listener a host registers for adapted log callbacks.
+ *
+ * A host with no way to mint a native function per registration uses this one
+ * for every registration and tells them apart by their listener_data.
+ */
+void mln_abi_log_listener(void* listener_data, void* record);
+
+/** The listener a host registers for adapted queued resource providers. */
+void mln_abi_resource_request_listener(void* listener_data, void* request);
+
+/**
+ * Installs the function this layer calls when a record is queued.
+ *
+ * The notifier runs on whichever MapLibre thread produced the record, so it
+ * does the least possible: wake the host's own execution context, which then
+ * drains. Passing null clears it.
+ */
+void mln_abi_queue_set_notifier(
+  void (*notify)(void* user_data), void* user_data
+);
+
+/**
+ * Moves queued records into host storage.
+ *
+ * Returns how many records were written. A host drains until this reports fewer
+ * than the capacity it offered.
+ */
+uint32_t mln_abi_queue_drain(mln_abi_record* records, uint32_t capacity);
+
+/** Reports how many records are queued, for a host draining to empty. */
+uint32_t mln_abi_queue_depth(void);
+
 /**
  * Issues a one-shot token naming a handle, for moving it to another host
  * execution context.

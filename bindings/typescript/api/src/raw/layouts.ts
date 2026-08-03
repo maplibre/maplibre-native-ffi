@@ -47,11 +47,12 @@ export const LAYOUTS: Readonly<
       },
     },
     mln_adapter_log_callback_state: {
-      size: 16,
+      size: 24,
       align: 8,
       fields: {
         listener: { offset: 0, size: 8 },
         consume: { offset: 8, size: 4 },
+        listener_data: { offset: 16, size: 8 },
       },
     },
     mln_adapter_log_record: {
@@ -67,12 +68,13 @@ export const LAYOUTS: Readonly<
       },
     },
     mln_adapter_queued_resource_provider: {
-      size: 24,
+      size: 32,
       align: 8,
       fields: {
         routes: { offset: 0, size: 8 },
         route_count: { offset: 8, size: 8 },
         listener: { offset: 16, size: 8 },
+        listener_data: { offset: 24, size: 8 },
       },
     },
     mln_adapter_queued_resource_provider_route: {
@@ -1272,11 +1274,12 @@ export const LAYOUTS: Readonly<
       },
     },
     mln_adapter_log_callback_state: {
-      size: 8,
+      size: 12,
       align: 4,
       fields: {
         listener: { offset: 0, size: 4 },
         consume: { offset: 4, size: 4 },
+        listener_data: { offset: 8, size: 4 },
       },
     },
     mln_adapter_log_record: {
@@ -1292,12 +1295,13 @@ export const LAYOUTS: Readonly<
       },
     },
     mln_adapter_queued_resource_provider: {
-      size: 12,
+      size: 16,
       align: 4,
       fields: {
         routes: { offset: 0, size: 4 },
         route_count: { offset: 4, size: 4 },
         listener: { offset: 8, size: 4 },
+        listener_data: { offset: 12, size: 4 },
       },
     },
     mln_adapter_queued_resource_provider_route: {

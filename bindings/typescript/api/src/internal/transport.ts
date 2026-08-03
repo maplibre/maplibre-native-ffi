@@ -82,6 +82,26 @@ export interface Transport {
   /** Names an entrypoint, so a failure can say which call it came from. */
   entrypointName(entrypoint: number): string | null;
 
+  /** Reports the address of the listener a callback family registers. */
+  listenerAddress(kind: number): Ptr;
+
+  /** Moves queued callback records into host storage, reporting how many. */
+  drainRecords(records: Ptr, capacity: number): number;
+
+  /** Reports how many callback records are waiting. */
+  recordDepth(): number;
+
+  /**
+   * Installs the signal that wakes this context when a record is queued.
+   *
+   * The signal runs on the host's own execution context, not on the MapLibre
+   * thread that produced the record.
+   */
+  startRecordNotifications(drain: () => void): void;
+
+  /** Removes the signal, leaving queued records for an explicit drain. */
+  stopRecordNotifications(): void;
+
   /** Issues a one-shot token naming a handle, for a move to another context. */
   transferIssue(handle: bigint): bigint;
   /** Claims a token, reporting the handle it named, or zero when it is spent. */

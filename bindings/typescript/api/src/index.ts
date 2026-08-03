@@ -47,6 +47,12 @@ export {
 } from "./internal/node-transport.ts";
 export { Map, MapMode, type MapOptions, type MapSize } from "./map.ts";
 export {
+  type LogCallbackOptions,
+  LogEvent,
+  type LogRecord,
+  LogSeverity,
+} from "./logging.ts";
+export {
   type LoadOptions,
   Maplibre,
   NetworkStatus,

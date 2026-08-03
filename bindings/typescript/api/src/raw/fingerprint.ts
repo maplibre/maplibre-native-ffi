@@ -7,7 +7,7 @@
  * disagrees, because the call ABI indexes entrypoints rather than naming them.
  */
 export const ABI_FINGERPRINT =
-  "4d25bf81864e53e286a07e4b59bb18247cff5fd1a8123db57bf200a3de2512c8";
+  "1caa4c67b70a8ff4b0b9552b133cc9b377ee8534934c3fe6313150e718eb9fb5";
 
 /**
  * Digest of the public header bytes the generation ran against.
@@ -16,4 +16,4 @@ export const ABI_FINGERPRINT =
  * because a checked-in dispatch table describes one exact library ABI.
  */
 export const ABI_HEADER_DIGEST =
-  "0d6dad96a46b655a6851e9fcf506b7c3ebea46b6286566f68914bf90b8713f02";
+  "341181abcd4c3829124217e39ace6a194b2a69259074900d93bdf81cfd1ccd94";

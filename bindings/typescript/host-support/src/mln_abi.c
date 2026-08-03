@@ -6,6 +6,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "mln_abi.h"
@@ -247,4 +248,143 @@ uint64_t mln_abi_transfer_claim(uint64_t token) {
 
 uint64_t mln_abi_transfer_discard(uint64_t token) {
   return mln_abi_transfer_take(token);
+}
+
+/*
+ * The record queue.
+ *
+ * MapLibre calls the adapter on its own threads, and the adapter hands this
+ * layer a record it owns. A host that can only run user code on its own
+ * execution context needs the record to wait somewhere until it gets there, so
+ * records queue here and the host drains them.
+ *
+ * The queue grows rather than dropping: a dropped record is a callback the host
+ * never sees and, for a resource request, a request nothing ever completes.
+ */
+
+/* The host reads this record through the layout below rather than a generated
+ * one, because this struct belongs to the support contract rather than to the
+ * public C API. These keep the two spellings from drifting. */
+static_assert(sizeof(mln_abi_record) == 24, "mln_abi_record size");
+static_assert(offsetof(mln_abi_record, kind) == 0, "mln_abi_record.kind");
+static_assert(
+  offsetof(mln_abi_record, registration) == 8, "mln_abi_record.registration"
+);
+static_assert(offsetof(mln_abi_record, record) == 16, "mln_abi_record.record");
+
+typedef struct mln_abi_queue_node {
+  struct mln_abi_queue_node* next;
+  mln_abi_record record;
+} mln_abi_queue_node;
+
+static mln_abi_queue_node* mln_abi_queue_head;
+static mln_abi_queue_node* mln_abi_queue_tail;
+static uint32_t mln_abi_queue_count;
+static void (*mln_abi_queue_notify)(void*);
+static void* mln_abi_queue_notify_data;
+
+#if defined(_WIN32)
+static SRWLOCK mln_abi_queue_lock = SRWLOCK_INIT;
+static void mln_abi_queue_acquire(void) {
+  AcquireSRWLockExclusive(&mln_abi_queue_lock);
+}
+static void mln_abi_queue_release(void) {
+  ReleaseSRWLockExclusive(&mln_abi_queue_lock);
+}
+#else
+static pthread_mutex_t mln_abi_queue_lock = PTHREAD_MUTEX_INITIALIZER;
+static void mln_abi_queue_acquire(void) {
+  pthread_mutex_lock(&mln_abi_queue_lock);
+}
+static void mln_abi_queue_release(void) {
+  pthread_mutex_unlock(&mln_abi_queue_lock);
+}
+#endif
+
+static void mln_abi_queue_push(
+  uint32_t kind, void* listener_data, void* record
+) {
+  mln_abi_queue_node* node = malloc(sizeof(*node));
+  if (node == NULL) {
+    /* Nothing can be delivered, so release what the adapter handed over rather
+     * than leaking it. The host learns nothing, which is the same outcome a
+     * dropped record has, without the leak. */
+    if (record != NULL) {
+      if (kind == MLN_ABI_RECORD_LOG) {
+        mln_adapter_log_record_destroy(record);
+      } else if (kind == MLN_ABI_RECORD_RESOURCE_REQUEST) {
+        mln_adapter_resource_provider_request_destroy(record);
+      }
+    }
+    return;
+  }
+  node->next = NULL;
+  node->record.kind = kind;
+  node->record.registration = (uint64_t)(uintptr_t)listener_data;
+  node->record.record = (uint64_t)(uintptr_t)record;
+
+  void (*notify)(void*) = NULL;
+  void* notify_data = NULL;
+  mln_abi_queue_acquire();
+  if (mln_abi_queue_tail == NULL) {
+    mln_abi_queue_head = node;
+  } else {
+    mln_abi_queue_tail->next = node;
+  }
+  mln_abi_queue_tail = node;
+  mln_abi_queue_count += 1U;
+  notify = mln_abi_queue_notify;
+  notify_data = mln_abi_queue_notify_data;
+  mln_abi_queue_release();
+
+  /* Outside the lock: the notifier reaches the host's runtime, which must not
+   * be able to deadlock against a producer. */
+  if (notify != NULL) {
+    notify(notify_data);
+  }
+}
+
+void mln_abi_log_listener(void* listener_data, void* record) {
+  mln_abi_queue_push(MLN_ABI_RECORD_LOG, listener_data, record);
+}
+
+void mln_abi_resource_request_listener(void* listener_data, void* request) {
+  mln_abi_queue_push(MLN_ABI_RECORD_RESOURCE_REQUEST, listener_data, request);
+}
+
+void mln_abi_queue_set_notifier(
+  void (*notify)(void* user_data), void* user_data
+) {
+  mln_abi_queue_acquire();
+  mln_abi_queue_notify = notify;
+  mln_abi_queue_notify_data = user_data;
+  mln_abi_queue_release();
+}
+
+uint32_t mln_abi_queue_drain(mln_abi_record* records, uint32_t capacity) {
+  if (records == NULL || capacity == 0U) {
+    return 0U;
+  }
+  uint32_t written = 0U;
+  mln_abi_queue_acquire();
+  while (written < capacity && mln_abi_queue_head != NULL) {
+    mln_abi_queue_node* node = mln_abi_queue_head;
+    mln_abi_queue_head = node->next;
+    if (mln_abi_queue_head == NULL) {
+      mln_abi_queue_tail = NULL;
+    }
+    mln_abi_queue_count -= 1U;
+    records[written] = node->record;
+    written += 1U;
+    free(node);
+  }
+  mln_abi_queue_release();
+  return written;
+}
+
+uint32_t mln_abi_queue_depth(void) {
+  mln_abi_queue_acquire();
+  const uint32_t depth = mln_abi_queue_count;
+  mln_abi_queue_release();
+  return depth;
 }
