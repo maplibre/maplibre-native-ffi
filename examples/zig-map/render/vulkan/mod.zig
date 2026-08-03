@@ -180,10 +180,6 @@ const VulkanTextureCompositor = struct {
     }
 
     fn presentImageView(self: *VulkanTextureCompositor, image_view: c.VkImageView) !bool {
-        if (image_view != self.pipeline.descriptor_image_view) {
-            self.pipeline.updateDescriptor(self.context.device, image_view);
-        }
-
         try self.waitForFrame();
 
         // The frame about to present is the first content the resized
@@ -192,6 +188,14 @@ const VulkanTextureCompositor = struct {
         if (self.swapchain_stale) {
             try self.recreateSwapchain();
             self.swapchain_stale = false;
+        }
+
+        // After the fence wait, so no in-flight commands read the descriptor
+        // set, and after the replacement, whose format change rebuilds the
+        // pipeline around an unwritten descriptor set that this check then
+        // populates.
+        if (image_view != self.pipeline.descriptor_image_view) {
+            self.pipeline.updateDescriptor(self.context.device, image_view);
         }
 
         var image_index: u32 = 0;

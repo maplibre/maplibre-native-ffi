@@ -160,12 +160,6 @@ static app_error vulkan_compositor_present_image_view(
   vulkan_compositor* compositor, VkImageView image_view, bool* out_presented
 ) {
   *out_presented = false;
-  if (image_view != compositor->pipeline.descriptor_image_view) {
-    vulkan_pipeline_update_descriptor(
-      &compositor->pipeline, compositor->context.device, image_view
-    );
-  }
-
   MAP_TRY(vulkan_compositor_wait_for_frame(compositor));
 
   // The frame about to present is the first content the resized swapchain
@@ -173,6 +167,15 @@ static app_error vulkan_compositor_present_image_view(
   if (compositor->swapchain_stale) {
     MAP_TRY(vulkan_compositor_recreate_swapchain(compositor));
     compositor->swapchain_stale = false;
+  }
+
+  // After the fence wait, so no in-flight commands read the descriptor set,
+  // and after the replacement, whose format change rebuilds the pipeline
+  // around an unwritten descriptor set that this check then populates.
+  if (image_view != compositor->pipeline.descriptor_image_view) {
+    vulkan_pipeline_update_descriptor(
+      &compositor->pipeline, compositor->context.device, image_view
+    );
   }
 
   uint32_t image_index = 0;
