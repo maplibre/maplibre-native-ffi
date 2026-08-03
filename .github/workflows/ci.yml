@@ -718,6 +718,9 @@ jobs:
       - run: mise run //examples/swift-map:build:ios
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dart:build:mobile ios-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -760,6 +763,9 @@ jobs:
       - run: mise run //examples/swift-map:build:ios-simulator
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dart:build:mobile ios-simulator-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -795,6 +801,9 @@ jobs:
       - run: mise run //examples/android-map:build opengl arm64-v8a --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dart:build:mobile android-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -825,6 +834,9 @@ jobs:
           android-arm64-vulkan
           build/packages/native/dist/maplibre-native-c-android-arm64-vulkan.tar.gz
       - run: mise run //bindings/kotlin:androidBuild vulkan arm64-v8a --prebuilt
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dart:build:mobile android-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Upload native artifact
@@ -862,6 +874,9 @@ jobs:
       - run: mise run //examples/android-map:build opengl x86_64 --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dart:build:mobile android-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -892,6 +907,9 @@ jobs:
           android-x64-vulkan
           build/packages/native/dist/maplibre-native-c-android-x64-vulkan.tar.gz
       - run: mise run //bindings/kotlin:androidBuild vulkan x86_64 --prebuilt
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dart:build:mobile android-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Upload native artifact

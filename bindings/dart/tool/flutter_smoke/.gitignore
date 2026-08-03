@@ -1,0 +1,11 @@
+/.dart_tool/
+/.idea/
+/android/
+/build/
+/ios/
+/test/
+/.metadata
+/*.iml
+/README.md
+/analysis_options.yaml
+/pubspec.lock

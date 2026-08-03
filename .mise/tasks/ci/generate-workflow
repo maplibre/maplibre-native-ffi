@@ -32,6 +32,7 @@ def android_compile_sdk() -> str:
         raise SystemExit("android-compileSdk missing from gradle/libs.versions.toml")
     return match.group(1)
 
+
 # Environment secrets for R2 writes live in the GitHub Environment `sccache`
 # (main only). PRs omit the environment and fall back to public read-only.
 SCCACHE_ENVIRONMENT = (

@@ -201,8 +201,7 @@ const Map<String, String> _appleMobile = {'metal': 'metal'};
 
 /// The presets `.github/workflows/snapshots.yml` publishes a shared library
 /// for, keyed by the target they serve. The OpenHarmony presets build from
-/// source and ship no archive, so they are absent here; so is device iOS, whose
-/// `ios-arm64-metal` archive holds only a static library.
+/// source and ship no archive, so they are absent here.
 const Map<String, ({String defaultBackend, Map<String, String> backends})>
 _platformTargets = {
   'linux-x64': (defaultBackend: 'vulkan', backends: _openglEgl),
@@ -212,6 +211,7 @@ _platformTargets = {
   'windows-arm64': (defaultBackend: 'vulkan', backends: _openglWgl),
   'android-arm64': (defaultBackend: 'opengl', backends: _openglEgl),
   'android-x64': (defaultBackend: 'opengl', backends: _openglEgl),
+  'ios-arm64': (defaultBackend: 'metal', backends: _appleMobile),
   'ios-simulator-arm64': (defaultBackend: 'metal', backends: _appleMobile),
 };
 
@@ -568,20 +568,6 @@ Map<String, String>? _publicHeaders(Uri includeDirectory) {
 /// The library directory is `lib` on most platforms, `lib64` where the
 /// toolchain's `CMAKE_INSTALL_LIBDIR` says so, and `bin` on Windows.
 File _libraryFile(Uri prefix, CodeConfig code) {
-  // Device iOS is the one target this project builds no shared library for:
-  // `cmake/platform/apple.cmake` clears MLN_FFI_SHARED_SUPPORTED there, so the
-  // prefix holds `libmaplibre-native-c.a` alone. A code asset carries a
-  // library the Dart runtime loads, which a static archive cannot be, so this
-  // says so rather than reporting the prefix as empty. The download path
-  // reaches the same conclusion earlier, by leaving device iOS out of the
-  // published-preset table.
-  if (code.targetOS == OS.iOS && code.iOS.targetSdk != IOSSdk.iPhoneSimulator) {
-    throw UnsupportedError(
-      'MapLibre Native builds a static archive for device iOS, which cannot '
-      'become a Dart code asset. The iOS simulator is supported.',
-    );
-  }
-
   final file = _libraryFileOrNull(prefix, code.targetOS);
   if (file == null) {
     throw FileSystemException(

@@ -13,6 +13,9 @@ toolchain. From the repository root:
 ```bash
 mise run //bindings/dart:test
 mise run //bindings/dart:test linux-x64-vulkan
+mise run //bindings/dart:build:mobile android-arm64-egl
+mise run //bindings/dart:build:mobile ios-arm64-metal
+mise run //bindings/dart:build:mobile ios-simulator-arm64-metal
 mise run --force //bindings/dart:ffigen
 ```
 
@@ -21,6 +24,11 @@ resulting install prefix, analyzes the package, and runs the Dart tests. The
 private raw declarations are checked in so Git and pub package consumers receive
 a complete library; CI regenerates them and fails on any diff. Generation is
 configured in `tool/ffigen.dart`.
+
+The mobile build task creates a temporary Flutter host, builds the selected
+native preset, and verifies that Flutter packages its code asset. Device and
+simulator iOS use separate presets because their dynamic libraries target
+different Apple SDKs.
 
 The native library reaches Dart as a code asset that `hook/build.dart` declares,
 which is how the generated `@Native` declarations resolve it. Build hooks run in
