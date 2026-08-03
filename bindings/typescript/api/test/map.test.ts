@@ -269,3 +269,75 @@ describe("camera values", () => {
     expect(cameraOptionsEquals(camera, { ...copy, zoom: 4 })).toBe(false);
   });
 });
+
+describe("a projection", () => {
+  it("round-trips screen and geographic space", () => {
+    const { map } = open({ width: 512, height: 512 });
+    map.jumpTo({ center: { latitude: 45.5, longitude: -122.6 }, zoom: 10 });
+    const projection = map.createProjection();
+    try {
+      const centre = projection.pixelForLatLng({
+        latitude: 45.5,
+        longitude: -122.6,
+      });
+      // The camera centre lands at the middle of the viewport.
+      expect(centre.x).toBeCloseTo(256, 3);
+      expect(centre.y).toBeCloseTo(256, 3);
+
+      const roundTripped = projection.latLngForPixel(centre);
+      expect(roundTripped.latitude).toBeCloseTo(45.5, 6);
+      expect(roundTripped.longitude).toBeCloseTo(-122.6, 6);
+
+      // A point to the right of centre is further east.
+      const east = projection.latLngForPixel({ x: 356, y: 256 });
+      expect(east.longitude).toBeGreaterThan(-122.6);
+    } finally {
+      projection.close();
+    }
+  });
+
+  it("keeps answering after the map it came from closes", () => {
+    const { map } = open({ width: 256, height: 256 });
+    map.jumpTo({ center: { latitude: 10, longitude: 20 }, zoom: 4 });
+    const projection = map.createProjection();
+    map.close();
+    // The projection owns its snapshot, so a released map does not release it.
+    expect(projection.getCamera().zoom).toBeCloseTo(4, 6);
+    expect(projection.latLngForPixel({ x: 128, y: 128 }).latitude).toBeCloseTo(
+      10,
+      3,
+    );
+    projection.close();
+    expect(projection.isClosed).toBe(true);
+  });
+
+  it("fits a camera to the coordinates it must show", () => {
+    const { map } = open({ width: 512, height: 512 });
+    const projection = map.createProjection();
+    try {
+      projection.setVisibleCoordinates([
+        { latitude: 40, longitude: -74 },
+        { latitude: 42, longitude: -71 },
+      ]);
+      const camera = projection.getCamera();
+      expect(camera.center?.latitude).toBeGreaterThan(39);
+      expect(camera.center?.latitude).toBeLessThan(43);
+      expect(camera.zoom).toBeGreaterThan(0);
+    } finally {
+      projection.close();
+    }
+  });
+});
+
+describe("projected meters", () => {
+  it("round-trip through the process-global helpers", () => {
+    const meters = maplibre.projectedMetersForLatLng({
+      latitude: 45,
+      longitude: -122,
+    });
+    expect(meters.northing).toBeCloseTo(5_621_521.486, 2);
+    const coordinate = maplibre.latLngForProjectedMeters(meters);
+    expect(coordinate.latitude).toBeCloseTo(45, 6);
+    expect(coordinate.longitude).toBeCloseTo(-122, 6);
+  });
+});

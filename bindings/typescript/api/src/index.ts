@@ -55,6 +55,7 @@ export {
   NetworkStatus,
   type RenderBackends,
 } from "./maplibre.ts";
+export { MapProjection } from "./projection.ts";
 export {
   ResourceErrorReason,
   ResourceRequest,

@@ -24,6 +24,7 @@ import {
   writeCameraOptions,
 } from "./internal/struct.ts";
 import type { Ptr } from "./internal/transport.ts";
+import { MapProjection } from "./projection.ts";
 import { EP } from "./raw/entrypoints.ts";
 import { MLN_MAP_MODE } from "./raw/enums.ts";
 import type { Runtime } from "./runtime.ts";
@@ -291,6 +292,17 @@ export class Map {
       native.checked(scope, EP.mln_map_is_gesture_in_progress, [id, out]);
       return native.memory.bytes(out, 1)[0] !== 0;
     });
+  }
+
+  /**
+   * Takes a projection helper from this map's current camera and viewport.
+   *
+   * The projection owns its snapshot, so it keeps answering after this map
+   * closes.
+   */
+  createProjection(): MapProjection {
+    this.#state.use("Map.createProjection");
+    return MapProjection.create(this.#state.native, this);
   }
 
   /** Releases the map. Closing twice succeeds. */

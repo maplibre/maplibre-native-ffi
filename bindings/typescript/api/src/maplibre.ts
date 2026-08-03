@@ -8,6 +8,7 @@
 
 import { MaplibreError } from "./errors.ts";
 import { NamedValue } from "./events.ts";
+import type { LatLng, ProjectedMeters } from "./geo.ts";
 import { CallbackRegistry, LogRegistration } from "./internal/callbacks.ts";
 import { Native } from "./internal/native.ts";
 import {
@@ -261,6 +262,68 @@ export class Maplibre {
    */
   createRuntime(options?: RuntimeOptions): Runtime {
     return Runtime.create(this.#native, this.#callbacks, options);
+  }
+
+  /**
+   * Where a coordinate lands in Web Mercator meters.
+   *
+   * This conversion depends on no map, so it needs none.
+   */
+  projectedMetersForLatLng(coordinate: LatLng): ProjectedMeters {
+    const native = this.#native;
+    return native.scope((scope) => {
+      const input = native.layout("mln_lat_lng");
+      const coordinateStorage = scope.allocateZeroed(input.size, input.align);
+      const coordinateView = native.memory.view(coordinateStorage, input.size);
+      coordinateView.setFloat64(
+        input.fields.latitude!.offset,
+        coordinate.latitude,
+        true,
+      );
+      coordinateView.setFloat64(
+        input.fields.longitude!.offset,
+        coordinate.longitude,
+        true,
+      );
+      const output = native.layout("mln_projected_meters");
+      const metersStorage = scope.allocateZeroed(output.size, output.align);
+      native.checked(scope, EP.mln_projected_meters_for_lat_lng, [
+        coordinateStorage,
+        metersStorage,
+      ]);
+      const view = native.memory.view(metersStorage, output.size);
+      return {
+        northing: view.getFloat64(output.fields.northing!.offset, true),
+        easting: view.getFloat64(output.fields.easting!.offset, true),
+      };
+    });
+  }
+
+  /** Which coordinate a position in Web Mercator meters names. */
+  latLngForProjectedMeters(meters: ProjectedMeters): LatLng {
+    const native = this.#native;
+    return native.scope((scope) => {
+      const input = native.layout("mln_projected_meters");
+      const metersStorage = scope.allocateZeroed(input.size, input.align);
+      const metersView = native.memory.view(metersStorage, input.size);
+      metersView.setFloat64(
+        input.fields.northing!.offset,
+        meters.northing,
+        true,
+      );
+      metersView.setFloat64(input.fields.easting!.offset, meters.easting, true);
+      const output = native.layout("mln_lat_lng");
+      const coordinateStorage = scope.allocateZeroed(output.size, output.align);
+      native.checked(scope, EP.mln_lat_lng_for_projected_meters, [
+        metersStorage,
+        coordinateStorage,
+      ]);
+      const view = native.memory.view(coordinateStorage, output.size);
+      return {
+        latitude: view.getFloat64(output.fields.latitude!.offset, true),
+        longitude: view.getFloat64(output.fields.longitude!.offset, true),
+      };
+    });
   }
 
   /** Adopts a wake source another host context transferred. */
