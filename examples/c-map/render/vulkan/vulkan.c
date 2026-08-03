@@ -161,10 +161,14 @@ static app_error vulkan_compositor_present_image_view(
   };
   const VkResult present =
     vkQueuePresentKHR(compositor->context.queue, &present_info);
-  if (
-    present != VK_SUCCESS && present != VK_SUBOPTIMAL_KHR &&
-    present != VK_ERROR_OUT_OF_DATE_KHR
-  ) {
+  if (present == VK_ERROR_OUT_OF_DATE_KHR) {
+    // Nothing reached the screen. The sampling pass was submitted, so wait it
+    // out before the caller releases its frame, and report no present so the
+    // render request is set again.
+    (void)vulkan_compositor_wait_for_frame(compositor);
+    return APP_OK;
+  }
+  if (present != VK_SUCCESS && present != VK_SUBOPTIMAL_KHR) {
     (void)vulkan_compositor_wait_for_frame(compositor);
     return expect_vk(present);
   }

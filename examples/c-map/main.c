@@ -157,6 +157,9 @@ static app_error render_loop(
           if (error != APP_OK) {
             return error;
           }
+          // The session resize enqueued the new extent to the map's owner
+          // thread, so release its parked pump the way an input command does.
+          map_channel_wake_runtime_loop(channel);
           render_request_set(request);
           break;
         default: {

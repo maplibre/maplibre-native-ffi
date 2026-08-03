@@ -187,10 +187,14 @@ const VulkanTextureCompositor = struct {
             .pResults = null,
         };
         const present = c.vkQueuePresentKHR(self.context.queue, &present_info);
-        if (present != c.VK_SUCCESS and
-            present != c.VK_SUBOPTIMAL_KHR and
-            present != c.VK_ERROR_OUT_OF_DATE_KHR)
-        {
+        if (present == c.VK_ERROR_OUT_OF_DATE_KHR) {
+            // Nothing reached the screen. The sampling pass was submitted, so
+            // wait it out before the caller releases its frame, and report no
+            // present so the render request is set again.
+            self.waitForFrame() catch {};
+            return false;
+        }
+        if (present != c.VK_SUCCESS and present != c.VK_SUBOPTIMAL_KHR) {
             self.waitForFrame() catch {};
             try util.expectVk(present);
         }
