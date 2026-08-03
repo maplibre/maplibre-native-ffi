@@ -270,12 +270,17 @@ static void metal_compositor_resize(
   metal_view_resize(&compositor->view, current_viewport);
 }
 
+/// Samples texture into the layer's next drawable. Reports false without
+/// presenting when the layer has no drawable to hand out, which a minimized
+/// or occluded window legitimately has not; the caller's render request stays
+/// pending and the draw retries once one is available.
 static app_error metal_compositor_draw_texture(
-  metal_compositor* compositor, id texture
+  metal_compositor* compositor, id texture, bool* out_presented
 ) {
+  *out_presented = false;
   const id drawable = msg_id(compositor->view.layer, "nextDrawable");
   if (drawable == nullptr) {
-    return APP_ERROR_BACKEND_DRAW_FAILED;
+    return APP_OK;
   }
 
   const id drawable_texture = msg_id(drawable, "texture");
@@ -316,6 +321,7 @@ static app_error metal_compositor_draw_texture(
   msg_set_id(command_buffer, "presentDrawable:", drawable);
   msg_void(command_buffer, "commit");
   msg_void(command_buffer, "waitUntilCompleted");
+  *out_presented = true;
   return APP_OK;
 }
 
@@ -602,8 +608,9 @@ static app_error render_update_owned(
     return APP_ERROR_BACKEND_DRAW_FAILED;
   }
 
+  bool presented = false;
   const app_error error = metal_compositor_draw_texture(
-    &target->as.owned.compositor, (id)frame.texture
+    &target->as.owned.compositor, (id)frame.texture, &presented
   );
   const mln_status release_status =
     mln_metal_owned_texture_release_frame(target->session.handle, &frame);
@@ -611,7 +618,7 @@ static app_error render_update_owned(
     diagnostics_log_status("Metal texture release failed", release_status);
   }
   MAP_TRY(error);
-  *out_rendered = true;
+  *out_rendered = presented;
   return APP_OK;
 }
 
@@ -630,9 +637,9 @@ app_error render_target_render_update(
         return APP_OK;
       }
       MAP_TRY(metal_compositor_draw_texture(
-        &target->as.borrowed.compositor, target->as.borrowed.texture
+        &target->as.borrowed.compositor, target->as.borrowed.texture,
+        out_rendered
       ));
-      *out_rendered = true;
       return APP_OK;
     }
     case RENDER_TARGET_MODE_NATIVE_SURFACE:

@@ -152,9 +152,17 @@ const VulkanTextureCompositor = struct {
             &self.context,
             self.current_viewport,
             previous.handle,
-        );
+        ) catch |err| {
+            // The failed replacement cleaned up after itself. Destroying the
+            // retired swapchain empties the struct it was copied from, and
+            // storing that back keeps teardown from destroying its handles a
+            // second time.
+            previous.deinit(self.context.device);
+            self.swapchain = previous;
+            return err;
+        };
         previous.deinit(self.context.device);
-        self.swapchain = try replacement;
+        self.swapchain = replacement;
 
         if (self.swapchain.format != previous_format) {
             self.pipeline.deinit(self.context.device);
