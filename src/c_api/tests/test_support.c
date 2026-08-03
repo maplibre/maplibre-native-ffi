@@ -1051,6 +1051,10 @@ void mln_test_release_thread_gpu_resources(void) {
   // it does, and a thread that is never reported leaves its joiner blocked for
   // good. Bounded so a keepalive that never comes back fails the run here,
   // where the cause is named, instead of at the runner's timeout.
+  //
+  // Aborting is what makes that bound mean anything: the joiner blocks whether
+  // or not the wait gave up, so returning would only add a line to the log the
+  // timeout eventually prints. The page shell reports an abort as a failure.
   for (unsigned int attempt = 0;
        attempt < 1000 && emscripten_runtime_keepalive_check(); attempt += 1) {
     emscripten_sleep(1);
@@ -1059,8 +1063,10 @@ void mln_test_release_thread_gpu_resources(void) {
     fprintf(
       stderr,
       "a runtime keepalive outlived this thread's graphics device; the thread "
-      "will not be reported as exited and joining it will block\n"
+      "would never be reported as exited, so the run fails here rather than "
+      "blocking whoever joins it\n"
     );
+    abort();
   }
 #endif
 }

@@ -81,19 +81,26 @@ apply_mln_patches() {
 }
 
 # `submodule update --checkout` refuses to move a worktree carrying local
-# changes, so anything applied comes back off before the checkout and goes on
-# again after. Only the files a patch touches are restored, so an unrelated
-# local edit is left where it is and fails the checkout as it would have anyway.
-revert_mln_patches() {
-  local patch
+# changes, and leaves one alone entirely when the submodule already sits at the
+# pinned commit, so the files a patch touches are restored before the checkout
+# and the patch goes on again after.
+#
+# Restoring those paths rather than reversing the patch is what handles an
+# edited patch: an earlier version of it is still applied, no longer reverses,
+# and would leave a stale hunk for the new version to fail against. Files that
+# no patch names are left where they are, so an unrelated local edit still fails
+# the checkout as it would have anyway.
+restore_mln_patch_paths() {
+  local patch path
   if [[ ! -e "$mln_path/.git" ]]; then
     return 0
   fi
-  for ((index = ${#mln_patches[@]} - 1; index >= 0; index -= 1)); do
-    patch="${mln_patches[index]}"
-    if mln_patch_applied "$patch"; then
-      git -C "$mln_path" apply --reverse "$patch"
-    fi
+  for patch in "${mln_patches[@]}"; do
+    # --numstat reads the patch alone, so it names the paths whatever state the
+    # worktree is in. Its columns are added, removed, path.
+    while IFS=$'\t' read -r _ _ path; do
+      git -C "$mln_path" checkout -- "$path"
+    done < <(git -C "$mln_path" apply --numstat "$patch")
   done
 }
 
@@ -117,7 +124,7 @@ if [[ "$top_status" == " "* ]]; then
   fi
 fi
 
-revert_mln_patches
+restore_mln_patch_paths
 
 git -c submodule.recurse=false submodule sync "$mln_path"
 # .gitmodules marks this submodule `update = none` so that Cargo and SwiftPM

@@ -14,6 +14,8 @@ only until it lands there.
    [maplibre-native#4451](https://github.com/maplibre/maplibre-native/pull/4451).
 
 Drop a patch once the pin moves to a commit that carries it. Applying is
-idempotent, and the sync reverts what it applied before moving the submodule, so
-a pin bump does not need the patches removed by hand. A patch that no longer
-applies fails the sync rather than being skipped.
+idempotent, and the sync restores the files a patch touches before moving the
+submodule, so a pin bump and an edit to a patch both take effect on a worktree
+that already carries the old version. A patch that no longer applies fails the
+sync rather than being skipped. Each patch changes files that the pinned commit
+already has, because restoring a path is how the sync clears what it applied.
