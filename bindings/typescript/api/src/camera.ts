@@ -43,9 +43,16 @@ export interface AnimationOptions {
   readonly durationMs?: number;
   /** Average fly-to velocity in screenfuls per second. */
   readonly velocity?: number;
-  /** Peak zoom for a fly-to transition. */
-  readonly maxZoom?: number;
+  /** Lowest zoom a fly-to transition passes through. */
+  readonly minZoom?: number;
   readonly easing?: UnitBezier;
+  /**
+   * Identifies the transition, so the event that reports its end names it.
+   *
+   * A caller that never sets one still gets the event; it just carries the id
+   * MapLibre chose.
+   */
+  readonly transitionId?: bigint;
 }
 
 export function cameraOptionsEquals(

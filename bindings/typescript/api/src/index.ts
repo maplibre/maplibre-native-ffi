@@ -7,6 +7,13 @@
  */
 
 export {
+  type AnimationOptions,
+  type CameraOptions,
+  cameraOptionsEquals,
+  copyCameraOptions,
+  type UnitBezier,
+} from "./camera.ts";
+export {
   type ErrorKind,
   MaplibreError,
   type MaplibreErrorOptions,
@@ -25,9 +32,20 @@ export {
   TileOperation,
 } from "./events.ts";
 export {
+  type EdgeInsets,
+  edgeInsetsEquals,
+  type LatLng,
+  latLngEquals,
+  type ProjectedMeters,
+  projectedMetersEquals,
+  type ScreenPoint,
+  screenPointEquals,
+} from "./geo.ts";
+export {
   AbiMismatchError,
   type NodeApiAddon,
 } from "./internal/node-transport.ts";
+export { Map, MapMode, type MapOptions, type MapSize } from "./map.ts";
 export {
   type LoadOptions,
   Maplibre,

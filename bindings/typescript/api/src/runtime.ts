@@ -13,6 +13,7 @@ import { decodeEvent } from "./internal/event-decode.ts";
 import { HandleState } from "./internal/handle.ts";
 import type { Native } from "./internal/native.ts";
 import type { Ptr } from "./internal/transport.ts";
+import { Map, type MapOptions } from "./map.ts";
 import { EP } from "./raw/entrypoints.ts";
 
 /** How a runtime is configured at creation. */
@@ -206,6 +207,17 @@ export class Runtime {
       return undefined;
     }
     return decodeEvent(native, this.#eventStorage);
+  }
+
+  /**
+   * Creates a map owned by this runtime.
+   *
+   * The map retains the runtime, so closing a runtime with live maps fails
+   * rather than leaving them naming a released object.
+   */
+  createMap(options: MapOptions): Map {
+    this.#state.use("Runtime.createMap");
+    return Map.create(this, this.#state.native, options);
   }
 
   /** Acquires a wake source that releases this runtime's parked owner thread. */
