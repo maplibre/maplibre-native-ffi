@@ -9,7 +9,6 @@ const DragMode = enum {
     none,
     pan,
     rotate,
-    pitch,
 };
 
 const keyboard_animation_ms = 160.0;
@@ -133,11 +132,6 @@ pub const Controller = struct {
                 const dy = y - self.last_y;
                 if (dx == 0 and dy == 0) return .{ .handled = true };
                 commands.push(.{ .adjust_bearing = .{ .delta = dx * 0.5 } });
-                commands.push(.{ .pitch_by = .{ .delta = dy / 2.0 } });
-            },
-            .pitch => {
-                const dy = y - self.last_y;
-                if (dy == 0) return .{ .handled = true };
                 commands.push(.{ .pitch_by = .{ .delta = dy / 2.0 } });
             },
         }
