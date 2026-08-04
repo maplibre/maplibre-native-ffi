@@ -126,12 +126,12 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
   {
     id: "BND-158",
     reason: "unwritten",
-    note: "header transforms are unimplemented in this binding",
+    note: "needs the adapter's HTTP header callback family, which this binding does not wrap yet",
   },
   {
     id: "BND-159",
     reason: "unwritten",
-    note: "header transforms are unimplemented in this binding",
+    note: "needs the adapter's HTTP header callback family, which this binding does not wrap yet",
   },
 
   // Render sessions. The browser suite attaches one through a real WebGL
