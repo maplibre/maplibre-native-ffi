@@ -392,9 +392,6 @@ impl ResourceRequestHandleFns {
 
 #[derive(Debug)]
 struct ResourceRequestHandleInner {
-    /// The native handle's own width. A public handle packs a kind, a slot
-    /// index, and a generation into 64 bits, so a pointer-width field drops
-    /// everything above the generation on a 32-bit target.
     handle: u64,
     decision_finalized: bool,
     provider_owned: bool,
