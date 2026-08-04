@@ -262,15 +262,18 @@ uint64_t mln_abi_transfer_discard(uint64_t token) {
  * never sees and, for a resource request, a request nothing ever completes.
  */
 
-/* The host reads this record through the layout below rather than a generated
+/* `_Static_assert` rather than the C23 keyword: a cross toolchain can be
+ * older than the host's, and this spelling has meant the same thing since C11.
+ *
+ * The host reads this record through the layout below rather than a generated
  * one, because this struct belongs to the support contract rather than to the
  * public C API. These keep the two spellings from drifting. */
-static_assert(sizeof(mln_abi_record) == 24, "mln_abi_record size");
-static_assert(offsetof(mln_abi_record, kind) == 0, "mln_abi_record.kind");
-static_assert(
+_Static_assert(sizeof(mln_abi_record) == 24, "mln_abi_record size");
+_Static_assert(offsetof(mln_abi_record, kind) == 0, "mln_abi_record.kind");
+_Static_assert(
   offsetof(mln_abi_record, registration) == 8, "mln_abi_record.registration"
 );
-static_assert(offsetof(mln_abi_record, record) == 16, "mln_abi_record.record");
+_Static_assert(offsetof(mln_abi_record, record) == 16, "mln_abi_record.record");
 
 typedef struct mln_abi_queue_node {
   struct mln_abi_queue_node* next;

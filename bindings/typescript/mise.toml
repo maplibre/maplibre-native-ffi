@@ -70,6 +70,13 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }, "generate"]
 dir = "../.."
 run = 'bindings/typescript/scripts/build-arkts-runtime.sh "$usage_preset"'
 
+[tasks."test:ohos-emulator"]
+description = "Run the normalized ABI check on the OpenHarmony emulator."
+usage = 'arg "[preset]" default="ohos-x64-egl"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }, "generate"]
+dir = "../.."
+run = 'bindings/typescript/scripts/run-ohos-abi-check.sh "$usage_preset"'
+
 [tasks.test]
 description = "Run the TypeScript binding tests under every installed runtime."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'

@@ -23,15 +23,19 @@ fn main() {
     check_header_digest(&include_dir, &generated.join("fingerprint.h"));
 
     println!("cargo:rerun-if-changed={}", host_support.display());
-    cc::Build::new()
+    let mut build = cc::Build::new();
+    build
         .file(host_support.join("src/mln_abi.c"))
         .file(generated.join("layout_assert.c"))
         .include(host_support.join("include"))
         .include(&generated)
         .include(&include_dir)
-        .std("c23")
-        .warnings(true)
-        .compile("mln_abi");
+        .warnings(true);
+    // The public headers are C23, and a cross toolchain can be older than the
+    // host's: the OpenHarmony SDK's Clang knows this standard only by its
+    // working name. Both spellings give the shim what it needs.
+    build.std(c_standard(&build));
+    build.compile("mln_abi");
 
     // The sys crate's link directives are emitted before this crate's static
     // library, and the linker drops a shared library nothing has needed yet, so
@@ -58,6 +62,27 @@ fn main() {
         println!("cargo:rustc-link-arg=-Wl,-rpath,{runtime_dir}");
         println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN/lib");
     }
+}
+
+/// Reports the newest C standard this build's compiler accepts.
+fn c_standard(build: &cc::Build) -> &'static str {
+    let compiler = build
+        .try_get_compiler()
+        .expect("a C compiler for the target");
+    for candidate in ["c23", "c2x"] {
+        let probe = std::process::Command::new(compiler.path())
+            .args(compiler.args())
+            .arg(format!("-std={candidate}"))
+            .args(["-fsyntax-only", "-xc", "-"])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+        if probe.is_ok_and(|status| status.success()) {
+            return candidate;
+        }
+    }
+    panic!("no C compiler accepting -std=c23 or -std=c2x");
 }
 
 /// Compares the artifact's headers against the digest the generation recorded.

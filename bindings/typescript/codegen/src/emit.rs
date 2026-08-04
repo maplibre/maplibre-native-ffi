@@ -310,19 +310,19 @@ fn append_asserts(text: &mut String, records: &BTreeMap<String, RecordLayout>) {
     for (name, record) in records {
         let _ = writeln!(
             text,
-            "static_assert(sizeof({name}) == {}, \"{name} size\");",
+            "_Static_assert(sizeof({name}) == {}, \"{name} size\");",
             record.size
         );
         let _ = writeln!(
             text,
-            "static_assert(_Alignof({name}) == {}, \"{name} alignment\");",
+            "_Static_assert(_Alignof({name}) == {}, \"{name} alignment\");",
             record.align
         );
         for field in &record.order {
             let (offset, _) = record.fields[field];
             let _ = writeln!(
                 text,
-                "static_assert(offsetof({name}, {field}) == {offset}, \"{name}.{field} offset\");"
+                "_Static_assert(offsetof({name}, {field}) == {offset}, \"{name}.{field} offset\");"
             );
         }
     }
