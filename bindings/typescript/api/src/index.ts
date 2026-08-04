@@ -63,7 +63,7 @@ export {
   type ScreenPoint,
   screenPointEquals,
 } from "./geo.ts";
-export { AbiMismatchError } from "./internal/node-transport.ts";
+export { AbiMismatchError } from "./internal/handshake.ts";
 export type { CustomGeometryTile } from "./internal/callbacks.ts";
 export {
   type CustomGeometrySourceOptions,

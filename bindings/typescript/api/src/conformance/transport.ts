@@ -14,6 +14,10 @@ import {
   statusFromSlot,
   u32Slot,
 } from "../internal/call.ts";
+import {
+  expectedPayloadIdentity,
+  verifyPayload,
+} from "../internal/handshake.ts";
 import { Memory, MemoryError } from "../internal/memory.ts";
 import { AbiCallStatus, type Ptr } from "../internal/transport.ts";
 import { EP } from "../raw/entrypoints.ts";
@@ -499,3 +503,44 @@ export const TRANSFER_GROUP: ConformanceGroup = {
 
 /** Referenced so the error type stays part of this module's contract. */
 export type { AbiCallError, MemoryError };
+
+export const HANDSHAKE_GROUP: ConformanceGroup = {
+  name: "the payload handshake",
+  cases: [
+    {
+      name: "refuses a payload whose fingerprint differs",
+      spec: ["BND-001"],
+      run({ expect }) {
+        const expected = expectedPayloadIdentity();
+        expect.throwsAny(
+          () => verifyPayload({ ...expected, fingerprint: "0".repeat(64) }),
+          "a payload generated from another schema",
+        );
+      },
+    },
+    {
+      name: "refuses a payload built against other headers",
+      spec: ["BND-001"],
+      run({ expect }) {
+        const expected = expectedPayloadIdentity();
+        expect.throwsAny(
+          () => verifyPayload({ ...expected, headerDigest: "0".repeat(64) }),
+          "a payload built against other headers",
+        );
+      },
+    },
+    {
+      name: "accepts the payload it is running over",
+      run({ maplibre, expect }) {
+        const transport = transportOf(maplibre);
+        // The loaded transport reports what it was built from, and the same
+        // rule that would refuse a mismatch accepts this one.
+        verifyPayload({
+          fingerprint: transport.abiFingerprint,
+          headerDigest: transport.headerDigest,
+        });
+        expect.notEqual(transport.abiFingerprint, "", "a reported fingerprint");
+      },
+    },
+  ],
+};

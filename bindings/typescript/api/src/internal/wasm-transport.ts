@@ -16,7 +16,7 @@
 
 import { MaplibreError } from "../errors.ts";
 import { ABI_FINGERPRINT, ABI_HEADER_DIGEST } from "../raw/fingerprint.ts";
-import { AbiMismatchError } from "./node-transport.ts";
+import { AbiMismatchError, verifyPayload } from "./handshake.ts";
 import type { Ptr, Slab, Transport } from "./transport.ts";
 
 /**
@@ -74,19 +74,8 @@ const decoder = new TextDecoder();
  */
 export function wasmTransport(module: WasmModule): Transport {
   const fingerprint = module.UTF8ToString(module._mln_abi_fingerprint());
-  if (fingerprint !== ABI_FINGERPRINT) {
-    throw new AbiMismatchError(
-      `the WebAssembly runtime reports ABI fingerprint ${fingerprint}, and this ` +
-        `package was generated from ${ABI_FINGERPRINT}`,
-    );
-  }
   const headerDigest = module.UTF8ToString(module._mln_abi_header_digest());
-  if (headerDigest !== ABI_HEADER_DIGEST) {
-    throw new AbiMismatchError(
-      `the WebAssembly runtime was built against public headers digesting to ` +
-        `${headerDigest}, and this package was generated from ${ABI_HEADER_DIGEST}`,
-    );
-  }
+  verifyPayload({ fingerprint, headerDigest });
 
   /**
    * The current linear memory.

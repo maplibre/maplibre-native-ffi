@@ -7,13 +7,8 @@
  * package was generated from.
  */
 
-import { ABI_FINGERPRINT, ABI_HEADER_DIGEST } from "../raw/fingerprint.ts";
+import { verifyPayload } from "./handshake.ts";
 import type { Ptr, Slab, Transport } from "./transport.ts";
-
-/** Thrown when an installed runtime payload does not match this package. */
-export class AbiMismatchError extends Error {
-  override name = "AbiMismatchError";
-}
 
 /** The addon surface a Node-API payload exposes. */
 export interface NodeApiAddon {
@@ -52,19 +47,8 @@ export interface NodeApiAddon {
  */
 export function nodeApiTransport(addon: NodeApiAddon): Transport {
   const fingerprint = addon.abiFingerprint();
-  if (fingerprint !== ABI_FINGERPRINT) {
-    throw new AbiMismatchError(
-      `the installed runtime reports ABI fingerprint ${fingerprint}, and this package ` +
-        `was generated from ${ABI_FINGERPRINT}`,
-    );
-  }
   const headerDigest = addon.abiHeaderDigest();
-  if (headerDigest !== ABI_HEADER_DIGEST) {
-    throw new AbiMismatchError(
-      `the installed runtime was built against public headers digesting to ${headerDigest}, ` +
-        `and this package was generated from ${ABI_HEADER_DIGEST}`,
-    );
-  }
+  verifyPayload({ fingerprint, headerDigest });
 
   // Slabs are retained here for the transport's life. A backing store does not
   // move, so the address stays valid; letting one be collected would leave

@@ -20,7 +20,12 @@ import {
   STYLE_GROUP,
   VALUES_GROUP,
 } from "./style.ts";
-import { CALL_ABI_GROUP, MEMORY_GROUP, TRANSFER_GROUP } from "./transport.ts";
+import {
+  CALL_ABI_GROUP,
+  HANDSHAKE_GROUP,
+  MEMORY_GROUP,
+  TRANSFER_GROUP,
+} from "./transport.ts";
 
 export type {
   CaseContext,
@@ -31,6 +36,7 @@ export type {
 
 export const CONFORMANCE: readonly ConformanceGroup[] = [
   CALL_ABI_GROUP,
+  HANDSHAKE_GROUP,
   MEMORY_GROUP,
   TRANSFER_GROUP,
   LIBRARY_GROUP,
