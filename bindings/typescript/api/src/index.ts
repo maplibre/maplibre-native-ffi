@@ -91,6 +91,7 @@ export {
 } from "./offline.ts";
 export { MapProjection } from "./projection.ts";
 export {
+  type FeatureStateSelector,
   type NativePointer,
   nativePointer,
   RenderSession,

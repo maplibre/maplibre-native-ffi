@@ -14,12 +14,16 @@
 
 import { MaplibreError } from "./errors.ts";
 import { HandleState } from "./internal/handle.ts";
+import { writeJsonValue, writeStringView } from "./internal/json-encode.ts";
+import type { Scope } from "./internal/memory.ts";
 import type { Native } from "./internal/native.ts";
 import { asUint32 } from "./internal/numbers.ts";
 import { attachHandleState, handleStateOf } from "./internal/private.ts";
 import type { Ptr } from "./internal/transport.ts";
+import type { JsonValue } from "./json.ts";
 import type { Map } from "./map.ts";
 import { EP } from "./raw/entrypoints.ts";
+import { MLN_FEATURE_STATE_SELECTOR_FIELD } from "./raw/enums.ts";
 
 declare const pointerBrand: unique symbol;
 
@@ -63,6 +67,19 @@ export interface VulkanContext {
   readonly graphicsQueue: NativePointer;
   readonly graphicsQueueFamilyIndex: number;
   readonly getInstanceProcAddr: NativePointer;
+}
+
+/**
+ * Which feature's state an operation names.
+ *
+ * The source is required. A vector source needs its layer to disambiguate, and
+ * a key narrows a removal to one entry rather than the whole state.
+ */
+export interface FeatureStateSelector {
+  readonly sourceId: string;
+  readonly sourceLayerId?: string;
+  readonly featureId?: string;
+  readonly stateKey?: string;
 }
 
 /** A session that renders into a texture the session itself creates. */
@@ -155,6 +172,36 @@ export class RenderSession {
     });
   }
 
+  /**
+   * Sets per-feature state on a source this session renders.
+   *
+   * Feature state lives on the renderer rather than on the map, so it belongs
+   * to a session: a resize that retires the renderer starts it empty again.
+   */
+  setFeatureState(selector: FeatureStateSelector, state: JsonValue): void {
+    const id = this.#state.use("RenderSession.setFeatureState");
+    const native = this.#state.native;
+    native.scope((scope) => {
+      native.checked(scope, EP.mln_render_session_set_feature_state, [
+        id,
+        writeFeatureStateSelector(native, scope, selector),
+        writeJsonValue(native, scope, state),
+      ]);
+    });
+  }
+
+  /** Removes per-feature state, or one key of it. */
+  removeFeatureState(selector: FeatureStateSelector): void {
+    const id = this.#state.use("RenderSession.removeFeatureState");
+    const native = this.#state.native;
+    native.scope((scope) => {
+      native.checked(scope, EP.mln_render_session_remove_feature_state, [
+        id,
+        writeFeatureStateSelector(native, scope, selector),
+      ]);
+    });
+  }
+
   /** Releases the backend resources, leaving this handle usable. */
   detach(): void {
     this.#call("RenderSession.detach", EP.mln_render_session_detach);
@@ -202,6 +249,56 @@ export class RenderSession {
       native.checked(scope, entrypoint, [id]);
     });
   }
+}
+
+function writeFeatureStateSelector(
+  native: Native,
+  scope: Scope,
+  selector: FeatureStateSelector,
+): Ptr {
+  const layout = native.layout("mln_feature_state_selector");
+  const storage = scope.allocateZeroed(layout.size, layout.align);
+  const view = native.memory.view(storage, layout.size);
+  view.setUint32(layout.fields.size!.offset, layout.size, true);
+  writeStringView(
+    native,
+    scope,
+    (storage + BigInt(layout.fields.source_id!.offset)) as Ptr,
+    selector.sourceId,
+  );
+  let mask = 0;
+  if (selector.sourceLayerId !== undefined) {
+    writeStringView(
+      native,
+      scope,
+      (storage + BigInt(layout.fields.source_layer_id!.offset)) as Ptr,
+      selector.sourceLayerId,
+    );
+    mask |=
+      MLN_FEATURE_STATE_SELECTOR_FIELD.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
+  }
+  if (selector.featureId !== undefined) {
+    writeStringView(
+      native,
+      scope,
+      (storage + BigInt(layout.fields.feature_id!.offset)) as Ptr,
+      selector.featureId,
+    );
+    mask |=
+      MLN_FEATURE_STATE_SELECTOR_FIELD.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
+  }
+  if (selector.stateKey !== undefined) {
+    writeStringView(
+      native,
+      scope,
+      (storage + BigInt(layout.fields.state_key!.offset)) as Ptr,
+      selector.stateKey,
+    );
+    mask |=
+      MLN_FEATURE_STATE_SELECTOR_FIELD.MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
+  }
+  view.setUint32(layout.fields.fields!.offset, mask, true);
+  return storage;
 }
 
 function writeExtent(
