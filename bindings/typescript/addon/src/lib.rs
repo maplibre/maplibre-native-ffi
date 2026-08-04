@@ -41,12 +41,16 @@ unsafe extern "C" {
     fn mln_abi_custom_geometry_fetch_listener_address() -> *mut std::ffi::c_void;
     fn mln_abi_custom_geometry_cancel_listener_address() -> *mut std::ffi::c_void;
     fn mln_abi_record_destroy(kind: u32, record: *mut std::ffi::c_void);
+    fn mln_abi_owner_create() -> u64;
+    fn mln_abi_owner_destroy(owner: u64);
+    fn mln_abi_owner_register(owner: u64) -> u64;
     fn mln_abi_queue_set_notifier(
+        owner: u64,
         notify: Option<unsafe extern "C" fn(*mut std::ffi::c_void)>,
         user_data: *mut std::ffi::c_void,
     );
-    fn mln_abi_queue_drain(records: *mut std::ffi::c_void, capacity: u32) -> u32;
-    fn mln_abi_queue_depth() -> u32;
+    fn mln_abi_queue_drain(owner: u64, records: *mut std::ffi::c_void, capacity: u32) -> u32;
+    fn mln_abi_queue_depth(owner: u64) -> u32;
     fn mln_abi_transfer_issue(handle: u64) -> u64;
     fn mln_abi_transfer_claim(token: u64) -> u64;
     fn mln_abi_transfer_discard(token: u64) -> u64;
@@ -223,9 +227,36 @@ pub fn destroy_record(kind: u32, record: BigInt) -> Result<()> {
     Ok(())
 }
 
-/// Drains queued callback records into host storage.
+/// Creates the owner one JavaScript realm's callback registry registers under.
+///
+/// Every realm in a process shares this one loaded library, so an identity a
+/// realm chose for itself would collide with the identity another realm chose.
+/// Owners come from the shared layer for that reason, and the registration
+/// identities minted under them are unique across the whole process.
 #[napi]
-pub fn drain_records(records: BigInt, capacity: u32) -> Result<u32> {
+pub fn create_callback_owner() -> BigInt {
+    BigInt::from(unsafe { mln_abi_owner_create() })
+}
+
+/// Destroys an owner, releasing records still queued for it.
+#[napi]
+pub fn destroy_callback_owner(owner: BigInt) -> Result<()> {
+    unsafe { mln_abi_owner_destroy(address(owner, "owner")?) };
+    Ok(())
+}
+
+/// Reserves a registration identity belonging to an owner.
+#[napi]
+pub fn register_callback(owner: BigInt) -> Result<BigInt> {
+    Ok(BigInt::from(unsafe {
+        mln_abi_owner_register(address(owner, "owner")?)
+    }))
+}
+
+/// Drains an owner's queued callback records into host storage.
+#[napi]
+pub fn drain_records(owner: BigInt, records: BigInt, capacity: u32) -> Result<u32> {
+    let owner = address(owner, "owner")?;
     let records = address(records, "records")? as usize as *mut std::ffi::c_void;
     if records.is_null() {
         return Err(Error::new(
@@ -233,13 +264,13 @@ pub fn drain_records(records: BigInt, capacity: u32) -> Result<u32> {
             "records must name host storage".to_owned(),
         ));
     }
-    Ok(unsafe { mln_abi_queue_drain(records, capacity) })
+    Ok(unsafe { mln_abi_queue_drain(owner, records, capacity) })
 }
 
-/// Reports how many records are waiting.
+/// Reports how many of an owner's records are waiting.
 #[napi]
-pub fn record_depth() -> u32 {
-    unsafe { mln_abi_queue_depth() }
+pub fn record_depth(owner: BigInt) -> Result<u32> {
+    Ok(unsafe { mln_abi_queue_depth(address(owner, "owner")?) })
 }
 
 /// Wakes the JavaScript context when a record is queued.
@@ -263,30 +294,45 @@ unsafe extern "C" fn notify_records(user_data: *mut std::ffi::c_void) {
         .call((), ThreadsafeFunctionCallMode::NonBlocking);
 }
 
-static NOTIFIER: std::sync::Mutex<Option<Box<RecordNotifier>>> = std::sync::Mutex::new(None);
+/// The notifier each owner installed.
+///
+/// This library is loaded once per process and every JavaScript realm in it
+/// shares these statics, so one slot would mean the realm that starts
+/// notifications last silences the ones before it. Owners are one per registry
+/// and few, so the list is walked rather than indexed, and a `Vec` is what a
+/// static can be built from without a lazy initializer.
+static NOTIFIERS: std::sync::Mutex<Vec<(u64, Box<RecordNotifier>)>> =
+    std::sync::Mutex::new(Vec::new());
 
-/// Installs the drain signal for this host context.
+/// Installs the drain signal for one owner.
 #[napi]
 pub fn start_record_notifications(
+    owner: BigInt,
     callback: ThreadsafeFunction<(), (), (), Status, false>,
 ) -> Result<()> {
+    let owner = address(owner, "owner")?;
     let notifier = Box::new(RecordNotifier { callback });
+    // The box owns the heap allocation the address names, so moving the box
+    // into the list afterwards leaves the address valid.
     let pointer = (&*notifier as *const RecordNotifier) as *mut std::ffi::c_void;
-    let mut slot = NOTIFIER.lock().unwrap();
-    // The previous notifier is cleared from native first, so no producer can be
-    // inside it while it is dropped.
-    unsafe { mln_abi_queue_set_notifier(None, std::ptr::null_mut()) };
-    *slot = Some(notifier);
-    unsafe { mln_abi_queue_set_notifier(Some(notify_records), pointer) };
+    let mut notifiers = NOTIFIERS.lock().unwrap();
+    // This owner's previous notifier is cleared from native first, so no
+    // producer can be inside it while it is dropped.
+    unsafe { mln_abi_queue_set_notifier(owner, None, std::ptr::null_mut()) };
+    notifiers.retain(|(installed, _)| *installed != owner);
+    notifiers.push((owner, notifier));
+    unsafe { mln_abi_queue_set_notifier(owner, Some(notify_records), pointer) };
     Ok(())
 }
 
-/// Removes the drain signal, leaving queued records for an explicit drain.
+/// Removes one owner's drain signal, leaving its records for an explicit drain.
 #[napi]
-pub fn stop_record_notifications() {
-    let mut slot = NOTIFIER.lock().unwrap();
-    unsafe { mln_abi_queue_set_notifier(None, std::ptr::null_mut()) };
-    *slot = None;
+pub fn stop_record_notifications(owner: BigInt) -> Result<()> {
+    let owner = address(owner, "owner")?;
+    let mut notifiers = NOTIFIERS.lock().unwrap();
+    unsafe { mln_abi_queue_set_notifier(owner, None, std::ptr::null_mut()) };
+    notifiers.retain(|(installed, _)| *installed != owner);
+    Ok(())
 }
 
 /// Registration for the ArkTS runtime, whose module loader differs.

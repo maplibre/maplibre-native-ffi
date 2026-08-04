@@ -16,6 +16,19 @@
 #include "maplibre_native_c/callback_adapter.h"
 
 /*
+ * A WebAssembly link keeps only the functions it is told to keep, and the list
+ * naming them lives in the link step rather than here, so a function this layer
+ * gains afterwards would be dropped from the module. Marking a definition keeps
+ * it whether or not the link step has heard of it.
+ */
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/emscripten.h>
+#define MLN_ABI_KEEP EMSCRIPTEN_KEEPALIVE
+#else
+#define MLN_ABI_KEEP
+#endif
+
+/*
  * Floating-point slots carry their bit pattern, because a slot is an integer.
  * memcpy is the portable spelling of that reinterpretation, and every compiler
  * this builds with folds it away.
@@ -260,6 +273,14 @@ uint64_t mln_abi_transfer_discard(uint64_t token) {
  *
  * The queue grows rather than dropping: a dropped record is a callback the host
  * never sees and, for a resource request, a request nothing ever completes.
+ *
+ * One process holds one copy of this layer and may hold many host execution
+ * contexts, because a runtime is thread-affine and an application that wants
+ * several runs a thread per runtime. Each of those threads is a JavaScript
+ * realm of its own, sharing this library and nothing above it. So a queue and a
+ * notifier per owner rather than one of each: a realm that registers later
+ * would otherwise take the records addressed to a realm that registered earlier
+ * and leave it with no way to be woken at all.
  */
 
 /* `_Static_assert` rather than the C23 keyword: a cross toolchain can be
@@ -280,11 +301,35 @@ typedef struct mln_abi_queue_node {
   mln_abi_record record;
 } mln_abi_queue_node;
 
-static mln_abi_queue_node* mln_abi_queue_head;
-static mln_abi_queue_node* mln_abi_queue_tail;
-static uint32_t mln_abi_queue_count;
-static void (*mln_abi_queue_notify)(void*);
-static void* mln_abi_queue_notify_data;
+typedef struct mln_abi_owner {
+  struct mln_abi_owner* next;
+  uintptr_t id;
+  uintptr_t last_registration;
+  mln_abi_queue_node* head;
+  mln_abi_queue_node* tail;
+  uint32_t count;
+  void (*notify)(void*);
+  void* notify_data;
+} mln_abi_owner;
+
+static mln_abi_owner* mln_abi_owners;
+static uintptr_t mln_abi_owner_sequence;
+
+/*
+ * A registration identity has to fit in listener_data, which the C API carries
+ * as a void*, so it is pointer-width rather than 64 bits: on wasm32 the upper
+ * half of a 64-bit identity would already be gone by the time a listener saw
+ * it. The owner takes the high half of those bits and the owner's own counter
+ * the low half, so an identity names its owner arithmetically and no two owners
+ * can mint the same one.
+ *
+ * That bounds both halves. Neither counter wraps onto a value that is still in
+ * use; an owner that reaches the end is refused instead, the way transfer
+ * tokens are.
+ */
+#define MLN_ABI_IDENTITY_HALF_BITS (sizeof(void*) * 4U)
+#define MLN_ABI_IDENTITY_HALF_MAX \
+  ((uintptr_t)((((uintptr_t)1U) << MLN_ABI_IDENTITY_HALF_BITS) - 1U))
 
 #if defined(_WIN32)
 static SRWLOCK mln_abi_queue_lock = SRWLOCK_INIT;
@@ -304,6 +349,100 @@ static void mln_abi_queue_release(void) {
 }
 #endif
 
+/* Callers hold the queue lock. The list is one entry per live host execution
+ * context, so it is walked rather than indexed. */
+static mln_abi_owner* mln_abi_owner_find(uintptr_t id) {
+  if (id == 0U) {
+    return NULL;
+  }
+  for (mln_abi_owner* owner = mln_abi_owners; owner != NULL;
+       owner = owner->next) {
+    if (owner->id == id) {
+      return owner;
+    }
+  }
+  return NULL;
+}
+
+/** Releases a list of nodes and the records they carry. */
+static void mln_abi_queue_release_nodes(mln_abi_queue_node* node) {
+  while (node != NULL) {
+    mln_abi_queue_node* next = node->next;
+    mln_abi_record_destroy(
+      node->record.kind, (void*)(uintptr_t)node->record.record
+    );
+    free(node);
+    node = next;
+  }
+}
+
+MLN_ABI_KEEP uint64_t mln_abi_owner_create(void) {
+  mln_abi_owner* owner = malloc(sizeof(*owner));
+  if (owner == NULL) {
+    return 0U;
+  }
+  mln_abi_queue_acquire();
+  if (mln_abi_owner_sequence >= MLN_ABI_IDENTITY_HALF_MAX) {
+    mln_abi_queue_release();
+    free(owner);
+    return 0U;
+  }
+  mln_abi_owner_sequence += 1U;
+  owner->id = mln_abi_owner_sequence;
+  owner->last_registration = 0U;
+  owner->head = NULL;
+  owner->tail = NULL;
+  owner->count = 0U;
+  owner->notify = NULL;
+  owner->notify_data = NULL;
+  owner->next = mln_abi_owners;
+  mln_abi_owners = owner;
+  mln_abi_queue_release();
+  return (uint64_t)owner->id;
+}
+
+MLN_ABI_KEEP void mln_abi_owner_destroy(uint64_t owner) {
+  mln_abi_owner* found = NULL;
+  mln_abi_queue_node* orphaned = NULL;
+  mln_abi_queue_acquire();
+  mln_abi_owner** link = &mln_abi_owners;
+  while (*link != NULL) {
+    if ((*link)->id == (uintptr_t)owner) {
+      found = *link;
+      *link = found->next;
+      break;
+    }
+    link = &(*link)->next;
+  }
+  if (found != NULL) {
+    orphaned = found->head;
+  }
+  mln_abi_queue_release();
+  if (found == NULL) {
+    return;
+  }
+  /* Outside the lock: releasing a record reaches the adapter, and a producer
+   * must not be able to deadlock against that. */
+  mln_abi_queue_release_nodes(orphaned);
+  free(found);
+}
+
+MLN_ABI_KEEP uint64_t mln_abi_owner_register(uint64_t owner) {
+  if (owner == 0U || owner > (uint64_t)MLN_ABI_IDENTITY_HALF_MAX) {
+    return 0U;
+  }
+  uint64_t identity = 0U;
+  mln_abi_queue_acquire();
+  mln_abi_owner* found = mln_abi_owner_find((uintptr_t)owner);
+  if (found != NULL && found->last_registration < MLN_ABI_IDENTITY_HALF_MAX) {
+    found->last_registration += 1U;
+    identity = ((uint64_t)found->id << MLN_ABI_IDENTITY_HALF_BITS) |
+               (uint64_t)found->last_registration;
+  }
+  mln_abi_queue_release();
+  return identity;
+}
+
 static void mln_abi_queue_push(
   uint32_t kind, void* listener_data, void* record
 ) {
@@ -315,24 +454,37 @@ static void mln_abi_queue_push(
     mln_abi_record_destroy(kind, record);
     return;
   }
+  const uintptr_t identity = (uintptr_t)listener_data;
   node->next = NULL;
   node->record.kind = kind;
-  node->record.registration = (uint64_t)(uintptr_t)listener_data;
+  node->record.registration = (uint64_t)identity;
   node->record.record = (uint64_t)(uintptr_t)record;
 
   void (*notify)(void*) = NULL;
   void* notify_data = NULL;
   mln_abi_queue_acquire();
-  if (mln_abi_queue_tail == NULL) {
-    mln_abi_queue_head = node;
-  } else {
-    mln_abi_queue_tail->next = node;
+  mln_abi_owner* owner =
+    mln_abi_owner_find(identity >> MLN_ABI_IDENTITY_HALF_BITS);
+  if (owner != NULL) {
+    if (owner->tail == NULL) {
+      owner->head = node;
+    } else {
+      owner->tail->next = node;
+    }
+    owner->tail = node;
+    owner->count += 1U;
+    notify = owner->notify;
+    notify_data = owner->notify_data;
   }
-  mln_abi_queue_tail = node;
-  mln_abi_queue_count += 1U;
-  notify = mln_abi_queue_notify;
-  notify_data = mln_abi_queue_notify_data;
   mln_abi_queue_release();
+
+  if (owner == NULL) {
+    /* The owner is gone, so no context can ever drain this. Releasing it here
+     * is the same outcome a delivery to a retired registration has. */
+    node->next = NULL;
+    mln_abi_queue_release_nodes(node);
+    return;
+  }
 
   /* Outside the lock: the notifier reaches the host's runtime, which must not
    * be able to deadlock against a producer. */
@@ -411,27 +563,33 @@ void* mln_abi_resource_request_listener_address(void) {
 }
 
 void mln_abi_queue_set_notifier(
-  void (*notify)(void* user_data), void* user_data
+  uint64_t owner, void (*notify)(void* user_data), void* user_data
 ) {
   mln_abi_queue_acquire();
-  mln_abi_queue_notify = notify;
-  mln_abi_queue_notify_data = user_data;
+  mln_abi_owner* found = mln_abi_owner_find((uintptr_t)owner);
+  if (found != NULL) {
+    found->notify = notify;
+    found->notify_data = user_data;
+  }
   mln_abi_queue_release();
 }
 
-uint32_t mln_abi_queue_drain(mln_abi_record* records, uint32_t capacity) {
+uint32_t mln_abi_queue_drain(
+  uint64_t owner, mln_abi_record* records, uint32_t capacity
+) {
   if (records == NULL || capacity == 0U) {
     return 0U;
   }
   uint32_t written = 0U;
   mln_abi_queue_acquire();
-  while (written < capacity && mln_abi_queue_head != NULL) {
-    mln_abi_queue_node* node = mln_abi_queue_head;
-    mln_abi_queue_head = node->next;
-    if (mln_abi_queue_head == NULL) {
-      mln_abi_queue_tail = NULL;
+  mln_abi_owner* found = mln_abi_owner_find((uintptr_t)owner);
+  while (found != NULL && written < capacity && found->head != NULL) {
+    mln_abi_queue_node* node = found->head;
+    found->head = node->next;
+    if (found->head == NULL) {
+      found->tail = NULL;
     }
-    mln_abi_queue_count -= 1U;
+    found->count -= 1U;
     records[written] = node->record;
     written += 1U;
     free(node);
@@ -440,9 +598,10 @@ uint32_t mln_abi_queue_drain(mln_abi_record* records, uint32_t capacity) {
   return written;
 }
 
-uint32_t mln_abi_queue_depth(void) {
+uint32_t mln_abi_queue_depth(uint64_t owner) {
   mln_abi_queue_acquire();
-  const uint32_t depth = mln_abi_queue_count;
+  const mln_abi_owner* found = mln_abi_owner_find((uintptr_t)owner);
+  const uint32_t depth = found == NULL ? 0U : found->count;
   mln_abi_queue_release();
   return depth;
 }

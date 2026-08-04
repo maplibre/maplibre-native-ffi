@@ -112,10 +112,10 @@ export class Maplibre {
     this.#callbacks = new CallbackRegistry(native);
     attachCallbackRegistry(this, this.#callbacks);
     // Records arrive on MapLibre's threads and wait until this context can run
-    // them. The signal is installed once and drains everything queued.
-    native.transport.startRecordNotifications(() => {
-      this.#callbacks.drain();
-    });
+    // them. The signal is installed once and drains everything queued for this
+    // context, leaving every other context in the process still able to be
+    // woken for its own.
+    this.#callbacks.startNotifications();
   }
 
   /**
@@ -194,9 +194,39 @@ export class Maplibre {
     this.#callbacks.drain();
   }
 
-  /** Reports how many callback records are waiting. */
+  /** Reports how many callback records are waiting for this context. */
   get pendingCallbackCount(): number {
-    return this.#native.transport.recordDepth();
+    return this.#callbacks.pendingCount;
+  }
+
+  /**
+   * Releases what this context holds in the loaded library.
+   *
+   * The library itself stays loaded, because a process shares one copy of it
+   * and another host context may still be using it. What goes is this
+   * context's own place in it: its log callback, the signal that wakes it, and
+   * the queue its records were waiting in. Records still queued for it are
+   * released rather than left outstanding, since nothing will drain them.
+   *
+   * Closing twice succeeds. A runtime this context created is closed on its
+   * own, before this: its registrations name native state that this call
+   * cannot prove is unreachable.
+   */
+  close(): void {
+    if (this.#callbacks.isClosed) {
+      return;
+    }
+    // The log callback is this facade's own registration, so it goes here. The
+    // clear queues the registration's retirement, and the drain delivers it, so
+    // the state it owns is released rather than left behind.
+    this.clearLogCallback();
+    this.#callbacks.drain();
+    this.#callbacks.close();
+  }
+
+  /** Reports whether this context has released its place in the library. */
+  get isClosed(): boolean {
+    return this.#callbacks.isClosed;
   }
 
   /**

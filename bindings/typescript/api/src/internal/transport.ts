@@ -93,6 +93,27 @@ export interface Transport {
   listenerAddress(kind: number): Ptr;
 
   /**
+   * Creates the owner a callback registry registers under.
+   *
+   * A process holds one copy of the shared library and may hold many host
+   * execution contexts, each a JavaScript realm with a module graph of its own.
+   * A realm cannot see what another realm chose, so an owner and the
+   * registration identities under it come from the shared layer, where every
+   * realm's are visible at once. Reports zero when none can be created.
+   */
+  createCallbackOwner(): bigint;
+
+  /** Destroys an owner, releasing records still queued for it. */
+  destroyCallbackOwner(owner: bigint): void;
+
+  /**
+   * Reserves a registration identity belonging to an owner.
+   *
+   * Reports zero when the owner is gone or has no identity left to give.
+   */
+  registerCallback(owner: bigint): bigint;
+
+  /**
    * Releases a record a drain delivered.
    *
    * Each family owns its records differently, and the shared layer does not
@@ -100,22 +121,23 @@ export interface Transport {
    */
   destroyRecord(kind: number, record: Ptr): void;
 
-  /** Moves queued callback records into host storage, reporting how many. */
-  drainRecords(records: Ptr, capacity: number): number;
+  /** Moves an owner's queued records into host storage, reporting how many. */
+  drainRecords(owner: bigint, records: Ptr, capacity: number): number;
 
-  /** Reports how many callback records are waiting. */
-  recordDepth(): number;
+  /** Reports how many of an owner's callback records are waiting. */
+  recordDepth(owner: bigint): number;
 
   /**
-   * Installs the signal that wakes this context when a record is queued.
+   * Installs the signal that wakes an owner's context when its record queues.
    *
    * The signal runs on the host's own execution context, not on the MapLibre
-   * thread that produced the record.
+   * thread that produced the record. It is per owner, so a context that starts
+   * later leaves the contexts already running still able to be woken.
    */
-  startRecordNotifications(drain: () => void): void;
+  startRecordNotifications(owner: bigint, drain: () => void): void;
 
   /** Removes the signal, leaving queued records for an explicit drain. */
-  stopRecordNotifications(): void;
+  stopRecordNotifications(owner: bigint): void;
 
   /** Issues a one-shot token naming a handle, for a move to another context. */
   transferIssue(handle: bigint): bigint;

@@ -56,8 +56,15 @@ export interface WasmModule {
   _mln_abi_custom_geometry_fetch_listener_address(): number;
   _mln_abi_custom_geometry_cancel_listener_address(): number;
   _mln_abi_record_destroy(kind: number, record: number): void;
-  _mln_abi_queue_drain(records: number, capacity: number): number;
-  _mln_abi_queue_depth(): number;
+  _mln_abi_owner_create(): bigint;
+  _mln_abi_owner_destroy(owner: bigint): void;
+  _mln_abi_owner_register(owner: bigint): bigint;
+  _mln_abi_queue_drain(
+    owner: bigint,
+    records: number,
+    capacity: number,
+  ): number;
+  _mln_abi_queue_depth(owner: bigint): number;
   _mln_abi_transfer_issue(handle: bigint): bigint;
   _mln_abi_transfer_claim(token: bigint): bigint;
   _mln_abi_transfer_discard(token: bigint): bigint;
@@ -209,12 +216,24 @@ export function wasmTransport(module: WasmModule): Transport {
       module._mln_abi_record_destroy(kind, Number(record));
     },
 
-    drainRecords(records: Ptr, capacity: number): number {
-      return module._mln_abi_queue_drain(Number(records), capacity);
+    // A module instance is a realm's own: its linear memory and its statics
+    // belong to whoever instantiated it, so owners here separate registries
+    // within one instance rather than realms. The identities still come from
+    // the shared layer, which is what keeps one code path over both transports.
+    createCallbackOwner: () =>
+      BigInt.asUintN(64, module._mln_abi_owner_create()),
+    destroyCallbackOwner: (owner: bigint) => {
+      module._mln_abi_owner_destroy(owner);
+    },
+    registerCallback: (owner: bigint) =>
+      BigInt.asUintN(64, module._mln_abi_owner_register(owner)),
+
+    drainRecords(owner: bigint, records: Ptr, capacity: number): number {
+      return module._mln_abi_queue_drain(owner, Number(records), capacity);
     },
 
-    recordDepth(): number {
-      return module._mln_abi_queue_depth();
+    recordDepth(owner: bigint): number {
+      return module._mln_abi_queue_depth(owner);
     },
 
     startRecordNotifications(): void {

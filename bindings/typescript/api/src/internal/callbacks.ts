@@ -52,10 +52,21 @@ export interface Registration {
 
 /**
  * Owns every live callback registration for one host execution context.
+ *
+ * The identities the registrations answer to are minted by the support layer
+ * rather than here. A process holds one copy of that layer and may hold many
+ * host execution contexts, because a Node application runs a worker thread per
+ * runtime and each worker is a realm with a module graph, and therefore a
+ * registry, of its own. A registry that numbered its own registrations would
+ * hand out the same identities as every other registry in the process, and a
+ * record would reach whichever one drained first.
  */
 export class CallbackRegistry {
   readonly #native: Native;
   readonly #registrations = new Map<bigint, Registration>();
+  /** This registry's identity in the shared layer, which owns its queue. */
+  readonly #owner: bigint;
+  #closed = false;
 
   /**
    * How many registrations are live.
@@ -67,12 +78,28 @@ export class CallbackRegistry {
     return this.#registrations.size;
   }
   readonly #records: Ptr;
-  #nextId = 1n;
   #draining = false;
 
   constructor(native: Native) {
     this.#native = native;
+    this.#owner = native.transport.createCallbackOwner();
+    if (this.#owner === 0n) {
+      throw new MaplibreError(
+        "invalidState",
+        "the runtime payload could not create a callback owner for this context",
+      );
+    }
     this.#records = native.memory.allocate(RECORD_BYTES * DRAIN_BATCH);
+  }
+
+  /**
+   * Installs the signal that wakes this context when one of its records
+   * queues, and delivers what arrived.
+   */
+  startNotifications(): void {
+    this.#native.transport.startRecordNotifications(this.#owner, () => {
+      this.drain();
+    });
   }
 
   /**
@@ -89,8 +116,14 @@ export class CallbackRegistry {
 
   /** Reserves an identity a registration's `listener_data` carries. */
   register(registration: Registration): bigint {
-    const id = this.#nextId;
-    this.#nextId += 1n;
+    this.#assertOpen("registering a callback");
+    const id = this.#native.transport.registerCallback(this.#owner);
+    if (id === 0n) {
+      throw new MaplibreError(
+        "invalidState",
+        "this context has no callback registration identity left to give",
+      );
+    }
     this.#registrations.set(id, registration);
     return id;
   }
@@ -100,6 +133,11 @@ export class CallbackRegistry {
     return this.#registrations.has(id);
   }
 
+  /** Reports how many of this context's records are waiting. */
+  get pendingCount(): number {
+    return this.#closed ? 0 : this.#native.transport.recordDepth(this.#owner);
+  }
+
   /**
    * Delivers every queued record.
    *
@@ -107,6 +145,7 @@ export class CallbackRegistry {
    * not start a second drain and see records out of order.
    */
   drain(): void {
+    this.#assertOpen("delivering callbacks");
     if (this.#draining) {
       return;
     }
@@ -114,6 +153,7 @@ export class CallbackRegistry {
     try {
       for (;;) {
         const count = this.#native.transport.drainRecords(
+          this.#owner,
           this.#records,
           DRAIN_BATCH,
         );
@@ -171,15 +211,38 @@ export class CallbackRegistry {
     this.#native.transport.destroyRecord(kind, record);
   }
 
-  /** Releases the drain storage once no registration remains. */
+  /**
+   * Releases this context's place in the shared layer.
+   *
+   * The owner goes last: destroying it releases the records still queued for
+   * it, and a record queued afterwards is released rather than waiting for a
+   * context that no longer drains. A registration this still holds belongs to
+   * native state something else owns, such as a runtime the host did not close,
+   * so its storage is left where it is rather than freed under native code that
+   * may still be inside it.
+   */
   close(): void {
-    if (this.#registrations.size > 0) {
+    if (this.#closed) {
+      return;
+    }
+    this.#closed = true;
+    this.#native.transport.stopRecordNotifications(this.#owner);
+    this.#native.transport.destroyCallbackOwner(this.#owner);
+    this.#registrations.clear();
+    this.#native.memory.free(this.#records);
+  }
+
+  get isClosed(): boolean {
+    return this.#closed;
+  }
+
+  #assertOpen(what: string): void {
+    if (this.#closed) {
       throw new MaplibreError(
-        "invalidState",
-        `${this.#registrations.size} callback registrations are still live`,
+        "closedHandle",
+        `${what} needs a library this host context has not closed`,
       );
     }
-    this.#native.memory.free(this.#records);
   }
 }
 

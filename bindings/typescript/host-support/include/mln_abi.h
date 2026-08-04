@@ -119,6 +119,46 @@ typedef struct mln_abi_record {
 } mln_abi_record;
 
 /**
+ * Creates an owner, which is one host execution context's identity here.
+ *
+ * A process holds one copy of this layer and may hold many host execution
+ * contexts: a Node application runs a worker thread per runtime, and each
+ * worker is a JavaScript realm with its own module graph while every worker
+ * shares this one loaded library. A realm therefore cannot mint registration
+ * identities of its own, and cannot be the only holder of a wake signal,
+ * without taking another realm's records or silencing it. An owner is where
+ * both of those live.
+ *
+ * Returns 0 when no owner can be created.
+ */
+uint64_t mln_abi_owner_create(void);
+
+/**
+ * Destroys an owner.
+ *
+ * Records still queued for it are released rather than left outstanding: no
+ * context can reach them once their owner is gone. Registration identities the
+ * owner minted stop naming anything, so a record a MapLibre thread pushes
+ * afterwards is released the same way.
+ */
+void mln_abi_owner_destroy(uint64_t owner);
+
+/**
+ * Reserves a registration identity belonging to an owner.
+ *
+ * The identity is what the host stores as a registration's listener_data, so a
+ * record names both the registration it belongs to and the owner it goes to.
+ * Minting it here rather than in a host realm is what keeps two realms from
+ * choosing the same one.
+ *
+ * The identity is a pointer-width value, because listener_data crosses the C
+ * API as a void*, and it carries the owner in its high half. An owner that has
+ * exhausted the low half, or that no longer exists, gets 0 rather than an
+ * identity that would name someone else's registration.
+ */
+uint64_t mln_abi_owner_register(uint64_t owner);
+
+/**
  * The listener a host registers for adapted log callbacks.
  *
  * A host with no way to mint a native function per registration uses this one
@@ -155,26 +195,30 @@ void* mln_abi_custom_geometry_cancel_listener_address(void);
 void mln_abi_record_destroy(uint32_t kind, void* record);
 
 /**
- * Installs the function this layer calls when a record is queued.
+ * Installs the function this layer calls when a record is queued for an owner.
  *
  * The notifier runs on whichever MapLibre thread produced the record, so it
- * does the least possible: wake the host's own execution context, which then
- * drains. Passing null clears it.
+ * does the least possible: wake the owner's own execution context, which then
+ * drains. Passing null clears this owner's. Each owner keeps its own, so a
+ * context that installs one later does not silence the ones already there.
  */
 void mln_abi_queue_set_notifier(
-  void (*notify)(void* user_data), void* user_data
+  uint64_t owner, void (*notify)(void* user_data), void* user_data
 );
 
 /**
- * Moves queued records into host storage.
+ * Moves an owner's queued records into host storage.
  *
- * Returns how many records were written. A host drains until this reports fewer
- * than the capacity it offered.
+ * Returns how many records were written, and writes only records addressed to
+ * this owner. A host drains until this reports fewer than the capacity it
+ * offered.
  */
-uint32_t mln_abi_queue_drain(mln_abi_record* records, uint32_t capacity);
+uint32_t mln_abi_queue_drain(
+  uint64_t owner, mln_abi_record* records, uint32_t capacity
+);
 
-/** Reports how many records are queued, for a host draining to empty. */
-uint32_t mln_abi_queue_depth(void);
+/** Reports how many of an owner's records are queued, for a drain to empty. */
+uint32_t mln_abi_queue_depth(uint64_t owner);
 
 /**
  * Issues a one-shot token naming a handle, for moving it to another host

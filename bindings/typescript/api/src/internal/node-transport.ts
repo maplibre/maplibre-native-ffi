@@ -28,11 +28,14 @@ export interface NodeApiAddon {
   readForeign(pointer: bigint, length: number): Uint8Array;
   readForeignCString(pointer: bigint): string | null;
   listenerAddress(kind: number): bigint;
+  createCallbackOwner(): bigint;
+  destroyCallbackOwner(owner: bigint): void;
+  registerCallback(owner: bigint): bigint;
   destroyRecord(kind: number, record: bigint): void;
-  drainRecords(records: bigint, capacity: number): number;
-  recordDepth(): number;
-  startRecordNotifications(callback: () => void): void;
-  stopRecordNotifications(): void;
+  drainRecords(owner: bigint, records: bigint, capacity: number): number;
+  recordDepth(owner: bigint): number;
+  startRecordNotifications(owner: bigint, callback: () => void): void;
+  stopRecordNotifications(owner: bigint): void;
   transferIssue(handle: bigint): bigint;
   transferClaim(token: bigint): bigint;
   transferDiscard(token: bigint): bigint;
@@ -107,17 +110,22 @@ export function nodeApiTransport(addon: NodeApiAddon): Transport {
     },
 
     listenerAddress: (kind: number): Ptr => addon.listenerAddress(kind),
+    createCallbackOwner: () => addon.createCallbackOwner(),
+    destroyCallbackOwner: (owner: bigint) => {
+      addon.destroyCallbackOwner(owner);
+    },
+    registerCallback: (owner: bigint) => addon.registerCallback(owner),
     destroyRecord: (kind: number, record: Ptr) => {
       addon.destroyRecord(kind, record);
     },
-    drainRecords: (records: Ptr, capacity: number) =>
-      addon.drainRecords(records, capacity),
-    recordDepth: () => addon.recordDepth(),
-    startRecordNotifications: (drain: () => void) => {
-      addon.startRecordNotifications(drain);
+    drainRecords: (owner: bigint, records: Ptr, capacity: number) =>
+      addon.drainRecords(owner, records, capacity),
+    recordDepth: (owner: bigint) => addon.recordDepth(owner),
+    startRecordNotifications: (owner: bigint, drain: () => void) => {
+      addon.startRecordNotifications(owner, drain);
     },
-    stopRecordNotifications: () => {
-      addon.stopRecordNotifications();
+    stopRecordNotifications: (owner: bigint) => {
+      addon.stopRecordNotifications(owner);
     },
 
     transferIssue: (handle) => addon.transferIssue(handle),
