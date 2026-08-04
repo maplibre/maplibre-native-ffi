@@ -94,7 +94,8 @@ pnpm --filter @maplibre/native-ffi exec vitest run
 # suite, so a case that passes under one and fails under another is a
 # difference between the runtimes rather than between two suites.
 cd bindings/typescript/api
-bun test runners/bun.test.ts
+bun test runners/bun.test.ts 2>&1 | tee /tmp/mln-bun.log
+grep -qE "^ *0 fail" /tmp/mln-bun.log
 # Deno needs the FFI permission to load a Node-API addon at all, and a local
 # node_modules directory to resolve the runtime payload package.
 deno test \

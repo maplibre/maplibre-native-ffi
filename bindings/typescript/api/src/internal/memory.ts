@@ -72,8 +72,12 @@ export class Memory {
         return address;
       }
     }
-    this.#addSlab(Math.max(DEFAULT_SLAB_BYTES, request + alignment));
-    const managed = this.#slabs[this.#slabs.length - 1]!;
+    // The new slab is named directly rather than found by position: the list
+    // is kept ordered by address so it can be searched, and where an allocator
+    // places a fresh buffer differs by runtime.
+    const managed = this.#addSlab(
+      Math.max(DEFAULT_SLAB_BYTES, request + alignment),
+    );
     const address = this.#allocateIn(managed, request, alignment);
     if (address === undefined) {
       throw new MemoryError(`a fresh slab could not satisfy ${request} bytes`);
@@ -101,7 +105,10 @@ export class Memory {
    * large temporary allocations does not become permanent memory.
    */
   #retireIfEmpty(managed: ManagedSlab): void {
-    if (this.#slabs.length <= 1 || this.#slabs[0] === managed) {
+    // The baseline is the slab this memory started with, not whichever one
+    // sorts lowest: the list is ordered by address so it can be searched, and
+    // which address an allocator hands out first differs by runtime.
+    if (this.#slabs.length <= 1 || this.#baseline === managed) {
       return;
     }
     if (
@@ -207,17 +214,22 @@ export class Memory {
     view.setUint32(0, Number(value), true);
   }
 
-  #addSlab(byteLength: number): void {
+  #baseline: ManagedSlab | undefined;
+
+  #addSlab(byteLength: number): ManagedSlab {
     const slab = this.#transport.addSlab(byteLength);
-    this.#slabs.push({
+    const managed: ManagedSlab = {
       slab,
       byteLength,
       free: [{ offset: 0, size: byteLength }],
-    });
+    };
+    this.#slabs.push(managed);
+    this.#baseline ??= managed;
     // Slabs are searched by address, and a binary search wants them ordered.
     this.#slabs.sort((left, right) =>
       left.slab.base < right.slab.base ? -1 : 1,
     );
+    return managed;
   }
 
   #allocateIn(
