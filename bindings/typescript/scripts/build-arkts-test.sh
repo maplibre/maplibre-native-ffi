@@ -31,8 +31,30 @@ for tool in "$es2abc" "$toolchains/lib/app_packing_tool.jar" \
   fi
 done
 
+# The addon is what the suite is testing, so its absence is a missing
+# prerequisite rather than something to pack around.
+addon="$payload/maplibre-native-ffi.so"
+if [[ ! -f "$addon" ]]; then
+  echo "no ArkTS payload at $addon; run //bindings/typescript:build:arkts $preset first" >&2
+  exit 1
+fi
+
+case "$preset" in
+ohos-arm64-*) abi=arm64-v8a ;;
+ohos-x64-*) abi=x86_64 ;;
+*)
+  echo "build-arkts-test.sh takes an ohos preset, not $preset" >&2
+  exit 1
+  ;;
+esac
+
 rm -rf "$work"
-mkdir -p "$work/ets" "$work/libs" "$work/resources/base/profile"
+mkdir -p "$work/ets" "$work/libs/$abi" "$work/resources/base/profile"
+# A hap carries its native libraries under the ABI it was built for.
+cp "$addon" "$work/libs/$abi/libmaplibre-native-ffi.so"
+if [[ -d "$payload/lib" ]]; then
+  cp "$payload"/lib/*.so "$work/libs/$abi/" 2>/dev/null || true
+fi
 
 # One bundle, because ArkTS resolves modules through its own build rather than
 # through node_modules. The payload's addon import stays external: the runtime
@@ -87,7 +109,7 @@ mise exec -- java -jar "$toolchains/lib/app_packing_tool.jar" \
   --mode hap \
   --json-path "$work/module.json" \
   --ets-path "$work/modules.abc" \
-  --lib-path "$payload/lib" \
+  --lib-path "$work/libs" \
   --resources-path "$work/resources" \
   --out-path "$unsigned" \
   --force true
