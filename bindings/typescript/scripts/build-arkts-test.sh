@@ -98,7 +98,29 @@ done < <(find "$source_dir/entry/src/ohosTest/ets" -name '*.ets' -print0)
   --output "$work/modules.abc" "@$info"
 
 # The manifest and resources the packing tool reads.
-cp "$source_dir/entry/src/ohosTest/module.json5" "$work/module.json"
+# A hap carries the application's own description beside the module's, and the
+# packing tool rejects a manifest without it.
+python3 - "$source_dir/entry/src/ohosTest/module.json5" "$work/module.json" "$bundle_id" <<'PYTHON'
+import json
+import sys
+
+source, target, bundle = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(source) as handle:
+    manifest = json.load(handle)
+manifest["app"] = {
+    "bundleName": bundle,
+    "vendor": "maplibre",
+    "versionCode": 1000000,
+    "versionName": "1.0.0",
+    "minAPIVersion": 12,
+    "targetAPIVersion": 12,
+    "apiReleaseType": "Release",
+    "debug": True,
+    "bundleType": "app",
+}
+with open(target, "w") as handle:
+    json.dump(manifest, handle)
+PYTHON
 printf '{"src":["pages/Index"]}\n' >"$work/resources/base/profile/main_pages.json"
 "$toolchains/restool" -i "$work/resources" -o "$work" -p "$bundle_id" -r ResourceTable \
   >/dev/null 2>&1 || true
@@ -108,15 +130,19 @@ printf '{"src":["pages/Index"]}\n' >"$work/resources/base/profile/main_pages.jso
 # the checkout. Run from the repository root it deletes the repository.
 echo "packing the hap"
 unsigned="$work/$module-unsigned.hap"
+# The tool empties its working directory as it exits, the hap it just wrote
+# included, so it is given a directory of its own to consume and the hap is
+# written outside it.
+mkdir -p "$work/pack"
 (
-  cd "$work"
+  cd "$work/pack"
   java -jar "$toolchains/lib/app_packing_tool.jar" \
     --mode hap \
-    --json-path module.json \
-    --ets-path modules.abc \
-    --lib-path libs \
-    --resources-path resources \
-    --out-path "$module-unsigned.hap"
+    --json-path ../module.json \
+    --ets-path ../modules.abc \
+    --lib-path ../libs \
+    --resources-path ../resources \
+    --out-path "../$module-unsigned.hap"
 )
 
 # Signing is two steps. The SDK ships an unsigned provisioning profile template
@@ -153,6 +179,16 @@ PYTHON
   -keystorePwd 123456
 )
 
+# The SDK ships the signing keys but no application certificate. The release
+# key's certificate is self-signed, so the chain is that one certificate.
+echo "exporting the application certificate"
+app_cert="$work/app-release.pem"
+keytool -exportcert -rfc \
+  -alias "openharmony application release" \
+  -keystore "$toolchains/lib/OpenHarmony.p12" \
+  -storetype PKCS12 \
+  -storepass 123456 >"$app_cert"
+
 echo "signing the hap"
 signed="$work/$module.hap"
 (
@@ -161,7 +197,7 @@ signed="$work/$module.hap"
   -keyAlias "openharmony application release" \
   -signAlg SHA256withECDSA \
   -mode localSign \
-  -appCertFile "$toolchains/lib/OpenHarmonyProfileRelease.pem" \
+  -appCertFile "$app_cert" \
   -profileFile "$profile" \
   -inFile "$unsigned" \
   -keystoreFile "$toolchains/lib/OpenHarmony.p12" \
