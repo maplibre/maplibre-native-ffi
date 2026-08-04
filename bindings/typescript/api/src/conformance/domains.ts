@@ -8,6 +8,12 @@
 
 import { cameraOptionsEquals, copyCameraOptions } from "../camera.ts";
 import { RuntimeEventType } from "../events.ts";
+import {
+  edgeInsetsEquals,
+  latLngEquals,
+  projectedMetersEquals,
+  screenPointEquals,
+} from "../geo.ts";
 import { jsonEquals, jsonFrom, jsonUint } from "../json.ts";
 import type { ConformanceGroup } from "./harness.ts";
 import { EMPTY_STYLE, pumpFor, withRuntime } from "./harness.ts";
@@ -248,6 +254,128 @@ export const DOMAIN_GROUPS: readonly ConformanceGroup[] = [
               "the zoom after the reader mutated its copy",
             );
           });
+        },
+      },
+      {
+        name: "compares every option value by field, not by identity",
+        spec: ["BND-070"],
+        run({ expect }) {
+          // Each value type this binding exposes, with one field changed in
+          // turn, so a comparison that ignored a field would be caught rather
+          // than a single example passing for all of them.
+          const latLng = { latitude: 1, longitude: 2 };
+          expect.ok(
+            latLngEquals(latLng, { latitude: 1, longitude: 2 }),
+            "an equal LatLng compares equal",
+          );
+          for (const changed of [
+            { latitude: 9, longitude: 2 },
+            { latitude: 1, longitude: 9 },
+          ]) {
+            expect.ok(
+              !latLngEquals(latLng, changed),
+              `a LatLng differing in one field is not equal: ${JSON.stringify(changed)}`,
+            );
+          }
+
+          const point = { x: 3, y: 4 };
+          expect.ok(
+            screenPointEquals(point, { x: 3, y: 4 }),
+            "an equal ScreenPoint compares equal",
+          );
+          for (const changed of [
+            { x: 9, y: 4 },
+            { x: 3, y: 9 },
+          ]) {
+            expect.ok(
+              !screenPointEquals(point, changed),
+              `a ScreenPoint differing in one field is not equal: ${JSON.stringify(changed)}`,
+            );
+          }
+
+          const insets = { top: 1, left: 2, bottom: 3, right: 4 };
+          expect.ok(
+            edgeInsetsEquals(insets, { top: 1, left: 2, bottom: 3, right: 4 }),
+            "equal EdgeInsets compare equal",
+          );
+          for (const key of ["top", "left", "bottom", "right"] as const) {
+            expect.ok(
+              !edgeInsetsEquals(insets, { ...insets, [key]: 99 }),
+              `EdgeInsets differing in ${key} are not equal`,
+            );
+          }
+
+          const meters = { northing: 5, easting: 6 };
+          expect.ok(
+            projectedMetersEquals(meters, { northing: 5, easting: 6 }),
+            "equal ProjectedMeters compare equal",
+          );
+          for (const changed of [
+            { northing: 9, easting: 6 },
+            { northing: 5, easting: 9 },
+          ]) {
+            expect.ok(
+              !projectedMetersEquals(meters, changed),
+              `ProjectedMeters differing in one field are not equal: ${JSON.stringify(changed)}`,
+            );
+          }
+
+          // Camera options carry optional fields, so absent has to stay
+          // distinct from a present zero, and every field has to take part.
+          const camera = {
+            center: latLng,
+            zoom: 4,
+            bearing: 5,
+            pitch: 6,
+            padding: insets,
+          };
+          expect.ok(
+            cameraOptionsEquals(camera, { ...camera }),
+            "equal camera options compare equal",
+          );
+          // Absent means the key is not there. This package forbids writing
+          // it as an explicit undefined, which is the distinction the case is
+          // about.
+          const { zoom: _omitted, ...withoutZoom } = camera;
+          expect.ok(
+            !cameraOptionsEquals(camera, withoutZoom),
+            "an absent field differs from a present one",
+          );
+          expect.ok(
+            !cameraOptionsEquals({ zoom: 0 }, {}),
+            "a present zero differs from an absent field",
+          );
+          for (const key of ["zoom", "bearing", "pitch"] as const) {
+            expect.ok(
+              !cameraOptionsEquals(camera, { ...camera, [key]: 99 }),
+              `camera options differing in ${key} are not equal`,
+            );
+          }
+          expect.ok(
+            !cameraOptionsEquals(camera, {
+              ...camera,
+              center: { latitude: 9, longitude: 2 },
+            }),
+            "camera options differing in a nested value are not equal",
+          );
+          expect.ok(
+            !cameraOptionsEquals(camera, {
+              ...camera,
+              padding: { ...insets, top: 99 },
+            }),
+            "camera options differing in nested padding are not equal",
+          );
+
+          // A copy is independent: mutating what it was made from cannot reach
+          // it, and it still compares equal to what it was made from.
+          const source = { center: { latitude: 1, longitude: 2 }, zoom: 4 };
+          const copy = copyCameraOptions(source);
+          (source.center as { latitude: number }).latitude = 99;
+          expect.ok(
+            !cameraOptionsEquals(copy, source),
+            "the copy did not follow its source",
+          );
+          expect.closeTo(copy.center?.latitude ?? 0, 1, 6, "the copied value");
         },
       },
       {

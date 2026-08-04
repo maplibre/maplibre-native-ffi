@@ -53,11 +53,6 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
     note: "several input-struct families are exercised; the requirement is one test per family, which needs an inventory of the families rather than examples",
   },
   {
-    id: "BND-070",
-    reason: "unwritten",
-    note: "camera options compare and copy by value; the requirement covers every option type and each field mutated in turn",
-  },
-  {
     id: "BND-085",
     reason: "unwritten",
     note: "an empty database lists through start/event/take; the requirement is region observation delivering copied status and error events",
