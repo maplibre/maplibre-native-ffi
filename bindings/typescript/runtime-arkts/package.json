@@ -1,0 +1,13 @@
+{
+  "name": "@maplibre/native-ffi-runtime-arkts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ArkTS runtime payload for the MapLibre Native TypeScript binding.",
+  "license": "BSD-2-Clause",
+  "exports": {
+    ".": { "types": "./index.d.ts", "default": "./index.ets" },
+    "./runtime.json": "./runtime.json"
+  },
+  "files": ["index.ets", "index.d.ts", "runtime.json", "*.so", "lib"]
+}

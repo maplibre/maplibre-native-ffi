@@ -43,3 +43,6 @@ bindings/openharmony/library/BuildProfile.ets
 /bindings/typescript/runtime-node/runtime.json
 /bindings/typescript/api/dist/
 /bindings/typescript/runtime-wasm/
+/bindings/typescript/runtime-arkts/*.so
+/bindings/typescript/runtime-arkts/lib/
+/bindings/typescript/runtime-arkts/runtime.json

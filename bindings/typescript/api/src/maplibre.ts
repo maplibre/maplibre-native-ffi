@@ -84,6 +84,7 @@ const KNOWN_RUNTIME_PACKAGES = [
   "@maplibre/native-ffi-runtime-windows-arm64-opengl",
   "@maplibre/native-ffi-runtime-android-arm64-vulkan",
   "@maplibre/native-ffi-runtime-android-arm64-opengl",
+  "@maplibre/native-ffi-runtime-arkts",
   "@maplibre/native-ffi-runtime-ohos-arm64-vulkan",
   "@maplibre/native-ffi-runtime-ohos-arm64-opengl",
   "@maplibre/native-ffi-runtime-node",

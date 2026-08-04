@@ -63,6 +63,13 @@ dir = "../.."
 tools = { emsdk = "{{vars.emsdk_version}}" }
 run = 'bindings/typescript/scripts/build-wasm-runtime.sh "$usage_preset"'
 
+[tasks."build:arkts"]
+description = "Cross-build the Node-API addon for OpenHarmony and stage the ArkTS payload."
+usage = 'arg "[preset]" default="ohos-arm64-vulkan"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }, "generate"]
+dir = "../.."
+run = 'bindings/typescript/scripts/build-arkts-runtime.sh "$usage_preset"'
+
 [tasks.test]
 description = "Run the TypeScript binding tests under every installed runtime."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
