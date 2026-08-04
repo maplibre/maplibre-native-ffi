@@ -82,7 +82,6 @@ export const RENDER_SESSION_GROUP: ConformanceGroup = {
   cases: [
     {
       name: "attaches a session-owned texture and renders through it",
-      spec: ["BND-162"],
       needs: NEEDS_CONTEXT,
       run({ maplibre, expect, renderContext }) {
         withRuntime(maplibre, (runtime, open) => {
@@ -238,7 +237,7 @@ export const RENDER_SESSION_GROUP: ConformanceGroup = {
     },
     {
       name: "copies queried features, their properties, and their state",
-      spec: ["BND-106"],
+      spec: ["BND-106", "BND-063"],
       needs: NEEDS_CONTEXT,
       run({ maplibre, expect, renderContext }) {
         withRuntime(maplibre, (runtime, open) => {
@@ -261,8 +260,12 @@ export const RENDER_SESSION_GROUP: ConformanceGroup = {
             // The source query answers from the source rather than the frame,
             // so it finds the feature whatever was drawn. Everything it returns
             // is copied out of memory the result owns, which is the point.
+            // The native result is destroyed before the query returns, so
+            // everything read below outlived the borrow window it came from.
+            // A view kept rather than copied would read freed storage here.
             const fromSource = session.querySourceFeatures("points", {});
             const first = expect.defined(fromSource[0], "a feature");
+            expect.equal(first.sourceId, "points", "the copied source id");
             const named = first.feature.properties?.find(
               (member) => member.name === "name",
             );

@@ -252,7 +252,6 @@ export const DOMAIN_GROUPS: readonly ConformanceGroup[] = [
       },
       {
         name: "compares and copies camera options by content",
-        spec: ["BND-070"],
         run({ expect }) {
           const camera = {
             center: { latitude: 1, longitude: 2 },

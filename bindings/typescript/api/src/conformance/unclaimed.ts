@@ -38,6 +38,63 @@ const NO_SECOND_THREAD =
 export const UNCLAIMED: readonly UnclaimedCase[] = [
   // Error mapping.
 
+  // Cases an external review found overclaimed. Each had a tag on a case that
+  // proved part of the requirement; the tag is gone and the reason says what is
+  // actually missing. A partial proof recorded as a whole one is worse than no
+  // proof, because nobody goes back to it.
+  {
+    id: "BND-048",
+    reason: "unwritten",
+    note: "a failed explicit release is proven; the requirement is about the leak channel a best-effort cleanup reports through, which is the finalizer path BND-044 also needs",
+  },
+  {
+    id: "BND-060",
+    reason: "unwritten",
+    note: "several input-struct families are exercised; the requirement is one test per family, which needs an inventory of the families rather than examples",
+  },
+  {
+    id: "BND-070",
+    reason: "unwritten",
+    note: "camera options compare and copy by value; the requirement covers every option type and each field mutated in turn",
+  },
+  {
+    id: "BND-085",
+    reason: "unwritten",
+    note: "an empty database lists through start/event/take; the requirement is region observation delivering copied status and error events",
+  },
+  {
+    id: "BND-088",
+    reason: "inapplicable",
+    note:
+      "the requirement is a park released by a wake signalled from another thread, and " +
+      NO_SECOND_THREAD,
+  },
+  {
+    id: "BND-124",
+    reason: "unwritten",
+    note: "a custom geometry source is registered and fed; the requirement is teardown across style reload, source removal, id reuse, map close, and an in-flight upcall, and the case tolerates no callback arriving at all",
+  },
+  {
+    id: "BND-141",
+    reason: "unwritten",
+    note: "a rewrite rule is observed to apply; the requirement is that request data reaches user code as language-owned copies, and a native rule table never reaches user code to copy",
+  },
+  {
+    id: "BND-158",
+    reason: "unwritten",
+    note: "headers are installed and a request arrives; the requirement adds that headers cross as copied values and that duplicate field names are rejected case-insensitively",
+  },
+  {
+    id: "BND-159",
+    reason: "unwritten",
+    note: "rules install, replace, and clear while a map is live; the requirement adds that transformed headers reach matching requests and stop after a clear, which needs a way to observe the headers on a request",
+  },
+  {
+    id: "BND-162",
+    reason: "unwritten",
+    note: "session-owned and caller-owned texture attach paths are proven; the surface path is not, because no host in the suite supplies a surface",
+  },
+
   // Handle lifetime.
   {
     id: "BND-044",

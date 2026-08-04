@@ -57,7 +57,6 @@ export const CALL_ABI_GROUP: ConformanceGroup = {
     },
     {
       name: "writes a by-value struct return into caller storage",
-      spec: ["BND-060"],
       run(context) {
         withCaller(context, ({ memory, caller }) => {
           const layout =
@@ -308,7 +307,6 @@ export const CALL_ABI_GROUP: ConformanceGroup = {
     },
     {
       name: "copies library-owned memory that sits outside every slab",
-      spec: ["BND-063"],
       run(context) {
         withCaller(context, ({ memory, caller }) => {
           const { expect } = context;

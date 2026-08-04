@@ -233,7 +233,7 @@ export const RUNTIME_GROUP: ConformanceGroup = {
     },
     {
       name: "keeps a handle live when native release refuses",
-      spec: ["BND-041", "BND-048"],
+      spec: ["BND-041"],
       run({ maplibre, expect }) {
         const runtime = maplibre.createRuntime();
         try {
@@ -293,7 +293,7 @@ export const RUNTIME_GROUP: ConformanceGroup = {
     },
     {
       name: "parks until a wake source signals, and the source outlives it",
-      spec: ["BND-088", "BND-089"],
+      spec: ["BND-089"],
       run({ maplibre, expect }) {
         const runtime = maplibre.createRuntime();
         const wake = runtime.acquireWakeSource();

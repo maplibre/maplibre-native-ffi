@@ -225,7 +225,6 @@ export const HOST_DATA_GROUP: ConformanceGroup = {
     },
     {
       name: "asks this host for a custom geometry tile and takes the answer",
-      spec: ["BND-124"],
       run({ maplibre, expect }) {
         withRuntime(maplibre, (runtime, open) => {
           const map = open();

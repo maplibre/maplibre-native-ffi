@@ -153,7 +153,6 @@ export const LOGGING_GROUP: ConformanceGroup = {
     },
     {
       name: "combines, tests, and applies a severity mask",
-      spec: ["BND-060"],
       run({ maplibre, expect }) {
         const mask = LogSeverityMask.warning.with(LogSeverityMask.error);
         expect.ok(mask.has(LogSeverityMask.warning), "the mask has warning");
@@ -171,7 +170,7 @@ export const OFFLINE_GROUP: ConformanceGroup = {
   cases: [
     {
       name: "lists an empty database through start, event, and take",
-      spec: ["BND-084", "BND-085"],
+      spec: ["BND-084"],
       async run({ maplibre, expect, cacheDirectory }) {
         const runtime = maplibre.createRuntime({
           cachePath: `${await cacheDirectory()}/cache.db`,
@@ -232,8 +231,48 @@ export const OFFLINE_GROUP: ConformanceGroup = {
       },
     },
     {
-      name: "reports an unknown operation id rather than inventing a result",
+      name: "refuses a released operation id after a new one exists",
       spec: ["BND-045"],
+      async run({ maplibre, expect, cacheDirectory }) {
+        const runtime = maplibre.createRuntime({
+          cachePath: `${await cacheDirectory()}/cache.db`,
+        });
+        try {
+          const first = runtime.startOfflineRegionList();
+          expect.ok(awaitCompletion(runtime), "the first operation completed");
+          // Taking the result releases the operation, so this id now names
+          // nothing.
+          runtime.takeOfflineRegionList(first);
+
+          // A second operation may be handed the same id the first gave up.
+          const second = runtime.startOfflineRegionList();
+          expect.ok(awaitCompletion(runtime), "the second operation completed");
+
+          // Replaying the released id must be refused whether or not it was
+          // reused. If it was reused, accepting it would take the second
+          // operation's result out from under its owner.
+          expect.equal(
+            expect.throws(
+              () => runtime.takeOfflineRegionList(first),
+              "replaying a released operation id",
+            ).kind,
+            "invalidArgument",
+            "the id is refused rather than answered",
+          );
+
+          // The live operation is untouched by the replay.
+          expect.equal(
+            runtime.takeOfflineRegionList(second).length,
+            0,
+            "the live operation still answers",
+          );
+        } finally {
+          runtime.close();
+        }
+      },
+    },
+    {
+      name: "reports an unknown operation id rather than inventing a result",
       async run({ maplibre, expect, cacheDirectory }) {
         const runtime = maplibre.createRuntime({
           cachePath: `${await cacheDirectory()}/cache.db`,
@@ -299,7 +338,7 @@ export const RESOURCES_GROUP: ConformanceGroup = {
     {
       name: "rewrites a matching URL and leaves others alone",
       transports: LOADER_OBSERVED,
-      spec: ["BND-140", "BND-141"],
+      spec: ["BND-140"],
       run({ maplibre, expect }) {
         withRuntime(maplibre, (runtime, open) => {
           runtime.setResourceRewriteRules([
@@ -526,7 +565,6 @@ export const RESOURCES_GROUP: ConformanceGroup = {
     },
     {
       name: "adds headers to a request it claims",
-      spec: ["BND-158"],
       needs: ["httpHeaderTransforms"],
       run({ maplibre, expect }) {
         withRuntime(maplibre, (runtime, open) => {
@@ -575,7 +613,6 @@ export const RESOURCES_GROUP: ConformanceGroup = {
     },
     {
       name: "installs, replaces, and clears header rules while maps are live",
-      spec: ["BND-159"],
       needs: ["httpHeaderTransforms"],
       run({ maplibre, expect }) {
         withRuntime(maplibre, (runtime, open) => {
