@@ -60,11 +60,6 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
     note: "needs fault injection into native destroy, which no seam offers yet",
   },
   {
-    id: "BND-043",
-    reason: "unwritten",
-    note: "a projection outliving its map is reachable and untested",
-  },
-  {
     id: "BND-044",
     reason: "inapplicable",
     note: "JavaScript finalization is not a cleanup hook this binding runs native release from",
@@ -93,11 +88,6 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
     note: "needs fault injection into a copy that follows a native snapshot",
   },
   {
-    id: "BND-069",
-    reason: "unwritten",
-    note: "copies are proven by content; that a later caller mutation cannot reach one is not",
-  },
-  {
     id: "BND-087",
     reason: "unwritten",
     note: "payload size is validated and no case proves the check precedes the read",
@@ -123,50 +113,20 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
     note: NO_SECOND_THREAD,
   },
   {
-    id: "BND-146",
-    reason: "unwritten",
-    note: "double completion is refused by the binding and no case drives it",
-  },
-  {
-    id: "BND-147",
-    reason: "unwritten",
-    note: "a released request reporting closed is untested",
-  },
-  {
     id: "BND-148",
     reason: "unwritten",
     note: "cancellation observed before a late completion is untested",
-  },
-  {
-    id: "BND-149",
-    reason: "unwritten",
-    note: "an error response becoming a loading-failure event is untested",
   },
   {
     id: "BND-150",
     reason: "unwritten",
     note: "inline completion followed by a contradicting return value is untested",
   },
-  {
-    id: "BND-151",
-    reason: "unwritten",
-    note: "a stale request handle reaching a later native request is untested",
-  },
-  {
-    id: "BND-152",
-    reason: "unwritten",
-    note: "a non-OK native completion staying terminal is untested",
-  },
   { id: "BND-153", reason: "inapplicable", note: NO_SECOND_THREAD },
   {
     id: "BND-155",
     reason: "unwritten",
     note: "scheme aliases are configurable and no case reads one back as the requested URL",
-  },
-  {
-    id: "BND-156",
-    reason: "unwritten",
-    note: "prefix routes are supported and only exact routes are exercised",
   },
   {
     id: "BND-157",

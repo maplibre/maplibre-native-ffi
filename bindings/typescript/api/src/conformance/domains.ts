@@ -215,6 +215,42 @@ export const DOMAIN_GROUPS: readonly ConformanceGroup[] = [
         },
       },
       {
+        name: "keeps a copy the caller's later mutation cannot reach",
+        spec: ["BND-069"],
+        run({ maplibre, expect }) {
+          withRuntime(maplibre, (_runtime, open) => {
+            const map = open();
+            // The caller keeps its own object and changes it afterwards. What
+            // the map holds was copied at the boundary, so it is unaffected.
+            const centre = { latitude: 10, longitude: 20 };
+            const camera = { center: centre, zoom: 5 };
+            map.jumpTo(camera);
+            (centre as { latitude: number }).latitude = -80;
+            (camera as { zoom: number }).zoom = 1;
+
+            const held = map.getCamera();
+            expect.closeTo(
+              held.center?.latitude ?? 0,
+              10,
+              6,
+              "the latitude the map kept",
+            );
+            expect.closeTo(held.zoom ?? 0, 5, 6, "the zoom the map kept");
+
+            // The same holds outward: a value read back is this caller's, and
+            // changing it cannot reach what the map holds.
+            const read = map.getCamera();
+            (read as { zoom?: number }).zoom = 99;
+            expect.closeTo(
+              map.getCamera().zoom ?? 0,
+              5,
+              6,
+              "the zoom after the reader mutated its copy",
+            );
+          });
+        },
+      },
+      {
         name: "compares and copies camera options by content",
         spec: ["BND-070"],
         run({ expect }) {
@@ -286,6 +322,43 @@ export const DOMAIN_GROUPS: readonly ConformanceGroup[] = [
               projection.close();
             }
           });
+        },
+      },
+      {
+        name: "keeps a projection usable after its map closes",
+        spec: ["BND-043"],
+        run({ maplibre, expect }) {
+          const runtime = maplibre.createRuntime();
+          try {
+            const map = runtime.createMap({ width: 256, height: 256 });
+            map.jumpTo({
+              center: { latitude: 45.5, longitude: -122.6 },
+              zoom: 10,
+            });
+            const projection = map.createProjection();
+            const before = projection.pixelForLatLng({
+              latitude: 45.5,
+              longitude: -122.6,
+            });
+
+            // A projection holds its own native handle rather than borrowing
+            // the map's, so closing the map leaves it answering.
+            map.close();
+            const after = projection.pixelForLatLng({
+              latitude: 45.5,
+              longitude: -122.6,
+            });
+            expect.closeTo(after.x, before.x, 6, "the projected x");
+            expect.closeTo(after.y, before.y, 6, "the projected y");
+
+            projection.close();
+            expect.throws(
+              () => projection.pixelForLatLng({ latitude: 0, longitude: 0 }),
+              "using a projection after its own release",
+            );
+          } finally {
+            runtime.close();
+          }
         },
       },
       {

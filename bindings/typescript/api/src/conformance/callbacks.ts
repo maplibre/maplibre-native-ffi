@@ -10,7 +10,11 @@ import { RuntimeEventType } from "../events.ts";
 import { LogSeverityMask } from "../logging.ts";
 import type { Map } from "../map.ts";
 import type { Maplibre } from "../maplibre.ts";
-import type { ResourceRequest } from "../resource-request.ts";
+import {
+  ResourceErrorReason,
+  type ResourceRequest,
+  ResourceResponseStatus,
+} from "../resource-request.ts";
 import type { Runtime } from "../runtime.ts";
 import type { ConformanceGroup } from "./harness.ts";
 import { drain, EMPTY_STYLE, withRuntime } from "./harness.ts";
@@ -377,7 +381,7 @@ export const RESOURCES_GROUP: ConformanceGroup = {
     },
     {
       name: "answers a claimed request after the callback returns",
-      spec: ["BND-144"],
+      spec: ["BND-144", "BND-146", "BND-156"],
       run({ maplibre, expect }) {
         withRuntime(maplibre, (runtime, open) => {
           const style = EMPTY_STYLE;
@@ -411,7 +415,12 @@ export const RESOURCES_GROUP: ConformanceGroup = {
           expect.ok(request.isSettled, "the request was answered");
           // Completion is terminal: a second one reports the binding's own
           // error rather than reaching C.
-          expect.throws(() => request.complete({}), "a second completion");
+          expect.equal(
+            expect.throws(() => request.complete({}), "a second completion")
+              .kind,
+            "closedHandle",
+            "the error a second completion reports",
+          );
 
           let loaded = false;
           for (let attempt = 0; attempt < 100 && !loaded; attempt += 1) {
@@ -425,6 +434,163 @@ export const RESOURCES_GROUP: ConformanceGroup = {
             }
           }
           expect.ok(loaded, "the deferred answer loaded the style");
+        });
+      },
+    },
+    {
+      name: "refuses to answer a request it gave up",
+      spec: ["BND-147"],
+      run({ maplibre, expect }) {
+        withRuntime(maplibre, (runtime, open) => {
+          let given: ResourceRequest | undefined;
+          runtime.setResourceProvider(
+            [{ url: "given://", matchPrefix: true, useRequestedUrl: true }],
+            (request) => {
+              given = request;
+            },
+          );
+          const map = open({ width: 64, height: 64 });
+          map.setStyleUrl("given://style.json");
+          for (
+            let attempt = 0;
+            attempt < 40 && given === undefined;
+            attempt += 1
+          ) {
+            runtime.pump(25);
+            maplibre.deliverCallbacks();
+            while (runtime.pollEvent() !== undefined) {
+              // Drained so the queue does not hold the pump open.
+            }
+          }
+          const request = expect.defined(given, "the claimed request");
+
+          request.close();
+          expect.ok(request.isSettled, "giving it up settles it");
+          // Everything that would reach C reports the binding's own error, so a
+          // released native request is never touched.
+          expect.equal(
+            expect.throws(
+              () => request.complete({ bytes: new Uint8Array(1) }),
+              "completing a request that was given up",
+            ).kind,
+            "closedHandle",
+            "the error completing reports",
+          );
+          expect.throws(
+            () => request.isCancelled,
+            "asking whether a released request was cancelled",
+          );
+          // Giving it up twice is not an error; it is already given up.
+          request.close();
+        });
+      },
+    },
+    {
+      name: "keeps a released request from reaching a later one",
+      spec: ["BND-151"],
+      run({ maplibre, expect }) {
+        withRuntime(maplibre, (runtime, open) => {
+          const seen: ResourceRequest[] = [];
+          runtime.setResourceProvider(
+            [{ url: "stale://", matchPrefix: true, useRequestedUrl: true }],
+            (request) => {
+              seen.push(request);
+            },
+          );
+
+          const map = open({ width: 64, height: 64 });
+          map.setStyleUrl("stale://first.json");
+          const pump = (): void => {
+            runtime.pump(25);
+            maplibre.deliverCallbacks();
+            while (runtime.pollEvent() !== undefined) {
+              // Drained so the queue does not hold the pump open.
+            }
+          };
+          for (let attempt = 0; attempt < 40 && seen.length < 1; attempt += 1) {
+            pump();
+          }
+          const first = expect.defined(seen[0], "the first request");
+
+          // Given up, so the native request behind it is released and its slot
+          // may be handed to whatever asks next.
+          first.close();
+
+          map.setStyleUrl("stale://second.json");
+          for (let attempt = 0; attempt < 40 && seen.length < 2; attempt += 1) {
+            pump();
+          }
+          const second = expect.defined(seen[1], "the second request");
+          expect.notEqual(
+            second.info.requestedUrl,
+            first.info.requestedUrl,
+            "the second request is a different one",
+          );
+
+          // The stale wrapper refuses on its own account. If it reached C it
+          // could answer or release whatever now holds that slot.
+          expect.equal(
+            expect.throws(
+              () => first.complete({ bytes: new Uint8Array(1) }),
+              "completing through a released request",
+            ).kind,
+            "closedHandle",
+            "the stale request reports its own state",
+          );
+          first.close();
+
+          // The later request is untouched by any of that.
+          expect.ok(!second.isSettled, "the second request is still open");
+          second.complete({ bytes: new TextEncoder().encode(EMPTY_STYLE) });
+          expect.ok(second.isSettled, "and answers normally");
+        });
+      },
+    },
+    {
+      name: "turns an error response into a loading failure",
+      spec: ["BND-149", "BND-152"],
+      run({ maplibre, expect }) {
+        withRuntime(maplibre, (runtime, open) => {
+          runtime.setResourceProvider(
+            [{ url: "failing://", matchPrefix: true, useRequestedUrl: true }],
+            (request) => {
+              // An error is an answer: it settles the request the way bytes do,
+              // and the status it carries reaches MapLibre rather than this
+              // binding inventing one.
+              request.complete({
+                status: ResourceResponseStatus.error,
+                errorReason: ResourceErrorReason.notFound,
+                errorMessage: "no such style",
+              });
+              expect.ok(request.isSettled, "an error answer settles it");
+              expect.equal(
+                expect.throws(
+                  () => request.complete({}),
+                  "answering again after an error",
+                ).kind,
+                "closedHandle",
+                "an error answer is as terminal as a successful one",
+              );
+            },
+          );
+
+          const map = open({ width: 64, height: 64 });
+          map.setStyleUrl("failing://style.json");
+          let failed = false;
+          for (let attempt = 0; attempt < 200 && !failed; attempt += 1) {
+            runtime.pump(25);
+            maplibre.deliverCallbacks();
+            for (
+              let event = runtime.pollEvent();
+              event !== undefined;
+              event = runtime.pollEvent()
+            ) {
+              if (event.type.equals(RuntimeEventType.mapLoadingFailed)) {
+                failed = true;
+              }
+            }
+          }
+          expect.ok(failed, "the error reached the runtime as a failure event");
         });
       },
     },
