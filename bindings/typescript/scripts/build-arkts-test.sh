@@ -37,15 +37,22 @@ mkdir -p "$work/ets" "$work/libs" "$work/resources/base/profile"
 # One bundle, because ArkTS resolves modules through its own build rather than
 # through node_modules. The payload's addon import stays external: the runtime
 # resolves a native module by library name.
+# The bundler writes inside its own package and the artifact is copied out.
+# Handing it an output directory elsewhere made its clean step delete this
+# checkout twice, `.git` included, which in a worktree is an ordinary file and
+# so no more protected than any other. `--no-clean` says the same thing twice on
+# purpose: nothing here should be removing directories it did not create.
 echo "bundling the conformance suite"
+bundle_dir="$root/bindings/typescript/api/dist-arkts"
 (
   cd "$root/bindings/typescript/api"
   pnpm exec vp pack src/arkts-entry.ts \
     --format esm \
-    --out-dir "$work/bundle" \
+    --no-clean \
+    --out-dir dist-arkts \
     --deps.never-bundle 'libmaplibre-native-ffi.so'
 )
-cp "$work/bundle/arkts-entry.mjs" "$work/ets/conformance.bundle.js"
+cp "$bundle_dir/arkts-entry.mjs" "$work/ets/conformance.bundle.js"
 
 # Each source becomes one bytecode record, and the records merge into the file
 # the runtime loads.
