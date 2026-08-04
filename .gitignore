@@ -47,3 +47,7 @@ bindings/openharmony/library/BuildProfile.ets
 /bindings/typescript/runtime-arkts/lib/
 /bindings/typescript/runtime-arkts/runtime.json
 /bindings/typescript/api/dist-arkts/
+
+# Screenshots vitest writes when a browser test fails.
+.vitest-attachments/
+**/test/__screenshots__/

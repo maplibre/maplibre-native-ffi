@@ -13,6 +13,7 @@ import { MLN_STATUS } from "../raw/enums.ts";
 import { LAYOUTS, type RecordLayout } from "../raw/layouts.ts";
 import { Caller, statusFromSlot } from "./call.ts";
 import { Memory, type Scope } from "./memory.ts";
+import { decodeUtf8 } from "./text.ts";
 import type { Ptr, Transport } from "./transport.ts";
 
 export class Native {
@@ -21,7 +22,6 @@ export class Native {
   readonly caller: Caller;
   readonly #layouts: Readonly<Record<string, RecordLayout>>;
   readonly #encoder = new TextEncoder();
-  readonly #decoder = new TextDecoder();
 
   constructor(transport: Transport) {
     this.transport = transport;
@@ -116,7 +116,7 @@ export class Native {
     if (pointer === 0n || length === 0) {
       return "";
     }
-    return this.#decoder.decode(this.transport.readForeign(pointer, length));
+    return decodeUtf8(this.transport.readForeign(pointer, length));
   }
 
   /** Copies library-owned bytes. */

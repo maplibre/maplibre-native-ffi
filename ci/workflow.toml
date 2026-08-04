@@ -87,6 +87,10 @@ commands = [
 platforms = ["emscripten"]
 commands = [
   { task = "//bindings/typescript:test:wasm", include = ["emscripten-wasm32-webgl"] },
+  # The same payload in the host it is built for. Node proves the transport;
+  # only a browser has the shared memory, the workers, and the page the module
+  # actually runs against.
+  { task = "//bindings/typescript:test:browser", include = ["emscripten-wasm32-webgl"] },
 ]
 
 [[suites]]

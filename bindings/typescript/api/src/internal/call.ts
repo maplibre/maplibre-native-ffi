@@ -11,6 +11,7 @@
 import { ENTRYPOINTS } from "../raw/entrypoints.ts";
 import { LAYOUTS, type RecordLayout } from "../raw/layouts.ts";
 import type { Memory, Scope } from "./memory.ts";
+import { decodeUtf8 } from "./text.ts";
 import { AbiCallStatus, type Ptr, type Transport } from "./transport.ts";
 
 const SLOT_BYTES = 8;
@@ -74,7 +75,6 @@ export class Caller {
   readonly #layouts: Readonly<Record<string, RecordLayout>>;
   readonly #diagnostic: Ptr;
   readonly #diagnosticLength: Ptr;
-  readonly #decoder = new TextDecoder();
 
   constructor(transport: Transport, memory: Memory) {
     this.#transport = transport;
@@ -163,7 +163,7 @@ export class Caller {
       diagnostic:
         length === 0
           ? ""
-          : this.#decoder.decode(this.#memory.bytes(this.#diagnostic, length)),
+          : decodeUtf8(this.#memory.bytes(this.#diagnostic, length)),
     };
   }
 }

@@ -128,3 +128,16 @@ usage = 'arg "[preset]" default="ohos-arm64-vulkan"'
 depends = [{ task = "build:arkts", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = 'bindings/typescript/scripts/pack-runtime.sh "$usage_preset"'
+
+[tasks."test:browser"]
+description = "Run the conformance suite in a browser over the WebAssembly transport."
+usage = 'arg "[preset]" default="emscripten-wasm32-webgl"'
+depends = [{ task = "build-wasm", args = ["{{usage.preset}}"] }, "build"]
+dir = "../.."
+run = '''
+cd bindings/typescript/api
+# The browser is a tool this suite needs and nothing else does, so it is
+# fetched here rather than declared for every task.
+pnpm exec playwright install --with-deps chromium
+pnpm exec vitest run --config vitest.browser.config.ts
+'''

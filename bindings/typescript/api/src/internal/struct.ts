@@ -17,6 +17,7 @@ import {
 import type { Scope } from "./memory.ts";
 import type { Native } from "./native.ts";
 import { asUint64 } from "./numbers.ts";
+import { decodeUtf8 } from "./text.ts";
 import type { Ptr } from "./transport.ts";
 
 /** Writes an `mln_camera_options` a camera command reads. */
@@ -260,6 +261,6 @@ export function copyOutText(
         `a copy-out entry point reported ${written} bytes after asking for ${required}`,
       );
     }
-    return new TextDecoder().decode(native.memory.bytes(buffer, written));
+    return decodeUtf8(native.memory.bytes(buffer, written));
   });
 }

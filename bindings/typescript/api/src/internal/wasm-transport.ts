@@ -17,6 +17,7 @@
 import { MaplibreError } from "../errors.ts";
 import { ABI_FINGERPRINT, ABI_HEADER_DIGEST } from "../raw/fingerprint.ts";
 import { AbiMismatchError, verifyPayload } from "./handshake.ts";
+import { decodeUtf8 } from "./text.ts";
 import type { Ptr, Slab, Transport } from "./transport.ts";
 
 /**
@@ -62,8 +63,6 @@ export interface WasmModule {
   _mln_abi_transfer_discard(token: bigint): bigint;
   UTF8ToString(pointer: number): string;
 }
-
-const decoder = new TextDecoder();
 
 /**
  * Wraps an instantiated module.
@@ -188,7 +187,7 @@ export function wasmTransport(module: WasmModule): Transport {
           `a string at ${pointer} has no terminator inside this module's memory`,
         );
       }
-      return decoder.decode(bytes.subarray(start, end));
+      return decodeUtf8(bytes.subarray(start, end));
     },
 
     entrypointName(entrypoint: number): string | null {

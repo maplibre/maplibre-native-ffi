@@ -25,6 +25,9 @@
   "devDependencies": {
     "@maplibre/native-ffi-runtime-node": "workspace:*",
     "@types/node": "^24.10.1",
+    "@vitest/browser": "^4.1.10",
+    "@vitest/browser-playwright": "^4.1.10",
+    "playwright": "^1.62.1",
     "vitest": "^4.1.10"
   },
   "main": "./dist/index.cjs",
