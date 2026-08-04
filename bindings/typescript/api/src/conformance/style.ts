@@ -337,3 +337,94 @@ export const HOST_DATA_GROUP: ConformanceGroup = {
     },
   ],
 };
+
+export const RENDER_TARGET_GROUP: ConformanceGroup = {
+  name: "render targets",
+  cases: [
+    {
+      name: "reports an unsupported backend rather than attaching",
+      spec: ["BND-160", "BND-161"],
+      run({ maplibre, expect }) {
+        withRuntime(maplibre, (runtime, open) => {
+          const map = open();
+          expect.ok(loadStyle(runtime, map), "the style loaded");
+          const backends = maplibre.renderBackends;
+
+          // Every build compiles one renderer, so the other three attach paths
+          // materialize their descriptors and then reach a backend this build
+          // does not have. That is what makes the descriptors testable without
+          // a graphics context: the failure has to come from the backend, not
+          // from a malformed struct.
+          if (!backends.metal) {
+            const error = expect.throws(
+              () =>
+                map.attachMetalOwnedTexture({
+                  extent: { width: 64, height: 64 },
+                  context: { device: 0n as never },
+                }),
+              "attaching Metal on a build without it",
+            );
+            expect.ok(
+              error.kind === "unsupported" || error.kind === "invalidArgument",
+              "the backend or its handles were rejected",
+            );
+          }
+          if (!backends.webgpu) {
+            expect.throws(
+              () =>
+                map.attachWebGpuOwnedTexture({
+                  extent: { width: 64, height: 64 },
+                  context: { device: 0n as never },
+                }),
+              "attaching WebGPU on a build without it",
+            );
+          }
+          if (!backends.opengl) {
+            expect.throws(
+              () =>
+                map.attachOpenGlOwnedTexture({
+                  extent: { width: 64, height: 64 },
+                  context: { platform: "egl", display: 0n as never },
+                }),
+              "attaching OpenGL on a build without it",
+            );
+          }
+        });
+      },
+    },
+    {
+      name: "rejects a caller-owned texture whose physical size is not a size",
+      spec: ["BND-161"],
+      run({ maplibre, expect }) {
+        withRuntime(maplibre, (runtime, open) => {
+          const map = open();
+          expect.ok(loadStyle(runtime, map), "the style loaded");
+          // The binding owns this one: the extent fields are uint32_t, so a
+          // fractional value would reach C as some other number.
+          const error = expect.throws(
+            () =>
+              map.attachVulkanBorrowedTexture({
+                extent: { width: 64, height: 64 },
+                physicalWidth: 1.5,
+                physicalHeight: 64,
+                context: {
+                  instance: 0n as never,
+                  physicalDevice: 0n as never,
+                  device: 0n as never,
+                  graphicsQueue: 0n as never,
+                  graphicsQueueFamilyIndex: 0,
+                  getInstanceProcAddr: 0n as never,
+                },
+                image: 0n as never,
+                imageView: 0n as never,
+                format: 0,
+                initialLayout: 0,
+              }),
+            "a fractional physical width",
+          );
+          expect.equal(error.kind, "invalidInput", "the error kind");
+        });
+      },
+    },
+  ],
+};

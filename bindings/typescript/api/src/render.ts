@@ -17,13 +17,15 @@ import { HandleState } from "./internal/handle.ts";
 import { writeJsonValue, writeStringView } from "./internal/json-encode.ts";
 import type { Scope } from "./internal/memory.ts";
 import type { Native } from "./internal/native.ts";
-import { asUint32 } from "./internal/numbers.ts";
+import { asInt32, asUint32 } from "./internal/numbers.ts";
 import { attachHandleState, handleStateOf } from "./internal/private.ts";
 import type { Ptr } from "./internal/transport.ts";
 import type { JsonValue } from "./json.ts";
 import type { Map } from "./map.ts";
 import { EP } from "./raw/entrypoints.ts";
+import { MLN_OPENGL_CONTEXT_PLATFORM } from "./raw/enums.ts";
 import { MLN_FEATURE_STATE_SELECTOR_FIELD } from "./raw/enums.ts";
+import type { RecordLayout } from "./raw/layouts.ts";
 
 declare const pointerBrand: unique symbol;
 
@@ -90,6 +92,11 @@ export interface VulkanOwnedTextureDescriptor {
 
 export class RenderSession {
   readonly #state: HandleState;
+
+  /** @internal Builds a wrapper for a session the caller just attached. */
+  static own(native: Native, id: bigint): RenderSession {
+    return new RenderSession(native, id);
+  }
 
   private constructor(native: Native, id: bigint) {
     // No parent: the C API keeps the map alive instead, by rejecting a map
@@ -359,3 +366,567 @@ function f64Bits(value: number): bigint {
   scratch.setFloat64(0, value, true);
   return scratch.getBigUint64(0, true);
 }
+
+/** A borrowed Metal context. */
+export interface MetalContext {
+  readonly device: NativePointer;
+}
+
+/** A borrowed WebGPU context. */
+export interface WebGpuContext {
+  /** Optional for texture sessions. */
+  readonly instance?: NativePointer;
+  readonly device: NativePointer;
+  readonly queue?: NativePointer;
+}
+
+/**
+ * A borrowed OpenGL context, named by the provider that made it current.
+ *
+ * The C API takes one union, and which arm it reads follows the platform, so
+ * the public value is tagged rather than leaving a caller to fill the right
+ * fields by convention.
+ */
+export type OpenGlContext =
+  | {
+      readonly platform: "wgl";
+      readonly deviceContext: NativePointer;
+      readonly shareContext?: NativePointer;
+      readonly getProcAddress?: NativePointer;
+    }
+  | {
+      readonly platform: "egl";
+      readonly display: NativePointer;
+      readonly config?: NativePointer;
+      readonly shareContext?: NativePointer;
+      readonly getProcAddress?: NativePointer;
+    }
+  | {
+      /** A WebGL context handle, which Emscripten numbers rather than addresses. */
+      readonly platform: "webgl";
+      readonly context: number;
+    };
+
+/** A session that presents through a host surface. */
+export interface SurfaceDescriptor<Context> {
+  readonly extent: RenderTargetExtent;
+  readonly context: Context;
+  /** The host surface: a CAMetalLayer, VkSurfaceKHR, or platform surface. */
+  readonly surface: NativePointer;
+}
+
+/** A session that renders into a texture the host owns. */
+export interface BorrowedTextureDescriptor<Context> {
+  readonly extent: RenderTargetExtent;
+  /** Physical image size in device pixels, stated rather than derived. */
+  readonly physicalWidth: number;
+  readonly physicalHeight: number;
+  readonly context: Context;
+}
+
+/** A Vulkan image the host owns. */
+export interface VulkanBorrowedTexture extends BorrowedTextureDescriptor<VulkanContext> {
+  readonly image: NativePointer;
+  readonly imageView: NativePointer;
+  readonly format: number;
+  readonly initialLayout: number;
+}
+
+/** A Metal texture the host owns. */
+export interface MetalBorrowedTexture extends BorrowedTextureDescriptor<MetalContext> {
+  readonly texture: NativePointer;
+}
+
+/** An OpenGL texture the host owns. */
+export interface OpenGlBorrowedTexture extends BorrowedTextureDescriptor<OpenGlContext> {
+  readonly texture: number;
+  readonly target: number;
+}
+
+/** A WebGPU texture the host owns. */
+export interface WebGpuBorrowedTexture extends BorrowedTextureDescriptor<WebGpuContext> {
+  readonly texture: NativePointer;
+  readonly textureView: NativePointer;
+  readonly format: number;
+}
+
+/** Writes a Metal context descriptor. */
+export function writeMetalContext(
+  native: Native,
+  storage: Ptr,
+  context: MetalContext,
+): void {
+  const layout = native.layout("mln_metal_context_descriptor");
+  native.memory
+    .view(storage, layout.size)
+    .setUint32(layout.fields.size!.offset, layout.size, true);
+  native.memory.writePointer(
+    (storage + BigInt(layout.fields.device!.offset)) as Ptr,
+    context.device,
+  );
+}
+
+/** Writes a WebGPU context descriptor. */
+export function writeWebGpuContext(
+  native: Native,
+  storage: Ptr,
+  context: WebGpuContext,
+): void {
+  const layout = native.layout("mln_webgpu_context_descriptor");
+  native.memory
+    .view(storage, layout.size)
+    .setUint32(layout.fields.size!.offset, layout.size, true);
+  for (const [field, value] of [
+    ["instance", context.instance],
+    ["device", context.device],
+    ["queue", context.queue],
+  ] as const) {
+    if (value !== undefined) {
+      native.memory.writePointer(
+        (storage + BigInt(layout.fields[field]!.offset)) as Ptr,
+        value,
+      );
+    }
+  }
+}
+
+/** Writes an OpenGL context descriptor, filling the arm its platform names. */
+export function writeOpenGlContext(
+  native: Native,
+  storage: Ptr,
+  context: OpenGlContext,
+): void {
+  const layout = native.layout("mln_opengl_context_descriptor");
+  const view = native.memory.view(storage, layout.size);
+  view.setUint32(layout.fields.size!.offset, layout.size, true);
+  const data = (storage + BigInt(layout.fields.data!.offset)) as Ptr;
+
+  const platform = {
+    wgl: MLN_OPENGL_CONTEXT_PLATFORM.MLN_OPENGL_CONTEXT_PLATFORM_WGL,
+    egl: MLN_OPENGL_CONTEXT_PLATFORM.MLN_OPENGL_CONTEXT_PLATFORM_EGL,
+    webgl: MLN_OPENGL_CONTEXT_PLATFORM.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL,
+  }[context.platform];
+  view.setUint32(layout.fields.platform!.offset, platform, true);
+
+  const writeArm = (
+    record: string,
+    fields: readonly (readonly [string, NativePointer | undefined])[],
+  ): void => {
+    const arm = native.layout(record);
+    native.memory
+      .view(data, arm.size)
+      .setUint32(arm.fields.size!.offset, arm.size, true);
+    for (const [field, value] of fields) {
+      if (value !== undefined) {
+        native.memory.writePointer(
+          (data + BigInt(arm.fields[field]!.offset)) as Ptr,
+          value,
+        );
+      }
+    }
+  };
+
+  switch (context.platform) {
+    case "wgl":
+      writeArm("mln_wgl_context_descriptor", [
+        ["device_context", context.deviceContext],
+        ["share_context", context.shareContext],
+        ["get_proc_address", context.getProcAddress],
+      ]);
+      return;
+    case "egl":
+      writeArm("mln_egl_context_descriptor", [
+        ["display", context.display],
+        ["config", context.config],
+        ["share_context", context.shareContext],
+        ["get_proc_address", context.getProcAddress],
+      ]);
+      return;
+    case "webgl": {
+      const arm = native.layout("mln_webgl_context_descriptor");
+      const view_ = native.memory.view(data, arm.size);
+      view_.setUint32(arm.fields.size!.offset, arm.size, true);
+      view_.setInt32(
+        arm.fields.context!.offset,
+        asInt32(context.context, "a WebGL context handle"),
+        true,
+      );
+      return;
+    }
+  }
+}
+
+/**
+ * Attaches a session, whichever backend and target family it is.
+ *
+ * Every attach takes the same shape — build the descriptor from the C API's
+ * default, fill the extent and the borrowed context, then hand it to the
+ * backend's entry point — so the families differ only in what they add.
+ */
+function attach(
+  native: Native,
+  map: Map,
+  operation: string,
+  record: string,
+  defaultEntrypoint: number,
+  attachEntrypoint: number,
+  fill: (storage: Ptr, layout: RecordLayout) => void,
+): RenderSession {
+  const id = native.scope((scope) => {
+    const layout = native.layout(record);
+    const storage = scope.allocateZeroed(layout.size, layout.align);
+    native.structValue(scope, defaultEntrypoint, storage);
+    fill(storage, layout);
+    const outSession = scope.allocateZeroed(8);
+    native.checked(scope, attachEntrypoint, [
+      handleStateOf(map).use(operation),
+      storage,
+      outSession,
+    ]);
+    return native.memory.view(outSession, 8).getBigUint64(0, true);
+  });
+  try {
+    return RenderSession.own(native, id);
+  } catch (error) {
+    // The session exists and nothing owns it, so it is released rather than
+    // left for a leak report that names no wrapper.
+    native.scope((scope) => {
+      native.raw(scope, EP.mln_render_session_destroy, [id]);
+    });
+    throw error;
+  }
+}
+
+/** Fills the extent every descriptor starts with. */
+function fillExtent(
+  native: Native,
+  storage: Ptr,
+  layout: RecordLayout,
+  extent: RenderTargetExtent,
+): void {
+  writeExtent(
+    native,
+    (storage + BigInt(layout.fields.extent!.offset)) as Ptr,
+    extent,
+  );
+}
+
+/** Fills the physical size a caller-owned texture states separately. */
+function fillPhysicalSize(
+  native: Native,
+  storage: Ptr,
+  layout: RecordLayout,
+  descriptor: { physicalWidth: number; physicalHeight: number },
+): void {
+  const view = native.memory.view(storage, layout.size);
+  view.setUint32(
+    layout.fields.physical_width!.offset,
+    asUint32(descriptor.physicalWidth, "physicalWidth"),
+    true,
+  );
+  view.setUint32(
+    layout.fields.physical_height!.offset,
+    asUint32(descriptor.physicalHeight, "physicalHeight"),
+    true,
+  );
+}
+
+/** Every attach the C API offers, by backend and target family. */
+export const ATTACH: {
+  metalSurface(
+    native: Native,
+    map: Map,
+    descriptor: SurfaceDescriptor<MetalContext>,
+  ): RenderSession;
+  vulkanSurface(
+    native: Native,
+    map: Map,
+    descriptor: SurfaceDescriptor<VulkanContext>,
+  ): RenderSession;
+  openglSurface(
+    native: Native,
+    map: Map,
+    descriptor: SurfaceDescriptor<OpenGlContext>,
+  ): RenderSession;
+  metalOwnedTexture(
+    native: Native,
+    map: Map,
+    descriptor: { extent: RenderTargetExtent; context: MetalContext },
+  ): RenderSession;
+  openglOwnedTexture(
+    native: Native,
+    map: Map,
+    descriptor: { extent: RenderTargetExtent; context: OpenGlContext },
+  ): RenderSession;
+  webgpuOwnedTexture(
+    native: Native,
+    map: Map,
+    descriptor: { extent: RenderTargetExtent; context: WebGpuContext },
+  ): RenderSession;
+  metalBorrowedTexture(
+    native: Native,
+    map: Map,
+    descriptor: MetalBorrowedTexture,
+  ): RenderSession;
+  vulkanBorrowedTexture(
+    native: Native,
+    map: Map,
+    descriptor: VulkanBorrowedTexture,
+  ): RenderSession;
+  openglBorrowedTexture(
+    native: Native,
+    map: Map,
+    descriptor: OpenGlBorrowedTexture,
+  ): RenderSession;
+  webgpuBorrowedTexture(
+    native: Native,
+    map: Map,
+    descriptor: WebGpuBorrowedTexture,
+  ): RenderSession;
+} = {
+  metalSurface(native, map, descriptor) {
+    return attach(
+      native,
+      map,
+      "Map.attachMetalSurface",
+      "mln_metal_surface_descriptor",
+      EP.mln_metal_surface_descriptor_default,
+      EP.mln_metal_surface_attach,
+      (storage, layout) => {
+        fillExtent(native, storage, layout, descriptor.extent);
+        writeMetalContext(
+          native,
+          (storage + BigInt(layout.fields.context!.offset)) as Ptr,
+          descriptor.context,
+        );
+        native.memory.writePointer(
+          (storage + BigInt(layout.fields.layer!.offset)) as Ptr,
+          descriptor.surface,
+        );
+      },
+    );
+  },
+  vulkanSurface(native, map, descriptor) {
+    return attach(
+      native,
+      map,
+      "Map.attachVulkanSurface",
+      "mln_vulkan_surface_descriptor",
+      EP.mln_vulkan_surface_descriptor_default,
+      EP.mln_vulkan_surface_attach,
+      (storage, layout) => {
+        fillExtent(native, storage, layout, descriptor.extent);
+        writeVulkanContext(
+          native,
+          (storage + BigInt(layout.fields.context!.offset)) as Ptr,
+          descriptor.context,
+        );
+        native.memory.writePointer(
+          (storage + BigInt(layout.fields.surface!.offset)) as Ptr,
+          descriptor.surface,
+        );
+      },
+    );
+  },
+  openglSurface(native, map, descriptor) {
+    return attach(
+      native,
+      map,
+      "Map.attachOpenGlSurface",
+      "mln_opengl_surface_descriptor",
+      EP.mln_opengl_surface_descriptor_default,
+      EP.mln_opengl_surface_attach,
+      (storage, layout) => {
+        fillExtent(native, storage, layout, descriptor.extent);
+        writeOpenGlContext(
+          native,
+          (storage + BigInt(layout.fields.context!.offset)) as Ptr,
+          descriptor.context,
+        );
+        native.memory.writePointer(
+          (storage + BigInt(layout.fields.surface!.offset)) as Ptr,
+          descriptor.surface,
+        );
+      },
+    );
+  },
+  metalOwnedTexture(native, map, descriptor) {
+    return attach(
+      native,
+      map,
+      "Map.attachMetalOwnedTexture",
+      "mln_metal_owned_texture_descriptor",
+      EP.mln_metal_owned_texture_descriptor_default,
+      EP.mln_metal_owned_texture_attach,
+      (storage, layout) => {
+        fillExtent(native, storage, layout, descriptor.extent);
+        writeMetalContext(
+          native,
+          (storage + BigInt(layout.fields.context!.offset)) as Ptr,
+          descriptor.context,
+        );
+      },
+    );
+  },
+  openglOwnedTexture(native, map, descriptor) {
+    return attach(
+      native,
+      map,
+      "Map.attachOpenGlOwnedTexture",
+      "mln_opengl_owned_texture_descriptor",
+      EP.mln_opengl_owned_texture_descriptor_default,
+      EP.mln_opengl_owned_texture_attach,
+      (storage, layout) => {
+        fillExtent(native, storage, layout, descriptor.extent);
+        writeOpenGlContext(
+          native,
+          (storage + BigInt(layout.fields.context!.offset)) as Ptr,
+          descriptor.context,
+        );
+      },
+    );
+  },
+  webgpuOwnedTexture(native, map, descriptor) {
+    return attach(
+      native,
+      map,
+      "Map.attachWebGpuOwnedTexture",
+      "mln_webgpu_owned_texture_descriptor",
+      EP.mln_webgpu_owned_texture_descriptor_default,
+      EP.mln_webgpu_owned_texture_attach,
+      (storage, layout) => {
+        fillExtent(native, storage, layout, descriptor.extent);
+        writeWebGpuContext(
+          native,
+          (storage + BigInt(layout.fields.context!.offset)) as Ptr,
+          descriptor.context,
+        );
+      },
+    );
+  },
+  metalBorrowedTexture(native, map, descriptor) {
+    return attach(
+      native,
+      map,
+      "Map.attachMetalBorrowedTexture",
+      "mln_metal_borrowed_texture_descriptor",
+      EP.mln_metal_borrowed_texture_descriptor_default,
+      EP.mln_metal_borrowed_texture_attach,
+      (storage, layout) => {
+        fillExtent(native, storage, layout, descriptor.extent);
+        fillPhysicalSize(native, storage, layout, descriptor);
+        writeMetalContext(
+          native,
+          (storage + BigInt(layout.fields.context!.offset)) as Ptr,
+          descriptor.context,
+        );
+        native.memory.writePointer(
+          (storage + BigInt(layout.fields.texture!.offset)) as Ptr,
+          descriptor.texture,
+        );
+      },
+    );
+  },
+  vulkanBorrowedTexture(native, map, descriptor) {
+    return attach(
+      native,
+      map,
+      "Map.attachVulkanBorrowedTexture",
+      "mln_vulkan_borrowed_texture_descriptor",
+      EP.mln_vulkan_borrowed_texture_descriptor_default,
+      EP.mln_vulkan_borrowed_texture_attach,
+      (storage, layout) => {
+        fillExtent(native, storage, layout, descriptor.extent);
+        fillPhysicalSize(native, storage, layout, descriptor);
+        writeVulkanContext(
+          native,
+          (storage + BigInt(layout.fields.context!.offset)) as Ptr,
+          descriptor.context,
+        );
+        native.memory.writePointer(
+          (storage + BigInt(layout.fields.image!.offset)) as Ptr,
+          descriptor.image,
+        );
+        native.memory.writePointer(
+          (storage + BigInt(layout.fields.image_view!.offset)) as Ptr,
+          descriptor.imageView,
+        );
+        const view = native.memory.view(storage, layout.size);
+        view.setInt32(
+          layout.fields.format!.offset,
+          asInt32(descriptor.format, "a Vulkan format"),
+          true,
+        );
+        view.setInt32(
+          layout.fields.initial_layout!.offset,
+          asInt32(descriptor.initialLayout, "a Vulkan image layout"),
+          true,
+        );
+      },
+    );
+  },
+  openglBorrowedTexture(native, map, descriptor) {
+    return attach(
+      native,
+      map,
+      "Map.attachOpenGlBorrowedTexture",
+      "mln_opengl_borrowed_texture_descriptor",
+      EP.mln_opengl_borrowed_texture_descriptor_default,
+      EP.mln_opengl_borrowed_texture_attach,
+      (storage, layout) => {
+        fillExtent(native, storage, layout, descriptor.extent);
+        fillPhysicalSize(native, storage, layout, descriptor);
+        writeOpenGlContext(
+          native,
+          (storage + BigInt(layout.fields.context!.offset)) as Ptr,
+          descriptor.context,
+        );
+        const view = native.memory.view(storage, layout.size);
+        view.setUint32(
+          layout.fields.texture!.offset,
+          asUint32(descriptor.texture, "a texture name"),
+          true,
+        );
+        view.setUint32(
+          layout.fields.target!.offset,
+          asUint32(descriptor.target, "a texture target"),
+          true,
+        );
+      },
+    );
+  },
+  webgpuBorrowedTexture(native, map, descriptor) {
+    return attach(
+      native,
+      map,
+      "Map.attachWebGpuBorrowedTexture",
+      "mln_webgpu_borrowed_texture_descriptor",
+      EP.mln_webgpu_borrowed_texture_descriptor_default,
+      EP.mln_webgpu_borrowed_texture_attach,
+      (storage, layout) => {
+        fillExtent(native, storage, layout, descriptor.extent);
+        fillPhysicalSize(native, storage, layout, descriptor);
+        writeWebGpuContext(
+          native,
+          (storage + BigInt(layout.fields.context!.offset)) as Ptr,
+          descriptor.context,
+        );
+        native.memory.writePointer(
+          (storage + BigInt(layout.fields.texture!.offset)) as Ptr,
+          descriptor.texture,
+        );
+        native.memory.writePointer(
+          (storage + BigInt(layout.fields.texture_view!.offset)) as Ptr,
+          descriptor.textureView,
+        );
+        native.memory
+          .view(storage, layout.size)
+          .setUint32(
+            layout.fields.format!.offset,
+            asUint32(descriptor.format, "a WebGPU format"),
+            true,
+          );
+      },
+    );
+  },
+};

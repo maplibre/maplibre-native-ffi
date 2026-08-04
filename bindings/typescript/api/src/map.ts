@@ -43,7 +43,21 @@ import {
   MLN_MAP_MODE,
   MLN_STYLE_IMAGE_OPTION_FIELD,
 } from "./raw/enums.ts";
-import { RenderSession, type VulkanOwnedTextureDescriptor } from "./render.ts";
+import {
+  ATTACH,
+  type MetalBorrowedTexture,
+  type MetalContext,
+  type OpenGlBorrowedTexture,
+  type OpenGlContext,
+  RenderSession,
+  type RenderTargetExtent,
+  type SurfaceDescriptor,
+  type VulkanBorrowedTexture,
+  type VulkanContext,
+  type VulkanOwnedTextureDescriptor,
+  type WebGpuBorrowedTexture,
+  type WebGpuContext,
+} from "./render.ts";
 import type { Runtime } from "./runtime.ts";
 
 /** How a map renders. */
@@ -685,6 +699,77 @@ export class Map {
       this,
       descriptor,
     );
+  }
+
+  /** Attaches a Metal session that presents through a host surface. */
+  attachMetalSurface(
+    descriptor: SurfaceDescriptor<MetalContext>,
+  ): RenderSession {
+    return ATTACH.metalSurface(this.#state.native, this, descriptor);
+  }
+
+  /** Attaches a Vulkan session that presents through a host surface. */
+  attachVulkanSurface(
+    descriptor: SurfaceDescriptor<VulkanContext>,
+  ): RenderSession {
+    return ATTACH.vulkanSurface(this.#state.native, this, descriptor);
+  }
+
+  /** Attaches an OpenGL session that presents through a host surface. */
+  attachOpenGlSurface(
+    descriptor: SurfaceDescriptor<OpenGlContext>,
+  ): RenderSession {
+    return ATTACH.openglSurface(this.#state.native, this, descriptor);
+  }
+
+  /** Attaches a Metal session that owns its texture. */
+  attachMetalOwnedTexture(descriptor: {
+    extent: RenderTargetExtent;
+    context: MetalContext;
+  }): RenderSession {
+    return ATTACH.metalOwnedTexture(this.#state.native, this, descriptor);
+  }
+
+  /** Attaches an OpenGL session that owns its texture. */
+  attachOpenGlOwnedTexture(descriptor: {
+    extent: RenderTargetExtent;
+    context: OpenGlContext;
+  }): RenderSession {
+    return ATTACH.openglOwnedTexture(this.#state.native, this, descriptor);
+  }
+
+  /** Attaches a WebGPU session that owns its texture. */
+  attachWebGpuOwnedTexture(descriptor: {
+    extent: RenderTargetExtent;
+    context: WebGpuContext;
+  }): RenderSession {
+    return ATTACH.webgpuOwnedTexture(this.#state.native, this, descriptor);
+  }
+
+  /** Attaches a Metal session that renders into a texture the host owns. */
+  attachMetalBorrowedTexture(descriptor: MetalBorrowedTexture): RenderSession {
+    return ATTACH.metalBorrowedTexture(this.#state.native, this, descriptor);
+  }
+
+  /** Attaches a Vulkan session that renders into an image the host owns. */
+  attachVulkanBorrowedTexture(
+    descriptor: VulkanBorrowedTexture,
+  ): RenderSession {
+    return ATTACH.vulkanBorrowedTexture(this.#state.native, this, descriptor);
+  }
+
+  /** Attaches an OpenGL session that renders into a texture the host owns. */
+  attachOpenGlBorrowedTexture(
+    descriptor: OpenGlBorrowedTexture,
+  ): RenderSession {
+    return ATTACH.openglBorrowedTexture(this.#state.native, this, descriptor);
+  }
+
+  /** Attaches a WebGPU session that renders into a texture the host owns. */
+  attachWebGpuBorrowedTexture(
+    descriptor: WebGpuBorrowedTexture,
+  ): RenderSession {
+    return ATTACH.webgpuBorrowedTexture(this.#state.native, this, descriptor);
   }
 
   /** Releases the map. Closing twice succeeds. */
