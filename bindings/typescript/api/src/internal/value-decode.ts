@@ -22,14 +22,51 @@ import {
 import type { Native } from "./native.ts";
 import type { Ptr } from "./transport.ts";
 
-/** Reads a pointer field at the transport's width. */
+/**
+ * A view over a value, wherever it lives.
+ *
+ * A value this binding allocated sits in a slab and is read in place. A value
+ * the library owns — everything a query result's nested pointers reach — sits
+ * outside every slab, so it is copied out before it is read. Nothing here
+ * writes, so a copy serves as well as a view.
+ */
+function valueView(native: Native, storage: Ptr, size: number): DataView {
+  if (native.memory.owns(storage)) {
+    return native.memory.view(storage, size);
+  }
+  const bytes = native.foreignBytes(storage, size);
+  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+}
+
+/** Reads bytes of a value, wherever it lives, under the same rule. */
+function valueBytes(native: Native, storage: Ptr, size: number): Uint8Array {
+  return native.memory.owns(storage)
+    ? native.memory.bytes(storage, size)
+    : native.foreignBytes(storage, size);
+}
+
+/** Reads a pointer field at the transport's width, wherever it lives. */
 function readPointer(native: Native, address: Ptr): Ptr {
-  return native.memory.readPointer(address);
+  if (native.memory.owns(address)) {
+    return native.memory.readPointer(address);
+  }
+  const width = native.transport.pointerSize;
+  const view = valueView(native, address, width);
+  return (
+    width === 8 ? view.getBigUint64(0, true) : BigInt(view.getUint32(0, true))
+  ) as Ptr;
 }
 
 /** Reads a `size_t` count field. */
 function readCount(native: Native, address: Ptr): number {
-  return native.readSize(address);
+  if (native.memory.owns(address)) {
+    return native.readSize(address);
+  }
+  const width = native.transport.pointerSize;
+  const view = valueView(native, address, width);
+  return width === 8
+    ? Number(view.getBigUint64(0, true))
+    : view.getUint32(0, true);
 }
 
 /** Copies a borrowed `mln_string_view`. */
@@ -49,28 +86,28 @@ export function readStringView(native: Native, storage: Ptr): string {
 /** Reads one `mln_json_value`. */
 export function readJsonValue(native: Native, storage: Ptr): JsonValue {
   const layout = native.layout("mln_json_value");
-  const view = native.memory.view(storage, layout.size);
+  const view = valueView(native, storage, layout.size);
   const data = (storage + BigInt(layout.fields.data!.offset)) as Ptr;
 
   switch (view.getUint32(layout.fields.type!.offset, true)) {
     case MLN_JSON_VALUE_TYPE.MLN_JSON_VALUE_TYPE_NULL:
       return { kind: "null" };
     case MLN_JSON_VALUE_TYPE.MLN_JSON_VALUE_TYPE_BOOL:
-      return { kind: "bool", value: native.memory.bytes(data, 1)[0] !== 0 };
+      return { kind: "bool", value: valueBytes(native, data, 1)[0] !== 0 };
     case MLN_JSON_VALUE_TYPE.MLN_JSON_VALUE_TYPE_UINT:
       return {
         kind: "uint",
-        value: native.memory.view(data, 8).getBigUint64(0, true),
+        value: valueView(native, data, 8).getBigUint64(0, true),
       };
     case MLN_JSON_VALUE_TYPE.MLN_JSON_VALUE_TYPE_INT:
       return {
         kind: "int",
-        value: native.memory.view(data, 8).getBigInt64(0, true),
+        value: valueView(native, data, 8).getBigInt64(0, true),
       };
     case MLN_JSON_VALUE_TYPE.MLN_JSON_VALUE_TYPE_DOUBLE:
       return {
         kind: "double",
-        value: native.memory.view(data, 8).getFloat64(0, true),
+        value: valueView(native, data, 8).getFloat64(0, true),
       };
     case MLN_JSON_VALUE_TYPE.MLN_JSON_VALUE_TYPE_STRING:
       return { kind: "string", value: readStringView(native, data) };
@@ -141,7 +178,7 @@ function readMembers(
 /** Reads one `mln_feature`. */
 export function readFeature(native: Native, storage: Ptr): Feature {
   const layout = native.layout("mln_feature");
-  const view = native.memory.view(storage, layout.size);
+  const view = valueView(native, storage, layout.size);
   const fields = layout.fields;
 
   const geometry = readGeometry(
@@ -160,19 +197,19 @@ export function readFeature(native: Native, storage: Ptr): Feature {
     case MLN_FEATURE_IDENTIFIER_TYPE.MLN_FEATURE_IDENTIFIER_TYPE_UINT:
       identifier = {
         kind: "uint",
-        value: native.memory.view(data, 8).getBigUint64(0, true),
+        value: valueView(native, data, 8).getBigUint64(0, true),
       };
       break;
     case MLN_FEATURE_IDENTIFIER_TYPE.MLN_FEATURE_IDENTIFIER_TYPE_INT:
       identifier = {
         kind: "int",
-        value: native.memory.view(data, 8).getBigInt64(0, true),
+        value: valueView(native, data, 8).getBigInt64(0, true),
       };
       break;
     case MLN_FEATURE_IDENTIFIER_TYPE.MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE:
       identifier = {
         kind: "double",
-        value: native.memory.view(data, 8).getFloat64(0, true),
+        value: valueView(native, data, 8).getFloat64(0, true),
       };
       break;
     case MLN_FEATURE_IDENTIFIER_TYPE.MLN_FEATURE_IDENTIFIER_TYPE_STRING:
@@ -191,7 +228,7 @@ export function readGeometry(native: Native, storage: Ptr): Geometry {
     return { kind: "empty" };
   }
   const layout = native.layout("mln_geometry");
-  const view = native.memory.view(storage, layout.size);
+  const view = valueView(native, storage, layout.size);
   const data = (storage + BigInt(layout.fields.data!.offset)) as Ptr;
 
   switch (view.getUint32(layout.fields.type!.offset, true)) {
@@ -273,7 +310,7 @@ export function readGeometry(native: Native, storage: Ptr): Geometry {
 
 function readLatLng(native: Native, storage: Ptr): LatLng {
   const layout = native.layout("mln_lat_lng");
-  const view = native.memory.view(storage, layout.size);
+  const view = valueView(native, storage, layout.size);
   return {
     latitude: view.getFloat64(layout.fields.latitude!.offset, true),
     longitude: view.getFloat64(layout.fields.longitude!.offset, true),

@@ -95,14 +95,9 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
 
   // Maps, queries, and style.
   {
-    id: "BND-106",
-    reason: "unwritten",
-    note: "a session can be attached now, and the query it answers decodes features the library owns through a decoder that reads binding-owned slabs only, so this case cannot pass until that is fixed",
-  },
-  {
     id: "BND-107",
     reason: "unwritten",
-    note: "the binding exposes no feature-extension query, and BND-106 blocks it besides",
+    note: "the binding exposes no feature-extension query",
   },
   { id: "BND-123", reason: "inapplicable", note: NO_SECOND_THREAD },
 

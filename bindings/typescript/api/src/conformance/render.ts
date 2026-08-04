@@ -205,5 +205,51 @@ export const RENDER_SESSION_GROUP: ConformanceGroup = {
         }
       },
     },
+    {
+      name: "copies queried features, their properties, and their state",
+      spec: ["BND-106"],
+      needs: NEEDS_CONTEXT,
+      run({ maplibre, expect, renderContext }) {
+        withRuntime(maplibre, (runtime, open) => {
+          const map = open(EXTENT);
+          const session = map.attachOpenGlOwnedTexture({
+            extent: EXTENT,
+            context: renderContext(),
+          });
+          try {
+            map.jumpTo({ center: { latitude: 0, longitude: 0 }, zoom: 4 });
+            expect.ok(loadStyle(runtime, map, POINT_STYLE), "the style loaded");
+            // A query reads the last frame, so one is drawn first. Tiles arrive
+            // through the loader, which is why this pumps rather than asking
+            // once.
+            for (let attempt = 0; attempt < 120; attempt += 1) {
+              runtime.pump(25);
+              session.renderUpdate();
+            }
+
+            // The source query answers from the source rather than the frame,
+            // so it finds the feature whatever was drawn. Everything it returns
+            // is copied out of memory the result owns, which is the point.
+            const fromSource = session.querySourceFeatures("points", {});
+            const first = expect.defined(fromSource[0], "a feature");
+            const named = first.feature.properties?.find(
+              (member) => member.name === "name",
+            );
+            expect.equal(
+              expect.defined(named, "the name property").value,
+              { kind: "string", value: "middle" } as JsonValue,
+              "the copied property",
+            );
+            expect.equal(
+              first.feature.geometry.kind,
+              "point",
+              "the copied geometry",
+            );
+          } finally {
+            session.close();
+          }
+        });
+      },
+    },
   ],
 };
