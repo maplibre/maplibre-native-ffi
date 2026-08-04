@@ -94,11 +94,6 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
   },
 
   // Maps, queries, and style.
-  {
-    id: "BND-107",
-    reason: "unwritten",
-    note: "the binding exposes no feature-extension query",
-  },
   { id: "BND-123", reason: "inapplicable", note: NO_SECOND_THREAD },
 
   // Resource requests.

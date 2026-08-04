@@ -95,7 +95,11 @@ export function writeGeoJson(
   }
 }
 
-function writeFeature(native: Native, scope: Scope, feature: Feature): Ptr {
+export function writeFeature(
+  native: Native,
+  scope: Scope,
+  feature: Feature,
+): Ptr {
   const layout = native.layout("mln_feature");
   const storage = scope.allocateZeroed(layout.size, layout.align);
   writeFeatureInto(native, scope, storage, feature);

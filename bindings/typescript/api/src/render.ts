@@ -14,7 +14,9 @@
 
 import { MaplibreError } from "./errors.ts";
 import type { ScreenPoint } from "./geo.ts";
+import type { Feature } from "./geojson.ts";
 import { writeSize } from "./internal/callbacks.ts";
+import { writeFeature } from "./internal/geojson-encode.ts";
 import { HandleState } from "./internal/handle.ts";
 import {
   stringView,
@@ -27,6 +29,7 @@ import { asInt32, asUint32 } from "./internal/numbers.ts";
 import { attachHandleState, handleStateOf } from "./internal/private.ts";
 import { readQueriedFeature } from "./internal/query-decode.ts";
 import type { Ptr } from "./internal/transport.ts";
+import { readFeature, readJsonValue } from "./internal/value-decode.ts";
 import type { JsonValue } from "./json.ts";
 import type { Map } from "./map.ts";
 import type {
@@ -36,6 +39,7 @@ import type {
   SourceFeatureQueryOptions,
 } from "./query.ts";
 import { EP } from "./raw/entrypoints.ts";
+import { MLN_FEATURE_EXTENSION_RESULT_TYPE } from "./raw/enums.ts";
 import {
   MLN_OPENGL_CONTEXT_PLATFORM,
   MLN_RENDERED_FEATURE_QUERY_OPTION_FIELD,
@@ -453,6 +457,83 @@ export class RenderSession {
     });
   }
 
+  /**
+   * Asks a source's renderer-side index about a feature it produced.
+   *
+   * The index that answers is the renderer's, which is why this belongs to a
+   * session rather than to the map: a cluster only exists once something has
+   * rendered it. The answer is either a value or the features behind it,
+   * depending on the extension asked.
+   */
+  queryFeatureExtensions(
+    sourceId: string,
+    feature: Feature,
+    extension: string,
+    extensionField: string,
+    argumentValue?: JsonValue,
+  ): FeatureExtensionResult {
+    const id = this.#state.use("RenderSession.queryFeatureExtensions");
+    const native = this.#state.native;
+    const result = native.scope((scope) => {
+      const out = scope.allocateZeroed(8);
+      native.checked(scope, EP.mln_render_session_query_feature_extensions, [
+        id,
+        stringView(native, scope, sourceId),
+        writeFeature(native, scope, feature),
+        stringView(native, scope, extension),
+        stringView(native, scope, extensionField),
+        argumentValue === undefined
+          ? 0n
+          : writeJsonValue(native, scope, argumentValue),
+        out,
+      ]);
+      return native.memory.view(out, 8).getBigUint64(0, true);
+    });
+    try {
+      return native.scope((scope) => {
+        const layout = native.layout("mln_feature_extension_result_info");
+        const storage = scope.allocateZeroed(layout.size, layout.align);
+        native.memory
+          .view(storage, layout.size)
+          .setUint32(layout.fields.size!.offset, layout.size, true);
+        native.checked(scope, EP.mln_feature_extension_result_get, [
+          result,
+          storage,
+        ]);
+        const view = native.memory.view(storage, layout.size);
+        const data = (storage + BigInt(layout.fields.data!.offset)) as Ptr;
+        if (
+          view.getUint32(layout.fields.type!.offset, true) ===
+          MLN_FEATURE_EXTENSION_RESULT_TYPE.MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE
+        ) {
+          return {
+            kind: "value" as const,
+            value: readJsonValue(native, native.memory.readPointer(data)),
+          };
+        }
+        // A collection is an array of features the result owns, read out one
+        // by one rather than borrowed.
+        const collection = native.layout("mln_feature_collection");
+        const features: Feature[] = [];
+        const first = native.memory.readPointer(data);
+        const count = native.readSize(
+          (data + BigInt(collection.fields.feature_count!.offset)) as Ptr,
+        );
+        const stride = BigInt(native.layout("mln_feature").size);
+        for (let index = 0; index < count; index += 1) {
+          features.push(
+            readFeature(native, (first + BigInt(index) * stride) as Ptr),
+          );
+        }
+        return { kind: "features" as const, features };
+      });
+    } finally {
+      native.scope((scope) => {
+        native.raw(scope, EP.mln_feature_extension_result_destroy, [result]);
+      });
+    }
+  }
+
   /** Resizes the target, which the map applies on its next pump. */
   resize(extent: RenderTargetExtent): void {
     const id = this.#state.use("RenderSession.resize");
@@ -694,6 +775,11 @@ export type OpenGlContext =
       readonly platform: "webgl";
       readonly context: number;
     };
+
+/** What a feature-extension query answered. */
+export type FeatureExtensionResult =
+  | { readonly kind: "value"; readonly value: JsonValue }
+  | { readonly kind: "features"; readonly features: readonly Feature[] };
 
 /** What a readback would produce, in device pixels. */
 export interface TextureImageInfo {

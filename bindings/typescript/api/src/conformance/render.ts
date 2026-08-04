@@ -46,6 +46,35 @@ const POINT_STYLE = JSON.stringify({
   ],
 });
 
+/** A clustered source, so the renderer builds an index to ask about. */
+const CLUSTER_STYLE = JSON.stringify({
+  version: 8,
+  name: "clustered",
+  sources: {
+    points: {
+      type: "geojson",
+      cluster: true,
+      clusterRadius: 200,
+      data: {
+        type: "FeatureCollection",
+        features: [0, 0.001, 0.002, 0.003].map((offset) => ({
+          type: "Feature",
+          properties: {},
+          geometry: { type: "Point", coordinates: [offset, offset] },
+        })),
+      },
+    },
+  },
+  layers: [
+    {
+      id: "points",
+      type: "circle",
+      source: "points",
+      paint: { "circle-radius": 20 },
+    },
+  ],
+});
+
 export const RENDER_SESSION_GROUP: ConformanceGroup = {
   name: "render sessions",
   cases: [
@@ -481,6 +510,58 @@ export const RENDER_SESSION_GROUP: ConformanceGroup = {
             expect.equal(error.kind, "unsupported", "the error kind");
           } finally {
             owned.close();
+          }
+        });
+      },
+    },
+    {
+      name: "asks a source's index about a feature it rendered",
+      spec: ["BND-107"],
+      needs: NEEDS_CONTEXT,
+      run({ maplibre, expect, renderContext }) {
+        withRuntime(maplibre, (runtime, open) => {
+          const map = open(EXTENT);
+          const session = map.attachOpenGlOwnedTexture({
+            extent: EXTENT,
+            context: renderContext(),
+          });
+          try {
+            map.jumpTo({ center: { latitude: 0, longitude: 0 }, zoom: 4 });
+            expect.ok(
+              loadStyle(runtime, map, CLUSTER_STYLE),
+              "the style loaded",
+            );
+            for (let attempt = 0; attempt < 120; attempt += 1) {
+              runtime.pump(25);
+              session.renderUpdate();
+            }
+
+            const clustered = session
+              .querySourceFeatures("points", {})
+              .find((found) =>
+                found.feature.properties?.some(
+                  (member) => member.name === "cluster_id",
+                ),
+              );
+            const cluster = expect.defined(clustered, "a clustered feature");
+
+            // The cluster index lives on the renderer, so the session is what
+            // answers. The feature goes back the way it came out.
+            const leaves = session.queryFeatureExtensions(
+              "points",
+              cluster.feature,
+              "supercluster",
+              "leaves",
+            );
+            expect.equal(leaves.kind, "features", "leaves are features");
+            if (leaves.kind === "features") {
+              expect.ok(
+                leaves.features.length > 0,
+                "the cluster has something in it",
+              );
+            }
+          } finally {
+            session.close();
           }
         });
       },

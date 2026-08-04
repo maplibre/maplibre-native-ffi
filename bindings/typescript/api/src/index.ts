@@ -117,6 +117,7 @@ export {
   type RenderTargetExtent,
   type VulkanContext,
   type VulkanOwnedTextureDescriptor,
+  type FeatureExtensionResult,
   type OpenGlFrameHandles,
   OpenGlTextureFrame,
   type TextureImageInfo,
