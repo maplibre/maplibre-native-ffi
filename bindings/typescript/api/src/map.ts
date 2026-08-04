@@ -615,6 +615,34 @@ export class Map {
       handlers.onFetchTile,
       handlers.onCancelTile,
     );
+    try {
+      this.#addCustomGeometrySource(
+        id,
+        sourceId,
+        registration,
+        options,
+        handlers.onCancelTile !== undefined,
+      );
+    } catch (error) {
+      // The registration was made before the call, because native code needs
+      // the listener addresses to install. A call that refuses leaves it
+      // holding the handlers, and through them this map, for the runtime's
+      // life, so it is retired here rather than waiting for a teardown that
+      // never comes.
+      registration.retire();
+      this.#callbacks.discard(registration.id);
+      throw error;
+    }
+  }
+
+  #addCustomGeometrySource(
+    id: bigint,
+    sourceId: string,
+    registration: CustomGeometryRegistration,
+    options: CustomGeometrySourceOptions,
+    cancels: boolean,
+  ): void {
+    const native = this.#state.native;
     native.scope((scope) => {
       const layout = native.layout("mln_custom_geometry_source_options");
       const storage = scope.allocateZeroed(layout.size, layout.align);
@@ -628,7 +656,7 @@ export class Map {
         (storage + BigInt(layout.fields.fetch_tile!.offset)) as Ptr,
         native.transport.listenerAddress(CustomGeometryListener.fetch),
       );
-      if (handlers.onCancelTile !== undefined) {
+      if (cancels) {
         native.memory.writePointer(
           (storage + BigInt(layout.fields.cancel_tile!.offset)) as Ptr,
           native.transport.listenerAddress(CustomGeometryListener.cancel),

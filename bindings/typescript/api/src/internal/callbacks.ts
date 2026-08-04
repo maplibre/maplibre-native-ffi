@@ -56,6 +56,16 @@ export interface Registration {
 export class CallbackRegistry {
   readonly #native: Native;
   readonly #registrations = new Map<bigint, Registration>();
+
+  /**
+   * How many registrations are live.
+   *
+   * A conformance case reads this to say a registration made for a call that
+   * then failed did not outlive it. Nothing in the public API needs it.
+   */
+  get registrationCount(): number {
+    return this.#registrations.size;
+  }
   readonly #records: Ptr;
   #nextId = 1n;
   #draining = false;
@@ -63,6 +73,18 @@ export class CallbackRegistry {
   constructor(native: Native) {
     this.#native = native;
     this.#records = native.memory.allocate(RECORD_BYTES * DRAIN_BATCH);
+  }
+
+  /**
+   * Drops a registration native never learned about.
+   *
+   * A retirement normally waits for native's own sentinel, because native may
+   * still be holding the identity. An installation that failed never handed
+   * the identity over, so there is nothing to wait for and the entry goes now
+   * rather than holding the handlers for the runtime's life.
+   */
+  discard(id: bigint): void {
+    this.#registrations.delete(id);
   }
 
   /** Reserves an identity a registration's `listener_data` carries. */

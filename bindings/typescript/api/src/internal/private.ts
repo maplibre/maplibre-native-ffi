@@ -14,6 +14,32 @@ import type { Native } from "./native.ts";
 
 const handleStates = new WeakMap<object, HandleState>();
 const natives = new WeakMap<object, Native>();
+const registries = new WeakMap<
+  object,
+  { readonly registrationCount: number }
+>();
+
+/** @internal Associates a facade with the callback registry it owns. */
+export function attachCallbackRegistry(
+  wrapper: object,
+  registry: { readonly registrationCount: number },
+): void {
+  registries.set(wrapper, registry);
+}
+
+/**
+ * @internal How many callback registrations a facade holds.
+ *
+ * A conformance case reads this to say a registration made for a call that
+ * then failed did not outlive it, which nothing in the public API exposes.
+ */
+export function registrationCountOf(wrapper: object): number {
+  const registry = registries.get(wrapper);
+  if (registry === undefined) {
+    throw new Error("this object owns no callback registry");
+  }
+  return registry.registrationCount;
+}
 
 /** Associates a wrapper with the handle state it owns. */
 export function attachHandleState(wrapper: object, state: HandleState): void {

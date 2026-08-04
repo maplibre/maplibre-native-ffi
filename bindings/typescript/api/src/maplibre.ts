@@ -16,7 +16,7 @@ import {
   nodeApiTransport,
 } from "./internal/node-transport.ts";
 import { asRawEnum, asUint32 } from "./internal/numbers.ts";
-import { attachNative } from "./internal/private.ts";
+import { attachCallbackRegistry, attachNative } from "./internal/private.ts";
 import type { Ptr, Transport } from "./internal/transport.ts";
 import {
   LogEvent,
@@ -110,6 +110,7 @@ export class Maplibre {
     this.#native = native;
     attachNative(this, native);
     this.#callbacks = new CallbackRegistry(native);
+    attachCallbackRegistry(this, this.#callbacks);
     // Records arrive on MapLibre's threads and wait until this context can run
     // them. The signal is installed once and drains everything queued.
     native.transport.startRecordNotifications(() => {

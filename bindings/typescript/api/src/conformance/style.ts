@@ -10,6 +10,7 @@ import {
   pointGeometry,
   polygonGeometry,
 } from "../geojson.ts";
+import { registrationCountOf } from "../internal/private.ts";
 import {
   jsonArray,
   jsonEquals,
@@ -220,6 +221,41 @@ export const HOST_DATA_GROUP: ConformanceGroup = {
             ]),
           );
           expect.ok(map.hasStyleSource("points"), "the source survived");
+        });
+      },
+    },
+    {
+      name: "retires a custom geometry registration the library refused",
+      run({ maplibre, expect }) {
+        withRuntime(maplibre, (runtime, open) => {
+          const map = open();
+          expect.ok(loadStyle(runtime, map), "the style loaded");
+          map.addCustomGeometrySource(
+            "taken",
+            { onFetchTile: () => undefined },
+            { minZoom: 0, maxZoom: 4 },
+          );
+
+          // The registration is made before the call, because native code
+          // needs the listener addresses to install. A second source under a
+          // name already taken is refused, and the registration made for it
+          // must not outlive the refusal: it holds the handlers, and through
+          // them this map, for the runtime's life.
+          const before = registrationCountOf(maplibre);
+          expect.throwsAny(
+            () =>
+              map.addCustomGeometrySource(
+                "taken",
+                { onFetchTile: () => undefined },
+                { minZoom: 0, maxZoom: 4 },
+              ),
+            "a source under a name already taken",
+          );
+          expect.equal(
+            registrationCountOf(maplibre),
+            before,
+            "the refused registration was retired",
+          );
         });
       },
     },
