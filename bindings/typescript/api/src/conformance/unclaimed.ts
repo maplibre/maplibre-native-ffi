@@ -61,13 +61,13 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
   },
   {
     id: "BND-141",
-    reason: "unwritten",
-    note: "a rewrite rule is observed to apply; the requirement is that request data reaches user code as language-owned copies, and a native rule table never reaches user code to copy",
+    reason: "inapplicable",
+    note: "the requirement is about data crossing into user code, and this binding installs the adapter's native rewrite rule table rather than a JavaScript callback, so no transform request data reaches user code to be copied; a binding that grew a callback transform would have to claim this",
   },
   {
     id: "BND-158",
-    reason: "unwritten",
-    note: "headers are installed and a request arrives; the requirement adds that headers cross as copied values and that duplicate field names are rejected case-insensitively",
+    reason: "inapplicable",
+    note: "the requirement is about headers crossing a callback boundary as copied values, and this binding installs the adapter's native header rule table rather than a JavaScript callback; the rules it supplies are copied at registration, which BND-159 is where that would be proven",
   },
   {
     id: "BND-159",
