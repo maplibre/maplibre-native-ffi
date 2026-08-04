@@ -74,7 +74,7 @@ export function decodeEvent(
   };
 }
 
-function decodePayload(
+export function decodePayload(
   native: Native,
   payloadType: number,
   pointer: Ptr,

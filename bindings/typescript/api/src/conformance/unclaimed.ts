@@ -72,11 +72,6 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
     reason: "unwritten",
     note: "needs fault injection into a copy that follows a native snapshot",
   },
-  {
-    id: "BND-087",
-    reason: "unwritten",
-    note: "payload size is validated and no case proves the check precedes the read",
-  },
 
   // Maps, queries, and style.
   { id: "BND-123", reason: "inapplicable", note: NO_SECOND_THREAD },

@@ -4,7 +4,10 @@
 
 import { errorKindForStatus, MaplibreError } from "../errors.ts";
 import { RuntimeEventType } from "../events.ts";
+import { decodePayload } from "../internal/event-decode.ts";
+import { nativeOf } from "../internal/private.ts";
 import { NetworkStatus } from "../maplibre.ts";
+import { MLN_RUNTIME_EVENT_PAYLOAD_TYPE } from "../raw/enums.ts";
 import type { ConformanceGroup } from "./harness.ts";
 import { EMPTY_STYLE, pumpFor, withRuntime } from "./harness.ts";
 
@@ -184,6 +187,46 @@ export const RUNTIME_GROUP: ConformanceGroup = {
           "and does not repeat the last native diagnostic",
         );
         runtime.close();
+      },
+    },
+    {
+      name: "keeps a payload smaller than this build expects as raw bytes",
+      spec: ["BND-087"],
+      run({ maplibre, expect }) {
+        const native = nativeOf(maplibre);
+        const layout = native.layout("mln_runtime_event_render_frame");
+        const type =
+          MLN_RUNTIME_EVENT_PAYLOAD_TYPE.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME;
+
+        native.scope((scope) => {
+          // A future library can shrink or replace a payload, and no call this
+          // build can make produces one, so the decoder is given a short one
+          // directly.
+          const storage = scope.allocateZeroed(layout.size, layout.align);
+          const short = decodePayload(native, type, storage, layout.size - 1);
+          expect.equal(
+            short.kind,
+            "unknown",
+            "a payload shorter than the layout is not read as one",
+          );
+          if (short.kind === "unknown") {
+            expect.equal(short.rawType, type, "the raw payload type survives");
+            expect.equal(
+              short.bytes.length,
+              layout.size - 1,
+              "and exactly what was sent is kept",
+            );
+          }
+
+          // The same payload at its full size decodes as itself, so the guard
+          // is a size check rather than a decoder that never runs.
+          const whole = decodePayload(native, type, storage, layout.size);
+          expect.notEqual(
+            whole.kind,
+            "unknown",
+            "a payload of the expected size is decoded",
+          );
+        });
       },
     },
     {
