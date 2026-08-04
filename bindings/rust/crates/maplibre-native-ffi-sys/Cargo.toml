@@ -16,6 +16,14 @@ repository.workspace = true
 metal = []
 opengl = []
 vulkan = []
+webgpu = []
+
+# A browser module is linked by whoever builds it, and cargo links this one, so
+# the platform library arrives as an rlib in the same crate graph. A prebuilt
+# archive would bring a second copy of `std`, which collides with the module's
+# own on the allocator shims and the panic runtime.
+[target.'cfg(target_os = "emscripten")'.dependencies]
+mln-ffi-platform = { path = "../../../../src/platform/rust" }
 
 [build-dependencies]
 bindgen = "0.72.1"

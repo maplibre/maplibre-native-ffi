@@ -1,22 +1,34 @@
-// Runs a browser test page in headless Chromium and exits with its status.
+// Runs a browser test module in headless Chromium and exits with its status.
 //
 // Two things make this more than "open a file:// URL":
 //
 //   * The build uses pthreads, so the page needs SharedArrayBuffer, which needs
 //     cross-origin isolation. That means COOP/COEP response headers, and those
 //     need a real origin, so the page is served rather than opened from disk.
-//   * A page cannot set a process exit status, so the shell posts Unity's status
-//     back here (see src/c_api/tests/browser_shell.html) and this process exits
-//     with it.
+//   * A page cannot set a process exit status, so the page posts the module's
+//     status back here and this process exits with it.
 //
-// Usage: node scripts/run-browser-test.mjs <page.html> [--timeout-seconds N]
-//        [--browser-arg FLAG]...
+// It takes either form emcc produces. The C suite links an `.html` page, whose
+// shell is src/c_api/tests/browser_shell.html. A cargo test binary is a `.js`
+// module with no page, so one is generated beside it, along with the worker that
+// hosts the module: `main` runs on a worker thread, where the blocking MapLibre
+// does during teardown is legal.
 //
-// Backends need different things from the browser, so the flags they need come
-// from the build rather than being hardcoded here.
+// Usage: node scripts/run-browser-test.mjs <page.html|module.js>
+//        [--timeout-seconds N] [--render-backend NAME] [--browser-arg FLAG]...
+//        [--module-arg ARG]...
+//
+// Backends need different things from the browser, and both suites name the
+// backend rather than the flags, so the mapping lives here alone.
 
 import { spawn } from "node:child_process";
-import { createReadStream, existsSync, readdirSync, statSync } from "node:fs";
+import {
+  createReadStream,
+  existsSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
@@ -30,6 +42,39 @@ const CONTENT_TYPES = {
   ".wasm": "application/wasm",
   ".data": "application/octet-stream",
   ".map": "application/json",
+};
+
+// Style documents the binding suite's resource tests fetch. A browser module has
+// no in-process TCP server to stand one up, so this server is the fixture, and
+// it is deliberately an oracle: it serves only what a passing run should ask
+// for, and each document names itself through the layer it carries. A request
+// for a URL that a resource transform should have rewritten therefore fails the
+// style load instead of loading an identical document.
+const FIXTURE_STYLE_LAYER_IDS = {
+  "/__fixture/http-style.json": "http-fixture",
+  "/__fixture/rewritten-style.json": "rewritten",
+  "/__fixture/original-after-clear.json": "original-after-clear",
+};
+
+// Chromium exposes WebGPU through Dawn on Vulkan, and the Vulkan feature is off
+// by default on Linux; unsafe-webgpu then allows the software adapter
+// SwiftShader provides. Both are needed and neither alone is enough -- verified
+// against a plain page, where without them navigator.gpu is present but
+// requestAdapter() returns null, forceFallbackAdapter included. The WebGL run
+// gets neither: it needs no Vulkan, and takes its software GL from
+// --enable-unsafe-swiftshader instead.
+const BACKEND_BROWSER_ARGS = {
+  // A canvas-backed WebGPU swapchain needs a shared image the compositor can
+  // also read. Headless has no display compositor by default, which is what
+  // "Could not find SharedImageBackingFactory" means, so the software path is
+  // enabled alongside Vulkan for surface sessions to present into a canvas.
+  webgpu: [
+    "--enable-unsafe-webgpu",
+    "--enable-features=Vulkan",
+    "--enable-unsafe-swiftshader",
+    "--use-angle=swiftshader",
+  ],
+  opengl: ["--enable-unsafe-swiftshader"],
 };
 
 function fail(message) {
@@ -64,7 +109,9 @@ function findBrowser() {
   if (existsSync(cache)) {
     for (const entry of readdirSync(cache).sort().reverse()) {
       if (!entry.startsWith("chromium-")) continue;
+      // Playwright has shipped both layouts; newer builds carry the arch.
       for (const relative of [
+        "chrome-linux64/chrome",
         "chrome-linux/chrome",
         "chrome-mac/Chromium.app/Contents/MacOS/Chromium",
       ]) {
@@ -78,20 +125,126 @@ function findBrowser() {
   );
 }
 
-const [pagePath, ...rest] = process.argv.slice(2);
-if (!pagePath)
-  fail("usage: run-browser-test.mjs <page.html> [--timeout-seconds N]");
-if (!existsSync(pagePath)) fail(`page does not exist: ${pagePath}`);
+const [targetPath, ...rest] = process.argv.slice(2);
+if (!targetPath)
+  fail(
+    "usage: run-browser-test.mjs <page.html|module.js> [--timeout-seconds N]",
+  );
+if (!existsSync(targetPath)) fail(`test target does not exist: ${targetPath}`);
 
 let timeoutSeconds = 600;
 const extraBrowserArgs = [];
+const moduleArgs = [];
 for (let i = 0; i < rest.length; i += 1) {
   if (rest[i] === "--timeout-seconds") timeoutSeconds = Number(rest[i + 1]);
   if (rest[i] === "--browser-arg") extraBrowserArgs.push(rest[i + 1]);
+  if (rest[i] === "--module-arg") moduleArgs.push(rest[i + 1]);
+  if (rest[i] === "--render-backend") {
+    const backend = rest[i + 1];
+    if (!(backend in BACKEND_BROWSER_ARGS))
+      fail(`no browser flags are known for the ${backend} backend`);
+    extraBrowserArgs.push(...BACKEND_BROWSER_ARGS[backend]);
+  }
 }
 
-const root = path.dirname(path.resolve(pagePath));
-const pageName = path.basename(pagePath);
+const root = path.dirname(path.resolve(targetPath));
+const pageName =
+  path.extname(targetPath) === ".html"
+    ? path.basename(targetPath)
+    : generateModulePage(path.basename(targetPath));
+
+// Writes the page and worker a cargo test binary needs, which emcc does not
+// produce for a `.js` output.
+//
+// The page hosts the module in a worker of its own so the browser's main thread
+// stays out of it entirely. Whether the module then proxies its entry point onto
+// a further pthread is the module's own business; see bindings/rust/mise.toml.
+function generateModulePage(moduleName) {
+  const stem = moduleName.replace(/\.js$/, "");
+  // The HTML parser ends an inline script at the first `</script`, whatever the
+  // JavaScript around it means, so a value carrying one has to reach the script
+  // escaped. Test filters and libtest arguments arrive here from a command line.
+  const embed = (value) => JSON.stringify(value).replaceAll("</", "<\\/");
+  const escapeText = (value) =>
+    value
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;");
+  const workerName = `${stem}.runner-worker.js`;
+  const generatedPageName = `${stem}.runner.html`;
+
+  writeFileSync(
+    path.join(root, workerName),
+    `self.onmessage = (event) => {
+  const lines = [];
+  const record = (text) => {
+    lines.push(text);
+    self.postMessage({ line: text });
+  };
+  self.Module = {
+    // Emscripten resolves the pthread worker script from the running script's
+    // URL, which in here is this worker rather than the module, so the pool
+    // would load this file forever without being told otherwise.
+    mainScriptUrlOrBlob: new URL(${JSON.stringify(moduleName)}, self.location.href).href,
+    arguments: event.data.args,
+    // Only a module linked with ENV among its exported runtime methods can be
+    // handed the fixture origin. One that was not is a module with no test
+    // reading it, so this reports nothing and lets the run proceed.
+    preRun: [() => {
+      if (typeof ENV !== "undefined") Object.assign(ENV, event.data.env);
+    }],
+    print: record,
+    printErr: record,
+    onExit: (status) => self.postMessage({ status, output: lines.join("\\n") }),
+    onAbort: (reason) => {
+      record("aborted: " + reason);
+      self.postMessage({ status: 70, output: lines.join("\\n") });
+    },
+  };
+  importScripts(${JSON.stringify(moduleName)});
+};
+`,
+  );
+
+  writeFileSync(
+    path.join(root, generatedPageName),
+    `<!DOCTYPE html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>${escapeText(stem)}</title></head>
+  <body>
+    <script>
+const report = (payload) =>
+  void fetch("/__result", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+window.addEventListener("error", (event) =>
+  report({ status: 70, output: "uncaught error: " + event.message }));
+window.addEventListener("unhandledrejection", (event) =>
+  report({ status: 70, output: "unhandled rejection: " + event.reason }));
+
+const worker = new Worker(${embed(workerName)});
+worker.onmessage = (event) => {
+  if (event.data.line !== undefined) {
+    console.log(event.data.line);
+    return;
+  }
+  report(event.data);
+};
+worker.onerror = (event) =>
+  report({ status: 70, output: "worker error: " + event.message });
+worker.postMessage({
+  args: ${embed(moduleArgs)},
+  env: { MLN_FFI_TEST_FIXTURE_ORIGIN: location.origin },
+});
+    </script>
+  </body>
+</html>
+`,
+  );
+  return generatedPageName;
+}
 
 let settle;
 const finished = new Promise((resolve) => {
@@ -116,6 +269,18 @@ const server = createServer((request, response) => {
         settle({ status: 2, output: `malformed result: ${String(error)}` });
       }
     });
+    return;
+  }
+
+  const layerId = FIXTURE_STYLE_LAYER_IDS[url.pathname];
+  if (layerId !== undefined) {
+    response.writeHead(200, { "Content-Type": "application/json" }).end(
+      JSON.stringify({
+        version: 8,
+        sources: {},
+        layers: [{ id: layerId, type: "background" }],
+      }),
+    );
     return;
   }
 

@@ -12,7 +12,7 @@ function(mln_ffi_configure_platform_dependencies target)
       MLN_FFI_ARCHIVE_FORMAT
       elf
       MLN_FFI_STATIC_ARCHIVES
-      "mbgl-vendor-icu;mln_ffi_platform_rust"
+      "mbgl-vendor-icu"
       MLN_FFI_TEST_SUPPORTED
       FALSE)
   if(ANDROID_ABI STREQUAL "arm64-v8a")

@@ -56,9 +56,8 @@ function(mln_ffi_configure_render_dependencies target)
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
     # WebGL2 is GLES 3.0, which is what MapLibre's GL backend targets. FULL_ES3
     # supplies the client-side array emulation the backend expects.
-    target_link_options(
-      ${target}
-      INTERFACE "-sMIN_WEBGL_VERSION=2" "-sMAX_WEBGL_VERSION=2" "-sFULL_ES3=1")
+    mln_ffi_emscripten_interface_link_options(
+      ${target} "-sMIN_WEBGL_VERSION=2" "-sMAX_WEBGL_VERSION=2" "-sFULL_ES3=1")
   else()
     message(
       FATAL_ERROR
@@ -155,19 +154,14 @@ function(mln_ffi_configure_renderer target)
         "Unsupported OpenGL context provider: ${MLN_FFI_OPENGL_CONTEXT_PROVIDER}")
   endif()
 
+  # An OpenGL surface descriptor names a context and the surface to present to
+  # separately: an HGLRC with an HDC, an EGLContext with an EGLSurface. A WebGL
+  # context is created against its canvas and carries that binding, so the
+  # context already names the surface and the descriptor's surface field is null
+  # there; see validate_opengl_surface_descriptor().
   set(MLN_FFI_OPENGL_SOURCES
-      ${PROJECT_SOURCE_DIR}/src/render/opengl/opengl_texture_session.cpp)
-  if(NOT MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
-    # An OpenGL surface descriptor names a surface object to present to. A
-    # browser WebGL context is bound to its canvas, so a host has nothing to put
-    # there, and the browser composites the canvas without a swap. Settling that
-    # descriptor shape belongs with the first browser host, so the browser build
-    # takes the unsupported stub for now.
-    #
-    # TODO(browser-surface): see #37.
-    list(APPEND MLN_FFI_OPENGL_SOURCES
-         ${PROJECT_SOURCE_DIR}/src/render/opengl/opengl_surface_session.cpp)
-  endif()
+      ${PROJECT_SOURCE_DIR}/src/render/opengl/opengl_texture_session.cpp
+      ${PROJECT_SOURCE_DIR}/src/render/opengl/opengl_surface_session.cpp)
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
     list(APPEND MLN_FFI_OPENGL_SOURCES
          ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_context.cpp)

@@ -1,19 +1,31 @@
 use std::cell::Cell;
 use std::error::Error as StdError;
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+use std::ffi::CStr;
+use std::ffi::CString;
 #[cfg(target_os = "windows")]
 use std::ffi::c_char;
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 use std::ffi::c_void;
-use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+#[cfg(not(target_os = "emscripten"))]
 use ash::vk;
+#[cfg(not(target_os = "emscripten"))]
 use ash::vk::Handle;
+#[cfg(not(target_os = "emscripten"))]
+use glow as gl_api;
+#[cfg(not(target_os = "emscripten"))]
 use glow::HasContext;
+// glow's manifest declares js-sys for every wasm32 target and those crates do
+// not build for Emscripten, so the browser fixtures bind the entry points they
+// need directly. See webgl_gl.rs.
+#[cfg(target_os = "emscripten")]
+mod webgl_gl;
 #[cfg(target_os = "linux")]
 use glutin_egl_sys::egl;
 #[cfg(target_os = "linux")]
@@ -21,6 +33,8 @@ use glutin_egl_sys::egl::types::{EGLConfig, EGLContext, EGLDisplay, EGLSurface, 
 #[cfg(target_os = "linux")]
 use libloading::Library;
 use static_assertions::assert_not_impl_any;
+#[cfg(target_os = "emscripten")]
+use webgl_gl as gl_api;
 
 use super::*;
 use crate::logging::test_support::LoggingTestGuard;
@@ -41,6 +55,10 @@ assert_not_impl_any!(OpenGLOwnedTextureFrameHandle: Send, Sync);
 
 const FEATURE_STATE_STYLE_JSON: &str = r#"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}}]}}},"layers":[{"id":"circle","type":"circle","source":"point","paint":{"circle-radius":["case",["boolean",["feature-state","hover"],false],10,5]}}]}"#;
 const QUERY_STYLE_JSON: &str = r##"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","geometry":{"type":"Point","coordinates":[-122.4194,37.7749]},"properties":{"kind":"capital","visible":true}}]}}},"layers":[{"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}},{"id":"point-circle","type":"circle","source":"point","paint":{"circle-color":"#f97316","circle-radius":12}}]}"##;
+/// The colour QUERY_STYLE_JSON paints over every pixel it covers, which is how
+/// a test tells a rendered frame from a blank one.
+const QUERY_STYLE_BACKGROUND_RGBA: [u8; 4] = [0xd8, 0xf1, 0xff, 0xff];
+
 const CLUSTER_BASE_STYLE_JSON: &str = r##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#ffffff"}}]}"##;
 fn create_owned_texture_session(
     map: &MapAttachRef,
@@ -55,6 +73,16 @@ fn create_owned_texture_session(
         ))?;
         return Ok((OwnedTextureTestContext::Metal(context), session));
     }
+    #[cfg(mln_webgpu_backend)]
+    if backends.contains(RenderBackendMask::WEBGPU) {
+        let context = WebGpuTestContext::new()?;
+        let session = map.attach_webgpu_owned_texture(&WebGpuOwnedTextureDescriptor::new(
+            extent,
+            context.descriptor(),
+        ))?;
+        return Ok((OwnedTextureTestContext::WebGpu(context), session));
+    }
+    #[cfg(not(target_os = "emscripten"))]
     if backends.contains(RenderBackendMask::VULKAN) {
         let context = VulkanTestContext::new()?;
         let session = map.attach_vulkan_owned_texture(&VulkanOwnedTextureDescriptor::new(
@@ -63,12 +91,29 @@ fn create_owned_texture_session(
         ))?;
         return Ok((OwnedTextureTestContext::Vulkan(Box::new(context)), session));
     }
-    Err("native library does not support Metal or Vulkan owned texture sessions".into())
+    if has_opengl_test_context_backend() {
+        let context = OpenGLTestContext::new(extent.width, extent.height)?;
+        let session = map.attach_opengl_owned_texture(&OpenGLOwnedTextureDescriptor::new(
+            extent,
+            context.descriptor(),
+        ))?;
+        return Ok((OwnedTextureTestContext::OpenGL(Box::new(context)), session));
+    }
+    Err("no configured render backend offers an owned texture test session".into())
 }
 
+/// Whether this build can attach an owned texture session for the tests above.
+///
+/// Every backend the C API offers one for qualifies, so long as the fixture can
+/// build a context for it: WebGPU needs a device, which is a browser build of
+/// this suite, and OpenGL needs a platform context provider the fixture
+/// implements. A test guarded on this runs its own backend's session or none.
 fn has_test_owned_texture_session_backend() -> bool {
     let backends = crate::supported_render_backends();
+    let webgpu = cfg!(mln_webgpu_backend) && backends.contains(RenderBackendMask::WEBGPU);
     backends.intersects(RenderBackendMask::METAL | RenderBackendMask::VULKAN)
+        || webgpu
+        || has_opengl_test_context_backend()
 }
 
 fn has_opengl_backend() -> bool {
@@ -88,11 +133,16 @@ fn has_opengl_test_context_backend() -> bool {
     {
         crate::supported_opengl_context_providers().contains(OpenGLContextProviderMask::WGL)
     }
-    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    #[cfg(target_os = "emscripten")]
     {
-        // The Rust test helper only implements Linux EGL and Windows WGL.
-        // macOS EGL remains covered by bindings that can create a test context
-        // and by the map examples until this helper grows a native EGL path.
+        crate::supported_opengl_context_providers().contains(OpenGLContextProviderMask::WEBGL)
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "emscripten")))]
+    {
+        // The Rust test helper only implements Linux EGL, Windows WGL, and
+        // browser WebGL. macOS EGL remains covered by bindings that can create a
+        // test context and by the map examples until this helper grows a native
+        // EGL path.
         false
     }
 }
@@ -146,15 +196,43 @@ fn create_opengl_borrowed_texture_session(
         physical_height,
         texture.descriptor(),
         texture.name(),
-        glow::TEXTURE_2D,
+        gl_api::TEXTURE_2D,
     ))?;
     Ok((texture, session))
+}
+
+/// Attaches a WebGPU caller-owned texture session, the way a browser host that
+/// allocates its own render target does.
+#[cfg(mln_webgpu_backend)]
+fn create_webgpu_borrowed_texture_session(
+    map: &MapAttachRef,
+    extent: RenderTargetExtent,
+) -> std::result::Result<
+    (
+        WebGpuTestContext,
+        WebGpuBorrowedTexture,
+        RenderSessionHandle,
+    ),
+    Box<dyn StdError>,
+> {
+    let context = WebGpuTestContext::new()?;
+    let (physical_width, physical_height) = extent.physical_size()?;
+    let texture = WebGpuBorrowedTexture::new(&context, physical_width, physical_height)?;
+    let session = map.attach_webgpu_borrowed_texture(&texture.descriptor(extent, &context))?;
+    Ok((context, texture, session))
 }
 
 #[allow(dead_code)]
 enum OwnedTextureTestContext {
     Metal(MetalTestContext),
+    // A browser build has no Vulkan.
+    #[cfg(not(target_os = "emscripten"))]
     Vulkan(Box<VulkanTestContext>),
+    #[cfg(mln_webgpu_backend)]
+    WebGpu(WebGpuTestContext),
+    // Boxed for the same reason Vulkan is: the context is several kilobytes
+    // and every other variant is a handful of bytes.
+    OpenGL(Box<OpenGLTestContext>),
 }
 
 impl OwnedTextureTestContext {
@@ -167,8 +245,16 @@ impl OwnedTextureTestContext {
             Self::Metal(context) => map.attach_metal_owned_texture(
                 &MetalOwnedTextureDescriptor::new(extent, context.descriptor()),
             ),
+            #[cfg(not(target_os = "emscripten"))]
             Self::Vulkan(context) => map.attach_vulkan_owned_texture(
                 &VulkanOwnedTextureDescriptor::new(extent, context.descriptor()),
+            ),
+            #[cfg(mln_webgpu_backend)]
+            Self::WebGpu(context) => map.attach_webgpu_owned_texture(
+                &WebGpuOwnedTextureDescriptor::new(extent, context.descriptor()),
+            ),
+            Self::OpenGL(context) => map.attach_opengl_owned_texture(
+                &OpenGLOwnedTextureDescriptor::new(extent, context.descriptor()),
             ),
         }
     }
@@ -189,6 +275,22 @@ impl OwnedTextureTestContext {
             Self::Metal(_) => session.set_metal_borrowed_texture_target(
                 &MetalBorrowedTextureDescriptor::new(extent.clone(), 64, 64, placeholder),
             ),
+            #[cfg(mln_webgpu_backend)]
+            Self::WebGpu(context) => {
+                // A placeholder handle is never dereferenced, but the setter has
+                // to match the backend or an unsupported build would answer
+                // instead of the session kind.
+                session.set_webgpu_borrowed_texture_target(&WebGpuBorrowedTextureDescriptor::new(
+                    extent.clone(),
+                    64,
+                    64,
+                    context.descriptor(),
+                    placeholder,
+                    placeholder,
+                    0,
+                ))
+            }
+            #[cfg(not(target_os = "emscripten"))]
             Self::Vulkan(context) => {
                 session.set_vulkan_borrowed_texture_target(&VulkanBorrowedTextureDescriptor::new(
                     extent.clone(),
@@ -200,6 +302,16 @@ impl OwnedTextureTestContext {
                     1,
                     0,
                     1,
+                ))
+            }
+            Self::OpenGL(context) => {
+                session.set_opengl_borrowed_texture_target(&OpenGLBorrowedTextureDescriptor::new(
+                    extent.clone(),
+                    64,
+                    64,
+                    context.descriptor(),
+                    1,
+                    gl_api::TEXTURE_2D,
                 ))
             }
         }
@@ -222,8 +334,32 @@ impl OwnedTextureTestContext {
                 frame.close().unwrap();
                 matches
             }
+            #[cfg(mln_webgpu_backend)]
+            Self::WebGpu(_) => {
+                let Ok(frame) = session.acquire_webgpu_owned_texture_frame() else {
+                    return false;
+                };
+                let metadata = frame.frame().unwrap();
+                let matches = metadata.width == expected.width
+                    && metadata.height == expected.height
+                    && metadata.scale_factor == expected.scale_factor;
+                frame.close().unwrap();
+                matches
+            }
+            #[cfg(not(target_os = "emscripten"))]
             Self::Vulkan(_) => {
                 let Ok(frame) = session.acquire_vulkan_owned_texture_frame() else {
+                    return false;
+                };
+                let metadata = frame.frame().unwrap();
+                let matches = (metadata.width, metadata.height)
+                    == (expected.width, expected.height)
+                    && metadata.scale_factor == expected.scale_factor;
+                frame.close().unwrap();
+                matches
+            }
+            Self::OpenGL(_) => {
+                let Ok(frame) = session.acquire_opengl_owned_texture_frame() else {
                     return false;
                 };
                 let metadata = frame.frame().unwrap();
@@ -277,11 +413,13 @@ impl MetalTestContext {
 struct OpenGLTestContext {
     descriptor: OpenGLContextDescriptor,
     surface_handle: NativePointer,
-    gl: glow::Context,
+    gl: gl_api::Context,
     #[cfg(target_os = "linux")]
     platform: EglTestContext,
     #[cfg(target_os = "windows")]
     platform: WglTestContext,
+    #[cfg(target_os = "emscripten")]
+    platform: WebGlTestContext,
 }
 
 #[cfg(target_os = "linux")]
@@ -515,6 +653,755 @@ fn load_egl_bindings(lib: &Library) -> std::result::Result<egl::Egl, Box<dyn Std
         })
     };
     Ok(egl)
+}
+
+/// The WebGPU header the module links, bound by this crate's build script.
+///
+/// Generated rather than taken from a crate: the fixtures hand their device to
+/// a session as an opaque handle, so it has to come from the very emdawnwebgpu
+/// instance the core links.
+#[cfg(mln_webgpu_backend)]
+#[allow(
+    non_snake_case,
+    non_camel_case_types,
+    non_upper_case_globals,
+    dead_code
+)]
+mod webgpu_sys {
+    include!(concat!(env!("OUT_DIR"), "/webgpu.rs"));
+}
+
+#[cfg(mln_webgpu_backend)]
+unsafe extern "C" {
+    /// Suspends and resumes through a task, which is what lets the JavaScript
+    /// job queue run. An ordinary sleep blocks the thread with `Atomics.wait`
+    /// and would never let it run at all.
+    fn emscripten_sleep(milliseconds: u32);
+}
+
+/// A WebGPU device of the fixture's own, standing in for a browser host's.
+///
+/// One per fixture rather than one per thread: a device outliving its fixture
+/// holds a runtime keepalive, and libtest offers no hook to end one afterwards.
+/// A device also belongs to the thread that created it, because emdawnwebgpu
+/// keeps WebGPU objects in the JS realm of that worker, and the suite attaches
+/// sessions from more than one thread.
+#[cfg(mln_webgpu_backend)]
+struct WebGpuTestContext {
+    instance: webgpu_sys::WGPUInstance,
+    adapter: webgpu_sys::WGPUAdapter,
+    device: webgpu_sys::WGPUDevice,
+}
+
+/// A slot an asynchronous WebGPU callback writes into, owned by the callback.
+///
+/// A wait here is bounded, and WebGPU delivers the callback whether or not the
+/// wait is still listening. A slot on the waiting stack, or inside the fixture
+/// the wait gives up on, would be written through after it is gone, so the
+/// callback holds a reference of its own and drops it when it fires.
+#[cfg(mln_webgpu_backend)]
+type CallbackSlot<T> = std::rc::Rc<std::cell::Cell<Option<T>>>;
+
+#[cfg(mln_webgpu_backend)]
+fn callback_slot<T>() -> (CallbackSlot<T>, *mut std::ffi::c_void) {
+    let slot: CallbackSlot<T> = std::rc::Rc::new(std::cell::Cell::new(None));
+    (slot.clone(), std::rc::Rc::into_raw(slot).cast_mut().cast())
+}
+
+/// Stores a callback's result and releases the reference it was given.
+///
+/// # Safety
+///
+/// `user_data` is the pointer [`callback_slot`] produced for this one callback,
+/// which WebGPU delivers exactly once, and `T` is the type that slot was made
+/// with. The pointer carries no type of its own, so each caller names it.
+#[cfg(mln_webgpu_backend)]
+unsafe fn fill_callback_slot<T>(user_data: *mut std::ffi::c_void, value: T) {
+    // SAFETY: the caller guarantees this pointer came from callback_slot and
+    // reaches here once, so this takes back that one reference.
+    let slot = unsafe {
+        std::rc::Rc::from_raw(user_data.cast_const().cast::<std::cell::Cell<Option<T>>>())
+    };
+    slot.set(Some(value));
+}
+
+/// Borrows a null-terminated string as the view WebGPU takes.
+///
+/// # Safety
+///
+/// The returned view points into `value`, which outlives every call it is
+/// passed to.
+#[cfg(mln_webgpu_backend)]
+fn string_view(value: &CString) -> webgpu_sys::WGPUStringView {
+    webgpu_sys::WGPUStringView {
+        data: value.as_ptr(),
+        length: value.as_bytes().len(),
+    }
+}
+
+#[cfg(mln_webgpu_backend)]
+unsafe extern "C" fn on_adapter(
+    status: webgpu_sys::WGPURequestAdapterStatus,
+    adapter: webgpu_sys::WGPUAdapter,
+    _message: webgpu_sys::WGPUStringView,
+    user_data: *mut std::ffi::c_void,
+    _reserved: *mut std::ffi::c_void,
+) {
+    let adapter = if status == webgpu_sys::WGPURequestAdapterStatus_Success {
+        adapter
+    } else {
+        std::ptr::null_mut()
+    };
+    // SAFETY: user_data is this request's adapter slot, delivered once.
+    unsafe { fill_callback_slot::<webgpu_sys::WGPUAdapter>(user_data, adapter) };
+}
+
+#[cfg(mln_webgpu_backend)]
+unsafe extern "C" fn on_device(
+    status: webgpu_sys::WGPURequestDeviceStatus,
+    device: webgpu_sys::WGPUDevice,
+    _message: webgpu_sys::WGPUStringView,
+    user_data: *mut std::ffi::c_void,
+    _reserved: *mut std::ffi::c_void,
+) {
+    let device = if status == webgpu_sys::WGPURequestDeviceStatus_Success {
+        device
+    } else {
+        std::ptr::null_mut()
+    };
+    // SAFETY: user_data is this request's device slot, delivered once.
+    unsafe { fill_callback_slot::<webgpu_sys::WGPUDevice>(user_data, device) };
+}
+
+/// Waits for one of WebGPU's futures.
+///
+/// Adapter and device requests are asynchronous. The fixtures run on a worker
+/// where waiting is legal, so this blocks rather than unwinding the test into a
+/// callback. Bounded, so a browser without a WebGPU adapter fails the fixture
+/// rather than hanging the suite until the runner's timeout.
+///
+/// A non-zero timeout is only legal on an instance that asked for timed waits;
+/// see [`WebGpuTestContext::new`].
+#[cfg(mln_webgpu_backend)]
+fn await_future(
+    instance: webgpu_sys::WGPUInstance,
+    future: webgpu_sys::WGPUFuture,
+) -> std::result::Result<(), Box<dyn StdError>> {
+    const TIMEOUT_NS: u64 = 5 * 1000 * 1000 * 1000;
+    let mut wait = webgpu_sys::WGPUFutureWaitInfo {
+        future,
+        completed: 0,
+    };
+    // SAFETY: instance is live and wait points at one writable entry.
+    let status = unsafe { webgpu_sys::wgpuInstanceWaitAny(instance, 1, &mut wait, TIMEOUT_NS) };
+    if status != webgpu_sys::WGPUWaitStatus_Success || wait.completed == 0 {
+        return Err(format!(
+            "waiting on a WebGPU future failed (status {status}, completed {})",
+            wait.completed
+        )
+        .into());
+    }
+    Ok(())
+}
+
+#[cfg(mln_webgpu_backend)]
+impl WebGpuTestContext {
+    fn new() -> std::result::Result<Self, Box<dyn StdError>> {
+        // Waiting on a future with a timeout has to be asked for up front, or
+        // wgpuInstanceWaitAny rejects every non-zero timeout instead of waiting.
+        // The capability needs Asyncify or JSPI, which the emdawnwebgpu port
+        // enables, and wgpuCreateInstance answers null when asked without it.
+        let mut descriptor: webgpu_sys::WGPUInstanceDescriptor = unsafe { std::mem::zeroed() };
+        descriptor.capabilities.timedWaitAnyEnable = 1;
+        // SAFETY: descriptor is live for the call.
+        let instance = unsafe { webgpu_sys::wgpuCreateInstance(&descriptor) };
+        if instance.is_null() {
+            return Err("creating a WebGPU instance with timed waits enabled failed".into());
+        }
+        let context = Self {
+            instance,
+            adapter: std::ptr::null_mut(),
+            device: std::ptr::null_mut(),
+        };
+        context.request_adapter_and_device()
+    }
+
+    fn request_adapter_and_device(mut self) -> std::result::Result<Self, Box<dyn StdError>> {
+        let options: webgpu_sys::WGPURequestAdapterOptions = unsafe { std::mem::zeroed() };
+        let (adapter_slot, adapter_user_data) = callback_slot::<webgpu_sys::WGPUAdapter>();
+        let mut adapter_info: webgpu_sys::WGPURequestAdapterCallbackInfo =
+            unsafe { std::mem::zeroed() };
+        adapter_info.mode = webgpu_sys::WGPUCallbackMode_AllowProcessEvents;
+        adapter_info.callback = Some(on_adapter);
+        adapter_info.userdata1 = adapter_user_data;
+        // SAFETY: instance is live, options outlives the call, and the slot
+        // outlives the request whatever the wait below does.
+        let future = unsafe {
+            webgpu_sys::wgpuInstanceRequestAdapter(self.instance, &options, adapter_info)
+        };
+        await_future(self.instance, future)?;
+        self.adapter = adapter_slot
+            .take()
+            .filter(|adapter| !adapter.is_null())
+            .ok_or("this browser provided no WebGPU adapter")?;
+
+        let device_descriptor: webgpu_sys::WGPUDeviceDescriptor = unsafe { std::mem::zeroed() };
+        let (device_slot, device_user_data) = callback_slot::<webgpu_sys::WGPUDevice>();
+        let mut device_info: webgpu_sys::WGPURequestDeviceCallbackInfo =
+            unsafe { std::mem::zeroed() };
+        device_info.mode = webgpu_sys::WGPUCallbackMode_AllowProcessEvents;
+        device_info.callback = Some(on_device);
+        device_info.userdata1 = device_user_data;
+        // SAFETY: adapter is live, the descriptor outlives the call, and the
+        // slot outlives the request whatever the wait below does.
+        let future = unsafe {
+            webgpu_sys::wgpuAdapterRequestDevice(self.adapter, &device_descriptor, device_info)
+        };
+        await_future(self.instance, future)?;
+        self.device = device_slot
+            .take()
+            .filter(|device| !device.is_null())
+            .ok_or("this browser provided no WebGPU device")?;
+        Ok(self)
+    }
+
+    fn descriptor(&self) -> WebGpuContextDescriptor {
+        // SAFETY: these handles are live until this value drops, and the
+        // session borrows them for no longer.
+        unsafe {
+            let mut descriptor = WebGpuContextDescriptor::new(NativePointer::from_ptr(self.device));
+            descriptor.instance = NativePointer::from_ptr(self.instance);
+            // Null asks the session for the device's default queue, which is
+            // what a browser host without a queue of its own hands over.
+            descriptor.queue = NativePointer::NULL;
+            descriptor
+        }
+    }
+}
+
+#[cfg(mln_webgpu_backend)]
+impl Drop for WebGpuTestContext {
+    /// Destroys rather than only releasing the device: emdawnwebgpu takes a
+    /// runtime keepalive per device and returns it when `device.lost` settles,
+    /// which destroying is what resolves. Releasing alone leaves the keepalive
+    /// standing.
+    ///
+    /// The yields are what let emdawnwebgpu run the continuations the destroy
+    /// queued; without them the next device request on this thread never
+    /// resolves. They are bounded and not an assertion: a test's map outlives
+    /// the fixture that lent it this device, so the last keepalive of a run
+    /// comes back later, once that map is gone. The entry point forces the exit
+    /// for that one; see bindings/rust/emscripten_proxy_main.c.
+    fn drop(&mut self) {
+        // SAFETY: these handles are this value's and are released exactly once.
+        unsafe {
+            if !self.device.is_null() {
+                webgpu_sys::wgpuDeviceDestroy(self.device);
+                webgpu_sys::wgpuDeviceRelease(self.device);
+            }
+            if !self.adapter.is_null() {
+                webgpu_sys::wgpuAdapterRelease(self.adapter);
+            }
+            if !self.instance.is_null() {
+                webgpu_sys::wgpuInstanceRelease(self.instance);
+            }
+            for _ in 0..100 {
+                emscripten_sleep(1);
+            }
+        }
+    }
+}
+
+/// A WebGPU surface over a canvas, the way a browser host presents.
+///
+/// The canvas is the fixture's own OffscreenCanvas, registered by the same JS
+/// support the WebGL fixtures use, so this needs no page of its own.
+#[cfg(mln_webgpu_backend)]
+struct WebGpuTestSurface {
+    surface: webgpu_sys::WGPUSurface,
+    id: CString,
+    format: u32,
+}
+
+/// The canvas format this device prefers, as a WebGPU enum value.
+#[cfg(mln_webgpu_backend)]
+fn preferred_canvas_format() -> u32 {
+    // SAFETY: the call takes nothing and returns a plain code.
+    if unsafe { webgl::mln_test_preferred_canvas_format() } == 1 {
+        webgpu_sys::WGPUTextureFormat_BGRA8Unorm
+    } else {
+        webgpu_sys::WGPUTextureFormat_RGBA8Unorm
+    }
+}
+
+#[cfg(mln_webgpu_backend)]
+impl WebGpuTestSurface {
+    fn new(
+        context: &WebGpuTestContext,
+        width: u32,
+        height: u32,
+    ) -> std::result::Result<Self, Box<dyn StdError>> {
+        let id = register_offscreen_canvas(width, height)?;
+        let selector = CString::new(format!("#{}", id.to_str().expect("ASCII id")))
+            .expect("the generated selector contains no NUL");
+
+        // SAFETY: the instance is live, and both the chained source and the
+        // descriptor outlive the call that reads them.
+        let surface = unsafe {
+            let mut source: webgpu_sys::WGPUEmscriptenSurfaceSourceCanvasHTMLSelector =
+                std::mem::zeroed();
+            source.chain.sType = webgpu_sys::WGPUSType_EmscriptenSurfaceSourceCanvasHTMLSelector;
+            source.selector = string_view(&selector);
+            let mut descriptor: webgpu_sys::WGPUSurfaceDescriptor = std::mem::zeroed();
+            descriptor.nextInChain = std::ptr::from_mut(&mut source.chain);
+            webgpu_sys::wgpuInstanceCreateSurface(context.instance, &descriptor)
+        };
+        if surface.is_null() {
+            // SAFETY: id is still live.
+            unsafe { webgl::mln_test_unregister_offscreen_canvas(id.as_ptr()) };
+            return Err("creating the fixture's WebGPU canvas surface failed".into());
+        }
+
+        Ok(Self {
+            surface,
+            id,
+            // What a browser host passes: the canvas format this device
+            // prefers. Configuring another one is legal and costs the browser
+            // an extra copy, which it says so in the console.
+            format: preferred_canvas_format(),
+        })
+    }
+
+    fn descriptor(
+        &self,
+        extent: RenderTargetExtent,
+        context: &WebGpuTestContext,
+    ) -> WebGpuSurfaceDescriptor {
+        // SAFETY: the surface is live until this value drops, and the session
+        // borrows it for no longer.
+        unsafe {
+            WebGpuSurfaceDescriptor::new(
+                extent,
+                context.descriptor(),
+                NativePointer::from_ptr(self.surface),
+                self.format,
+            )
+        }
+    }
+}
+
+#[cfg(mln_webgpu_backend)]
+impl WebGpuTestSurface {
+    /// Reads the canvas this surface presents to.
+    ///
+    /// The session configures the surface for rendering only, so its frame
+    /// texture is not copyable and the canvas is what a test can read. That is
+    /// also the honest thing to check: it says the frame was presented, not
+    /// merely drawn.
+    fn read_rgba(
+        &self,
+        width: u32,
+        height: u32,
+    ) -> std::result::Result<Vec<u8>, Box<dyn StdError>> {
+        let mut pixels = vec![0_u8; (width * height * 4) as usize];
+        // SAFETY: the id is live, and the buffer is this call's with its own
+        // capacity reported.
+        let copied = unsafe {
+            webgl::mln_test_read_canvas_rgba(self.id.as_ptr(), pixels.as_mut_ptr(), pixels.len())
+        };
+        if copied != pixels.len() {
+            return Err(format!(
+                "reading the fixture's canvas returned {copied} of {} bytes",
+                pixels.len()
+            )
+            .into());
+        }
+        Ok(pixels)
+    }
+}
+
+#[cfg(mln_webgpu_backend)]
+impl Drop for WebGpuTestSurface {
+    fn drop(&mut self) {
+        // SAFETY: the surface and the registration are this value's, and both
+        // are released exactly once.
+        unsafe {
+            webgpu_sys::wgpuSurfaceRelease(self.surface);
+            webgl::mln_test_unregister_offscreen_canvas(self.id.as_ptr());
+        }
+    }
+}
+
+/// A caller-owned WebGPU texture and view, the way a host that allocates its own
+/// render target hands one over.
+#[cfg(mln_webgpu_backend)]
+struct WebGpuBorrowedTexture {
+    texture: webgpu_sys::WGPUTexture,
+    texture_view: webgpu_sys::WGPUTextureView,
+    format: u32,
+    width: u32,
+    height: u32,
+}
+
+#[cfg(mln_webgpu_backend)]
+impl WebGpuBorrowedTexture {
+    fn new(
+        context: &WebGpuTestContext,
+        width: u32,
+        height: u32,
+    ) -> std::result::Result<Self, Box<dyn StdError>> {
+        let format = webgpu_sys::WGPUTextureFormat_RGBA8Unorm;
+        let mut descriptor: webgpu_sys::WGPUTextureDescriptor = unsafe { std::mem::zeroed() };
+        // Render attachment because the session draws into it, and texture
+        // binding because a host samples it afterwards.
+        descriptor.usage = webgpu_sys::WGPUTextureUsage_RenderAttachment
+            | webgpu_sys::WGPUTextureUsage_TextureBinding
+            | webgpu_sys::WGPUTextureUsage_CopySrc;
+        descriptor.dimension = webgpu_sys::WGPUTextureDimension_2D;
+        descriptor.size = webgpu_sys::WGPUExtent3D {
+            width,
+            height,
+            depthOrArrayLayers: 1,
+        };
+        descriptor.format = format;
+        descriptor.mipLevelCount = 1;
+        descriptor.sampleCount = 1;
+
+        // SAFETY: the device is live and descriptor is live for the call.
+        let texture = unsafe { webgpu_sys::wgpuDeviceCreateTexture(context.device, &descriptor) };
+        if texture.is_null() {
+            return Err("creating the fixture's WebGPU texture failed".into());
+        }
+        // SAFETY: texture is the handle just created.
+        let texture_view = unsafe { webgpu_sys::wgpuTextureCreateView(texture, std::ptr::null()) };
+        if texture_view.is_null() {
+            // SAFETY: releasing the texture this call created.
+            unsafe { webgpu_sys::wgpuTextureRelease(texture) };
+            return Err("creating the fixture's WebGPU texture view failed".into());
+        }
+
+        Ok(Self {
+            texture,
+            texture_view,
+            format,
+            width,
+            height,
+        })
+    }
+
+    fn descriptor(
+        &self,
+        extent: RenderTargetExtent,
+        context: &WebGpuTestContext,
+    ) -> WebGpuBorrowedTextureDescriptor {
+        // SAFETY: both handles are live until this value drops, and the session
+        // borrows them for no longer.
+        unsafe {
+            WebGpuBorrowedTextureDescriptor::new(
+                extent,
+                self.width,
+                self.height,
+                context.descriptor(),
+                NativePointer::from_ptr(self.texture),
+                NativePointer::from_ptr(self.texture_view),
+                self.format,
+            )
+        }
+    }
+}
+
+#[cfg(mln_webgpu_backend)]
+unsafe extern "C" fn on_buffer_mapped(
+    status: webgpu_sys::WGPUMapAsyncStatus,
+    _message: webgpu_sys::WGPUStringView,
+    user_data: *mut std::ffi::c_void,
+    _reserved: *mut std::ffi::c_void,
+) {
+    // SAFETY: user_data is this request's status slot, delivered once.
+    unsafe { fill_callback_slot::<webgpu_sys::WGPUMapAsyncStatus>(user_data, status) };
+}
+
+#[cfg(mln_webgpu_backend)]
+impl WebGpuBorrowedTexture {
+    /// Reads this texture back, so a test can tell what the session drew into
+    /// it rather than only that the call returned.
+    ///
+    /// Independent of the readback the C API offers: this waits on the
+    /// fixture's own instance, which asked for timed waits, so a blank result
+    /// here means the frame is blank rather than that a wait went wrong.
+    fn read_rgba(
+        &self,
+        context: &WebGpuTestContext,
+    ) -> std::result::Result<Vec<u8>, Box<dyn StdError>> {
+        // WebGPU pads every row of a texture-to-buffer copy to 256 bytes.
+        const ROW_ALIGNMENT: u32 = 256;
+        let row_stride = self.width * 4;
+        let aligned_row_stride = row_stride.div_ceil(ROW_ALIGNMENT) * ROW_ALIGNMENT;
+        let mapped_size = u64::from(aligned_row_stride) * u64::from(self.height);
+
+        // SAFETY: every handle below is live for the calls it is passed to, and
+        // each descriptor outlives its own call.
+        unsafe {
+            let mut buffer_descriptor: webgpu_sys::WGPUBufferDescriptor = std::mem::zeroed();
+            buffer_descriptor.size = mapped_size;
+            buffer_descriptor.usage =
+                webgpu_sys::WGPUBufferUsage_CopyDst | webgpu_sys::WGPUBufferUsage_MapRead;
+            let staging = webgpu_sys::wgpuDeviceCreateBuffer(context.device, &buffer_descriptor);
+            if staging.is_null() {
+                return Err("creating the fixture's readback buffer failed".into());
+            }
+
+            let encoder =
+                webgpu_sys::wgpuDeviceCreateCommandEncoder(context.device, std::ptr::null());
+            let mut source: webgpu_sys::WGPUTexelCopyTextureInfo = std::mem::zeroed();
+            source.texture = self.texture;
+            source.aspect = webgpu_sys::WGPUTextureAspect_All;
+            let mut target: webgpu_sys::WGPUTexelCopyBufferInfo = std::mem::zeroed();
+            target.buffer = staging;
+            target.layout.bytesPerRow = aligned_row_stride;
+            target.layout.rowsPerImage = self.height;
+            let extent = webgpu_sys::WGPUExtent3D {
+                width: self.width,
+                height: self.height,
+                depthOrArrayLayers: 1,
+            };
+            webgpu_sys::wgpuCommandEncoderCopyTextureToBuffer(encoder, &source, &target, &extent);
+            let commands = webgpu_sys::wgpuCommandEncoderFinish(encoder, std::ptr::null());
+            webgpu_sys::wgpuCommandEncoderRelease(encoder);
+            let queue = webgpu_sys::wgpuDeviceGetQueue(context.device);
+            webgpu_sys::wgpuQueueSubmit(queue, 1, &commands);
+            webgpu_sys::wgpuCommandBufferRelease(commands);
+            webgpu_sys::wgpuQueueRelease(queue);
+
+            let (status_slot, status_user_data) = callback_slot::<webgpu_sys::WGPUMapAsyncStatus>();
+            let mut callback_info: webgpu_sys::WGPUBufferMapCallbackInfo = std::mem::zeroed();
+            callback_info.mode = webgpu_sys::WGPUCallbackMode_WaitAnyOnly;
+            callback_info.callback = Some(on_buffer_mapped);
+            callback_info.userdata1 = status_user_data;
+            let future = webgpu_sys::wgpuBufferMapAsync(
+                staging,
+                webgpu_sys::WGPUMapMode_Read,
+                0,
+                mapped_size as usize,
+                callback_info,
+            );
+            // Releases the buffer however the wait ends, which a `?` straight
+            // out of here would skip.
+            let waited = await_future(context.instance, future);
+            let status = status_slot.take();
+            if waited.is_err() || status != Some(webgpu_sys::WGPUMapAsyncStatus_Success) {
+                webgpu_sys::wgpuBufferRelease(staging);
+                waited?;
+                return Err(
+                    format!("mapping the fixture's readback buffer failed ({status:?})").into(),
+                );
+            }
+
+            let mapped =
+                webgpu_sys::wgpuBufferGetConstMappedRange(staging, 0, mapped_size as usize)
+                    .cast::<u8>();
+            if mapped.is_null() {
+                webgpu_sys::wgpuBufferUnmap(staging);
+                webgpu_sys::wgpuBufferRelease(staging);
+                return Err("the fixture's readback buffer produced no mapped range".into());
+            }
+            let mut pixels = Vec::with_capacity((row_stride * self.height) as usize);
+            for row in 0..self.height {
+                let offset = (row * aligned_row_stride) as usize;
+                pixels.extend_from_slice(std::slice::from_raw_parts(
+                    mapped.add(offset),
+                    row_stride as usize,
+                ));
+            }
+            webgpu_sys::wgpuBufferUnmap(staging);
+            webgpu_sys::wgpuBufferRelease(staging);
+            Ok(pixels)
+        }
+    }
+}
+
+#[cfg(mln_webgpu_backend)]
+impl Drop for WebGpuBorrowedTexture {
+    fn drop(&mut self) {
+        // SAFETY: both handles are this value's and are released exactly once.
+        unsafe {
+            webgpu_sys::wgpuTextureViewRelease(self.texture_view);
+            webgpu_sys::wgpuTextureRelease(self.texture);
+        }
+    }
+}
+
+#[cfg(target_os = "emscripten")]
+mod webgl {
+    use std::ffi::{CStr, c_char, c_void};
+
+    // emscripten/html5_webgl.h. Fields in declaration order; `bool` there is C23
+    // `_Bool`, which Rust's `bool` matches.
+    #[repr(C)]
+    pub(super) struct ContextAttributes {
+        pub alpha: bool,
+        pub depth: bool,
+        pub stencil: bool,
+        pub antialias: bool,
+        pub premultiplied_alpha: bool,
+        pub preserve_drawing_buffer: bool,
+        pub power_preference: i32,
+        pub fail_if_major_performance_caveat: bool,
+        pub major_version: i32,
+        pub minor_version: i32,
+        pub enable_extensions_by_default: bool,
+        pub explicit_swap_control: bool,
+        pub proxy_context_to_main_thread: i32,
+        pub render_via_offscreen_back_buffer: bool,
+    }
+
+    /// EMSCRIPTEN_WEBGL_CONTEXT_PROXY_DISALLOW.
+    pub(super) const PROXY_DISALLOW: i32 = 0;
+    /// EMSCRIPTEN_RESULT_SUCCESS.
+    pub(super) const RESULT_SUCCESS: i32 = 0;
+
+    unsafe extern "C" {
+        pub(super) fn emscripten_webgl_init_context_attributes(attributes: *mut ContextAttributes);
+        pub(super) fn emscripten_webgl_create_context(
+            target: *const c_char,
+            attributes: *const ContextAttributes,
+        ) -> i32;
+        pub(super) fn emscripten_webgl_make_context_current(context: i32) -> i32;
+        pub(super) fn emscripten_webgl_destroy_context(context: i32) -> i32;
+        pub(super) fn emscripten_webgl_get_proc_address(name: *const c_char) -> *mut c_void;
+
+        // bindings/rust/crates/maplibre-native-ffi/emscripten/test_support.js.
+        pub(super) fn mln_test_register_offscreen_canvas(
+            name: *const c_char,
+            width: i32,
+            height: i32,
+        );
+        pub(super) fn mln_test_unregister_offscreen_canvas(name: *const c_char);
+        // Only the WebGPU surface fixtures present to a canvas and read it
+        // back; a WebGL build links the same JS support and calls neither.
+        #[cfg(mln_webgpu_backend)]
+        pub(super) fn mln_test_preferred_canvas_format() -> i32;
+        #[cfg(mln_webgpu_backend)]
+        pub(super) fn mln_test_read_canvas_rgba(
+            name: *const c_char,
+            out: *mut u8,
+            capacity: usize,
+        ) -> usize;
+    }
+
+    pub(super) fn proc_address(symbol: &CStr) -> *const c_void {
+        // SAFETY: symbol is a valid null-terminated name.
+        unsafe { emscripten_webgl_get_proc_address(symbol.as_ptr()) }
+    }
+}
+
+/// A WebGL2 context on a canvas of the fixture's own.
+///
+/// The browser owns the context a session renders into, so this creates a real
+/// one and hands it over the way a browser host would. Each fixture gets a
+/// private OffscreenCanvas because an OffscreenCanvas belongs to one thread and
+/// the suite attaches sessions from more than one.
+#[cfg(target_os = "emscripten")]
+struct WebGlTestContext {
+    context: i32,
+    id: CString,
+}
+
+#[cfg(target_os = "emscripten")]
+static WEBGL_CANVAS_SERIAL: AtomicUsize = AtomicUsize::new(1);
+
+/// Registers an OffscreenCanvas of the fixture's own and returns its id.
+///
+/// Both browser backends take their render target from a canvas, so both reach
+/// the same registry; see emscripten/test_support.js.
+#[cfg(target_os = "emscripten")]
+fn register_offscreen_canvas(
+    width: u32,
+    height: u32,
+) -> std::result::Result<CString, Box<dyn StdError>> {
+    let serial = WEBGL_CANVAS_SERIAL.fetch_add(1, Ordering::Relaxed);
+    let id = CString::new(format!("mln-rust-test-{serial}"))
+        .expect("the generated canvas id contains no NUL");
+    // SAFETY: id is a live null-terminated string, and the extent is the
+    // fixture's own.
+    unsafe {
+        webgl::mln_test_register_offscreen_canvas(id.as_ptr(), width as i32, height as i32);
+    }
+    Ok(id)
+}
+
+#[cfg(target_os = "emscripten")]
+impl WebGlTestContext {
+    fn new(width: u32, height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
+        let id = register_offscreen_canvas(width, height)?;
+
+        let mut attributes = std::mem::MaybeUninit::<webgl::ContextAttributes>::uninit();
+        // SAFETY: emscripten fills every field of the struct this points at.
+        let mut attributes = unsafe {
+            webgl::emscripten_webgl_init_context_attributes(attributes.as_mut_ptr());
+            attributes.assume_init()
+        };
+        // WebGL2 is the GLES 3.0 the OpenGL backend targets.
+        attributes.major_version = 2;
+        attributes.minor_version = 0;
+        attributes.depth = true;
+        attributes.stencil = true;
+        attributes.antialias = false;
+        // The suite renders into its own texture rather than presenting, so the
+        // context needs no drawing buffer preservation and there is no swap to
+        // take over. It stays on the thread that created it.
+        attributes.preserve_drawing_buffer = false;
+        attributes.explicit_swap_control = false;
+        attributes.proxy_context_to_main_thread = webgl::PROXY_DISALLOW;
+
+        let target = CString::new(format!("#{}", id.to_str().expect("ASCII id")))
+            .expect("the generated selector contains no NUL");
+        // SAFETY: both pointers are live for the call.
+        let context =
+            unsafe { webgl::emscripten_webgl_create_context(target.as_ptr(), &attributes) };
+        if context <= 0 {
+            // SAFETY: id is still live.
+            unsafe { webgl::mln_test_unregister_offscreen_canvas(id.as_ptr()) };
+            return Err(format!("creating the fixture's WebGL context failed: {context}").into());
+        }
+
+        let created = Self { context, id };
+        created.make_current()?;
+        Ok(created)
+    }
+
+    fn descriptor(&self) -> OpenGLContextDescriptor {
+        OpenGLContextDescriptor::WebGl(WebGlContextDescriptor::new(self.context))
+    }
+
+    // A browser session presents to the canvas this context was created
+    // against, so the context names the surface and the descriptor's own
+    // surface field stays null. See validate_opengl_surface_descriptor().
+    fn surface(&self) -> NativePointer {
+        NativePointer::NULL
+    }
+
+    fn make_current(&self) -> std::result::Result<(), Box<dyn StdError>> {
+        // SAFETY: the context is live until this value is dropped.
+        let result = unsafe { webgl::emscripten_webgl_make_context_current(self.context) };
+        if result == webgl::RESULT_SUCCESS {
+            Ok(())
+        } else {
+            Err(format!("making the fixture's WebGL context current failed: {result}").into())
+        }
+    }
+}
+
+#[cfg(target_os = "emscripten")]
+impl Drop for WebGlTestContext {
+    fn drop(&mut self) {
+        // SAFETY: the context and the registration are this value's, and both
+        // are released exactly once.
+        unsafe {
+            webgl::emscripten_webgl_destroy_context(self.context);
+            webgl::mln_test_unregister_offscreen_canvas(self.id.as_ptr());
+        }
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -829,7 +1716,7 @@ impl OpenGLTestContext {
     fn new_platform(_width: u32, _height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
         let platform = EglTestContext::new()?;
         let gl = unsafe {
-            glow::Context::from_loader_function(|symbol| {
+            gl_api::Context::from_loader_function(|symbol| {
                 let symbol = CString::new(symbol).expect("GL symbol names do not contain NULs");
                 platform.get_proc_address(&symbol).cast()
             })
@@ -849,7 +1736,7 @@ impl OpenGLTestContext {
     fn new_platform(width: u32, height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
         let platform = WglTestContext::new(width, height)?;
         let gl = unsafe {
-            glow::Context::from_loader_function(|symbol| {
+            gl_api::Context::from_loader_function(|symbol| {
                 let symbol = CString::new(symbol).expect("GL symbol names do not contain NULs");
                 platform.get_proc_address(&symbol).cast()
             })
@@ -865,9 +1752,31 @@ impl OpenGLTestContext {
         })
     }
 
-    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    #[cfg(target_os = "emscripten")]
+    fn new_platform(width: u32, height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
+        let platform = WebGlTestContext::new(width, height)?;
+        // glow builds its native backend for Emscripten, where the GLES entry
+        // points are linked into the module rather than looked up at run time.
+        let gl = unsafe {
+            gl_api::Context::from_loader_function(|symbol| {
+                let symbol = CString::new(symbol).expect("GL symbol names do not contain NULs");
+                webgl::proc_address(&symbol).cast()
+            })
+        };
+        let descriptor = platform.descriptor();
+        let surface_handle = platform.surface();
+
+        Ok(Self {
+            descriptor,
+            surface_handle,
+            gl,
+            platform,
+        })
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "emscripten")))]
     fn new_platform(_width: u32, _height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
-        Err("OpenGL test context is only available on Windows WGL and Linux EGL".into())
+        Err("OpenGL test context is only available on WGL, EGL, and WebGL".into())
     }
 
     fn descriptor(&self) -> OpenGLContextDescriptor {
@@ -889,7 +1798,12 @@ impl OpenGLTestContext {
             self.platform.make_current()?;
             Ok(())
         }
-        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+        #[cfg(target_os = "emscripten")]
+        {
+            self.platform.make_current()?;
+            Ok(())
+        }
+        #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "emscripten")))]
         {
             Ok(())
         }
@@ -897,14 +1811,19 @@ impl OpenGLTestContext {
 
     fn check_gl_error(&self, operation: &str) -> std::result::Result<(), Box<dyn StdError>> {
         let error = unsafe { self.gl.get_error() };
-        if error == glow::NO_ERROR {
+        if error == gl_api::NO_ERROR {
             Ok(())
         } else {
             Err(format!("{operation} failed with OpenGL error 0x{error:x}").into())
         }
     }
 
-    #[cfg(target_os = "windows")]
+    /// Reads the surface this context presents to.
+    ///
+    /// The browser reads the context's own drawing buffer, which is what its
+    /// canvas composites, so it names no read buffer: WebGL has one, and
+    /// selecting FRONT is not a choice it offers.
+    #[cfg(any(target_os = "windows", target_os = "emscripten"))]
     fn read_surface_rgba(
         &self,
         width: u32,
@@ -913,15 +1832,17 @@ impl OpenGLTestContext {
         self.make_current()?;
         let mut pixels = vec![0_u8; width as usize * height as usize * 4];
         unsafe {
-            self.gl.read_buffer(glow::FRONT);
+            self.gl.bind_framebuffer(gl_api::FRAMEBUFFER, None);
+            #[cfg(target_os = "windows")]
+            self.gl.read_buffer(gl_api::FRONT);
             self.gl.read_pixels(
                 0,
                 0,
                 width as i32,
                 height as i32,
-                glow::RGBA,
-                glow::UNSIGNED_BYTE,
-                glow::PixelPackData::Slice(Some(&mut pixels)),
+                gl_api::RGBA,
+                gl_api::UNSIGNED_BYTE,
+                gl_api::PixelPackData::Slice(Some(&mut pixels)),
             );
         }
         self.check_gl_error("read OpenGL surface")?;
@@ -931,7 +1852,7 @@ impl OpenGLTestContext {
 
 struct OpenGLBorrowedTexture {
     context: OpenGLTestContext,
-    texture: Option<glow::NativeTexture>,
+    texture: Option<gl_api::NativeTexture>,
     width: u32,
     height: u32,
 }
@@ -952,37 +1873,37 @@ impl OpenGLBorrowedTexture {
         context: &OpenGLTestContext,
         width: u32,
         height: u32,
-    ) -> std::result::Result<glow::NativeTexture, Box<dyn StdError>> {
+    ) -> std::result::Result<gl_api::NativeTexture, Box<dyn StdError>> {
         context.make_current()?;
         let texture = unsafe {
             let texture = context.gl.create_texture()?;
-            context.gl.bind_texture(glow::TEXTURE_2D, Some(texture));
+            context.gl.bind_texture(gl_api::TEXTURE_2D, Some(texture));
             context.gl.tex_parameter_i32(
-                glow::TEXTURE_2D,
-                glow::TEXTURE_MIN_FILTER,
-                glow::NEAREST as i32,
+                gl_api::TEXTURE_2D,
+                gl_api::TEXTURE_MIN_FILTER,
+                gl_api::NEAREST as i32,
             );
             context.gl.tex_parameter_i32(
-                glow::TEXTURE_2D,
-                glow::TEXTURE_MAG_FILTER,
-                glow::NEAREST as i32,
+                gl_api::TEXTURE_2D,
+                gl_api::TEXTURE_MAG_FILTER,
+                gl_api::NEAREST as i32,
             );
             // Zeroed rather than left undefined: a test that reads this back
             // to prove the session rendered into it needs a known starting
             // value, or undefined contents could pass for a rendered frame.
             let blank = vec![0_u8; (width as usize) * (height as usize) * 4];
             context.gl.tex_image_2d(
-                glow::TEXTURE_2D,
+                gl_api::TEXTURE_2D,
                 0,
-                glow::RGBA8 as i32,
+                gl_api::RGBA8 as i32,
                 width as i32,
                 height as i32,
                 0,
-                glow::RGBA,
-                glow::UNSIGNED_BYTE,
-                glow::PixelUnpackData::Slice(Some(&blank)),
+                gl_api::RGBA,
+                gl_api::UNSIGNED_BYTE,
+                gl_api::PixelUnpackData::Slice(Some(&blank)),
             );
-            context.gl.bind_texture(glow::TEXTURE_2D, None);
+            context.gl.bind_texture(gl_api::TEXTURE_2D, None);
             texture
         };
         context.check_gl_error("create borrowed texture")?;
@@ -996,14 +1917,14 @@ impl OpenGLBorrowedTexture {
         &self,
         width: u32,
         height: u32,
-    ) -> std::result::Result<glow::NativeTexture, Box<dyn StdError>> {
+    ) -> std::result::Result<gl_api::NativeTexture, Box<dyn StdError>> {
         Self::create_texture(&self.context, width, height)
     }
 
     /// Tracks a replacement the session has taken and releases the outgoing one.
     fn adopt(
         &mut self,
-        texture: glow::NativeTexture,
+        texture: gl_api::NativeTexture,
         width: u32,
         height: u32,
     ) -> std::result::Result<(), Box<dyn StdError>> {
@@ -1037,17 +1958,20 @@ impl OpenGLBorrowedTexture {
             let framebuffer = self.context.gl.create_framebuffer()?;
             self.context
                 .gl
-                .bind_framebuffer(glow::FRAMEBUFFER, Some(framebuffer));
+                .bind_framebuffer(gl_api::FRAMEBUFFER, Some(framebuffer));
             self.context.gl.framebuffer_texture_2d(
-                glow::FRAMEBUFFER,
-                glow::COLOR_ATTACHMENT0,
-                glow::TEXTURE_2D,
+                gl_api::FRAMEBUFFER,
+                gl_api::COLOR_ATTACHMENT0,
+                gl_api::TEXTURE_2D,
                 Some(texture),
                 0,
             );
-            let status = self.context.gl.check_framebuffer_status(glow::FRAMEBUFFER);
-            if status != glow::FRAMEBUFFER_COMPLETE {
-                self.context.gl.bind_framebuffer(glow::FRAMEBUFFER, None);
+            let status = self
+                .context
+                .gl
+                .check_framebuffer_status(gl_api::FRAMEBUFFER);
+            if status != gl_api::FRAMEBUFFER_COMPLETE {
+                self.context.gl.bind_framebuffer(gl_api::FRAMEBUFFER, None);
                 self.context.gl.delete_framebuffer(framebuffer);
                 return Err(
                     format!("borrowed texture framebuffer is incomplete: 0x{status:x}").into(),
@@ -1058,11 +1982,11 @@ impl OpenGLBorrowedTexture {
                 0,
                 self.width as i32,
                 self.height as i32,
-                glow::RGBA,
-                glow::UNSIGNED_BYTE,
-                glow::PixelPackData::Slice(Some(&mut pixels)),
+                gl_api::RGBA,
+                gl_api::UNSIGNED_BYTE,
+                gl_api::PixelPackData::Slice(Some(&mut pixels)),
             );
-            self.context.gl.bind_framebuffer(glow::FRAMEBUFFER, None);
+            self.context.gl.bind_framebuffer(gl_api::FRAMEBUFFER, None);
             self.context.gl.delete_framebuffer(framebuffer);
         }
         self.context.check_gl_error("read borrowed texture")?;
@@ -1082,6 +2006,7 @@ impl Drop for OpenGLBorrowedTexture {
     }
 }
 
+#[cfg(not(target_os = "emscripten"))]
 struct VulkanTestContext {
     _entry: ash::Entry,
     instance: ash::Instance,
@@ -1091,6 +2016,7 @@ struct VulkanTestContext {
     graphics_queue_family_index: u32,
 }
 
+#[cfg(not(target_os = "emscripten"))]
 impl VulkanTestContext {
     fn new() -> std::result::Result<Self, Box<dyn StdError>> {
         let entry = load_vulkan_entry()?;
@@ -1195,6 +2121,7 @@ impl VulkanTestContext {
     }
 }
 
+#[cfg(not(target_os = "emscripten"))]
 impl Drop for VulkanTestContext {
     fn drop(&mut self) {
         // SAFETY: Device and instance are live and destroyed in dependency order.
@@ -1206,6 +2133,7 @@ impl Drop for VulkanTestContext {
     }
 }
 
+#[cfg(not(target_os = "emscripten"))]
 fn load_vulkan_entry() -> std::result::Result<ash::Entry, Box<dyn StdError>> {
     if let Ok(install_dir) = std::env::var("MAPLIBRE_NATIVE_C_INSTALL_DIR") {
         let library_dir = std::path::Path::new(&install_dir).join(if cfg!(target_os = "windows") {
@@ -1231,6 +2159,7 @@ fn load_vulkan_entry() -> std::result::Result<ash::Entry, Box<dyn StdError>> {
     unsafe { ash::Entry::load() }.map_err(Into::into)
 }
 
+#[cfg(not(target_os = "emscripten"))]
 fn has_instance_extension(
     entry: &ash::Entry,
     name: &CStr,
@@ -1244,6 +2173,7 @@ fn has_instance_extension(
     }))
 }
 
+#[cfg(not(target_os = "emscripten"))]
 fn has_device_extension(
     instance: &ash::Instance,
     physical_device: vk::PhysicalDevice,
@@ -1258,6 +2188,7 @@ fn has_device_extension(
     }))
 }
 
+#[cfg(not(target_os = "emscripten"))]
 fn pick_vulkan_physical_device(
     instance: &ash::Instance,
 ) -> std::result::Result<(vk::PhysicalDevice, u32), Box<dyn StdError>> {
@@ -1563,10 +2494,10 @@ fn opengl_owned_texture_session_attaches_with_platform_context() {
     let frame = session.acquire_opengl_owned_texture_frame().unwrap();
     assert_eq!(frame.frame().unwrap().width, 32);
     assert_eq!(frame.frame().unwrap().height, 16);
-    assert_eq!(frame.frame().unwrap().target, glow::TEXTURE_2D);
-    assert_eq!(frame.frame().unwrap().internal_format, glow::RGBA8);
-    assert_eq!(frame.frame().unwrap().format, glow::RGBA);
-    assert_eq!(frame.frame().unwrap().type_, glow::UNSIGNED_BYTE);
+    assert_eq!(frame.frame().unwrap().target, gl_api::TEXTURE_2D);
+    assert_eq!(frame.frame().unwrap().internal_format, gl_api::RGBA8);
+    assert_eq!(frame.frame().unwrap().format, gl_api::RGBA);
+    assert_eq!(frame.frame().unwrap().type_, gl_api::UNSIGNED_BYTE);
     assert!(!frame.texture().unwrap().is_zero());
     frame.close().unwrap();
 
@@ -1596,10 +2527,19 @@ fn opengl_owned_texture_session_attaches_with_platform_context() {
     runtime.close().unwrap();
 }
 
+/// Whether this platform has an OpenGL surface for a session to render into.
+///
+/// A browser has none: a WebGL context presents through its canvas, and a
+/// browser host renders into a texture instead, so `mln_opengl_surface_attach`
+/// has nothing to be handed. Every other OpenGL provider supplies one.
+fn has_opengl_surface_test_backend() -> bool {
+    has_opengl_test_context_backend()
+}
+
 #[test]
 // Spec coverage: BND-162.
 fn opengl_surface_session_renders_with_platform_context() {
-    if !has_opengl_test_context_backend() {
+    if !has_opengl_surface_test_backend() {
         return;
     }
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
@@ -1618,11 +2558,140 @@ fn opengl_surface_session_renders_with_platform_context() {
     ));
     assert!(session.render_update().unwrap());
 
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "emscripten"))]
     {
         let pixels = _context.read_surface_rgba(32, 16).unwrap();
         assert!(pixels.iter().any(|byte| *byte != 0));
     }
+
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[cfg(mln_webgpu_backend)]
+#[test]
+// Spec coverage: BND-162.
+fn webgpu_surface_session_renders_and_presents_through_a_canvas() {
+    if !crate::supported_render_backends().contains(RenderBackendMask::WEBGPU) {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(128, 128, 1.0)).unwrap();
+    let context = WebGpuTestContext::new().expect("a browser build reaches a WebGPU device");
+    let surface = WebGpuTestSurface::new(&context, 128, 128)
+        .expect("a WebGPU instance creates a surface over a canvas");
+    let extent = RenderTargetExtent::new(128, 128, 1.0);
+    let session = map
+        .attach_ref()
+        .unwrap()
+        .attach_webgpu_surface(&surface.descriptor(extent.clone(), &context))
+        .expect("WebGPU surface session should attach when WebGPU is supported");
+
+    map.set_style_json(QUERY_STYLE_JSON).unwrap();
+    assert!(wait_for_runtime_event(
+        &runtime,
+        RuntimeEventType::MapRenderUpdateAvailable
+    ));
+    // A frame reported rendered means the surface gave up its texture and took
+    // it back at present, which is the whole of the acquire and present cycle.
+    assert!(session.render_update().unwrap());
+
+    // The frame reached the canvas, not just the render pass: the style paints
+    // its background over every pixel.
+    //
+    // A browser shows a WebGPU frame once the task that drew it yields, which
+    // is what expires the texture the surface handed out, so this yields before
+    // reading rather than snapshotting the canvas mid-task.
+    // SAFETY: yielding is legal on this thread, which entered through main.
+    unsafe { emscripten_sleep(1) };
+    let pixels = surface.read_rgba(128, 128).unwrap();
+    assert!(
+        pixels
+            .chunks_exact(4)
+            .any(|pixel| pixel == QUERY_STYLE_BACKGROUND_RGBA),
+        "the session should present its frame to the canvas"
+    );
+
+    // A surface hands out one texture per frame, so a second frame proves the
+    // first was released rather than held.
+    map.set_style_json(CLUSTER_BASE_STYLE_JSON).unwrap();
+    assert!(wait_for_runtime_event(
+        &runtime,
+        RuntimeEventType::MapRenderUpdateAvailable
+    ));
+    assert!(session.render_update().unwrap());
+
+    // A session-owned frame belongs to the texture session kind, so this
+    // reports the mismatch rather than handing back a texture it does not own.
+    assert_eq!(
+        session
+            .acquire_webgpu_owned_texture_frame()
+            .unwrap_err()
+            .kind(),
+        ErrorKind::Unsupported
+    );
+
+    let replacement = WebGpuTestSurface::new(&context, 128, 128)
+        .expect("a WebGPU instance creates a second surface over a canvas");
+    session
+        .set_webgpu_surface_target(&replacement.descriptor(extent, &context))
+        .expect("a replacement naming the same device and format is accepted");
+    map.set_style_json(QUERY_STYLE_JSON).unwrap();
+    assert!(wait_for_runtime_event(
+        &runtime,
+        RuntimeEventType::MapRenderUpdateAvailable
+    ));
+    assert!(session.render_update().unwrap());
+
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[cfg(mln_webgpu_backend)]
+#[test]
+// Spec coverage: BND-162 and BND-171.
+fn webgpu_borrowed_texture_session_renders_into_a_host_texture() {
+    if !crate::supported_render_backends().contains(RenderBackendMask::WEBGPU) {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(128, 128, 1.0)).unwrap();
+
+    let (context, texture, session) = create_webgpu_borrowed_texture_session(
+        &map.attach_ref().unwrap(),
+        RenderTargetExtent::new(128, 128, 1.0),
+    )
+    .expect("WebGPU borrowed texture session should attach when WebGPU is supported");
+
+    map.set_style_json(QUERY_STYLE_JSON).unwrap();
+    assert!(wait_for_runtime_event(
+        &runtime,
+        RuntimeEventType::MapRenderUpdateAvailable
+    ));
+    assert!(session.render_update().unwrap());
+
+    // The style paints its background over every pixel, so finding it in the
+    // host's texture is what says this session rendered into the one it was
+    // handed rather than only reporting that it did.
+    let pixels = texture.read_rgba(&context).unwrap();
+    assert!(
+        pixels
+            .chunks_exact(4)
+            .any(|pixel| pixel == QUERY_STYLE_BACKGROUND_RGBA),
+        "the session should render into the host's texture"
+    );
+
+    // A session-owned frame belongs to the other target kind, so this reports
+    // the mismatch rather than handing back a texture it does not own.
+    assert_eq!(
+        session
+            .acquire_webgpu_owned_texture_frame()
+            .unwrap_err()
+            .kind(),
+        ErrorKind::Unsupported
+    );
 
     session.close().unwrap();
     map.close().unwrap();
@@ -1708,7 +2777,7 @@ fn set_target_hands_a_live_session_a_new_borrowed_texture() {
             physical_height,
             texture.descriptor(),
             replacement.0.get(),
-            glow::TEXTURE_2D,
+            gl_api::TEXTURE_2D,
         ))
         .unwrap();
     texture
@@ -1717,10 +2786,8 @@ fn set_target_hands_a_live_session_a_new_borrowed_texture() {
 
     // The session stayed live across the replacement and renders into the
     // texture it was just given, once the map has caught up to the new size.
-    // QUERY_STYLE_JSON paints this background over every pixel it covers, so
-    // finding it in a texture that started zeroed means this session rendered
-    // into the one it was handed.
-    const QUERY_STYLE_BACKGROUND_RGBA: [u8; 4] = [0xd8, 0xf1, 0xff, 0xff];
+    // Finding the style's background in a texture that started zeroed means
+    // this session rendered into the one it was handed.
     assert!(
         texture.read_rgba().unwrap().iter().all(|byte| *byte == 0),
         "a freshly allocated replacement should start blank"
@@ -1802,7 +2869,7 @@ fn set_target_reports_unsupported_for_a_session_owned_opengl_texture() {
             64,
             context.descriptor(),
             1,
-            glow::TEXTURE_2D,
+            gl_api::TEXTURE_2D,
         ))
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::Unsupported);
@@ -2868,12 +3935,6 @@ fn texture_readback_copies_metadata_and_fills_reusable_buffers_when_supported() 
                 info = Some(copied);
                 break;
             }
-            Err(error) if error.kind() == ErrorKind::Unsupported => {
-                session.close().unwrap();
-                map.close().unwrap();
-                runtime.close().unwrap();
-                return;
-            }
             Err(error) if error.kind() == ErrorKind::InvalidState => {}
             Err(error) => panic!("unexpected readback metadata error: {error:?}"),
         }
@@ -2901,6 +3962,30 @@ fn texture_readback_copies_metadata_and_fills_reusable_buffers_when_supported() 
         .unwrap();
     assert_eq!(copied_info, info);
     assert_eq!(reusable.len(), info.byte_length);
+
+    // What comes back is the frame that was drawn, not a buffer of the right
+    // shape. This renders on rather than reading once: a generation counts as
+    // rendered from the first frame that completes for it, which can be before
+    // the style has anything to paint, so the first readable frame is blank on
+    // every backend.
+    let content_deadline = Instant::now() + Duration::from_secs(5);
+    let mut rendered_the_style = false;
+    while Instant::now() < content_deadline && !rendered_the_style {
+        let _ = runtime.pump(Some(Duration::ZERO));
+        while let Ok(Some(_)) = runtime.poll_event() {}
+        let _ = session.render_update();
+        session
+            .read_premultiplied_rgba8_into(&mut reusable)
+            .unwrap();
+        rendered_the_style = reusable
+            .chunks_exact(4)
+            .any(|pixel| pixel == QUERY_STYLE_BACKGROUND_RGBA);
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(
+        rendered_the_style,
+        "readback should return the frame this session rendered"
+    );
 
     session.close().unwrap();
     map.close().unwrap();
@@ -3028,7 +4113,7 @@ fn opengl_attach_calls_report_unsupported_when_backend_unavailable() {
             16,
             opengl_context.clone(),
             1,
-            glow::TEXTURE_2D,
+            gl_api::TEXTURE_2D,
         ))
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::Unsupported);

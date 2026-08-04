@@ -120,6 +120,99 @@ cargo clippy \
   --all-targets -- -D warnings
 '''
 
+[tasks."test:browser"]
+description = "Run the Rust binding tests as a page in headless Chromium."
+usage = 'arg "[preset]" default="emscripten-wasm32-webgl"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+dir = "../.."
+run = '''
+set -euo pipefail
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+
+# emcc links the module, so every option CMake linked the browser build with has
+# to be repeated here. The build publishes them rather than this task knowing
+# them; see cmake/mln_ffi_install.cmake.
+link_flags_file="$native_install_dir/share/maplibre-native-c/emscripten-link-flags.txt"
+if [[ ! -f "$link_flags_file" ]]; then
+  echo "missing $link_flags_file; run 'mise run build $usage_preset' first" >&2
+  exit 1
+fi
+
+# libtest is synchronous, so the suite's main never returns to an event loop.
+# Emscripten needs the thread hosting the module to keep servicing JavaScript --
+# it is what starts pthread workers, recycles finished ones, and lets the browser
+# HTTP transport start -- so main is proxied onto a pthread of its own, where
+# blocking is legal. rustc emits no entry point under the name that option's crt
+# calls; bindings/rust/emscripten_proxy_main.c bridges the two.
+proxy_main_object="$MISE_MONOREPO_ROOT/build/$usage_preset/rust-emscripten-proxy-main.o"
+mkdir -p "$(dirname "$proxy_main_object")"
+emcc -pthread -fwasm-exceptions -c \
+  "$MISE_MONOREPO_ROOT/bindings/rust/emscripten_proxy_main.c" \
+  -o "$proxy_main_object"
+
+# Options the test harness needs on top of the build's. The suite runs as a page,
+# so the module has to exit for its status to be reported, the fixtures create a
+# WebGL context on a private OffscreenCanvas, and the runner passes the fixture
+# server's origin through the environment.
+harness_flags=(
+  -sEXIT_RUNTIME=1
+  -sENVIRONMENT=web,worker
+  -sOFFSCREENCANVAS_SUPPORT=1
+  -sEXPORTED_RUNTIME_METHODS=ENV,GL
+  -sPROXY_TO_PTHREAD
+  # Proxying transfers the canvas named by this setting to the thread it starts,
+  # and pthread_create fails with EINVAL when the name resolves to nothing. A
+  # module hosted in a worker has no page canvas to transfer, and needs none:
+  # every fixture creates a private OffscreenCanvas on the thread that asked for
+  # it. The two quote characters have to reach emcc, which rejects a bare `=`.
+  "-sOFFSCREENCANVASES_TO_PTHREAD=''"
+  "$proxy_main_object"
+)
+
+# These reach every crate in the graph, which cargo:rustc-link-arg cannot: it
+# stops at the package whose build script emitted it, so the crates above the sys
+# crate would link without them. The encoded form separates arguments with \x1f,
+# which keeps a port path containing spaces intact, and cargo fingerprints it, so
+# changing a flag relinks instead of reusing a stale binary.
+unit_separator=$'\x1f'
+rustflags=("-C" "target-feature=+atomics,+bulk-memory")
+while IFS= read -r flag; do
+  [[ -n "$flag" ]] || continue
+  rustflags+=("-C" "link-arg=$flag")
+done < "$link_flags_file"
+for flag in "${harness_flags[@]}"; do
+  rustflags+=("-C" "link-arg=$flag")
+done
+encoded=""
+for flag in "${rustflags[@]}"; do
+  encoded+="${encoded:+$unit_separator}$flag"
+done
+export CARGO_ENCODED_RUSTFLAGS="$encoded"
+
+# rustup ships no wasm32-unknown-emscripten std built with atomics, and an
+# Emscripten module linked under shared memory needs every object to carry them,
+# so std is rebuilt from source. -Zbuild-std is nightly-only; RUSTC_BOOTSTRAP
+# unlocks it on the pinned stable toolchain, the same way cmake/mln_ffi_rust.cmake
+# does for the platform library.
+export RUSTC_BOOTSTRAP=1
+export CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER="$MISE_MONOREPO_ROOT/scripts/run-browser-cargo-test.sh"
+cargo test \
+  -p maplibre-native-ffi-sys \
+  -p maplibre-native-ffi-core \
+  -p maplibre-native-ffi \
+  --target wasm32-unknown-emscripten \
+  -Zbuild-std=std,panic_abort \
+  -- --test-threads=1
+cargo clippy \
+  -p maplibre-native-ffi-sys \
+  -p maplibre-native-ffi-core \
+  -p maplibre-native-ffi \
+  --target wasm32-unknown-emscripten \
+  -Zbuild-std=std,panic_abort \
+  --all-targets -- -D warnings
+'''
+
 [tasks."test:ohos-emulator"]
 description = "Run the Rust binding tests in the OpenHarmony emulator."
 depends = [{ task = "//:build", args = ["ohos-x64-egl"] }]

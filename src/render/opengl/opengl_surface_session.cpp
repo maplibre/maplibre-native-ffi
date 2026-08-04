@@ -18,6 +18,8 @@
 #include <Windows.h>
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 #include <EGL/egl.h>
+#elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+#include <emscripten/html5.h>
 #endif
 
 #include "diagnostics/diagnostics.hpp"
@@ -185,6 +187,15 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
     ) {
       throw std::runtime_error("Swapping OpenGL EGL surface buffers failed");
     }
+#elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+    // The browser composites the canvas itself, so a frame drawn into the
+    // context's default framebuffer is presented with nothing called here.
+    //
+    // emscripten_webgl_commit_frame() is not that call. It answers
+    // INVALID_TARGET for a context with implicit swap control, which is the
+    // default, and for one with explicit swap control it returns success
+    // without doing anything: the WebGL commit() it used to make has been
+    // removed from browsers.
 #else
     throw std::runtime_error("OpenGL context provider is unsupported");
 #endif
@@ -196,6 +207,8 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
     return render_context_ != nullptr;
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
     return egl_context_.has_value();
+#elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+    return descriptor_.context.data.webgl.context > 0;
 #else
     return false;
 #endif
@@ -228,6 +241,10 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
         egl_context_ ? egl_context_->active_api() : EGL_NONE
       )
     );
+#elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+    // Emscripten resolves GLES entry points at link time.
+    (void)name;
+    return nullptr;
 #else
     (void)name;
     return nullptr;
@@ -272,6 +289,17 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
         static_cast<EGLSurface>(descriptor_.surface)
       );
     }
+#elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+    // The context carries the canvas it draws to, so making it current is the
+    // whole of it. There is no second drawable to fall back to either.
+    previous_webgl_context_ = emscripten_webgl_get_current_context();
+    if (
+      emscripten_webgl_make_context_current(
+        descriptor_.context.data.webgl.context
+      ) != EMSCRIPTEN_RESULT_SUCCESS
+    ) {
+      throw std::runtime_error("Switching WebGL context failed");
+    }
 #else
     throw std::runtime_error("OpenGL context provider is unsupported");
 #endif
@@ -287,6 +315,9 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
     previous_render_context_ = nullptr;
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
     egl_context_->deactivate();
+#elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+    (void)emscripten_webgl_make_context_current(previous_webgl_context_);
+    previous_webgl_context_ = 0;
 #endif
   }
 
@@ -320,6 +351,9 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   }
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   void destroy_native_context() { egl_context_.reset(); }
+#elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+  // The host owns the context this session borrowed.
+  void destroy_native_context() {}
 #else
   void destroy_native_context() {}
 #endif
@@ -335,6 +369,8 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   void* previous_render_context_ = nullptr;
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   std::optional<mln::core::opengl::EglSharedContext> egl_context_;
+#elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+  EMSCRIPTEN_WEBGL_CONTEXT_HANDLE previous_webgl_context_ = 0;
 #endif
 };
 

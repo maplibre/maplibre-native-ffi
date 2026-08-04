@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstring>
 #include <deque>
+#include <functional>
 #include <iterator>
 #include <memory>
 #include <mutex>
@@ -30,6 +31,9 @@
 
 #include <emscripten.h>
 #include <emscripten/fetch.h>
+#include <emscripten/proxying.h>
+#include <emscripten/threading.h>
+#include <pthread.h>
 
 #include "../offline_url.hpp"
 
@@ -192,6 +196,68 @@ auto makeResponse(const Resource& resource, emscripten_fetch_t* fetch)
   return result;
 }
 
+// The thread every fetch is issued on.
+//
+// emscripten_fetch performs its request on the calling thread and reports it
+// through that thread's event loop. Every MapLibre thread parks in its run loop
+// rather than returning to one, so a fetch issued from one is never reported at
+// all: the request reaches the server and the response is dropped.
+//
+// This thread exists to have an event loop. Its entry takes a runtime keepalive
+// and returns, which leaves the worker alive servicing JavaScript, and work
+// reaches it through the proxying queue. Responses travel back through
+// util::AsyncTask, which wakes a parked run loop through a condition variable
+// and so needs no event loop on the receiving side.
+//
+// A thread of its own rather than the main runtime thread, which a host is free
+// to block: nothing here should depend on how a host drives the runtime.
+class TransportThread {
+ public:
+  static auto instance() -> TransportThread& {
+    static TransportThread thread;
+    return thread;
+  }
+
+  // Reports false when the thread is unavailable, which leaves the caller to
+  // fail the request rather than wait for a response nothing will produce.
+  [[nodiscard]] auto run(std::function<void()> work) -> bool {
+    if (!started_) {
+      return false;
+    }
+    auto task = std::make_unique<std::function<void()>>(std::move(work));
+    if (
+      emscripten_proxy_async(
+        emscripten_proxy_get_system_queue(), thread_, &execute, task.get()
+      ) == 0
+    ) {
+      return false;
+    }
+    // The queue owns it from here; execute() takes it back.
+    static_cast<void>(task.release());
+    return true;
+  }
+
+ private:
+  TransportThread() {
+    started_ = pthread_create(&thread_, nullptr, &live, nullptr) == 0;
+  }
+
+  static auto live(void* /*unused*/) -> void* {
+    emscripten_runtime_keepalive_push();
+    return nullptr;
+  }
+
+  static void execute(void* raw) {
+    const auto task = std::unique_ptr<std::function<void()>>{
+      static_cast<std::function<void()>*>(raw)
+    };
+    (*task)();
+  }
+
+  pthread_t thread_{};
+  bool started_ = false;
+};
+
 class FetchRequestState;
 
 class FetchRequestQueue {
@@ -253,7 +319,7 @@ class FetchRequestState
   }
 
   void initializeDelivery();
-  void start();
+  void startOnTransport();
   void cancel();
 
  private:
@@ -273,6 +339,8 @@ class FetchRequestState
   static auto takeHolder(emscripten_fetch_t* fetch)
     -> std::unique_ptr<std::shared_ptr<FetchRequestState>>;
   static void onFetchComplete(emscripten_fetch_t* fetch);
+
+  void start();
 
   void closeClaimedFetch(emscripten_fetch_t* claimedFetch);
   void completeFetch(emscripten_fetch_t* completedFetch);
@@ -366,7 +434,7 @@ void FetchRequestQueue::pump() {
     }
 
     for (const auto& state : ready) {
-      state->start();
+      state->startOnTransport();
     }
 
     {
@@ -401,6 +469,25 @@ auto FetchRequestState::buildRequestHeaders() const -> RequestHeaders {
   // Unlike the native sources, this one sends no User-Agent: the browser sets
   // it and an XHR rejects the header.
   return headers;
+}
+
+// Hands the request to the transport thread, which is the only thread whose
+// event loop runs and so the only one a fetch can report to. Everything from
+// here happens there, including the bookkeeping after emscripten_fetch()
+// returns, so the request's own rules about who claims what are unchanged --
+// only the thread they run on is.
+void FetchRequestState::startOnTransport() {
+  auto self = shared_from_this();
+  if (TransportThread::instance().run([self]() { self->start(); })) {
+    return;
+  }
+
+  auto response = Response{};
+  response.error = std::make_unique<Response::Error>(
+    Response::Error::Reason::Connection,
+    "the browser transport thread is unavailable"
+  );
+  finish(std::move(response));
 }
 
 void FetchRequestState::start() {
@@ -490,9 +577,19 @@ void FetchRequestState::start() {
 }
 
 void FetchRequestState::closeClaimedFetch(emscripten_fetch_t* claimedFetch) {
-  // Aborts the transfer. Emscripten reports the abort to onFetchComplete() from
-  // inside this call, which finds the handle claimed and leaves it here.
-  emscripten_fetch_close(claimedFetch);
+  // Aborts the transfer, on the thread that owns the handle. Emscripten reports
+  // the abort to onFetchComplete() from inside this call, which finds the
+  // handle claimed and leaves it here.
+  //
+  // Cancellation reaches this from whichever thread released the request, so
+  // the close is handed to the transport thread the same way the start was.
+  // Closing where the transport cannot reach it is the fallback, because
+  // leaking the handle costs the module a slot for the rest of its life.
+  if (!TransportThread::instance().run([claimedFetch]() {
+        emscripten_fetch_close(claimedFetch);
+      })) {
+    emscripten_fetch_close(claimedFetch);
+  }
   std::scoped_lock lock(mutex_);
   transport_ = Transport::None;
 }

@@ -52,10 +52,32 @@ The build script downloads the matching native artifact.
 maplibre-native-ffi = { git = "https://github.com/maplibre/maplibre-native-ffi", features = ["vulkan"] }
 ```
 
-The other features are `opengl` and `metal`.
+The other features are `opengl`, `metal`, and `webgpu`. WebGPU is a browser
+backend and has no native artifact.
 
 Set `MAPLIBRE_NATIVE_C_INSTALL_DIR` to an install prefix to use your own build
 instead.
+
+A prefix ships the C library and the Rust platform library beside it, and its
+pkg-config file lists both. This crate links the first and takes the second as a
+cargo dependency, because a module carries one copy of the Rust standard
+library. A host in any other language links both.
+
+### Browser
+
+The crate also builds for `wasm32-unknown-emscripten`, where it links the
+Emscripten core into the module cargo produces. That build needs an install
+prefix rather than a published artifact, and it needs the options the core was
+linked with, which the prefix publishes at
+`share/maplibre-native-c/emscripten-link-flags.txt`. Emscripten also links no
+`std` built with atomics, so `std` is rebuilt from source.
+`mise run //bindings/rust:test:browser` shows the complete invocation.
+
+A browser module holds its map on Emscripten pthreads, so the page has to be
+cross-origin isolated, and the thread hosting the module has to keep servicing
+JavaScript: it is what starts pthread workers and what the HTTP transport needs
+to report a response. A host whose entry point blocks proxies it onto a pthread
+with `-sPROXY_TO_PTHREAD`.
 
 ## Python
 

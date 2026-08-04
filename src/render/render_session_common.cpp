@@ -164,6 +164,29 @@ auto opengl_borrowed_texture_descriptor_default() noexcept
   };
 }
 
+auto webgpu_surface_descriptor_default() noexcept
+  -> mln_webgpu_surface_descriptor {
+  return mln_webgpu_surface_descriptor{
+    .size = sizeof(mln_webgpu_surface_descriptor),
+    .extent =
+      mln_render_target_extent{
+        .size = sizeof(mln_render_target_extent),
+        .width = 256,
+        .height = 256,
+        .scale_factor = 1.0,
+      },
+    .context =
+      mln_webgpu_context_descriptor{
+        .size = sizeof(mln_webgpu_context_descriptor),
+        .instance = nullptr,
+        .device = nullptr,
+        .queue = nullptr,
+      },
+    .surface = nullptr,
+    .format = 0,
+  };
+}
+
 auto opengl_surface_descriptor_default() noexcept
   -> mln_opengl_surface_descriptor {
   return mln_opengl_surface_descriptor{
@@ -178,6 +201,22 @@ auto opengl_surface_descriptor_default() noexcept
     .context = opengl_context_descriptor_default(),
     .surface = nullptr,
   };
+}
+
+// A host owns its WebGPU device, so a session needs one handed to it. The
+// instance and queue are optional: neither session kind needs the instance, and
+// a null queue means the device's default queue.
+auto validate_webgpu_context(const mln_webgpu_context_descriptor& context)
+  -> mln_status {
+  if (context.size < sizeof(mln_webgpu_context_descriptor)) {
+    set_thread_error("mln_webgpu_context_descriptor.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (context.device == nullptr) {
+    set_thread_error("WebGPU device must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
 }
 
 auto validate_opengl_context(

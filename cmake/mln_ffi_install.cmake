@@ -53,9 +53,9 @@ endfunction()
 function(mln_ffi_install_c_api_complete_static_archive target)
   get_target_property(MLN_FFI_INSTALL_ARCHIVE ${target} MLN_FFI_INSTALL_ARCHIVE)
   # A platform that merges nothing leaves this unset -- see
-  # mln_ffi_configure_complete_static_archive() and the browser's `none` archive
-  # format. The rest of the prefix, headers and pkg-config included, still
-  # installs; the artifact such a platform distributes instead is its own task.
+  # mln_ffi_configure_complete_static_archive(). The rest of the prefix, headers
+  # and pkg-config included, still installs; the artifact such a platform
+  # distributes instead is its own task.
   if(NOT MLN_FFI_INSTALL_ARCHIVE)
     return()
   endif()
@@ -63,6 +63,54 @@ function(mln_ffi_install_c_api_complete_static_archive target)
     FILES "${MLN_FFI_INSTALL_ARCHIVE}"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+
+endfunction()
+
+# Installs the Rust platform library beside the archive that needs it.
+#
+# It stays out of the merged archive because it carries its own copy of Rust's
+# `std`, and a Rust host linking both gets two: `wasm-ld` and every other linker
+# reject that on the allocator shims and the panic runtime. Such a host takes
+# this library as a cargo dependency and links the archive alone; every other
+# host links both, which pkg-config states.
+function(mln_ffi_install_platform_library)
+  if(NOT TARGET mln_ffi_platform_rust)
+    return()
+  endif()
+  install(
+    FILES "$<TARGET_FILE:mln_ffi_platform_rust>"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+endfunction()
+
+# Publishes what a host needs to link the module itself, and reports where the
+# library it should link lives.
+#
+# A browser build ships archives rather than a linked module, so the host runs
+# the final emcc link. The options that link needs are the ones CMake applied,
+# collected by the helpers in cmake/mln_ffi_emscripten.cmake, and they travel
+# two
+# ways: a file for a build system that reads one flag per line, and the
+# pkg-config `Libs:` line for everything else.
+function(mln_ffi_install_link_options target)
+  get_property(link_options GLOBAL PROPERTY MLN_FFI_EMSCRIPTEN_LINK_OPTIONS)
+  if(NOT link_options)
+    return()
+  endif()
+  list(REMOVE_DUPLICATES link_options)
+
+  set(link_options_file "${CMAKE_CURRENT_BINARY_DIR}/emscripten-link-flags.txt")
+  list(JOIN link_options "\n" link_options_lines)
+  file(WRITE "${link_options_file}" "${link_options_lines}\n")
+  install(
+    FILES "${link_options_file}"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/maplibre-native-c"
+    COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+
+  list(JOIN link_options " " pkg_config_link_options)
+  set(MLN_FFI_PKG_CONFIG_LIBS
+      "${MLN_FFI_PKG_CONFIG_LIBS} ${pkg_config_link_options}"
+      PARENT_SCOPE)
 endfunction()
 
 function(mln_ffi_install_c_api_shared_target target)
@@ -103,6 +151,14 @@ function(mln_ffi_install_c_api_library target)
   get_target_property(MLN_FFI_TARGET_PLATFORM mln_ffi_platform_dependencies
                       MLN_FFI_TARGET_PLATFORM)
   mln_ffi_resolve_git_sha()
+  mln_ffi_install_link_options(${target})
+  mln_ffi_install_platform_library()
+  # A host that links the archive links this beside it. A Rust host is the
+  # exception and takes it from cargo instead; see
+  # mln_ffi_install_platform_library().
+  if(TARGET mln_ffi_platform_rust)
+    set(MLN_FFI_PKG_CONFIG_LIBS "${MLN_FFI_PKG_CONFIG_LIBS} -lmln_ffi_platform")
+  endif()
 
   set(pc_file "${CMAKE_CURRENT_BINARY_DIR}/maplibre-native-c.pc")
   set(artifact_file

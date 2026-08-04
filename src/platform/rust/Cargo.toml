@@ -6,7 +6,11 @@ license.workspace = true
 repository.workspace = true
 
 [lib]
-crate-type = ["staticlib"]
+# The CMake build links the staticlib. A browser build is linked by the host
+# rather than by CMake, and a host building with cargo takes the rlib instead:
+# its module would otherwise carry this library's copy of `std` alongside its
+# own. See bindings/rust/crates/maplibre-native-ffi-sys/src/lib.rs.
+crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 # Image decoding is shared by every platform, so a raster tile decodes to the

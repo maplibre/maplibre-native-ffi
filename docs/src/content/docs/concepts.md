@@ -43,11 +43,11 @@ live render session.
 
 Render targets come in three kinds:
 
-| Render target           | Owned by | Renders                              |
-| ----------------------- | -------- | ------------------------------------ |
-| native surface          | caller   | To a window or view, and presents    |
-| owned texture target    | session  | Offscreen, into a session allocation |
-| borrowed texture target | caller   | Offscreen, into a caller allocation  |
+| Render target           | Owned by | Renders                                    |
+| ----------------------- | -------- | ------------------------------------------ |
+| native surface          | caller   | To a window, view, or canvas, and presents |
+| owned texture target    | session  | Offscreen, into a session allocation       |
+| borrowed texture target | caller   | Offscreen, into a caller allocation        |
 
 Keeping render sessions separate from maps lets the host manage the graphics
 backend lifecycle independently.

@@ -300,11 +300,13 @@
     {
       "name": "emscripten-wasm32-webgl",
       "configurePreset": "emscripten-wasm32-webgl",
+      "targets": ["install"],
       "jobs": 0
     },
     {
       "name": "emscripten-wasm32-webgpu",
       "configurePreset": "emscripten-wasm32-webgpu",
+      "targets": ["install"],
       "jobs": 0
     },
     {

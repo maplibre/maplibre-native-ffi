@@ -17,10 +17,22 @@ maplibre-native-ffi-sys = { path = "../maplibre-native-ffi-sys" }
 metal = ["maplibre-native-ffi-sys/metal"]
 opengl = ["maplibre-native-ffi-sys/opengl"]
 vulkan = ["maplibre-native-ffi-sys/vulkan"]
+webgpu = ["maplibre-native-ffi-sys/webgpu"]
+
+[build-dependencies]
+# The browser render fixtures bind the WebGPU header the module links, the way
+# the sys crate binds our own.
+bindgen = "0.72.1"
 
 [dev-dependencies]
+static_assertions = "1.1.0"
+
+# Graphics fixtures for the native backends. A browser build has no Vulkan, takes
+# its GL context from Emscripten rather than EGL, and cannot use glow at all:
+# glow's manifest declares js-sys for every wasm32 target and those crates do not
+# build there, so the browser fixtures bind the entry points they need directly.
+[target.'cfg(not(target_os = "emscripten"))'.dev-dependencies]
 ash = "0.38.0"
 glow = "0.16.0"
 glutin_egl_sys = "0.7.1"
 libloading = "0.8.9"
-static_assertions = "1.1.0"

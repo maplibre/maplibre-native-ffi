@@ -100,14 +100,6 @@ static void a_second_thread_attaches_and_renders(void) {
   TEST_ASSERT_TRUE(probe.attached);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.render_status);
   TEST_ASSERT_TRUE(probe.rendered);
-#if defined(MLN_FFI_TEST_BACKEND_WEBGPU)
-  // The WebGPU backend has no readStillImage() yet, so the session reports that
-  // it cannot read back rather than returning a frame. Everything above this
-  // still covers the cross-thread attach and the render itself.
-  //
-  // TODO(browser-webgpu): assert the frame once WebGPU readback lands.
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_UNSUPPORTED, probe.readback_status);
-#else
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.readback_status);
   TEST_ASSERT_EQUAL_UINT32(64, probe.width);
   TEST_ASSERT_EQUAL_UINT32(64, probe.height);
@@ -116,7 +108,6 @@ static void a_second_thread_attaches_and_renders(void) {
   TEST_ASSERT_EQUAL_UINT8(0, probe.pixel[1]);
   TEST_ASSERT_EQUAL_UINT8(0, probe.pixel[2]);
   TEST_ASSERT_EQUAL_UINT8(255, probe.pixel[3]);
-#endif
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

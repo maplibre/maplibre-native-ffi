@@ -16,15 +16,40 @@ set(MLN_FFI_EMSCRIPTEN_INITIAL_MEMORY "512MB"
 set(MLN_FFI_EMSCRIPTEN_STACK_SIZE "1MB"
     CACHE STRING "WASM stack size for native rendering code")
 
+# A browser build installs an archive rather than a linked module, so the host
+# runs the final emcc link and has to repeat every option the module needs.
+# These three helpers apply an option and record it in one global list, which is
+# what `share/maplibre-native-c/emscripten-link-flags.txt` and the pkg-config
+# `Libs:` line are generated from. An option applied any other way reaches
+# neither, and a host would link a module missing it.
+function(mln_ffi_emscripten_record_link_options)
+  set_property(GLOBAL APPEND PROPERTY MLN_FFI_EMSCRIPTEN_LINK_OPTIONS ${ARGN})
+endfunction()
+
+function(mln_ffi_emscripten_directory_link_options)
+  add_link_options(${ARGN})
+  mln_ffi_emscripten_record_link_options(${ARGN})
+endfunction()
+
+function(mln_ffi_emscripten_interface_link_options target)
+  target_link_options(${target} INTERFACE ${ARGN})
+  mln_ffi_emscripten_record_link_options(${ARGN})
+endfunction()
+
 # MapLibre runs its tile work on threads, and a browser host drives the map from
 # whichever pthread owns the runtime, so pthreads are not optional here. They
 # require the page to be cross-origin isolated (COOP/COEP), which is a
 # deployment constraint for anything embedding a browser build.
 add_compile_options(-pthread)
-add_link_options(
-  -pthread "-sPTHREAD_POOL_SIZE=${MLN_FFI_EMSCRIPTEN_PTHREAD_POOL_SIZE}"
+mln_ffi_emscripten_directory_link_options(
+  -pthread
+  "-sPTHREAD_POOL_SIZE=${MLN_FFI_EMSCRIPTEN_PTHREAD_POOL_SIZE}"
   "-sINITIAL_MEMORY=${MLN_FFI_EMSCRIPTEN_INITIAL_MEMORY}"
-  "-sSTACK_SIZE=${MLN_FFI_EMSCRIPTEN_STACK_SIZE}")
+  "-sSTACK_SIZE=${MLN_FFI_EMSCRIPTEN_STACK_SIZE}"
+  # The C API is C++ underneath, so the module needs libc++. emcc links it by
+  # default from a `.cpp` input, which a host linking only archives and objects
+  # from another language has none of.
+  "-sDEFAULT_TO_CXX=1")
 
 # WebGPU is asynchronous in a browser and MapLibre calls it synchronously, so
 # the emdawnwebgpu port implements emwgpuWaitAny by suspending the calling
@@ -55,4 +80,4 @@ if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
         "Emscripten suspension link option for emdawnwebgpu (-sASYNCIFY=1 or -sJSPI)")
 endif()
 add_compile_options(-fwasm-exceptions)
-add_link_options(-fwasm-exceptions)
+mln_ffi_emscripten_directory_link_options(-fwasm-exceptions)

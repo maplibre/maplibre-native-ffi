@@ -4,6 +4,14 @@
 //! and unsafe extern functions generated from `include/maplibre_native_c.h`.
 //! Safety policy and ergonomic adaptation live in crates above this layer.
 
+// The C core calls into the platform library for HTTP and image decoding. In a
+// browser build that library reaches the module as an rlib rather than inside
+// the installed archive, so that the module carries one copy of `std` instead of
+// two. rustc drops an rlib no Rust code names, and the calls come from the C
+// side, so this is what keeps it on the link line.
+#[cfg(target_os = "emscripten")]
+extern crate mln_ffi_platform as _;
+
 mod bindings {
     #![allow(clippy::all)]
     #![allow(non_camel_case_types)]

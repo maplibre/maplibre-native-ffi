@@ -425,6 +425,7 @@ jobs:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test emscripten-wasm32-webgl
+      - run: mise run //bindings/rust:test:browser emscripten-wasm32-webgl
 
   target-emscripten-wasm32-webgpu:
     name: target / emscripten-wasm32-webgpu
@@ -442,6 +443,7 @@ jobs:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test emscripten-wasm32-webgpu
+      - run: mise run //bindings/rust:test:browser emscripten-wasm32-webgpu
 
   target-macos-arm64-metal:
     name: target / macos-arm64-metal

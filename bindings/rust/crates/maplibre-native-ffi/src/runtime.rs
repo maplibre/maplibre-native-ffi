@@ -1022,7 +1022,11 @@ impl Drop for WakeSource {
 
 #[cfg(test)]
 mod tests {
+    // The fixture HTTP servers below are native-only; a browser build fetches
+    // from the servers the test runner hosts instead.
+    #[cfg(not(target_os = "emscripten"))]
     use std::io::{Read, Write};
+    #[cfg(not(target_os = "emscripten"))]
     use std::net::TcpListener;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
@@ -1038,6 +1042,7 @@ mod tests {
 
     const PROVIDER_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
 
+    #[cfg(not(target_os = "emscripten"))]
     fn spawn_style_server(
         request_count: usize,
     ) -> (
@@ -1078,7 +1083,7 @@ mod tests {
         (base_url, receiver, handle)
     }
 
-    #[cfg(not(target_env = "ohos"))]
+    #[cfg(not(any(target_env = "ohos", target_os = "emscripten")))]
     fn spawn_recording_style_server(
         request_count: usize,
     ) -> (
@@ -1113,7 +1118,7 @@ mod tests {
         (base_url, receiver, handle)
     }
 
-    #[cfg(not(target_env = "ohos"))]
+    #[cfg(not(any(target_env = "ohos", target_os = "emscripten")))]
     fn spawn_redirect_style_servers() -> (
         String,
         std::sync::mpsc::Receiver<(String, bool)>,
@@ -2118,6 +2123,66 @@ mod tests {
         runtime.close().unwrap();
     }
 
+    /// The browser has no in-process TCP server, so the runner serves the two
+    /// style documents and answers 404 for everything else. That makes the
+    /// server the oracle: a rewrite that did not happen fails the style load
+    /// rather than fetching an identical document, and the layer each document
+    /// carries names which one was used. See scripts/run-browser-test.mjs.
+    #[cfg(target_os = "emscripten")]
+    #[test]
+    // Spec coverage: BND-140.
+    fn resource_transform_rewrites_style_url_and_clear_restores_original_url() {
+        let origin = std::env::var("MLN_FFI_TEST_FIXTURE_ORIGIN").expect(
+            "MLN_FFI_TEST_FIXTURE_ORIGIN is unset; run the suite through \
+             `mise run //bindings/rust:test:browser`",
+        );
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let transform_url = format!("{origin}/__fixture/rewritten-style.json");
+        // Matches the URL loaded after the clear as well, so a transform that
+        // outlived the clear rewrites that request too and the layer id says so.
+        runtime
+            .set_resource_transform(move |request| {
+                (request.url.ends_with("/original-style.json")
+                    || request.url.ends_with("/original-after-clear.json"))
+                .then(|| transform_url.clone())
+            })
+            .unwrap();
+
+        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+        map.set_style_url(&format!("{origin}/__fixture/original-style.json"))
+            .unwrap();
+        assert!(wait_for_runtime_event(
+            &runtime,
+            RuntimeEventType::MapStyleLoaded
+        ));
+        // Contains rather than equals: MapLibre adds its own annotation layer to
+        // every style it loads.
+        assert!(
+            map.style_layer_ids()
+                .unwrap()
+                .iter()
+                .any(|id| id == "rewritten")
+        );
+
+        runtime.clear_resource_transform().unwrap();
+        map.set_style_url(&format!("{origin}/__fixture/original-after-clear.json"))
+            .unwrap();
+        assert!(wait_for_runtime_event(
+            &runtime,
+            RuntimeEventType::MapStyleLoaded
+        ));
+        assert!(
+            map.style_layer_ids()
+                .unwrap()
+                .iter()
+                .any(|id| id == "original-after-clear")
+        );
+
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[cfg(not(target_os = "emscripten"))]
     #[test]
     // Spec coverage: BND-140.
     fn resource_transform_rewrites_style_url_and_clear_restores_original_url() {
@@ -2125,9 +2190,14 @@ mod tests {
         let (base_url, requests, server) = spawn_style_server(2);
         let transform_base_url = base_url.clone();
 
+        // Matches the URL loaded after the clear as well, so a transform that
+        // outlived the clear rewrites that request too and the recorded path
+        // says so.
         runtime
             .set_resource_transform(move |request| {
-                if request.url.ends_with("/original-style.json") {
+                if request.url.ends_with("/original-style.json")
+                    || request.url.ends_with("/original-after-clear.json")
+                {
                     Some(format!("{transform_base_url}/rewritten-style.json"))
                 } else {
                     None
@@ -2164,7 +2234,7 @@ mod tests {
         server.join().unwrap();
     }
 
-    #[cfg(not(target_env = "ohos"))]
+    #[cfg(not(any(target_env = "ohos", target_os = "emscripten")))]
     #[test]
     // Spec coverage: BND-158 and BND-159.
     fn http_header_transform_reaches_requests_and_clear_stops_it() {
@@ -2210,7 +2280,7 @@ mod tests {
         server.join().unwrap();
     }
 
-    #[cfg(not(target_env = "ohos"))]
+    #[cfg(not(any(target_env = "ohos", target_os = "emscripten")))]
     #[test]
     // Spec coverage: BND-158.
     fn http_header_transform_skips_non_http_urls() {
@@ -2234,7 +2304,7 @@ mod tests {
         runtime.close().unwrap();
     }
 
-    #[cfg(not(target_env = "ohos"))]
+    #[cfg(not(any(target_env = "ohos", target_os = "emscripten")))]
     #[test]
     // Spec coverage: BND-159.
     fn http_header_transform_preserves_same_origin_and_strips_cross_origin_redirects() {
@@ -2282,9 +2352,13 @@ mod tests {
         }
     }
 
-    #[cfg(target_env = "ohos")]
+    // OpenHarmony's platform HTTP client has no redirect-decision hook, and the
+    // browser's fetch transport follows redirects itself, so both report header
+    // transforms unsupported rather than enabling a transport that cannot
+    // satisfy the redirect contract.
+    #[cfg(any(target_env = "ohos", target_os = "emscripten"))]
     #[test]
-    fn http_header_transform_reports_unsupported_on_openharmony() {
+    fn http_header_transform_reports_unsupported() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let error = runtime
             .set_http_header_transform(|_| Vec::new())

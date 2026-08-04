@@ -72,3 +72,10 @@ commands = [{ task = "//bindings/python:test" }]
 [[suites]]
 platforms = ["linux", "macos", "windows"]
 commands = [{ task = "//bindings/dart:build" }]
+
+# The Rust binding is the only one that targets the browser. It runs as a page in
+# headless Chromium against the same build tree the C API suite uses; see
+# bindings/rust/mise.toml.
+[[suites]]
+platforms = ["emscripten"]
+commands = [{ task = "//bindings/rust:test:browser" }]

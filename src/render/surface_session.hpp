@@ -12,6 +12,8 @@ auto vulkan_surface_descriptor_default() noexcept
   -> mln_vulkan_surface_descriptor;
 auto opengl_surface_descriptor_default() noexcept
   -> mln_opengl_surface_descriptor;
+auto webgpu_surface_descriptor_default() noexcept
+  -> mln_webgpu_surface_descriptor;
 // The backend-independent half of surface descriptor validation: pointer, size,
 // nested size, extent, and the handles the descriptor declares required. The
 // backend that owns a descriptor adds whatever probing needs its own headers
@@ -31,6 +33,9 @@ auto validate_opengl_surface_descriptor(
   const mln_opengl_surface_descriptor* descriptor,
   bool require_supported_provider
 ) -> mln_status;
+auto validate_webgpu_surface_descriptor(
+  const mln_webgpu_surface_descriptor* descriptor
+) -> mln_status;
 auto metal_surface_attach(
   mln_map map, const mln_metal_surface_descriptor* descriptor,
   mln_render_session* out_session
@@ -43,6 +48,10 @@ auto opengl_surface_attach(
   mln_map map, const mln_opengl_surface_descriptor* descriptor,
   mln_render_session* out_session
 ) -> mln_status;
+auto webgpu_surface_attach(
+  mln_map map, const mln_webgpu_surface_descriptor* descriptor,
+  mln_render_session* out_session
+) -> mln_status;
 auto metal_surface_set_target(
   mln_render_session session, const mln_metal_surface_descriptor* descriptor
 ) -> mln_status;
@@ -51,6 +60,9 @@ auto vulkan_surface_set_target(
 ) -> mln_status;
 auto opengl_surface_set_target(
   mln_render_session session, const mln_opengl_surface_descriptor* descriptor
+) -> mln_status;
+auto webgpu_surface_set_target(
+  mln_render_session session, const mln_webgpu_surface_descriptor* descriptor
 ) -> mln_status;
 
 }  // namespace mln::core

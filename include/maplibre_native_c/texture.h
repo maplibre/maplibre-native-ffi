@@ -711,8 +711,6 @@ MLN_API mln_status mln_opengl_borrowed_texture_set_target(
  *
  * A backend that cannot read pixels back answers MLN_STATUS_UNSUPPORTED without
  * filling out_info, so a size probe is not a way to ask whether readback works.
- * WebGPU is such a backend today; acquire the frame instead and copy it with
- * the graphics API.
  *
  * Returns:
  * - MLN_STATUS_OK on success, including a size probe.

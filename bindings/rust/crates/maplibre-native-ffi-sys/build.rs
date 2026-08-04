@@ -19,9 +19,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-env-changed=CARGO_CFG_TARGET_OS");
     let install_dir = native_install_dir()?;
     let include_dir = install_dir.join("include");
-    let link_dir = native_library_dir(&install_dir);
     let target_os = env::var("CARGO_CFG_TARGET_OS")?;
     let target_family = env::var("CARGO_CFG_TARGET_FAMILY")?;
+    let link_dir = native_library_dir(&install_dir);
     let runtime_dir = native_runtime_dir(&install_dir, &target_os);
     let header = include_dir.join("maplibre_native_c.h");
 
@@ -31,13 +31,35 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("cargo:rustc-link-search=native={}", link_dir.display());
     println!("cargo:rustc-link-lib={LIBRARY_NAME}");
-    if target_family.split(',').any(|family| family == "unix") {
+    // Cargo fingerprints this script's output, not the files it names, so a
+    // native rebuild that leaves the headers alone would otherwise reuse a
+    // binary linked against the previous library.
+    print_rerun_if_changed(&link_dir);
+    println!(
+        "cargo:rerun-if-changed={}",
+        install_dir
+            .join("share/maplibre-native-c/artifact.json")
+            .display()
+    );
+    // Emscripten reports the unix family, and wasm-ld rejects -rpath.
+    if target_os != "emscripten" && target_family.split(',').any(|family| family == "unix") {
         println!("cargo:rustc-link-arg=-Wl,-rpath,{}", runtime_dir.display());
+    }
+    if target_os == "emscripten" {
+        emit_emscripten_link_args(&install_dir)?;
     }
     // Windows has no rpath, so a dependent has to place the DLL itself. The
     // `links` key turns this into DEP_MAPLIBRE_NATIVE_C_RUNTIME_DIR for the
     // crates that need it.
     println!("cargo:runtime-dir={}", runtime_dir.display());
+    // The artifact compiles exactly one renderer, and a crate above this one has
+    // no other way to learn which: the backend features select an artifact, but
+    // a local prefix is taken as given. This reaches them as
+    // DEP_MAPLIBRE_NATIVE_C_RENDER_BACKEND.
+    if let Ok(descriptor) = download::read_descriptor(&install_dir) {
+        println!("cargo:render-backend={}", descriptor.render_backend());
+    }
+    println!("cargo:rerun-if-env-changed=EMSDK");
     println!("cargo:rerun-if-env-changed=LIBCLANG_PATH");
     println!("cargo:rerun-if-env-changed=BINDGEN_EXTRA_CLANG_ARGS");
     println!("cargo:rerun-if-env-changed=SDKROOT");
@@ -58,6 +80,25 @@ fn main() -> Result<(), Box<dyn Error>> {
         if let Some(sdk_path) = apple_sdk_name(&target_os, &target).and_then(apple_sdk_path) {
             builder = builder.clang_arg(format!("-isysroot{sdk_path}"));
         }
+    }
+
+    // libclang has no emcc driver to locate the Emscripten sysroot either, and
+    // these headers include its stdint.h. EMSDK is what the CMake toolchain
+    // reads, so a checkout configured to build the browser target already has
+    // it.
+    if target_os == "emscripten" {
+        let emsdk = env::var("EMSDK")
+            .map_err(|_| "EMSDK is required to generate bindings for wasm32-unknown-emscripten")?;
+        builder = builder
+            .clang_arg("--target=wasm32-unknown-emscripten")
+            .clang_arg(format!(
+                "--sysroot={emsdk}/upstream/emscripten/cache/sysroot"
+            ))
+            // A wasm target hides declarations by default and bindgen generates
+            // nothing for a hidden function, silently. Every function here says
+            // MLN_API and so survives either way, but a declaration that forgot
+            // to would go missing on this target alone.
+            .clang_arg("-fvisibility=default");
     }
 
     let bindings = builder
@@ -96,6 +137,28 @@ fn native_install_dir() -> Result<PathBuf, Box<dyn Error>> {
         return Ok(PathBuf::from(install_dir));
     }
     download::install_prefix(backend)
+}
+
+/// Repeats the options CMake linked the browser build with, which a host has to
+/// supply because emcc links the module rather than CMake.
+///
+/// These reach this crate's own binaries and tests. A crate above this one links
+/// its own test binaries, and `cargo::rustc-link-arg` stops at the package that
+/// emitted it, so those builds pass the same options through
+/// `CARGO_ENCODED_RUSTFLAGS` — see `bindings/rust/mise.toml`.
+fn emit_emscripten_link_args(install_dir: &Path) -> Result<(), Box<dyn Error>> {
+    let path = install_dir.join("share/maplibre-native-c/emscripten-link-flags.txt");
+    println!("cargo:rerun-if-changed={}", path.display());
+    let contents = fs::read_to_string(&path)
+        .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+    for flag in contents
+        .lines()
+        .map(str::trim)
+        .filter(|flag| !flag.is_empty())
+    {
+        println!("cargo:rustc-link-arg={flag}");
+    }
+    Ok(())
 }
 
 fn native_runtime_dir(install_dir: &Path, target_os: &str) -> PathBuf {
@@ -188,7 +251,7 @@ mod download {
     const RELEASE_BASE_URL: &str =
         "https://github.com/maplibre/maplibre-native-ffi/releases/download";
     const SNAPSHOT_TAG: &str = "unstable-native-snapshot";
-    const BACKENDS: [&str; 3] = ["metal", "opengl", "vulkan"];
+    const BACKENDS: [&str; 4] = ["metal", "opengl", "vulkan", "webgpu"];
 
     /// A published `<os>-<arch>-<backend>` artifact.
     struct Preset {
@@ -298,7 +361,7 @@ mod download {
 
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
-    struct ArtifactDescriptor {
+    pub(super) struct ArtifactDescriptor {
         /// Absent from archives published before the field was added.
         #[serde(default)]
         git_sha: Option<String>,
@@ -587,13 +650,19 @@ mod download {
         }
     }
 
-    fn read_descriptor(prefix: &Path) -> Result<ArtifactDescriptor, Box<dyn Error>> {
+    pub(super) fn read_descriptor(prefix: &Path) -> Result<ArtifactDescriptor, Box<dyn Error>> {
         let path = prefix.join("share/maplibre-native-c/artifact.json");
         let contents = fs::read_to_string(&path)
             .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
         serde_json::from_str(&contents).map_err(|error| {
             format!("invalid artifact descriptor {}: {error}", path.display()).into()
         })
+    }
+
+    impl ArtifactDescriptor {
+        pub(super) fn render_backend(&self) -> &str {
+            &self.render_backend
+        }
     }
 
     fn verify_descriptor(

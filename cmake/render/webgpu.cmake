@@ -4,6 +4,14 @@ function(mln_ffi_configure_render_dependencies target)
   # bindings, so linking it is all the port needs.
   if(TARGET mbgl-vendor-dawn)
     target_link_libraries(${target} INTERFACE mbgl-vendor-dawn)
+    # The port chooses its own link options upstream, so a host linking the
+    # module needs whatever that target carries rather than a copy of it kept
+    # here. See cmake/mln_ffi_emscripten.cmake for where they end up.
+    get_target_property(dawn_link_options mbgl-vendor-dawn
+                        INTERFACE_LINK_OPTIONS)
+    if(dawn_link_options)
+      mln_ffi_emscripten_record_link_options(${dawn_link_options})
+    endif()
   else()
     message(FATAL_ERROR "MapLibre Native did not provide mbgl-vendor-dawn")
   endif()

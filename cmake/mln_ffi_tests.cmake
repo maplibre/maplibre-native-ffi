@@ -41,7 +41,9 @@ function(mln_ffi_configure_browser_c_api_test)
       # worker attaches it, and register it in GL.offscreenCanvases -- which is
       # what resolves the selector, so that table has to be reachable from JS.
       "-sOFFSCREENCANVAS_SUPPORT=1"
-      "-sEXPORTED_RUNTIME_METHODS=GL"
+      # GL for the canvas registry the fixtures resolve their selector through,
+      # ENV for the fixture origin the page shell hands the HTTP test.
+      "-sEXPORTED_RUNTIME_METHODS=GL,ENV"
       "SHELL:--shell-file ${PROJECT_SOURCE_DIR}/src/c_api/tests/browser_shell.html"
       # Unity reports through stdout and the process exit status, so the runner
       # needs the module to exit rather than keep its runtime alive.
@@ -53,23 +55,10 @@ function(mln_ffi_configure_browser_c_api_test)
   # kill it first costs the diagnosis and leaves the profile behind.
   set(runner_timeout_seconds 240)
 
-  # Chromium exposes WebGPU through Dawn on Vulkan, and the Vulkan feature is
-  # off by default on Linux; unsafe-webgpu then allows the software adapter
-  # SwiftShader provides. Both are needed and neither alone is enough --
-  # verified against a plain page, where without them navigator.gpu is present
-  # but requestAdapter() returns null, forceFallbackAdapter included. They stay
-  # off the WebGL run, which needs no Vulkan and gets its software GL from
-  # --enable-unsafe-swiftshader.
-  set(browser_args)
-  if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
-    list(APPEND browser_args --browser-arg --enable-unsafe-webgpu --browser-arg
-         --enable-features=Vulkan)
-  else()
-    # Software WebGL2 for a runner with no GPU. The WebGPU run does not get it,
-    # because it selects a software GL implementation and Dawn reaches the GPU
-    # through Vulkan.
-    list(APPEND browser_args --browser-arg --enable-unsafe-swiftshader)
-  endif()
+  # Which browser flags a backend needs lives in the runner, because the Rust
+  # binding suite reaches the same browser and would otherwise keep a second
+  # copy of the mapping.
+  set(browser_args --render-backend ${MLN_FFI_RENDER_BACKEND})
 
   find_program(MLN_FFI_NODE_EXECUTABLE node REQUIRED)
   add_test(
