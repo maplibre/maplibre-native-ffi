@@ -79,6 +79,7 @@ export class CallbackRegistry {
   }
   readonly #records: Ptr;
   #draining = false;
+  #children = 0;
 
   constructor(native: Native) {
     this.#native = native;
@@ -100,6 +101,33 @@ export class CallbackRegistry {
     this.#native.transport.startRecordNotifications(this.#owner, () => {
       this.drain();
     });
+  }
+
+  /** Records a live runtime, which keeps this context's place open. */
+  retainChild(): void {
+    this.#children += 1;
+  }
+
+  releaseChild(): void {
+    this.#children -= 1;
+  }
+
+  /**
+   * Refuses when a runtime this context created is still open.
+   *
+   * The specification requires a parent release to fail without consuming or
+   * destroying the parent, so this is asked before anything is released rather
+   * than partway through closing.
+   */
+  requireNoChildren(operation: string): void {
+    if (this.#children > 0) {
+      throw new MaplibreError(
+        "childrenLive",
+        `this context has ${this.#children} live runtimes, which keep its ` +
+          `place in the library valid`,
+        { operation },
+      );
+    }
   }
 
   /**

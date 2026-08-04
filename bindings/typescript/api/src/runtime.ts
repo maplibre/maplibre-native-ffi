@@ -292,6 +292,8 @@ export class Runtime {
     callbacks: CallbackRegistry,
     options: RuntimeOptions = {},
   ): Runtime {
+    // Retained after the native runtime exists, so a create that failed leaves
+    // the facade closable.
     const id = native.scope((scope) => {
       const layout = native.layout("mln_runtime_options");
       const storage = scope.allocateZeroed(layout.size);
@@ -313,6 +315,7 @@ export class Runtime {
       return native.memory.view(outRuntime, 8).getBigUint64(0, true);
     });
     try {
+      callbacks.retainChild();
       return new Runtime(native, id, callbacks);
     } catch (error) {
       // The native handle exists and nothing owns it, so it is released here
@@ -774,7 +777,9 @@ export class Runtime {
       });
     });
     // Storage is returned only once the native handle is gone, so a failed
-    // destroy leaves the runtime usable for a retry.
+    // destroy leaves the runtime usable for a retry. The same is true of the
+    // facade: it stays held until this runtime is really gone.
+    this.#callbacks.releaseChild();
     this.#retireProvider();
     this.#rewriteRules?.release();
     this.#rewriteRules = undefined;

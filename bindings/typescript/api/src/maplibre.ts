@@ -208,14 +208,19 @@ export class Maplibre {
    * the queue its records were waiting in. Records still queued for it are
    * released rather than left outstanding, since nothing will drain them.
    *
-   * Closing twice succeeds. A runtime this context created is closed on its
-   * own, before this: its registrations name native state that this call
-   * cannot prove is unreachable.
+   * Closing twice succeeds. A runtime this context created keeps this open, so
+   * closing while one is live reports `childrenLive` and releases nothing: the
+   * runtime still drains this registry, and its registrations name native
+   * state this call cannot prove is unreachable.
    */
   close(): void {
     if (this.#callbacks.isClosed) {
       return;
     }
+    // Asked before anything is released: a runtime this context created still
+    // drains this registry, and the specification requires a parent release to
+    // fail without consuming or destroying the parent.
+    this.#callbacks.requireNoChildren("Maplibre.close");
     // The log callback is this facade's own registration, so it goes here. The
     // clear queues the registration's retirement, and the drain delivers it, so
     // the state it owns is released rather than left behind.

@@ -360,6 +360,32 @@ export const RUNTIME_GROUP: ConformanceGroup = {
       },
     },
     {
+      name: "refuses to close a context whose runtime is still open",
+      spec: ["BND-042"],
+      run({ maplibre, expect }) {
+        // The facade is a parent: a runtime drains its registry, so releasing
+        // it while one is live would leave that runtime reaching into a place
+        // in the library that had already been given up.
+        const runtime = maplibre.createRuntime();
+        try {
+          const error = expect.throws(
+            () => maplibre.close(),
+            "closing a context with a live runtime",
+          );
+          expect.equal(error.kind, "childrenLive", "the error kind");
+          // Nothing was consumed by the refusal: the context still works.
+          expect.equal(maplibre.isClosed, false, "the context is still open");
+          expect.ok(maplibre.cVersion === 0, "and still answers");
+          runtime.pump(1);
+        } finally {
+          runtime.close();
+        }
+        // Closing it here would end this suite's own context, so only the
+        // refusal is proven; the worker test closes one for real.
+        expect.equal(maplibre.isClosed, false, "the context is still open");
+      },
+    },
+    {
       name: "rejects an asset path containing an embedded NUL",
       spec: ["BND-024"],
       run({ maplibre, expect }) {
