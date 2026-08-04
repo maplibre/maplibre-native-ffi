@@ -41,8 +41,8 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
   // Handle lifetime.
   {
     id: "BND-044",
-    reason: "inapplicable",
-    note: "JavaScript finalization is not a cleanup hook this binding runs native release from",
+    reason: "unwritten",
+    note: "this was classified inapplicable and that was wrong: `internal/handle.ts` installs a FinalizationRegistry that reports a leaked handle rather than releasing it, which is the behaviour this case describes, and nothing tests it",
   },
   {
     id: "BND-046",
@@ -80,7 +80,12 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
   { id: "BND-174", reason: "inapplicable", note: NO_SECOND_THREAD },
 
   // Threading.
-  ...([190, 191, 192, 193, 194, 195, 197] as const).map((number) => ({
+  {
+    id: "BND-192",
+    reason: "inapplicable",
+    note: "this case applies to a binding that ships an owner-thread execution adapter, and this one does not; the reason is the missing adapter rather than the missing second thread",
+  },
+  ...([190, 191, 193, 194, 195, 197] as const).map((number) => ({
     id: `BND-${number}`,
     reason: "inapplicable" as const,
     note: NO_SECOND_THREAD,
