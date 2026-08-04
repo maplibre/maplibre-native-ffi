@@ -78,6 +78,14 @@ export {
 } from "./json.ts";
 export { MapProjection } from "./projection.ts";
 export {
+  type NativePointer,
+  nativePointer,
+  RenderSession,
+  type RenderTargetExtent,
+  type VulkanContext,
+  type VulkanOwnedTextureDescriptor,
+} from "./render.ts";
+export {
   ResourceErrorReason,
   ResourceRequest,
   type ResourceRequestInfo,

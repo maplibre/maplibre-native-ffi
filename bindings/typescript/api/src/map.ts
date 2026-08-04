@@ -29,6 +29,7 @@ import type { JsonValue } from "./json.ts";
 import { MapProjection } from "./projection.ts";
 import { EP } from "./raw/entrypoints.ts";
 import { MLN_MAP_MODE } from "./raw/enums.ts";
+import { RenderSession, type VulkanOwnedTextureDescriptor } from "./render.ts";
 import type { Runtime } from "./runtime.ts";
 
 /** How a map renders. */
@@ -397,6 +398,24 @@ export class Map {
   createProjection(): MapProjection {
     this.#state.use("Map.createProjection");
     return MapProjection.create(this.#state.native, this);
+  }
+
+  /**
+   * Attaches a Vulkan render session that owns its texture.
+   *
+   * The calling context becomes the session's owner. Attaching validates that
+   * this map is live rather than that the caller owns it, so a host may render
+   * from a context that never touches the map.
+   */
+  attachVulkanOwnedTexture(
+    descriptor: VulkanOwnedTextureDescriptor,
+  ): RenderSession {
+    this.#state.use("Map.attachVulkanOwnedTexture");
+    return RenderSession.attachVulkanOwnedTexture(
+      this.#state.native,
+      this,
+      descriptor,
+    );
   }
 
   /** Releases the map. Closing twice succeeds. */

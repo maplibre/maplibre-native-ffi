@@ -10,6 +10,7 @@ import {
   Maplibre,
   type Map,
   MapMode,
+  nativePointer,
   type Runtime,
   type RuntimeEvent,
   RuntimeEventType,
@@ -339,5 +340,46 @@ describe("projected meters", () => {
     const coordinate = maplibre.latLngForProjectedMeters(meters);
     expect(coordinate.latitude).toBeCloseTo(45, 6);
     expect(coordinate.longitude).toBeCloseTo(-122, 6);
+  });
+});
+
+describe("render sessions", () => {
+  it("reports the C API's rejection of an incomplete context", () => {
+    const { map } = open();
+    // Every Vulkan handle is required, and this host has none to give. The C
+    // API rejects the descriptor rather than the binding guessing at one, which
+    // is the whole contract for a borrowed backend address.
+    try {
+      map.attachVulkanOwnedTexture({
+        extent: { width: 64, height: 64 },
+        context: {
+          instance: nativePointer(0n),
+          physicalDevice: nativePointer(0n),
+          device: nativePointer(0n),
+          graphicsQueue: nativePointer(0n),
+          graphicsQueueFamilyIndex: 0,
+          getInstanceProcAddr: nativePointer(0n),
+        },
+      });
+      expect.unreachable("a null Vulkan context is invalid");
+    } catch (error) {
+      expect(error).toBeInstanceOf(MaplibreError);
+      const kind = (error as MaplibreError).kind;
+      // A build without Vulkan reports unsupported; a Vulkan build rejects the
+      // handles. Either way the binding passed the descriptor through.
+      expect(["invalidArgument", "unsupported"]).toContain(kind);
+      expect((error as MaplibreError).diagnostic).not.toBe("");
+    }
+    map.close();
+  });
+
+  it("rejects an address no pointer can hold", () => {
+    expect(() => nativePointer(-1n)).toThrow(MaplibreError);
+    expect(() => nativePointer(1n << 64n)).toThrow(MaplibreError);
+    // Every address a 64-bit host can produce is representable, including one
+    // with its top byte tagged.
+    expect(nativePointer(0xb4_00_7f_12_34_56_78_90n)).toBe(
+      0xb4_00_7f_12_34_56_78_90n,
+    );
   });
 });
