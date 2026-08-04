@@ -79,6 +79,38 @@ export interface CaseContext {
     width: number,
     height: number,
   ): { texture: number; target: number };
+  /**
+   * An HTTP origin the library can fetch from, recording what arrived.
+   *
+   * Only a runner that declared `httpOrigin` is asked for one. Listening on a
+   * port is a property of the host rather than of the transport: a Node process
+   * can, and a page cannot listen at all.
+   */
+  httpOrigin(): Promise<HttpOrigin>;
+}
+
+/** One request an origin received. */
+export interface RecordedRequest {
+  /** The path and query the library asked for, as it arrived. */
+  readonly path: string;
+  /**
+   * The request's headers, keyed by lowercased name.
+   *
+   * HTTP field names are case-insensitive and the hosts that serve this origin
+   * report them lowercased, so a case looks a header up by the name it sent in
+   * lowercase rather than by the casing it chose.
+   */
+  readonly headers: ReadonlyMap<string, string>;
+}
+
+/** A live HTTP origin, which answers every path with an empty style. */
+export interface HttpOrigin {
+  /** The base URL a case appends a path to, ending in a slash. */
+  readonly url: string;
+  /** What arrived, in the order it arrived. Grows as requests come in. */
+  readonly requests: readonly RecordedRequest[];
+  /** Stops listening, however the case ended. */
+  close(): void;
 }
 
 export interface ConformanceCase {
@@ -103,6 +135,8 @@ export interface ConformanceCase {
    * context to attach a render session to, which is a property of the host
    * rather than of the transport: a browser has WebGL, and a bare Node process
    * has none at all.
+   * `httpOrigin` means the host can listen on a loopback port and serve the
+   * requests the library makes, which a page cannot do at all.
    * ArkTS resolves neither packages nor paths — an application reaches this
    * binding as a bundle its own build produced — so a case about how the
    * published package is laid out has nothing to look at there. This states
@@ -122,7 +156,8 @@ export interface ConformanceGroup {
 export type Capability =
   | "packageResolution"
   | "renderContext"
-  | "httpHeaderTransforms";
+  | "httpHeaderTransforms"
+  | "httpOrigin";
 
 /**
  * Whether a runner should register this case.

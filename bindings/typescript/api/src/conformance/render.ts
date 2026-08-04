@@ -13,6 +13,8 @@ import { clearForcedStatuses, forceStatus } from "../internal/faults.ts";
 import { jsonBool, jsonFrom, jsonObject, type JsonValue } from "../json.ts";
 import { pointQuery } from "../query.ts";
 import { EP } from "../raw/entrypoints.ts";
+import { MLN_STATUS } from "../raw/enums.ts";
+import { nativePointer } from "../render.ts";
 import type { ConformanceGroup } from "./harness.ts";
 import { EMPTY_STYLE, loadStyle, withRuntime } from "./harness.ts";
 
@@ -106,6 +108,200 @@ export const RENDER_SESSION_GROUP: ConformanceGroup = {
             session.close();
           }
           expect.equal(session.isClosed, true, "the session closed");
+        });
+      },
+    },
+    {
+      name: "sends each attach path to its own C session family",
+      spec: ["BND-162"],
+      needs: NEEDS_CONTEXT,
+      run({ maplibre, expect, renderContext, hostTexture }) {
+        withRuntime(maplibre, (_runtime, open) => {
+          const map = open(EXTENT);
+          const context = renderContext();
+          const hostOwned = hostTexture(EXTENT.width, EXTENT.height);
+          const sessionOwnedTexture = { extent: EXTENT, context };
+          const callerOwnedTexture = {
+            extent: EXTENT,
+            physicalWidth: EXTENT.width,
+            physicalHeight: EXTENT.height,
+            context,
+            texture: hostOwned.texture,
+            target: hostOwned.target,
+          };
+          // A stand-in for the host surface a browser has nothing to put here:
+          // a WebGL context is bound to its canvas, so there is no surface
+          // object to name. It is only ever handed to a family that refuses it,
+          // below, and a host whose build carries surface sessions has to hand
+          // this case a real one.
+          const surface = {
+            extent: EXTENT,
+            context,
+            surface: nativePointer(1n),
+          };
+
+          // Which C function an attach path called is invisible from a session
+          // that came back, so each family's entry point is made to refuse in
+          // turn. A fault is keyed by entry point and a failing call names the
+          // one it went through, so a path that had reached another family's
+          // function would report that other name, or, for the two that attach
+          // here, would not fail at all.
+          const families = [
+            {
+              name: "mln_opengl_surface_attach",
+              entrypoint: EP.mln_opengl_surface_attach,
+              attach: () => map.attachOpenGlSurface(surface),
+            },
+            {
+              name: "mln_opengl_owned_texture_attach",
+              entrypoint: EP.mln_opengl_owned_texture_attach,
+              attach: () => map.attachOpenGlOwnedTexture(sessionOwnedTexture),
+            },
+            {
+              name: "mln_opengl_borrowed_texture_attach",
+              entrypoint: EP.mln_opengl_borrowed_texture_attach,
+              attach: () => map.attachOpenGlBorrowedTexture(callerOwnedTexture),
+            },
+          ];
+          for (const family of families) {
+            forceStatus(family.entrypoint, MLN_STATUS.MLN_STATUS_NATIVE_ERROR);
+            try {
+              const error = expect.throws(
+                family.attach,
+                `attaching through ${family.name}`,
+              );
+              expect.equal(
+                error.operation,
+                family.name,
+                "the C function the attach path called",
+              );
+              // The arranged status rather than the one this build would
+              // otherwise report, which is what says the answer came from that
+              // call and not from somewhere earlier in the path.
+              expect.equal(
+                error.nativeStatus,
+                MLN_STATUS.MLN_STATUS_NATIVE_ERROR,
+                "the status arranged for that call",
+              );
+            } finally {
+              clearForcedStatuses();
+            }
+          }
+
+          // With nothing arranged, both texture families attach for real. A map
+          // holds one session at a time, so they take turns.
+          const sessionOwned =
+            map.attachOpenGlOwnedTexture(sessionOwnedTexture);
+          try {
+            expect.equal(
+              sessionOwned.isClosed,
+              false,
+              "the session-owned texture session is live",
+            );
+            expect.equal(
+              typeof sessionOwned.renderUpdate(),
+              "boolean",
+              "and answers an update",
+            );
+          } finally {
+            sessionOwned.close();
+          }
+          const callerOwned =
+            map.attachOpenGlBorrowedTexture(callerOwnedTexture);
+          try {
+            expect.equal(
+              callerOwned.isClosed,
+              false,
+              "the caller-owned texture session is live",
+            );
+            expect.equal(
+              typeof callerOwned.renderUpdate(),
+              "boolean",
+              "and answers an update",
+            );
+            // One public handle whichever family made it, so a host that moves
+            // between them keeps the API it was written against.
+            expect.ok(
+              Object.getPrototypeOf(callerOwned) ===
+                Object.getPrototypeOf(sessionOwned),
+              "both families hand back the same session type",
+            );
+          } finally {
+            callerOwned.close();
+          }
+
+          // The surface path with nothing arranged reaches the C surface family
+          // itself, which reads the descriptor this binding materialized in the
+          // order that family documents: the extent, then the context, then the
+          // surface handle. A descriptor missing only the surface is refused for
+          // the surface, and one whose extent is not a size is refused for the
+          // extent instead, so what answers is native reading this struct rather
+          // than anything this binding screened first.
+          const withoutSurface = expect.throws(
+            () =>
+              map.attachOpenGlSurface({
+                extent: EXTENT,
+                context,
+                surface: nativePointer(0n),
+              }),
+            "attaching a surface session with no surface handle",
+          );
+          expect.equal(
+            withoutSurface.operation,
+            "mln_opengl_surface_attach",
+            "the C function that refused it",
+          );
+          expect.equal(
+            withoutSurface.kind,
+            "invalidArgument",
+            "the error kind",
+          );
+          expect.contains(
+            withoutSurface.diagnostic,
+            "surface",
+            "the diagnostic names the surface handle",
+          );
+          const badExtent = expect.throws(
+            () =>
+              map.attachOpenGlSurface({
+                extent: { width: 0, height: EXTENT.height },
+                context,
+                surface: nativePointer(0n),
+              }),
+            "attaching a surface session with an extent that is not a size",
+          );
+          expect.contains(
+            badExtent.diagnostic,
+            "dimensions",
+            "the extent is read before the surface handle",
+          );
+
+          // What the family answers a descriptor it accepts is the build's to
+          // say. A browser composites its canvas without a swap and has no
+          // surface object to present through, so this build compiles the
+          // OpenGL surface family as a stub that reports unsupported, while the
+          // two texture families attach in that same build. Either answer is
+          // the surface family's own: a path that had gone to a texture family
+          // would have attached here, as those two just did.
+          const answer = expect.throws(
+            () => map.attachOpenGlSurface(surface),
+            "attaching a surface session whose descriptor is complete",
+          );
+          expect.equal(
+            answer.operation,
+            "mln_opengl_surface_attach",
+            "the C function that answered",
+          );
+          expect.equal(
+            answer.kind,
+            "unsupported",
+            "what the surface family carries in this build",
+          );
+          expect.contains(
+            answer.diagnostic,
+            "surface",
+            "the diagnostic names surface sessions",
+          );
         });
       },
     },

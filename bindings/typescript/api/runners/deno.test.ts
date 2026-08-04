@@ -13,6 +13,7 @@ import {
   MaplibreError,
   groupsFor,
 } from "../src/index.ts";
+import { startHttpOrigin } from "./http-origin.ts";
 
 const maplibre = await Maplibre.load();
 
@@ -136,7 +137,11 @@ const TRANSPORT = "node-api";
  * No graphics context exists here, so the render-session cases are left to a
  * host that has one.
  */
-const CAPABILITIES = ["packageResolution", "httpHeaderTransforms"] as const;
+const CAPABILITIES = [
+  "packageResolution",
+  "httpHeaderTransforms",
+  "httpOrigin",
+] as const;
 
 for (const group of groupsFor(CONFORMANCE, {
   transport: TRANSPORT,
@@ -151,6 +156,7 @@ for (const group of groupsFor(CONFORMANCE, {
         renderContext,
         hostTexture,
         loadPackage,
+        httpOrigin: startHttpOrigin,
       });
     });
   }

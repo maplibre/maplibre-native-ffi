@@ -43,11 +43,6 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
   // actually missing. A partial proof recorded as a whole one is worse than no
   // proof, because nobody goes back to it.
   {
-    id: "BND-048",
-    reason: "unwritten",
-    note: "a failed explicit release is proven; the requirement is about the leak channel a best-effort cleanup reports through, which is the finalizer path BND-044 also needs",
-  },
-  {
     id: "BND-088",
     reason: "inapplicable",
     note:
@@ -64,23 +59,8 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
     reason: "inapplicable",
     note: "the requirement is about headers crossing a callback boundary as copied values, and this binding installs the adapter's native header rule table rather than a JavaScript callback; the rules it supplies are copied at registration, which BND-159 is where that would be proven",
   },
-  {
-    id: "BND-159",
-    reason: "unwritten",
-    note: "rules install, replace, and clear while a map is live; proving a header reaches a request needs the library to make one, and it does not. A `node:http` endpoint was built and pointed at through `setStyleUrl`, and after ten seconds of pumping it was never contacted — so the blocker is upstream of headers: whatever issues an HTTP request for a style is not running under the conformance runtime. Find that before building the endpoint again",
-  },
-  {
-    id: "BND-162",
-    reason: "unwritten",
-    note: "session-owned and caller-owned texture attach paths are proven; the surface path is not, because WebGL has no surface handle and no Node-API host in the suite supplies one — it needs a host with a native window",
-  },
 
   // Handle lifetime.
-  {
-    id: "BND-044",
-    reason: "unwritten",
-    note: "this was classified inapplicable and that was wrong: `internal/handle.ts` installs a FinalizationRegistry that reports a leaked handle rather than releasing it, which is the behaviour this case describes, and nothing tests it",
-  },
   {
     id: "BND-046",
     reason: "inapplicable",

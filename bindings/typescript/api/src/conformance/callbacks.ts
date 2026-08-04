@@ -21,8 +21,43 @@ import {
   ResourceResponseStatus,
 } from "../resource-request.ts";
 import type { Runtime } from "../runtime.ts";
-import type { ConformanceGroup } from "./harness.ts";
+import type {
+  ConformanceGroup,
+  HttpOrigin,
+  RecordedRequest,
+} from "./harness.ts";
 import { drain, EMPTY_STYLE, loadStyle, withRuntime } from "./harness.ts";
+
+/**
+ * Asks the map for a style at a path on the origin, and reports what arrived.
+ *
+ * `pump` blocks in native code while the origin answers on the host's own
+ * event loop, so a loop that only pumped would hold the host still and the
+ * origin would never accept the connection. That is why this waits by giving
+ * the host a turn between pumps rather than by pumping harder.
+ */
+async function requestThrough(
+  maplibre: Maplibre,
+  runtime: Runtime,
+  map: Map,
+  origin: HttpOrigin,
+  path: string,
+): Promise<RecordedRequest | undefined> {
+  const before = origin.requests.length;
+  map.setStyleUrl(`${origin.url}${path}`);
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    runtime.pump(25);
+    maplibre.deliverCallbacks();
+    while (runtime.pollEvent() !== undefined) {
+      // Drained so the queue does not hold the pump open.
+    }
+    if (origin.requests.length > before) {
+      return origin.requests[origin.requests.length - 1];
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1));
+  }
+  return undefined;
+}
 
 /** Pumps until an offline operation reports that it finished. */
 function awaitCompletion(runtime: Runtime): boolean {
@@ -719,6 +754,122 @@ export const RESOURCES_GROUP: ConformanceGroup = {
           );
           runtime.clearHttpHeaderTransforms();
         });
+      },
+    },
+    {
+      name: "carries transformed headers to a real request and stops on clear",
+      spec: ["BND-159"],
+      needs: ["httpHeaderTransforms", "httpOrigin"],
+      async run({ maplibre, expect, httpOrigin }) {
+        const origin = await httpOrigin();
+        const runtime = maplibre.createRuntime();
+        try {
+          // The map stays open across every install, replacement, and clear,
+          // so what this case proves is a rule table changing under a live map
+          // rather than one chosen before anything was running.
+          const map = runtime.createMap({ width: 64, height: 64 });
+          try {
+            runtime.setHttpHeaderTransforms([
+              {
+                url: origin.url,
+                matchPrefix: true,
+                headers: [
+                  { name: "X-Conformance", value: "first" },
+                  { name: "X-Second", value: "also" },
+                ],
+              },
+            ]);
+            const first = expect.defined(
+              await requestThrough(
+                maplibre,
+                runtime,
+                map,
+                origin,
+                "first.json",
+              ),
+              "the request the installed rule applied to",
+            );
+            expect.equal(
+              first.headers.get("x-conformance"),
+              "first",
+              "the header the rule supplied reached the origin",
+            );
+            expect.equal(
+              first.headers.get("x-second"),
+              "also",
+              "the rule's whole header list reached the origin",
+            );
+
+            // The replacement matches a narrower prefix, so the same run shows
+            // both that the old table is gone and that a rule adds headers to
+            // the requests it claims rather than to every request.
+            runtime.setHttpHeaderTransforms([
+              {
+                url: `${origin.url}scoped/`,
+                matchPrefix: true,
+                headers: [{ name: "X-Replaced", value: "second" }],
+              },
+            ]);
+            const matched = expect.defined(
+              await requestThrough(
+                maplibre,
+                runtime,
+                map,
+                origin,
+                "scoped/style.json",
+              ),
+              "the request the replacement rule matched",
+            );
+            expect.equal(
+              matched.headers.get("x-replaced"),
+              "second",
+              "the replacement's header reached the origin",
+            );
+            expect.absent(
+              matched.headers.get("x-conformance"),
+              "a header from the replaced table",
+            );
+            const unmatched = expect.defined(
+              await requestThrough(
+                maplibre,
+                runtime,
+                map,
+                origin,
+                "elsewhere/style.json",
+              ),
+              "the request outside the rule's prefix",
+            );
+            expect.absent(
+              unmatched.headers.get("x-replaced"),
+              "a header on a request the rule does not claim",
+            );
+
+            runtime.clearHttpHeaderTransforms();
+            const cleared = expect.defined(
+              await requestThrough(
+                maplibre,
+                runtime,
+                map,
+                origin,
+                "scoped/after-clear.json",
+              ),
+              "the request after the clear",
+            );
+            expect.absent(
+              cleared.headers.get("x-replaced"),
+              "a header after the table was cleared",
+            );
+            expect.absent(
+              cleared.headers.get("x-conformance"),
+              "a header from any earlier table after the clear",
+            );
+          } finally {
+            map.close();
+          }
+        } finally {
+          runtime.close();
+          origin.close();
+        }
       },
     },
     {

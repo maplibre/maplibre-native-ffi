@@ -15,6 +15,27 @@ import { EP } from "../raw/entrypoints.ts";
 import type { Native } from "./native.ts";
 import type { Ptr } from "./transport.ts";
 
+/** What reporting a dropped handle needs, and nothing else. */
+interface LeakWatch {
+  readonly native: Native;
+  readonly token: Ptr;
+}
+
+/**
+ * Names one dropped handle to the library, which reports it and releases the
+ * token.
+ *
+ * This is the whole body of the finalizer below. It is a function rather than a
+ * closure written into the registry so that a caller holding the handle can
+ * take the same path, because nothing obliges a collector to ever run the
+ * finalizer itself.
+ */
+function reportLeak({ native, token }: LeakWatch): void {
+  native.scope((scope) => {
+    native.raw(scope, EP.mln_adapter_handle_leak_report, [token]);
+  });
+}
+
 /**
  * Reports handles the host dropped without closing.
  *
@@ -22,14 +43,13 @@ import type { Ptr } from "./transport.ts";
  * whether the owner thread still exists, so it reports rather than destroys.
  * Destroying a thread-affine handle from here would be a use from the wrong
  * thread at best.
+ *
+ * A registered value carries the library and the token, never the handle state:
+ * the state holds the wrapper whose collection is the trigger, so an entry that
+ * reached the state would keep the wrapper reachable and the finalizer would
+ * never run.
  */
-const leakReports = new FinalizationRegistry<{ native: Native; token: Ptr }>(
-  ({ native, token }) => {
-    native.scope((scope) => {
-      native.raw(scope, EP.mln_adapter_handle_leak_report, [token]);
-    });
-  },
-);
+const leakReports = new FinalizationRegistry<LeakWatch>(reportLeak);
 
 export type HandleLifecycle = "live" | "releasing" | "closed";
 
@@ -156,19 +176,52 @@ export class HandleState {
     this.#retireLeakToken();
   }
 
-  #retireLeakToken(): void {
-    if (this.#owner !== undefined) {
-      leakReports.unregister(this);
-      this.#owner = undefined;
+  /**
+   * Takes the path a finalizer takes for a wrapper the host dropped, and
+   * reports whether an open handle was there to report.
+   *
+   * Nothing obliges a collector to run a finalizer, so a case that dropped a
+   * wrapper and waited for one would be measuring the collector rather than
+   * this binding. Running the registered body here, against a handle whose
+   * wrapper is still in hand, makes what that path does observable: the handle
+   * is reported, the native object is left alone, and an explicit release still
+   * closes it.
+   */
+  reportLeakAsCollected(): boolean {
+    const token = this.#stopWatching();
+    if (token === 0n) {
+      return false;
     }
-    if (this.#leakToken !== 0n) {
-      const token = this.#leakToken;
-      this.#leakToken = 0n;
+    reportLeak({ native: this.native, token });
+    return true;
+  }
+
+  #retireLeakToken(): void {
+    const token = this.#stopWatching();
+    if (token !== 0n) {
       this.native.scope((scope) => {
         this.native.raw(scope, EP.mln_adapter_handle_leak_token_destroy, [
           token,
         ]);
       });
     }
+  }
+
+  /**
+   * Ends the watch and hands back the token it held, or zero when there was
+   * none.
+   *
+   * A token belongs to whatever consumes it next, and both consumers free it,
+   * so the watch ends first: a registry entry left behind would report a second
+   * time against memory the library has already released.
+   */
+  #stopWatching(): Ptr {
+    if (this.#owner !== undefined) {
+      leakReports.unregister(this);
+      this.#owner = undefined;
+    }
+    const token = this.#leakToken;
+    this.#leakToken = 0n;
+    return token;
   }
 }

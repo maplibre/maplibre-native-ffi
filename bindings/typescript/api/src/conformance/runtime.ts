@@ -6,7 +6,7 @@ import { errorKindForStatus, MaplibreError } from "../errors.ts";
 import { RuntimeEventType } from "../events.ts";
 import { decodePayload } from "../internal/event-decode.ts";
 import { clearForcedStatuses, forceStatus } from "../internal/faults.ts";
-import { nativeOf } from "../internal/private.ts";
+import { handleStateOf, nativeOf } from "../internal/private.ts";
 import { NetworkStatus } from "../maplibre.ts";
 import { EP } from "../raw/entrypoints.ts";
 import { MLN_RUNTIME_EVENT_PAYLOAD_TYPE } from "../raw/enums.ts";
@@ -260,6 +260,99 @@ export const RUNTIME_GROUP: ConformanceGroup = {
 
           map.close();
           expect.equal(map.isClosed, true, "a later release closed it");
+        } finally {
+          clearForcedStatuses();
+          runtime.close();
+        }
+      },
+    },
+    {
+      name: "reports a dropped handle rather than destroying it",
+      spec: ["BND-044"],
+      run({ maplibre, expect }) {
+        const runtime = maplibre.createRuntime();
+        try {
+          const map = runtime.createMap({ width: 64, height: 64 });
+          // A host drops a wrapper by losing its last reference, and no
+          // collector is obliged to notice, so this takes the path the
+          // finalizer takes instead of waiting for one. The library names the
+          // leak on the process's error stream, so a line about a leaked Map
+          // handle while this case runs is the case working.
+          const mapState = handleStateOf(map);
+          expect.ok(
+            mapState.reportLeakAsCollected(),
+            "the collection path reported the open map",
+          );
+
+          // A cleanup hook cannot know whether the owner thread still exists,
+          // so destroying a thread-affine handle from one would be a use from
+          // the wrong thread at best. The native map answering afterwards is
+          // what shows nothing destroyed it.
+          expect.equal(map.isClosed, false, "the map is still live");
+          expect.equal(
+            map.getSize().width,
+            64,
+            "and the native map still answers",
+          );
+          map.close();
+          expect.equal(map.isClosed, true, "an explicit release closes it");
+          expect.equal(
+            mapState.reportLeakAsCollected(),
+            false,
+            "and a closed handle has nothing left to report",
+          );
+
+          // A runtime is thread-affine for the same reason and is watched the
+          // same way, so the hook leaves it alone too.
+          expect.ok(
+            handleStateOf(runtime).reportLeakAsCollected(),
+            "the collection path reported the open runtime",
+          );
+          runtime.pump(0);
+          expect.absent(
+            runtime.pollEvent(),
+            "the native runtime still answers",
+          );
+        } finally {
+          runtime.close();
+        }
+      },
+    },
+    {
+      name: "reports a handle whose release failed, and closes it on a retry",
+      spec: ["BND-048"],
+      run({ maplibre, expect }) {
+        const runtime = maplibre.createRuntime();
+        try {
+          const map = runtime.createMap({ width: 64, height: 64 });
+          const state = handleStateOf(map);
+          // Nothing a caller can do makes a destroy fail, so it is arranged.
+          forceStatus(EP.mln_map_destroy, -5);
+          try {
+            expect.equal(
+              expect.throws(() => map.close(), "a destroy that refuses").kind,
+              "nativeError",
+              "the failure reported through the call that attempted it",
+            );
+          } finally {
+            clearForcedStatuses();
+          }
+
+          // The release did not happen, so the handle is still watched: a host
+          // that gives up and drops the wrapper is told about the map it still
+          // owns rather than losing it silently.
+          expect.ok(
+            state.reportLeakAsCollected(),
+            "the leak channel still covers a handle whose release failed",
+          );
+          expect.equal(
+            map.getSize().width,
+            64,
+            "and neither the failed release nor the report destroyed it",
+          );
+
+          map.close();
+          expect.equal(map.isClosed, true, "a retried release closes it");
         } finally {
           clearForcedStatuses();
           runtime.close();

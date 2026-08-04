@@ -93,6 +93,17 @@ function renderContext(): never {
   throw new Error("this runtime has no graphics context to render through");
 }
 
+/**
+ * No case registered here asks for an HTTP origin.
+ *
+ * The cases that fetch from one are the header-transform cases, and the library
+ * refuses header transforms on this transport, so this runner leaves the
+ * capability out rather than standing up a server nothing would reach.
+ */
+function httpOrigin(): never {
+  throw new Error("this runner offers no HTTP origin");
+}
+
 const assertions: Expect = {
   equal(actual, expected, what) {
     expect(actual, what).toEqual(expected);
@@ -174,6 +185,7 @@ describe("the WebAssembly transport", () => {
             loadPackage,
             renderContext,
             hostTexture,
+            httpOrigin,
           });
         });
       }

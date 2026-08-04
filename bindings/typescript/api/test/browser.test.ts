@@ -127,6 +127,17 @@ function hostTexture(
   return { texture: id, target: context.TEXTURE_2D };
 }
 
+/**
+ * A page cannot listen on a port.
+ *
+ * The cases that fetch from an origin of their own declare the capability, and
+ * this runner leaves it out, so reaching this is a registration mistake rather
+ * than something to work around.
+ */
+function httpOrigin(): never {
+  throw new Error("a page cannot listen for HTTP requests");
+}
+
 let cacheSequence = 0;
 function cacheDirectory(): Promise<string> {
   const filesystem = (module_ as { FS?: { mkdir(path: string): void } }).FS;
@@ -223,6 +234,7 @@ describe("a browser hosting the WebAssembly payload", () => {
             loadPackage,
             renderContext,
             hostTexture,
+            httpOrigin,
           });
         });
       }
