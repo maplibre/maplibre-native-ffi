@@ -625,6 +625,8 @@ const EglAttachContext = if (supports_egl) struct {
         _ = egl.eglTerminate(self.display);
     }
 
+    const EGL_PLATFORM_SURFACELESS_MESA: egl.EGLenum = 0x31DD;
+
     fn initDisplay() !egl.EGLDisplay {
         if (builtin.os.tag == .macos) {
             const display_attributes = [_]egl.EGLint{
@@ -634,7 +636,16 @@ const EglAttachContext = if (supports_egl) struct {
             };
             return initializeDisplay(egl.eglGetPlatformDisplayEXT(egl.EGL_PLATFORM_ANGLE_ANGLE, null, &display_attributes));
         }
-        return initializeDisplay(egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY));
+        // OpenHarmony's EGL serves its own window system, so it keeps the
+        // default display.
+        if (builtin.abi.isOpenHarmony()) {
+            return initializeDisplay(egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY));
+        }
+        // These fixtures render into pbuffers and never present, so they name
+        // the surfaceless platform. EGL_DEFAULT_DISPLAY resolves to whichever
+        // platform libEGL was built for, commonly x11, which fails to
+        // initialize on a host with no display server.
+        return initializeDisplay(egl.eglGetPlatformDisplay(EGL_PLATFORM_SURFACELESS_MESA, null, null));
     }
 
     fn initializeDisplay(display: egl.EGLDisplay) !egl.EGLDisplay {

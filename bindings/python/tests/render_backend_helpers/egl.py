@@ -8,6 +8,15 @@ import os
 import sys
 
 
+if sys.platform != "darwin":
+    # These fixtures render into pbuffers and never present, so they ask for the
+    # surfaceless platform. EGL_DEFAULT_DISPLAY resolves to whichever platform
+    # libEGL was built for, commonly x11, which fails to initialize on a host
+    # with no display server. Mesa reads this on the first EGL call, which is
+    # the route PyOpenGL leaves open: it hands back a null wrapper from
+    # eglGetPlatformDisplay. The C and Zig fixtures name the platform directly.
+    os.environ.setdefault("EGL_PLATFORM", "surfaceless")
+
 if sys.platform == "darwin":
     os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
     _cdll = ctypes.CDLL
