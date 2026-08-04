@@ -201,6 +201,10 @@ profile["type"] = "release"
 profile["app-distribution-type"] = "os_integration"
 profile["validity"] = {"not-before": 1600000000, "not-after": 2500000000}
 profile.pop("debug-info", None)
+# The device's parser wants these named on a release profile.
+profile["bundle-info"]["app-identifier"] = "maplibre-native-ffi-conformance"
+profile.setdefault("app-privilege-capabilities", [])
+profile.setdefault("acls", {"allowed-acls": [""]})
 with open(certificate) as handle:
     chain = handle.read()
 first = chain.index("-----BEGIN CERTIFICATE-----")
