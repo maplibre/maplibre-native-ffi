@@ -77,6 +77,12 @@ export {
   jsonUint,
   type JsonValue,
 } from "./json.ts";
+export {
+  AmbientCacheOperation,
+  type OfflineOperationId,
+  type OfflineRegion,
+  OfflineRegionDefinitionType,
+} from "./offline.ts";
 export { MapProjection } from "./projection.ts";
 export {
   type NativePointer,

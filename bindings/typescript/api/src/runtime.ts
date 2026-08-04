@@ -17,11 +17,17 @@ import {
 import { decodeEvent } from "./internal/event-decode.ts";
 import { HandleState } from "./internal/handle.ts";
 import type { Native } from "./internal/native.ts";
-import { asInt64 } from "./internal/numbers.ts";
+import { asInt64, asRawEnum, asUint64 } from "./internal/numbers.ts";
 import { attachHandleState, mapForId } from "./internal/private.ts";
 import { readQueuedRequest } from "./internal/queued-request.ts";
 import type { Ptr } from "./internal/transport.ts";
 import { Map, type MapOptions } from "./map.ts";
+import {
+  type AmbientCacheOperation,
+  type OfflineOperationId,
+  type OfflineRegion,
+  OfflineRegionDefinitionType,
+} from "./offline.ts";
 import { EP } from "./raw/entrypoints.ts";
 import type { ResourceRequest } from "./resource-request.ts";
 import {
@@ -546,6 +552,86 @@ export class Runtime {
     this.#rewriteRules = undefined;
   }
 
+  /**
+   * Starts listing the offline regions in this runtime's database.
+   *
+   * Offline work runs against a database, so it is a command: this reports that
+   * the operation was accepted, its completion arrives as an
+   * `offlineOperationCompleted` event naming the id, and the result is taken
+   * afterwards.
+   */
+  startOfflineRegionList(): OfflineOperationId {
+    const id = this.#state.use("Runtime.startOfflineRegionList");
+    const native = this.#state.native;
+    return native.scope((scope) => {
+      const out = scope.allocateZeroed(8);
+      native.checked(scope, EP.mln_runtime_offline_regions_list_start, [
+        id,
+        out,
+      ]);
+      return native.memory.view(out, 8).getBigUint64(0, true);
+    });
+  }
+
+  /**
+   * Takes the result of a completed region list.
+   *
+   * Ownership transfers once. A take that fails leaves the operation there, so
+   * a caller may retry it.
+   */
+  takeOfflineRegionList(
+    operation: OfflineOperationId,
+  ): readonly OfflineRegion[] {
+    const id = this.#state.use("Runtime.takeOfflineRegionList");
+    const native = this.#state.native;
+    return native.scope((scope) => {
+      const outList = scope.allocateZeroed(8);
+      native.checked(scope, EP.mln_runtime_offline_regions_list_take_result, [
+        id,
+        asUint64(operation, "operation id"),
+        outList,
+      ]);
+      const list = native.memory.view(outList, 8).getBigUint64(0, true);
+      try {
+        return readOfflineRegions(native, list);
+      } finally {
+        // The list handle is this call's to release, on every path.
+        native.scope((inner) => {
+          native.raw(inner, EP.mln_offline_region_list_destroy, [list]);
+        });
+      }
+    });
+  }
+
+  /** Starts an ambient cache operation, reporting its id. */
+  startAmbientCacheOperation(
+    operation: AmbientCacheOperation,
+  ): OfflineOperationId {
+    const id = this.#state.use("Runtime.startAmbientCacheOperation");
+    const native = this.#state.native;
+    return native.scope((scope) => {
+      const out = scope.allocateZeroed(8);
+      native.checked(scope, EP.mln_runtime_run_ambient_cache_operation_start, [
+        id,
+        BigInt(asRawEnum(operation.rawValue, "ambient cache operation")),
+        out,
+      ]);
+      return native.memory.view(out, 8).getBigUint64(0, true);
+    });
+  }
+
+  /** Discards an operation whose result the host will not take. */
+  discardOfflineOperation(operation: OfflineOperationId): void {
+    const id = this.#state.use("Runtime.discardOfflineOperation");
+    const native = this.#state.native;
+    native.scope((scope) => {
+      native.checked(scope, EP.mln_runtime_offline_operation_discard, [
+        id,
+        asUint64(operation, "operation id"),
+      ]);
+    });
+  }
+
   /** Releases the runtime. Closing twice succeeds. */
   close(): void {
     if (this.#state.isClosed) {
@@ -569,4 +655,52 @@ export class Runtime {
   get isClosed(): boolean {
     return this.#state.isClosed;
   }
+}
+
+/** Copies every region out of a list the C API handed back. */
+function readOfflineRegions(
+  native: Native,
+  list: bigint,
+): readonly OfflineRegion[] {
+  return native.scope((scope) => {
+    const outCount = scope.allocateZeroed(8);
+    native.checked(scope, EP.mln_offline_region_list_count, [list, outCount]);
+    const count = native.readSize(outCount);
+
+    const layout = native.layout("mln_offline_region_info");
+    const definition = native.layout("mln_offline_region_definition");
+    const info = scope.allocateZeroed(layout.size, layout.align);
+    const regions: OfflineRegion[] = [];
+    for (let index = 0; index < count; index += 1) {
+      native.memory.bytes(info, layout.size).fill(0);
+      native.memory
+        .view(info, layout.size)
+        .setUint32(layout.fields.size!.offset, layout.size, true);
+      native.checked(scope, EP.mln_offline_region_list_get, [
+        list,
+        BigInt(index),
+        info,
+      ]);
+      const view = native.memory.view(info, layout.size);
+      const metadataPointer = native.memory.readPointer(
+        (info + BigInt(layout.fields.metadata!.offset)) as Ptr,
+      );
+      const metadataSize = native.readSize(
+        (info + BigInt(layout.fields.metadata_size!.offset)) as Ptr,
+      );
+      regions.push({
+        id: view.getBigInt64(layout.fields.id!.offset, true),
+        definitionType: OfflineRegionDefinitionType.fromRawValue(
+          view.getUint32(
+            layout.fields.definition!.offset + definition.fields.type!.offset,
+            true,
+          ),
+        ),
+        // The bytes belong to the list, which this call releases, so they are
+        // copied before it does.
+        metadata: native.foreignBytes(metadataPointer, metadataSize),
+      });
+    }
+    return regions;
+  });
 }
