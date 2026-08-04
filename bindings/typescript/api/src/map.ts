@@ -543,6 +543,42 @@ export class Map {
   }
 
   /**
+   * Adds a GeoJSON source from data this host holds.
+   *
+   * The data crosses as the descriptor graph MapLibre holds rather than as
+   * text, so an integer keeps the alternative it arrived as and an object keeps
+   * its member order.
+   */
+  addGeoJsonSource(sourceId: string, data: GeoJson): void {
+    const id = this.#state.use("Map.addGeoJsonSource");
+    const native = this.#state.native;
+    native.scope((scope) => {
+      const layout = native.layout("mln_geojson_source_options");
+      const options = scope.allocateZeroed(layout.size, layout.align);
+      native.structValue(scope, EP.mln_geojson_source_options_default, options);
+      native.checked(scope, EP.mln_map_add_geojson_source_data, [
+        id,
+        stringView(native, scope, sourceId),
+        writeGeoJson(native, scope, data),
+        options,
+      ]);
+    });
+  }
+
+  /** Replaces the data of a GeoJSON source, keeping the options it has. */
+  setGeoJsonSourceData(sourceId: string, data: GeoJson): void {
+    const id = this.#state.use("Map.setGeoJsonSourceData");
+    const native = this.#state.native;
+    native.scope((scope) => {
+      native.checked(scope, EP.mln_map_set_geojson_source_data, [
+        id,
+        stringView(native, scope, sourceId),
+        writeGeoJson(native, scope, data),
+      ]);
+    });
+  }
+
+  /**
    * Adds a source whose tiles this host supplies.
    *
    * MapLibre asks for a tile on one of its own threads and expects nothing

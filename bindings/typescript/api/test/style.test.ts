@@ -317,3 +317,34 @@ describe("custom geometry sources", () => {
     );
   });
 });
+
+describe("GeoJSON sources", () => {
+  it("adds a source from host data and replaces it", () => {
+    const map = loadedMap();
+    map.addGeoJsonSource(
+      "points",
+      geoJsonFeatureCollection([
+        {
+          geometry: pointGeometry({ latitude: 51.5, longitude: -0.1 }),
+          properties: [{ name: "name", value: jsonString("london") }],
+          identifier: { kind: "uint", value: 1n },
+        },
+      ]),
+    );
+    expect(map.hasStyleSource("points")).toBe(true);
+
+    // Replacing the data keeps the source and the options it was added with.
+    map.setGeoJsonSourceData(
+      "points",
+      geoJsonFeatureCollection([
+        {
+          geometry: lineStringGeometry([
+            { latitude: 0, longitude: 0 },
+            { latitude: 1, longitude: 1 },
+          ]),
+        },
+      ]),
+    );
+    expect(map.hasStyleSource("points")).toBe(true);
+  });
+});
