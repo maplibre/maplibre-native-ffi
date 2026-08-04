@@ -388,7 +388,10 @@ export const CONFORMANCE: readonly ConformanceGroup[] = [
           try {
             withRuntime(maplibre, (runtime, open) => {
               const map = open({ width: 64, height: 64 });
-              map.setStyleUrl("https://127.0.0.1:1/style.json");
+              // A malformed document makes the style parser log from its own
+              // thread. Reaching for the network instead would test the host's
+              // HTTP transport, which a WebAssembly host supplies itself.
+              map.setStyleJson('{"version":8,"sources":{},"layers":[{}]}');
               for (let attempt = 0; attempt < 40; attempt += 1) {
                 runtime.pump(25);
                 while (runtime.pollEvent() !== undefined) {

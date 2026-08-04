@@ -352,6 +352,14 @@ void mln_abi_resource_request_listener(void* listener_data, void* request) {
   mln_abi_queue_push(MLN_ABI_RECORD_RESOURCE_REQUEST, listener_data, request);
 }
 
+void* mln_abi_log_listener_address(void) {
+  return (void*)(uintptr_t)&mln_abi_log_listener;
+}
+
+void* mln_abi_resource_request_listener_address(void) {
+  return (void*)(uintptr_t)&mln_abi_resource_request_listener;
+}
+
 void mln_abi_queue_set_notifier(
   void (*notify)(void* user_data), void* user_data
 ) {

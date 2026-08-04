@@ -78,7 +78,12 @@ export function nodeApiTransport(addon: NodeApiAddon): Transport {
 
     addSlab(byteLength: number): Slab {
       const buffer = new ArrayBuffer(byteLength);
-      const slab: Slab = { base: addon.registerSlab(buffer), buffer };
+      // A Node-API slab owns its buffer outright, so it starts at byte zero.
+      const slab: Slab = {
+        base: addon.registerSlab(buffer),
+        byteOffset: 0,
+        buffer,
+      };
       slabs.set(slab.base, slab);
       return slab;
     },

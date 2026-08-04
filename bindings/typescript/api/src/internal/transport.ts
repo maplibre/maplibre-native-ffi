@@ -23,8 +23,15 @@ export type Ptr = bigint & { readonly [pointerBrand]?: never };
 
 /** A block of memory both JavaScript and the C API can reach. */
 export interface Slab {
-  /** The address of byte zero of `buffer`. */
+  /** The address of this slab's first byte. */
   readonly base: Ptr;
+  /**
+   * Where the slab starts inside `buffer`.
+   *
+   * A Node-API slab owns its buffer, so this is zero. A WebAssembly slab is a
+   * region of the one linear memory, so it is the slab's offset in it.
+   */
+  readonly byteOffset: number;
   /**
    * The storage itself.
    *

@@ -114,6 +114,17 @@ void mln_abi_log_listener(void* listener_data, void* record);
 void mln_abi_resource_request_listener(void* listener_data, void* request);
 
 /**
+ * Reports the address of the log listener.
+ *
+ * A host that reaches this layer through exported functions alone cannot take a
+ * function's address, so the address is reported by a function of its own.
+ */
+void* mln_abi_log_listener_address(void);
+
+/** Reports the address of the queued resource provider listener. */
+void* mln_abi_resource_request_listener_address(void);
+
+/**
  * Installs the function this layer calls when a record is queued.
  *
  * The notifier runs on whichever MapLibre thread produced the record, so it

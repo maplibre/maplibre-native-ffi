@@ -46,6 +46,16 @@ bindings/typescript/scripts/stage-runtime.sh "$usage_preset"
 pnpm --filter @maplibre/native-ffi run build
 '''
 
+[tasks.build-wasm]
+description = "Link the WebAssembly runtime payload."
+usage = 'arg "[preset]" default="emscripten-wasm32-webgl"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }, "generate"]
+dir = "../.."
+# The Emscripten SDK is a multi-gigabyte tool an environment may leave out, so
+# this task names it rather than the binding declaring it for every task.
+tools = { emsdk = "{{vars.emsdk_version}}" }
+run = 'bindings/typescript/scripts/build-wasm-runtime.sh "$usage_preset"'
+
 [tasks.test]
 description = "Run the TypeScript binding tests under every installed runtime."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'

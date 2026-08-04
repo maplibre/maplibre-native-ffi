@@ -160,7 +160,11 @@ export class Memory {
         `a ${length}-byte view at ${address} leaves its slab`,
       );
     }
-    return new DataView(found.slab.buffer, offset, length);
+    return new DataView(
+      found.slab.buffer,
+      found.slab.byteOffset + offset,
+      length,
+    );
   }
 
   /** Returns a byte view over binding-owned memory, under the same rules. */
@@ -175,7 +179,11 @@ export class Memory {
         `a ${length}-byte view at ${address} leaves its slab`,
       );
     }
-    return new Uint8Array(found.slab.buffer, offset, length);
+    return new Uint8Array(
+      found.slab.buffer,
+      found.slab.byteOffset + offset,
+      length,
+    );
   }
 
   /** Reads a pointer field, whose width follows the transport's ABI class. */
