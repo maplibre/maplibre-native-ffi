@@ -94,6 +94,16 @@ const assertions: Expect = {
     expect(thrown, what).toBeInstanceOf(MaplibreError);
     return thrown as MaplibreError;
   },
+  throwsAny(body, what) {
+    let thrown: unknown;
+    try {
+      body();
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown, what).toBeInstanceOf(Error);
+    return thrown as Error;
+  },
   fail(what) {
     expect.unreachable(what);
   },

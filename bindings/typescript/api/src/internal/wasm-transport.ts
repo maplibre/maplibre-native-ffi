@@ -240,8 +240,14 @@ export function wasmTransport(module: WasmModule): Transport {
       // Nothing was installed, so nothing is removed.
     },
 
-    transferIssue: (handle) => module._mln_abi_transfer_issue(handle),
-    transferClaim: (token) => module._mln_abi_transfer_claim(token),
-    transferDiscard: (token) => module._mln_abi_transfer_discard(token),
+    // A wasm i64 reaches JavaScript as a signed BigInt, and every one of these
+    // is an unsigned handle or token, so a value with the top bit set would
+    // come back negative and match nothing.
+    transferIssue: (handle) =>
+      BigInt.asUintN(64, module._mln_abi_transfer_issue(handle)),
+    transferClaim: (token) =>
+      BigInt.asUintN(64, module._mln_abi_transfer_claim(token)),
+    transferDiscard: (token) =>
+      BigInt.asUintN(64, module._mln_abi_transfer_discard(token)),
   };
 }

@@ -11,6 +11,8 @@
 
 import type { MaplibreError } from "../errors.ts";
 import { RuntimeEventType } from "../events.ts";
+import { nativeOf } from "../internal/private.ts";
+import type { Transport } from "../internal/transport.ts";
 import type { Map } from "../map.ts";
 import type { Maplibre } from "../maplibre.ts";
 import type { Runtime } from "../runtime.ts";
@@ -28,6 +30,14 @@ export interface Expect {
   contains(haystack: string, needle: string, what: string): void;
   /** Asserts the body throws the binding's error, and reports which one. */
   throws(body: () => void, what: string): MaplibreError;
+  /**
+   * Asserts the body throws at all.
+   *
+   * The layers beneath the public API report their own error types — a bad
+   * allocation is not a MapLibre status — so a case about those asks only that
+   * the failure surfaced.
+   */
+  throwsAny(body: () => void, what: string): Error;
   fail(what: string): never;
 }
 
@@ -73,6 +83,18 @@ export const EMPTY_STYLE = JSON.stringify({
   sources: {},
   layers: [],
 });
+
+/**
+ * The transport a loaded library sits on.
+ *
+ * The bindability cases reach it directly, which is what lets the same rules be
+ * checked against the Node-API addon and the WebAssembly module. It stays out
+ * of the public API: this reads the association the package keeps privately,
+ * rather than the facade publishing one.
+ */
+export function transportOf(maplibre: Maplibre): Transport {
+  return nativeOf(maplibre).transport;
+}
 
 /** Runs `body` with a runtime, closing it and its maps however the body ends. */
 export function withRuntime<T>(

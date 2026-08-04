@@ -78,6 +78,18 @@ const assertions: Expect = {
     }
     return thrown;
   },
+  throwsAny(body, what) {
+    let thrown: unknown;
+    try {
+      body();
+    } catch (error) {
+      thrown = error;
+    }
+    if (!(thrown instanceof Error)) {
+      throw new Error(`${what}: expected a failure`);
+    }
+    return thrown;
+  },
   fail(what): never {
     throw new Error(what);
   },

@@ -60,6 +60,16 @@ const assertions: Expect = {
     expect(thrown instanceof MaplibreError, what).toBe(true);
     return thrown as MaplibreError;
   },
+  throwsAny(body, what) {
+    let thrown: unknown;
+    try {
+      body();
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown instanceof Error).toBe(true);
+    return thrown as Error;
+  },
   fail(what): never {
     throw new Error(what);
   },
