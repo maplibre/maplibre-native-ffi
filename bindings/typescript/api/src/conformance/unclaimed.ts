@@ -51,8 +51,8 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
   },
   {
     id: "BND-047",
-    reason: "unwritten",
-    note: "handles are separate classes here, so a mismatch needs a seam that forges an id of the wrong kind, which faults.ts does not do",
+    reason: "inapplicable",
+    note: "a handle's native id lives in a private field of its own class, so no code outside that class can reach one to pass it to another kind's operation; forging one means defeating the language rather than the binding",
   },
   { id: "BND-049", reason: "inapplicable", note: NO_SECOND_THREAD },
 
