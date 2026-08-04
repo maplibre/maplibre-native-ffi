@@ -88,11 +88,6 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
   // context, so what remains is not the context but the API: the binding
   // exposes no CPU readback, no owned-texture frames, and no `set_target`.
   {
-    id: "BND-169",
-    reason: "unwritten",
-    note: "the seam can force the release to fail; no case drives it yet",
-  },
-  {
     id: "BND-172",
     reason: "inapplicable",
     note: "the frame wrapper's construction cannot fail: it is built from a record already copied out",

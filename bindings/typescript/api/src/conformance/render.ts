@@ -8,8 +8,10 @@
  * nothing.
  */
 
+import { clearForcedStatuses, forceStatus } from "../internal/faults.ts";
 import { jsonBool, jsonObject, type JsonValue } from "../json.ts";
 import { pointQuery } from "../query.ts";
+import { EP } from "../raw/entrypoints.ts";
 import type { ConformanceGroup } from "./harness.ts";
 import { EMPTY_STYLE, loadStyle, withRuntime } from "./harness.ts";
 
@@ -561,6 +563,52 @@ export const RENDER_SESSION_GROUP: ConformanceGroup = {
               );
             }
           } finally {
+            session.close();
+          }
+        });
+      },
+    },
+    {
+      name: "keeps a frame held when giving it back refuses",
+      spec: ["BND-169"],
+      needs: NEEDS_CONTEXT,
+      run({ maplibre, expect, renderContext }) {
+        withRuntime(maplibre, (runtime, open) => {
+          const map = open(EXTENT);
+          const session = map.attachOpenGlOwnedTexture({
+            extent: EXTENT,
+            context: renderContext(),
+          });
+          try {
+            expect.ok(loadStyle(runtime, map, POINT_STYLE), "the style loaded");
+            for (let attempt = 0; attempt < 40; attempt += 1) {
+              runtime.pump(25);
+              session.renderUpdate();
+            }
+
+            const frame = session.acquireOpenGlFrame();
+            forceStatus(EP.mln_opengl_owned_texture_release_frame, -5);
+            try {
+              expect.throws(
+                () => frame.release(),
+                "a frame release that refuses",
+              );
+              // The session still holds the frame, so the wrapper must too: a
+              // wrapper that marked itself released would leave the session
+              // holding a frame nobody can give back.
+              expect.equal(frame.isReleased, false, "the frame is still held");
+              expect.ok(
+                frame.handles.texture > 0,
+                "and still exposes the texture it was lent",
+              );
+            } finally {
+              clearForcedStatuses();
+            }
+
+            frame.release();
+            expect.equal(frame.isReleased, true, "a later release succeeded");
+          } finally {
+            clearForcedStatuses();
             session.close();
           }
         });
