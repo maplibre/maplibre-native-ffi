@@ -8,7 +8,11 @@
  */
 
 import { NamedValue } from "./events.ts";
-import { MLN_LOG_EVENT, MLN_LOG_SEVERITY } from "./raw/enums.ts";
+import {
+  MLN_LOG_EVENT,
+  MLN_LOG_SEVERITY,
+  MLN_LOG_SEVERITY_MASK,
+} from "./raw/enums.ts";
 
 /** How serious a log record is. */
 export class LogSeverity extends NamedValue {
@@ -148,4 +152,58 @@ export interface LogCallbackOptions {
    * here: `true` silences MapLibre's own output, and `false` leaves it.
    */
   readonly consume?: boolean;
+}
+
+/**
+ * Which severities MapLibre may dispatch asynchronously.
+ *
+ * A record dispatched asynchronously reaches the callback after the code that
+ * logged it has moved on, which is why errors stay synchronous by default.
+ */
+export class LogSeverityMask {
+  private constructor(readonly rawValue: number) {}
+
+  /** Info and warning records may be asynchronous; errors stay synchronous. */
+  static readonly default = new LogSeverityMask(
+    MLN_LOG_SEVERITY_MASK.MLN_LOG_SEVERITY_MASK_DEFAULT,
+  );
+  static readonly all = new LogSeverityMask(
+    MLN_LOG_SEVERITY_MASK.MLN_LOG_SEVERITY_MASK_ALL,
+  );
+  /** Nothing is dispatched asynchronously. */
+  static readonly none = new LogSeverityMask(0);
+
+  static readonly info = new LogSeverityMask(
+    MLN_LOG_SEVERITY_MASK.MLN_LOG_SEVERITY_MASK_INFO,
+  );
+  static readonly warning = new LogSeverityMask(
+    MLN_LOG_SEVERITY_MASK.MLN_LOG_SEVERITY_MASK_WARNING,
+  );
+  static readonly error = new LogSeverityMask(
+    MLN_LOG_SEVERITY_MASK.MLN_LOG_SEVERITY_MASK_ERROR,
+  );
+
+  /** Combines two masks. */
+  with(other: LogSeverityMask): LogSeverityMask {
+    return new LogSeverityMask(this.rawValue | other.rawValue);
+  }
+
+  /** Reports whether this mask contains every bit of another. */
+  has(other: LogSeverityMask): boolean {
+    return (this.rawValue & other.rawValue) === other.rawValue;
+  }
+
+  /**
+   * Names a mask by its raw bits.
+   *
+   * The C API rejects unknown bits, so an unknown value passes through for it
+   * to reject rather than being rejected here.
+   */
+  static fromRawValue(rawValue: number): LogSeverityMask {
+    return new LogSeverityMask(rawValue);
+  }
+
+  equals(other: LogSeverityMask): boolean {
+    return this.rawValue === other.rawValue;
+  }
 }

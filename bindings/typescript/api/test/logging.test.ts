@@ -9,6 +9,7 @@
 
 import {
   type LogRecord,
+  LogSeverityMask,
   MaplibreError,
   Maplibre,
   type Runtime,
@@ -119,5 +120,32 @@ describe("the log callback", () => {
     ).not.toThrow();
     provokeLogging();
     expect(MaplibreError.name).toBe("MaplibreError");
+  });
+});
+
+describe("async log severities", () => {
+  it("combines, tests, and applies a mask", () => {
+    const both = LogSeverityMask.info.with(LogSeverityMask.warning);
+    expect(both.has(LogSeverityMask.info)).toBe(true);
+    expect(both.has(LogSeverityMask.error)).toBe(false);
+    // The default is exactly info and warning, which is what MapLibre may
+    // dispatch asynchronously; errors stay synchronous.
+    expect(both.equals(LogSeverityMask.default)).toBe(true);
+
+    maplibre.setAsyncLogSeverities(LogSeverityMask.none);
+    maplibre.setAsyncLogSeverities(LogSeverityMask.all);
+    maplibre.setAsyncLogSeverities(LogSeverityMask.default);
+  });
+
+  it("reports the C API's rejection of unknown bits", () => {
+    try {
+      maplibre.setAsyncLogSeverities(LogSeverityMask.fromRawValue(0xffff));
+      expect.unreachable("unknown mask bits are invalid");
+    } catch (error) {
+      expect(error).toBeInstanceOf(MaplibreError);
+      expect((error as MaplibreError).kind).toBe("invalidArgument");
+      // The binding does not duplicate the C API's mask validation.
+      expect((error as MaplibreError).diagnostic).not.toBe("");
+    }
   });
 });

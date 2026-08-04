@@ -55,6 +55,7 @@ export {
   LogEvent,
   type LogRecord,
   LogSeverity,
+  LogSeverityMask,
 } from "./logging.ts";
 export {
   type LoadOptions,

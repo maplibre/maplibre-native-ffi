@@ -15,11 +15,12 @@ import {
   type NodeApiAddon,
   nodeApiTransport,
 } from "./internal/node-transport.ts";
-import { asRawEnum } from "./internal/numbers.ts";
+import { asRawEnum, asUint32 } from "./internal/numbers.ts";
 import { attachNative } from "./internal/private.ts";
 import type { Ptr, Transport } from "./internal/transport.ts";
 import {
   LogEvent,
+  LogSeverityMask,
   type LogCallbackOptions,
   type LogRecord,
   LogSeverity,
@@ -153,6 +154,20 @@ export class Maplibre {
       throw error;
     }
     this.#logRegistration = registration;
+  }
+
+  /**
+   * Controls which log severities MapLibre may dispatch asynchronously.
+   *
+   * An asynchronous record reaches the callback after the code that logged it
+   * has moved on, so errors stay synchronous by default.
+   */
+  setAsyncLogSeverities(mask: LogSeverityMask): void {
+    this.#native.scope((scope) => {
+      this.#native.checked(scope, EP.mln_log_set_async_severity_mask, [
+        BigInt(asUint32(mask.rawValue, "log severity mask")),
+      ]);
+    });
   }
 
   /** Clears the process-global log callback. */
