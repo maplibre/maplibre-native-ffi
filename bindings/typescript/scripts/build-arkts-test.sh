@@ -334,8 +334,23 @@ echo "installing on $connect_key"
 "$hdc" -t "$connect_key" install -r "$signed"
 
 echo "running the conformance suite"
+# `aa test` reports a passing exit status whatever the suite did, so the tally
+# it prints is what decides. A run that never reached the report is a failure
+# too, which is why the result line has to be present rather than merely free
+# of failures.
+report="$work/report.txt"
 "$hdc" -t "$connect_key" shell aa test \
   -b "$bundle_id" \
   -m "$module" \
   -s unittest /ets/TestRunner/OpenHarmonyTestRunner \
-  -s timeout 300000
+  -s timeout 300000 | tee "$report"
+
+result="$(grep -o 'Tests run:.*' "$report" || true)"
+if [[ -z "$result" ]]; then
+  echo "the suite printed no result; the run did not finish" >&2
+  exit 1
+fi
+echo "$result"
+if [[ ! "$result" =~ Failure:\ 0,\ Error:\ 0 ]]; then
+  exit 1
+fi

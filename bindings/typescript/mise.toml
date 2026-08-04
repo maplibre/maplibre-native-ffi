@@ -107,3 +107,10 @@ deno test \
   --node-modules-dir=manual \
   runners/deno.test.ts
 '''
+
+[tasks."test:arkts"]
+description = "Run the conformance suite on an OpenHarmony device."
+usage = 'arg "[preset]" default="ohos-x64-egl"'
+depends = [{ task = "build:arkts", args = ["{{usage.preset}}"] }]
+dir = "../.."
+run = 'bindings/typescript/scripts/build-arkts-test.sh "$usage_preset"'
