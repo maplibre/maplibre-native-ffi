@@ -3,8 +3,8 @@ package org.maplibre.nativeffi.internal.wasm
 import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 import org.maplibre.nativeffi.internal.status.Status
 
-@JsFun("() => globalThis.__maplibreNativeC._mln_browser_dispatcher_create()")
-private external fun createDispatcher(): Int
+@JsFun("(ids) => globalThis.__maplibreNativeC._mln_browser_dispatcher_create_with_canvases(ids)")
+private external fun createDispatcher(canvasIds: Int): Int
 
 @JsFun("(d) => globalThis.__maplibreNativeC._mln_browser_dispatcher_stop(d)")
 private external fun stopDispatcher(dispatcher: Int)
@@ -122,14 +122,68 @@ internal object Dispatcher {
    */
   private val diagnostics = mutableMapOf<Int, String>()
 
-  /** Creates the owner thread on first use. */
+  /**
+   * Page canvases to hand the owner thread as it starts, in the order they were reserved.
+   *
+   * A browser moves a canvas between agents only at `pthread_create`, so this list is read once and
+   * never again. It is what [reserveCanvas] fills.
+   */
+  private val reservedCanvases = mutableListOf<String>()
+
+  /**
+   * Claims a page canvas for the owner thread, before that thread exists.
+   *
+   * A `<canvas>` element with this `id` is transferred to the owner thread when the thread is
+   * created, and from then on the page's element is a placeholder that displays what the owner
+   * thread draws. That is the whole of zero-copy presentation in a browser: a render target's
+   * default framebuffer *is* the canvas the page shows, so a frame reaches the page without being
+   * read back, copied, or passed through JavaScript.
+   *
+   * **Reserve before the first call that reaches native.** The owner thread starts lazily, on the
+   * first call placed on it, and a browser will not transfer a canvas to a thread that is already
+   * running — so this reports a failure rather than silently reserving something that can never
+   * arrive. The element must be in the document by then too, and control of it must not already
+   * have been transferred; either of those makes creating the thread fail instead.
+   *
+   * Reserving the same id twice does nothing, so a host may reserve on a path it takes more than
+   * once.
+   */
+  fun reserveCanvas(id: String) {
+    Status.requireArgument(id.isNotEmpty()) { "a canvas id must not be empty" }
+    // The list crosses to native as one comma-separated string, which is the shape Emscripten's
+    // transfer attribute takes, so a comma inside an id would split it into two that name nothing.
+    Status.requireArgument(!id.contains(',')) { "a canvas id must not contain a comma: $id" }
+    Heap.requireCString(id, "canvas id")
+    if (reservedCanvases.contains(id)) return
+    if (handle != 0) {
+      throw Status.invalidState(
+        "The canvas \"$id\" cannot be reserved because the MapLibre Native browser module's owner " +
+          "thread has already started. A browser hands a canvas to a thread only as that thread " +
+          "is created, so every canvas is reserved before the first call that reaches native."
+      )
+    }
+    reservedCanvases.add(id)
+  }
+
+  /** Creates the owner thread on first use, transferring whatever canvases were reserved. */
   private fun require(): Int {
     if (handle != 0) return handle
     BrowserModule.require()
-    val created = createDispatcher()
+    val ids = reservedCanvases.joinToString(",")
+    val created =
+      if (ids.isEmpty()) createDispatcher(0)
+      else
+        Heap.withScratch(Heap.utf8Size(ids)) { block ->
+          Heap.storeUtf8(block, ids)
+          createDispatcher(block.address)
+        }
     if (created == 0) {
       throw Status.invalidState(
-        "The MapLibre Native browser module could not start its owner thread"
+        if (ids.isEmpty()) "The MapLibre Native browser module could not start its owner thread"
+        else
+          "The MapLibre Native browser module could not start its owner thread with the canvases " +
+            "$ids. Each must be the id of a <canvas> element in the document whose control has " +
+            "not already been transferred."
       )
     }
     handle = created
@@ -276,6 +330,11 @@ internal object Dispatcher {
     // Nothing is outstanding by now, so anything still here belongs to a caller that never
     // resumed; it would otherwise be handed to whichever token matched it after a restart.
     diagnostics.clear()
+    // The canvases went with the thread and cannot come back: a page gives control of a canvas
+    // away once, and the element it gave away is not drawable again. Carrying the reservations
+    // into a restart would only make that restart fail, so a host that starts over supplies fresh
+    // elements.
+    reservedCanvases.clear()
     stopDispatcher(dispatcher)
   }
 

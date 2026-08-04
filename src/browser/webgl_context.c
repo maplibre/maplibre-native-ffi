@@ -27,32 +27,36 @@
 // (`mln_opengl_owned_texture_acquire_frame`). The texture is the interop
 // object, and nothing is copied.
 //
-// **The canvas is a private OffscreenCanvas the render thread makes.** A WebGL2
-// context cannot exist without one, and this one is never displayed. What a
-// texture session renders goes into a framebuffer of its own; what a surface
-// session renders goes into this canvas's default framebuffer, where a host
-// reaches it through the same context. Putting pixels on the page is the host's
-// job and not this module's.
+// **A context is created against one of two kinds of canvas**, and which one
+// decides how a frame reaches the page.
 //
-// Two other arrangements were considered and are not used.
+// - A canvas the host transferred to the owner thread, named by its element id.
+//   The page still displays that `<canvas>` element, and the browser pushes
+//   whatever the owner thread draws into it at the end of each task, so a
+//   surface session's frame -- or a texture blitted onto the default
+//   framebuffer by `webgl_host.c` -- appears on the page with nothing copied
+//   through the module or through JavaScript. Transferring is
+//   `mln_browser_dispatcher_create_with_canvases`'s job, because Emscripten
+//   only transfers at `pthread_create`.
+// - A private OffscreenCanvas this file creates, for a context with no id
+//   named. It is never displayed, which is exactly what a host that reads
+//   frames back wants; a WebGL2 context cannot exist without some canvas, and
+//   this is the one that costs the page nothing.
 //
-// - Transferring a page canvas to the render thread at `pthread_create`, which
-//   is Emscripten's supported way to draw to something the page displays. It is
-//   also the only moment such a transfer can happen, so the canvas would have
-//   to be chosen before the module's first call, by a host that may not have
-//   one yet -- and it answers a question the C API does not ask.
-// - Creating the context on the page and rendering from the owner thread with
-//   `EMSCRIPTEN_WEBGL_CONTEXT_PROXY_ALWAYS`. The wait graph allows it -- a
-//   worker waiting on the page is the direction that already exists, and the
-//   page services its proxy queue even while parked on a promise -- but every
-//   one of a frame's thousands of GL calls would become a cross-thread round
-//   trip with the worker blocked on it, and the proxied path needs
-//   `-sOFFSCREEN_FRAMEBUFFER`, which this module is not linked with.
+// Rendering from the owner thread through a context the *page* created was
+// considered and is not used. `EMSCRIPTEN_WEBGL_CONTEXT_PROXY_ALWAYS` allows it
+// -- a worker waiting on the page is the direction that already exists, and the
+// page services its proxy queue even while parked on a promise -- but every one
+// of a frame's thousands of GL calls would become a cross-thread round trip
+// with the worker blocked on it, and the proxied path needs
+// `-sOFFSCREEN_FRAMEBUFFER`, which this module is not linked with.
 //
 // The registry is `GL.offscreenCanvases` rather than `specialHTMLTargets`,
 // because `findCanvasEventTarget()` -- which is what resolves the selector
 // under `-sOFFSCREENCANVAS_SUPPORT` -- searches the former and never consults
-// the latter.
+// the latter. It is also where Emscripten puts a transferred canvas, so both
+// kinds are found the same way, and the difference between them is only who
+// created the entry and therefore who removes it.
 
 #include <emscripten/em_js.h>
 #include <emscripten/html5.h>
@@ -64,6 +68,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "browser/dispatcher.h"
 #include "maplibre_native_c/base.h"
@@ -83,12 +88,26 @@ EM_JS(void, mln_browser_webgl_unregister_canvas, (const char* name), {
   delete Module["GL"].offscreenCanvases[UTF8ToString(name)];
 });
 
+// Reports whether the registry holds an entry for `name`, which for a
+// host-named canvas is what says the transfer at `pthread_create` reached this
+// thread. Checked before a context is created against it, so a mistyped id
+// fails saying the canvas is missing rather than failing as a context that
+// could not be made.
+EM_JS(int, mln_browser_webgl_has_canvas, (const char* name), {
+  return Module["GL"].offscreenCanvases[UTF8ToString(name)] ? 1 : 0;
+});
+
 // Sizes a registered canvas's drawing buffer, reporting whether the entry was
 // still there. Written here rather than through
 // emscripten_set_canvas_element_size(), which resolves the same registry but
 // then assigns to the registry entry rather than to the OffscreenCanvas inside
-// it -- it expects the shape its own transfer path produces, and this module
-// constructs its canvases instead.
+// it.
+//
+// The two kinds of entry hold their canvas under different names: this file
+// constructs `{canvas}`, and Emscripten's `pthread_create` transfer produces
+// `{offscreenCanvas, canvasSharedPtr}`. Both are resolved here, the same way
+// `_emscripten_webgl_do_create_context` resolves them, so a host sizes a canvas
+// without knowing which kind it has.
 EM_JS(
   int, mln_browser_webgl_size_canvas, (const char* name, int width, int height),
   {
@@ -96,8 +115,20 @@ EM_JS(
     if (!entry) {
       return 0;
     }
-    entry.canvas.width = width;
-    entry.canvas.height = height;
+    const canvas = entry.offscreenCanvas || entry.canvas;
+    if (!canvas) {
+      return 0;
+    }
+    canvas.width = width;
+    canvas.height = height;
+    // A transferred canvas carries its size in shared memory so that the page
+    // and this thread agree on it. Left stale,
+    // emscripten_get_canvas_element_size would keep reporting whatever the
+    // element measured before the transfer.
+    if (entry.canvasSharedPtr) {
+      HEAP32[entry.canvasSharedPtr >> 2] = width;
+      HEAP32[(entry.canvasSharedPtr + 4) >> 2] = height;
+    }
     return 1;
   }
 );
@@ -108,11 +139,21 @@ EM_JS(
 // OffscreenCanvas and its drawing buffer would stay reachable from the module
 // for as long as the page lives, and a host that reattaches a session per
 // resize would accumulate one per attach.
-#define MLN_BROWSER_WEBGL_CANVAS_ID_BYTES 32
+//
+// Long enough for an element id a host would actually write. A longer one is
+// refused at creation rather than truncated, because a truncated key names a
+// different canvas or none.
+#define MLN_BROWSER_WEBGL_CANVAS_ID_BYTES 64
 
 typedef struct mln_browser_webgl_canvas {
   EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
   char id[MLN_BROWSER_WEBGL_CANVAS_ID_BYTES];
+  // Set for the private OffscreenCanvas this file constructs, and clear for a
+  // canvas the host transferred at `pthread_create`. It decides who removes the
+  // registry entry: a transferred canvas belongs to the host and to the page
+  // element it is still displayed through, and removing its entry would leave
+  // the host unable to make a second context for the canvas it still owns.
+  bool owned;
   struct mln_browser_webgl_canvas* next;
 } mln_browser_webgl_canvas;
 
@@ -174,18 +215,27 @@ static bool mln_browser_webgl_copy_id(
 /**
  * Creates a WebGL2 context on the calling thread, or returns zero.
  *
- * `width` and `height` size the OffscreenCanvas that backs it. A texture
- * session draws into a framebuffer of its own rather than into this canvas, so
- * for one the size bounds nothing the map renders and only has to be positive,
- * because a zero-sized canvas has no drawing buffer to create a context
- * against. A surface session renders into this canvas's default framebuffer, so
- * for one the size is that session's physical extent.
+ * `canvas_id` names a `<canvas>` element the host transferred to this thread
+ * with mln_browser_dispatcher_create_with_canvases(), and the page keeps
+ * displaying that element: everything reaching this context's default
+ * framebuffer is composited onto it, so a frame reaches the page with nothing
+ * copied. Pass null or an empty string for a private OffscreenCanvas instead,
+ * which is never displayed and is what a host that reads frames back wants.
+ *
+ * `width` and `height` size the canvas's drawing buffer. A texture session
+ * draws into a framebuffer of its own rather than into the canvas, so for one
+ * the size bounds nothing the map renders and only has to be positive, because
+ * a zero-sized canvas has no drawing buffer to create a context against. A
+ * surface session renders into the canvas's default framebuffer, so for one the
+ * size is that session's physical extent -- and so is the size of anything
+ * mln_browser_webgl_present_texture_here() blits onto it.
  *
  * **The context is affine to the calling thread**, which must therefore be the
  * thread that owns the render session it is given to. Zero is what a failure
  * reports, and it is also the value the C API refuses in
  * `mln_webgl_context_descriptor`, so a host that passes the result on
- * unchecked is rejected there rather than rendering into nothing.
+ * unchecked is rejected there rather than rendering into nothing. A
+ * `canvas_id` that no transfer put on this thread is one such failure.
  *
  * The context is left current on this thread. Sessions make it current for
  * themselves around every frame, so this matters only to a host that wants to
@@ -193,9 +243,13 @@ static bool mln_browser_webgl_copy_id(
  * with a rendered texture, and it has to do it here.
  */
 MLN_API int32_t mln_browser_webgl_context_create_here(
-  uint32_t width, uint32_t height
+  const char* canvas_id, uint32_t width, uint32_t height
 ) MLN_NOEXCEPT {
   if (width == 0 || height == 0 || width > INT32_MAX || height > INT32_MAX) {
+    return 0;
+  }
+  const bool host_canvas = canvas_id != NULL && canvas_id[0] != '\0';
+  if (host_canvas && strlen(canvas_id) >= MLN_BROWSER_WEBGL_CANVAS_ID_BYTES) {
     return 0;
   }
   mln_browser_webgl_canvas* entry = calloc(1, sizeof(*entry));
@@ -203,9 +257,26 @@ MLN_API int32_t mln_browser_webgl_context_create_here(
     return 0;
   }
 
-  const unsigned int serial = atomic_fetch_add(&canvas_serial, 1U) + 1U;
-  (void)snprintf(entry->id, sizeof(entry->id), "mln-webgl-%u", serial);
-  mln_browser_webgl_register_canvas(entry->id, (int)width, (int)height);
+  if (host_canvas) {
+    (void)snprintf(entry->id, sizeof(entry->id), "%s", canvas_id);
+    if (!mln_browser_webgl_has_canvas(entry->id)) {
+      free(entry);
+      return 0;
+    }
+    // Sized here as well as for a private canvas, so that `width` and `height`
+    // mean the same thing either way. A transferred canvas arrives at whatever
+    // the element measured, which is a CSS layout size rather than the device
+    // pixels a session renders in.
+    if (!mln_browser_webgl_size_canvas(entry->id, (int)width, (int)height)) {
+      free(entry);
+      return 0;
+    }
+  } else {
+    entry->owned = true;
+    const unsigned int serial = atomic_fetch_add(&canvas_serial, 1U) + 1U;
+    (void)snprintf(entry->id, sizeof(entry->id), "mln-webgl-%u", serial);
+    mln_browser_webgl_register_canvas(entry->id, (int)width, (int)height);
+  }
 
   EmscriptenWebGLContextAttributes attributes;
   emscripten_webgl_init_context_attributes(&attributes);
@@ -219,12 +290,16 @@ MLN_API int32_t mln_browser_webgl_context_create_here(
   attributes.antialias = EM_FALSE;
   // Preserved, because a host reads a surface session's frame out of this
   // canvas's default framebuffer in a later task than the one that drew it --
-  // see mln_browser_webgl_read_pixels(). Nothing composites a canvas the page
-  // has never seen, so in principle nothing would clear the buffer either, but
-  // that is an absence to rely on rather than a guarantee, and this is the
-  // guarantee. A texture session never touches this buffer, so it pays nothing.
+  // see mln_browser_webgl_read_pixels(). A canvas the page displays is
+  // composited at the end of each task and would otherwise be cleared as part
+  // of that, which would also lose a frame between two of a host's own calls.
+  // A texture session never touches this buffer, so it pays nothing.
   attributes.preserveDrawingBuffer = EM_TRUE;
-  // Nothing presents this canvas, so there is no swap to take control of.
+  // Left implicit, which is what presenting depends on: with implicit swap the
+  // browser pushes what this context drew when the task that drew it ends, and
+  // the owner thread's task ends after every drain. Taking explicit control
+  // would mean calling emscripten_webgl_commit_frame(), which is a documented
+  // no-op in this emsdk and would present nothing at all.
   attributes.explicitSwapControl = EM_FALSE;
   // The context stays on this thread. Proxying it to the page would turn every
   // GL call MapLibre makes into a cross-thread round trip, and needs a build
@@ -235,7 +310,9 @@ MLN_API int32_t mln_browser_webgl_context_create_here(
   (void)snprintf(target, sizeof(target), "#%s", entry->id);
   entry->context = emscripten_webgl_create_context(target, &attributes);
   if (entry->context == 0) {
-    mln_browser_webgl_unregister_canvas(entry->id);
+    if (entry->owned) {
+      mln_browser_webgl_unregister_canvas(entry->id);
+    }
     free(entry);
     return 0;
   }
@@ -244,7 +321,9 @@ MLN_API int32_t mln_browser_webgl_context_create_here(
     EMSCRIPTEN_RESULT_SUCCESS
   ) {
     (void)emscripten_webgl_destroy_context(entry->context);
-    mln_browser_webgl_unregister_canvas(entry->id);
+    if (entry->owned) {
+      mln_browser_webgl_unregister_canvas(entry->id);
+    }
     free(entry);
     return 0;
   }
@@ -260,6 +339,11 @@ MLN_API int32_t mln_browser_webgl_context_create_here(
  * handle for a target's lifetime, and a target left holding a destroyed context
  * renders into nothing.
  *
+ * A private OffscreenCanvas goes with the context that was created against it.
+ * A canvas the host transferred does not: the page still displays the element,
+ * the transfer cannot be repeated, and a host may create a second context
+ * against it -- so its registry entry stays for the thread's lifetime.
+ *
  * A handle this module did not create, or one already destroyed, is ignored.
  */
 MLN_API void mln_browser_webgl_context_destroy_here(
@@ -271,7 +355,9 @@ MLN_API void mln_browser_webgl_context_destroy_here(
     return;
   }
   (void)emscripten_webgl_destroy_context(entry->context);
-  mln_browser_webgl_unregister_canvas(entry->id);
+  if (entry->owned) {
+    mln_browser_webgl_unregister_canvas(entry->id);
+  }
   free(entry);
 }
 
@@ -364,6 +450,11 @@ MLN_API bool mln_browser_webgl_canvas_resize(
 }
 
 typedef struct mln_browser_webgl_create_request {
+  // Copied rather than borrowed, because a canvas id is the one argument here
+  // that a host is likely to build from a string it then drops. Everything else
+  // crossing to the owner thread is a scalar or host memory the host was
+  // already told to keep.
+  char canvas_id[MLN_BROWSER_WEBGL_CANVAS_ID_BYTES];
   uint32_t width;
   uint32_t height;
   int32_t* out_context;
@@ -374,8 +465,9 @@ static void mln_browser_webgl_run_create(void* argument) {
   // Written before this returns, and the dispatcher posts the completion only
   // afterwards, so a host that reads it once its token comes back reads a value
   // this thread has finished writing.
-  *request->out_context =
-    mln_browser_webgl_context_create_here(request->width, request->height);
+  *request->out_context = mln_browser_webgl_context_create_here(
+    request->canvas_id, request->width, request->height
+  );
   free(request);
 }
 
@@ -388,6 +480,10 @@ static void mln_browser_webgl_run_create(void* argument) {
  * `token` follows the same rules mln_browser_dispatcher_submit() sets, and the
  * completion for it reports true.
  *
+ * `canvas_id` is mln_browser_webgl_context_create_here()'s, and names a canvas
+ * this dispatcher was created with; it is copied here rather than borrowed, so
+ * it need not outlive this call. An id longer than 63 bytes is refused.
+ *
  * `out_context` is host memory that must stay valid and untouched until that
  * completion arrives, because the owner thread is what writes it. It receives
  * the context handle, or zero when creation failed.
@@ -396,15 +492,25 @@ static void mln_browser_webgl_run_create(void* argument) {
  * completion follows `token`, and `out_context` is unwritten.
  */
 MLN_API bool mln_browser_webgl_context_create(
-  mln_browser_dispatcher* dispatcher, uint32_t width, uint32_t height,
-  int32_t* out_context, uint32_t token
+  mln_browser_dispatcher* dispatcher, const char* canvas_id, uint32_t width,
+  uint32_t height, int32_t* out_context, uint32_t token
 ) MLN_NOEXCEPT {
   if (dispatcher == NULL || out_context == NULL) {
+    return false;
+  }
+  if (
+    canvas_id != NULL && strlen(canvas_id) >= MLN_BROWSER_WEBGL_CANVAS_ID_BYTES
+  ) {
     return false;
   }
   mln_browser_webgl_create_request* request = calloc(1, sizeof(*request));
   if (request == NULL) {
     return false;
+  }
+  if (canvas_id != NULL) {
+    (void)snprintf(
+      request->canvas_id, sizeof(request->canvas_id), "%s", canvas_id
+    );
   }
   request->width = width;
   request->height = height;

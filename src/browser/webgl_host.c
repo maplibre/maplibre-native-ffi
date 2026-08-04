@@ -23,8 +23,25 @@
 // target hands its own texture back through
 // mln_opengl_owned_texture_acquire_frame() and needs nothing from here.
 //
-// **mln_browser_webgl_read_pixels() is how a frame leaves.** The C API's own
-// readback, mln_texture_read_premultiplied_rgba8(), covers session-owned
+// **mln_browser_webgl_present_texture() is how a texture frame reaches the
+// page.** A surface session needs nothing: it renders into the default
+// framebuffer of the canvas its context is bound to, and if that canvas is one
+// the host transferred, the browser composites it onto the page element at the
+// end of the task that drew it. A texture session renders into a framebuffer of
+// its own, so something has to move those pixels onto the default framebuffer,
+// and that something has to run in the session's context on the session's
+// thread -- which is here.
+//
+// It is a `glBlitFramebuffer` from a scratch read framebuffer with the texture
+// attached, and it is what "zero copy" means in a browser: the pixels stay in
+// GPU memory, never enter the module's heap, and never cross an agent boundary.
+// A textured quad would do the same job and would need a program, a vertex
+// buffer, and a vertex array, each of which is state MapLibre's GL backend
+// caches; the blit touches two framebuffer bindings and the scissor.
+//
+// **mln_browser_webgl_read_pixels() is how a frame leaves** when a host is not
+// presenting at all -- a test, a screenshot, a host with no page. The C API's
+// own readback, mln_texture_read_premultiplied_rgba8(), covers session-owned
 // texture targets and refuses the other two families -- for a caller-owned
 // target the texture was never the session's to read, and a surface target has
 // no texture at all. On every other platform that is not a gap, because the
@@ -237,6 +254,90 @@ MLN_API bool mln_browser_webgl_read_pixels_here(
   return read;
 }
 
+/**
+ * Blits a rendered texture onto the default framebuffer of its context.
+ *
+ * This is how a texture session's frame reaches the page. `texture` names a
+ * two-dimensional texture of `context` -- the one a caller-owned target was
+ * given, or the one mln_opengl_owned_texture_acquire_frame() reported -- and
+ * `width` and `height` are its size in device pixels. The destination is the
+ * canvas the context was created against, so a context created for a canvas the
+ * host transferred puts the frame on the page, with the pixels never leaving
+ * the GPU.
+ *
+ * **This does not present by itself.** The browser composites the canvas when
+ * the task that drew into it ends, which for a page host is when the owner
+ * thread finishes the batch of work this was submitted in. Nothing here forces
+ * that, and nothing can: `emscripten_webgl_commit_frame` is a documented no-op
+ * in this emsdk, and an implicit-swap context has no other flip to ask for.
+ *
+ * **Rows are not reversed.** `srcY0` maps to `dstY0`, which puts the texture's
+ * GL-origin row at the framebuffer's GL-origin row -- the same place a surface
+ * session's own frame lands in the same framebuffer. Reversing here would make
+ * a texture session's page output the mirror of a surface session's.
+ *
+ * A blit is clipped by the draw framebuffer's scissor rectangle, and MapLibre's
+ * GL backend leaves the scissor enabled between frames, so the scissor is
+ * disabled for the blit and put back afterwards along with both framebuffer
+ * bindings. Leaving any of the three changed would be state the next frame
+ * renders against without knowing.
+ *
+ * Returns false when the context cannot be made current, when the extent does
+ * not fit, when the texture cannot be attached to a framebuffer, or when the
+ * blit reported a GL error.
+ */
+MLN_API bool mln_browser_webgl_present_texture_here(
+  int32_t context, uint32_t texture, uint32_t width, uint32_t height
+) MLN_NOEXCEPT {
+  if (
+    texture == 0 || !mln_browser_webgl_extent_fits(width, height) ||
+    !mln_browser_webgl_bind(context)
+  ) {
+    return false;
+  }
+
+  GLint previous_read = 0;
+  GLint previous_draw = 0;
+  glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &previous_read);
+  glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &previous_draw);
+  const GLboolean scissored = glIsEnabled(GL_SCISSOR_TEST);
+  mln_browser_webgl_clear_errors();
+
+  GLuint framebuffer = 0;
+  glGenFramebuffers(1, &framebuffer);
+  glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
+  glFramebufferTexture2D(
+    GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, (GLuint)texture, 0
+  );
+  bool presented =
+    glCheckFramebufferStatus(GL_READ_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+
+  if (presented) {
+    // Zero is the canvas's own framebuffer, which is the one the browser
+    // composites; naming a framebuffer of our own would present nothing.
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    if (scissored) {
+      glDisable(GL_SCISSOR_TEST);
+    }
+    // GL_NEAREST because source and destination are the same size, so there is
+    // nothing to filter, and because a multi-sampled or format-converting blit
+    // is the only case where GL_LINEAR is even allowed.
+    glBlitFramebuffer(
+      0, 0, (GLsizei)width, (GLsizei)height, 0, 0, (GLsizei)width,
+      (GLsizei)height, GL_COLOR_BUFFER_BIT, GL_NEAREST
+    );
+    presented = glGetError() == GL_NO_ERROR;
+    if (scissored) {
+      glEnable(GL_SCISSOR_TEST);
+    }
+  }
+
+  glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)previous_read);
+  glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)previous_draw);
+  glDeleteFramebuffers(1, &framebuffer);
+  return presented;
+}
+
 typedef struct mln_browser_webgl_texture_create_request {
   int32_t context;
   uint32_t width;
@@ -331,6 +432,64 @@ MLN_API bool mln_browser_webgl_texture_destroy(
   request->texture = texture;
   if (!mln_browser_dispatcher_submit_task(
         dispatcher, mln_browser_webgl_run_texture_destroy, request, token
+      )) {
+    free(request);
+    return false;
+  }
+  return true;
+}
+
+typedef struct mln_browser_webgl_present_request {
+  int32_t context;
+  uint32_t texture;
+  uint32_t width;
+  uint32_t height;
+  int32_t* out_ok;
+} mln_browser_webgl_present_request;
+
+static void mln_browser_webgl_run_present(void* argument) {
+  mln_browser_webgl_present_request* request = argument;
+  *request->out_ok =
+    mln_browser_webgl_present_texture_here(
+      request->context, request->texture, request->width, request->height
+    )
+      ? 1
+      : 0;
+  free(request);
+}
+
+/**
+ * Presents a rendered texture on the dispatcher's thread that owns its context.
+ *
+ * mln_browser_webgl_present_texture_here()'s work, placed on the owner thread,
+ * which is what a page host calls: the context, the texture, and the canvas all
+ * belong to that thread, and so does the task whose ending composites the
+ * canvas.
+ *
+ * `out_ok` is host memory that must stay valid and untouched until the
+ * completion for `token` arrives; it receives one when the frame was blitted.
+ *
+ * Returns false when the submission was refused, in which case nothing runs and
+ * no completion follows `token`.
+ */
+MLN_API bool mln_browser_webgl_present_texture(
+  mln_browser_dispatcher* dispatcher, int32_t context, uint32_t texture,
+  uint32_t width, uint32_t height, int32_t* out_ok, uint32_t token
+) MLN_NOEXCEPT {
+  if (dispatcher == NULL || out_ok == NULL) {
+    return false;
+  }
+  mln_browser_webgl_present_request* request = calloc(1, sizeof(*request));
+  if (request == NULL) {
+    return false;
+  }
+  request->context = context;
+  request->texture = texture;
+  request->width = width;
+  request->height = height;
+  request->out_ok = out_ok;
+  if (!mln_browser_dispatcher_submit_task(
+        dispatcher, mln_browser_webgl_run_present, request, token
       )) {
     free(request);
     return false;

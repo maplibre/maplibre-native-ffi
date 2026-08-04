@@ -204,6 +204,48 @@ a browser has none: the context is bound to the canvas it was created on, and
 that canvas's default framebuffer is what the session presents to. There is no
 swap; the browser composites.
 
+## Doing the host's own GL work
+
+Every other platform expects a host to issue graphics calls of its own on the
+thread it renders on: making the texture a caller-owned target draws into,
+putting a rendered frame where the user can see it, reading one back. A browser
+host owns no such thread, and cannot reach the one that renders — a WebGL
+context belongs to the agent that created it, and WebGL shares no objects
+between contexts, so a texture the page made through
+`canvas.getContext("webgl2")` names nothing a session could attach. The module
+therefore carries that work, placed where it has to run. Each entry point has a
+`_here` form for a host that already owns the render thread, and a dispatched
+form that answers through the completion ring.
+
+`mln_browser_webgl_texture_create` makes an RGBA8 texture in a context, and its
+name is what `mln_opengl_borrowed_texture_descriptor.texture` carries. The
+texture is the host's: nothing tracks it, a render target only borrows it, and
+`mln_browser_webgl_texture_destroy` is what releases it — before the context it
+was made in is destroyed, or with that context, which releases everything made
+in it.
+
+`mln_browser_webgl_present_texture` blits a texture onto the default framebuffer
+of the context that owns it. This is how a texture target's frame reaches the
+page, and it is zero-copy in the sense that matters in a browser: the pixels
+stay in GPU memory, never enter the module's heap, and never cross an agent
+boundary. A surface target needs nothing, because it already renders into that
+framebuffer. Either way the browser composites the canvas when the task that
+drew into it ends, so the frame appears a page turn later rather than as the
+call returns.
+
+`mln_browser_webgl_read_pixels` reads a frame back instead, from a texture or
+from the default framebuffer, as RGBA8 with row zero at the bottom. The C API's
+own `mln_texture_read_premultiplied_rgba8` covers session-owned texture targets
+and refuses the other two families, which everywhere else is not a gap because
+the host reads its own texture with its own graphics API; here it would be one.
+This is the expensive way to use a frame — it stalls the owner thread until the
+GPU is done — and a host that only wants to show one presents it instead.
+
+Every one of these restores the GL state it changed, including the scissor
+enable that a blit is clipped by. MapLibre's GL backend remembers what it last
+set and skips a redundant call, so state left changed behind its back is state
+the next frame renders against without knowing.
+
 ## Receiving log records
 
 MapLibre dispatches a log record from whichever thread produced it. A call from

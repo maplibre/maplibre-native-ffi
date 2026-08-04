@@ -23,17 +23,40 @@
 // already runs, and parks its caller in between with its own mechanism -- for a
 // Kotlin/Wasm host, a JavaScript promise resolved when the token comes back.
 //
-// **The thread is created with no canvas transferred to it.** Emscripten hands
-// an OffscreenCanvas to a thread only at `pthread_create`, through
-// `emscripten_pthread_attr_settransferredcanvases`, and this thread is the one
-// that renders -- so that is the one moment where a page canvas could have been
-// given to it. It is deliberately not: the canvas would have to be chosen
-// before the first call, by a host that may not have one, for a build whose
-// only render targets are texture targets, which draw into a framebuffer of
-// their own and never present to a default framebuffer. `webgl_context.c`
-// creates a private OffscreenCanvas on this thread instead, and the pixels
-// leave through texture readback. A build that gains a surface session would
-// revisit this, and it would have to be here.
+// **The thread does not park between calls; it returns to its event loop.**
+// That is what makes presenting possible at all. A browser composites an
+// OffscreenCanvas when the task that drew into it *ends* -- Emscripten's own
+// `settings.js` calls it "the implicit swap behavior of WebGL where exiting any
+// event callback would automatically perform a flip" -- and a thread sitting in
+// `pthread_cond_wait`, which is `Atomics.wait`, never ends the task it was
+// started in. Such a thread renders correctly and can never show a frame.
+//
+// So the thread entry takes an Emscripten runtime keepalive and returns.
+// Emscripten keeps the worker alive for as long as that keepalive is held, and
+// work reaches it as a proxied task on a module-wide `em_proxying_queue`: a
+// submission publishes its call on the queue below and posts one wake, and the
+// wake drains everything queued and returns. Ending that task is what
+// composites whatever it drew.
+//
+// **Measured, not assumed.** Putting the blocking loop back and running the
+// same suite fails all three of `BrowserPresentationTest`'s cases with the page
+// canvas entirely transparent -- "no frame ever reached it" -- while the other
+// 145 tests pass, including `rendersABackgroundFrameAndReadsItBack`, which
+// reads a texture back rather than presenting it. The surface case is the
+// clearest: its own readback of the canvas's default framebuffer still holds
+// the right colour in that build, so the map rendered exactly as it does here
+// and the frame simply never left the thread that drew it.
+//
+// **A page canvas is transferred at `pthread_create` and nowhere else.**
+// Emscripten hands an OffscreenCanvas to a thread through
+// `emscripten_pthread_attr_settransferredcanvases`, which is an attribute of
+// the thread's creation, so a canvas a host wants to render onto has to be
+// named before this thread starts.
+// mln_browser_dispatcher_create_with_canvases() is where a host names them, and
+// a host that renders to the page reserves its canvas ids before its first
+// call. `webgl_context.c` then creates a context against a transferred canvas
+// by name, or against a private OffscreenCanvas of its own when a host is
+// headless and reads its frames back instead.
 //
 // Placing module-local work on this thread is what `submit_task` below is for;
 // creating a WebGL context is the first such caller, because a context belongs
@@ -46,6 +69,9 @@
 // message rather than none. So the message is copied here, at the moment the
 // call finishes, and published beside the status.
 
+#include <emscripten/eventloop.h>
+#include <emscripten/proxying.h>
+#include <emscripten/threading.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -97,7 +123,6 @@ typedef struct mln_browser_call {
 typedef struct mln_browser_dispatcher {
   pthread_t thread;
   pthread_mutex_t mutex;
-  pthread_cond_t ready;
   mln_browser_call* head;
   mln_browser_call* tail;
   bool stopping;
@@ -105,6 +130,14 @@ typedef struct mln_browser_dispatcher {
   // Set when the host stopped without joining, which makes releasing the
   // dispatcher the thread's own last act.
   bool detached;
+  // Wakes posted to the owner thread and not yet finished. There is no
+  // condition variable to signal any more, so this is what says whether another
+  // task may still touch this dispatcher: the last wake to leave, with the
+  // queue empty and the dispatcher stopping, is the one that drops the
+  // keepalive and -- when the host could not join -- frees this. Counting is
+  // what makes that exact; a wake still in flight would otherwise read a
+  // dispatcher the previous one had already released.
+  uint32_t wakes;
 
   // Finished calls, oldest first. The host polls this rather than being called
   // back, and that is the whole point: a callback would have to reach the
@@ -158,32 +191,77 @@ static void mln_browser_copy_diagnostic(
   destination[length] = '\0';
 }
 
+static pthread_once_t queue_once = PTHREAD_ONCE_INIT;
+static em_proxying_queue* dispatch_queue;
+
+static void mln_browser_dispatcher_create_queue(void) {
+  dispatch_queue = em_proxying_queue_create();
+}
+
+// The queue every wake travels on, created once and never destroyed.
+//
+// Never destroyed because a wake outlives the dispatcher it names: the last one
+// to run is what frees a detached dispatcher, and destroying the queue from
+// there would be destroying the thing currently executing. One queue for the
+// module costs a single allocation and removes the question entirely.
+//
+// A dedicated queue rather than Emscripten's system queue, for the reason
+// src/browser/sync_callback.c states at length: system-queue work runs at
+// arbitrary system-function boundaries, which is signal-handler territory, and
+// a whole map call is not safe there.
+static em_proxying_queue* mln_browser_dispatcher_queue(void) {
+  pthread_once(&queue_once, mln_browser_dispatcher_create_queue);
+  return dispatch_queue;
+}
+
+static void mln_browser_dispatcher_drain(void* argument);
+
+// Posts one wake to the owner thread. The caller has already counted it in
+// `wakes` under the mutex, which is what keeps the dispatcher alive across
+// this: a free can only happen once no wake is outstanding.
+static bool mln_browser_dispatcher_wake(mln_browser_dispatcher* dispatcher) {
+  return emscripten_proxy_async(
+           mln_browser_dispatcher_queue(), dispatcher->thread,
+           mln_browser_dispatcher_drain, dispatcher
+         ) != 0;
+}
+
+// The thread's entry point, which returns immediately and on purpose.
+//
+// The keepalive is what keeps the worker alive without it: Emscripten ends a
+// pthread when its entry returns and nothing is holding the runtime, and holds
+// it open otherwise. Returning is the point -- everything this thread later
+// draws is composited because the task that drew it ended, and a thread that
+// never left its entry never ends one.
 static void* mln_browser_dispatcher_main(void* argument) {
+  (void)argument;
+  emscripten_runtime_keepalive_push();
+  return NULL;
+}
+
+// Performs everything queued, then returns, which is the moment the browser
+// composites whatever this drew.
+//
+// One wake is posted per submission, so a wake that finds the queue already
+// emptied by an earlier one does nothing and costs an event-loop turn. That is
+// cheaper than the alternative -- leaving a call unqueued because a wake was
+// already in flight is how a caller ends up parked on an answer nobody will
+// produce.
+static void mln_browser_dispatcher_drain(void* argument) {
   mln_browser_dispatcher* dispatcher = argument;
   while (true) {
     pthread_mutex_lock(&dispatcher->mutex);
-    while (dispatcher->head == NULL && !dispatcher->stopping) {
-      // Legal here and nowhere the host lives: this is a worker.
-      pthread_cond_wait(&dispatcher->ready, &dispatcher->mutex);
-    }
-    if (dispatcher->head == NULL && dispatcher->stopping) {
-      const bool detached = dispatcher->detached;
-      pthread_mutex_unlock(&dispatcher->mutex);
-      if (detached) {
-        // Stopped by a host that cannot join, so the thread is what releases
-        // the dispatcher; nothing refers to it after the stop call returned.
-        pthread_cond_destroy(&dispatcher->ready);
-        pthread_mutex_destroy(&dispatcher->mutex);
-        free(dispatcher);
-      }
-      return NULL;
-    }
     mln_browser_call* call = dispatcher->head;
-    dispatcher->head = call->next;
-    if (dispatcher->head == NULL) {
-      dispatcher->tail = NULL;
+    if (call != NULL) {
+      dispatcher->head = call->next;
+      if (dispatcher->head == NULL) {
+        dispatcher->tail = NULL;
+      }
     }
     pthread_mutex_unlock(&dispatcher->mutex);
+    if (call == NULL) {
+      break;
+    }
 
     // A module-local task always runs: there is no index to reject and no slot
     // count to check, because the caller is this module rather than a host
@@ -223,6 +301,31 @@ static void* mln_browser_dispatcher_main(void* argument) {
     dispatcher->completed_size++;
     pthread_mutex_unlock(&dispatcher->mutex);
   }
+
+  pthread_mutex_lock(&dispatcher->mutex);
+  dispatcher->wakes--;
+  // True at most once. Nothing is queued after stopping is set, and stopping
+  // posts exactly one wake of its own, so the count reaches zero with the
+  // dispatcher stopping on one wake and no other.
+  const bool finished =
+    dispatcher->stopping && dispatcher->head == NULL && dispatcher->wakes == 0;
+  const bool detached = dispatcher->detached;
+  pthread_mutex_unlock(&dispatcher->mutex);
+  if (!finished) {
+    return;
+  }
+
+  // Dropped from inside the task rather than after it, because Emscripten
+  // re-checks whether to end the thread as each task returns; popping here is
+  // what makes the very next check end it.
+  emscripten_runtime_keepalive_pop();
+  if (detached) {
+    // Stopped by a host that cannot join, so the last wake is what releases the
+    // dispatcher; nothing refers to it after the stop call returned, and no
+    // other wake is outstanding to read it.
+    pthread_mutex_destroy(&dispatcher->mutex);
+    free(dispatcher);
+  }
 }
 
 // Takes ownership of `call` and queues it, or refuses and releases it. Shared
@@ -242,23 +345,133 @@ static bool mln_browser_dispatcher_enqueue(
     return false;
   }
   dispatcher->outstanding++;
-  // Published before the wake, so an owner that wakes, finds the queue, and
-  // re-checks always sees this call rather than parking again beside it.
+  // Published before the wake, so an owner woken by this always finds this call
+  // rather than draining an empty queue beside it.
   if (dispatcher->tail == NULL) {
     dispatcher->head = call;
   } else {
     dispatcher->tail->next = call;
   }
   dispatcher->tail = call;
-  pthread_cond_signal(&dispatcher->ready);
+  dispatcher->wakes++;
   pthread_mutex_unlock(&dispatcher->mutex);
-  return true;
+  if (mln_browser_dispatcher_wake(dispatcher)) {
+    return true;
+  }
+
+  // The wake could not be allocated, so this call may have nothing coming to
+  // run it. Taken back rather than left queued: a caller that was told its
+  // submission was accepted parks on an answer, and an answer that never
+  // arrives strands it for the page's lifetime. An earlier wake may already
+  // have claimed the call, in which case its answer *is* coming and the
+  // submission stands.
+  pthread_mutex_lock(&dispatcher->mutex);
+  dispatcher->wakes--;
+  mln_browser_call* previous = NULL;
+  mln_browser_call* current = dispatcher->head;
+  while (current != NULL && current != call) {
+    previous = current;
+    current = current->next;
+  }
+  const bool reclaimed = current == call;
+  if (reclaimed) {
+    if (previous == NULL) {
+      dispatcher->head = call->next;
+    } else {
+      previous->next = call->next;
+    }
+    if (dispatcher->tail == call) {
+      dispatcher->tail = previous;
+    }
+    dispatcher->outstanding--;
+  }
+  pthread_mutex_unlock(&dispatcher->mutex);
+  if (!reclaimed) {
+    return true;
+  }
+  free(call);
+  return false;
+}
+
+// Rewrites a comma-separated list of canvas element ids into the selector list
+// Emscripten's transfer attribute expects, or returns null when the list names
+// nothing.
+//
+// Emscripten resolves each entry with `document.querySelector`, so `map` has to
+// travel as `#map`. Making the host write the selector instead would put a
+// piece of Emscripten's implementation in every host's API; an element id is
+// what a host already has.
+//
+// Surrounding whitespace is dropped so that a host may write the list the way
+// it reads, and an empty entry is skipped rather than passed on, because
+// `querySelector("#")` throws and Emscripten reports that as a failed transfer
+// for the whole thread.
+static char* mln_browser_dispatcher_selector(const char* canvas_ids) {
+  if (canvas_ids == NULL) {
+    return NULL;
+  }
+  const size_t length = strlen(canvas_ids);
+  if (length == 0) {
+    return NULL;
+  }
+  // One '#' per entry, and there are at most as many entries as characters, so
+  // twice the input plus a terminator covers every list.
+  char* selector = calloc(length * 2 + 2, 1);
+  if (selector == NULL) {
+    return NULL;
+  }
+  size_t written = 0;
+  size_t at = 0;
+  while (at < length) {
+    while (at < length && (canvas_ids[at] == ' ' || canvas_ids[at] == ',')) {
+      at++;
+    }
+    size_t end = at;
+    while (end < length && canvas_ids[end] != ',') {
+      end++;
+    }
+    size_t trimmed = end;
+    while (trimmed > at && canvas_ids[trimmed - 1] == ' ') {
+      trimmed--;
+    }
+    if (trimmed > at) {
+      if (written > 0) {
+        selector[written++] = ',';
+      }
+      selector[written++] = '#';
+      memcpy(selector + written, canvas_ids + at, trimmed - at);
+      written += trimmed - at;
+    }
+    at = end + 1;
+  }
+  selector[written] = '\0';
+  if (written == 0) {
+    free(selector);
+    return NULL;
+  }
+  return selector;
 }
 
 /**
- * Creates a dispatcher and the thread that owns whatever runs on it.
+ * Creates a dispatcher, transferring the named page canvases to its thread.
  *
- * Returns null when the thread cannot be created.
+ * `canvas_ids` is a comma-separated list of `id` attributes of `<canvas>`
+ * elements in the host's document, or null or empty for none.
+ * mln_browser_webgl_context_create() then names one of them to render onto, and
+ * what that context draws reaches the page with no copy, because the canvas the
+ * page displays *is* the canvas the owner thread renders into.
+ *
+ * **This is the only moment a canvas can be transferred.** Emscripten performs
+ * the transfer inside `pthread_create`, so every canvas a host will ever render
+ * onto through this dispatcher is named here, before the first call. A host
+ * that names none is not limited to nothing -- `webgl_context.c` creates a
+ * private OffscreenCanvas for a context with no canvas named, which is what a
+ * host that reads frames back rather than presenting them wants.
+ *
+ * Returns null when the thread cannot be created, which includes an id that
+ * names no element and an element whose control has already been transferred:
+ * Emscripten refuses the whole `pthread_create` in either case rather than
+ * starting a thread with part of what was asked for.
  *
  * Answers are collected with mln_browser_dispatcher_take_completion(). There is
  * no readiness signal and no callback: a host drains on whatever cadence it
@@ -271,9 +484,14 @@ static bool mln_browser_dispatcher_enqueue(
  * is a single JavaScript agent, which is what makes that safe; a host with more
  * than one thread must serialize them itself.
  */
-MLN_API mln_browser_dispatcher* mln_browser_dispatcher_create(
-  void
+MLN_API mln_browser_dispatcher* mln_browser_dispatcher_create_with_canvases(
+  const char* canvas_ids
 ) MLN_NOEXCEPT {
+  // Before anything else, because a dispatcher whose wakes have nowhere to
+  // travel would accept calls and never run one.
+  if (mln_browser_dispatcher_queue() == NULL) {
+    return NULL;
+  }
   mln_browser_dispatcher* dispatcher = calloc(1, sizeof(*dispatcher));
   if (dispatcher == NULL) {
     return NULL;
@@ -282,23 +500,60 @@ MLN_API mln_browser_dispatcher* mln_browser_dispatcher_create(
     free(dispatcher);
     return NULL;
   }
-  if (pthread_cond_init(&dispatcher->ready, NULL) != 0) {
+
+  // Held until `pthread_create` returns: the attribute keeps the pointer rather
+  // than a copy, and Emscripten reads the string as it performs the transfer.
+  char* selector = mln_browser_dispatcher_selector(canvas_ids);
+  if (selector == NULL && canvas_ids != NULL && canvas_ids[0] != '\0') {
+    // A host asked for canvases and none could be built -- an all-separator
+    // list, or an allocation that failed. Refused rather than quietly starting
+    // a thread with nothing transferred to it, which would fail much later, at
+    // a context creation that could not say why its canvas was missing.
     pthread_mutex_destroy(&dispatcher->mutex);
     free(dispatcher);
     return NULL;
   }
-  if (
-    pthread_create(
-      &dispatcher->thread, NULL, mln_browser_dispatcher_main, dispatcher
-    ) != 0
-  ) {
-    pthread_cond_destroy(&dispatcher->ready);
+  pthread_attr_t attributes;
+  pthread_attr_t* attributes_used = NULL;
+  if (selector != NULL) {
+    if (pthread_attr_init(&attributes) != 0) {
+      free(selector);
+      pthread_mutex_destroy(&dispatcher->mutex);
+      free(dispatcher);
+      return NULL;
+    }
+    attributes_used = &attributes;
+    (void)emscripten_pthread_attr_settransferredcanvases(&attributes, selector);
+  }
+  const int created = pthread_create(
+    &dispatcher->thread, attributes_used, mln_browser_dispatcher_main,
+    dispatcher
+  );
+  if (attributes_used != NULL) {
+    (void)pthread_attr_destroy(attributes_used);
+  }
+  free(selector);
+  if (created != 0) {
     pthread_mutex_destroy(&dispatcher->mutex);
     free(dispatcher);
     return NULL;
   }
   dispatcher->started = true;
   return dispatcher;
+}
+
+/**
+ * Creates a dispatcher with no page canvas transferred to its thread.
+ *
+ * mln_browser_dispatcher_create_with_canvases() with nothing named, which is
+ * what a host that reads its frames back rather than presenting them wants.
+ * Such a host renders into a private OffscreenCanvas or into a texture, and
+ * neither is ever displayed.
+ */
+MLN_API mln_browser_dispatcher* mln_browser_dispatcher_create(
+  void
+) MLN_NOEXCEPT {
+  return mln_browser_dispatcher_create_with_canvases(NULL);
 }
 
 /**
@@ -410,12 +665,21 @@ MLN_API void mln_browser_dispatcher_destroy(
   }
   pthread_mutex_lock(&dispatcher->mutex);
   dispatcher->stopping = true;
-  pthread_cond_signal(&dispatcher->ready);
+  dispatcher->wakes++;
   pthread_mutex_unlock(&dispatcher->mutex);
-  if (dispatcher->started) {
+  // The stop travels as a wake like everything else, because the thread is not
+  // waiting on anything this could signal: it is in its event loop, and this is
+  // what reaches it there. The wake it runs is the one that drops the keepalive
+  // and lets Emscripten end the thread, which is what the join below waits for.
+  const bool woken = mln_browser_dispatcher_wake(dispatcher);
+  if (dispatcher->started && woken) {
     pthread_join(dispatcher->thread, NULL);
   }
-  pthread_cond_destroy(&dispatcher->ready);
+  // Only reachable when the wake could not be allocated, which leaves the
+  // thread holding its keepalive with nothing left to reach it. Releasing the
+  // dispatcher anyway is the lesser harm: joining would wait forever, and
+  // nothing outstanding can name this dispatcher, because the wake that would
+  // have was never posted.
   pthread_mutex_destroy(&dispatcher->mutex);
   free(dispatcher);
 }
@@ -455,8 +719,12 @@ MLN_API void mln_browser_dispatcher_stop(
   pthread_mutex_lock(&dispatcher->mutex);
   dispatcher->stopping = true;
   dispatcher->detached = true;
-  pthread_cond_signal(&dispatcher->ready);
+  dispatcher->wakes++;
   pthread_mutex_unlock(&dispatcher->mutex);
+  // Safe to read the dispatcher here even though the thread may free it,
+  // because the count taken above is what a free waits for: no wake can find
+  // the count at zero until this one has run.
+  (void)mln_browser_dispatcher_wake(dispatcher);
 }
 
 /**

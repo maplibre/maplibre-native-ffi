@@ -225,15 +225,23 @@ internal object BrowserModule {
       "_mln_browser_entry_slots",
       "_mln_browser_entry_total",
       "_mln_browser_invoke_here",
-      // The owner thread every runtime-affine call runs on.
-      "_mln_browser_dispatcher_create",
+      // The owner thread every runtime-affine call runs on. It is created with the page canvases a
+      // host will render onto, because a browser transfers a canvas to a thread only as that
+      // thread is created.
+      "_mln_browser_dispatcher_create_with_canvases",
       "_mln_browser_dispatcher_submit",
       "_mln_browser_dispatcher_take_completion",
       "_mln_browser_dispatcher_stop",
-      // The WebGL contexts a render target draws through, which have to be created on that same
-      // owner thread because a context belongs to the thread that made it.
+      // The WebGL contexts a render target draws through, and the GL work a host does with what one
+      // rendered. All of it has to run on that same owner thread, because a WebGL context belongs
+      // to the thread that made it and shares nothing with any other context.
       "_mln_browser_webgl_context_create",
       "_mln_browser_webgl_context_destroy",
+      "_mln_browser_webgl_canvas_resize",
+      "_mln_browser_webgl_texture_create",
+      "_mln_browser_webgl_texture_destroy",
+      "_mln_browser_webgl_present_texture",
+      "_mln_browser_webgl_read_pixels",
       // The log queue.
       "_mln_browser_log_install",
       "_mln_browser_log_take_since",
