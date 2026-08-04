@@ -145,40 +145,6 @@ mkdir -p "$work/pack"
     --out-path "../$module-unsigned.hap"
 )
 
-# Signing is two steps. The SDK ships an unsigned provisioning profile template
-# rather than a signed profile, so the template is signed first and the hap is
-# signed against the result.
-echo "signing the provisioning profile"
-profile="$work/profile.p7b"
-manifest="$work/profile.json"
-python3 - "$toolchains/lib/UnsgnedDebugProfileTemplate.json" "$manifest" "$bundle_id" <<'PYTHON'
-import json
-import sys
-
-template, target, bundle = sys.argv[1], sys.argv[2], sys.argv[3]
-with open(template) as source:
-    profile = json.load(source)
-# The template names an example application; a device checks this against the
-# bundle it is asked to install.
-profile["bundle-info"]["bundle-name"] = bundle
-with open(target, "w") as destination:
-    json.dump(profile, destination)
-PYTHON
-
-(
-  cd "$work"
-  java -jar "$toolchains/lib/hap-sign-tool.jar" sign-profile \
-  -keyAlias "openharmony application profile release" \
-  -signAlg SHA256withECDSA \
-  -mode localSign \
-  -profileCertFile "$toolchains/lib/OpenHarmonyProfileRelease.pem" \
-  -inFile "$manifest" \
-  -keystoreFile "$toolchains/lib/OpenHarmony.p12" \
-  -outFile "$profile" \
-  -keyPwd 123456 \
-  -keystorePwd 123456
-)
-
 # The SDK ships the signing keys but no application certificate. The release
 # key's own certificate is self-signed and the verifier rejects it, so a
 # certificate is issued for that key by the CA in the same keystore, and the
@@ -209,6 +175,59 @@ java -jar "$toolchains/lib/hap-sign-tool.jar" generate-app-cert \
   -subCaCertFile "$sub_ca" \
   -outFile "$app_cert"
 
+# Signing is two steps. The SDK ships an unsigned provisioning profile template
+# rather than a signed profile, so the template is signed first and the hap is
+# signed against the result.
+echo "signing the provisioning profile"
+profile="$work/profile.p7b"
+manifest="$work/profile.json"
+python3 - "$toolchains/lib/UnsgnedDebugProfileTemplate.json" "$manifest" \
+  "$bundle_id" "$app_cert" <<'PYTHON'
+import json
+import sys
+
+template, target, bundle, certificate = sys.argv[1:5]
+with open(template) as source:
+    profile = json.load(source)
+# A device checks the profile against the bundle it is asked to install, and
+# against the certificate the hap was signed with. The template names an example
+# application and carries the SDK's own certificate, so both are replaced.
+profile["bundle-info"]["bundle-name"] = bundle
+# The template expired in 2024 and names other people's devices. A profile that
+# restricts installation to a device list cannot serve an emulator that reports
+# no udid, so this one carries a release distribution instead, which is not
+# device-bound.
+profile["type"] = "release"
+profile["app-distribution-type"] = "os_integration"
+profile["validity"] = {"not-before": 1600000000, "not-after": 2500000000}
+profile.pop("debug-info", None)
+with open(certificate) as handle:
+    chain = handle.read()
+first = chain.index("-----BEGIN CERTIFICATE-----")
+second = chain.index("-----BEGIN CERTIFICATE-----", first + 1)
+# A release profile names the certificate that signs distributed builds, where
+# a debug one names the development certificate.
+leaf = chain[first:second]
+profile["bundle-info"]["development-certificate"] = leaf
+profile["bundle-info"]["distribution-certificate"] = leaf
+with open(target, "w") as destination:
+    json.dump(profile, destination)
+PYTHON
+
+(
+  cd "$work"
+  java -jar "$toolchains/lib/hap-sign-tool.jar" sign-profile \
+  -keyAlias "openharmony application profile release" \
+  -signAlg SHA256withECDSA \
+  -mode localSign \
+  -profileCertFile "$toolchains/lib/OpenHarmonyProfileRelease.pem" \
+  -inFile "$manifest" \
+  -keystoreFile "$toolchains/lib/OpenHarmony.p12" \
+  -outFile "$profile" \
+  -keyPwd 123456 \
+  -keystorePwd 123456
+)
+
 echo "signing the hap"
 signed="$work/$module.hap"
 (
@@ -227,3 +246,23 @@ signed="$work/$module.hap"
 )
 
 echo "built $signed"
+
+# Nothing above this point needs a device. What follows installs the application
+# and starts the runner, which prints results the way every other runtime's
+# runner does.
+if [[ "${MLN_TS_ARKTS_INSTALL:-1}" == "0" ]]; then
+  exit 0
+fi
+
+connect_key=127.0.0.1:55555
+hdc="$toolchains/hdc"
+
+echo "installing on $connect_key"
+"$hdc" -t "$connect_key" install -r "$signed"
+
+echo "running the conformance suite"
+"$hdc" -t "$connect_key" shell aa test \
+  -b "$bundle_id" \
+  -m "$module" \
+  -s unittest /ets/testrunner/OpenHarmonyTestRunner \
+  -s timeout 300000
