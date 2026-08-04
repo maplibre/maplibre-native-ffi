@@ -382,8 +382,8 @@ typedef struct egl_state {
 // could not create a context. The Rust fixtures already ask this way; see
 // EglTestContext in bindings/rust.
 //
-// OpenHarmony keeps the default display, whose EGL serves its own window
-// system.
+// Android and OpenHarmony keep the default display, whose EGL serves their own
+// window systems.
 static EGLDisplay get_egl_display(void) {
 #if defined(__APPLE__)
   const EGLAttrib attributes[] = {
@@ -394,7 +394,7 @@ static EGLDisplay get_egl_display(void) {
     EGL_NONE,
   };
   return eglGetPlatformDisplay(EGL_PLATFORM_ANGLE_ANGLE, NULL, attributes);
-#elif defined(__OHOS__)
+#elif defined(__OHOS__) || defined(__ANDROID__)
   return eglGetDisplay(EGL_DEFAULT_DISPLAY);
 #else
   return eglGetPlatformDisplay(
