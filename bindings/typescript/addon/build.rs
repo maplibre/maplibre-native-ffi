@@ -11,6 +11,15 @@ use std::path::{Path, PathBuf};
 use sha2::{Digest, Sha256};
 
 fn main() {
+
+    // The ArkTS runtime keeps its Node-API implementation in a shared library,
+    // where Node, Bun, and Deno export those symbols from the executable that
+    // loads the addon. Without this the library dlopens far enough to be found
+    // and then fails to relocate, which the runtime reports as a module with no
+    // exports.
+    if std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("ohos") {
+        println!("cargo:rustc-link-lib=dylib=ace_napi.z");
+    }
     napi_build::setup();
 
     let include_dir = PathBuf::from(

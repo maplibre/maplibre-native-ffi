@@ -76,6 +76,29 @@ bundle_dir="$root/bindings/typescript/api/dist-arkts"
 )
 cp "$bundle_dir/arkts-entry.mjs" "$work/ets/conformance.bundle.js"
 
+# hypium ships on the ohpm registry rather than in the SDK, so it is fetched
+# once and kept in the build tree. The version is pinned: the report format the
+# runner prints is what a CI job parses.
+hypium_version=1.0.28
+hypium_archive="$root/build/hypium-$hypium_version.har"
+hypium="$root/build/hypium-$hypium_version/package"
+if [[ ! -d "$hypium" ]]; then
+  echo "fetching hypium $hypium_version"
+  curl -fsSL -o "$hypium_archive" \
+    "https://ohpm.openharmony.cn/ohpm/@ohos/hypium/-/hypium-$hypium_version.har"
+  # A .har is a gzipped tar, and this environment's tar cannot create the
+  # entries it holds.
+  python3 -c "
+import sys, tarfile
+with tarfile.open(sys.argv[1]) as archive:
+    archive.extractall(sys.argv[2], filter='data')
+" "$hypium_archive" "$root/build/hypium-$hypium_version"
+fi
+
+# The module declares compileMode esmodule, because the bytecode below is one
+# merged modules.abc. Without it the runtime keeps the older per-file layout and
+# looks for every record as its own .abc, which is what "Not found
+# <record>.abc" means even when the record is present in the merged file.
 # Each source becomes one bytecode record, and the records merge into the file
 # the runtime loads.
 echo "compiling ArkTS sources"
@@ -83,15 +106,50 @@ info="$work/filesInfo.txt"
 : >"$info"
 add_source() {
   local file="$1" record="$2"
-  printf '%s;%s;esm;%s;%s\n' "$file" "$record" "$file" "$record" >>"$info"
+  # A record is addressed as <bundle>/<module>/<path>, and the last field names
+  # the package it belongs to, which is the module.
+  printf '%s;%s;esm;%s;%s\n' "$file" "$record" "$file" "$module" >>"$info"
 }
-add_source "$work/ets/conformance.bundle.js" "$module/ets/conformance.bundle"
+
+# A source names system modules as `@ohos:x` once it is bytecode; the `@ohos.x`
+# spelling is what the ArkTS front end accepts, and nothing else rewrites it
+# here. `@ohos/` names an ohpm package instead and is left alone.
+rewrite_system_imports() {
+  sed -i -E "s|(['\"])@ohos\\.|\\1@ohos:|g" "$1"
+}
+
+add_source "$work/ets/conformance.bundle.js" "$bundle_id/$module/ets/conformance.bundle"
+rewrite_system_imports "$work/ets/conformance.bundle.js"
+# A native library packed into the application is addressed as
+# `@app:<bundle>/<module>/<name>`, with the `lib` prefix and `.so` suffix
+# dropped. The bundler leaves the library's own file name in place, and this is
+# where it becomes something the runtime resolves.
+sed -i -E "s|['\"]libmaplibre-native-ffi\\.so['\"]|'@app:$bundle_id/$module/maplibre-native-ffi'|g" \
+  "$work/ets/conformance.bundle.js"
+
+# hypium is the framework `aa test` reports through, and it is an ohpm package
+# rather than part of the SDK. It is plain JavaScript with relative imports, so
+# its files become records beside the suite's instead of needing a bundler that
+# can resolve ohpm.
+while IFS= read -r -d '' source; do
+  relative="${source#"$hypium"/}"
+  target="$work/ets/hypium/$relative"
+  mkdir -p "$(dirname "$target")"
+  cp "$source" "$target"
+  rewrite_system_imports "$target"
+  add_source "$target" "$bundle_id/$module/ets/hypium/${relative%.js}"
+done < <(find "$hypium" -name '*.js' -print0)
+
 while IFS= read -r -d '' source; do
   relative="${source#"$source_dir"/entry/src/ohosTest/}"
   target="$work/${relative%.ets}.ts"
   mkdir -p "$(dirname "$target")"
   cp "$source" "$target"
-  add_source "$target" "$module/${relative%.ets}"
+  rewrite_system_imports "$target"
+  # hypium is a record in this bundle rather than a package the runtime
+  # resolves, so the import names where it landed.
+  sed -i "s|'@ohos/hypium'|'../hypium/index'|g" "$target"
+  add_source "$target" "$bundle_id/$module/${relative%.ets}"
 done < <(find "$source_dir/entry/src/ohosTest/ets" -name '*.ets' -print0)
 
 "$es2abc" --merge-abc --module --extension=ts \
@@ -279,5 +337,5 @@ echo "running the conformance suite"
 "$hdc" -t "$connect_key" shell aa test \
   -b "$bundle_id" \
   -m "$module" \
-  -s unittest /ets/testrunner/OpenHarmonyTestRunner \
+  -s unittest /ets/TestRunner/OpenHarmonyTestRunner \
   -s timeout 300000

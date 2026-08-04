@@ -288,3 +288,69 @@ pub fn stop_record_notifications() {
     unsafe { mln_abi_queue_set_notifier(None, std::ptr::null_mut()) };
     *slot = None;
 }
+
+/// Registration for the ArkTS runtime, whose module loader differs.
+///
+/// Node, Bun, and Deno call `napi_register_module_v1` on a library they have
+/// loaded, so nothing else is needed there. The ArkTS runtime instead resolves
+/// `@app:<bundle>/<module>/<name>` against a registry that every native module
+/// adds itself to while loading, and reports a module with no exports when the
+/// name is absent. This adds the entry, and delegates to the registration
+/// napi-rs already generates.
+#[cfg(target_env = "ohos")]
+mod ohos {
+    use std::ffi::c_void;
+    use std::os::raw::c_char;
+
+    use napi::sys::{napi_env, napi_value};
+
+    unsafe extern "C" {
+        fn napi_register_module_v1(env: napi_env, exports: napi_value) -> napi_value;
+        fn napi_module_register(module: *mut NapiModule);
+    }
+
+    #[repr(C)]
+    struct NapiModule {
+        nm_version: i32,
+        nm_flags: u32,
+        nm_filename: *const c_char,
+        nm_register_func:
+            Option<unsafe extern "C" fn(env: napi_env, exports: napi_value) -> napi_value>,
+        nm_modname: *const c_char,
+        nm_priv: *mut c_void,
+        reserved: [*mut c_void; 4],
+    }
+
+    // The registry keeps the pointer it is given, so the module outlives the
+    // call that registers it.
+    unsafe impl Sync for NapiModule {}
+
+    unsafe extern "C" fn register(env: napi_env, exports: napi_value) -> napi_value {
+        unsafe { napi_register_module_v1(env, exports) }
+    }
+
+    /// The name the application imports, which is the library's own without the
+    /// `lib` prefix and `.so` suffix.
+    const MODULE_NAME: &[u8] = b"maplibre-native-ffi\0";
+    const FILE_NAME: &[u8] = b"libmaplibre-native-ffi.so\0";
+
+    static mut MODULE: NapiModule = NapiModule {
+        nm_version: 1,
+        nm_flags: 0,
+        nm_filename: FILE_NAME.as_ptr().cast(),
+        nm_register_func: Some(register),
+        nm_modname: MODULE_NAME.as_ptr().cast(),
+        nm_priv: std::ptr::null_mut(),
+        reserved: [std::ptr::null_mut(); 4],
+    };
+
+    unsafe extern "C" fn register_module() {
+        unsafe { napi_module_register(&raw mut MODULE) };
+    }
+
+    // Registration has to happen as the library loads, before the runtime looks
+    // the name up, which is what the constructor section is for.
+    #[used]
+    #[unsafe(link_section = ".init_array")]
+    static REGISTER: unsafe extern "C" fn() = register_module;
+}

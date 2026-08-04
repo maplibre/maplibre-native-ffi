@@ -550,6 +550,7 @@ export const PACKAGING_GROUP: ConformanceGroup = {
   cases: [
     {
       name: "drives the native library through either module format",
+      needs: ["packageResolution"],
       run: async ({ expect, loadPackage }) => {
         for (const format of ["esm", "cjs"] as const) {
           const api = await loadPackage(format);

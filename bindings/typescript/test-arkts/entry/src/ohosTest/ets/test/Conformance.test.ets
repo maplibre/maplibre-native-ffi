@@ -11,26 +11,40 @@ import fileIo from '@ohos.file.fs';
 
 // The suite and the loaded library come from one bundle, because ArkTS resolves
 // modules through its own build rather than through node_modules.
-import { CONFORMANCE, Expect, Maplibre, MaplibreError } from '../../../../conformance.bundle';
+// Types are imported separately: a merged-bytecode import is checked against
+// what the record actually exports, and a type is not one of them.
+import { CONFORMANCE, loadArkTs, MaplibreError } from '../conformance.bundle';
+import type { Expect } from '../conformance.bundle';
 
 export default function conformanceTest() {
-  const maplibre = Maplibre.loadArkTs();
+  const maplibre = loadArkTs();
 
+  // Distinct per run, so a case starts from a directory nothing has written.
+  const runTag = `${Date.now()}`;
   let cacheSequence = 0;
   const cacheDirectory = async (): Promise<string> => {
     cacheSequence += 1;
     // An application's own files directory is the writable place on a device.
-    const path = `/data/storage/el2/base/haps/entry_test/files/cache-${cacheSequence}`;
+    // An application keeps its files across runs, so the name carries the run
+    // as well as the case: a second run must not inherit the first's database.
+    const path = `/data/storage/el2/base/haps/entry_test/files/cache-${runTag}-${cacheSequence}`;
     fileIo.mkdirSync(path, true);
     return path;
   };
 
+  // Values are compared by their serialization, and this binding's addresses
+  // are bigint, which JSON refuses. A bigint is shown with the marker so it
+  // never compares equal to the string of the same digits.
+  const show = (value: ESObject): string =>
+    JSON.stringify(value, (_key: string, member: ESObject): ESObject =>
+      typeof member === 'bigint' ? `${member}n` : member) ?? String(value);
+
   const assertions: Expect = {
     equal: (actual, expected, what) => {
-      expect(JSON.stringify(actual)).assertEqual(JSON.stringify(expected));
+      expect(show(actual)).assertEqual(show(expected));
     },
     notEqual: (actual, unexpected, what) => {
-      expect(JSON.stringify(actual) !== JSON.stringify(unexpected)).assertTrue();
+      expect(show(actual) !== show(unexpected)).assertTrue();
     },
     ok: (actual, what) => {
       expect(actual).assertTrue();
@@ -76,6 +90,12 @@ export default function conformanceTest() {
   for (const group of CONFORMANCE) {
     describe(group.name, () => {
       for (const entry of group.cases) {
+        // ArkTS resolves neither packages nor paths, so a case that asks the
+        // runtime to find this package by name has nothing here to find. The
+        // case says so itself rather than this runner skipping by name.
+        if (entry.needs?.includes('packageResolution')) {
+          continue;
+        }
         it(entry.name, TestType.FUNCTION, async () => {
           await entry.run({ maplibre, expect: assertions, cacheDirectory, loadPackage });
         });
@@ -85,5 +105,5 @@ export default function conformanceTest() {
 
   // The bundle is the package here, so there is one module format to load.
   const loadPackage = async (): Promise<ESObject> =>
-    import('../../../../conformance.bundle');
+    import('../conformance.bundle');
 }

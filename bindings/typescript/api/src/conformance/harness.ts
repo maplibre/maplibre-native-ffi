@@ -75,6 +75,17 @@ export interface ConformanceCase {
    * never to avoid a failure.
    */
   readonly transports?: readonly ("node-api" | "wasm")[];
+  /**
+   * Runtime capabilities this case needs, which not every runtime has.
+   *
+   * `packageResolution` means the runtime finds a module by package name.
+   * ArkTS resolves neither packages nor paths — an application reaches this
+   * binding as a bundle its own build produced — so a case about how the
+   * published package is laid out has nothing to look at there. This states
+   * that as a property of the case rather than leaving a runner to skip a
+   * failure by name.
+   */
+  readonly needs?: readonly "packageResolution"[];
   run(context: CaseContext): Promise<void> | void;
 }
 

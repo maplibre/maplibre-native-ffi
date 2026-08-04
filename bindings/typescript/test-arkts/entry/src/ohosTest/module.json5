@@ -22,6 +22,7 @@
       }
     ],
     "virtualMachine": "ark",
+    "compileMode": "esmodule",
     "pages": "$profile:main_pages"
   }
 }
