@@ -777,6 +777,58 @@ export const RESOURCES_GROUP: ConformanceGroup = {
       },
     },
     {
+      name: "leaves a request answerable when it refuses the response",
+      run({ maplibre, expect }) {
+        withRuntime(maplibre, (runtime, open) => {
+          let held: ResourceRequest | undefined;
+          runtime.setResourceProvider(
+            [{ url: "refused://", matchPrefix: true, useRequestedUrl: true }],
+            (request) => {
+              held ??= request;
+            },
+          );
+          const map = open({ width: 64, height: 64 });
+          map.setStyleUrl("refused://style.json");
+          for (
+            let attempt = 0;
+            attempt < 40 && held === undefined;
+            attempt += 1
+          ) {
+            runtime.pump(25);
+            maplibre.deliverCallbacks();
+            while (runtime.pollEvent() !== undefined) {
+              // Drained so the queue does not hold the pump open.
+            }
+          }
+          const request = expect.defined(held, "the claimed request");
+
+          // A response this binding refuses never reaches C, so the native
+          // request is still outstanding. Treating it as answered would strand
+          // it: nobody could complete it and nobody could give it up.
+          expect.equal(
+            expect.throws(
+              () =>
+                request.complete({
+                  etag: `bad${String.fromCharCode(0)}etag`,
+                }),
+              "a response carrying an embedded NUL",
+            ).kind,
+            "invalidInput",
+            "the binding refuses it before crossing into C",
+          );
+          expect.equal(
+            request.isSettled,
+            false,
+            "the request is still outstanding",
+          );
+
+          // And the host can answer it properly on the next try.
+          request.complete({ bytes: new TextEncoder().encode(EMPTY_STYLE) });
+          expect.ok(request.isSettled, "a valid answer settles it");
+        });
+      },
+    },
+    {
       name: "keeps a released request from reaching a later one",
       spec: ["BND-151"],
       run({ maplibre, expect }) {

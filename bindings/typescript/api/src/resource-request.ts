@@ -164,9 +164,6 @@ export class ResourceRequest {
   complete(response: ResourceResponse): void {
     this.#requireOpen("ResourceRequest.complete");
     const native = this.#native;
-    // The completion path is consumed before the call, so a native failure
-    // cannot be retried into a second completion.
-    this.#settled = true;
     native.scope((scope) => {
       const layout = native.layout("mln_resource_response");
       const storage = scope.allocateZeroed(layout.size, layout.align);
@@ -234,6 +231,11 @@ export class ResourceRequest {
         response.retryAfterUnixMs,
         "retryAfterUnixMs",
       );
+      // Settled once the completion reaches C, and not before: a response
+      // this binding refuses never reached native code, so the request is
+      // still outstanding and the host must be able to answer it again. A
+      // native failure still counts, because C may have taken the response.
+      this.#settled = true;
       native.checked(scope, EP.mln_resource_request_complete, [
         this.#handle,
         storage,

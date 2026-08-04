@@ -141,13 +141,12 @@ export class CallbackRegistry {
   }
 
   #destroy(kind: number, record: Ptr): void {
-    const entrypoint =
-      kind === RecordKind.log
-        ? EP.mln_adapter_log_record_destroy
-        : EP.mln_adapter_resource_provider_request_destroy;
-    this.#native.scope((scope) => {
-      this.#native.raw(scope, entrypoint, [record]);
-    });
+    // Each kind is allocated differently — a log record and a resource request
+    // by their adapters, a custom geometry record by `malloc` — so the shim
+    // dispatches on the kind rather than this picking a destructor. Choosing
+    // here meant a custom geometry record reached a resource-request
+    // destructor, which is type confusion across the boundary.
+    this.#native.transport.destroyRecord(kind, record);
   }
 
   /** Releases the drain storage once no registration remains. */
