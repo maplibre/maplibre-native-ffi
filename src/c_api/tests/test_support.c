@@ -373,6 +373,17 @@ typedef struct egl_state {
   EGLContext context;
 } egl_state;
 
+// These fixtures render into pbuffers and never present, so they name the
+// surfaceless platform rather than taking the default one.
+//
+// EGL_DEFAULT_DISPLAY resolves to whichever platform libEGL was built for,
+// which is commonly x11. A host without a display server then fails
+// eglInitialize() with EGL_NOT_INITIALIZED, and every fixture reports that it
+// could not create a context. The Rust fixtures already ask this way; see
+// EglTestContext in bindings/rust.
+//
+// OpenHarmony keeps the default display, whose EGL serves its own window
+// system.
 static EGLDisplay get_egl_display(void) {
 #if defined(__APPLE__)
   const EGLAttrib attributes[] = {
@@ -383,8 +394,12 @@ static EGLDisplay get_egl_display(void) {
     EGL_NONE,
   };
   return eglGetPlatformDisplay(EGL_PLATFORM_ANGLE_ANGLE, NULL, attributes);
-#else
+#elif defined(__OHOS__)
   return eglGetDisplay(EGL_DEFAULT_DISPLAY);
+#else
+  return eglGetPlatformDisplay(
+    EGL_PLATFORM_SURFACELESS_MESA, EGL_DEFAULT_DISPLAY, NULL
+  );
 #endif
 }
 
