@@ -24,6 +24,7 @@ import {
   CALL_ABI_GROUP,
   HANDSHAKE_GROUP,
   MEMORY_GROUP,
+  PACKAGING_GROUP,
   TRANSFER_GROUP,
 } from "./transport.ts";
 
@@ -38,6 +39,7 @@ export const CONFORMANCE: readonly ConformanceGroup[] = [
   CALL_ABI_GROUP,
   HANDSHAKE_GROUP,
   MEMORY_GROUP,
+  PACKAGING_GROUP,
   TRANSFER_GROUP,
   LIBRARY_GROUP,
   RUNTIME_GROUP,

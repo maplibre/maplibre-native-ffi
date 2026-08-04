@@ -15,6 +15,18 @@ import {
 
 const maplibre = await Maplibre.load();
 
+/** Loads the built package the way a Deno consumer would. */
+async function loadPackage(
+  format: "esm" | "cjs",
+): Promise<typeof import("../src/index.ts")> {
+  const distribution = new URL("../dist/", import.meta.url);
+  const specifier = new URL(
+    format === "esm" ? "index.mjs" : "index.cjs",
+    distribution,
+  );
+  return (await import(specifier.href)) as never;
+}
+
 /** Offline work needs a database, which Deno creates through its own API. */
 async function cacheDirectory(): Promise<string> {
   return Deno.makeTempDir({ prefix: "maplibre-conformance-" });
@@ -110,7 +122,12 @@ for (const group of CONFORMANCE) {
   );
   for (const entry of cases) {
     Deno.test(`${group.name} > ${entry.name}`, async () => {
-      await entry.run({ maplibre, expect: assertions, cacheDirectory });
+      await entry.run({
+        maplibre,
+        expect: assertions,
+        cacheDirectory,
+        loadPackage,
+      });
     });
   }
 }

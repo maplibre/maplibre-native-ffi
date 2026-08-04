@@ -544,3 +544,33 @@ export const HANDSHAKE_GROUP: ConformanceGroup = {
     },
   ],
 };
+
+export const PACKAGING_GROUP: ConformanceGroup = {
+  name: "the built package",
+  cases: [
+    {
+      name: "drives the native library through either module format",
+      run: async ({ expect, loadPackage }) => {
+        for (const format of ["esm", "cjs"] as const) {
+          const api = await loadPackage(format);
+          const maplibre = await api.Maplibre.load();
+          const runtime = maplibre.createRuntime();
+          try {
+            const map = runtime.createMap({ width: 64, height: 48 });
+            expect.equal(map.getSize().width, 64, `${format} drives a map`);
+            map.close();
+          } finally {
+            runtime.close();
+          }
+          // The two builds are one implementation, so an error from either is
+          // the same class to a consumer that catches it.
+          expect.equal(
+            api.MaplibreError.name,
+            "MaplibreError",
+            `${format} errors`,
+          );
+        }
+      },
+    },
+  ],
+};

@@ -16,6 +16,19 @@ import { describe, expect, it } from "vitest";
 
 const maplibre = await Maplibre.load();
 
+/** Loads the built package the way a consumer of this runtime would. */
+async function loadPackage(
+  format: "esm" | "cjs",
+): Promise<typeof import("../src/index.ts")> {
+  const { fileURLToPath } = await import("node:url");
+  const distribution = fileURLToPath(new URL("../dist/", import.meta.url));
+  if (format === "esm") {
+    return (await import(`${distribution}index.mjs`)) as never;
+  }
+  const { createRequire } = await import("node:module");
+  return createRequire(import.meta.url)(`${distribution}index.cjs`) as never;
+}
+
 /** Offline work needs a database, and Node spells its temp directory this way. */
 async function cacheDirectory(): Promise<string> {
   const { mkdtemp } = await import("node:fs/promises");
@@ -84,7 +97,12 @@ for (const group of CONFORMANCE) {
     );
     for (const entry of cases) {
       it(entry.name, async () => {
-        await entry.run({ maplibre, expect: assertions, cacheDirectory });
+        await entry.run({
+          maplibre,
+          expect: assertions,
+          cacheDirectory,
+          loadPackage,
+        });
       });
     }
   });

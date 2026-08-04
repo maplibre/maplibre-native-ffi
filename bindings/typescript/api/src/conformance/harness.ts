@@ -52,6 +52,13 @@ export interface CaseContext {
    * for an API only one of them has.
    */
   cacheDirectory(): Promise<string>;
+  /**
+   * Loads this package as a consumer would, in the module format named.
+   *
+   * Which formats a runtime resolves, and how, is the runtime's own business,
+   * so the runner performs the load and the case checks what came back.
+   */
+  loadPackage(format: "esm" | "cjs"): Promise<typeof import("../index.ts")>;
 }
 
 export interface ConformanceCase {

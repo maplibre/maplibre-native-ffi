@@ -48,6 +48,24 @@ const maplibre = Maplibre.fromTransport(wasmTransport(module_));
  * The module has its own in-memory filesystem and cannot see the host's, so the
  * directory is made inside the module rather than beside the test.
  */
+/**
+ * Loads the built package.
+ *
+ * The distribution is one build whichever transport it ends up on, so this
+ * loads the same files the Node-API runners do.
+ */
+async function loadPackage(
+  format: "esm" | "cjs",
+): Promise<typeof import("../src/index.ts")> {
+  const { fileURLToPath } = await import("node:url");
+  const distribution = fileURLToPath(new URL("../dist/", import.meta.url));
+  if (format === "esm") {
+    return (await import(`${distribution}index.mjs`)) as never;
+  }
+  const { createRequire } = await import("node:module");
+  return createRequire(import.meta.url)(`${distribution}index.cjs`) as never;
+}
+
 let cacheSequence = 0;
 function cacheDirectory(): Promise<string> {
   const filesystem = (module_ as { FS?: { mkdir(path: string): void } }).FS;
@@ -128,7 +146,12 @@ describe("the WebAssembly transport", () => {
       );
       for (const entry of cases) {
         it(entry.name, async () => {
-          await entry.run({ maplibre, expect: assertions, cacheDirectory });
+          await entry.run({
+            maplibre,
+            expect: assertions,
+            cacheDirectory,
+            loadPackage,
+          });
         });
       }
     });
