@@ -6,7 +6,6 @@
  * and the FFI permission to load a native addon at all.
  */
 
-/// <reference types="deno" />
 import {
   CONFORMANCE,
   type Expect,

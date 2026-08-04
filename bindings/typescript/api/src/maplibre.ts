@@ -61,8 +61,32 @@ export interface RenderBackends {
   readonly webgpu: boolean;
 }
 
-/** Which runtime payload packages the facade knows how to load. */
-const KNOWN_RUNTIME_PACKAGES = ["@maplibre/native-ffi-runtime-node"] as const;
+/**
+ * The runtime payload packages this facade knows how to load.
+ *
+ * A payload is named for the target and the public render backend it carries,
+ * because MapLibre Native compiles exactly one renderer per build. Discovery
+ * tries each in turn; a checkout's locally staged payload comes last, so an
+ * installed one wins over a development one.
+ */
+const KNOWN_RUNTIME_PACKAGES = [
+  "@maplibre/native-ffi-runtime-linux-x64-vulkan",
+  "@maplibre/native-ffi-runtime-linux-x64-opengl",
+  "@maplibre/native-ffi-runtime-linux-arm64-vulkan",
+  "@maplibre/native-ffi-runtime-linux-arm64-opengl",
+  "@maplibre/native-ffi-runtime-macos-arm64-metal",
+  "@maplibre/native-ffi-runtime-macos-arm64-vulkan",
+  "@maplibre/native-ffi-runtime-macos-arm64-opengl",
+  "@maplibre/native-ffi-runtime-windows-x64-vulkan",
+  "@maplibre/native-ffi-runtime-windows-x64-opengl",
+  "@maplibre/native-ffi-runtime-windows-arm64-vulkan",
+  "@maplibre/native-ffi-runtime-windows-arm64-opengl",
+  "@maplibre/native-ffi-runtime-android-arm64-vulkan",
+  "@maplibre/native-ffi-runtime-android-arm64-opengl",
+  "@maplibre/native-ffi-runtime-ohos-arm64-vulkan",
+  "@maplibre/native-ffi-runtime-ohos-arm64-opengl",
+  "@maplibre/native-ffi-runtime-node",
+] as const;
 
 export interface LoadOptions {
   /**

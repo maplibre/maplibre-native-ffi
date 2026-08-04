@@ -12,7 +12,6 @@ import {
   Maplibre,
   MaplibreError,
 } from "../src/index.ts";
-/// <reference types="bun" />
 import { describe, expect, it } from "bun:test";
 
 const maplibre = await Maplibre.load();
