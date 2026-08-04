@@ -32,6 +32,7 @@ import { EP } from "./raw/entrypoints.ts";
 import type { ResourceRequest } from "./resource-request.ts";
 import {
   ANY_RESOURCE_KIND,
+  type HttpHeaderTransformRule,
   type ResourceRewriteRule,
   type ResourceRoute,
   routeFlags,
@@ -265,6 +266,7 @@ export class Runtime {
   readonly #state: HandleState;
   readonly #eventStorage: Ptr;
   #rewriteRules: RuleTable | undefined;
+  #headerTransforms: RuleTable | undefined;
   #provider: ProviderRegistration | undefined;
   readonly #hasEventStorage: Ptr;
 
@@ -545,6 +547,67 @@ export class Runtime {
         provider.provider,
       ]);
     });
+  }
+
+  /**
+   * Adds headers to the requests MapLibre makes.
+   *
+   * The first rule whose URL matches supplies its whole header list. Names and
+   * values are copied here, because native code reads them for as long as the
+   * table is installed and a caller's strings are the caller's.
+   */
+  setHttpHeaderTransforms(rules: readonly HttpHeaderTransformRule[]): void {
+    const id = this.#state.use("Runtime.setHttpHeaderTransforms");
+    const native = this.#state.native;
+    const table = RuleTable.headerTransformRules(
+      native,
+      rules.map((rule) => ({
+        kind: rule.kind?.rawValue ?? ANY_RESOURCE_KIND,
+        url: rule.url,
+        flags: rule.matchPrefix === true ? 1 : 0,
+        headers: rule.headers,
+      })),
+    );
+    try {
+      native.scope((scope) => {
+        const layout = native.layout("mln_http_header_transform");
+        const transform = scope.allocateZeroed(layout.size, layout.align);
+        native.memory
+          .view(transform, layout.size)
+          .setUint32(layout.fields.size!.offset, layout.size, true);
+        native.memory.writePointer(
+          (transform + BigInt(layout.fields.callback!.offset)) as Ptr,
+          native.transport.symbol(
+            EP.mln_adapter_http_header_transform_callback,
+          ),
+        );
+        native.memory.writePointer(
+          (transform + BigInt(layout.fields.user_data!.offset)) as Ptr,
+          table.table,
+        );
+        native.checked(scope, EP.mln_runtime_set_http_header_transform, [
+          id,
+          transform,
+        ]);
+      });
+    } catch (error) {
+      table.release();
+      throw error;
+    }
+    // The C call has returned, so native code no longer reads the old table.
+    this.#headerTransforms?.release();
+    this.#headerTransforms = table;
+  }
+
+  /** Stops adding headers. */
+  clearHttpHeaderTransforms(): void {
+    const id = this.#state.use("Runtime.clearHttpHeaderTransforms");
+    const native = this.#state.native;
+    native.scope((scope) => {
+      native.checked(scope, EP.mln_runtime_clear_http_header_transform, [id]);
+    });
+    this.#headerTransforms?.release();
+    this.#headerTransforms = undefined;
   }
 
   /** Stops rewriting resource URLs. */

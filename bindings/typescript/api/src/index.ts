@@ -141,6 +141,8 @@ export {
 } from "./query.ts";
 export {
   ANY_RESOURCE_KIND,
+  type HttpHeader,
+  type HttpHeaderTransformRule,
   ResourceKind,
   type ResourceRewriteRule,
   type ResourceRoute,

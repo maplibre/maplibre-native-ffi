@@ -119,7 +119,10 @@ export interface ConformanceGroup {
 }
 
 /** What a runner can offer beyond the transport it loaded. */
-export type Capability = "packageResolution" | "renderContext";
+export type Capability =
+  | "packageResolution"
+  | "renderContext"
+  | "httpHeaderTransforms";
 
 /**
  * Whether a runner should register this case.

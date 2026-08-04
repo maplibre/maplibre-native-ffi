@@ -68,16 +68,6 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
     note: NO_SECOND_THREAD,
   },
   { id: "BND-153", reason: "inapplicable", note: NO_SECOND_THREAD },
-  {
-    id: "BND-158",
-    reason: "unwritten",
-    note: "needs the adapter's HTTP header callback family, which this binding does not wrap yet",
-  },
-  {
-    id: "BND-159",
-    reason: "unwritten",
-    note: "needs the adapter's HTTP header callback family, which this binding does not wrap yet",
-  },
 
   // Render sessions. The browser suite attaches one through a real WebGL
   // context, so what remains is not the context but the API: the binding

@@ -73,6 +73,24 @@ export class ResourceKind extends NamedValue {
   }
 }
 
+/** One header a transform rule supplies. */
+export interface HttpHeader {
+  readonly name: string;
+  readonly value: string;
+}
+
+/** Adds headers to requests whose URL this rule claims. */
+export interface HttpHeaderTransformRule {
+  /** The URL this rule compares, complete unless `matchPrefix` is set. */
+  readonly url: string;
+  /** Compares `url` as a literal prefix rather than the whole URL. */
+  readonly matchPrefix?: boolean;
+  /** The resource kind this rule matches, or every kind when absent. */
+  readonly kind?: ResourceKind;
+  /** The headers this rule supplies, which replace nothing already sent. */
+  readonly headers: readonly HttpHeader[];
+}
+
 /** Matches every resource kind. */
 export const ANY_RESOURCE_KIND = 0xffff_ffff;
 

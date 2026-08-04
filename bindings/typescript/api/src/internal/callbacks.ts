@@ -245,6 +245,105 @@ export class RuleTable {
     this.#allocations.push(...allocations);
   }
 
+  /** Builds the header-transform table an HTTP header transform reads. */
+  static headerTransformRules(
+    native: Native,
+    rules: readonly {
+      kind: number;
+      url: string;
+      flags: number;
+      headers: readonly { name: string; value: string }[];
+    }[],
+  ): RuleTable {
+    const allocations: Ptr[] = [];
+    const allocate = (size: number, alignment?: number): Ptr => {
+      const address = native.memory.allocate(size, alignment);
+      allocations.push(address);
+      native.memory.bytes(address, size).fill(0);
+      return address;
+    };
+    const persist = (value: string, what: string): Ptr => {
+      const bytes = new TextEncoder().encode(value);
+      if (bytes.includes(0)) {
+        throw new MaplibreError(
+          "invalidInput",
+          `${what} contains an embedded NUL, which a null-terminated C string cannot carry`,
+        );
+      }
+      const address = allocate(bytes.length + 1, 1);
+      native.memory.bytes(address, bytes.length + 1).set(bytes);
+      return address;
+    };
+
+    try {
+      const headerLayout = native.layout("mln_adapter_http_header");
+      const ruleLayout = native.layout(
+        "mln_adapter_http_header_transform_rule",
+      );
+      const tableLayout = native.layout(
+        "mln_adapter_http_header_transform_rules",
+      );
+      const array = allocate(
+        Math.max(ruleLayout.size * rules.length, 1),
+        ruleLayout.align,
+      );
+      rules.forEach((rule, index) => {
+        const base = (array + BigInt(index * ruleLayout.size)) as Ptr;
+        const view = native.memory.view(base, ruleLayout.size);
+        view.setUint32(ruleLayout.fields.kind!.offset, rule.kind, true);
+        view.setUint32(ruleLayout.fields.flags!.offset, rule.flags, true);
+        native.memory.writePointer(
+          (base + BigInt(ruleLayout.fields.url!.offset)) as Ptr,
+          persist(rule.url, "rule url"),
+        );
+        // The headers a rule supplies are native-owned for as long as the
+        // table is registered, so they are copied here rather than borrowed
+        // from the caller's strings.
+        const headers = allocate(
+          Math.max(headerLayout.size * rule.headers.length, 1),
+          headerLayout.align,
+        );
+        rule.headers.forEach((header, position) => {
+          const at = (headers + BigInt(position * headerLayout.size)) as Ptr;
+          native.memory.writePointer(
+            (at + BigInt(headerLayout.fields.name!.offset)) as Ptr,
+            persist(header.name, "header name"),
+          );
+          native.memory.writePointer(
+            (at + BigInt(headerLayout.fields.value!.offset)) as Ptr,
+            persist(header.value, "header value"),
+          );
+        });
+        native.memory.writePointer(
+          (base + BigInt(ruleLayout.fields.headers!.offset)) as Ptr,
+          headers,
+        );
+        writeSize(
+          native,
+          (base + BigInt(ruleLayout.fields.header_count!.offset)) as Ptr,
+          rule.headers.length,
+        );
+      });
+
+      const table = allocate(tableLayout.size, tableLayout.align);
+      native.memory.writePointer(
+        (table + BigInt(tableLayout.fields.rules!.offset)) as Ptr,
+        array,
+      );
+      writeSize(
+        native,
+        (table + BigInt(tableLayout.fields.count!.offset)) as Ptr,
+        rules.length,
+      );
+      return new RuleTable(native, table, allocations);
+    } catch (error) {
+      for (const address of allocations) {
+        native.memory.free(address);
+      }
+      throw error;
+    }
+  }
+
   /** Builds the rewrite-rule table a resource transform reads. */
   static rewriteRules(
     native: Native,

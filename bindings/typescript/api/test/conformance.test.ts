@@ -110,7 +110,7 @@ const TRANSPORT = "node-api";
  * No graphics context exists here, so the render-session cases are left to a
  * host that has one.
  */
-const CAPABILITIES = ["packageResolution"] as const;
+const CAPABILITIES = ["packageResolution", "httpHeaderTransforms"] as const;
 
 for (const group of groupsFor(CONFORMANCE, {
   transport: TRANSPORT,

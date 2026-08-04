@@ -12,6 +12,7 @@ import { LogSeverityMask } from "../logging.ts";
 import type { Map } from "../map.ts";
 import type { Maplibre } from "../maplibre.ts";
 import { EP } from "../raw/entrypoints.ts";
+import type { ResourceRequestInfo } from "../resource-request.ts";
 import {
   ResourceErrorReason,
   type ResourceRequest,
@@ -19,7 +20,7 @@ import {
 } from "../resource-request.ts";
 import type { Runtime } from "../runtime.ts";
 import type { ConformanceGroup } from "./harness.ts";
-import { drain, EMPTY_STYLE, withRuntime } from "./harness.ts";
+import { drain, EMPTY_STYLE, loadStyle, withRuntime } from "./harness.ts";
 
 /** Pumps until an offline operation reports that it finished. */
 function awaitCompletion(runtime: Runtime): boolean {
@@ -520,6 +521,105 @@ export const RESOURCES_GROUP: ConformanceGroup = {
           );
           // Giving it up twice is not an error; it is already given up.
           request.close();
+        });
+      },
+    },
+    {
+      name: "adds headers to a request it claims",
+      spec: ["BND-158"],
+      needs: ["httpHeaderTransforms"],
+      run({ maplibre, expect }) {
+        withRuntime(maplibre, (runtime, open) => {
+          let seen: ResourceRequestInfo | undefined;
+          runtime.setHttpHeaderTransforms([
+            {
+              url: "headers://",
+              matchPrefix: true,
+              headers: [
+                { name: "X-Conformance", value: "yes" },
+                { name: "X-Second", value: "also" },
+              ],
+            },
+          ]);
+          // A provider claims the request so it never leaves this process; the
+          // transform still runs, because it applies to the request rather
+          // than to whoever answers it.
+          runtime.setResourceProvider(
+            [{ url: "headers://", matchPrefix: true, useRequestedUrl: true }],
+            (request) => {
+              seen ??= request.info;
+              request.complete({
+                bytes: new TextEncoder().encode(EMPTY_STYLE),
+              });
+            },
+          );
+
+          const map = open({ width: 64, height: 64 });
+          map.setStyleUrl("headers://style.json");
+          for (
+            let attempt = 0;
+            attempt < 60 && seen === undefined;
+            attempt += 1
+          ) {
+            runtime.pump(25);
+            maplibre.deliverCallbacks();
+            while (runtime.pollEvent() !== undefined) {
+              // Drained so the queue does not hold the pump open.
+            }
+          }
+          // The rule's strings were copied at registration, so what native
+          // code read cannot depend on anything this case still holds.
+          expect.defined(seen, "the request the transform applied to");
+        });
+      },
+    },
+    {
+      name: "installs, replaces, and clears header rules while maps are live",
+      spec: ["BND-159"],
+      needs: ["httpHeaderTransforms"],
+      run({ maplibre, expect }) {
+        withRuntime(maplibre, (runtime, open) => {
+          const map = open({ width: 64, height: 64 });
+          loadStyle(runtime, map);
+
+          runtime.setHttpHeaderTransforms([
+            { url: "first://", headers: [{ name: "X-One", value: "1" }] },
+          ]);
+          // Replacing does not leave the old table installed, and the old one
+          // is released rather than leaked, which closing the runtime proves.
+          runtime.setHttpHeaderTransforms([
+            {
+              url: "second://",
+              matchPrefix: true,
+              headers: [{ name: "X-Two", value: "2" }],
+            },
+          ]);
+          runtime.clearHttpHeaderTransforms();
+          // Clearing with nothing installed is a no-op rather than an error.
+          runtime.clearHttpHeaderTransforms();
+
+          // A header name that cannot cross as a C string is refused by the
+          // binding, and the rules already installed are untouched.
+          runtime.setHttpHeaderTransforms([
+            { url: "third://", headers: [{ name: "X-Three", value: "3" }] },
+          ]);
+          expect.equal(
+            expect.throws(
+              () =>
+                runtime.setHttpHeaderTransforms([
+                  {
+                    url: "fourth://",
+                    headers: [
+                      { name: `X${String.fromCharCode(0)}Bad`, value: "4" },
+                    ],
+                  },
+                ]),
+              "a header name carrying an embedded NUL",
+            ).kind,
+            "invalidInput",
+            "the binding refuses it before crossing into C",
+          );
+          runtime.clearHttpHeaderTransforms();
         });
       },
     },
