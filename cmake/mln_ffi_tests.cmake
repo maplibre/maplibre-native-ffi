@@ -41,7 +41,9 @@ function(mln_ffi_configure_browser_c_api_test)
       # worker attaches it, and register it in GL.offscreenCanvases -- which is
       # what resolves the selector, so that table has to be reachable from JS.
       "-sOFFSCREENCANVAS_SUPPORT=1"
-      "-sEXPORTED_RUNTIME_METHODS=GL"
+      # GL for the canvas registry the fixtures resolve their selector through,
+      # ENV for the fixture origin the page shell hands the HTTP test.
+      "-sEXPORTED_RUNTIME_METHODS=GL,ENV"
       "SHELL:--shell-file ${PROJECT_SOURCE_DIR}/src/c_api/tests/browser_shell.html"
       # Unity reports through stdout and the process exit status, so the runner
       # needs the module to exit rather than keep its runtime alive.

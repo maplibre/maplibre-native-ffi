@@ -22,6 +22,7 @@ void tearDown(void) {
 
 int main(void) {
   UNITY_BEGIN();
+  run_browser_http_abi_tests();
   run_callback_adapter_abi_tests();
   run_core_abi_tests();
   run_handles_abi_tests();

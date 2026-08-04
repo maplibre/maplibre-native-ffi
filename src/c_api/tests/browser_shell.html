@@ -47,6 +47,13 @@ window.addEventListener("unhandledrejection", (event) => {
 
 var Module = {
   canvas: document.getElementById("canvas"),
+  // The origin the runner serves this page from, which is also where it serves
+  // the style the HTTP test loads. The suite reads it with getenv().
+  preRun: [
+    () => {
+      ENV.MLN_FFI_TEST_FIXTURE_ORIGIN = location.origin;
+    },
+  ],
   print: record,
   printErr: record,
   onExit: (status) => report(status),

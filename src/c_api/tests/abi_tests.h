@@ -18,6 +18,7 @@
 // `main.c`; CMake globs the sources and fails configuration when `main.c` is
 // missing a call.
 
+void run_browser_http_abi_tests(void);
 void run_callback_adapter_abi_tests(void);
 void run_core_abi_tests(void);
 void run_handles_abi_tests(void);
