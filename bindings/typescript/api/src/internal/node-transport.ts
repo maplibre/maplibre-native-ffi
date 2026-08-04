@@ -33,6 +33,7 @@ export interface NodeApiAddon {
   readForeign(pointer: bigint, length: number): Uint8Array;
   readForeignCString(pointer: bigint): string | null;
   listenerAddress(kind: number): bigint;
+  destroyRecord(kind: number, record: bigint): void;
   drainRecords(records: bigint, capacity: number): number;
   recordDepth(): number;
   startRecordNotifications(callback: () => void): void;
@@ -122,6 +123,9 @@ export function nodeApiTransport(addon: NodeApiAddon): Transport {
     },
 
     listenerAddress: (kind: number): Ptr => addon.listenerAddress(kind),
+    destroyRecord: (kind: number, record: Ptr) => {
+      addon.destroyRecord(kind, record);
+    },
     drainRecords: (records: Ptr, capacity: number) =>
       addon.drainRecords(records, capacity),
     recordDepth: () => addon.recordDepth(),

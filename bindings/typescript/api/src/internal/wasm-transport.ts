@@ -52,6 +52,9 @@ export interface WasmModule {
   _mln_abi_symbol(entrypoint: number): number;
   _mln_abi_log_listener_address(): number;
   _mln_abi_resource_request_listener_address(): number;
+  _mln_abi_custom_geometry_fetch_listener_address(): number;
+  _mln_abi_custom_geometry_cancel_listener_address(): number;
+  _mln_abi_record_destroy(kind: number, record: number): void;
   _mln_abi_queue_drain(records: number, capacity: number): number;
   _mln_abi_queue_depth(): number;
   _mln_abi_transfer_issue(handle: bigint): bigint;
@@ -205,13 +208,17 @@ export function wasmTransport(module: WasmModule): Transport {
     },
 
     listenerAddress(kind: number): Ptr {
-      const address =
-        kind === 1
-          ? module._mln_abi_log_listener_address()
-          : kind === 2
-            ? module._mln_abi_resource_request_listener_address()
-            : 0;
-      return BigInt(address) as Ptr;
+      const addresses: Readonly<Record<number, () => number>> = {
+        1: () => module._mln_abi_log_listener_address(),
+        2: () => module._mln_abi_resource_request_listener_address(),
+        3: () => module._mln_abi_custom_geometry_fetch_listener_address(),
+        4: () => module._mln_abi_custom_geometry_cancel_listener_address(),
+      };
+      return BigInt(addresses[kind]?.() ?? 0) as Ptr;
+    },
+
+    destroyRecord(kind: number, record: Ptr): void {
+      module._mln_abi_record_destroy(kind, Number(record));
     },
 
     drainRecords(records: Ptr, capacity: number): number {

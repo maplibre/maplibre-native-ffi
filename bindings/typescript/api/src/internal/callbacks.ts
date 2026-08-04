@@ -22,6 +22,13 @@ import type { Ptr } from "./transport.ts";
 export const RecordKind = {
   log: 1,
   resourceRequest: 2,
+  customGeometryTile: 3,
+} as const;
+
+/** The listeners a custom geometry source registers, by their address id. */
+export const CustomGeometryListener = {
+  fetch: 3,
+  cancel: 4,
 } as const;
 
 /** The support layer's record struct, whose layout its own assertions pin. */

@@ -38,6 +38,9 @@ unsafe extern "C" {
         listener_data: *mut std::ffi::c_void,
         request: *mut std::ffi::c_void,
     );
+    fn mln_abi_custom_geometry_fetch_listener_address() -> *mut std::ffi::c_void;
+    fn mln_abi_custom_geometry_cancel_listener_address() -> *mut std::ffi::c_void;
+    fn mln_abi_record_destroy(kind: u32, record: *mut std::ffi::c_void);
     fn mln_abi_queue_set_notifier(
         notify: Option<unsafe extern "C" fn(*mut std::ffi::c_void)>,
         user_data: *mut std::ffi::c_void,
@@ -202,9 +205,22 @@ pub fn listener_address(kind: u32) -> BigInt {
     let address = match kind {
         1 => mln_abi_log_listener as *const () as usize,
         2 => mln_abi_resource_request_listener as *const () as usize,
+        3 => (unsafe { mln_abi_custom_geometry_fetch_listener_address() }) as usize,
+        4 => (unsafe { mln_abi_custom_geometry_cancel_listener_address() }) as usize,
         _ => 0,
     };
     BigInt::from(address as u64)
+}
+
+/// Releases a record a drain delivered.
+///
+/// Each family owns its records differently, and the host does not have to know
+/// which: naming the kind is enough.
+#[napi]
+pub fn destroy_record(kind: u32, record: BigInt) -> Result<()> {
+    let record = address(record, "record")? as usize as *mut std::ffi::c_void;
+    unsafe { mln_abi_record_destroy(kind, record) };
+    Ok(())
 }
 
 /// Drains queued callback records into host storage.

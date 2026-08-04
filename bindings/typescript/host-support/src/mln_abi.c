@@ -309,13 +309,7 @@ static void mln_abi_queue_push(
     /* Nothing can be delivered, so release what the adapter handed over rather
      * than leaking it. The host learns nothing, which is the same outcome a
      * dropped record has, without the leak. */
-    if (record != NULL) {
-      if (kind == MLN_ABI_RECORD_LOG) {
-        mln_adapter_log_record_destroy(record);
-      } else if (kind == MLN_ABI_RECORD_RESOURCE_REQUEST) {
-        mln_adapter_resource_provider_request_destroy(record);
-      }
-    }
+    mln_abi_record_destroy(kind, record);
     return;
   }
   node->next = NULL;
@@ -341,6 +335,59 @@ static void mln_abi_queue_push(
    * be able to deadlock against a producer. */
   if (notify != NULL) {
     notify(notify_data);
+  }
+}
+
+static void mln_abi_custom_geometry_push(
+  void* listener_data, mln_canonical_tile_id tile_id, uint32_t cancelled
+) {
+  mln_abi_custom_geometry_tile* copy = malloc(sizeof(*copy));
+  if (copy == NULL) {
+    return;
+  }
+  copy->cancelled = cancelled;
+  copy->z = tile_id.z;
+  copy->x = tile_id.x;
+  copy->y = tile_id.y;
+  mln_abi_queue_push(MLN_ABI_RECORD_CUSTOM_GEOMETRY_TILE, listener_data, copy);
+}
+
+static void mln_abi_custom_geometry_fetch_listener(
+  void* user_data, mln_canonical_tile_id tile_id
+) {
+  mln_abi_custom_geometry_push(user_data, tile_id, 0U);
+}
+
+static void mln_abi_custom_geometry_cancel_listener(
+  void* user_data, mln_canonical_tile_id tile_id
+) {
+  mln_abi_custom_geometry_push(user_data, tile_id, 1U);
+}
+
+void* mln_abi_custom_geometry_fetch_listener_address(void) {
+  return (void*)(uintptr_t)&mln_abi_custom_geometry_fetch_listener;
+}
+
+void* mln_abi_custom_geometry_cancel_listener_address(void) {
+  return (void*)(uintptr_t)&mln_abi_custom_geometry_cancel_listener;
+}
+
+void mln_abi_record_destroy(uint32_t kind, void* record) {
+  if (record == NULL) {
+    return;
+  }
+  switch (kind) {
+    case MLN_ABI_RECORD_LOG:
+      mln_adapter_log_record_destroy(record);
+      return;
+    case MLN_ABI_RECORD_RESOURCE_REQUEST:
+      mln_adapter_resource_provider_request_destroy(record);
+      return;
+    case MLN_ABI_RECORD_CUSTOM_GEOMETRY_TILE:
+      free(record);
+      return;
+    default:
+      return;
   }
 }
 

@@ -92,6 +92,14 @@ export interface Transport {
   /** Reports the address of the listener a callback family registers. */
   listenerAddress(kind: number): Ptr;
 
+  /**
+   * Releases a record a drain delivered.
+   *
+   * Each family owns its records differently, and the shared layer does not
+   * have to know which: naming the kind is enough.
+   */
+  destroyRecord(kind: number, record: Ptr): void;
+
   /** Moves queued callback records into host storage, reporting how many. */
   drainRecords(records: Ptr, capacity: number): number;
 

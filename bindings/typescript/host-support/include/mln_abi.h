@@ -86,7 +86,23 @@ void* mln_abi_symbol(uint32_t entrypoint);
 enum mln_abi_record_kind {
   MLN_ABI_RECORD_LOG = 1,
   MLN_ABI_RECORD_RESOURCE_REQUEST = 2,
+  MLN_ABI_RECORD_CUSTOM_GEOMETRY_TILE = 3,
 };
+
+/**
+ * A custom geometry tile request, copied for the host.
+ *
+ * MapLibre passes the tile id by value and returns immediately, so the id is
+ * copied into a record this layer owns and the host releases through
+ * mln_abi_record_destroy().
+ */
+typedef struct mln_abi_custom_geometry_tile {
+  /** Zero for a fetch, one for a cancel. */
+  uint32_t cancelled;
+  uint32_t z;
+  uint32_t x;
+  uint32_t y;
+} mln_abi_custom_geometry_tile;
 
 /**
  * One record a MapLibre thread handed to this layer.
@@ -123,6 +139,20 @@ void* mln_abi_log_listener_address(void);
 
 /** Reports the address of the queued resource provider listener. */
 void* mln_abi_resource_request_listener_address(void);
+
+/** Reports the address of the custom geometry tile fetch listener. */
+void* mln_abi_custom_geometry_fetch_listener_address(void);
+
+/** Reports the address of the custom geometry tile cancel listener. */
+void* mln_abi_custom_geometry_cancel_listener_address(void);
+
+/**
+ * Releases a record a drain delivered.
+ *
+ * Each family owns its records differently, and the host should not have to
+ * know which; naming the kind is enough.
+ */
+void mln_abi_record_destroy(uint32_t kind, void* record);
 
 /**
  * Installs the function this layer calls when a record is queued.
