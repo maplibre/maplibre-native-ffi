@@ -7,6 +7,13 @@
  */
 
 export {
+  CONFORMANCE,
+  type ConformanceCase,
+  conformanceCases,
+  type ConformanceGroup,
+  type Expect,
+} from "./conformance.ts";
+export {
   type AnimationOptions,
   type CameraOptions,
   cameraOptionsEquals,

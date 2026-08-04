@@ -1,5 +1,10 @@
 [tools]
 "core:node" = "{{vars.node_version}}"
+# Bun and Deno run the same addon and the same conformance suite. They are
+# declared here rather than at the repository root because only this binding
+# uses them.
+"core:bun" = "{{vars.bun_version}}"
+"core:deno" = "{{vars.deno_version}}"
 
 [tasks.generate]
 description = "Regenerate the raw layer and the normalized C dispatch from the public headers."
@@ -42,7 +47,7 @@ pnpm --filter @maplibre/native-ffi run build
 '''
 
 [tasks.test]
-description = "Run the TypeScript binding tests."
+description = "Run the TypeScript binding tests under every installed runtime."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "build", args = ["{{usage.preset}}"] }]
 dir = "../.."
@@ -53,4 +58,19 @@ export LD_LIBRARY_PATH="$native_install_dir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_P
 export DYLD_LIBRARY_PATH="$native_install_dir/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
 cargo clippy -p mln-ts-addon -p mln-ts-codegen --all-targets -- -D warnings
 pnpm --filter @maplibre/native-ffi exec vitest run
+
+# Bun and Deno load the same compiled addon and register the same conformance
+# suite, so a case that passes under one and fails under another is a
+# difference between the runtimes rather than between two suites.
+cd bindings/typescript/api
+bun test runners/bun.test.ts
+# Deno needs the FFI permission to load a Node-API addon at all, and a local
+# node_modules directory to resolve the runtime payload package.
+deno test \
+  --allow-read \
+  --allow-ffi \
+  --allow-env \
+  --allow-net \
+  --node-modules-dir=manual \
+  runners/deno.test.ts
 '''

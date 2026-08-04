@@ -67,10 +67,12 @@ android_ndk_version = "28.2.13676358"
 # which nothing here calls, and is the smallest one that still ships a full
 # graphics stack.
 android_system_image = "system-images;android-36;default;x86_64"
+bun_version = "1.3.9"
 cargo_about_version = "0.9.1"
 cmake_version = "4.3.3"
 dart_version = "3.12.2"
 dotnet_version = "10.0.203"
+deno_version = "2.6.3"
 doxygen_version = "1.13.2"
 dprint_version = "0.53.2"
 emsdk_version = "4.0.10"

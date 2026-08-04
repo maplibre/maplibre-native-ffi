@@ -24,6 +24,8 @@
   },
   "devDependencies": {
     "@maplibre/native-ffi-runtime-node": "workspace:*",
+    "@types/bun": "^1.3.9",
+    "@types/deno": "^2.4.0",
     "@types/node": "^24.10.1",
     "vitest": "^4.1.10"
   },

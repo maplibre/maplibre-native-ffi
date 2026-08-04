@@ -831,6 +831,50 @@ checksum = "sha256:8cae2385eb69b93084ea2e6a4bce57233feb56ab16b3087bea25cbc0abadb
 url = "https://github.com/rhysd/actionlint/releases/download/v1.7.8/actionlint_1.7.8_windows_amd64.zip"
 url_api = "https://api.github.com/repos/rhysd/actionlint/releases/assets/303046377"
 
+[[tools.bun]]
+version = "1.3.9"
+backend = "core:bun"
+
+[tools.bun."platforms.linux-arm64"]
+checksum = "sha256:a2c2862bcc1fd1c0b3a8dcdc8c7efb5e2acd871eb20ed2f17617884ede81c844"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.9/bun-linux-aarch64.zip"
+
+[tools.bun."platforms.linux-arm64-musl"]
+checksum = "sha256:412e9b2732d148cb127a753d63899b0333c4f4f1bd8dde79316ecfb7ef170270"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.9/bun-linux-aarch64-musl.zip"
+
+[tools.bun."platforms.linux-x64"]
+checksum = "sha256:4680e80e44e32aa718560ceae85d22ecfbf2efb8f3641782e35e4b7efd65a1aa"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.9/bun-linux-x64.zip"
+
+[tools.bun."platforms.linux-x64-baseline"]
+checksum = "sha256:104d4d037f4b35e10215c0507e1779691f39c57bd91ddeefe11cad781e3fc4b9"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.9/bun-linux-x64-baseline.zip"
+
+[tools.bun."platforms.linux-x64-musl"]
+checksum = "sha256:04b7184318937623d317de6b25e82bef7bf5cce0b241501c5d0499513201c72d"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.9/bun-linux-x64-musl.zip"
+
+[tools.bun."platforms.linux-x64-musl-baseline"]
+checksum = "sha256:40ea1b2b209d393a07e06299d2d19a31710f1e55d15811a193bfa7c9dd757e01"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.9/bun-linux-x64-musl-baseline.zip"
+
+[tools.bun."platforms.macos-arm64"]
+checksum = "sha256:cde6a4edf19cf64909158fa5a464a12026fd7f0d79a4a950c10cf0af04266d85"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.9/bun-darwin-aarch64.zip"
+
+[tools.bun."platforms.windows-arm64"]
+checksum = "sha256:cc22962b3dcc51f279f13bf843675e052479e64a323f85eb29442066cf3942fe"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.9/bun-windows-x64-baseline.zip"
+
+[tools.bun."platforms.windows-x64"]
+checksum = "sha256:f4c1cf3549f6af986dc6535c40b4785ff1a7e7805e59637ec450fc11adb0c874"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.9/bun-windows-x64.zip"
+
+[tools.bun."platforms.windows-x64-baseline"]
+checksum = "sha256:cc22962b3dcc51f279f13bf843675e052479e64a323f85eb29442066cf3942fe"
+url = "https://github.com/oven-sh/bun/releases/download/bun-v1.3.9/bun-windows-x64-baseline.zip"
+
 [[tools."conda:doxygen"]]
 version = "1.13.2"
 backend = "conda:doxygen"
@@ -1078,6 +1122,29 @@ url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.
 [tools.dart."platforms.windows-x64"]
 checksum = "sha256:77fd96c823ed09a85e58209a2c5f16b0fc02e5ed4f3e3d46fddf4be763d498d6"
 url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-windows-x64-release.zip"
+
+[[tools.deno]]
+version = "2.6.3"
+backend = "core:deno"
+
+[tools.deno."platforms.linux-arm64"]
+checksum = "sha256:92c9496e8c71e6b18abf1f728d6223bb682749e4946f24589a7ef8972fec423e"
+url = "https://dl.deno.land/release/v2.6.3/deno-aarch64-unknown-linux-gnu.zip"
+
+[tools.deno."platforms.linux-x64"]
+checksum = "sha256:b3c24dc6f3982607896bd795fd6bcbdc53f3d11e8d8190b2a07fd1881eb1148a"
+url = "https://dl.deno.land/release/v2.6.3/deno-x86_64-unknown-linux-gnu.zip"
+
+[tools.deno."platforms.macos-arm64"]
+checksum = "sha256:7fdc01002a90a6ac58b8936e5d7a872fa7885db71d51bac7f776b7b790c82085"
+url = "https://dl.deno.land/release/v2.6.3/deno-aarch64-apple-darwin.zip"
+
+[tools.deno."platforms.windows-arm64"]
+url = "https://dl.deno.land/release/v2.6.3/deno-aarch64-pc-windows-msvc.zip"
+
+[tools.deno."platforms.windows-x64"]
+checksum = "sha256:a011a0c6f1ea120ec60a65969e9d549af894b999cf1d35fe5ee81e694227cce2"
+url = "https://dl.deno.land/release/v2.6.3/deno-x86_64-pc-windows-msvc.zip"
 
 [[tools.dotnet]]
 version = "10.0.203"

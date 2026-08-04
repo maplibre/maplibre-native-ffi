@@ -51,9 +51,10 @@ commands = [{ task = "//bindings/dotnet:test" }]
 platforms = ["linux", "macos"]
 commands = [{ task = "//bindings/go:test" }]
 
-# The TypeScript suite runs where its Node-API addon is built. One desktop
-# target covers the transport and the public API; the payload matrix is a
-# packaging concern rather than a behavioral one.
+# The TypeScript suite runs where its Node-API addon is built, and runs its
+# conformance cases under Node, Bun, and Deno against that one addon. One
+# desktop target covers the transport and the public API; the payload matrix is
+# a packaging concern rather than a behavioral one.
 [[suites]]
 platforms = ["linux"]
 commands = [
