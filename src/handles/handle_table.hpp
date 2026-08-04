@@ -272,12 +272,12 @@ class HandleTable {
   std::vector<std::uint32_t> free_indices_;
 };
 
-// One process-global table per object type. The whole C API links into a
-// single target, so the function-local static is unique.
+// Intentionally leaked because destroying live handles during C++ static
+// teardown can use resources that have already been destroyed.
 template <typename Object>
 auto handle_table() -> HandleTable<Object>& {
-  static auto value = HandleTable<Object>{};
-  return value;
+  static auto* const value = new HandleTable<Object>{};
+  return *value;
 }
 
 }  // namespace mln::core
