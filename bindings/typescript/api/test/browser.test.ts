@@ -12,6 +12,7 @@
 import {
   CONFORMANCE,
   type Expect,
+  groupsFor,
   Maplibre,
   MaplibreError,
 } from "../src/index.ts";
@@ -38,6 +39,51 @@ beforeAll(async () => {
   module_ = await createRuntime();
   maplibre = Maplibre.fromTransport(wasmTransport(module_));
 }, 120_000);
+
+/**
+ * What this runner offers.
+ *
+ * A page has a real WebGL context, which is what a render session attaches to,
+ * and no CommonJS loader at all, which is why it resolves no package.
+ */
+const CAPABILITIES = ["renderContext"] as const;
+
+/**
+ * A WebGL context the module owns, made current before it is handed over.
+ *
+ * Emscripten numbers its contexts rather than addressing them, so this crosses
+ * as a handle rather than a pointer. One context serves every case: creating
+ * one per case would exhaust what a browser will give a page.
+ */
+let context: { platform: "webgl"; context: number } | undefined;
+function renderContext(): { platform: "webgl"; context: number } {
+  if (context === undefined) {
+    const gl = (
+      module_ as unknown as {
+        GL: {
+          createContext(canvas: HTMLCanvasElement, attributes: object): number;
+          makeContextCurrent(handle: number): boolean;
+        };
+      }
+    ).GL;
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 256;
+    const handle = gl.createContext(canvas, {
+      majorVersion: 2,
+      minorVersion: 0,
+      alpha: true,
+      depth: true,
+      stencil: true,
+      antialias: false,
+    });
+    if (handle === 0 || !gl.makeContextCurrent(handle)) {
+      throw new Error("this browser gave the module no WebGL 2 context");
+    }
+    context = { platform: "webgl", context: handle };
+  }
+  return context;
+}
 
 let cacheSequence = 0;
 function cacheDirectory(): Promise<string> {
@@ -121,26 +167,19 @@ describe("a browser hosting the WebAssembly payload", () => {
   /** What this runner loads, so a case restricted to another one is skipped. */
   const TRANSPORT = "wasm";
 
-  for (const group of CONFORMANCE) {
-    const cases = group.cases.filter(
-      (entry) =>
-        (entry.transports === undefined ||
-          entry.transports.includes(TRANSPORT)) &&
-        !entry.needs?.includes("packageResolution"),
-    );
-    // A group whose every case belongs to another host is left out entirely: an
-    // empty suite is an error rather than a pass.
-    if (cases.length === 0) {
-      continue;
-    }
+  for (const group of groupsFor(CONFORMANCE, {
+    transport: TRANSPORT,
+    capabilities: CAPABILITIES,
+  })) {
     describe(group.name, () => {
-      for (const entry of cases) {
+      for (const entry of group.cases) {
         it(entry.name, async () => {
           await entry.run({
             maplibre,
             expect: assertions,
             cacheDirectory,
             loadPackage,
+            renderContext,
           });
         });
       }

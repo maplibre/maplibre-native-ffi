@@ -15,6 +15,7 @@ import {
   type Expect,
   Maplibre,
   MaplibreError,
+  groupsFor,
 } from "../src/index.ts";
 import {
   type WasmModule,
@@ -78,6 +79,16 @@ function cacheDirectory(): Promise<string> {
   return Promise.resolve(path);
 }
 
+/**
+ * No graphics context exists here.
+ *
+ * A case that needs one names the capability and this runner leaves it out, so
+ * reaching this is a registration mistake rather than something to work around.
+ */
+function renderContext(): never {
+  throw new Error("this runtime has no graphics context to render through");
+}
+
 const assertions: Expect = {
   equal(actual, expected, what) {
     expect(actual, what).toEqual(expected);
@@ -137,20 +148,27 @@ describe("the WebAssembly transport", () => {
   /** What this runner loads, so a case restricted to another one is skipped. */
   const TRANSPORT = "wasm";
 
-  for (const group of CONFORMANCE) {
+  /**
+   * What this runner can offer beyond the transport.
+   *
+   * No graphics context exists here, so the render-session cases are left to a
+   * host that has one.
+   */
+  const CAPABILITIES = ["packageResolution"] as const;
+
+  for (const group of groupsFor(CONFORMANCE, {
+    transport: TRANSPORT,
+    capabilities: CAPABILITIES,
+  })) {
     describe(group.name, () => {
-      const cases = group.cases.filter(
-        (entry) =>
-          entry.transports === undefined ||
-          entry.transports.includes(TRANSPORT),
-      );
-      for (const entry of cases) {
+      for (const entry of group.cases) {
         it(entry.name, async () => {
           await entry.run({
             maplibre,
             expect: assertions,
             cacheDirectory,
             loadPackage,
+            renderContext,
           });
         });
       }

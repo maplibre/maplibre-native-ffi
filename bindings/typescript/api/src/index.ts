@@ -10,6 +10,8 @@ export {
   CONFORMANCE,
   type ConformanceCase,
   conformanceCases,
+  groupsFor,
+  runsHere,
   type ConformanceGroup,
   type Expect,
 } from "./conformance/index.ts";

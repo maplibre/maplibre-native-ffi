@@ -107,12 +107,12 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
   {
     id: "BND-106",
     reason: "unwritten",
-    note: "queries need an attached render session; see the render-target group",
+    note: "a session can be attached now, and the query it answers decodes features the library owns through a decoder that reads binding-owned slabs only, so this case cannot pass until that is fixed",
   },
   {
     id: "BND-107",
     reason: "unwritten",
-    note: "cluster expansion needs an attached render session",
+    note: "the binding exposes no feature-extension query, and BND-106 blocks it besides",
   },
   { id: "BND-123", reason: "inapplicable", note: NO_SECOND_THREAD },
 
@@ -184,25 +184,32 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
     note: "header transforms are unimplemented in this binding",
   },
 
-  // Render sessions. Attaching needs host-supplied backend handles, which the
-  // browser suite can now provide through WebGL and the Node-API runners
-  // cannot. Until a runner attaches one, none of these run anywhere.
-  ...(
-    [
-      162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176,
-    ] as const
-  ).map((number) => ({
+  // Render sessions. The browser suite attaches one through a real WebGL
+  // context, so what remains is not the context but the API: the binding
+  // exposes no CPU readback, no owned-texture frames, and no `set_target`.
+  {
+    id: "BND-166",
+    reason: "unwritten",
+    note: "the binding exposes no CPU readback",
+  },
+  ...([167, 168, 169, 170, 172, 173] as const).map((number) => ({
     id: `BND-${number}`,
     reason: "unwritten" as const,
-    note: "needs a suite that attaches a render session with host-supplied backend handles",
+    note: "the binding exposes no owned-texture frame handles",
+  })),
+  {
+    id: "BND-171",
+    reason: "unwritten",
+    note: "a caller-owned texture is attachable and no case proves close leaves the caller's handles alone",
+  },
+  { id: "BND-174", reason: "inapplicable", note: NO_SECOND_THREAD },
+  ...([175, 176] as const).map((number) => ({
+    id: `BND-${number}`,
+    reason: "unwritten" as const,
+    note: "the binding exposes no `set_target`",
   })),
 
   // Threading.
-  {
-    id: "BND-196",
-    reason: "unwritten",
-    note: "a released map refused at attach needs a render session and no second thread",
-  },
   ...([190, 191, 192, 193, 194, 195, 197] as const).map((number) => ({
     id: `BND-${number}`,
     reason: "inapplicable" as const,

@@ -13,6 +13,7 @@
 import { LOGGING_GROUP, OFFLINE_GROUP, RESOURCES_GROUP } from "./callbacks.ts";
 import { DOMAIN_GROUPS } from "./domains.ts";
 import type { ConformanceCase, ConformanceGroup } from "./harness.ts";
+import { RENDER_SESSION_GROUP } from "./render.ts";
 import { LIBRARY_GROUP, RUNTIME_GROUP } from "./runtime.ts";
 import {
   HOST_DATA_GROUP,
@@ -29,11 +30,13 @@ import {
 } from "./transport.ts";
 
 export type {
+  Capability,
   CaseContext,
   ConformanceCase,
   ConformanceGroup,
   Expect,
 } from "./harness.ts";
+export { groupsFor, runsHere } from "./harness.ts";
 
 export const CONFORMANCE: readonly ConformanceGroup[] = [
   CALL_ABI_GROUP,
@@ -46,6 +49,7 @@ export const CONFORMANCE: readonly ConformanceGroup[] = [
   ...DOMAIN_GROUPS,
   STYLE_GROUP,
   RENDER_TARGET_GROUP,
+  RENDER_SESSION_GROUP,
   VALUES_GROUP,
   HOST_DATA_GROUP,
   LOGGING_GROUP,

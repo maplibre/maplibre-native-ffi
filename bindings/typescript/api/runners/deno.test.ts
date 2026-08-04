@@ -11,6 +11,7 @@ import {
   type Expect,
   Maplibre,
   MaplibreError,
+  groupsFor,
 } from "../src/index.ts";
 
 const maplibre = await Maplibre.load();
@@ -30,6 +31,16 @@ async function loadPackage(
 /** Offline work needs a database, which Deno creates through its own API. */
 async function cacheDirectory(): Promise<string> {
   return Deno.makeTempDir({ prefix: "maplibre-conformance-" });
+}
+
+/**
+ * No graphics context exists here.
+ *
+ * A case that needs one names the capability and this runner leaves it out, so
+ * reaching this is a registration mistake rather than something to work around.
+ */
+function renderContext(): never {
+  throw new Error("this runtime has no graphics context to render through");
 }
 
 const assertions: Expect = {
@@ -115,17 +126,25 @@ function replacer(_key: string, value: unknown): unknown {
 /** What this runner loads, so a case restricted to another one is skipped. */
 const TRANSPORT = "node-api";
 
-for (const group of CONFORMANCE) {
-  const cases = group.cases.filter(
-    (entry) =>
-      entry.transports === undefined || entry.transports.includes(TRANSPORT),
-  );
-  for (const entry of cases) {
+/**
+ * What this runner can offer beyond the transport.
+ *
+ * No graphics context exists here, so the render-session cases are left to a
+ * host that has one.
+ */
+const CAPABILITIES = ["packageResolution"] as const;
+
+for (const group of groupsFor(CONFORMANCE, {
+  transport: TRANSPORT,
+  capabilities: CAPABILITIES,
+})) {
+  for (const entry of group.cases) {
     Deno.test(`${group.name} > ${entry.name}`, async () => {
       await entry.run({
         maplibre,
         expect: assertions,
         cacheDirectory,
+        renderContext,
         loadPackage,
       });
     });

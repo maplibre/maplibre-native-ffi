@@ -15,6 +15,7 @@ import { nativeOf } from "../internal/private.ts";
 import type { Transport } from "../internal/transport.ts";
 import type { Map } from "../map.ts";
 import type { Maplibre } from "../maplibre.ts";
+import type { OpenGlContext } from "../render.ts";
 import type { Runtime } from "../runtime.ts";
 
 /** Assertions a case uses, which each runner maps onto its own framework. */
@@ -59,6 +60,14 @@ export interface CaseContext {
    * so the runner performs the load and the case checks what came back.
    */
   loadPackage(format: "esm" | "cjs"): Promise<typeof import("../index.ts")>;
+  /**
+   * A live graphics context to attach a render session to.
+   *
+   * Only a runner that declared `renderContext` is asked for one, so this may
+   * throw where no host context exists rather than returning something every
+   * case would have to check.
+   */
+  renderContext(): OpenGlContext;
 }
 
 export interface ConformanceCase {
@@ -79,19 +88,73 @@ export interface ConformanceCase {
    * Runtime capabilities this case needs, which not every runtime has.
    *
    * `packageResolution` means the runtime finds a module by package name.
+   * `renderContext` means the host can hand the binding a live graphics
+   * context to attach a render session to, which is a property of the host
+   * rather than of the transport: a browser has WebGL, and a bare Node process
+   * has none at all.
    * ArkTS resolves neither packages nor paths — an application reaches this
    * binding as a bundle its own build produced — so a case about how the
    * published package is laid out has nothing to look at there. This states
    * that as a property of the case rather than leaving a runner to skip a
    * failure by name.
    */
-  readonly needs?: readonly "packageResolution"[];
+  readonly needs?: readonly Capability[];
   run(context: CaseContext): Promise<void> | void;
 }
 
 export interface ConformanceGroup {
   readonly name: string;
   readonly cases: readonly ConformanceCase[];
+}
+
+/** What a runner can offer beyond the transport it loaded. */
+export type Capability = "packageResolution" | "renderContext";
+
+/**
+ * Whether a runner should register this case.
+ *
+ * Every runner asks the same question here rather than each writing its own
+ * filter, because a runner that quietly disagreed would report a smaller suite
+ * as a full pass.
+ */
+export function runsHere(
+  entry: ConformanceCase,
+  host: {
+    readonly transport: "node-api" | "wasm";
+    readonly capabilities: readonly Capability[];
+  },
+): boolean {
+  if (
+    entry.transports !== undefined &&
+    !entry.transports.includes(host.transport)
+  ) {
+    return false;
+  }
+  return (entry.needs ?? []).every((needed) =>
+    host.capabilities.includes(needed),
+  );
+}
+
+/**
+ * The groups a runner should register, with the cases it should run.
+ *
+ * A group whose every case belongs to another host is dropped rather than
+ * registered empty: an empty suite is an error in some frameworks and a silent
+ * pass in others, and neither is what "this host does not run these" means.
+ */
+export function groupsFor(
+  groups: readonly ConformanceGroup[],
+  host: {
+    readonly transport: "node-api" | "wasm";
+    readonly capabilities: readonly Capability[];
+  },
+): readonly { name: string; cases: readonly ConformanceCase[] }[] {
+  return groups
+    .map((group) => ({
+      name: group.name,
+      cases: group.cases.filter((entry) => runsHere(entry, host)),
+    }))
+    .filter((group) => group.cases.length > 0);
 }
 
 /** A style with no sources, so a load completes without touching the network. */

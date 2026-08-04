@@ -11,6 +11,7 @@ import {
   type Expect,
   Maplibre,
   MaplibreError,
+  groupsFor,
 } from "../src/index.ts";
 import { describe, expect, it } from "vitest";
 
@@ -35,6 +36,16 @@ async function cacheDirectory(): Promise<string> {
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
   return mkdtemp(join(tmpdir(), "maplibre-conformance-"));
+}
+
+/**
+ * No graphics context exists here.
+ *
+ * A case that needs one names the capability and this runner leaves it out, so
+ * reaching this is a registration mistake rather than something to work around.
+ */
+function renderContext(): never {
+  throw new Error("this runtime has no graphics context to render through");
 }
 
 const assertions: Expect = {
@@ -89,18 +100,26 @@ const assertions: Expect = {
 /** What this runner loads, so a case restricted to another one is skipped. */
 const TRANSPORT = "node-api";
 
-for (const group of CONFORMANCE) {
+/**
+ * What this runner can offer beyond the transport.
+ *
+ * No graphics context exists here, so the render-session cases are left to a
+ * host that has one.
+ */
+const CAPABILITIES = ["packageResolution"] as const;
+
+for (const group of groupsFor(CONFORMANCE, {
+  transport: TRANSPORT,
+  capabilities: CAPABILITIES,
+})) {
   describe(group.name, () => {
-    const cases = group.cases.filter(
-      (entry) =>
-        entry.transports === undefined || entry.transports.includes(TRANSPORT),
-    );
-    for (const entry of cases) {
+    for (const entry of group.cases) {
       it(entry.name, async () => {
         await entry.run({
           maplibre,
           expect: assertions,
           cacheDirectory,
+          renderContext,
           loadPackage,
         });
       });

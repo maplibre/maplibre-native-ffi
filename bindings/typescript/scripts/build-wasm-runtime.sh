@@ -89,7 +89,7 @@ mkdir -p "$package"
   -sOFFSCREENCANVAS_SUPPORT=1 \
   -sWASM_BIGINT=1 \
   -sEXPORTED_FUNCTIONS="$exported_functions" \
-  -sEXPORTED_RUNTIME_METHODS='["UTF8ToString","HEAPU8","FS"]' \
+  -sEXPORTED_RUNTIME_METHODS='["UTF8ToString","HEAPU8","FS","GL"]' \
   "${@:2}"
 
 target="${preset%-*}"
