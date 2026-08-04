@@ -170,6 +170,46 @@ internal object Dispatcher {
     }
   }
 
+  /**
+   * Places one of the module's own entry points on the owner thread.
+   *
+   * [call] goes through the generated table, and that table carries the C API and nothing else. A
+   * browser module entry point is not in it and still has to run where the runtime lives — a WebGL
+   * context belongs to the thread that created it, and this is that thread. So [submit] is handed
+   * the dispatcher and a token and calls the module export itself, while everything around it is
+   * what [call] already does: one outstanding call, a promise parked on until the token comes back,
+   * and the drain that resolves it.
+   *
+   * Whatever storage [submit] hands native is the caller's, and the rule [call] states applies to
+   * it unchanged: the owner thread writes it, so nothing may read or release it until this returns.
+   */
+  fun submitTask(name: String, submit: (dispatcher: Int, token: Int) -> Boolean) {
+    // Same reasoning as in [call]: a callback frame was entered from native, so it is not a
+    // promising stack and cannot park, and it runs while a scope may already be parked.
+    if (CallbackScope.isInside()) {
+      throw Status.invalidState(
+        "$name cannot be called from inside a MapLibre callback. Hand the work back to the " +
+          "thread that owns the runtime and call it there."
+      )
+    }
+    val dispatcher = require()
+    val token = nextToken++
+    if (nextToken == TOKEN_WRAP) nextToken = 1
+    beginWait(token)
+    startDraining()
+    if (!submit(dispatcher, token)) {
+      resolveCall(token, 0)
+      awaitCall(token)
+      throw Status.invalidState(
+        "The MapLibre Native browser module refused a call to $name; too many calls are " +
+          "already outstanding, or its owner thread is stopping."
+      )
+    }
+    // A task has no index and no slot count, so nothing about it can be rejected the way a table
+    // call can be; the completion is only what says the owner thread has finished writing.
+    awaitCall(token)
+  }
+
   private fun startDraining() {
     if (draining) return
     draining = true

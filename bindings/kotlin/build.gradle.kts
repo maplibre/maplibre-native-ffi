@@ -2,6 +2,7 @@ import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
@@ -32,6 +33,23 @@ val checkedInJextractSources = layout.projectDirectory.dir("src/jvmMain/generate
 // Struct offsets the browser binding writes descriptors at. Checked in like the jextract output,
 // and regenerated from the browser ABI manifest rather than hand-maintained.
 val checkedInWasmLayoutSources = layout.projectDirectory.dir("src/wasmJsMain/generated")
+// The prelinked Emscripten module the browser binding drives, which the browser build leaves beside
+// its wasm and its ABI manifest. Named by a property the way the host native install is, because
+// the browser target has no install step to read it from.
+val browserModuleSourceDir =
+  providers
+    .gradleProperty("maplibre.browser.moduleDir")
+    .map(rootProject::file)
+    .orElse(rootProject.layout.buildDirectory.dir("browser-module-unconfigured").map { it.asFile })
+val browserModuleConfigured = providers.gradleProperty("maplibre.browser.moduleDir").isPresent
+// The three files the wasmJs test page serves. Collected into a directory of their own so the test
+// harness serves the module and nothing else out of the browser build tree.
+val packagedBrowserModule = layout.buildDirectory.dir("wasmJsBrowserModule")
+val testBrowserPath =
+  providers
+    .environmentVariable("MLN_FFI_TEST_BROWSER")
+    .orElse(providers.environmentVariable("CHROME_PATH"))
+    .orElse(providers.environmentVariable("CHROME_BIN"))
 val packagedAndroidBindingLibs = layout.buildDirectory.dir("generated/jniLibs/androidMain")
 val generatedJavaCppSources =
   layout.buildDirectory.dir("generated/sources/javacpp/androidMain/java")
@@ -51,7 +69,16 @@ kotlin {
   // repeated on every declaration that reaches native.
   @OptIn(ExperimentalWasmDsl::class)
   wasmJs {
-    browser()
+    browser {
+      testTask {
+        // Karma serves the page, so it also sets the cross-origin isolation headers the module's
+        // pthreads need and serves the module beside the test bundle. Both live in karma.config.d,
+        // which Kotlin appends to the generated Karma configuration. Naming the launcher here is
+        // what puts karma-chrome-launcher on the harness; karma.config.d then selects a launcher of
+        // its own that carries the flags a container needs.
+        useKarma { useChromeHeadless() }
+      }
+    }
     compilerOptions {
       optIn.addAll(
         "kotlin.js.ExperimentalWasmJsInterop",
@@ -204,6 +231,38 @@ tasks.named<Test>("jvmTest") {
       .files(maplibreNativeC.loaderLibraryDirs)
       .withPropertyName("maplibreNativeCLoaderLibraryDirs")
     inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstallDir")
+  }
+}
+
+// The module, its wasm, and its ABI manifest travel together: the loader fetches the manifest
+// beside the module before it instantiates anything, and refuses a module that arrives without one.
+val packageBrowserModule =
+  tasks.register<Sync>("packageBrowserModule") {
+    group = "build"
+    description = "Collects the prelinked Emscripten module that the wasmJs browser tests load."
+    from(browserModuleSourceDir) {
+      include("maplibre_native_c.mjs", "maplibre_native_c.wasm", "maplibre_native_c-abi.json")
+    }
+    into(packagedBrowserModule)
+  }
+
+tasks.named<KotlinJsTest>("wasmJsBrowserTest") {
+  dependsOn(packageBrowserModule)
+  inputs.dir(packagedBrowserModule).withPropertyName("browserModule")
+  // Read by karma.config.d, which serves this directory to the test page. Karma runs as its own
+  // process, so a Gradle-side path reaches it through the environment rather than through a
+  // property.
+  environment["MLN_FFI_BROWSER_MODULE_DIR"] = packagedBrowserModule.get().asFile.path
+  // The same variables the C API browser runner honours, so one host setting names one browser for
+  // every browser suite in the repository.
+  testBrowserPath.orNull?.let { environment["CHROME_BIN"] = it }
+  val moduleConfigured = browserModuleConfigured
+  doFirst {
+    check(moduleConfigured) {
+      "The wasmJs browser tests drive the prelinked Emscripten module. Build it with " +
+        "`mise run build emscripten-wasm32-webgl` and name it with " +
+        "-Pmaplibre.browser.moduleDir=build/emscripten-wasm32-webgl/browser."
+    }
   }
 }
 

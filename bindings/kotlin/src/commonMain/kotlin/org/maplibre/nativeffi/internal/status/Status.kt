@@ -4,6 +4,7 @@ import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.error.UnsupportedFeatureException
 
 /** Converts C ABI status values to Kotlin exceptions. */
 internal object Status {
@@ -51,6 +52,17 @@ internal object Status {
   inline fun requireArgument(condition: Boolean, diagnostic: () -> String) {
     if (!condition) throw invalidArgument(diagnostic())
   }
+
+  /**
+   * Creates a binding-owned unsupported error without reaching native for a diagnostic.
+   *
+   * Some inputs are shaped by the common API but meaningful on only one platform: a WebGL context
+   * names an entry in the browser module's own table, and no desktop or mobile target has that
+   * table to look it up in. The binding refuses those here rather than passing them down, because
+   * what native would receive is a well-formed descriptor naming something that does not exist.
+   */
+  fun unsupported(diagnostic: String): UnsupportedFeatureException =
+    UnsupportedFeatureException(MaplibreStatus.UNSUPPORTED.nativeCode, diagnostic)
 
   /** Creates the binding-owned error for closing a callback owner from inside its callback. */
   fun callbackReentry(typeName: String): InvalidStateException =

@@ -22,12 +22,30 @@
 // The host never blocks. It submits, drains the ring on whatever cadence it
 // already runs, and parks its caller in between with its own mechanism -- for a
 // Kotlin/Wasm host, a JavaScript promise resolved when the token comes back.
+//
+// **The thread is created with no canvas transferred to it.** Emscripten hands
+// an OffscreenCanvas to a thread only at `pthread_create`, through
+// `emscripten_pthread_attr_settransferredcanvases`, and this thread is the one
+// that renders -- so that is the one moment where a page canvas could have been
+// given to it. It is deliberately not: the canvas would have to be chosen
+// before the first call, by a host that may not have one, for a build whose
+// only render targets are texture targets, which draw into a framebuffer of
+// their own and never present to a default framebuffer. `webgl_context.c`
+// creates a private OffscreenCanvas on this thread instead, and the pixels
+// leave through texture readback. A build that gains a surface session would
+// revisit this, and it would have to be here.
+//
+// Placing module-local work on this thread is what `submit_task` below is for;
+// creating a WebGL context is the first such caller, because a context belongs
+// to the thread that created it.
 
 #include <pthread.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+#include "browser/dispatcher.h"
 
 #include "browser/dispatch_table.h"
 #include "maplibre_native_c/base.h"
@@ -42,6 +60,11 @@ typedef struct mln_browser_call {
   const mln_browser_slot* slots;
   uint32_t slot_count;
   mln_browser_slot* result;
+  // Set for a module-local task and null for a table call, which is what the
+  // owner thread branches on. A task carries its own argument and reports no
+  // status, so the three fields above are unused when it is set.
+  mln_browser_dispatcher_task task;
+  void* task_argument;
   uint32_t token;
   struct mln_browser_call* next;
 } mln_browser_call;
@@ -104,9 +127,19 @@ static void* mln_browser_dispatcher_main(void* argument) {
     }
     pthread_mutex_unlock(&dispatcher->mutex);
 
-    const bool ok = mln_browser_invoke_here(
-      call->index, call->slots, call->slot_count, call->result
-    );
+    // A module-local task always runs: there is no index to reject and no slot
+    // count to check, because the caller is this module rather than a host
+    // packing a buffer by hand. It reports its own outcome through whatever
+    // storage it was given, the same way a table call's status reaches the
+    // result slot.
+    bool ok = true;
+    if (call->task != NULL) {
+      call->task(call->task_argument);
+    } else {
+      ok = mln_browser_invoke_here(
+        call->index, call->slots, call->slot_count, call->result
+      );
+    }
     const uint32_t token = call->token;
     free(call);
 
@@ -121,6 +154,36 @@ static void* mln_browser_dispatcher_main(void* argument) {
     dispatcher->completed_size++;
     pthread_mutex_unlock(&dispatcher->mutex);
   }
+}
+
+// Takes ownership of `call` and queues it, or refuses and releases it. Shared
+// by both submission paths so that the capacity bound, the publication order,
+// and the wake are stated once: a second copy would be a second place for the
+// accounting that keeps a completion slot reserved to drift.
+static bool mln_browser_dispatcher_enqueue(
+  mln_browser_dispatcher* dispatcher, mln_browser_call* call
+) {
+  pthread_mutex_lock(&dispatcher->mutex);
+  if (
+    dispatcher->stopping ||
+    dispatcher->outstanding == MLN_BROWSER_COMPLETION_CAPACITY
+  ) {
+    pthread_mutex_unlock(&dispatcher->mutex);
+    free(call);
+    return false;
+  }
+  dispatcher->outstanding++;
+  // Published before the wake, so an owner that wakes, finds the queue, and
+  // re-checks always sees this call rather than parking again beside it.
+  if (dispatcher->tail == NULL) {
+    dispatcher->head = call;
+  } else {
+    dispatcher->tail->next = call;
+  }
+  dispatcher->tail = call;
+  pthread_cond_signal(&dispatcher->ready);
+  pthread_mutex_unlock(&dispatcher->mutex);
+  return true;
 }
 
 /**
@@ -217,28 +280,44 @@ MLN_API bool mln_browser_dispatcher_submit(
   call->slot_count = slot_count;
   call->result = result;
   call->token = token;
+  return mln_browser_dispatcher_enqueue(dispatcher, call);
+}
 
-  pthread_mutex_lock(&dispatcher->mutex);
-  if (
-    dispatcher->stopping ||
-    dispatcher->outstanding == MLN_BROWSER_COMPLETION_CAPACITY
-  ) {
-    pthread_mutex_unlock(&dispatcher->mutex);
-    free(call);
+/**
+ * Places one module-local task on the dispatcher's thread.
+ *
+ * `task` is a function in this module rather than a host function pointer, and
+ * `argument` is whatever it needs; both are opaque here. Everything else works
+ * exactly as mln_browser_dispatcher_submit() does -- the same capacity bound,
+ * the same token rules, and the same completion the host collects with
+ * mln_browser_dispatcher_take_completion(), which reports true because a task
+ * has no index or slot count that could be rejected.
+ *
+ * This exists because some of what the owner thread owns is not reachable
+ * through the generated call table. A WebGL context belongs to the thread that
+ * created it, so a context this thread renders through has to be created here,
+ * and no C API entry point creates one.
+ *
+ * **The task's own storage follows the same rule the slots do.** It is written
+ * on this thread, so nothing may read or release it until the completion for
+ * `token` arrives. Returns false under the same conditions submit does, and
+ * nothing runs and no completion follows.
+ */
+MLN_API bool mln_browser_dispatcher_submit_task(
+  mln_browser_dispatcher* dispatcher, mln_browser_dispatcher_task task,
+  void* argument, uint32_t token
+) MLN_NOEXCEPT {
+  if (dispatcher == NULL || task == NULL) {
     return false;
   }
-  dispatcher->outstanding++;
-  // Published before the wake, so an owner that wakes, finds the queue, and
-  // re-checks always sees this call rather than parking again beside it.
-  if (dispatcher->tail == NULL) {
-    dispatcher->head = call;
-  } else {
-    dispatcher->tail->next = call;
+  mln_browser_call* call = calloc(1, sizeof(*call));
+  if (call == NULL) {
+    return false;
   }
-  dispatcher->tail = call;
-  pthread_cond_signal(&dispatcher->ready);
-  pthread_mutex_unlock(&dispatcher->mutex);
-  return true;
+  call->task = task;
+  call->task_argument = argument;
+  call->token = token;
+  return mln_browser_dispatcher_enqueue(dispatcher, call);
 }
 
 /**

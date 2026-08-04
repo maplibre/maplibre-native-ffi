@@ -95,7 +95,12 @@ private external fun instance(): MaplibreNativeCModule?
               'built as a browser module this binding can drive')
           }
         }
-        return import(url)
+        // webpackIgnore keeps a bundler's hands off this. The module is fetched from wherever the
+        // host deployed it, at a URL only known at run time, so a bundler that treats this as a
+        // build-time dependency rewrites it to its own resolver and the load fails with the URL
+        // reported as a missing module. Kotlin's own wasmJs browser toolchain runs webpack, so
+        // this affects every host, not just this repository's tests.
+        return import(/* webpackIgnore: true */ url)
       })
       .then((factory) => factory.default({ locateFile: (path) => new URL(path, url).href }))
       .then((module) => {
@@ -225,11 +230,21 @@ internal object BrowserModule {
       "_mln_browser_dispatcher_submit",
       "_mln_browser_dispatcher_take_completion",
       "_mln_browser_dispatcher_stop",
+      // The WebGL contexts a render target draws through, which have to be created on that same
+      // owner thread because a context belongs to the thread that made it.
+      "_mln_browser_webgl_context_create",
+      "_mln_browser_webgl_context_destroy",
       // The log queue.
       "_mln_browser_log_install",
       "_mln_browser_log_take_since",
       "_mln_browser_log_mark",
       "_mln_browser_log_take_dropped",
+      // The synchronous callbacks native invokes from its own threads, which reach the page
+      // through the module rather than through a trampoline a worker cannot call.
+      "_mln_browser_sync_provider_install",
+      "_mln_browser_sync_provider_thunk",
+      "_mln_browser_sync_transform_install",
+      "_mln_browser_sync_transform_thunk",
       // Entry points this binding calls directly rather than through the table,
       // because they touch no runtime state and so have no owner thread to reach.
       "_mln_thread_last_error_message",
@@ -259,5 +274,10 @@ internal object BrowserModule {
       "UTF8ToString",
       "stringToUTF8",
       "lengthBytesUTF8",
+      // Installing a host callback puts a trampoline into the module's function table and takes it
+      // out again. Without these two, a module loads and works until the first host callback is
+      // registered, which is exactly the late, misattributed failure this list exists to prevent.
+      "addFunction",
+      "removeFunction",
     )
 }

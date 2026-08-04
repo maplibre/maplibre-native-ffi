@@ -135,6 +135,23 @@ esac
   ":bindings:kotlin:${kotlin_target}Test"
 '''
 
+[tasks.wasmJsTest]
+description = "Run the Kotlin browser binding tests in headless Chromium."
+depends = [{ task = "//:build", args = ["emscripten-wasm32-webgl"] }]
+dir = "../.."
+# The browser target has no install step, so the tests are pointed at the browser build's own output
+# directory, where the module sits beside its wasm and its ABI manifest.
+#
+# Kotlin resolves its Karma tooling with Yarn 1 by default, which refuses to run under a checkout
+# whose package.json names another package manager. This repository's does, so the wasm test
+# tooling is resolved with npm instead.
+run = '''
+./gradlew \
+  -Pkotlin.js.yarn=false \
+  -Pmaplibre.browser.moduleDir=build/emscripten-wasm32-webgl/browser \
+  :bindings:kotlin:wasmJsBrowserTest
+'''
+
 [tasks.iosBuild]
 description = "Build the Kotlin binding and embedded Metal runtime for an iOS target."
 usage = '''

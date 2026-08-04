@@ -51,6 +51,7 @@ shared = [
   "!gradle.properties",
   "!gradlew",
   "!gradlew.bat",
+  "!kotlin-js-store/**",
   "!package.json",
   "!pnpm-lock.yaml",
   "!pnpm-workspace.yaml",
@@ -106,6 +107,10 @@ paths = [
   "gradle.properties",
   "gradlew",
   "gradlew.bat",
+  # The Kotlin Gradle plugin pins the npm tooling its wasmJs browser tests run
+  # under, and writes the lock file to this directory at the repository root
+  # rather than beside the module it belongs to.
+  "kotlin-js-store/**",
 ]
 
 [components.python]

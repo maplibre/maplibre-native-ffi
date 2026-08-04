@@ -59,6 +59,16 @@ private external fun runPromising(): Promise<JsAny?>
  */
 public suspend fun <T> maplibreScope(block: () -> T): T = SuspensionGate.withGate {
   var produced: Any? = null
+  // A scope whose trampoline never ran leaves its block behind, and the next scope must not pick up
+  // that one instead of its own.
+  pendingBlock = null
+  // Calling the entry point from Kotlin is what keeps its export in the linked binary. The only
+  // other reference to it is the JavaScript string in runPromising, and dead-code elimination
+  // cannot see inside a string: without this call the export survives a build that compiles this
+  // module together with its caller, and is dropped from every build that links it as a klib --
+  // which is every host that consumes the published artifact. With no block pending the entry
+  // returns immediately and does nothing, which is what makes it usable as the reference.
+  maplibreScopeEntry()
   pendingBlock = { produced = block() }
   runPromising().awaitOrThrow()
   pendingFailure?.let {

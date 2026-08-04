@@ -106,6 +106,45 @@ already destroyed its owner-affine handles and drained its outstanding calls: a
 runtime, map, or render session can only be destroyed on the thread that owns
 it.
 
+`mln_browser_dispatcher_submit_task` places work the module itself owns on that
+thread. It takes no index and no slots, because its caller is another
+translation unit in this module rather than a host packing a buffer; everything
+else — the capacity bound, the token rules, the completion — is what
+`mln_browser_dispatcher_submit` does. Its completion always reports that the
+call was invoked, since there is no index or slot count that could be rejected.
+The WebGL entry points below are the only caller.
+
+## Creating a WebGL context
+
+A browser host has no way to make a context a render target can use. The handle
+in `mln_webgl_context_descriptor` is an index into this module's own context
+table, so a context the page created with `canvas.getContext("webgl2")` is not
+one native can look up, and a WebGL context belongs to the thread that created
+it — which for a page host is the dispatcher's thread. The module therefore
+creates contexts, on the thread that renders through them.
+
+`mln_browser_webgl_context_create` places that work on a dispatcher's thread and
+reports the handle through a host pointer it writes before the completion for
+the token arrives. That pointer follows the same rule the argument slots do: it
+stays the host's, and untouched, until then. The handle is zero when creation
+failed, which is also the value the C API refuses in a descriptor.
+`mln_browser_webgl_context_destroy` releases one the same way.
+
+`mln_browser_webgl_context_create_here` and
+`mln_browser_webgl_context_destroy_here` are the same work on the calling
+thread, for a host that already owns the thread it renders on. The affinity rule
+is the whole contract: create the context on the thread that will own the render
+session, and destroy it there, after every target that borrowed the handle is
+detached or destroyed.
+
+The context is backed by an `OffscreenCanvas` the render thread constructs, not
+by anything on the page. This build compiles texture sessions only, which draw
+into a framebuffer of their own and never present, so a canvas transferred from
+the page would display nothing. A frame reaches the page through
+`mln_texture_read_premultiplied_rgba8`, which has no owner thread of its own.
+Width and height size that backing canvas and bound nothing the map renders;
+they only have to be positive.
+
 ## Receiving log records
 
 MapLibre dispatches a log record from whichever thread produced it. A call from

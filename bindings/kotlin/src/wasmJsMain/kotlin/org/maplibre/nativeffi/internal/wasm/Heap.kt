@@ -116,6 +116,30 @@ internal value class HeapPointer(val address: Int) {
 
 internal object Heap {
   /**
+   * Refuses an address a typed-array view would not read where it was asked to.
+   *
+   * The accessors below index a view by element rather than by byte, because `HEAPF64[address >>>
+   * 3]` is one shift where a `DataView` call is a method dispatch. The shift discards the low bits,
+   * so a misaligned address does not read slowly — it reads a *different* address, and the value
+   * that comes back belongs to whatever the neighbouring field is. That failure is silent and it is
+   * not local: the descriptor still parses, and the wrong value only surfaces somewhere far from
+   * the marshaller that misplaced it.
+   *
+   * Every descriptor these accessors reach is aligned by the C ABI already, so a violation here is
+   * a marshalling bug rather than a caller's mistake. It is checked rather than assumed because the
+   * one that was found — a `size_t` packed ahead of a struct in a shared scratch block — looked
+   * correct in the code that wrote it.
+   */
+  private fun requireAligned(pointer: HeapPointer, width: Int) {
+    if (pointer.address and (width - 1) != 0) {
+      throw Status.invalidState(
+        "A $width-byte field was placed at address ${pointer.address}, which is not $width-byte " +
+          "aligned; the descriptor holding it is laid out wrongly."
+      )
+    }
+  }
+
+  /**
    * Allocates [size] zeroed bytes of Emscripten heap for the body, and frees them afterwards.
    *
    * Descriptors reach native as a pointer to bytes the caller owns, so every call that passes one
@@ -176,35 +200,58 @@ internal object Heap {
     heapStoreByte(pointer.address, value.toInt() and 0xFF)
   }
 
-  fun loadUShort(pointer: HeapPointer): Int = heapLoadUShort(pointer.address)
+  fun loadUShort(pointer: HeapPointer): Int {
+    requireAligned(pointer, 2)
+    return heapLoadUShort(pointer.address)
+  }
 
-  fun loadShort(pointer: HeapPointer): Int = heapLoadShort(pointer.address)
+  fun loadShort(pointer: HeapPointer): Int {
+    requireAligned(pointer, 2)
+    return heapLoadShort(pointer.address)
+  }
 
   fun storeShort(pointer: HeapPointer, value: Int) {
+    requireAligned(pointer, 2)
     heapStoreShort(pointer.address, value)
   }
 
-  fun loadInt(pointer: HeapPointer): Int = heapLoadInt(pointer.address)
+  fun loadInt(pointer: HeapPointer): Int {
+    requireAligned(pointer, 4)
+    return heapLoadInt(pointer.address)
+  }
 
   fun storeInt(pointer: HeapPointer, value: Int) {
+    requireAligned(pointer, 4)
     heapStoreInt(pointer.address, value)
   }
 
-  fun loadLong(pointer: HeapPointer): Long = heapLoadLong(pointer.address)
+  fun loadLong(pointer: HeapPointer): Long {
+    requireAligned(pointer, 8)
+    return heapLoadLong(pointer.address)
+  }
 
   fun storeLong(pointer: HeapPointer, value: Long) {
+    requireAligned(pointer, 8)
     heapStoreLong(pointer.address, value)
   }
 
-  fun loadFloat(pointer: HeapPointer): Float = heapLoadFloat(pointer.address)
+  fun loadFloat(pointer: HeapPointer): Float {
+    requireAligned(pointer, 4)
+    return heapLoadFloat(pointer.address)
+  }
 
   fun storeFloat(pointer: HeapPointer, value: Float) {
+    requireAligned(pointer, 4)
     heapStoreFloat(pointer.address, value)
   }
 
-  fun loadDouble(pointer: HeapPointer): Double = heapLoadDouble(pointer.address)
+  fun loadDouble(pointer: HeapPointer): Double {
+    requireAligned(pointer, 8)
+    return heapLoadDouble(pointer.address)
+  }
 
   fun storeDouble(pointer: HeapPointer, value: Double) {
+    requireAligned(pointer, 8)
     heapStoreDouble(pointer.address, value)
   }
 
