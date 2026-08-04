@@ -172,6 +172,34 @@ Both module formats come from one build, so `require()` reaches the same API.
 Installing more than one compatible payload makes `load()` ask which one to
 use, because the binding picks no runtime for you.
 
+A browser loads a WebAssembly payload instead, through its own entry point, so
+a server application never pulls WebAssembly loading in:
+
+```bash frame="terminal"
+pnpm add @maplibre/native-ffi @maplibre/native-ffi-runtime-emscripten-wasm32-opengl
+```
+
+```ts
+import { loadBrowser } from "@maplibre/native-ffi/browser";
+
+const maplibre = await loadBrowser();
+```
+
+The payload is threaded, so a page must be [cross-origin isolated][coi] or the
+browser withholds the shared memory it needs. Serve the page with:
+
+```
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+A bundled application usually serves the payload's `.mjs` and `.wasm` itself
+rather than letting the loader resolve the package. Name them with
+`loadBrowser({ moduleUrl })`; the payload exports both files as subpaths so a
+build can copy them out.
+
+[coi]: https://developer.mozilla.org/en-US/docs/Web/API/Window/crossOriginIsolated
+
 ## Go
 
 ```bash frame="terminal"

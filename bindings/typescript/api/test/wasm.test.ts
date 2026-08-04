@@ -5,43 +5,41 @@
  * pointer is differs. Running the same cases against both is what says the
  * shared layer is actually shared rather than merely written once.
  *
- * Node instantiates the same artifact a browser would. The cases avoid the
- * module's default HTTP path, which is Emscripten Fetch and so needs XHR: a
- * non-browser host serves resources through a provider instead.
+ * Node instantiates the same artifact a browser would, through the same public
+ * entry point. The cases avoid the module's default HTTP path, which is
+ * Emscripten Fetch and so needs XHR: a non-browser host serves resources
+ * through a provider instead.
  */
 
+import { instantiateWasmPayload, loadBrowser } from "../src/browser.ts";
 import {
   CONFORMANCE,
   type Expect,
-  Maplibre,
-  MaplibreError,
   groupsFor,
-} from "../src/index.ts";
-import {
-  type WasmModule,
-  wasmTransport,
-} from "../src/internal/wasm-transport.ts";
+} from "../src/conformance/index.ts";
+import { MaplibreError } from "../src/index.ts";
+import { wasmTransport } from "../src/internal/wasm-transport.ts";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const modulePath = fileURLToPath(
-  new URL("../../runtime-wasm/maplibre-native-ffi.mjs", import.meta.url),
-);
+const payloadEntry = new URL("../../runtime-wasm/index.mjs", import.meta.url)
+  .href;
 
 // The payload is built by `mise run //bindings/typescript:build-wasm`, which the
 // test task runs first. A missing payload is a build that did not happen, so it
 // fails rather than skipping.
-if (!existsSync(modulePath)) {
+if (!existsSync(fileURLToPath(payloadEntry))) {
   throw new Error(
-    `no WebAssembly payload at ${modulePath}; run //bindings/typescript:build-wasm`,
+    `no WebAssembly payload at ${payloadEntry}; run //bindings/typescript:build-wasm`,
   );
 }
 
-const createRuntime = (await import(modulePath))
-  .default as () => Promise<WasmModule>;
-const module_ = await createRuntime();
-const maplibre = Maplibre.fromTransport(wasmTransport(module_));
+// Loaded through the public browser entry point, against the staged payload
+// package rather than the module file inside it, so this exercises what a
+// consumer installs as well as what the transport does with it.
+const module_ = await instantiateWasmPayload({ moduleUrl: payloadEntry });
+const maplibre = await loadBrowser({ module: module_ });
 
 /**
  * Offline work needs a database.

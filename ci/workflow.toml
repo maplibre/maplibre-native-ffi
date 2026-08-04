@@ -16,6 +16,9 @@ typescript_payloads = [
   "windows-arm64-vulkan",
 ]
 typescript_arkts_payloads = ["ohos-arm64-egl", "ohos-arm64-vulkan"]
+# The browser payload is the WebAssembly module rather than an addon, so it is
+# packed by its own task, but it is published the same way the others are.
+typescript_wasm_payloads = ["emscripten-wasm32-webgl"]
 
 # Desktop suites run in the matching native target job and reuse its build tree.
 [[suites]]

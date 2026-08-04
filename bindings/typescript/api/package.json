@@ -15,11 +15,16 @@
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.mts",
+      "import": "./dist/browser.mjs",
+      "require": "./dist/browser.cjs"
     }
   },
   "files": ["dist"],
   "scripts": {
-    "build": "vp pack src/index.ts --format esm --format cjs",
+    "build": "vp pack src/index.ts src/browser.ts --format esm --format cjs",
     "test": "vitest run"
   },
   "devDependencies": {

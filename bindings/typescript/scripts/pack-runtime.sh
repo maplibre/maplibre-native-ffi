@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# Packs a built Node-API addon as the runtime payload package for its target.
+# Packs a built artifact as the runtime payload package for its target.
+#
+# The artifact is a Node-API addon for every target that has one and the
+# WebAssembly module for the browser, and a payload package carries it the same
+# way either way.
 #
 # `stage-runtime.sh` writes one payload into the checkout, which is what a
 # development build loads. A published payload instead has to say in its name
@@ -18,9 +22,15 @@ version="${MLN_TS_VERSION:-0.0.0}"
 # onto the backend they drive.
 target="${preset%-*}"
 case "${preset##*-}" in
-egl | wgl | glx) backend=opengl ;;
+egl | wgl | glx | webgl) backend=opengl ;;
 *) backend="${preset##*-}" ;;
 esac
+
+# Files beyond the addon, the entry, the types, and the metadata. Only the
+# WebAssembly payload has any: its module file is a second artifact, and it is
+# the payload an application has to serve itself, so it carries the instructions
+# for that.
+extra=()
 
 case "$preset" in
 ohos-*)
@@ -29,6 +39,12 @@ ohos-*)
   source_dir="$root/bindings/typescript/runtime-arkts"
   addon=maplibre-native-ffi.so
   entry=index.ets
+  ;;
+emscripten-*)
+  source_dir="$root/bindings/typescript/runtime-wasm"
+  addon=maplibre-native-ffi.wasm
+  entry=index.mjs
+  extra=(maplibre-native-ffi.mjs README.md)
   ;;
 *)
   source_dir="$root/bindings/typescript/runtime-node"
@@ -51,6 +67,9 @@ mkdir -p "$package/lib" "$out_dir/dist"
 cp "$source_dir/$addon" "$package/"
 cp "$source_dir/$entry" "$source_dir/index.d.ts" "$package/"
 cp "$source_dir/runtime.json" "$package/"
+for file in ${extra[@]+"${extra[@]}"}; do
+  cp "$source_dir/$file" "$package/"
+done
 if compgen -G "$source_dir/lib/*" >/dev/null; then
   cp "$source_dir"/lib/* "$package/lib/"
 fi
@@ -71,19 +90,28 @@ if runtime["target"] != target or runtime["backend"] != backend:
     )
 PYTHON
 
-python3 - "$package/package.json" "$name" "$version" "$entry" "$addon" <<'PYTHON'
+python3 - "$package/package.json" "$name" "$version" "$entry" "$addon" \
+  ${extra[@]+"${extra[@]}"} <<'PYTHON'
 import json
 import sys
 
 path, name, version, entry, addon = sys.argv[1:6]
+extra = sys.argv[6:]
 extension = addon.rsplit(".", 1)[1]
 # ArkTS resolves a module through its own build, so its payload names the ArkTS
 # source; every other runtime resolves through node_modules.
-exports = (
+entry_arm = (
     {"types": "./index.d.ts", "default": f"./{entry}"}
     if entry.endswith(".ets")
     else {"types": "./index.d.ts", "import": f"./{entry}"}
 )
+exports = {".": entry_arm, "./runtime.json": "./runtime.json"}
+if extension == "wasm":
+    # A bundled application copies the module and its WebAssembly into what it
+    # serves, so those two are named rather than left to a path into the
+    # installed package.
+    for file in [addon, *(name for name in extra if name.endswith(".mjs"))]:
+        exports[f"./{file}"] = f"./{file}"
 with open(path, "w") as handle:
     json.dump(
         {
@@ -94,8 +122,15 @@ with open(path, "w") as handle:
                 "Compiled MapLibre Native runtime payload for the TypeScript binding."
             ),
             "license": "BSD-2-Clause",
-            "exports": {".": exports, "./runtime.json": "./runtime.json"},
-            "files": [entry, "index.d.ts", "runtime.json", f"*.{extension}", "lib"],
+            "exports": exports,
+            "files": [
+                entry,
+                "index.d.ts",
+                "runtime.json",
+                f"*.{extension}",
+                "lib",
+                *extra,
+            ],
         },
         handle,
         indent=2,

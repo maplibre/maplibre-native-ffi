@@ -122,6 +122,13 @@ depends = [{ task = "build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = 'bindings/typescript/scripts/pack-runtime.sh "$usage_preset"'
 
+[tasks."pack:wasm"]
+description = "Pack the WebAssembly runtime payload package."
+usage = 'arg "[preset]" default="emscripten-wasm32-webgl"'
+depends = [{ task = "build-wasm", args = ["{{usage.preset}}"] }]
+dir = "../.."
+run = 'bindings/typescript/scripts/pack-runtime.sh "$usage_preset"'
+
 [tasks."pack:arkts"]
 description = "Pack the OpenHarmony runtime payload package."
 usage = 'arg "[preset]" default="ohos-arm64-vulkan"'

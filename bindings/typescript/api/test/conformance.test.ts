@@ -10,10 +10,9 @@ import { startHttpOrigin } from "../runners/http-origin.ts";
 import {
   CONFORMANCE,
   type Expect,
-  Maplibre,
-  MaplibreError,
   groupsFor,
-} from "../src/index.ts";
+} from "../src/conformance/index.ts";
+import { Maplibre, MaplibreError } from "../src/index.ts";
 import { describe, expect, it } from "vitest";
 
 const maplibre = await Maplibre.load();

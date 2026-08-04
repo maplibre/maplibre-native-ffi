@@ -261,6 +261,8 @@ def payload_task(source: dict[str, object], preset: str) -> str | None:
         return "pack"
     if preset in source.get("typescript_arkts_payloads", []):
         return "pack:arkts"
+    if preset in source.get("typescript_wasm_payloads", []):
+        return "pack:wasm"
     return None
 
 

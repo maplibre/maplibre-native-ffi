@@ -467,6 +467,15 @@ jobs:
       - run: mise run test emscripten-wasm32-webgl
       - run: mise run //bindings/typescript:test:wasm emscripten-wasm32-webgl
       - run: mise run //bindings/typescript:test:browser emscripten-wasm32-webgl
+      - run: mise run //bindings/typescript:pack:wasm emscripten-wasm32-webgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload TypeScript runtime payload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: typescript-runtime-emscripten-wasm32-webgl-${{ github.sha }}
+          path: build/packages/typescript/dist/*.tgz
+          if-no-files-found: error
 
   target-emscripten-wasm32-webgpu:
     name: target / emscripten-wasm32-webgpu

@@ -4,17 +4,13 @@
  * This package owns every public name. A runtime payload package supplies one
  * compiled artifact and the metadata describing it, and defines no MapLibre API
  * of its own.
+ *
+ * A browser loads the WebAssembly payload through `@maplibre/native-ffi/browser`
+ * instead, because package discovery and WebAssembly loading have no host in
+ * common. The conformance suite is not public API at all; a runner imports it
+ * from `src/conformance/index.ts` inside this repository.
  */
 
-export {
-  CONFORMANCE,
-  type ConformanceCase,
-  conformanceCases,
-  groupsFor,
-  runsHere,
-  type ConformanceGroup,
-  type Expect,
-} from "./conformance/index.ts";
 export {
   type AnimationOptions,
   type CameraOptions,
@@ -120,6 +116,7 @@ export {
   type VulkanContext,
   type VulkanOwnedTextureDescriptor,
   type FeatureExtensionResult,
+  type OpenGlContext,
   type OpenGlFrameHandles,
   OpenGlTextureFrame,
   type TextureImageInfo,

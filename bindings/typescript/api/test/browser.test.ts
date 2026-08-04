@@ -10,34 +10,37 @@
  */
 
 import {
+  createWebGlContext,
+  instantiateWasmPayload,
+  loadBrowser,
+  type WasmModule,
+} from "../src/browser.ts";
+import {
   CONFORMANCE,
   type Expect,
   groupsFor,
-  Maplibre,
-  MaplibreError,
-} from "../src/index.ts";
-import {
-  type WasmModule,
-  wasmTransport,
-} from "../src/internal/wasm-transport.ts";
+} from "../src/conformance/index.ts";
+import { type Maplibre, MaplibreError } from "../src/index.ts";
 import { beforeAll, describe, expect, it } from "vitest";
 
-// Served rather than imported from disk: a page fetches the payload, and
-// Emscripten finds the `.wasm` beside the `.mjs` through that URL. The URL is
-// built here rather than written as a literal, because the dev server resolves
-// a literal at transform time and refuses to hand over a script it only serves.
-// The payload is instantiated once the run has started rather than while this
-// file is being collected: a browser collects every file before running any of
-// them, so awaiting a multi-megabyte module up there stalls the whole run.
+// Loaded the way an application that serves the payload itself loads it: the
+// public entry point is handed the URL the page fetches it from, and Emscripten
+// finds the `.wasm` beside the `.mjs` through that URL. The URL is built here
+// rather than written as a literal, because the dev server resolves a literal
+// at transform time and refuses to hand over a script it only serves.
+//
+// The module is instantiated separately from the load because this runner needs
+// it for itself, for a WebGL context and for the module's filesystem. It
+// happens once the run has started rather than while this file is being
+// collected: a browser collects every file before running any of them, so
+// awaiting a multi-megabyte module up there stalls the whole run.
 let module_: WasmModule;
 let maplibre: Maplibre;
 
 beforeAll(async () => {
   const payload = new URL("/maplibre-native-ffi.mjs", import.meta.url).href;
-  const createRuntime = (await import(/* @vite-ignore */ payload))
-    .default as () => Promise<WasmModule>;
-  module_ = await createRuntime();
-  maplibre = Maplibre.fromTransport(wasmTransport(module_));
+  module_ = await instantiateWasmPayload({ moduleUrl: payload });
+  maplibre = await loadBrowser({ module: module_ });
 }, 120_000);
 
 /**
@@ -51,36 +54,19 @@ const CAPABILITIES = ["renderContext"] as const;
 /**
  * A WebGL context the module owns, made current before it is handed over.
  *
- * Emscripten numbers its contexts rather than addressing them, so this crosses
- * as a handle rather than a pointer. One context serves every case: creating
- * one per case would exhaust what a browser will give a page.
+ * Made through the public helper, because that is the only way a page can hand
+ * a context to a render session: Emscripten numbers its contexts rather than
+ * addressing them, so one this page asked the canvas for is an object the
+ * module cannot name. One context serves every case: creating one per case
+ * would exhaust what a browser will give a page.
  */
 let context: { platform: "webgl"; context: number } | undefined;
 function renderContext(): { platform: "webgl"; context: number } {
   if (context === undefined) {
-    const gl = (
-      module_ as unknown as {
-        GL: {
-          createContext(canvas: HTMLCanvasElement, attributes: object): number;
-          makeContextCurrent(handle: number): boolean;
-        };
-      }
-    ).GL;
     const canvas = document.createElement("canvas");
     canvas.width = 256;
     canvas.height = 256;
-    const handle = gl.createContext(canvas, {
-      majorVersion: 2,
-      minorVersion: 0,
-      alpha: true,
-      depth: true,
-      stencil: true,
-      antialias: false,
-    });
-    if (handle === 0 || !gl.makeContextCurrent(handle)) {
-      throw new Error("this browser gave the module no WebGL 2 context");
-    }
-    context = { platform: "webgl", context: handle };
+    context = createWebGlContext(module_, canvas);
   }
   return context;
 }
