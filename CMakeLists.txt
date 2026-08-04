@@ -68,6 +68,11 @@ mln_ffi_install_c_api_library(maplibre_native_c)
 # they never depend on the bare target name.
 add_library(maplibre_native_ffi::c ALIAS maplibre_native_c)
 
+# The browser's distributable artifact is a linked module rather than a library,
+# so it is produced here rather than by whatever consumes it.
+include(mln_ffi_browser_module)
+mln_ffi_add_browser_module(mln_ffi_browser_module maplibre_native_c)
+
 if(BUILD_TESTING AND MLN_FFI_ARTIFACT_NAME)
   include(cmake/mln_ffi_tests.cmake)
   mln_ffi_add_c_api_test()

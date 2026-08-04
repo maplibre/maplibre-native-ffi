@@ -1,0 +1,86 @@
+package org.maplibre.nativeffi
+
+import kotlin.js.JsAny
+import kotlin.js.Promise
+import kotlin.wasm.WasmExport
+import org.maplibre.nativeffi.internal.wasm.Dispatcher
+import org.maplibre.nativeffi.internal.wasm.SuspensionGate
+import org.maplibre.nativeffi.internal.wasm.awaitOrThrow
+
+/**
+ * The block a promising stack is about to run, and what it produced.
+ *
+ * A WebAssembly export takes primitives, so the block cannot be passed through one. It is handed
+ * over here instead, and the trampoline picks it up. Only one is ever in flight because
+ * [SuspensionGate] serializes scopes.
+ */
+private var pendingBlock: (() -> Unit)? = null
+private var pendingFailure: Throwable? = null
+
+/**
+ * The entry point every suspension inside a scope unwinds to.
+ *
+ * `@WasmExport` rather than `@JsExport` because this has to be a *raw* WebAssembly export for
+ * `WebAssembly.promising` to accept it, and `@JsExport`'s underlying export name is not a
+ * documented contract. The name is fixed here so the trampoline below can resolve it.
+ */
+@WasmExport("mln_maplibre_scope_entry")
+internal fun maplibreScopeEntry(): Int {
+  val block = pendingBlock ?: return 0
+  pendingBlock = null
+  return try {
+    block()
+    1
+  } catch (failure: Throwable) {
+    // Carried out rather than thrown across the promising boundary, where it would arrive as an
+    // opaque rejection with the Kotlin type lost.
+    pendingFailure = failure
+    0
+  }
+}
+
+@JsFun("() => WebAssembly.promising(wasmExports['mln_maplibre_scope_entry'])()")
+private external fun runPromising(): Promise<JsAny?>
+
+/**
+ * Runs [block] on a stack that may park on native work.
+ *
+ * This is the browser binding's one departure from the API every other platform presents, and it
+ * exists because of how the same-ness is achieved rather than in spite of it. Owner-affine calls
+ * run on a thread the module owns, and a caller waits for them by parking its own stack on a
+ * promise — a WebAssembly feature that is only legal on a stack entered through
+ * `WebAssembly.promising`. This establishes that stack.
+ *
+ * Inside, host code is identical to what it would be on JVM, Android, or Kotlin/Native: ordinary
+ * synchronous calls on ordinary handles. A map loop lives inside one scope for its whole life.
+ *
+ * Scopes are serialized. Kotlin's scoped memory allocator is module-global, so two scopes parked at
+ * once could unwind each other's allocations; a second caller waits here rather than interleaving.
+ */
+public suspend fun <T> maplibreScope(block: () -> T): T = SuspensionGate.withGate {
+  var produced: Any? = null
+  pendingBlock = { produced = block() }
+  runPromising().awaitOrThrow()
+  pendingFailure?.let {
+    pendingFailure = null
+    throw it
+  }
+  @Suppress("UNCHECKED_CAST")
+  produced as T
+}
+
+/**
+ * Stops the thread this binding's runtimes ran on.
+ *
+ * Suspending, and it takes the same gate [maplibreScope] does, because it must not run while a
+ * scope is parked. Stopping there would leave that scope waiting on a completion nothing polls for
+ * any more: its stack never resumes, its scratch is never freed, and any handle it had just created
+ * is lost with the thread that alone could destroy it.
+ *
+ * Called once, after every handle is closed. The module's own contract is destroy, then drain, then
+ * stop: a call still in flight has storage the owner thread may still be writing, and an
+ * owner-affine handle can only ever be destroyed on that thread.
+ */
+public suspend fun shutdownMaplibre() {
+  SuspensionGate.withGate { Dispatcher.stop() }
+}

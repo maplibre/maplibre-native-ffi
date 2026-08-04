@@ -8,6 +8,21 @@ description = "Regenerate the committed JVM FFM declarations with jextract."
 dir = "../.."
 run = "./gradlew :bindings:kotlin:generateJvmJextractBindings --rerun-tasks"
 
+[tasks.generate-wasm]
+description = "Regenerate the committed browser struct offsets from the browser ABI manifest."
+dir = "../.."
+# The manifest is produced by the browser build, which measures offsets with the
+# pinned Emscripten clang and reads each signature out of the module it just
+# linked. Regenerating from anything else would put a digest in the committed
+# file that no shipped module carries, and the loader would reject every module.
+run = '''
+set -euo pipefail
+mise run build emscripten-wasm32-webgl
+python3 scripts/generate-wasm-struct-layouts.py \\
+  build/emscripten-wasm32-webgl/browser/maplibre_native_c-abi.json \\
+  bindings/kotlin/src/wasmJsMain/generated/org/maplibre/nativeffi/internal/wasm/generated/StructLayouts.kt
+'''
+
 [tasks.api]
 description = "Generate Dokka HTML API reference for the Kotlin binding."
 dir = "../.."

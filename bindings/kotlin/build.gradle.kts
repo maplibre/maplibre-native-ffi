@@ -1,4 +1,5 @@
 import org.gradle.api.tasks.testing.Test
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
@@ -28,6 +29,9 @@ val androidTargets =
     providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS)
   )
 val checkedInJextractSources = layout.projectDirectory.dir("src/jvmMain/generated")
+// Struct offsets the browser binding writes descriptors at. Checked in like the jextract output,
+// and regenerated from the browser ABI manifest rather than hand-maintained.
+val checkedInWasmLayoutSources = layout.projectDirectory.dir("src/wasmJsMain/generated")
 val packagedAndroidBindingLibs = layout.buildDirectory.dir("generated/jniLibs/androidMain")
 val generatedJavaCppSources =
   layout.buildDirectory.dir("generated/sources/javacpp/androidMain/java")
@@ -40,6 +44,22 @@ kotlin {
   iosSimulatorArm64()
   linuxX64()
   macosArm64()
+
+  // The browser binding calls a prelinked Emscripten module through JavaScript rather than a
+  // shared library, and keeps the common synchronous API by parking a Kotlin stack on a promise.
+  // Both mechanisms are experimental in Kotlin 2.4, so the opt-ins are target-wide rather than
+  // repeated on every declaration that reaches native.
+  @OptIn(ExperimentalWasmDsl::class)
+  wasmJs {
+    browser()
+    compilerOptions {
+      optIn.addAll(
+        "kotlin.js.ExperimentalWasmJsInterop",
+        "kotlin.wasm.ExperimentalWasmInterop",
+        "kotlin.wasm.unsafe.UnsafeWasmMemoryApi",
+      )
+    }
+  }
 
   jvmToolchain(libs.versions.java.toolchain.get().toInt())
 
@@ -92,6 +112,8 @@ kotlin {
   sourceSets {
     androidMain { dependencies { implementation(libs.javacpp) } }
 
+    wasmJsMain { kotlin.srcDir(checkedInWasmLayoutSources) }
+
     commonTest.dependencies { implementation(kotlin("test")) }
   }
 }
@@ -118,6 +140,7 @@ canonicalizeKmpRootMetadata(
       "jvm" to "$mavenArtifact-jvm",
       "linuxX64" to "$mavenArtifact-linuxx64",
       "macosArm64" to "$mavenArtifact-macosarm64",
+      "wasmJs" to "$mavenArtifact-wasm-js",
     ),
 )
 

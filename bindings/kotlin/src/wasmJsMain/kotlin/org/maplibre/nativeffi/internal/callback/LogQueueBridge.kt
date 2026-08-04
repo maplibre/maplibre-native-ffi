@@ -1,0 +1,211 @@
+package org.maplibre.nativeffi.internal.callback
+
+import org.maplibre.nativeffi.internal.wasm.BrowserModule
+import org.maplibre.nativeffi.internal.wasm.CallbackScope
+import org.maplibre.nativeffi.internal.wasm.HeapPointer
+import org.maplibre.nativeffi.internal.wasm.generated.MlnAdapterLogRecord
+import org.maplibre.nativeffi.log.LogCallback
+import org.maplibre.nativeffi.log.LogEvent
+import org.maplibre.nativeffi.log.LogRecord
+import org.maplibre.nativeffi.log.LogSeverity
+
+@JsFun("(consume) => globalThis.__maplibreNativeC._mln_browser_log_install(consume)")
+private external fun installQueue(consume: Int): Int
+
+@JsFun("(mark) => globalThis.__maplibreNativeC._mln_browser_log_take_since(mark)")
+private external fun takeRecord(mark: Long): Int
+
+@JsFun("() => globalThis.__maplibreNativeC._mln_browser_log_mark()")
+private external fun currentMark(): Long
+
+// `uint64_t`, which the module exports as an i64 and so reaches JavaScript as a BigInt under
+// `-sWASM_BIGINT`. Declared as Long for that reason: reading it as a Double would throw on the
+// first drain, before any record had been delivered.
+@JsFun("() => globalThis.__maplibreNativeC._mln_browser_log_take_dropped()")
+private external fun takeDropped(): Long
+
+@JsFun("(address) => globalThis.__maplibreNativeC._mln_adapter_log_record_destroy(address)")
+private external fun destroyRecord(address: Int)
+
+@JsFun("(address) => globalThis.__maplibreNativeC.UTF8ToString(address)")
+private external fun readString(address: Int): String
+
+@JsFun("(drain) => globalThis.setTimeout(drain, 0)")
+private external fun scheduleDrain(drain: () -> Unit)
+
+/**
+ * One host callback's registration with the browser log queue.
+ *
+ * This holds only the Kotlin side. The queue is registered with native once, by [LogQueueDrain],
+ * and stays registered while any callback is installed -- which is what makes replacement work.
+ * `mln_adapter_log_record_listener` takes no user data while the adapter treats the state address
+ * as registration identity, so a binding that re-registered per callback could not tell the adapter
+ * anything had changed. Registering once sidesteps that: there is only ever one registration, and
+ * which Kotlin callback receives its records is this binding's own business.
+ */
+internal class LogQueueBridge(private val callback: LogCallback) : AutoCloseable {
+  private val gate = CallbackGate("LogCallback")
+
+  /** Delivers [record] unless this registration has been replaced or cleared. */
+  fun deliver(record: LogRecord) {
+    val lease = gate.enter() ?: return
+    try {
+      // Contained: a callback failure must not stop the drain, and there is no native frame above
+      // this to unwind into. Marked as callback scope so anything it calls that would dispatch to
+      // the owner thread reports that rather than trapping on an illegal suspension.
+      runCatching { CallbackScope.inside { callback.log(record) } }
+    } finally {
+      lease.close()
+    }
+  }
+
+  fun checkCanClose() = gate.checkCanClose()
+
+  override fun close() = gate.close()
+}
+
+/**
+ * Drains the native log queue onto a browser task.
+ *
+ * Logging is process-global and has no runtime to pump, so nothing in the C API's model says when
+ * this should run. It runs as its own task instead: draining inside a runtime pump would stop
+ * logging exactly when a host most wants it -- during startup, and during teardown after the last
+ * pump.
+ *
+ * A macrotask rather than a microtask, and bounded per turn, so a logging burst cannot starve
+ * rendering. It never suspends and never takes the module-wide suspension gate, so it can run while
+ * a `maplibreScope` is parked: the parked stack cannot resume until this task returns, which makes
+ * any allocator scope opened here properly nested inside it.
+ *
+ * **Stated limitation.** [LogCallback.log] returns whether the callback consumed the record, but a
+ * browser host cannot answer that: MapLibre needs the decision on the logging thread, before the
+ * record has reached the page. The registration reports a fixed "not consumed", so native logging
+ * behaves exactly as it would with no callback installed, and a Kotlin callback observes records
+ * without being able to suppress them. Its return value is ignored. That is the browser's choice,
+ * not the API's, and whether the common contract should change is open.
+ */
+internal object LogQueueDrain {
+  // The native registration is made once and never withdrawn, because the adapter's listener takes
+  // no user data and so a withdrawal cannot be attributed to the registration that is retiring.
+  // Every attempt to reconstruct that ordering had a race. Registering for the module's lifetime
+  // removes the question: native never sees a change, and which Kotlin callback receives a record
+  // is decided when the record is delivered, where it can be decided exactly.
+  private const val NOT_CONSUMED = 0
+  private const val BATCH = 64
+
+  private var installed = false
+  private var running = false
+
+  // Records enqueued before this are not this callback's. Taken when a callback is installed and
+  // compared inside the same lock that enqueues, so there is no window in which a record produced
+  // while nobody was listening can be delivered to whoever listens next -- which flushing at the
+  // right moments could only ever narrow, not close.
+  private var mark = 0L
+
+  // Where the current callback comes from. The registry already owns which one is installed --
+  // it swaps on replacement without re-installing -- so holding a second copy here would go stale
+  // the first time a host replaced its callback, and every record after that would reach a closed
+  // bridge instead of the new one.
+  private var registry: (() -> LogQueueBridge?)? = null
+
+  /**
+   * How many records the queue dropped because the host did not drain them.
+   *
+   * Reported as its own count rather than as a synthesized log record: a fabricated
+   * `WARNING`/`GENERAL` would be indistinguishable from one MapLibre produced, and a host that
+   * persists its telemetry would file this binding's delivery loss as native output.
+   */
+  var droppedRecords: Long = 0L
+    private set
+
+  /**
+   * Begins a callback's era: registers with native on first use, takes a fresh mark, and starts the
+   * drain.
+   *
+   * Called for **every** installation, not only the first. The native registration is for the
+   * module's lifetime -- see the note on this object -- but the mark is not: it is what says which
+   * records belong to the callback being installed, so a replacement that reused the previous mark
+   * would inherit its predecessor's queued records.
+   *
+   * The mark is taken before the caller publishes the new callback, so a record enqueued during the
+   * swap belongs to the callback being installed rather than to the one it replaces.
+   *
+   * Which callback receives records is [source]'s answer, read afresh on every record, so replacing
+   * or clearing takes effect immediately and without telling native anything.
+   */
+  fun beginEra(source: () -> LogQueueBridge?): Int {
+    BrowserModule.require()
+    registry = source
+    if (!installed) {
+      val status = installQueue(NOT_CONSUMED)
+      if (status != 0) return status
+      installed = true
+    }
+    // Everything already queued belongs to a period this callback was not listening for.
+    mark = currentMark()
+    if (!running) {
+      running = true
+      scheduleDrain(::drainTurn)
+    }
+    return 0
+  }
+
+  /**
+   * Stops delivering to a Kotlin callback.
+   *
+   * Native stays registered, so the drain keeps running and keeps releasing records; they simply
+   * reach no one. Unregistering would be the tidier thing and is not safe to do -- see the note on
+   * this object.
+   */
+  fun clear(): Int {
+    BrowserModule.require()
+    // The drain stops on its next turn once it finds no callback. The ring is bounded and native
+    // keeps evicting into its dropped count, so a stopped drain cannot grow memory.
+    return 0
+  }
+
+  private fun drainTurn() {
+    if (registry?.invoke() == null) {
+      // Nothing is listening, so the task parks however busy native happens to be -- a condition
+      // that also counted records would keep waking the page forever under a steady log rate. The
+      // backlog is left where it is: the next install takes a mark past it, so it can neither be
+      // delivered late nor grow beyond the bounded ring.
+      droppedRecords += takeDropped()
+      running = false
+      return
+    }
+    var delivered = 0
+    var address = takeRecord(mark)
+    while (address != 0) {
+      deliver(HeapPointer(address))
+      delivered++
+      if (delivered == BATCH) break
+      address = takeRecord(mark)
+    }
+    val dropped = takeDropped()
+    if (dropped > 0L) droppedRecords += dropped
+    scheduleDrain(::drainTurn)
+  }
+
+  private fun deliver(record: HeapPointer) {
+    try {
+      val bridge = registry?.invoke()
+      if (bridge == null) {
+        // Nothing is listening, so the record is released without being decoded: reading the
+        // message and building a LogRecord for no one is the cost this avoids.
+        return
+      }
+      // Copied before the record is released, which is the only window it is valid in.
+      val decoded =
+        LogRecord(
+          LogSeverity.fromNative(MlnAdapterLogRecord.severity(record)),
+          LogEvent.fromNative(MlnAdapterLogRecord.event(record)),
+          MlnAdapterLogRecord.code(record),
+          readString(MlnAdapterLogRecord.message(record).address),
+        )
+      bridge.deliver(decoded)
+    } finally {
+      destroyRecord(record.address)
+    }
+  }
+}
