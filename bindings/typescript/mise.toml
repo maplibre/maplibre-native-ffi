@@ -51,7 +51,7 @@ description = "Run the conformance suite over the WebAssembly transport."
 usage = 'arg "[preset]" default="emscripten-wasm32-webgl"'
 depends = [{ task = "build-wasm", args = ["{{usage.preset}}"] }, "build"]
 dir = "../.."
-run = 'cd bindings/typescript/api && pnpm exec vitest run test/wasm.test.ts'
+run = 'cd bindings/typescript/api && pnpm exec vitest run --config vitest.wasm.config.ts'
 
 [tasks.build-wasm]
 description = "Link the WebAssembly runtime payload."
