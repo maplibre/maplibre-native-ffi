@@ -205,9 +205,11 @@ auto makeResponse(const Resource& resource, emscripten_fetch_t* fetch)
 //
 // This thread exists to have an event loop. Its entry takes a runtime keepalive
 // and returns, which leaves the worker alive servicing JavaScript, and work
-// reaches it through the proxying queue. Responses travel back through
-// util::AsyncTask, which wakes a parked run loop through a condition variable
-// and so needs no event loop on the receiving side.
+// reaches it through the proxying queue. The first request queue starts the
+// worker and the last one releases its keepalive, so a host that destroys all
+// browser HTTP sources does not retain a worker forever. Responses travel back
+// through util::AsyncTask, which wakes a parked run loop through a condition
+// variable and so needs no event loop on the receiving side.
 //
 // A thread of its own rather than the main runtime thread, which a host is free
 // to block: nothing here should depend on how a host drives the runtime.
@@ -218,9 +220,45 @@ class TransportThread {
     return thread;
   }
 
+  void acquire() {
+    std::scoped_lock lock(mutex_);
+    users_ += 1;
+    if (users_ != 1) {
+      return;
+    }
+    started_ = pthread_create(&thread_, nullptr, &live, nullptr) == 0;
+    if (started_) {
+      pthread_detach(thread_);
+    }
+  }
+
+  void release() {
+    auto thread = pthread_t{};
+    {
+      std::scoped_lock lock(mutex_);
+      if (users_ == 0) {
+        return;
+      }
+      users_ -= 1;
+      if (users_ != 0 || !started_) {
+        return;
+      }
+      thread = thread_;
+      started_ = false;
+    }
+
+    // Queue destruction means no request can enqueue more transport work. A
+    // stop proxy therefore runs after everything already queued and drops the
+    // keepalive once that work is complete.
+    static_cast<void>(emscripten_proxy_async(
+      emscripten_proxy_get_system_queue(), thread, &stop, nullptr
+    ));
+  }
+
   // Reports false when the thread is unavailable, which leaves the caller to
   // fail the request rather than wait for a response nothing will produce.
   [[nodiscard]] auto run(std::function<void()> work) -> bool {
+    std::scoped_lock lock(mutex_);
     if (!started_) {
       return false;
     }
@@ -238,14 +276,14 @@ class TransportThread {
   }
 
  private:
-  TransportThread() {
-    started_ = pthread_create(&thread_, nullptr, &live, nullptr) == 0;
-  }
+  TransportThread() = default;
 
   static auto live(void* /*unused*/) -> void* {
     emscripten_runtime_keepalive_push();
     return nullptr;
   }
+
+  static void stop(void* /*unused*/) { emscripten_runtime_keepalive_pop(); }
 
   static void execute(void* raw) {
     const auto task = std::unique_ptr<std::function<void()>>{
@@ -254,7 +292,9 @@ class TransportThread {
     (*task)();
   }
 
+  std::mutex mutex_;
   pthread_t thread_{};
+  std::size_t users_ = 0;
   bool started_ = false;
 };
 
@@ -262,6 +302,9 @@ class FetchRequestState;
 
 class FetchRequestQueue {
  public:
+  FetchRequestQueue() { TransportThread::instance().acquire(); }
+  ~FetchRequestQueue() { TransportThread::instance().release(); }
+
   void enqueue(const std::shared_ptr<FetchRequestState>& state);
   void release(uint64_t id, const FetchRequestState* state);
 
