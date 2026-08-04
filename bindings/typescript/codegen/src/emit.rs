@@ -350,11 +350,24 @@ pub fn entrypoint_names_inc(native: &Parsed) -> String {
 ///
 /// The dispatch assigns through slot 0 for these, so a null or misaligned
 /// address has to be rejected before the store rather than trapped after it.
-pub fn result_struct_align_inc(
+pub fn result_struct_align_inc(native: &Parsed, wasm: &Parsed) -> String {
+    let mut text = String::from(C_BANNER);
+    // A record's alignment follows the ABI, so the table does too. A native
+    // alignment applied on wasm32 would reject caller storage that target
+    // itself considers aligned.
+    text.push_str("#if UINTPTR_MAX == 0xFFFFFFFFu\n");
+    append_result_aligns(&mut text, native, &wasm.records);
+    text.push_str("#else\n");
+    append_result_aligns(&mut text, native, &native.records);
+    text.push_str("#endif\n");
+    text
+}
+
+fn append_result_aligns(
+    text: &mut String,
     native: &Parsed,
     records: &BTreeMap<String, RecordLayout>,
-) -> String {
-    let mut text = String::from(C_BANNER);
+) {
     for entrypoint in &native.entrypoints {
         let alignment = entrypoint
             .result_record
@@ -364,7 +377,6 @@ pub fn result_struct_align_inc(
             .unwrap_or(0);
         let _ = writeln!(text, "{alignment}, /* {} */", entrypoint.name);
     }
-    text
 }
 
 /// Marks which entrypoints report `mln_status`.

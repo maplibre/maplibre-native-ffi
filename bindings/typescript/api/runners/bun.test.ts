@@ -65,9 +65,16 @@ const assertions: Expect = {
   },
 };
 
+/** What this runner loads, so a case restricted to another one is skipped. */
+const TRANSPORT = "node-api";
+
 for (const group of CONFORMANCE) {
   describe(group.name, () => {
-    for (const entry of group.cases) {
+    const cases = group.cases.filter(
+      (entry) =>
+        entry.transports === undefined || entry.transports.includes(TRANSPORT),
+    );
+    for (const entry of cases) {
       it(entry.name, async () => {
         await entry.run({ maplibre, expect: assertions, cacheDirectory });
       });

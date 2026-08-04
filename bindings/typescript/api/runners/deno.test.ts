@@ -88,8 +88,15 @@ function replacer(_key: string, value: unknown): unknown {
   return typeof value === "bigint" ? value.toString() : value;
 }
 
+/** What this runner loads, so a case restricted to another one is skipped. */
+const TRANSPORT = "node-api";
+
 for (const group of CONFORMANCE) {
-  for (const entry of group.cases) {
+  const cases = group.cases.filter(
+    (entry) =>
+      entry.transports === undefined || entry.transports.includes(TRANSPORT),
+  );
+  for (const entry of cases) {
     Deno.test(`${group.name} > ${entry.name}`, async () => {
       await entry.run({ maplibre, expect: assertions, cacheDirectory });
     });

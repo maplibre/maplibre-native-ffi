@@ -10,10 +10,11 @@
  * internals — is tested beside that runtime instead.
  */
 
-import { LOGGING_GROUP, OFFLINE_GROUP } from "./callbacks.ts";
+import { LOGGING_GROUP, OFFLINE_GROUP, RESOURCES_GROUP } from "./callbacks.ts";
 import { DOMAIN_GROUPS } from "./domains.ts";
 import type { ConformanceCase, ConformanceGroup } from "./harness.ts";
 import { LIBRARY_GROUP, RUNTIME_GROUP } from "./runtime.ts";
+import { HOST_DATA_GROUP, STYLE_GROUP, VALUES_GROUP } from "./style.ts";
 
 export type {
   CaseContext,
@@ -26,7 +27,11 @@ export const CONFORMANCE: readonly ConformanceGroup[] = [
   LIBRARY_GROUP,
   RUNTIME_GROUP,
   ...DOMAIN_GROUPS,
+  STYLE_GROUP,
+  VALUES_GROUP,
+  HOST_DATA_GROUP,
   LOGGING_GROUP,
+  RESOURCES_GROUP,
   OFFLINE_GROUP,
 ];
 

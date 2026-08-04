@@ -99,7 +99,7 @@ fn run() -> Result<Vec<PathBuf>, String> {
         ),
         (
             generated.join("result_struct_align.inc"),
-            emit::result_struct_align_inc(&native, &native.records),
+            emit::result_struct_align_inc(&native, &wasm),
         ),
         (
             generated.join("fingerprint.h"),
