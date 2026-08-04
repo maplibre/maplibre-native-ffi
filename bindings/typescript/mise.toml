@@ -114,3 +114,17 @@ usage = 'arg "[preset]" default="ohos-x64-egl"'
 depends = [{ task = "build:arkts", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = 'bindings/typescript/scripts/build-arkts-test.sh "$usage_preset"'
+
+[tasks."pack"]
+description = "Pack the runtime payload package for a target."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "build", args = ["{{usage.preset}}"] }]
+dir = "../.."
+run = 'bindings/typescript/scripts/pack-runtime.sh "$usage_preset"'
+
+[tasks."pack:arkts"]
+description = "Pack the OpenHarmony runtime payload package."
+usage = 'arg "[preset]" default="ohos-arm64-vulkan"'
+depends = [{ task = "build:arkts", args = ["{{usage.preset}}"] }]
+dir = "../.."
+run = 'bindings/typescript/scripts/pack-runtime.sh "$usage_preset"'

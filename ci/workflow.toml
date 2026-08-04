@@ -1,3 +1,22 @@
+# The TypeScript binding publishes one runtime payload per target: a payload
+# carries a compiled addon, and a host can only load the one built for it. These
+# are the targets a payload is packed and uploaded for, which is also the set the
+# snapshot registry serves. OpenHarmony packs through its own cross-build.
+typescript_payloads = [
+  "linux-x64-egl",
+  "linux-x64-vulkan",
+  "linux-arm64-egl",
+  "linux-arm64-vulkan",
+  "macos-arm64-metal",
+  "macos-arm64-vulkan",
+  "macos-arm64-egl",
+  "windows-x64-wgl",
+  "windows-x64-vulkan",
+  "windows-arm64-wgl",
+  "windows-arm64-vulkan",
+]
+typescript_arkts_payloads = ["ohos-arm64-egl", "ohos-arm64-vulkan"]
+
 # Desktop suites run in the matching native target job and reuse its build tree.
 [[suites]]
 platforms = ["linux", "macos", "windows"]

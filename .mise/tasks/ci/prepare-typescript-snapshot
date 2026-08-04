@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+#MISE description="Relabel a runtime payload or generate the TypeScript snapshot registry."
+#MISE shell="bash"
+#USAGE arg "<command>" help="relabel or registry"
+#USAGE arg "<arguments>..." help="Arguments passed to ci/typescript_snapshot.py"
+set -euo pipefail
+
+read -r -a arguments <<< "${usage_arguments-}"
+exec python ci/typescript_snapshot.py "${usage_command?}" "${arguments[@]}"

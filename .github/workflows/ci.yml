@@ -143,6 +143,15 @@ jobs:
             ~/.cache/zig/p
             ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
+      - run: mise run //bindings/typescript:pack linux-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload TypeScript runtime payload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: typescript-runtime-linux-x64-egl-${{ github.sha }}
+          path: build/packages/typescript/dist/*.tgz
+          if-no-files-found: error
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -237,6 +246,15 @@ jobs:
             ~/.cache/zig/p
             ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
+      - run: mise run //bindings/typescript:pack linux-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload TypeScript runtime payload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: typescript-runtime-linux-x64-vulkan-${{ github.sha }}
+          path: build/packages/typescript/dist/*.tgz
+          if-no-files-found: error
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -323,6 +341,15 @@ jobs:
             ~/.cache/zig/p
             ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
+      - run: mise run //bindings/typescript:pack linux-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload TypeScript runtime payload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: typescript-runtime-linux-arm64-egl-${{ github.sha }}
+          path: build/packages/typescript/dist/*.tgz
+          if-no-files-found: error
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -405,6 +432,15 @@ jobs:
             ~/.cache/zig/p
             ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
+      - run: mise run //bindings/typescript:pack linux-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload TypeScript runtime payload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: typescript-runtime-linux-arm64-vulkan-${{ github.sha }}
+          path: build/packages/typescript/dist/*.tgz
+          if-no-files-found: error
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -526,6 +562,15 @@ jobs:
             ~/.cache/zig/p
             ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
+      - run: mise run //bindings/typescript:pack macos-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload TypeScript runtime payload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: typescript-runtime-macos-arm64-metal-${{ github.sha }}
+          path: build/packages/typescript/dist/*.tgz
+          if-no-files-found: error
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -607,6 +652,15 @@ jobs:
             ~/.cache/zig/p
             ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
+      - run: mise run //bindings/typescript:pack macos-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload TypeScript runtime payload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: typescript-runtime-macos-arm64-vulkan-${{ github.sha }}
+          path: build/packages/typescript/dist/*.tgz
+          if-no-files-found: error
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -685,6 +739,15 @@ jobs:
             ~/.cache/zig/p
             ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
+      - run: mise run //bindings/typescript:pack macos-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload TypeScript runtime payload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: typescript-runtime-macos-arm64-egl-${{ github.sha }}
+          path: build/packages/typescript/dist/*.tgz
+          if-no-files-found: error
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -965,6 +1028,15 @@ jobs:
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run //bindings/rust:build ohos-arm64-egl
       - run: mise run //bindings/go:build ohos-arm64-egl
+      - run: mise run //bindings/typescript:pack:arkts ohos-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload TypeScript runtime payload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: typescript-runtime-ohos-arm64-egl-${{ github.sha }}
+          path: build/packages/typescript/dist/*.tgz
+          if-no-files-found: error
 
   target-ohos-arm64-vulkan:
     name: target / ohos-arm64-vulkan
@@ -983,6 +1055,15 @@ jobs:
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run //bindings/rust:build ohos-arm64-vulkan
       - run: mise run //bindings/go:build ohos-arm64-vulkan
+      - run: mise run //bindings/typescript:pack:arkts ohos-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload TypeScript runtime payload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: typescript-runtime-ohos-arm64-vulkan-${{ github.sha }}
+          path: build/packages/typescript/dist/*.tgz
+          if-no-files-found: error
 
   target-ohos-x64-egl:
     name: target / ohos-x64-egl
@@ -1087,6 +1168,15 @@ jobs:
             ~/.cache/zig/p
             ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
+      - run: mise run //bindings/typescript:pack windows-x64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload TypeScript runtime payload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: typescript-runtime-windows-x64-wgl-${{ github.sha }}
+          path: build/packages/typescript/dist/*.tgz
+          if-no-files-found: error
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -1159,6 +1249,15 @@ jobs:
             ~/.cache/zig/p
             ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
+      - run: mise run //bindings/typescript:pack windows-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload TypeScript runtime payload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: typescript-runtime-windows-x64-vulkan-${{ github.sha }}
+          path: build/packages/typescript/dist/*.tgz
+          if-no-files-found: error
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -1213,6 +1312,15 @@ jobs:
       - run: mise run //bindings/dart:build windows-arm64-wgl
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/typescript:pack windows-arm64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload TypeScript runtime payload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: typescript-runtime-windows-arm64-wgl-${{ github.sha }}
+          path: build/packages/typescript/dist/*.tgz
+          if-no-files-found: error
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -1266,6 +1374,15 @@ jobs:
       - run: mise run //bindings/dart:build windows-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/typescript:pack windows-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload TypeScript runtime payload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: typescript-runtime-windows-arm64-vulkan-${{ github.sha }}
+          path: build/packages/typescript/dist/*.tgz
+          if-no-files-found: error
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

@@ -19,6 +19,7 @@ on:
           - kotlin
           - python
           - dotnet
+          - typescript
           - docs
 
 permissions:
@@ -51,7 +52,9 @@ jobs:
       publish_kotlin: ${{ steps.plan.outputs.publish_kotlin }}
       publish_python: ${{ steps.plan.outputs.publish_python }}
       publish_dotnet: ${{ steps.plan.outputs.publish_dotnet }}
+      publish_typescript: ${{ steps.plan.outputs.publish_typescript }}
       publish_docs: ${{ steps.plan.outputs.publish_docs }}
+      npm_snapshot_version: ${{ steps.version.outputs.npm }}
     steps:
       # Publish this workflow's main commit after its CI run succeeds. A manual
       # dispatch can overlap CI, so wait for that run instead of selecting an
@@ -154,8 +157,11 @@ jobs:
         id: version
         run: |
           stamp="$(date -u +%Y%m%d%H%M)"
-          echo "value=0.1.0.dev$stamp" >> "$GITHUB_OUTPUT"
-          echo "dotnet=0.1.0-preview.$stamp" >> "$GITHUB_OUTPUT"
+          {
+            echo "value=0.1.0.dev$stamp"
+            echo "dotnet=0.1.0-preview.$stamp"
+            echo "npm=0.1.0-snapshot.$stamp"
+          } >> "$GITHUB_OUTPUT"
 
   stage-dotnet:
     name: .NET packages
@@ -348,12 +354,71 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  typescript-registry:
+    name: TypeScript npm registry
+    needs:
+      - plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ needs.plan.outputs.publish_typescript == 'true' }}
+    permissions:
+      actions: read
+      contents: read
+    env:
+      MISE_NO_HOOKS: "1"
+      SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
+      SNAPSHOT_VERSION: ${{ needs.plan.outputs.npm_snapshot_version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SNAPSHOT_SHA }}
+          persist-credentials: false
+      - uses: jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
+        with:
+          cache: false
+          install_args: python
+      # The payloads were built and packed by the CI run this snapshot names,
+      # so they are taken from it rather than compiled a second time on a
+      # runner that would have to be every target at once.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.plan.outputs.run_id }}
+          pattern: typescript-runtime-*-${{ env.SNAPSHOT_SHA }}
+          path: build/packages/typescript/published
+          merge-multiple: true
+      - name: Relabel the payloads to the snapshot version
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          payloads=(build/packages/typescript/published/*.tgz)
+          if [[ "${#payloads[@]}" -eq 0 ]]; then
+            echo "the CI run uploaded no runtime payloads" >&2
+            exit 1
+          fi
+          for payload in "${payloads[@]}"; do
+            mise run --no-deps ci:prepare-typescript-snapshot relabel \
+              "$payload" build/packages/typescript/snapshot "$SNAPSHOT_VERSION"
+          done
+      - run: >-
+          mise run --no-deps ci:prepare-typescript-snapshot registry
+          build/packages/typescript/snapshot build/packages/typescript/npm
+          https://maplibre.github.io/maplibre-native-ffi/npm
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: typescript-npm-registry-${{ env.SNAPSHOT_SHA }}
+          path: build/packages/typescript/npm
+          if-no-files-found: error
+          retention-days: 1
+
   docs-pages:
     name: Docs Pages
     needs:
       - plan
       - python-index
       - dotnet-feed
+      - typescript-registry
     runs-on: ubuntu-latest
     timeout-minutes: 60
     # Runs whatever became of the staging jobs. Each step below takes its
@@ -365,7 +430,8 @@ jobs:
         always() && needs.plan.result == 'success' &&
         (needs.plan.outputs.publish_docs == 'true' ||
          needs.plan.outputs.publish_python == 'true' ||
-         needs.plan.outputs.publish_dotnet == 'true')
+         needs.plan.outputs.publish_dotnet == 'true' ||
+         needs.plan.outputs.publish_typescript == 'true')
       }}
     environment: sccache
     permissions:
@@ -429,6 +495,19 @@ jobs:
           mise run --no-deps ci:prepare-dotnet-snapshot mirror
           https://maplibre.github.io/maplibre-native-ffi/nuget/
           docs/dist/nuget
+      # Keyed on the registry job rather than on the plan, for the reason the
+      # Python index above is.
+      - if: ${{ needs.typescript-registry.result == 'success' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: typescript-npm-registry-${{ env.SNAPSHOT_SHA }}
+          path: docs/dist/npm
+      # Preserve the separately gated payload registry across a docs-only deploy.
+      - if: ${{ needs.typescript-registry.result != 'success' }}
+        run: >-
+          mise run --no-deps ci:prepare-typescript-snapshot mirror
+          https://maplibre.github.io/maplibre-native-ffi/npm
+          docs/dist/npm
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: docs/dist

@@ -144,9 +144,22 @@ paths = [
   ".config/dotnet-tools.json",
 ]
 
+[components.typescript]
+description = "Per-target runtime payloads on the GitHub Pages npm registry."
+depends = ["native"]
+# The payloads carry the addon and the metadata the facade reads, and the
+# workspace roots are what their build resolves through.
+paths = [
+  "bindings/typescript/**",
+  "package.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  ".npmrc",
+]
+
 [components.docs]
 description = "Docs site on GitHub Pages."
-depends = ["kotlin", "python", "dotnet"]
+depends = ["kotlin", "python", "dotnet", "typescript"]
 # The site embeds an API reference generated from every binding, so it takes the
 # binding sources along with the ecosystem roots each doc tool builds through.
 # As the remaining bindings gain components of their own, `depends` should name
@@ -155,12 +168,7 @@ paths = [
   "bindings/dart/**",
   "bindings/go/**",
   "bindings/swift/**",
-  "bindings/typescript/**",
   "bindings/zig/**",
-  "package.json",
-  "pnpm-lock.yaml",
-  "pnpm-workspace.yaml",
-  ".npmrc",
   "Directory.Packages.props",
   "Maplibre.NativeFfi.slnx",
   ".config/dotnet-tools.json",

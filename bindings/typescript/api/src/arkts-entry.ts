@@ -9,14 +9,13 @@
 
 // Installed before anything below can encode a string.
 import "./internal/arkts-globals.ts";
-
+import type { NodeApiAddon } from "./internal/node-transport.ts";
+import { nodeApiTransport } from "./internal/node-transport.ts";
+import { Maplibre } from "./maplibre.ts";
 // The specifier is the packed library's own name, which the bundler is told to
 // leave alone and the ArkTS runtime resolves against the application's libs.
 // @ts-expect-error the ArkTS runtime resolves this, and no type describes it
 import arktsAddon from "libmaplibre-native-ffi.so";
-import type { NodeApiAddon } from "./internal/node-transport.ts";
-import { nodeApiTransport } from "./internal/node-transport.ts";
-import { Maplibre } from "./maplibre.ts";
 
 export {
   CONFORMANCE,

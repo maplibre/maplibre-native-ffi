@@ -250,6 +250,20 @@ def preset_sets(
     return configured, built, tested, packaged
 
 
+def payload_task(source: dict[str, object], preset: str) -> str | None:
+    """The task that packs this target's runtime payload, if it has one.
+
+    A payload is named for its target and render backend, so a host that
+    imports one gets the addon built for it. OpenHarmony cross-builds through
+    its own task, because the device's toolchain is not the runner's.
+    """
+    if preset in source.get("typescript_payloads", []):
+        return "pack"
+    if preset in source.get("typescript_arkts_payloads", []):
+        return "pack:arkts"
+    return None
+
+
 def target_rows(
     source: dict[str, object], presets: dict[str, object]
 ) -> list[dict[str, object]]:
@@ -270,6 +284,7 @@ def target_rows(
             "gradle": uses_gradle(native + consumers),
             "save_toolchains": row_runner not in claimed_runners,
             "native_commands": native if preset in packaged else native + consumers,
+            "payload_task": payload_task(source, preset),
         }
         claimed_runners.add(row_runner)
         if preset in packaged:

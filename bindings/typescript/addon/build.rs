@@ -11,7 +11,6 @@ use std::path::{Path, PathBuf};
 use sha2::{Digest, Sha256};
 
 fn main() {
-
     // The ArkTS runtime keeps its Node-API implementation in a shared library,
     // where Node, Bun, and Deno export those symbols from the executable that
     // loads the addon. Without this the library dlopens far enough to be found

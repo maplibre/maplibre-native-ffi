@@ -144,6 +144,28 @@ def target_job(row: dict[str, object]) -> list[str]:
                 "          key: ${{ steps.setup.outputs.zig-cache-key }}",
             ]
         )
+    # The payload is packed after the consumers have run, so it carries the
+    # addon the suite on this runner exercised rather than an unbuilt one.
+    payload = row.get("payload_task")
+    if payload:
+        lines.extend(
+            run_step(
+                f"mise run //bindings/typescript:{payload} {preset}",
+                env=CONSUMER_ENV,
+            )
+        )
+        lines.extend(
+            [
+                "      - name: Upload TypeScript runtime payload",
+                f"        uses: {UPLOAD}",
+                "        with:",
+                "          name: typescript-runtime-"
+                + preset
+                + "-${{ github.sha }}",
+                "          path: build/packages/typescript/dist/*.tgz",
+                "          if-no-files-found: error",
+            ]
+        )
     if package:
         lines.extend(
             [
