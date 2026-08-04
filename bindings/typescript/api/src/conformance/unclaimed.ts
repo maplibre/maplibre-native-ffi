@@ -50,7 +50,7 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
   {
     id: "BND-085",
     reason: "unwritten",
-    note: "an empty database lists through start/event/take; the requirement is region observation delivering copied status and error events",
+    note: "the binding wraps only the region list; `mln_runtime_offline_region_create_start`, `_delete_start`, `_get_status_start` and their take-result pairs exist in C and are not exposed, so there is no region to observe",
   },
   {
     id: "BND-088",
@@ -72,12 +72,12 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
   {
     id: "BND-159",
     reason: "unwritten",
-    note: "rules install, replace, and clear while a map is live; the requirement adds that transformed headers reach matching requests and stop after a clear, which needs a way to observe the headers on a request",
+    note: "rules install, replace, and clear while a map is live; proving headers reach matching requests needs a request to expose the headers it carries, which neither the C API nor this binding does — it needs an HTTP endpoint the suite controls",
   },
   {
     id: "BND-162",
     reason: "unwritten",
-    note: "session-owned and caller-owned texture attach paths are proven; the surface path is not, because no host in the suite supplies a surface",
+    note: "session-owned and caller-owned texture attach paths are proven; the surface path is not, because WebGL has no surface handle and no Node-API host in the suite supplies one — it needs a host with a native window",
   },
 
   // Handle lifetime.
