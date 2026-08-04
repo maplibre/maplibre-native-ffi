@@ -16,6 +16,14 @@ import { describe, expect, it } from "bun:test";
 
 const maplibre = await Maplibre.load();
 
+/** Offline work needs a database; Bun implements Node's filesystem API. */
+async function cacheDirectory(): Promise<string> {
+  const { mkdtemp } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  return mkdtemp(join(tmpdir(), "maplibre-conformance-"));
+}
+
 const assertions: Expect = {
   equal(actual, expected, what) {
     expect(actual, what).toEqual(expected);
@@ -61,7 +69,7 @@ for (const group of CONFORMANCE) {
   describe(group.name, () => {
     for (const entry of group.cases) {
       it(entry.name, async () => {
-        await entry.run({ maplibre, expect: assertions });
+        await entry.run({ maplibre, expect: assertions, cacheDirectory });
       });
     }
   });

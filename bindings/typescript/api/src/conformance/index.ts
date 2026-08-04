@@ -10,6 +10,7 @@
  * internals — is tested beside that runtime instead.
  */
 
+import { LOGGING_GROUP, OFFLINE_GROUP } from "./callbacks.ts";
 import { DOMAIN_GROUPS } from "./domains.ts";
 import type { ConformanceCase, ConformanceGroup } from "./harness.ts";
 import { LIBRARY_GROUP, RUNTIME_GROUP } from "./runtime.ts";
@@ -25,6 +26,8 @@ export const CONFORMANCE: readonly ConformanceGroup[] = [
   LIBRARY_GROUP,
   RUNTIME_GROUP,
   ...DOMAIN_GROUPS,
+  LOGGING_GROUP,
+  OFFLINE_GROUP,
 ];
 
 /** Every case, flattened, for a runner that wants one list. */

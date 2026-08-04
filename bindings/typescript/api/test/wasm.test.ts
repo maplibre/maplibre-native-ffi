@@ -42,6 +42,24 @@ const createRuntime = (await import(modulePath))
 const module_ = await createRuntime();
 const maplibre = Maplibre.fromTransport(wasmTransport(module_));
 
+/**
+ * Offline work needs a database.
+ *
+ * The module has its own in-memory filesystem and cannot see the host's, so the
+ * directory is made inside the module rather than beside the test.
+ */
+let cacheSequence = 0;
+function cacheDirectory(): Promise<string> {
+  const filesystem = (module_ as { FS?: { mkdir(path: string): void } }).FS;
+  if (filesystem === undefined) {
+    throw new Error("the WebAssembly module exposes no filesystem");
+  }
+  cacheSequence += 1;
+  const path = `/maplibre-conformance-${cacheSequence}`;
+  filesystem.mkdir(path);
+  return Promise.resolve(path);
+}
+
 const assertions: Expect = {
   equal(actual, expected, what) {
     expect(actual, what).toEqual(expected);
@@ -92,7 +110,7 @@ describe("the WebAssembly transport", () => {
     describe(group.name, () => {
       for (const entry of group.cases) {
         it(entry.name, async () => {
-          await entry.run({ maplibre, expect: assertions });
+          await entry.run({ maplibre, expect: assertions, cacheDirectory });
         });
       }
     });

@@ -34,6 +34,14 @@ export interface Expect {
 export interface CaseContext {
   readonly maplibre: Maplibre;
   readonly expect: Expect;
+  /**
+   * A directory this case may write a cache database into.
+   *
+   * Offline work needs one, and every runtime spells its filesystem
+   * differently, so the runner supplies the path rather than the suite reaching
+   * for an API only one of them has.
+   */
+  cacheDirectory(): Promise<string>;
 }
 
 export interface ConformanceCase {

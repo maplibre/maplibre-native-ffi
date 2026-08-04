@@ -15,6 +15,11 @@ import {
 
 const maplibre = await Maplibre.load();
 
+/** Offline work needs a database, which Deno creates through its own API. */
+async function cacheDirectory(): Promise<string> {
+  return Deno.makeTempDir({ prefix: "maplibre-conformance-" });
+}
+
 const assertions: Expect = {
   equal(actual, expected, what) {
     const left = JSON.stringify(actual, replacer);
@@ -86,7 +91,7 @@ function replacer(_key: string, value: unknown): unknown {
 for (const group of CONFORMANCE) {
   for (const entry of group.cases) {
     Deno.test(`${group.name} > ${entry.name}`, async () => {
-      await entry.run({ maplibre, expect: assertions });
+      await entry.run({ maplibre, expect: assertions, cacheDirectory });
     });
   }
 }

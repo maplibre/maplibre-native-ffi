@@ -85,6 +85,7 @@ bun test runners/bun.test.ts
 # node_modules directory to resolve the runtime payload package.
 deno test \
   --allow-read \
+  --allow-write \
   --allow-ffi \
   --allow-env \
   --allow-net \

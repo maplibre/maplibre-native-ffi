@@ -6,6 +6,7 @@
  * transport's own internals — stay beside that runtime.
  */
 
+import { cameraOptionsEquals, copyCameraOptions } from "../camera.ts";
 import { RuntimeEventType } from "../events.ts";
 import { jsonEquals, jsonFrom, jsonUint } from "../json.ts";
 import type { ConformanceGroup } from "./harness.ts";
@@ -180,6 +181,59 @@ export const DOMAIN_GROUPS: readonly ConformanceGroup[] = [
               "the zoom was untouched",
             );
           });
+        },
+      },
+      {
+        name: "accepts a transition and brackets a gesture",
+        spec: ["BND-102"],
+        run({ maplibre, expect }) {
+          withRuntime(maplibre, (_runtime, open) => {
+            const map = open();
+            map.jumpTo({ center: { latitude: 0, longitude: 0 }, zoom: 1 });
+            // A transition is a command: the call reports acceptance, and the
+            // camera reaches its target as the map advances, which needs a
+            // renderer. This asserts acceptance and the snapshot it started
+            // from.
+            map.easeTo(
+              { center: { latitude: 1, longitude: 2 }, zoom: 4 },
+              { durationMs: 10_000 },
+            );
+            expect.closeTo(map.getCamera().zoom ?? 0, 1, 3, "the start zoom");
+            map.cancelTransitions();
+
+            expect.ok(!map.isGestureInProgress(), "no gesture at rest");
+            map.setGestureInProgress(true);
+            expect.ok(map.isGestureInProgress(), "a gesture in progress");
+            map.setGestureInProgress(false);
+            expect.ok(!map.isGestureInProgress(), "the gesture ended");
+          });
+        },
+      },
+      {
+        name: "compares and copies camera options by content",
+        spec: ["BND-070"],
+        run({ expect }) {
+          const camera = {
+            center: { latitude: 1, longitude: 2 },
+            padding: { top: 1, left: 2, bottom: 3, right: 4 },
+            zoom: 3,
+          };
+          const copy = copyCameraOptions(camera);
+          expect.ok(cameraOptionsEquals(camera, copy), "a copy compares equal");
+          expect.ok(copy.center !== camera.center, "the copy is independent");
+          // An absent field and a present zero are different values.
+          expect.ok(
+            !cameraOptionsEquals({ zoom: 0 }, {}),
+            "present zero is not absent",
+          );
+          expect.ok(
+            cameraOptionsEquals({ zoom: 0 }, { zoom: 0 }),
+            "two present zeros",
+          );
+          expect.ok(
+            !cameraOptionsEquals(camera, { ...copy, zoom: 4 }),
+            "a changed field",
+          );
         },
       },
       {
