@@ -1,161 +1,17 @@
 /**
- * The conformance suite, as data.
+ * Maps, styles, cameras, projections, values, logging, and resources.
  *
- * Every runtime this binding supports has its own test framework, and none of
- * them agrees with the others about how a test is declared. The suite is
- * therefore a tree of named cases with plain async bodies, and each runtime's
- * runner registers the same tree in whatever its framework expects. A case that
- * passes under Node and fails under Bun is then a real difference between the
- * runtimes rather than a difference between two suites.
- *
- * These are the cases that must hold on every runtime and transport. Behavior a
- * single runtime owns — module formats, worker transfer — is tested beside that
- * runtime instead.
+ * These moved out of the Node-only vitest files so every runtime proves the
+ * same behavior. Cases that belong to one runtime — module formats, the
+ * transport's own internals — stay beside that runtime.
  */
 
-import { MaplibreError } from "./errors.ts";
-import { RuntimeEventType } from "./events.ts";
-import { type Map, Maplibre } from "./index.ts";
-import { jsonEquals, jsonFrom, jsonUint } from "./json.ts";
-import type { Runtime } from "./runtime.ts";
+import { RuntimeEventType } from "../events.ts";
+import { jsonEquals, jsonFrom, jsonUint } from "../json.ts";
+import type { ConformanceGroup } from "./harness.ts";
+import { EMPTY_STYLE, pumpFor, withRuntime } from "./harness.ts";
 
-/** Fails the case when the value is not what it should be. */
-export interface Expect {
-  equal<T>(actual: T, expected: T, what: string): void;
-  ok(actual: boolean, what: string): void;
-  throws(body: () => void, what: string): MaplibreError;
-}
-
-export interface ConformanceCase {
-  readonly name: string;
-  run(context: { maplibre: Maplibre; expect: Expect }): Promise<void> | void;
-}
-
-export interface ConformanceGroup {
-  readonly name: string;
-  readonly cases: readonly ConformanceCase[];
-}
-
-const EMPTY_STYLE = JSON.stringify({
-  version: 8,
-  name: "empty",
-  sources: {},
-  layers: [],
-});
-
-/** Runs `body` with a runtime, closing it and its maps however the body ends. */
-function withRuntime<T>(
-  maplibre: Maplibre,
-  body: (
-    runtime: Runtime,
-    open: (options?: { width: number; height: number }) => Map,
-  ) => T,
-): T {
-  const runtime = maplibre.createRuntime();
-  const maps: Map[] = [];
-  try {
-    return body(runtime, (options = { width: 256, height: 256 }) => {
-      const map = runtime.createMap(options);
-      maps.push(map);
-      return map;
-    });
-  } finally {
-    while (maps.length > 0) {
-      maps.pop()!.close();
-    }
-    runtime.close();
-  }
-}
-
-/** Pumps until an event of this type arrives, reporting whether it did. */
-function pumpFor(
-  runtime: Runtime,
-  type: RuntimeEventType,
-  attempts = 200,
-): boolean {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    runtime.pump(25);
-    for (
-      let event = runtime.pollEvent();
-      event !== undefined;
-      event = runtime.pollEvent()
-    ) {
-      if (event.type.equals(type)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-export const CONFORMANCE: readonly ConformanceGroup[] = [
-  {
-    name: "the loaded library",
-    cases: [
-      {
-        name: "reports one compiled render backend",
-        run({ maplibre, expect }) {
-          const enabled = Object.values(maplibre.renderBackends).filter(
-            Boolean,
-          );
-          // MapLibre Native compiles exactly one renderer per build.
-          expect.equal(enabled.length, 1, "compiled render backends");
-        },
-      },
-      {
-        name: "reports the C ABI version it was built against",
-        run({ maplibre, expect }) {
-          expect.equal(maplibre.cVersion, 0, "C ABI version");
-        },
-      },
-    ],
-  },
-  {
-    name: "runtime lifetime",
-    cases: [
-      {
-        name: "creates, pumps, drains, and closes",
-        run({ maplibre, expect }) {
-          const runtime = maplibre.createRuntime();
-          runtime.pump(0);
-          expect.equal(runtime.pollEvent(), undefined, "an empty event queue");
-          runtime.close();
-          expect.ok(runtime.isClosed, "the runtime is closed");
-          // Closing twice succeeds without crossing into native code.
-          runtime.close();
-        },
-      },
-      {
-        name: "reports its own closed state before reaching native code",
-        run({ maplibre, expect }) {
-          const runtime = maplibre.createRuntime();
-          runtime.close();
-          const error = expect.throws(
-            () => runtime.pump(0),
-            "a pump after close",
-          );
-          expect.equal(error.kind, "closedHandle", "the error kind");
-          expect.equal(error.diagnostic, "", "no native diagnostic");
-        },
-      },
-      {
-        name: "wakes a parked pump from a wake source",
-        run({ maplibre, expect }) {
-          withRuntime(maplibre, (runtime) => {
-            const wake = runtime.acquireWakeSource();
-            wake.signal();
-            const started = Date.now();
-            runtime.pump(5_000);
-            expect.ok(
-              Date.now() - started < 2_000,
-              "the pump returned on the wake",
-            );
-            wake.close();
-          });
-        },
-      },
-    ],
-  },
+export const DOMAIN_GROUPS: readonly ConformanceGroup[] = [
   {
     name: "maps and styles",
     cases: [
@@ -189,9 +45,9 @@ export const CONFORMANCE: readonly ConformanceGroup[] = [
           withRuntime(maplibre, (runtime, open) => {
             const map = open();
             map.setStyleJson(EMPTY_STYLE);
-            expect.ok(
+            expect.defined(
               pumpFor(runtime, RuntimeEventType.mapStyleLoaded),
-              "the style loaded",
+              "the style-loaded event",
             );
             expect.equal(
               map.copyLoadedStyleJson(),
@@ -225,6 +81,58 @@ export const CONFORMANCE: readonly ConformanceGroup[] = [
               }
             }
             expect.ok(named, "a style-loaded event arrived");
+          });
+        },
+      },
+      {
+        name: "carries no wrapper for a map that has already closed",
+        spec: ["BND-086"],
+        run({ maplibre, expect }) {
+          withRuntime(maplibre, (runtime, open) => {
+            const map = open();
+            map.setStyleJson(EMPTY_STYLE);
+            // Pump once so the load starts, then close before draining what it
+            // produced. An event for a released map names its identity and no
+            // wrapper.
+            runtime.pump(25);
+            map.close();
+            for (
+              let event = runtime.pollEvent();
+              event !== undefined;
+              event = runtime.pollEvent()
+            ) {
+              expect.absent(event.map, "no wrapper for a closed map");
+            }
+          });
+        },
+      },
+      {
+        name: "reports the URL a style was last requested from",
+        spec: ["BND-108"],
+        run({ maplibre, expect }) {
+          withRuntime(maplibre, (runtime, open) => {
+            const map = open();
+            expect.equal(map.copyStyleUrl(), "", "no URL before a load");
+            map.setStyleUrl("https://example.invalid/style.json");
+            expect.equal(
+              map.copyStyleUrl(),
+              "https://example.invalid/style.json",
+              "the requested URL",
+            );
+          });
+        },
+      },
+      {
+        name: "reports a map extent the C API rejects",
+        spec: ["BND-104"],
+        run({ maplibre, expect }) {
+          withRuntime(maplibre, (runtime) => {
+            const error = expect.throws(
+              () => runtime.createMap({ width: 0, height: 256 }),
+              "a zero-width map",
+            );
+            expect.equal(error.kind, "invalidArgument", "the error kind");
+            expect.notEqual(error.diagnostic, "", "the native diagnostic");
           });
         },
       },
@@ -346,9 +254,9 @@ export const CONFORMANCE: readonly ConformanceGroup[] = [
           withRuntime(maplibre, (runtime, open) => {
             const map = open();
             map.setStyleJson(EMPTY_STYLE);
-            expect.ok(
+            expect.defined(
               pumpFor(runtime, RuntimeEventType.mapStyleLoaded),
-              "the style loaded",
+              "the style-loaded event",
             );
             map.addStyleSource(
               "added",
@@ -452,12 +360,3 @@ export const CONFORMANCE: readonly ConformanceGroup[] = [
     ],
   },
 ];
-
-/** Every case, flattened, for a runner that wants one list. */
-export function conformanceCases(): readonly (ConformanceCase & {
-  group: string;
-})[] {
-  return CONFORMANCE.flatMap((group) =>
-    group.cases.map((entry) => ({ ...entry, group: group.name })),
-  );
-}

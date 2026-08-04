@@ -12,7 +12,7 @@ export {
   conformanceCases,
   type ConformanceGroup,
   type Expect,
-} from "./conformance.ts";
+} from "./conformance/index.ts";
 export {
   type AnimationOptions,
   type CameraOptions,

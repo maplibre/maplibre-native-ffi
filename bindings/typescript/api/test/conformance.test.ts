@@ -1,9 +1,9 @@
 /**
- * The transport-neutral conformance suite, registered in vitest.
+ * The conformance suite, registered in vitest.
  *
- * The cases themselves live in `src/conformance.ts` so Bun, Deno, and a browser
- * run the same tree. A case that passes here and fails there is a difference
- * between the runtimes rather than between two suites.
+ * The cases live in `src/conformance/` so Bun, Deno, and the WebAssembly
+ * transport run the same tree. A case that passes here and fails there is a
+ * difference between the runtimes rather than between two suites.
  */
 
 import {
@@ -20,8 +20,25 @@ const assertions: Expect = {
   equal(actual, expected, what) {
     expect(actual, what).toEqual(expected);
   },
+  notEqual(actual, unexpected, what) {
+    expect(actual, what).not.toEqual(unexpected);
+  },
   ok(actual, what) {
     expect(actual, what).toBe(true);
+  },
+  closeTo(actual, expected, digits, what) {
+    expect(actual, what).toBeCloseTo(expected, digits);
+  },
+  defined(actual, what) {
+    expect(actual, what).not.toBeUndefined();
+    expect(actual, what).not.toBeNull();
+    return actual as NonNullable<typeof actual>;
+  },
+  absent(actual, what) {
+    expect(actual, what).toBeUndefined();
+  },
+  contains(haystack, needle, what) {
+    expect(haystack, what).toContain(needle);
   },
   throws(body, what) {
     let thrown: unknown;
@@ -32,6 +49,9 @@ const assertions: Expect = {
     }
     expect(thrown, what).toBeInstanceOf(MaplibreError);
     return thrown as MaplibreError;
+  },
+  fail(what) {
+    expect.unreachable(what);
   },
 };
 

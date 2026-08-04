@@ -23,9 +23,40 @@ const assertions: Expect = {
       throw new Error(`${what}: expected ${right}, got ${left}`);
     }
   },
+  notEqual(actual, unexpected, what) {
+    if (
+      JSON.stringify(actual, replacer) === JSON.stringify(unexpected, replacer)
+    ) {
+      throw new Error(
+        `${what}: expected something other than ${String(actual)}`,
+      );
+    }
+  },
   ok(actual, what) {
     if (!actual) {
       throw new Error(`${what}: expected true`);
+    }
+  },
+  closeTo(actual, expected, digits, what) {
+    const tolerance = 10 ** -digits / 2;
+    if (!(Math.abs(actual - expected) <= tolerance)) {
+      throw new Error(`${what}: expected ${expected}, got ${actual}`);
+    }
+  },
+  defined(actual, what) {
+    if (actual === undefined || actual === null) {
+      throw new Error(`${what}: expected a value`);
+    }
+    return actual;
+  },
+  absent(actual, what) {
+    if (actual !== undefined) {
+      throw new Error(`${what}: expected nothing, got ${String(actual)}`);
+    }
+  },
+  contains(haystack, needle, what) {
+    if (!haystack.includes(needle)) {
+      throw new Error(`${what}: ${JSON.stringify(haystack)} lacks ${needle}`);
     }
   },
   throws(body, what) {
@@ -41,6 +72,9 @@ const assertions: Expect = {
       );
     }
     return thrown;
+  },
+  fail(what): never {
+    throw new Error(what);
   },
 };
 

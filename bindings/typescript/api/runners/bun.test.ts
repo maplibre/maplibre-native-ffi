@@ -17,21 +17,43 @@ import { describe, expect, it } from "bun:test";
 const maplibre = await Maplibre.load();
 
 const assertions: Expect = {
-  equal(actual, expected) {
-    expect(actual).toEqual(expected);
+  equal(actual, expected, what) {
+    expect(actual, what).toEqual(expected);
   },
-  ok(actual) {
-    expect(actual).toBe(true);
+  notEqual(actual, unexpected, what) {
+    expect(actual, what).not.toEqual(unexpected);
   },
-  throws(body) {
+  ok(actual, what) {
+    expect(actual, what).toBe(true);
+  },
+  closeTo(actual, expected, digits, what) {
+    // Bun and Deno spell an approximate comparison differently, so the suite
+    // gets the same rule from arithmetic instead.
+    const tolerance = 10 ** -digits / 2;
+    expect(Math.abs(actual - expected) <= tolerance, what).toBe(true);
+  },
+  defined(actual, what) {
+    expect(actual === undefined || actual === null, what).toBe(false);
+    return actual as NonNullable<typeof actual>;
+  },
+  absent(actual, what) {
+    expect(actual === undefined, what).toBe(true);
+  },
+  contains(haystack, needle, what) {
+    expect(haystack.includes(needle), what).toBe(true);
+  },
+  throws(body, what) {
     let thrown: unknown;
     try {
       body();
     } catch (error) {
       thrown = error;
     }
-    expect(thrown).toBeInstanceOf(MaplibreError);
+    expect(thrown instanceof MaplibreError, what).toBe(true);
     return thrown as MaplibreError;
+  },
+  fail(what): never {
+    throw new Error(what);
   },
 };
 
