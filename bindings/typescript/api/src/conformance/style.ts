@@ -269,7 +269,7 @@ export const HOST_DATA_GROUP: ConformanceGroup = {
     },
     {
       name: "carries a whole geometry tree across the boundary",
-      spec: ["BND-065"],
+      spec: ["BND-065", "BND-071"],
       run({ maplibre, expect }) {
         withRuntime(maplibre, (runtime, open) => {
           const map = open();

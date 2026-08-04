@@ -18,6 +18,7 @@ export const DOMAIN_GROUPS: readonly ConformanceGroup[] = [
     cases: [
       {
         name: "applies creation options",
+        spec: ["BND-100"],
         run({ maplibre, expect }) {
           withRuntime(maplibre, (_runtime, open) => {
             const size = open({ width: 320, height: 240 }).getSize();
@@ -28,6 +29,7 @@ export const DOMAIN_GROUPS: readonly ConformanceGroup[] = [
       },
       {
         name: "keeps its runtime open while a map is live",
+        spec: ["BND-042"],
         run({ maplibre, expect }) {
           const runtime = maplibre.createRuntime();
           const map = runtime.createMap({ width: 64, height: 64 });
@@ -42,6 +44,7 @@ export const DOMAIN_GROUPS: readonly ConformanceGroup[] = [
       },
       {
         name: "loads a style and reads the document back unchanged",
+        spec: ["BND-101"],
         run({ maplibre, expect }) {
           withRuntime(maplibre, (runtime, open) => {
             const map = open();
@@ -61,6 +64,7 @@ export const DOMAIN_GROUPS: readonly ConformanceGroup[] = [
       },
       {
         name: "names the live map an event came from",
+        spec: ["BND-081"],
         run({ maplibre, expect }) {
           withRuntime(maplibre, (runtime, open) => {
             const map = open();
@@ -165,6 +169,7 @@ export const DOMAIN_GROUPS: readonly ConformanceGroup[] = [
       },
       {
         name: "separates an omitted field from one set to zero",
+        spec: ["BND-061"],
         run({ maplibre, expect }) {
           withRuntime(maplibre, (_runtime, open) => {
             const map = open();
@@ -257,6 +262,7 @@ export const DOMAIN_GROUPS: readonly ConformanceGroup[] = [
     cases: [
       {
         name: "round-trips screen and geographic space",
+        spec: ["BND-103"],
         run({ maplibre, expect }) {
           withRuntime(maplibre, (_runtime, open) => {
             const map = open({ width: 512, height: 512 });
@@ -284,6 +290,7 @@ export const DOMAIN_GROUPS: readonly ConformanceGroup[] = [
       },
       {
         name: "converts to projected meters without a map",
+        spec: ["BND-103"],
         run({ maplibre, expect }) {
           const meters = maplibre.projectedMetersForLatLng({
             latitude: 45,
@@ -376,6 +383,7 @@ export const DOMAIN_GROUPS: readonly ConformanceGroup[] = [
     cases: [
       {
         name: "serves a claimed request and passes the rest through",
+        spec: ["BND-142", "BND-143"],
         run({ maplibre, expect }) {
           withRuntime(maplibre, (runtime, open) => {
             const style = EMPTY_STYLE;

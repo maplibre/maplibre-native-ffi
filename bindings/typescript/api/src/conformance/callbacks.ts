@@ -164,7 +164,7 @@ export const OFFLINE_GROUP: ConformanceGroup = {
   cases: [
     {
       name: "lists an empty database through start, event, and take",
-      spec: ["BND-084"],
+      spec: ["BND-084", "BND-085"],
       async run({ maplibre, expect, cacheDirectory }) {
         const runtime = maplibre.createRuntime({
           cachePath: `${await cacheDirectory()}/cache.db`,
@@ -256,7 +256,7 @@ export const RESOURCES_GROUP: ConformanceGroup = {
     {
       name: "rewrites a matching URL and leaves others alone",
       transports: LOADER_OBSERVED,
-      spec: ["BND-140"],
+      spec: ["BND-140", "BND-141"],
       run({ maplibre, expect }) {
         withRuntime(maplibre, (runtime, open) => {
           runtime.setResourceRewriteRules([
