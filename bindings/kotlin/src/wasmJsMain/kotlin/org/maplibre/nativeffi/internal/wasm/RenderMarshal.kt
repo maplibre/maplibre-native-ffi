@@ -6,7 +6,6 @@ import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.status.Status
-import org.maplibre.nativeffi.internal.wasm.generated.MlnCoordinateSpan
 import org.maplibre.nativeffi.internal.wasm.generated.MlnEglContextDescriptor
 import org.maplibre.nativeffi.internal.wasm.generated.MlnFeature
 import org.maplibre.nativeffi.internal.wasm.generated.MlnFeatureCollection
@@ -15,17 +14,12 @@ import org.maplibre.nativeffi.internal.wasm.generated.MlnFeatureExtensionResultT
 import org.maplibre.nativeffi.internal.wasm.generated.MlnFeatureIdentifierType
 import org.maplibre.nativeffi.internal.wasm.generated.MlnFeatureStateSelector
 import org.maplibre.nativeffi.internal.wasm.generated.MlnFeatureStateSelectorField
-import org.maplibre.nativeffi.internal.wasm.generated.MlnGeometry
-import org.maplibre.nativeffi.internal.wasm.generated.MlnGeometryCollection
-import org.maplibre.nativeffi.internal.wasm.generated.MlnGeometryType
 import org.maplibre.nativeffi.internal.wasm.generated.MlnLatLng
-import org.maplibre.nativeffi.internal.wasm.generated.MlnMultiLineGeometry
-import org.maplibre.nativeffi.internal.wasm.generated.MlnMultiPolygonGeometry
 import org.maplibre.nativeffi.internal.wasm.generated.MlnOpenglBorrowedTextureDescriptor
 import org.maplibre.nativeffi.internal.wasm.generated.MlnOpenglContextDescriptor
 import org.maplibre.nativeffi.internal.wasm.generated.MlnOpenglContextPlatform
 import org.maplibre.nativeffi.internal.wasm.generated.MlnOpenglOwnedTextureFrame
-import org.maplibre.nativeffi.internal.wasm.generated.MlnPolygonGeometry
+import org.maplibre.nativeffi.internal.wasm.generated.MlnOpenglSurfaceDescriptor
 import org.maplibre.nativeffi.internal.wasm.generated.MlnQueriedFeature
 import org.maplibre.nativeffi.internal.wasm.generated.MlnQueriedFeatureField
 import org.maplibre.nativeffi.internal.wasm.generated.MlnRenderTargetExtent
@@ -55,6 +49,7 @@ import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLContextDescriptor
 import org.maplibre.nativeffi.render.OpenGLOwnedTextureFrame
+import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
 import org.maplibre.nativeffi.render.RenderTargetExtent
 import org.maplibre.nativeffi.render.TextureImageInfo
 import org.maplibre.nativeffi.render.WebglContextDescriptor
@@ -139,6 +134,24 @@ internal object RenderMarshal {
         MlnWebglContextDescriptor.setContext(data, context.context)
       }
     }
+  }
+
+  const val OPENGL_SURFACE_SIZEOF: Int = MlnOpenglSurfaceDescriptor.SIZEOF
+
+  /**
+   * Writes an OpenGL surface descriptor.
+   *
+   * The surface field is what a browser makes different. Every other OpenGL provider names a
+   * drawable beside the context — an HDC, an EGLSurface — and a WebGL context has none: it is bound
+   * to the canvas it was created on, and that canvas's default framebuffer is what the session
+   * presents to. So native requires this field to be null here, and passing anything else is
+   * refused there rather than silently ignored.
+   */
+  fun writeOpenGLSurface(base: HeapPointer, descriptor: OpenGLSurfaceDescriptor) {
+    MlnOpenglSurfaceDescriptor.setSize(base, MlnOpenglSurfaceDescriptor.SIZEOF)
+    writeExtent(base + MlnOpenglSurfaceDescriptor.OFFSET_EXTENT, descriptor.extent)
+    writeOpenGLContext(base + MlnOpenglSurfaceDescriptor.OFFSET_CONTEXT, descriptor.context)
+    MlnOpenglSurfaceDescriptor.setSurface(base, address(descriptor.surface))
   }
 
   const val OPENGL_BORROWED_TEXTURE_SIZEOF: Int = MlnOpenglBorrowedTextureDescriptor.SIZEOF
@@ -543,60 +556,8 @@ internal object RenderMarshal {
 
   // ---------------------------------------------------------------- geometry, reading only
 
-  /** Reads a geometry tree native owns. Writing lives in [GeometryMarshal]. */
-  fun readGeometry(base: HeapPointer, depth: Int): Geometry {
-    requireGeometryDepth(depth)
-    val data = base + MlnGeometry.OFFSET_DATA
-    return when (val type = MlnGeometry.type(base)) {
-      MlnGeometryType.MLN_GEOMETRY_TYPE_EMPTY -> Geometry.Empty
-      // The point arm holds the coordinate by value rather than by pointer.
-      MlnGeometryType.MLN_GEOMETRY_TYPE_POINT -> Geometry.Point(readLatLng(data))
-      MlnGeometryType.MLN_GEOMETRY_TYPE_LINE_STRING -> Geometry.LineString(readSpan(data))
-      MlnGeometryType.MLN_GEOMETRY_TYPE_MULTI_POINT -> Geometry.MultiPoint(readSpan(data))
-      MlnGeometryType.MLN_GEOMETRY_TYPE_POLYGON -> Geometry.Polygon(readSpans(data))
-      MlnGeometryType.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING -> {
-        val lines = MlnMultiLineGeometry.lines(data)
-        Geometry.MultiLineString(
-          List(readCount(MlnMultiLineGeometry.lineCount(data))) { index ->
-            readSpan(lines + index * MlnCoordinateSpan.SIZEOF)
-          }
-        )
-      }
-      MlnGeometryType.MLN_GEOMETRY_TYPE_MULTI_POLYGON -> {
-        val polygons = MlnMultiPolygonGeometry.polygons(data)
-        Geometry.MultiPolygon(
-          List(readCount(MlnMultiPolygonGeometry.polygonCount(data))) { index ->
-            readSpans(polygons + index * MlnPolygonGeometry.SIZEOF)
-          }
-        )
-      }
-      MlnGeometryType.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION -> {
-        val geometries = MlnGeometryCollection.geometries(data)
-        Geometry.Collection(
-          List(readCount(MlnGeometryCollection.geometryCount(data))) { index ->
-            readGeometry(geometries + index * MlnGeometry.SIZEOF, depth + 1)
-          }
-        )
-      }
-      // A tag from a newer C API than this binding was generated against. The geometry is kept
-      // rather than rejected so a caller can still see the rest of the tree it arrived in.
-      else -> Geometry.Unknown(type, MlnGeometry.size(base))
-    }
-  }
-
-  private fun readSpans(base: HeapPointer): List<List<LatLng>> {
-    val rings = MlnPolygonGeometry.rings(base)
-    return List(readCount(MlnPolygonGeometry.ringCount(base))) { index ->
-      readSpan(rings + index * MlnCoordinateSpan.SIZEOF)
-    }
-  }
-
-  private fun readSpan(base: HeapPointer): List<LatLng> {
-    val coordinates = MlnCoordinateSpan.coordinates(base)
-    return List(readCount(MlnCoordinateSpan.coordinateCount(base))) { index ->
-      readLatLng(coordinates + index * MlnLatLng.SIZEOF)
-    }
-  }
+  /** Reads a geometry tree native owns. Both halves live in [GeometryMarshal]. */
+  fun readGeometry(base: HeapPointer, depth: Int): Geometry = GeometryMarshal.read(base, depth)
 
   private fun readLatLng(base: HeapPointer): LatLng =
     LatLng(MlnLatLng.latitude(base), MlnLatLng.longitude(base))

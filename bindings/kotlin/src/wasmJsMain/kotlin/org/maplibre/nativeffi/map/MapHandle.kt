@@ -1507,19 +1507,27 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     throw unsupportedBackend("Vulkan")
 
   /**
-   * Unsupported: this build compiles no OpenGL surface session.
+   * Attaches a surface target that presents through the canvas its WebGL context is bound to.
    *
-   * An OpenGL surface descriptor names a surface object to present to, and a browser WebGL context
-   * is bound to its canvas, so a host has nothing to put there and the browser composites the
-   * canvas without a swap. The native build leaves the surface entry points as their unsupported
-   * stubs for that reason, which is what this reports. Attach a texture target instead.
+   * `descriptor.surface` must be the null pointer. Every other OpenGL provider names a drawable
+   * there — an HDC, an EGLSurface — and a browser has none to name: the context already selects a
+   * canvas, and the session renders into that canvas's default framebuffer. Presenting is the
+   * browser compositing that canvas, so a canvas the page displays shows the frame with no copy.
+   *
+   * The context is the host's. It names an entry in the browser module's own table, so the host
+   * creates it on the thread this session will run on and passes the handle; this binding neither
+   * creates one nor knows which canvas it selects.
    */
   public actual fun attachOpenGLSurface(descriptor: OpenGLSurfaceDescriptor): RenderSessionHandle =
-    throw UnsupportedFeatureException(
-      MaplibreStatus.UNSUPPORTED.nativeCode,
-      "OpenGL surface sessions are not supported by the browser build of MapLibre Native; " +
-        "attach a texture target instead",
-    )
+    live {
+      // The out-handle goes first because it is the only member here that needs eight-byte
+      // alignment.
+      Heap.withScratch(HANDLE_BYTES + RenderMarshal.OPENGL_SURFACE_SIZEOF) { out ->
+        val block = out + HANDLE_BYTES
+        RenderMarshal.writeOpenGLSurface(block, descriptor)
+        attach("mln_opengl_surface_attach", block, out)
+      }
+    }
 
   public actual fun createProjection(): MapProjectionHandle = live {
     Heap.withScratch(HANDLE_BYTES) { out ->
@@ -2220,9 +2228,16 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
    * requires callers to pass.
    */
   private fun <T> withArena(bytes: Long, body: (HeapArena) -> T): T {
-    Status.requireArgument(bytes in 1..Int.MAX_VALUE.toLong()) {
-      "a descriptor block must be positive and addressable on this target"
+    Status.requireArgument(bytes in 0..Int.MAX_VALUE.toLong()) {
+      "a descriptor block must be non-negative and addressable on this target"
     }
+    // Zero is the ordinary case for a call whose descriptors are all optional and all absent:
+    // `scaleBy(scale, null)` passes a null anchor, which the C API reads as the screen centre, so
+    // there is nothing to place. An empty arena rather than an empty allocation, because the
+    // module's allocator has no zero-sized block to give and none is wanted. Any allocation
+    // against this fails the arena's own bounds check, which is what a measure of zero followed by
+    // a write should do.
+    if (bytes == 0L) return body(HeapArena(HeapPointer(0), 0))
     val size = bytes.toInt()
     return Heap.withScratch(size) { block -> body(HeapArena(block, size)) }
   }
@@ -2245,7 +2260,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
 
   /** Rejects a string C would truncate when it is passed as null-terminated text. */
   private fun requireValidCString(value: String, subject: String) {
-    Status.requireArgument(NUL !in value) { "$subject cannot contain embedded NUL characters" }
+    Heap.requireCString(value, subject)
   }
 
   /**

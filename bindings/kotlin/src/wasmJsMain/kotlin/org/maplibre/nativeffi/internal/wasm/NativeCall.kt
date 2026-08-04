@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.internal.wasm
 
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 import org.maplibre.nativeffi.internal.status.Status
 
 /**
@@ -46,11 +47,11 @@ internal object NativeCall {
    * The call protocol this binding packs for.
    *
    * Kept beside the packing code rather than generated, because it describes what the code below
-   * does: change how a slot is written, or how a struct return is addressed, and this and the
-   * module's own constant both move. Mirrors `MLN_BROWSER_DISPATCH_PROTOCOL` in
-   * `src/browser/dispatch_table.h`.
+   * does: change how a slot is written, how a struct return is addressed, or what a dispatched
+   * call's completion reports, and this and the module's own constant both move. Mirrors
+   * `MLN_BROWSER_DISPATCH_PROTOCOL` in `src/browser/dispatch_table.h`.
    */
-  const val EXPECTED_PROTOCOL: Int = 1
+  const val EXPECTED_PROTOCOL: Int = 2
 
   private val indices = mutableMapOf<String, Int>()
 
@@ -106,6 +107,10 @@ internal object NativeCall {
     return Heap.withScratch(bytes) { scratch ->
       val result = scratch + slotCount * SLOT_BYTES
       fill(Slots(scratch))
+      // This one runs on the page, so the page's own diagnostic slot is the authority on what it
+      // says. Handing it back retires whatever the last dispatched call left behind, which belongs
+      // to the owner thread and not to this failure.
+      NativeDiagnostics.clearProxiedDiagnostic()
       if (!invokeHere(entry, scratch.address, slotCount, result.address)) {
         // The module rejects a call it cannot place: an index it does not carry,
         // or a buffer shorter than the entry reads. Both mean this binding and

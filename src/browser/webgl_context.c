@@ -18,17 +18,29 @@
 // already owns the thread it renders on, such as one running under
 // `-sPROXY_TO_PTHREAD`.
 //
-// **The canvas is a private OffscreenCanvas the render thread makes.** Three
-// other arrangements were possible and this is the one that fits what this
-// build can render.
+// **WebGL has no share groups**, and that is what decides how a frame leaves.
+// A texture belongs to the one context it was created in and to no other, so a
+// host that wants to draw with what MapLibre rendered issues its own GL calls
+// in *this* context, on *this* thread. That is what the C API's texture
+// families are for: the host either lends a texture it created here
+// (`mln_opengl_borrowed_texture_attach`) or takes the one the session created
+// (`mln_opengl_owned_texture_acquire_frame`). The texture is the interop
+// object, and nothing is copied.
+//
+// **The canvas is a private OffscreenCanvas the render thread makes.** A WebGL2
+// context cannot exist without one, and this one is never displayed. What a
+// texture session renders goes into a framebuffer of its own; what a surface
+// session renders goes into this canvas's default framebuffer, where a host
+// reaches it through the same context. Putting pixels on the page is the host's
+// job and not this module's.
+//
+// Two other arrangements were considered and are not used.
 //
 // - Transferring a page canvas to the render thread at `pthread_create`, which
 //   is Emscripten's supported way to draw to something the page displays. It is
 //   also the only moment such a transfer can happen, so the canvas would have
 //   to be chosen before the module's first call, by a host that may not have
-//   one yet. And it would buy nothing here: this build compiles texture
-//   sessions only, which render into a framebuffer of their own and never touch
-//   the default framebuffer the transferred canvas would present.
+//   one yet -- and it answers a question the C API does not ask.
 // - Creating the context on the page and rendering from the owner thread with
 //   `EMSCRIPTEN_WEBGL_CONTEXT_PROXY_ALWAYS`. The wait graph allows it -- a
 //   worker waiting on the page is the direction that already exists, and the
@@ -36,15 +48,6 @@
 //   one of a frame's thousands of GL calls would become a cross-thread round
 //   trip with the worker blocked on it, and the proxied path needs
 //   `-sOFFSCREEN_FRAMEBUFFER`, which this module is not linked with.
-// - Rendering to the default framebuffer of a canvas and reading it back, which
-//   is not reachable at all: `mln_opengl_surface_attach` is an unsupported stub
-//   in this build.
-//
-// So the context is backed by an OffscreenCanvas constructed on the render
-// thread, exactly as the C API's own browser fixtures do it, and a frame leaves
-// through `mln_texture_read_premultiplied_rgba8`. A host displays it by putting
-// those pixels into a canvas of its own. Nothing about that is affine to any
-// thread, which is what makes a private canvas enough.
 //
 // The registry is `GL.offscreenCanvases` rather than `specialHTMLTargets`,
 // because `findCanvasEventTarget()` -- which is what resolves the selector
@@ -80,15 +83,36 @@ EM_JS(void, mln_browser_webgl_unregister_canvas, (const char* name), {
   delete Module["GL"].offscreenCanvases[UTF8ToString(name)];
 });
 
+// Sizes a registered canvas's drawing buffer, reporting whether the entry was
+// still there. Written here rather than through
+// emscripten_set_canvas_element_size(), which resolves the same registry but
+// then assigns to the registry entry rather than to the OffscreenCanvas inside
+// it -- it expects the shape its own transfer path produces, and this module
+// constructs its canvases instead.
+EM_JS(
+  int, mln_browser_webgl_size_canvas, (const char* name, int width, int height),
+  {
+    const entry = Module["GL"].offscreenCanvases[UTF8ToString(name)];
+    if (!entry) {
+      return 0;
+    }
+    entry.canvas.width = width;
+    entry.canvas.height = height;
+    return 1;
+  }
+);
+
 // A context and the canvas registration that has to outlive it. Emscripten
 // keeps the context; this keeps the registry key, which is the only thing that
 // says which entry to remove when the context goes away. Without it the
 // OffscreenCanvas and its drawing buffer would stay reachable from the module
 // for as long as the page lives, and a host that reattaches a session per
 // resize would accumulate one per attach.
+#define MLN_BROWSER_WEBGL_CANVAS_ID_BYTES 32
+
 typedef struct mln_browser_webgl_canvas {
   EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
-  char id[32];
+  char id[MLN_BROWSER_WEBGL_CANVAS_ID_BYTES];
   struct mln_browser_webgl_canvas* next;
 } mln_browser_webgl_canvas;
 
@@ -126,13 +150,36 @@ static mln_browser_webgl_canvas* mln_browser_webgl_unlink(
   return entry;
 }
 
+// Copies the registry key of the canvas behind `context`, or reports that this
+// module did not create it. Copied under the lock rather than handing back the
+// record, because the record is only safe to read while the lock is held and
+// the key is all a caller needs.
+static bool mln_browser_webgl_copy_id(
+  EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context, char* out, size_t capacity
+) {
+  bool found = false;
+  pthread_mutex_lock(&canvas_mutex);
+  for (const mln_browser_webgl_canvas* entry = canvases; entry != NULL;
+       entry = entry->next) {
+    if (entry->context == context) {
+      (void)snprintf(out, capacity, "%s", entry->id);
+      found = true;
+      break;
+    }
+  }
+  pthread_mutex_unlock(&canvas_mutex);
+  return found;
+}
+
 /**
  * Creates a WebGL2 context on the calling thread, or returns zero.
  *
  * `width` and `height` size the OffscreenCanvas that backs it. A texture
  * session draws into a framebuffer of its own rather than into this canvas, so
- * the size bounds nothing the map renders; it only has to be positive, because
- * a zero-sized canvas has no drawing buffer to create a context against.
+ * for one the size bounds nothing the map renders and only has to be positive,
+ * because a zero-sized canvas has no drawing buffer to create a context
+ * against. A surface session renders into this canvas's default framebuffer, so
+ * for one the size is that session's physical extent.
  *
  * **The context is affine to the calling thread**, which must therefore be the
  * thread that owns the render session it is given to. Zero is what a failure
@@ -142,7 +189,8 @@ static mln_browser_webgl_canvas* mln_browser_webgl_unlink(
  *
  * The context is left current on this thread. Sessions make it current for
  * themselves around every frame, so this matters only to a host that wants to
- * issue its own GL calls right after creating one.
+ * issue its own GL calls right after creating one -- which is what a host does
+ * with a rendered texture, and it has to do it here.
  */
 MLN_API int32_t mln_browser_webgl_context_create_here(
   uint32_t width, uint32_t height
@@ -169,9 +217,14 @@ MLN_API int32_t mln_browser_webgl_context_create_here(
   attributes.depth = EM_TRUE;
   attributes.stencil = EM_TRUE;
   attributes.antialias = EM_FALSE;
-  // Nothing presents this canvas, so there is no drawing buffer worth
-  // preserving between frames and no swap to take control of.
-  attributes.preserveDrawingBuffer = EM_FALSE;
+  // Preserved, because a host reads a surface session's frame out of this
+  // canvas's default framebuffer in a later task than the one that drew it --
+  // see mln_browser_webgl_read_pixels(). Nothing composites a canvas the page
+  // has never seen, so in principle nothing would clear the buffer either, but
+  // that is an absence to rely on rather than a guarantee, and this is the
+  // guarantee. A texture session never touches this buffer, so it pays nothing.
+  attributes.preserveDrawingBuffer = EM_TRUE;
+  // Nothing presents this canvas, so there is no swap to take control of.
   attributes.explicitSwapControl = EM_FALSE;
   // The context stays on this thread. Proxying it to the page would turn every
   // GL call MapLibre makes into a cross-thread round trip, and needs a build
@@ -220,6 +273,94 @@ MLN_API void mln_browser_webgl_context_destroy_here(
   (void)emscripten_webgl_destroy_context(entry->context);
   mln_browser_webgl_unregister_canvas(entry->id);
   free(entry);
+}
+
+/**
+ * Sizes the drawing buffer behind a context this thread owns.
+ *
+ * A surface session renders into the default framebuffer of the canvas its
+ * context was created on, and that framebuffer is only as large as the canvas.
+ * So a host that changes such a session's extent changes this too, in two
+ * steps: this call, and then mln_render_session_resize() or
+ * mln_opengl_surface_set_target() with the matching extent. Neither implies the
+ * other -- the session's extent is what MapLibre lays a frame out for, and this
+ * is what the frame has room to land in.
+ *
+ * **The canvas belongs to the thread that created it**, which is why this is
+ * affine the way everything else here is. The context's contents survive:
+ * resizing a canvas reallocates its drawing buffer and nothing else, so every
+ * texture, buffer, and program the session built stays as it was.
+ *
+ * A texture session has no reason to call this, because it draws into a
+ * framebuffer of its own and never touches the canvas.
+ *
+ * Returns false for a non-positive size and for a handle this module did not
+ * create, or has already destroyed.
+ */
+MLN_API bool mln_browser_webgl_canvas_resize_here(
+  int32_t context, uint32_t width, uint32_t height
+) MLN_NOEXCEPT {
+  if (width == 0 || height == 0 || width > INT32_MAX || height > INT32_MAX) {
+    return false;
+  }
+  char id[MLN_BROWSER_WEBGL_CANVAS_ID_BYTES];
+  if (!mln_browser_webgl_copy_id(
+        (EMSCRIPTEN_WEBGL_CONTEXT_HANDLE)context, id, sizeof(id)
+      )) {
+    return false;
+  }
+  return mln_browser_webgl_size_canvas(id, (int)width, (int)height) != 0;
+}
+
+typedef struct mln_browser_webgl_resize_request {
+  int32_t context;
+  uint32_t width;
+  uint32_t height;
+  int32_t* out_ok;
+} mln_browser_webgl_resize_request;
+
+static void mln_browser_webgl_run_resize(void* argument) {
+  mln_browser_webgl_resize_request* request = argument;
+  *request->out_ok = mln_browser_webgl_canvas_resize_here(
+                       request->context, request->width, request->height
+                     )
+                       ? 1
+                       : 0;
+  free(request);
+}
+
+/**
+ * Sizes a canvas's drawing buffer on the dispatcher's thread that owns it.
+ *
+ * mln_browser_webgl_canvas_resize_here()'s work, placed on the owner thread.
+ * `out_ok` is host memory that must stay valid and untouched until the
+ * completion for `token` arrives; it receives one when the canvas was sized.
+ *
+ * Returns false when the submission was refused, in which case nothing runs and
+ * no completion follows `token`.
+ */
+MLN_API bool mln_browser_webgl_canvas_resize(
+  mln_browser_dispatcher* dispatcher, int32_t context, uint32_t width,
+  uint32_t height, int32_t* out_ok, uint32_t token
+) MLN_NOEXCEPT {
+  if (dispatcher == NULL || out_ok == NULL) {
+    return false;
+  }
+  mln_browser_webgl_resize_request* request = calloc(1, sizeof(*request));
+  if (request == NULL) {
+    return false;
+  }
+  request->context = context;
+  request->width = width;
+  request->height = height;
+  request->out_ok = out_ok;
+  if (!mln_browser_dispatcher_submit_task(
+        dispatcher, mln_browser_webgl_run_resize, request, token
+      )) {
+    free(request);
+    return false;
+  }
+  return true;
 }
 
 typedef struct mln_browser_webgl_create_request {

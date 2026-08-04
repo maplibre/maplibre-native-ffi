@@ -197,6 +197,9 @@ public actual class RuntimeHandle private constructor(private val handle: Native
     path: String
   ): OfflineOperationHandle<List<OfflineRegionInfo>> =
     Heap.withScratch(Heap.utf8Size(path)) { scratch ->
+      // Crosses as a bare `const char*`, so an embedded NUL would silently merge a database whose
+      // path is a prefix of the one the caller named.
+      Heap.requireCString(path, "path")
       Heap.storeUtf8(scratch, path)
       startOperation(
         "mln_runtime_offline_regions_merge_database_start",
@@ -603,6 +606,9 @@ public actual class RuntimeHandle private constructor(private val handle: Native
     public actual fun create(options: RuntimeOptions): RuntimeHandle {
       val assetPath = options.assetPath
       val cachePath = options.cachePath
+      // Both cross as bare `const char*`, so a NUL would truncate the path rather than be rejected.
+      assetPath?.let { Heap.requireCString(it, "assetPath") }
+      cachePath?.let { Heap.requireCString(it, "cachePath") }
       val assetBytes = assetPath?.let { Heap.utf8Size(it) } ?: 0
       val cacheBytes = cachePath?.let { Heap.utf8Size(it) } ?: 0
       // The out-handle, the descriptor, and the two paths share one block. The handle goes first

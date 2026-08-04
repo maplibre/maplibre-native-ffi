@@ -49,6 +49,9 @@
       for (const entry of fs.readdirSync(cache).sort().reverse()) {
         if (!entry.startsWith("chromium-")) continue;
         for (const relative of [
+          // Playwright renamed this directory to chrome-linux64; older caches still
+          // use chrome-linux, so both are tried rather than pinning either.
+          "chrome-linux64/chrome",
           "chrome-linux/chrome",
           "chrome-mac/Chromium.app/Contents/MacOS/Chromium",
         ]) {

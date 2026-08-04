@@ -25,7 +25,7 @@ function(mln_ffi_add_browser_module target api_target)
       "-DMLN_FFI_NM=${CMAKE_NM}"
       "-DMLN_FFI_ARCHIVE=$<TARGET_FILE:${api_target}>"
       "-DMLN_FFI_OUTPUT=${export_list}"
-      "-DMLN_FFI_EXTRA_EXPORTS=_malloc$<SEMICOLON>_free$<SEMICOLON>_mln_browser_entry_index$<SEMICOLON>_mln_browser_entry_total$<SEMICOLON>_mln_browser_invoke_here$<SEMICOLON>_mln_browser_dispatch_protocol$<SEMICOLON>_mln_browser_headers_digest$<SEMICOLON>_mln_browser_entry_slots$<SEMICOLON>_mln_browser_log_install$<SEMICOLON>_mln_browser_log_take_since$<SEMICOLON>_mln_browser_log_mark$<SEMICOLON>_mln_browser_dispatcher_create$<SEMICOLON>_mln_browser_dispatcher_submit$<SEMICOLON>_mln_browser_dispatcher_destroy$<SEMICOLON>_mln_browser_dispatcher_stop$<SEMICOLON>_mln_browser_dispatcher_take_completion$<SEMICOLON>_mln_browser_log_take_dropped$<SEMICOLON>_mln_browser_sync_provider_install$<SEMICOLON>_mln_browser_sync_provider_thunk$<SEMICOLON>_mln_browser_sync_transform_install$<SEMICOLON>_mln_browser_sync_transform_thunk$<SEMICOLON>_mln_browser_dispatcher_submit_task$<SEMICOLON>_mln_browser_webgl_context_create$<SEMICOLON>_mln_browser_webgl_context_create_here$<SEMICOLON>_mln_browser_webgl_context_destroy$<SEMICOLON>_mln_browser_webgl_context_destroy_here"
+      "-DMLN_FFI_EXTRA_EXPORTS=_malloc$<SEMICOLON>_free$<SEMICOLON>_mln_browser_entry_index$<SEMICOLON>_mln_browser_entry_total$<SEMICOLON>_mln_browser_invoke_here$<SEMICOLON>_mln_browser_dispatch_protocol$<SEMICOLON>_mln_browser_headers_digest$<SEMICOLON>_mln_browser_entry_slots$<SEMICOLON>_mln_browser_log_install$<SEMICOLON>_mln_browser_log_take_since$<SEMICOLON>_mln_browser_log_mark$<SEMICOLON>_mln_browser_dispatcher_create$<SEMICOLON>_mln_browser_dispatcher_submit$<SEMICOLON>_mln_browser_dispatcher_destroy$<SEMICOLON>_mln_browser_dispatcher_stop$<SEMICOLON>_mln_browser_dispatcher_take_completion$<SEMICOLON>_mln_browser_log_take_dropped$<SEMICOLON>_mln_browser_sync_provider_install$<SEMICOLON>_mln_browser_sync_provider_thunk$<SEMICOLON>_mln_browser_sync_transform_install$<SEMICOLON>_mln_browser_sync_transform_thunk$<SEMICOLON>_mln_browser_dispatcher_submit_task$<SEMICOLON>_mln_browser_webgl_context_create$<SEMICOLON>_mln_browser_webgl_context_create_here$<SEMICOLON>_mln_browser_webgl_context_destroy$<SEMICOLON>_mln_browser_webgl_context_destroy_here$<SEMICOLON>_mln_browser_webgl_canvas_resize$<SEMICOLON>_mln_browser_webgl_canvas_resize_here$<SEMICOLON>_mln_browser_webgl_texture_create$<SEMICOLON>_mln_browser_webgl_texture_create_here$<SEMICOLON>_mln_browser_webgl_texture_destroy$<SEMICOLON>_mln_browser_webgl_texture_destroy_here$<SEMICOLON>_mln_browser_webgl_read_pixels$<SEMICOLON>_mln_browser_webgl_read_pixels_here"
       -P
       "${PROJECT_SOURCE_DIR}/cmake/scripts/mln_ffi_browser_exports.cmake"
     DEPENDS
@@ -68,6 +68,7 @@ function(mln_ffi_add_browser_module target api_target)
     "${PROJECT_SOURCE_DIR}/src/browser/dispatcher.c"
     "${PROJECT_SOURCE_DIR}/src/browser/sync_callback.c"
     "${PROJECT_SOURCE_DIR}/src/browser/webgl_context.c"
+    "${PROJECT_SOURCE_DIR}/src/browser/webgl_host.c"
     "${dispatch_table}")
   add_dependencies(${target} ${target}_exports)
   target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/src")

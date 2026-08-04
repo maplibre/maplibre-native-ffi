@@ -14,7 +14,7 @@ import org.maplibre.nativeffi.internal.wasm.BrowserModule
  * thread and is gone, or replaced, by the time the page resumes. Reading it here would report an
  * empty or unrelated message for the failure the caller is actually holding. The dispatch path
  * therefore copies the diagnostic on the executing pthread, beside the status, and publishes it
- * through [pending] for the duration of the failure it belongs to.
+ * through [proxied].
  */
 @JsFun(
   """
@@ -29,27 +29,31 @@ private external fun lastErrorMessage(): String
 
 internal actual object NativeDiagnostics {
   /**
-   * The diagnostic a proxied call brought back, valid only while that call's failure is being
-   * turned into an exception.
+   * The diagnostic the last dispatched call brought back, or null when the last call this binding
+   * made ran on the page.
    *
-   * Set by the dispatch path immediately around the status check, so nothing reads a diagnostic
-   * that outlived the call that produced it.
+   * This is the page's stand-in for the owner thread's own slot, and it follows the same rule that
+   * slot does: every dispatched call replaces it, with the empty string when it did not fail. So a
+   * diagnostic is never older than the call whose status is being converted, which is the whole
+   * point -- a message that outlived its call would name an unrelated failure.
+   *
+   * Null rather than empty for a page-thread call, because the page has a real slot of its own for
+   * those and it is the authority on them.
    */
-  private var pending: String? = null
+  private var proxied: String? = null
 
-  /** Runs [body] with [diagnostic] reported as the current one. */
-  fun <T> withProxiedDiagnostic(diagnostic: String, body: () -> T): T {
-    val previous = pending
-    pending = diagnostic
-    try {
-      return body()
-    } finally {
-      pending = previous
-    }
+  /** Reports [diagnostic] as the current one until the next call this binding makes. */
+  fun setProxiedDiagnostic(diagnostic: String) {
+    proxied = diagnostic
+  }
+
+  /** Hands the page's own slot back the authority, for a call this binding makes on the page. */
+  fun clearProxiedDiagnostic() {
+    proxied = null
   }
 
   actual fun currentDiagnostic(): String {
-    pending?.let {
+    proxied?.let {
       return it
     }
     // A diagnostic is read on failure paths, including ones a host reaches before it loads the

@@ -10,6 +10,7 @@
 // be declared here and called from `main.c`.
 
 void run_browser_http_abi_tests(void);
+void run_browser_render_target_abi_tests(void);
 void run_callback_adapter_abi_tests(void);
 void run_core_abi_tests(void);
 void run_handles_abi_tests(void);

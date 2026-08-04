@@ -7,13 +7,14 @@
 #include "maplibre_native_c/base.h"
 
 // The shape of the generic call protocol: the slot width, the argument order,
-// the struct-return convention, and the signatures below.
+// the struct-return convention, the signatures below, and what a dispatched
+// call's completion reports back.
 //
 // The public headers' digest cannot stand in for this. Two modules built from
 // identical headers can still disagree here, and a host that packed for one and
 // called the other would mispack memory rather than fail. Bump this whenever
 // any of those change.
-#define MLN_BROWSER_DISPATCH_PROTOCOL 1
+#define MLN_BROWSER_DISPATCH_PROTOCOL 2
 
 // One packed call argument, or a call's result.
 //

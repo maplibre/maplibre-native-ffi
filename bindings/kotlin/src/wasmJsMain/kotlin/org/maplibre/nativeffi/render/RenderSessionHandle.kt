@@ -97,19 +97,21 @@ internal constructor(private val map: MapHandle, private val handle: NativeRende
   }
 
   /**
-   * Unsupported: this build compiles no OpenGL surface session.
+   * Takes a new extent for a surface session, which is all this can change in a browser.
    *
-   * An OpenGL surface descriptor names a surface object to present to, and a browser WebGL context
-   * is bound to its canvas, so a host has nothing to put there and the browser composites the
-   * canvas without a swap. The native build leaves the surface entry points as their unsupported
-   * stubs for that reason, which is what this reports. Render into a texture target instead.
+   * There is no surface object to replace: the session presents through the canvas its context is
+   * bound to, and `descriptor.surface` must be [NativePointer.NULL] as it was at attach. Resizing
+   * the canvas's drawing buffer is the host's to do, on the thread that owns the context, and is
+   * not something this binding can reach.
    */
   public actual fun setOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor) {
-    throw UnsupportedFeatureException(
-      MaplibreStatus.UNSUPPORTED.nativeCode,
-      "OpenGL surface sessions are not supported by the browser build of MapLibre Native; " +
-        "attach a texture target instead",
-    )
+    activeFrame.ensureInactive("set target")
+    live {
+      Heap.withScratch(RenderMarshal.OPENGL_SURFACE_SIZEOF) { block ->
+        RenderMarshal.writeOpenGLSurface(block, descriptor)
+        callWithDescriptor("mln_opengl_surface_set_target", block)
+      }
+    }
   }
 
   public actual fun setMetalBorrowedTextureTarget(descriptor: MetalBorrowedTextureDescriptor) {

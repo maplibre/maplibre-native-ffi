@@ -1,25 +1,15 @@
 package org.maplibre.nativeffi.internal.wasm
 
-import org.maplibre.nativeffi.geo.Geometry
-import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.internal.status.Status
-import org.maplibre.nativeffi.internal.wasm.generated.MlnCoordinateSpan
-import org.maplibre.nativeffi.internal.wasm.generated.MlnGeometry
-import org.maplibre.nativeffi.internal.wasm.generated.MlnGeometryCollection
-import org.maplibre.nativeffi.internal.wasm.generated.MlnGeometryType
-import org.maplibre.nativeffi.internal.wasm.generated.MlnLatLng
 import org.maplibre.nativeffi.internal.wasm.generated.MlnLatLngBounds
-import org.maplibre.nativeffi.internal.wasm.generated.MlnMultiLineGeometry
-import org.maplibre.nativeffi.internal.wasm.generated.MlnMultiPolygonGeometry
 import org.maplibre.nativeffi.internal.wasm.generated.MlnOfflineGeometryRegionDefinition
 import org.maplibre.nativeffi.internal.wasm.generated.MlnOfflineRegionDefinition
 import org.maplibre.nativeffi.internal.wasm.generated.MlnOfflineRegionDefinitionType
 import org.maplibre.nativeffi.internal.wasm.generated.MlnOfflineRegionInfo
 import org.maplibre.nativeffi.internal.wasm.generated.MlnOfflineRegionStatus
 import org.maplibre.nativeffi.internal.wasm.generated.MlnOfflineTilePyramidRegionDefinition
-import org.maplibre.nativeffi.internal.wasm.generated.MlnPolygonGeometry
 import org.maplibre.nativeffi.internal.wasm.generated.MlnRenderingStats
 import org.maplibre.nativeffi.internal.wasm.generated.MlnRuntimeEvent
 import org.maplibre.nativeffi.internal.wasm.generated.MlnRuntimeEventCameraTransitionFinished
@@ -195,7 +185,7 @@ internal object OfflineMarshal {
       MlnOfflineRegionDefinitionType.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY ->
         OfflineRegionDefinition.GeometryRegion(
           Heap.loadUtf8(MlnOfflineGeometryRegionDefinition.styleUrl(data)),
-          readGeometry(MlnOfflineGeometryRegionDefinition.geometry(data), 0),
+          GeometryMarshal.read(MlnOfflineGeometryRegionDefinition.geometry(data), 0),
           MlnOfflineGeometryRegionDefinition.minZoom(data),
           MlnOfflineGeometryRegionDefinition.maxZoom(data),
           MlnOfflineGeometryRegionDefinition.pixelRatio(data),
@@ -204,68 +194,6 @@ internal object OfflineMarshal {
       else -> OfflineRegionDefinition.Unknown(type, MlnOfflineRegionDefinition.size(base))
     }
   }
-
-  /**
-   * Reads the geometry tree at [base].
-   *
-   * This is the read half of what [GeometryMarshal] writes, and it lives here because the geometry
-   * arm of a region definition is currently the only place the C API hands a tree back. Move it
-   * beside the writer once a second reader needs it.
-   */
-  private fun readGeometry(base: HeapPointer, depth: Int): Geometry {
-    // Native accepts no deeper tree than this, so a deeper one means the descriptor is not the
-    // shape it claims. Refusing beats recursing until this module's stack runs out.
-    if (depth > Geometry.MAX_COLLECTION_DEPTH) {
-      throw Status.invalidState(
-        "A geometry read from native nests deeper than the ${Geometry.MAX_COLLECTION_DEPTH} " +
-          "levels the C API accepts."
-      )
-    }
-    val data = base + MlnGeometry.OFFSET_DATA
-    return when (val type = MlnGeometry.type(base)) {
-      MlnGeometryType.MLN_GEOMETRY_TYPE_EMPTY -> Geometry.Empty
-      // The point arm holds its coordinate by value rather than behind a span.
-      MlnGeometryType.MLN_GEOMETRY_TYPE_POINT -> Geometry.Point(CameraMarshal.readLatLng(data))
-      MlnGeometryType.MLN_GEOMETRY_TYPE_LINE_STRING -> Geometry.LineString(readSpan(data))
-      MlnGeometryType.MLN_GEOMETRY_TYPE_MULTI_POINT -> Geometry.MultiPoint(readSpan(data))
-      MlnGeometryType.MLN_GEOMETRY_TYPE_POLYGON ->
-        Geometry.Polygon(
-          readSpans(MlnPolygonGeometry.rings(data), MlnPolygonGeometry.ringCount(data))
-        )
-      MlnGeometryType.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING ->
-        Geometry.MultiLineString(
-          readSpans(MlnMultiLineGeometry.lines(data), MlnMultiLineGeometry.lineCount(data))
-        )
-      MlnGeometryType.MLN_GEOMETRY_TYPE_MULTI_POLYGON -> {
-        val polygons = MlnMultiPolygonGeometry.polygons(data)
-        Geometry.MultiPolygon(
-          List(MlnMultiPolygonGeometry.polygonCount(data)) { index ->
-            val entry = polygons + index * MlnPolygonGeometry.SIZEOF
-            readSpans(MlnPolygonGeometry.rings(entry), MlnPolygonGeometry.ringCount(entry))
-          }
-        )
-      }
-      MlnGeometryType.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION -> {
-        val children = MlnGeometryCollection.geometries(data)
-        Geometry.Collection(
-          List(MlnGeometryCollection.geometryCount(data)) { index ->
-            readGeometry(children + index * MlnGeometry.SIZEOF, depth + 1)
-          }
-        )
-      }
-      else -> Geometry.Unknown(type, MlnGeometry.size(base))
-    }
-  }
-
-  private fun readSpan(span: HeapPointer): List<LatLng> {
-    val coordinates = MlnCoordinateSpan.coordinates(span)
-    return List(MlnCoordinateSpan.coordinateCount(span)) { index ->
-      CameraMarshal.readLatLng(coordinates + index * MlnLatLng.SIZEOF)
-    }
-  }
-
-  private fun readSpans(spans: HeapPointer, count: Int): List<List<LatLng>> =
-    List(count) { index -> readSpan(spans + index * MlnCoordinateSpan.SIZEOF) }
 
   private fun writeBounds(base: HeapPointer, bounds: LatLngBounds) {
     CameraMarshal.writeLatLng(base + MlnLatLngBounds.OFFSET_SOUTHWEST, bounds.southwest)

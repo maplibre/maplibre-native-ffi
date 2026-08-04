@@ -18,8 +18,11 @@ dir = "../.."
 run = '''
 set -euo pipefail
 mise run build emscripten-wasm32-webgl
-python3 scripts/generate-wasm-struct-layouts.py \\
-  build/emscripten-wasm32-webgl/browser/maplibre_native_c-abi.json \\
+# A single backslash: this is a TOML literal string, so escapes are not
+# processed and a doubled one ends the line at the shell instead of continuing
+# it, leaving the generator with no output argument.
+python3 scripts/generate-wasm-struct-layouts.py \
+  build/emscripten-wasm32-webgl/browser/maplibre_native_c-abi.json \
   bindings/kotlin/src/wasmJsMain/generated/org/maplibre/nativeffi/internal/wasm/generated/StructLayouts.kt
 '''
 

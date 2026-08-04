@@ -61,8 +61,30 @@ any of those happens, because a page may not block. A dispatcher owns a thread
 that may block instead.
 
 `mln_browser_dispatcher_create` starts that thread. It returns null when the
-allocation, the mutex, the condition variable, or the thread itself cannot be
-created.
+allocation, the mutex, or the thread itself cannot be created.
+
+`mln_browser_dispatcher_create_with_canvases` starts it owning page canvases the
+host names, as a comma-separated list of canvas element ids. Emscripten moves an
+`OffscreenCanvas` between agents only at `pthread_create`, so **this is the only
+moment a canvas can reach the thread that renders**. A host that will ever
+attach a surface session names its canvases here, before its first call, and
+calls this from the page: only the agent holding a canvas can give it away. The
+canvases stay with the thread for its life, so a session can be closed and
+another attached to the same canvas. It returns null for the same reasons
+`mln_browser_dispatcher_create` does, and additionally when a named canvas is
+not in the document or control of it has already been transferred.
+
+A canvas given away this way is no longer drawable from the page. The `<canvas>`
+element becomes a placeholder that displays what the owner thread renders, with
+no copy.
+
+The thread runs one browser task per batch of calls rather than one task for its
+whole life, and that is load-bearing rather than incidental. A browser
+composites a canvas when the task that drew into it ends, so a thread that
+rendered and then parked inside the same task would draw frames nothing ever
+displays. Everything a submitted call reaches has to tolerate returning to an
+event loop between calls; blocking _within_ a call is still legal, and is what
+the thread exists for.
 
 `mln_browser_dispatcher_submit` places one call on that thread, carrying the
 same index and slots that a direct call takes, plus a token the host chooses.
@@ -72,11 +94,26 @@ and when the call cannot be allocated. A host that parks on a token it did not
 check waits forever, because no completion follows a refusal.
 
 `mln_browser_dispatcher_take_completion` reports whether a completion was taken.
-It is false for a null dispatcher, for either output being null, and for an
-empty ring, and it leaves both outputs unwritten. On true it writes the token
+It is false for a null dispatcher, for a null token or invoked output, and for
+an empty ring, and it leaves its outputs unwritten. On true it writes the token
 and a separate value saying whether that call's entry point was invoked — the
 same distinction a direct call draws, and false there for an unknown index, a
 short slot count, or null slots an entry reads.
+
+It also writes the diagnostic that the call left behind, into a buffer that the
+host supplies with the buffer's capacity in bytes. The message arrives as
+null-terminated UTF-8, empty for a call that did not fail, and truncated on a
+UTF-8 boundary when it is longer than the buffer. A host that has no use for the
+message passes a null buffer and a capacity of zero.
+
+**The completion is the only place a dispatched call's message can be read.**
+The C API's diagnostic is thread-local, so a failure on the dispatcher's thread
+writes that thread's slot, and the next call placed there replaces it. A host
+that reads `mln_thread_last_error_message` after its own caller resumes reads
+its own thread's slot, which the dispatched call never wrote. The owner thread
+therefore copies the message where it was produced, at the moment the call
+finishes, and the completion carries it back. The copy is at most 512 bytes
+including the terminator, so a longer message reaches the host cut short.
 
 A host polls the ring on whatever cadence it already runs. There is no readiness
 signal and no callback.
@@ -137,13 +174,35 @@ is the whole contract: create the context on the thread that will own the render
 session, and destroy it there, after every target that borrowed the handle is
 detached or destroyed.
 
-The context is backed by an `OffscreenCanvas` the render thread constructs, not
-by anything on the page. This build compiles texture sessions only, which draw
-into a framebuffer of their own and never present, so a canvas transferred from
-the page would display nothing. A frame reaches the page through
-`mln_texture_read_premultiplied_rgba8`, which has no owner thread of its own.
-Width and height size that backing canvas and bound nothing the map renders;
-they only have to be positive.
+Both take a canvas element id, and which kind of canvas it names decides what a
+session can do with the context.
+
+- A page canvas the dispatcher was created with. What a surface session renders
+  into that context's default framebuffer is composited onto the page's canvas
+  with no readback and no copy, which is the only zero-copy presentation a
+  browser has.
+- A private `OffscreenCanvas` this module constructs, when the id is null or
+  empty. Nothing displays it. A texture session draws into a framebuffer of its
+  own and never touches it, so it exists only because a WebGL context cannot be
+  created without a canvas; the frame leaves through
+  `mln_texture_read_premultiplied_rgba8`, which has no owner thread of its own.
+
+Width and height size the drawing buffer in device pixels either way. For a
+texture session they bound nothing the map renders and only have to be positive;
+for a surface session they are the session's physical extent.
+
+`mln_browser_webgl_canvas_resize` and `mln_browser_webgl_canvas_resize_here`
+size a canvas's drawing buffer afterwards. A page owns its canvas's layout size
+and the owner thread owns its drawing buffer, because a canvas given to another
+thread can only be sized there, so a host resizes in two steps: this, and then
+`mln_render_session_resize` or `mln_opengl_surface_set_target` with the matching
+extent.
+
+An OpenGL surface descriptor's `surface` field must be null for WebGL. Every
+other provider names a drawable beside the context — an HDC, an EGLSurface — and
+a browser has none: the context is bound to the canvas it was created on, and
+that canvas's default framebuffer is what the session presents to. There is no
+swap; the browser composites.
 
 ## Receiving log records
 
@@ -195,8 +254,9 @@ prerelease.
 
 `mln_browser_headers_digest` reports the digest of the public headers this
 module was built from. `mln_browser_dispatch_protocol` reports the call protocol
-version, and that version covers the slot layout, the argument order, and the
-struct-return convention. Both change independently of each other.
+version, and that version covers the slot layout, the argument order, the
+struct-return convention, and what a completion reports. Both change
+independently of each other.
 
 The ABI manifest records the same digest and protocol. A host checks the
 manifest before instantiating and the module's own values afterwards. The first

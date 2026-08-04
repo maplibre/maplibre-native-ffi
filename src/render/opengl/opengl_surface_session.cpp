@@ -166,7 +166,21 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   }
 
   void swap_surface() {
-#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+#if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+    // Nothing to swap. A WebGL drawing buffer is presented by the browser, not
+    // by the program that drew into it: the canvas this context is bound to is
+    // composited once the task that rendered returns to the event loop, which
+    // is what makes the frame above visible. Emscripten's
+    // emscripten_webgl_commit_frame() exists for the same moment, but it wants
+    // a context created with explicitSwapControl and is a no-op even then,
+    // because the .commit() it was written against was removed from browsers.
+    //
+    // The consequence belongs to whoever owns the render thread rather than to
+    // this file: a thread that renders and then parks without ending its task
+    // has drawn a frame the browser never composites. See src/browser/
+    // dispatcher.c, which is why the module's owner thread runs one task per
+    // call instead of looping inside a single one.
+#elif defined(MLN_FFI_OPENGL_PROVIDER_WGL)
     if (SwapBuffers(static_cast<HDC>(descriptor_.surface)) == 0) {
       throw std::runtime_error("Swapping OpenGL WGL surface buffers failed");
     }

@@ -202,6 +202,84 @@ internal object GeometryMarshal {
     return spans
   }
 
+  /**
+   * Reads a geometry tree native owns, copying every coordinate into Kotlin.
+   *
+   * The read half lives beside the write half deliberately. It was written twice — once for an
+   * offline region definition and once for a queried feature — and the two copies drifted: one
+   * checked the counts native reported and the other did not. A tree is native-owned storage that
+   * its destroy frees, so everything below is copied out rather than left as a view.
+   */
+  fun read(base: HeapPointer, depth: Int): Geometry {
+    requireDepth(depth)
+    val data = base + MlnGeometry.OFFSET_DATA
+    return when (val type = MlnGeometry.type(base)) {
+      MlnGeometryType.MLN_GEOMETRY_TYPE_EMPTY -> Geometry.Empty
+      // The point arm holds the coordinate by value rather than by pointer.
+      MlnGeometryType.MLN_GEOMETRY_TYPE_POINT -> Geometry.Point(CameraMarshal.readLatLng(data))
+      MlnGeometryType.MLN_GEOMETRY_TYPE_LINE_STRING -> Geometry.LineString(readSpan(data))
+      MlnGeometryType.MLN_GEOMETRY_TYPE_MULTI_POINT -> Geometry.MultiPoint(readSpan(data))
+      MlnGeometryType.MLN_GEOMETRY_TYPE_POLYGON -> Geometry.Polygon(readRings(data))
+      MlnGeometryType.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING -> {
+        val lines = MlnMultiLineGeometry.lines(data)
+        Geometry.MultiLineString(
+          List(readCount(MlnMultiLineGeometry.lineCount(data))) { index ->
+            readSpan(lines + index * MlnCoordinateSpan.SIZEOF)
+          }
+        )
+      }
+      MlnGeometryType.MLN_GEOMETRY_TYPE_MULTI_POLYGON -> {
+        val polygons = MlnMultiPolygonGeometry.polygons(data)
+        Geometry.MultiPolygon(
+          List(readCount(MlnMultiPolygonGeometry.polygonCount(data))) { index ->
+            readRings(polygons + index * MlnPolygonGeometry.SIZEOF)
+          }
+        )
+      }
+      MlnGeometryType.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION -> {
+        val geometries = MlnGeometryCollection.geometries(data)
+        Geometry.Collection(
+          List(readCount(MlnGeometryCollection.geometryCount(data))) { index ->
+            read(geometries + index * MlnGeometry.SIZEOF, depth + 1)
+          }
+        )
+      }
+      // A tag from a newer C API than this binding was generated against. The geometry is kept
+      // rather than rejected so a caller can still see the rest of the tree it arrived in.
+      else -> Geometry.Unknown(type, MlnGeometry.size(base))
+    }
+  }
+
+  private fun readRings(base: HeapPointer): List<List<LatLng>> {
+    val rings = MlnPolygonGeometry.rings(base)
+    return List(readCount(MlnPolygonGeometry.ringCount(base))) { index ->
+      readSpan(rings + index * MlnCoordinateSpan.SIZEOF)
+    }
+  }
+
+  private fun readSpan(base: HeapPointer): List<LatLng> {
+    val coordinates = MlnCoordinateSpan.coordinates(base)
+    return List(readCount(MlnCoordinateSpan.coordinateCount(base))) { index ->
+      CameraMarshal.readLatLng(coordinates + index * MlnLatLng.SIZEOF)
+    }
+  }
+
+  /**
+   * Refuses a count native reported that no real descriptor could carry.
+   *
+   * `size_t` is 32 bits on this target, so a count past [Int.MAX_VALUE] arrives negative. The heap
+   * could not hold a tree that large, so a negative one means the address being read is not the
+   * descriptor it was taken for, and continuing would index arbitrary memory.
+   */
+  private fun readCount(count: Int): Int {
+    if (count < 0) {
+      throw Status.invalidState(
+        "The MapLibre Native browser module reported a geometry element count of $count"
+      )
+    }
+    return count
+  }
+
   private fun writeCoordinates(arena: HeapArena, coordinates: List<LatLng>): HeapPointer {
     val array = arena.allocate(sizeOf(MlnLatLng.SIZEOF, coordinates.size).toInt(), COORDINATE_ALIGN)
     coordinates.forEachIndexed { index, coordinate ->

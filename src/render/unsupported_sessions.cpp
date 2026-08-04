@@ -399,10 +399,6 @@ auto opengl_surface_set_target(
   return MLN_STATUS_UNSUPPORTED;
 }
 
-#endif
-
-#if !defined(MLN_RENDER_BACKEND_OPENGL)
-
 auto opengl_owned_texture_attach(
   mln_map map, const mln_opengl_owned_texture_descriptor* descriptor,
   mln_render_session* out_session

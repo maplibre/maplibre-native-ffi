@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.internal.wasm
 
+import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 import org.maplibre.nativeffi.internal.status.Status
 
 @JsFun("() => globalThis.__maplibreNativeC._mln_browser_dispatcher_create()")
@@ -23,13 +24,19 @@ private external fun submitCall(
 
 @JsFun(
   """
-  (d, out) => {
+  (d, out, diagnostic, capacity) => {
     const module = globalThis.__maplibreNativeC
-    return module._mln_browser_dispatcher_take_completion(d, out, out + 4)
+    return module._mln_browser_dispatcher_take_completion(
+      d, out, out + 4, diagnostic, capacity)
   }
 """
 )
-private external fun takeCompletion(dispatcher: Int, out: Int): Boolean
+private external fun takeCompletion(
+  dispatcher: Int,
+  out: Int,
+  diagnostic: Int,
+  capacity: Int,
+): Boolean
 
 /**
  * Registers the promise a caller will park on, before its call is submitted.
@@ -105,6 +112,16 @@ internal object Dispatcher {
   private var draining = false
   private var nextToken = 1
 
+  /**
+   * Diagnostics the drain has collected, by the token of the call that produced each.
+   *
+   * A message reaches the page only here, in the completion, because the C API's own is
+   * thread-local to the owner thread and the next call there replaces it. It waits in this map for
+   * the caller that is parked on the token to resume and take it; a call that left no message puts
+   * nothing here at all.
+   */
+  private val diagnostics = mutableMapOf<Int, String>()
+
   /** Creates the owner thread on first use. */
   private fun require(): Int {
     if (handle != 0) return handle
@@ -161,7 +178,12 @@ internal object Dispatcher {
             "already outstanding, or its owner thread is stopping."
         )
       }
-      if (awaitCall(token) == 0) {
+      val invoked = awaitCall(token)
+      // Taken whatever the outcome, so a message never outlives the call it belongs to, and
+      // published before the status is read: [read] is where the status becomes an exception, and
+      // the diagnostic that exception copies has to be this call's.
+      NativeDiagnostics.setProxiedDiagnostic(diagnostics.remove(token) ?: "")
+      if (invoked == 0) {
         throw Status.invalidState(
           "The MapLibre Native browser module could not invoke $name with $slotCount slots."
         )
@@ -222,9 +244,16 @@ internal object Dispatcher {
       draining = false
       return
     }
-    Heap.withScratch(COMPLETION_BYTES) { out ->
-      while (takeCompletion(dispatcher, out.address)) {
-        resolveCall(Heap.loadInt(out), Heap.loadInt(out + 4))
+    Heap.withScratch(COMPLETION_BYTES + DIAGNOSTIC_BYTES) { out ->
+      val diagnostic = out + COMPLETION_BYTES
+      while (takeCompletion(dispatcher, out.address, diagnostic.address, DIAGNOSTIC_BYTES)) {
+        val token = Heap.loadInt(out)
+        // Only a failing call leaves one, so the common case stores nothing. Recorded before the
+        // token is resolved for order rather than for safety: the parked caller resumes on a
+        // microtask, which cannot run while this loop holds the stack.
+        val message = Heap.loadUtf8(diagnostic)
+        if (message.isNotEmpty()) diagnostics[token] = message
+        resolveCall(token, Heap.loadInt(out + 4))
       }
     }
     // Kept running for the dispatcher's life. A caller parks before its call is submitted, so a
@@ -244,11 +273,19 @@ internal object Dispatcher {
     if (dispatcher == 0) return
     handle = 0
     draining = false
+    // Nothing is outstanding by now, so anything still here belongs to a caller that never
+    // resumed; it would otherwise be handed to whichever token matched it after a restart.
+    diagnostics.clear()
     stopDispatcher(dispatcher)
   }
 
   private const val SLOT_BYTES = 8
   private const val COMPLETION_BYTES = 8
+  // What the module copies for a failure, terminator included; see MLN_BROWSER_DIAGNOSTIC_CAPACITY
+  // in src/browser/dispatcher.c. The capacity travels with the call rather than being agreed on, so
+  // this bounds only what this binding is willing to receive: the module truncates to whatever it
+  // is given, on a UTF-8 boundary.
+  private const val DIAGNOSTIC_BYTES = 512
   // Tokens must be unique among outstanding calls. What guarantees that is the module-wide
   // suspension gate: one scope runs at a time, so one dispatched call is outstanding at a time.
   // The wrap is only to keep the counter from growing without bound -- it is not what makes a

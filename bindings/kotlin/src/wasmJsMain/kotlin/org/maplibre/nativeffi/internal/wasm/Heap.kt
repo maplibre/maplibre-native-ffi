@@ -177,6 +177,18 @@ internal object Heap {
     return bytes.toInt()
   }
 
+  /**
+   * Rejects a string C would truncate when it is passed as null-terminated text.
+   *
+   * Only for arguments that cross as a bare `const char*`. A `mln_string_view` carries its own
+   * length, so an embedded NUL is ordinary content there and must not be refused; a null-terminated
+   * argument would instead be silently cut at the first one, and native would act on a prefix the
+   * caller never asked for.
+   */
+  fun requireCString(value: String, subject: String) {
+    Status.requireArgument('\u0000' !in value) { "$subject cannot contain embedded NUL characters" }
+  }
+
   /** Bytes a null-terminated copy of [text] occupies, including the terminator. */
   fun utf8Size(text: String): Int = heapUtf8Length(text) + 1
 

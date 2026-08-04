@@ -43,10 +43,21 @@ public actual object Maplibre {
    */
   public actual fun loadNativeLibrary() {
     BrowserModule.require()
-    val version = cVersion()
-    if (version != EXPECTED_C_ABI_VERSION) {
-      throw AbiVersionMismatchException(version, EXPECTED_C_ABI_VERSION)
+    checkCompatibleCAbi()
+  }
+
+  /**
+   * Refuses a module whose C ABI contract version is not the one this binding was generated for.
+   *
+   * Split out of [loadNativeLibrary], as on every other platform, so the guard can be exercised
+   * against a version no loadable module reports.
+   */
+  internal fun checkCompatibleCAbi(actualVersion: Long = cVersion()) {
+    if (actualVersion == EXPECTED_C_ABI_VERSION) {
+      return
     }
+
+    throw AbiVersionMismatchException(actualVersion, EXPECTED_C_ABI_VERSION)
   }
 
   /**

@@ -38,22 +38,47 @@
 // Placing module-local work on this thread is what `submit_task` below is for;
 // creating a WebGL context is the first such caller, because a context belongs
 // to the thread that created it.
+//
+// **A diagnostic travels with its completion.** The C API's message is
+// thread-local, so a failure produced here belongs to this thread, and the next
+// call on this thread overwrites it -- by the time the host resumes there is
+// nothing left for it to read, and reading later would report an unrelated
+// message rather than none. So the message is copied here, at the moment the
+// call finishes, and published beside the status.
 
 #include <pthread.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "browser/dispatcher.h"
 
 #include "browser/dispatch_table.h"
 #include "maplibre_native_c/base.h"
+#include "maplibre_native_c/diagnostics.h"
 
 // How many calls may be outstanding at once. A caller is parked until its
 // answer arrives, so this is a bound on concurrent callers rather than on
 // throughput.
 #define MLN_BROWSER_COMPLETION_CAPACITY 256
+
+// How much of a failure's message a completion carries, including the
+// terminator.
+//
+// The storage is inline, one buffer per completion slot, so the ring reserves
+// 256 * 512 bytes -- 128 KiB, once, with the dispatcher. That is deliberate.
+// Submission already reserves a completion slot so that an accepted call always
+// has somewhere for its answer to go, and allocating the message instead would
+// put an allocation that can fail back inside that guarantee, exactly when
+// memory is short and a diagnostic is worth the most.
+//
+// The C API's own buffer is 4 KiB, so a message can be longer than this and is
+// then truncated. Truncation stops at a UTF-8 boundary: a host decodes what
+// arrives, and a split sequence would reach it as a replacement character
+// rather than as the text native wrote.
+#define MLN_BROWSER_DIAGNOSTIC_CAPACITY 512
 
 typedef struct mln_browser_call {
   uint32_t index;
@@ -90,6 +115,10 @@ typedef struct mln_browser_dispatcher {
   // none of that, and costs the same event-loop turn the callback would have.
   uint32_t completed_tokens[MLN_BROWSER_COMPLETION_CAPACITY];
   uint8_t completed_ok[MLN_BROWSER_COMPLETION_CAPACITY];
+  // The message the call left behind, copied on the thread that produced it.
+  // Empty for a call that did not fail.
+  char completed_diagnostics[MLN_BROWSER_COMPLETION_CAPACITY]
+                            [MLN_BROWSER_DIAGNOSTIC_CAPACITY];
   uint32_t completed_head;
   uint32_t completed_size;
   // Accepted but not yet collected. Submission is what this bounds, so a call
@@ -99,6 +128,35 @@ typedef struct mln_browser_dispatcher {
   // point it can still do something about it.
   uint32_t outstanding;
 } mln_browser_dispatcher;
+
+// Copies at most `capacity` bytes of `message`, terminator included, cutting on
+// a UTF-8 boundary. A null or empty message writes an empty string, which is
+// what says the call it belongs to did not fail.
+static void mln_browser_copy_diagnostic(
+  char* destination, uint32_t capacity, const char* message
+) {
+  if (destination == NULL || capacity == 0) {
+    return;
+  }
+  if (message == NULL) {
+    destination[0] = '\0';
+    return;
+  }
+  uint32_t length = 0;
+  while (message[length] != '\0' && length + 1 < capacity) {
+    length++;
+  }
+  if (message[length] != '\0') {
+    // `length` indexes the first byte left behind. When that byte continues a
+    // sequence, the sequence started inside what would be copied, so the whole
+    // of it is dropped rather than half written.
+    while (length > 0 && ((unsigned char)message[length] & 0xC0u) == 0x80u) {
+      length--;
+    }
+  }
+  memcpy(destination, message, length);
+  destination[length] = '\0';
+}
 
 static void* mln_browser_dispatcher_main(void* argument) {
   mln_browser_dispatcher* dispatcher = argument;
@@ -133,12 +191,19 @@ static void* mln_browser_dispatcher_main(void* argument) {
     // storage it was given, the same way a table call's status reaches the
     // result slot.
     bool ok = true;
+    const char* diagnostic = NULL;
     if (call->task != NULL) {
       call->task(call->task_argument);
     } else {
       ok = mln_browser_invoke_here(
         call->index, call->slots, call->slot_count, call->result
       );
+      // Read here, on the thread that wrote it, because this is the last moment
+      // it exists: the next call placed on this thread replaces it. A
+      // status-returning entry point clears the message when it starts, so an
+      // empty one means this call did not fail and nothing but a terminator is
+      // copied below.
+      diagnostic = mln_thread_last_error_message();
     }
     const uint32_t token = call->token;
     free(call);
@@ -151,6 +216,10 @@ static void* mln_browser_dispatcher_main(void* argument) {
       MLN_BROWSER_COMPLETION_CAPACITY;
     dispatcher->completed_tokens[slot] = token;
     dispatcher->completed_ok[slot] = ok ? 1u : 0u;
+    mln_browser_copy_diagnostic(
+      dispatcher->completed_diagnostics[slot], MLN_BROWSER_DIAGNOSTIC_CAPACITY,
+      diagnostic
+    );
     dispatcher->completed_size++;
     pthread_mutex_unlock(&dispatcher->mutex);
   }
@@ -399,11 +468,20 @@ MLN_API void mln_browser_dispatcher_stop(
  * `result` is then unwritten, so a host must not read a result it did not get a
  * true for.
  *
+ * `out_diagnostic` receives the message that call left on the owner thread, as
+ * null-terminated UTF-8 of at most `diagnostic_capacity` bytes including the
+ * terminator, truncated on a UTF-8 boundary. It is empty for a call that did
+ * not fail. **This is the only place that message can be had.** It is
+ * thread-local to the thread that produced it, and the next call placed there
+ * overwrites it, so a host that asked mln_thread_last_error_message() after
+ * resuming would read its own empty slot. Pass null, and zero, to drop it.
+ *
  * The host drains this from its own task and resolves whatever it parked on
  * that token.
  */
 MLN_API bool mln_browser_dispatcher_take_completion(
-  mln_browser_dispatcher* dispatcher, uint32_t* out_token, uint32_t* out_ok
+  mln_browser_dispatcher* dispatcher, uint32_t* out_token, uint32_t* out_ok,
+  char* out_diagnostic, uint32_t diagnostic_capacity
 ) MLN_NOEXCEPT {
   if (dispatcher == NULL || out_token == NULL || out_ok == NULL) {
     return false;
@@ -413,6 +491,10 @@ MLN_API bool mln_browser_dispatcher_take_completion(
   if (dispatcher->completed_size > 0) {
     *out_token = dispatcher->completed_tokens[dispatcher->completed_head];
     *out_ok = dispatcher->completed_ok[dispatcher->completed_head];
+    mln_browser_copy_diagnostic(
+      out_diagnostic, diagnostic_capacity,
+      dispatcher->completed_diagnostics[dispatcher->completed_head]
+    );
     dispatcher->completed_head =
       (dispatcher->completed_head + 1) % MLN_BROWSER_COMPLETION_CAPACITY;
     dispatcher->completed_size--;

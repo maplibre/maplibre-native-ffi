@@ -36,17 +36,19 @@ private external fun submitDestroy(dispatcher: Int, context: Int, token: Int): B
  * being a field a host fills in: there is no way for page code to reach that thread's context
  * table.
  *
+ * WebGL has no share groups, so a texture belongs to the one context it was made in. Anything that
+ * draws with what MapLibre rendered has to issue its GL calls in this context, on the thread that
+ * owns it — which page code cannot do. Until a host can run its own GL work on that thread, a frame
+ * reaches the page through [RenderSessionHandle.readPremultipliedRgba8].
+ *
  * The canvas behind the context is a private `OffscreenCanvas` on that thread, never on the page.
- * This build renders into texture targets, which draw into a framebuffer of their own, so nothing
- * would be displayed by a canvas even if one had been transferred; a frame reaches the page through
- * [RenderSessionHandle.readPremultipliedRgba8] instead.
  *
  * Closing is what releases the context and its canvas, and there is no finalizer behind it: a
  * browser host cannot recover leaked resources by restarting a process. Close it only after every
  * render target that borrowed it has been detached or destroyed, because the C API borrows the
  * handle for a target's lifetime.
  */
-public class WebglContext private constructor(private val handle: Int) : AutoCloseable {
+internal class WebglContext private constructor(private val handle: Int) : AutoCloseable {
   private val core =
     BorrowedResourceCore("WebglContext") {
       Dispatcher.submitTask("mln_browser_webgl_context_destroy") { dispatcher, token ->
@@ -60,23 +62,25 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
    * A fresh descriptor each call, because a descriptor is mutable: a shared one that a caller
    * changed would point every later target at whatever it was changed to.
    */
-  public fun descriptor(): WebglContextDescriptor = core.withOpenResource {
+  fun descriptor(): WebglContextDescriptor = core.withOpenResource {
     WebglContextDescriptor(handle)
   }
 
-  public override fun close(): Unit = core.close()
+  override fun close(): Unit = core.close()
 
-  public companion object {
+  companion object {
     /**
      * Creates a WebGL2 context, sized to back a target of [width] by [height] device pixels.
      *
      * The size is the backing canvas's. A texture target renders into a framebuffer of its own
-     * rather than into that canvas, so this bounds nothing the map draws; it only has to be
-     * positive, because a zero-sized canvas has no drawing buffer to create a context against.
+     * rather than into that canvas, so for one this bounds nothing the map draws and only has to be
+     * positive, because a zero-sized canvas has no drawing buffer to create a context against. A
+     * surface target renders into that canvas's default framebuffer, so for one it is the target's
+     * physical extent.
      *
      * Call this inside a `maplibreScope`, like every other call that reaches the owner thread.
      */
-    public fun create(width: Int, height: Int): WebglContext {
+    fun create(width: Int, height: Int): WebglContext {
       Status.requireArgument(width > 0) { "width must be positive, but was $width" }
       Status.requireArgument(height > 0) { "height must be positive, but was $height" }
       val handle =

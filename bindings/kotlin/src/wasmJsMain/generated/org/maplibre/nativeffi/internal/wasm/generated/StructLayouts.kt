@@ -28,7 +28,7 @@ internal object StructLayouts {
    * these offsets corrupts its heap.
    */
   const val HEADERS_DIGEST: String =
-    "E23C0EFBE63A181DF9C10A99622B47401513D1947E101E48343A83B8BF40982F"
+    "72DDB338BE17F42A9CCE15BFA7D84FB8556C1A96A57ABF24644A600A43BAD26C"
 }
 
 /** Values of `enum mln_adapter_http_header_route_flags`. */
