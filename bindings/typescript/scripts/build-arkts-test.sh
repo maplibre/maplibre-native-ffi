@@ -103,16 +103,21 @@ printf '{"src":["pages/Index"]}\n' >"$work/resources/base/profile/main_pages.jso
 "$toolchains/restool" -i "$work/resources" -o "$work" -p "$bundle_id" -r ResourceTable \
   >/dev/null 2>&1 || true
 
+# The packing tool empties its own working directory on the way out, whatever
+# paths it is given, so it is run from the scratch directory rather than from
+# the checkout. Run from the repository root it deletes the repository.
 echo "packing the hap"
 unsigned="$work/$module-unsigned.hap"
-mise exec -- java -jar "$toolchains/lib/app_packing_tool.jar" \
-  --mode hap \
-  --json-path "$work/module.json" \
-  --ets-path "$work/modules.abc" \
-  --lib-path "$work/libs" \
-  --resources-path "$work/resources" \
-  --out-path "$unsigned" \
-  --force true
+(
+  cd "$work"
+  java -jar "$toolchains/lib/app_packing_tool.jar" \
+    --mode hap \
+    --json-path module.json \
+    --ets-path modules.abc \
+    --lib-path libs \
+    --resources-path resources \
+    --out-path "$module-unsigned.hap"
+)
 
 # Signing is two steps. The SDK ships an unsigned provisioning profile template
 # rather than a signed profile, so the template is signed first and the hap is
@@ -134,7 +139,9 @@ with open(target, "w") as destination:
     json.dump(profile, destination)
 PYTHON
 
-mise exec -- java -jar "$toolchains/lib/hap-sign-tool.jar" sign-profile \
+(
+  cd "$work"
+  java -jar "$toolchains/lib/hap-sign-tool.jar" sign-profile \
   -keyAlias "openharmony application profile release" \
   -signAlg SHA256withECDSA \
   -mode localSign \
@@ -144,10 +151,13 @@ mise exec -- java -jar "$toolchains/lib/hap-sign-tool.jar" sign-profile \
   -outFile "$profile" \
   -keyPwd 123456 \
   -keystorePwd 123456
+)
 
 echo "signing the hap"
 signed="$work/$module.hap"
-mise exec -- java -jar "$toolchains/lib/hap-sign-tool.jar" sign-app \
+(
+  cd "$work"
+  java -jar "$toolchains/lib/hap-sign-tool.jar" sign-app \
   -keyAlias "openharmony application release" \
   -signAlg SHA256withECDSA \
   -mode localSign \
@@ -158,5 +168,6 @@ mise exec -- java -jar "$toolchains/lib/hap-sign-tool.jar" sign-app \
   -outFile "$signed" \
   -keyPwd 123456 \
   -keystorePwd 123456
+)
 
 echo "built $signed"
