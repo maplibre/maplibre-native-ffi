@@ -39,6 +39,10 @@ async function cacheDirectory(): Promise<string> {
  * A case that needs one names the capability and this runner leaves it out, so
  * reaching this is a registration mistake rather than something to work around.
  */
+function hostTexture(): never {
+  throw new Error("this runtime has no graphics context to make a texture in");
+}
+
 function renderContext(): never {
   throw new Error("this runtime has no graphics context to render through");
 }
@@ -145,6 +149,7 @@ for (const group of groupsFor(CONFORMANCE, {
         expect: assertions,
         cacheDirectory,
         renderContext,
+        hostTexture,
         loadPackage,
       });
     });

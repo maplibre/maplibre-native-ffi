@@ -117,6 +117,9 @@ export {
   type RenderTargetExtent,
   type VulkanContext,
   type VulkanOwnedTextureDescriptor,
+  type OpenGlFrameHandles,
+  OpenGlTextureFrame,
+  type TextureImageInfo,
 } from "./render.ts";
 export {
   ResourceErrorReason,

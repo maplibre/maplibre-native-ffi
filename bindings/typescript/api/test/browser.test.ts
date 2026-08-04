@@ -85,6 +85,48 @@ function renderContext(): { platform: "webgl"; context: number } {
   return context;
 }
 
+/**
+ * A texture this page owns, which a caller-owned target draws into.
+ *
+ * Made through the same context the session attaches to, so the session can
+ * see it, and kept by this runner so a case can check the session left it
+ * alone.
+ */
+function hostTexture(
+  width: number,
+  height: number,
+): { texture: number; target: number } {
+  const handle = renderContext().context;
+  const gl = (
+    module_ as unknown as {
+      GL: {
+        contexts: { GLctx: WebGL2RenderingContext }[];
+        getNewId(table: unknown[]): number;
+        textures: unknown[];
+      };
+    }
+  ).GL;
+  const context = gl.contexts[handle]!.GLctx;
+  const texture = context.createTexture();
+  context.bindTexture(context.TEXTURE_2D, texture);
+  context.texImage2D(
+    context.TEXTURE_2D,
+    0,
+    context.RGBA8,
+    width,
+    height,
+    0,
+    context.RGBA,
+    context.UNSIGNED_BYTE,
+    null,
+  );
+  // Emscripten addresses a texture by the id it assigned, not by the JS object,
+  // so the id is what crosses to the C API.
+  const id = gl.getNewId(gl.textures);
+  gl.textures[id] = texture;
+  return { texture: id, target: context.TEXTURE_2D };
+}
+
 let cacheSequence = 0;
 function cacheDirectory(): Promise<string> {
   const filesystem = (module_ as { FS?: { mkdir(path: string): void } }).FS;
@@ -180,6 +222,7 @@ describe("a browser hosting the WebAssembly payload", () => {
             cacheDirectory,
             loadPackage,
             renderContext,
+            hostTexture,
           });
         });
       }

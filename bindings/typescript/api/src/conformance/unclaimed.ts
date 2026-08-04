@@ -143,19 +143,14 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
   // context, so what remains is not the context but the API: the binding
   // exposes no CPU readback, no owned-texture frames, and no `set_target`.
   {
-    id: "BND-166",
+    id: "BND-169",
     reason: "unwritten",
-    note: "the binding exposes no CPU readback",
+    note: "needs fault injection into native frame release, which no seam offers yet",
   },
-  ...([167, 168, 169, 170, 172, 173] as const).map((number) => ({
-    id: `BND-${number}`,
-    reason: "unwritten" as const,
-    note: "the binding exposes no owned-texture frame handles",
-  })),
   {
-    id: "BND-171",
-    reason: "unwritten",
-    note: "a caller-owned texture is attachable and no case proves close leaves the caller's handles alone",
+    id: "BND-172",
+    reason: "inapplicable",
+    note: "the frame wrapper's construction cannot fail: it is built from a record already copied out",
   },
   { id: "BND-174", reason: "inapplicable", note: NO_SECOND_THREAD },
   ...([175, 176] as const).map((number) => ({

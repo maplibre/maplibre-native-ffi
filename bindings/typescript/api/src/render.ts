@@ -291,6 +291,125 @@ export class RenderSession {
     });
   }
 
+  /**
+   * Describes the image a readback would produce, without copying one.
+   *
+   * A size probe, so a host can size a buffer once and reuse it. A backend that
+   * cannot read pixels back reports unsupported rather than answering with a
+   * size, so this is not a way to ask whether readback works.
+   */
+  imageInfo(): TextureImageInfo {
+    const id = this.#state.use("RenderSession.imageInfo");
+    const native = this.#state.native;
+    return native.scope((scope) => {
+      const storage = this.#imageInfoStorage(scope);
+      native.checked(scope, EP.mln_texture_read_premultiplied_rgba8, [
+        id,
+        0n,
+        0n,
+        storage,
+      ]);
+      return readImageInfo(native, storage);
+    });
+  }
+
+  /**
+   * Copies the last rendered frame into `into` as premultiplied RGBA8.
+   *
+   * `into` is the caller's, and stays the caller's: a buffer too small for the
+   * image leaves it untouched and reports what size was needed, so a host can
+   * grow it and ask again.
+   */
+  readPremultipliedRgba8(into: Uint8Array): TextureImageInfo {
+    const id = this.#state.use("RenderSession.readPremultipliedRgba8");
+    const native = this.#state.native;
+    return native.scope((scope) => {
+      const storage = this.#imageInfoStorage(scope);
+      // The C API writes through a pointer, and a host buffer is not native
+      // memory, so the copy lands in a scope allocation first.
+      const pixels = scope.allocateZeroed(Math.max(into.byteLength, 1));
+      native.checked(scope, EP.mln_texture_read_premultiplied_rgba8, [
+        id,
+        pixels,
+        BigInt(into.byteLength),
+        storage,
+      ]);
+      const info = readImageInfo(native, storage);
+      into.set(native.memory.bytes(pixels, info.byteLength));
+      return info;
+    });
+  }
+
+  /**
+   * Takes the most recently rendered texture, which is the session's until it
+   * is given back.
+   *
+   * While a frame is held the session renders nothing new and every operation
+   * that would disturb the texture reports invalid state, so the frame is
+   * released in a `finally` wherever one is taken.
+   */
+  acquireOpenGlFrame(): OpenGlTextureFrame {
+    const id = this.#state.use("RenderSession.acquireOpenGlFrame");
+    const native = this.#state.native;
+    return native.scope((scope) => {
+      const layout = native.layout("mln_opengl_owned_texture_frame");
+      const storage = scope.allocateZeroed(layout.size, layout.align);
+      native.memory
+        .view(storage, layout.size)
+        .setUint32(layout.fields.size!.offset, layout.size, true);
+      native.checked(scope, EP.mln_opengl_owned_texture_acquire_frame, [
+        id,
+        storage,
+      ]);
+      const view = native.memory.view(storage, layout.size);
+      const read = (field: string): number =>
+        view.getUint32(layout.fields[field]!.offset, true);
+      return new OpenGlTextureFrame(
+        this,
+        native.memory.bytes(storage, layout.size).slice(),
+        {
+          width: read("width"),
+          height: read("height"),
+          scaleFactor: view.getFloat64(
+            layout.fields.scale_factor!.offset,
+            true,
+          ),
+          texture: read("texture"),
+          target: read("target"),
+          internalFormat: read("internal_format"),
+          format: read("format"),
+          type: read("type"),
+        },
+      );
+    });
+  }
+
+  /** @internal Gives a frame back, which only the frame calls. */
+  releaseOpenGlFrame(record: Uint8Array): void {
+    const id = this.#state.use("RenderSession.releaseOpenGlFrame");
+    const native = this.#state.native;
+    native.scope((scope) => {
+      const layout = native.layout("mln_opengl_owned_texture_frame");
+      const storage = scope.allocateZeroed(layout.size, layout.align);
+      native.memory.bytes(storage, layout.size).set(record);
+      native.checked(scope, EP.mln_opengl_owned_texture_release_frame, [
+        id,
+        storage,
+      ]);
+    });
+  }
+
+  #imageInfoStorage(scope: Scope): Ptr {
+    const native = this.#state.native;
+    const layout = native.layout("mln_texture_image_info");
+    const storage = scope.allocateZeroed(layout.size, layout.align);
+    native.structValue(scope, EP.mln_texture_image_info_default, storage);
+    native.memory
+      .view(storage, layout.size)
+      .setUint32(layout.fields.size!.offset, layout.size, true);
+    return storage;
+  }
+
   /** Resizes the target, which the map applies on its next pump. */
   resize(extent: RenderTargetExtent): void {
     const id = this.#state.use("RenderSession.resize");
@@ -532,6 +651,98 @@ export type OpenGlContext =
       readonly platform: "webgl";
       readonly context: number;
     };
+
+/** What a readback would produce, in device pixels. */
+export interface TextureImageInfo {
+  readonly width: number;
+  readonly height: number;
+  /** Bytes per image row, which padding may make wider than `width * 4`. */
+  readonly stride: number;
+  /** How many bytes a buffer needs to hold the image. */
+  readonly byteLength: number;
+}
+
+/** The graphics handles a held frame exposes, which are the session's. */
+export interface OpenGlFrameHandles {
+  readonly width: number;
+  readonly height: number;
+  readonly scaleFactor: number;
+  /** The texture object name, borrowed until the frame is released. */
+  readonly texture: number;
+  readonly target: number;
+  readonly internalFormat: number;
+  readonly format: number;
+  readonly type: number;
+}
+
+/**
+ * A rendered texture the host holds.
+ *
+ * The texture belongs to the session and is only borrowed, so it is given back
+ * as soon as the host has read or drawn it. Reading the handles after that
+ * fails rather than handing out a name the session may have reused.
+ */
+export class OpenGlTextureFrame {
+  readonly #session: RenderSession;
+  readonly #record: Uint8Array;
+  readonly #handles: OpenGlFrameHandles;
+  #released = false;
+
+  /** @internal Built by the session that acquired it. */
+  constructor(
+    session: RenderSession,
+    record: Uint8Array,
+    handles: OpenGlFrameHandles,
+  ) {
+    this.#session = session;
+    this.#record = record;
+    this.#handles = handles;
+  }
+
+  /** The borrowed graphics handles, while this frame is still held. */
+  get handles(): OpenGlFrameHandles {
+    if (this.#released) {
+      throw new MaplibreError(
+        "closedHandle",
+        "this texture frame was released, so its handles are no longer valid",
+        { operation: "OpenGlTextureFrame.handles" },
+      );
+    }
+    return this.#handles;
+  }
+
+  get isReleased(): boolean {
+    return this.#released;
+  }
+
+  /**
+   * Gives the texture back to the session.
+   *
+   * A release that fails leaves the frame held, because the session still owns
+   * a frame it has not taken back; a later release can succeed.
+   */
+  release(): void {
+    if (this.#released) {
+      return;
+    }
+    this.#session.releaseOpenGlFrame(this.#record);
+    this.#released = true;
+  }
+}
+
+/** Reads the metadata a readback filled in. */
+function readImageInfo(native: Native, storage: Ptr): TextureImageInfo {
+  const layout = native.layout("mln_texture_image_info");
+  const view = native.memory.view(storage, layout.size);
+  return {
+    width: view.getUint32(layout.fields.width!.offset, true),
+    height: view.getUint32(layout.fields.height!.offset, true),
+    stride: view.getUint32(layout.fields.stride!.offset, true),
+    byteLength: native.readSize(
+      (storage + BigInt(layout.fields.byte_length!.offset)) as Ptr,
+    ),
+  };
+}
 
 /** A session that presents through a host surface. */
 export interface SurfaceDescriptor<Context> {

@@ -251,5 +251,172 @@ export const RENDER_SESSION_GROUP: ConformanceGroup = {
         });
       },
     },
+    {
+      name: "reads a rendered frame back to the CPU",
+      spec: ["BND-166"],
+      needs: NEEDS_CONTEXT,
+      run({ maplibre, expect, renderContext }) {
+        withRuntime(maplibre, (runtime, open) => {
+          const map = open(EXTENT);
+          const session = map.attachOpenGlOwnedTexture({
+            extent: EXTENT,
+            context: renderContext(),
+          });
+          try {
+            expect.ok(loadStyle(runtime, map, POINT_STYLE), "the style loaded");
+            for (let attempt = 0; attempt < 60; attempt += 1) {
+              runtime.pump(25);
+              session.renderUpdate();
+            }
+
+            const info = session.imageInfo();
+            expect.equal(info.width, EXTENT.width, "the image width");
+            expect.equal(info.height, EXTENT.height, "the image height");
+            expect.ok(
+              info.byteLength >= info.width * info.height * 4,
+              "the image needs at least four bytes a pixel",
+            );
+            expect.ok(
+              info.stride >= info.width * 4,
+              "a row is at least four bytes a pixel",
+            );
+
+            // A buffer too small is refused, and stays the caller's: nothing is
+            // written into it and it can be grown and offered again.
+            const small = new Uint8Array(info.byteLength - 1).fill(0xab);
+            expect.throws(
+              () => session.readPremultipliedRgba8(small),
+              "reading into a buffer too small for the image",
+            );
+            expect.ok(
+              small.every((byte) => byte === 0xab),
+              "the buffer it refused is untouched",
+            );
+
+            // The same buffer serves again, which is what sizing it once is
+            // for.
+            const pixels = new Uint8Array(info.byteLength);
+            const first = session.readPremultipliedRgba8(pixels);
+            expect.equal(first.byteLength, info.byteLength, "the copied size");
+            expect.ok(
+              pixels.some((byte) => byte !== 0),
+              "the image has something in it",
+            );
+            const again = session.readPremultipliedRgba8(pixels);
+            expect.equal(
+              again.width,
+              first.width,
+              "a reused buffer reads again",
+            );
+          } finally {
+            session.close();
+          }
+        });
+      },
+    },
+    {
+      name: "lends a rendered texture and takes it back",
+      spec: ["BND-167", "BND-168", "BND-170", "BND-173"],
+      needs: NEEDS_CONTEXT,
+      run({ maplibre, expect, renderContext }) {
+        withRuntime(maplibre, (runtime, open) => {
+          const map = open(EXTENT);
+          const session = map.attachOpenGlOwnedTexture({
+            extent: EXTENT,
+            context: renderContext(),
+          });
+          try {
+            expect.ok(loadStyle(runtime, map, POINT_STYLE), "the style loaded");
+            for (let attempt = 0; attempt < 60; attempt += 1) {
+              runtime.pump(25);
+              session.renderUpdate();
+            }
+
+            const frame = session.acquireOpenGlFrame();
+            expect.ok(frame.handles.texture > 0, "a borrowed texture name");
+            expect.equal(frame.handles.width, EXTENT.width, "the frame width");
+            expect.equal(frame.isReleased, false, "the frame is held");
+
+            // While it is held the session cannot disturb the texture, so
+            // everything that would reports rather than doing it.
+            expect.throwsAny(
+              () => session.acquireOpenGlFrame(),
+              "a second acquire while one is held",
+            );
+            expect.throwsAny(
+              () => session.renderUpdate(),
+              "rendering while a frame is held",
+            );
+            expect.throwsAny(
+              () => session.resize({ width: 64, height: 64 }),
+              "resizing while a frame is held",
+            );
+
+            frame.release();
+            expect.equal(frame.isReleased, true, "the frame was given back");
+            // A released frame hands out no handles: the session may have
+            // reused that texture name by now.
+            expect.equal(
+              expect.throws(
+                () => frame.handles,
+                "reading handles after release",
+              ).kind,
+              "closedHandle",
+              "the error a released frame reports",
+            );
+            // Giving it back twice is not an error; it is already back.
+            frame.release();
+            // And the session works again.
+            expect.equal(
+              typeof session.renderUpdate(),
+              "boolean",
+              "the session renders again",
+            );
+          } finally {
+            session.close();
+          }
+        });
+      },
+    },
+    {
+      name: "leaves a caller-owned texture to its owner",
+      spec: ["BND-171"],
+      needs: NEEDS_CONTEXT,
+      run({ maplibre, expect, renderContext, hostTexture }) {
+        withRuntime(maplibre, (runtime, open) => {
+          const map = open(EXTENT);
+          const owned = hostTexture(EXTENT.width, EXTENT.height);
+          const session = map.attachOpenGlBorrowedTexture({
+            extent: EXTENT,
+            physicalWidth: EXTENT.width,
+            physicalHeight: EXTENT.height,
+            context: renderContext(),
+            texture: owned.texture,
+            target: owned.target,
+          });
+          loadStyle(runtime, map, EMPTY_STYLE);
+          session.renderUpdate();
+
+          // Readback belongs to a session that owns its target. This one draws
+          // into the caller's texture, so the caller reads it with its own
+          // graphics API instead.
+          expect.throws(
+            () => session.imageInfo(),
+            "reading back from a caller-owned target",
+          );
+
+          session.close();
+          // Closing the session releases what the session made. The texture was
+          // never the session's to release, and the host still holds the same
+          // one it passed in.
+          const after = hostTexture(EXTENT.width, EXTENT.height);
+          expect.notEqual(
+            after.texture,
+            owned.texture,
+            "the host's texture name was not handed back out",
+          );
+        });
+      },
+    },
   ],
 };

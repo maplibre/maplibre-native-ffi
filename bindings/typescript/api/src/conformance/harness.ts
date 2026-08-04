@@ -68,6 +68,17 @@ export interface CaseContext {
    * case would have to check.
    */
   renderContext(): OpenGlContext;
+  /**
+   * A texture the host owns and keeps, for a caller-owned render target.
+   *
+   * The session draws into it and must not release or renumber it, which is
+   * what the caller-owned cases check, so the host makes it and reads it back
+   * afterwards.
+   */
+  hostTexture(
+    width: number,
+    height: number,
+  ): { texture: number; target: number };
 }
 
 export interface ConformanceCase {
