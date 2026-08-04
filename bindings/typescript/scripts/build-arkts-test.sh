@@ -180,14 +180,34 @@ PYTHON
 )
 
 # The SDK ships the signing keys but no application certificate. The release
-# key's certificate is self-signed, so the chain is that one certificate.
-echo "exporting the application certificate"
-app_cert="$work/app-release.pem"
-keytool -exportcert -rfc \
-  -alias "openharmony application release" \
-  -keystore "$toolchains/lib/OpenHarmony.p12" \
-  -storetype PKCS12 \
-  -storepass 123456 >"$app_cert"
+# key's own certificate is self-signed and the verifier rejects it, so a
+# certificate is issued for that key by the CA in the same keystore, and the
+# chain the verifier walks is emitted alongside it.
+echo "issuing the application certificate"
+app_cert="$work/app-release.cer"
+root_ca="$work/root-ca.cer"
+sub_ca="$work/sub-ca.cer"
+keytool -exportcert -rfc -alias "openharmony application root ca" \
+  -keystore "$toolchains/lib/OpenHarmony.p12" -storetype PKCS12 \
+  -storepass 123456 >"$root_ca"
+keytool -exportcert -rfc -alias "openharmony application ca" \
+  -keystore "$toolchains/lib/OpenHarmony.p12" -storetype PKCS12 \
+  -storepass 123456 >"$sub_ca"
+
+java -jar "$toolchains/lib/hap-sign-tool.jar" generate-app-cert \
+  -keyAlias "openharmony application release" \
+  -issuer "C=CN, O=OpenHarmony, OU=OpenHarmony Team, CN=OpenHarmony Application CA" \
+  -issuerKeyAlias "openharmony application ca" \
+  -subject "C=CN, O=OpenHarmony, OU=MapLibre, CN=MapLibre Native FFI Conformance" \
+  -signAlg SHA256withECDSA \
+  -keystoreFile "$toolchains/lib/OpenHarmony.p12" \
+  -keystorePwd 123456 \
+  -keyPwd 123456 \
+  -issuerKeyPwd 123456 \
+  -outForm certChain \
+  -rootCaCertFile "$root_ca" \
+  -subCaCertFile "$sub_ca" \
+  -outFile "$app_cert"
 
 echo "signing the hap"
 signed="$work/$module.hap"
