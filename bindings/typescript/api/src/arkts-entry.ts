@@ -21,6 +21,8 @@ export {
   CONFORMANCE,
   conformanceCases,
   coveredSpecCases,
+  groupsFor,
+  runsHere,
 } from "./conformance/index.ts";
 export type {
   CaseContext,

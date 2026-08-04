@@ -13,7 +13,8 @@ import fileIo from '@ohos.file.fs';
 // modules through its own build rather than through node_modules.
 // Types are imported separately: a merged-bytecode import is checked against
 // what the record actually exports, and a type is not one of them.
-import { CONFORMANCE, loadArkTs, MaplibreError } from '../conformance.bundle';
+import { groupsFor, loadArkTs, MaplibreError } from '../conformance.bundle';
+import { CONFORMANCE } from '../conformance.bundle';
 import type { Expect } from '../conformance.bundle';
 
 export default function conformanceTest() {
@@ -38,6 +39,13 @@ export default function conformanceTest() {
   const show = (value: ESObject): string =>
     JSON.stringify(value, (_key: string, member: ESObject): ESObject =>
       typeof member === 'bigint' ? `${member}n` : member) ?? String(value);
+
+  // A case that needs one names the capability and is left out above, so
+  // reaching this is a registration mistake rather than something to work
+  // around.
+  const renderContext = (): ESObject => {
+    throw new Error('this runtime has no graphics context to render through');
+  };
 
   const assertions: Expect = {
     equal: (actual, expected, what) => {
@@ -87,15 +95,14 @@ export default function conformanceTest() {
     },
   };
 
-  for (const group of CONFORMANCE) {
+  // What this runner offers: ArkTS resolves no package by name, and a device
+  // test has no graphics context to attach a render session to. `groupsFor`
+  // decides what to register, so this runner cannot drift from the others.
+  const HOST: ESObject = { transport: 'node-api', capabilities: [] };
+
+  for (const group of groupsFor(CONFORMANCE, HOST)) {
     describe(group.name, () => {
       for (const entry of group.cases) {
-        // ArkTS resolves neither packages nor paths, so a case that asks the
-        // runtime to find this package by name has nothing here to find. The
-        // case says so itself rather than this runner skipping by name.
-        if (entry.needs?.includes('packageResolution')) {
-          continue;
-        }
         it(entry.name, TestType.FUNCTION, async () => {
           await entry.run({ maplibre, expect: assertions, cacheDirectory, loadPackage });
         });
