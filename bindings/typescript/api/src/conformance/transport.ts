@@ -18,7 +18,8 @@ import {
   expectedPayloadIdentity,
   verifyPayload,
 } from "../internal/handshake.ts";
-import { Memory, MemoryError } from "../internal/memory.ts";
+import { Memory, MemoryError, type Scope } from "../internal/memory.ts";
+import { nativeOf } from "../internal/private.ts";
 import { AbiCallStatus, type Ptr } from "../internal/transport.ts";
 import { EP } from "../raw/entrypoints.ts";
 import { MLN_STATUS } from "../raw/enums.ts";
@@ -244,6 +245,68 @@ export const CALL_ABI_GROUP: ConformanceGroup = {
             );
           });
         });
+      },
+    },
+    {
+      name: "initializes every input-struct family from C defaults",
+      spec: ["BND-060"],
+      run({ maplibre, expect }) {
+        const native = nativeOf(maplibre);
+        // The families are taken from the generated tables rather than listed
+        // here, so a family added to the C API joins this case by existing
+        // instead of by somebody remembering to add it.
+        const families = Object.keys(EP)
+          .filter((name) => name.endsWith("_default"))
+          .map((name) => name.slice(0, -"_default".length));
+        expect.ok(families.length > 0, "there are families to check");
+
+        const withoutSize: string[] = [];
+        for (const family of families) {
+          const layout = native.layout(family);
+          native.scope((scope: Scope) => {
+            const storage = scope.allocateZeroed(layout.size, layout.align);
+            native.structValue(
+              scope,
+              EP[`${family}_default` as keyof typeof EP],
+              storage,
+            );
+            const view = native.memory.view(storage, layout.size);
+            const size = layout.fields["size"];
+            if (size === undefined) {
+              // A family with no size field cannot version itself; recorded
+              // rather than skipped, so the list below is the whole answer.
+              withoutSize.push(family);
+              return;
+            }
+            // The defaults a library returns describe the struct this build
+            // was generated against, which is what lets a caller pass one
+            // through without knowing its layout.
+            expect.equal(
+              view.getUint32(size.offset, true),
+              layout.size,
+              `${family} reports the size this build expects`,
+            );
+            // A field mask, where the family has one, starts empty: a caller
+            // sets what it means and nothing arrives set by accident.
+            const mask = layout.fields["fields"];
+            if (mask !== undefined) {
+              expect.equal(
+                view.getUint32(mask.offset, true),
+                0,
+                `${family} starts with no field claimed`,
+              );
+            }
+          });
+        }
+
+        // Nested inputs are reached through the families above rather than
+        // separately: a descriptor holding another descriptor is initialized
+        // by the same call.
+        expect.equal(
+          withoutSize.join(", "),
+          "",
+          "every input-struct family carries a size field",
+        );
       },
     },
     {
