@@ -117,6 +117,9 @@ manifest["app"] = {
     "apiReleaseType": "Release",
     "debug": True,
     "bundleType": "app",
+    # The application carries its own icon and label, not only its abilities.
+    "icon": "$media:icon",
+    "label": "$string:app_name",
 }
 with open(target, "w") as handle:
     json.dump(manifest, handle)
@@ -124,11 +127,12 @@ PYTHON
 printf '{"src":["pages/Index"]}\n' >"$work/resources/base/profile/main_pages.json"
 # The device's manifest parser requires the icon, label, and pages a module
 # names, so the resources they point at are compiled rather than skipped.
-cp -r "$source_dir/entry/src/ohosTest/resources/." "$work/resources/"
-mkdir -p "$work/compiled"
-# restool reads the module manifest beside the resources it compiles.
-cp "$work/module.json" "$work/resources/module.json"
-"$toolchains/restool" -i "$work/resources" -o "$work/compiled" \
+# restool takes the module directory, which holds the manifest beside the
+# resources the manifest refers to, rather than the resource directory itself.
+mkdir -p "$work/module/resources" "$work/compiled"
+cp -r "$source_dir/entry/src/ohosTest/resources/." "$work/module/resources/"
+cp "$work/module.json" "$work/module/module.json"
+"$toolchains/restool" -i "$work/module" -o "$work/compiled" \
   -p "$bundle_id" -r ResourceTable -f
 
 # The packing tool empties its own working directory on the way out, whatever
