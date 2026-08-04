@@ -24,6 +24,7 @@ export {
 } from "./camera.ts";
 export {
   type ErrorKind,
+  errorKindForStatus,
   MaplibreError,
   type MaplibreErrorOptions,
 } from "./errors.ts";

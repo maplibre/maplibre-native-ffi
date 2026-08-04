@@ -2,6 +2,7 @@
  * The loaded library, runtimes, wake sources, and event polling.
  */
 
+import { errorKindForStatus, MaplibreError } from "../errors.ts";
 import { RuntimeEventType } from "../events.ts";
 import { NetworkStatus } from "../maplibre.ts";
 import type { ConformanceGroup } from "./harness.ts";
@@ -109,6 +110,80 @@ export const RUNTIME_GROUP: ConformanceGroup = {
         expect.equal(error.kind, "closedHandle", "the error kind");
         // Nothing crossed into C, so there is no native diagnostic to carry.
         expect.equal(error.diagnostic, "", "no native diagnostic");
+      },
+    },
+    {
+      name: "maps every native status category to its error kind",
+      spec: ["BND-020", "BND-021"],
+      run({ expect }) {
+        // No real call can produce every status on demand, and a future
+        // library can report one this build does not name, so the conversion
+        // is driven directly. It is the same function every failing call uses.
+        const expected: readonly [number, string][] = [
+          [-1, "invalidArgument"],
+          [-2, "invalidState"],
+          [-3, "wrongThread"],
+          [-4, "unsupported"],
+          [-5, "nativeError"],
+        ];
+        for (const [status, kind] of expected) {
+          expect.equal(
+            errorKindForStatus(status),
+            kind,
+            `status ${status} maps to ${kind}`,
+          );
+        }
+
+        // A status this build does not name is not collapsed onto a kind that
+        // happens to be nearby, and the raw value survives on the error so a
+        // caller can report what actually came back.
+        expect.equal(
+          errorKindForStatus(-999),
+          "unknownStatus",
+          "an unnamed status keeps its own kind",
+        );
+        const error = new MaplibreError("unknownStatus", "from the future", {
+          nativeStatus: -999,
+        });
+        expect.equal(error.nativeStatus, -999, "the raw status is preserved");
+      },
+    },
+    {
+      name: "reports its own diagnostic rather than a stale native one",
+      spec: ["BND-025"],
+      run({ maplibre, expect }) {
+        const runtime = maplibre.createRuntime();
+        const map = runtime.createMap({ width: 64, height: 64 });
+        // A real native failure first, which leaves a diagnostic behind in the
+        // library's thread-local storage.
+        const native = expect.throws(
+          () => map.setStyleJson("{not json"),
+          "a style the library rejects",
+        );
+        expect.ok(
+          native.diagnostic.length > 0,
+          "the native failure carried a diagnostic",
+        );
+
+        // A failure the binding decides for itself must not carry that one. It
+        // describes what this binding refused, and names no native status
+        // because no call was made.
+        map.close();
+        const own = expect.throws(
+          () => map.setStyleJson("{}"),
+          "using a map after it closed",
+        );
+        expect.equal(own.kind, "closedHandle", "the binding's own kind");
+        expect.absent(
+          own.nativeStatus,
+          "a binding-owned failure has no native status",
+        );
+        expect.notEqual(
+          own.diagnostic,
+          native.diagnostic,
+          "and does not repeat the last native diagnostic",
+        );
+        runtime.close();
       },
     },
     {

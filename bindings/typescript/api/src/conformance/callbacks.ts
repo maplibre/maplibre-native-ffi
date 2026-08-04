@@ -486,6 +486,97 @@ export const RESOURCES_GROUP: ConformanceGroup = {
       },
     },
     {
+      name: "keeps a scheme alias in the URL it was asked for",
+      spec: ["BND-155", "BND-157"],
+      run({ maplibre, expect }) {
+        withRuntime(maplibre, (runtime, open) => {
+          let seen: { requested: string; resolved: string } | undefined;
+          // The route compares the URL as asked for, which still carries the
+          // alias. A route matching what a fetch would use would not claim it.
+          runtime.setResourceProvider(
+            [{ url: "maplibre://", matchPrefix: true, useRequestedUrl: true }],
+            (request) => {
+              seen = {
+                requested: request.info.requestedUrl,
+                resolved: request.info.resolvedUrl,
+              };
+              request.complete({
+                bytes: new TextEncoder().encode(EMPTY_STYLE),
+              });
+            },
+          );
+
+          const map = open({ width: 64, height: 64 });
+          map.setStyleUrl("maplibre://maps/streets");
+          for (
+            let attempt = 0;
+            attempt < 60 && seen === undefined;
+            attempt += 1
+          ) {
+            runtime.pump(25);
+            maplibre.deliverCallbacks();
+            while (runtime.pollEvent() !== undefined) {
+              // Drained so the queue does not hold the pump open.
+            }
+          }
+
+          const urls = expect.defined(seen, "the claimed request");
+          expect.contains(
+            urls.requested,
+            "maplibre://",
+            "the requested URL keeps the alias it was asked for",
+          );
+          // What a provider would fetch is the alias resolved, which is a
+          // different string. Both are offered because a cache keys on one and
+          // a fetch uses the other.
+          expect.notEqual(
+            urls.resolved,
+            urls.requested,
+            "the resolved URL is the alias expanded",
+          );
+        });
+      },
+    },
+    {
+      name: "settles a request answered inside the callback",
+      spec: ["BND-150"],
+      run({ maplibre, expect }) {
+        withRuntime(maplibre, (runtime, open) => {
+          let settledInside: boolean | undefined;
+          runtime.setResourceProvider(
+            [{ url: "inline://", matchPrefix: true, useRequestedUrl: true }],
+            (request) => {
+              request.complete({
+                bytes: new TextEncoder().encode(EMPTY_STYLE),
+              });
+              // Ownership is finalized by the answer, not by this callback
+              // returning, so it is already settled here.
+              settledInside = request.isSettled;
+              // Whatever this callback does afterwards cannot unsettle it.
+              request.close();
+            },
+          );
+
+          const map = open({ width: 64, height: 64 });
+          map.setStyleUrl("inline://style.json");
+          let loaded = false;
+          for (let attempt = 0; attempt < 200 && !loaded; attempt += 1) {
+            runtime.pump(25);
+            maplibre.deliverCallbacks();
+            for (
+              let event = runtime.pollEvent();
+              event !== undefined;
+              event = runtime.pollEvent()
+            ) {
+              loaded ||= event.type.equals(RuntimeEventType.mapStyleLoaded);
+            }
+          }
+          expect.equal(settledInside, true, "answering settled it inside");
+          expect.ok(loaded, "and the answer reached MapLibre");
+        });
+      },
+    },
+    {
       name: "keeps a released request from reaching a later one",
       spec: ["BND-151"],
       run({ maplibre, expect }) {

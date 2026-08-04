@@ -37,21 +37,6 @@ const NO_SECOND_THREAD =
 
 export const UNCLAIMED: readonly UnclaimedCase[] = [
   // Error mapping.
-  {
-    id: "BND-020",
-    reason: "unwritten",
-    note: "one category is proven; a case driving every status category is not written",
-  },
-  {
-    id: "BND-021",
-    reason: "unwritten",
-    note: "needs an internal conversion seam, as the network-status case has",
-  },
-  {
-    id: "BND-025",
-    reason: "unwritten",
-    note: "binding-owned validation is proven; that it never reports a stale native diagnostic is not",
-  },
 
   // Handle lifetime.
   {
@@ -107,22 +92,7 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
     reason: "unwritten",
     note: "cancellation observed before a late completion is untested",
   },
-  {
-    id: "BND-150",
-    reason: "unwritten",
-    note: "inline completion followed by a contradicting return value is untested",
-  },
   { id: "BND-153", reason: "inapplicable", note: NO_SECOND_THREAD },
-  {
-    id: "BND-155",
-    reason: "unwritten",
-    note: "scheme aliases are configurable and no case reads one back as the requested URL",
-  },
-  {
-    id: "BND-157",
-    reason: "unwritten",
-    note: "route comparison against an aliased URL is untested",
-  },
   {
     id: "BND-158",
     reason: "unwritten",
