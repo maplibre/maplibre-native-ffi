@@ -392,7 +392,7 @@ impl ResourceRequestHandleFns {
 
 #[derive(Debug)]
 struct ResourceRequestHandleInner {
-    handle: usize,
+    handle: u64,
     decision_finalized: bool,
     provider_owned: bool,
     release_accounted_for: bool,
@@ -426,7 +426,7 @@ impl ResourceRequestHandleState {
         }
         Ok(Arc::new(Self {
             inner: Mutex::new(ResourceRequestHandleInner {
-                handle: handle.0 as usize,
+                handle: handle.0,
                 decision_finalized: false,
                 provider_owned: false,
                 release_accounted_for: false,
@@ -438,7 +438,7 @@ impl ResourceRequestHandleState {
     }
 
     fn native_handle(inner: &ResourceRequestHandleInner) -> sys::mln_resource_request_handle {
-        sys::mln_resource_request_handle(inner.handle as u64)
+        sys::mln_resource_request_handle(inner.handle)
     }
 
     pub fn complete(&self, response: &ResourceResponse) -> Result<()> {
@@ -706,6 +706,16 @@ mod tests {
             )
         }
         .unwrap()
+    }
+
+    #[test]
+    fn resource_request_handle_preserves_all_64_bits() {
+        let state = fake_state();
+        let inner = state.lock_inner().unwrap();
+        assert_eq!(
+            ResourceRequestHandleState::native_handle(&inner).0,
+            0x0c00_0000_0000_0034
+        );
     }
 
     #[test]
