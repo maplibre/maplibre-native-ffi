@@ -153,11 +153,6 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
     note: "the frame wrapper's construction cannot fail: it is built from a record already copied out",
   },
   { id: "BND-174", reason: "inapplicable", note: NO_SECOND_THREAD },
-  ...([175, 176] as const).map((number) => ({
-    id: `BND-${number}`,
-    reason: "unwritten" as const,
-    note: "the binding exposes no `set_target`",
-  })),
 
   // Threading.
   ...([190, 191, 192, 193, 194, 195, 197] as const).map((number) => ({

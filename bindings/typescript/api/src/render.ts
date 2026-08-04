@@ -410,6 +410,49 @@ export class RenderSession {
     return storage;
   }
 
+  /**
+   * Points this session at another texture the host owns.
+   *
+   * The session is kept, along with the map it renders and the state it holds;
+   * only where it draws changes. A session that owns its target has nothing to
+   * replace and reports unsupported.
+   */
+  setOpenGlBorrowedTexture(descriptor: OpenGlBorrowedTexture): void {
+    const id = this.#state.use("RenderSession.setOpenGlBorrowedTexture");
+    const native = this.#state.native;
+    native.scope((scope) => {
+      const layout = native.layout("mln_opengl_borrowed_texture_descriptor");
+      const storage = scope.allocateZeroed(layout.size, layout.align);
+      native.structValue(
+        scope,
+        EP.mln_opengl_borrowed_texture_descriptor_default,
+        storage,
+      );
+      fillExtent(native, storage, layout, descriptor.extent);
+      fillPhysicalSize(native, storage, layout, descriptor);
+      writeOpenGlContext(
+        native,
+        (storage + BigInt(layout.fields.context!.offset)) as Ptr,
+        descriptor.context,
+      );
+      const view = native.memory.view(storage, layout.size);
+      view.setUint32(
+        layout.fields.texture!.offset,
+        asUint32(descriptor.texture, "a texture name"),
+        true,
+      );
+      view.setUint32(
+        layout.fields.target!.offset,
+        asUint32(descriptor.target, "a texture target"),
+        true,
+      );
+      native.checked(scope, EP.mln_opengl_borrowed_texture_set_target, [
+        id,
+        storage,
+      ]);
+    });
+  }
+
   /** Resizes the target, which the map applies on its next pump. */
   resize(extent: RenderTargetExtent): void {
     const id = this.#state.use("RenderSession.resize");

@@ -418,5 +418,72 @@ export const RENDER_SESSION_GROUP: ConformanceGroup = {
         });
       },
     },
+    {
+      name: "points a caller-owned session at another texture",
+      spec: ["BND-175", "BND-176"],
+      needs: NEEDS_CONTEXT,
+      run({ maplibre, expect, renderContext, hostTexture }) {
+        withRuntime(maplibre, (runtime, open) => {
+          const map = open(EXTENT);
+          const first = hostTexture(EXTENT.width, EXTENT.height);
+          const session = map.attachOpenGlBorrowedTexture({
+            extent: EXTENT,
+            physicalWidth: EXTENT.width,
+            physicalHeight: EXTENT.height,
+            context: renderContext(),
+            texture: first.texture,
+            target: first.target,
+          });
+          try {
+            loadStyle(runtime, map, EMPTY_STYLE);
+            session.renderUpdate();
+
+            // The session is kept: only where it draws changes.
+            const second = hostTexture(EXTENT.width, EXTENT.height);
+            session.setOpenGlBorrowedTexture({
+              extent: EXTENT,
+              physicalWidth: EXTENT.width,
+              physicalHeight: EXTENT.height,
+              context: renderContext(),
+              texture: second.texture,
+              target: second.target,
+            });
+            expect.equal(session.isClosed, false, "the session was kept");
+            expect.equal(
+              typeof session.renderUpdate(),
+              "boolean",
+              "and renders into the new target",
+            );
+          } finally {
+            session.close();
+          }
+
+          // A session that owns its target has no host target to replace, and
+          // says so rather than quietly doing nothing.
+          const owned = map.attachOpenGlOwnedTexture({
+            extent: EXTENT,
+            context: renderContext(),
+          });
+          try {
+            const spare = hostTexture(EXTENT.width, EXTENT.height);
+            const error = expect.throws(
+              () =>
+                owned.setOpenGlBorrowedTexture({
+                  extent: EXTENT,
+                  physicalWidth: EXTENT.width,
+                  physicalHeight: EXTENT.height,
+                  context: renderContext(),
+                  texture: spare.texture,
+                  target: spare.target,
+                }),
+              "replacing the target of a session-owned texture",
+            );
+            expect.equal(error.kind, "unsupported", "the error kind");
+          } finally {
+            owned.close();
+          }
+        });
+      },
+    },
   ],
 };
