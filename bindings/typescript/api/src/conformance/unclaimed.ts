@@ -70,11 +70,6 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
       NO_SECOND_THREAD,
   },
   {
-    id: "BND-124",
-    reason: "unwritten",
-    note: "a custom geometry source is registered and fed; the requirement is teardown across style reload, source removal, id reuse, map close, and an in-flight upcall, and the case tolerates no callback arriving at all",
-  },
-  {
     id: "BND-141",
     reason: "unwritten",
     note: "a rewrite rule is observed to apply; the requirement is that request data reaches user code as language-owned copies, and a native rule table never reaches user code to copy",

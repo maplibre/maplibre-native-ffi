@@ -8,8 +8,9 @@
  * nothing.
  */
 
+import { emptyGeometry, geoJsonGeometry } from "../geojson.ts";
 import { clearForcedStatuses, forceStatus } from "../internal/faults.ts";
-import { jsonBool, jsonObject, type JsonValue } from "../json.ts";
+import { jsonBool, jsonFrom, jsonObject, type JsonValue } from "../json.ts";
 import { pointQuery } from "../query.ts";
 import { EP } from "../raw/entrypoints.ts";
 import type { ConformanceGroup } from "./harness.ts";
@@ -613,6 +614,132 @@ export const RENDER_SESSION_GROUP: ConformanceGroup = {
           } finally {
             clearForcedStatuses();
             session.close();
+          }
+        });
+      },
+    },
+    {
+      name: "asks for custom geometry tiles and stops after teardown",
+      spec: ["BND-124"],
+      needs: NEEDS_CONTEXT,
+      run({ maplibre, expect, renderContext }) {
+        withRuntime(maplibre, (runtime, open) => {
+          const map = open(EXTENT);
+          const session = map.attachOpenGlOwnedTexture({
+            extent: EXTENT,
+            context: renderContext(),
+          });
+          const asked: string[] = [];
+          const draw = (rounds: number): void => {
+            for (let attempt = 0; attempt < rounds; attempt += 1) {
+              runtime.pump(25);
+              session.renderUpdate();
+              maplibre.deliverCallbacks();
+              while (runtime.pollEvent() !== undefined) {
+                // Drained so the queue does not hold the pump open.
+              }
+            }
+          };
+
+          try {
+            expect.ok(loadStyle(runtime, map, EMPTY_STYLE), "the style loaded");
+            map.addCustomGeometrySource(
+              "hosted",
+              {
+                onFetchTile: (tile) => {
+                  asked.push(`${tile.z}/${tile.x}/${tile.y}`);
+                  map.setCustomGeometryTileData(
+                    "hosted",
+                    tile,
+                    geoJsonGeometry(emptyGeometry),
+                  );
+                },
+              },
+              { minZoom: 0, maxZoom: 4 },
+            );
+            map.addStyleLayer(
+              jsonFrom({ id: "hosted-dots", type: "circle", source: "hosted" }),
+            );
+
+            // Rendering is what makes MapLibre ask. Without a session nothing
+            // draws and the callback never fires, which is how a defect on
+            // this exact path survived: the record it delivers is allocated
+            // and freed differently from every other kind.
+            draw(120);
+            expect.ok(asked.length > 0, "the host was asked for a tile");
+
+            // Removing the source retires its callbacks. Nothing may arrive
+            // for it afterwards, however long the map keeps drawing.
+            const beforeRemoval = asked.length;
+            // A source a layer still draws from cannot go, so the layer goes
+            // first — the same order a host would have to use.
+            expect.ok(map.removeStyleLayer("hosted-dots"), "the layer went");
+            expect.ok(
+              map.removeStyleSource("hosted"),
+              "the source was removed",
+            );
+            draw(40);
+            expect.equal(
+              asked.length,
+              beforeRemoval,
+              "no tile was asked for after the source was removed",
+            );
+
+            // The same id may be used again, and the new registration is the
+            // one that receives — a stale one would deliver to a retired
+            // handler.
+            const second: string[] = [];
+            map.addCustomGeometrySource(
+              "hosted",
+              {
+                onFetchTile: (tile) => {
+                  second.push(`${tile.z}/${tile.x}/${tile.y}`);
+                  map.setCustomGeometryTileData(
+                    "hosted",
+                    tile,
+                    geoJsonGeometry(emptyGeometry),
+                  );
+                },
+              },
+              { minZoom: 0, maxZoom: 4 },
+            );
+            map.addStyleLayer(
+              jsonFrom({
+                id: "hosted-again",
+                type: "circle",
+                source: "hosted",
+              }),
+            );
+            draw(120);
+            expect.ok(second.length > 0, "the new registration receives");
+            expect.equal(
+              asked.length,
+              beforeRemoval,
+              "and the retired one still receives nothing",
+            );
+
+            // Closing the map with a source live must not deliver afterwards.
+            const atClose = second.length;
+            session.close();
+            map.close();
+            // Pumped without the session, which is gone: what is being watched
+            // for is a callback arriving after its map closed.
+            for (let attempt = 0; attempt < 20; attempt += 1) {
+              runtime.pump(25);
+              maplibre.deliverCallbacks();
+              while (runtime.pollEvent() !== undefined) {
+                // Drained so the queue does not hold the pump open.
+              }
+            }
+            expect.equal(
+              second.length,
+              atClose,
+              "nothing arrived after the map closed",
+            );
+          } finally {
+            if (!session.isClosed) {
+              session.close();
+            }
           }
         });
       },
