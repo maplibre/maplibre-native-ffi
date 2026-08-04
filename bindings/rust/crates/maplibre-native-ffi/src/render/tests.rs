@@ -63,12 +63,25 @@ fn create_owned_texture_session(
         ))?;
         return Ok((OwnedTextureTestContext::Vulkan(Box::new(context)), session));
     }
-    Err("native library does not support Metal or Vulkan owned texture sessions".into())
+    if has_opengl_test_context_backend() {
+        let context = OpenGLTestContext::new(extent.width, extent.height)?;
+        let session = map.attach_opengl_owned_texture(&OpenGLOwnedTextureDescriptor::new(
+            extent,
+            context.descriptor(),
+        ))?;
+        return Ok((OwnedTextureTestContext::OpenGL(Box::new(context)), session));
+    }
+    Err("no configured render backend offers an owned texture test session".into())
 }
 
+/// Whether this build can attach an owned texture session for the tests above.
+///
+/// Every backend the C API offers one for qualifies, so long as the fixture can
+/// build a context for it.
 fn has_test_owned_texture_session_backend() -> bool {
     let backends = crate::supported_render_backends();
     backends.intersects(RenderBackendMask::METAL | RenderBackendMask::VULKAN)
+        || has_opengl_test_context_backend()
 }
 
 fn has_opengl_backend() -> bool {
@@ -155,6 +168,9 @@ fn create_opengl_borrowed_texture_session(
 enum OwnedTextureTestContext {
     Metal(MetalTestContext),
     Vulkan(Box<VulkanTestContext>),
+    // Boxed for the same reason Vulkan is: the context is several kilobytes
+    // and every other variant is a handful of bytes.
+    OpenGL(Box<OpenGLTestContext>),
 }
 
 impl OwnedTextureTestContext {
@@ -169,6 +185,9 @@ impl OwnedTextureTestContext {
             ),
             Self::Vulkan(context) => map.attach_vulkan_owned_texture(
                 &VulkanOwnedTextureDescriptor::new(extent, context.descriptor()),
+            ),
+            Self::OpenGL(context) => map.attach_opengl_owned_texture(
+                &OpenGLOwnedTextureDescriptor::new(extent, context.descriptor()),
             ),
         }
     }
@@ -202,6 +221,16 @@ impl OwnedTextureTestContext {
                     1,
                 ))
             }
+            Self::OpenGL(context) => {
+                session.set_opengl_borrowed_texture_target(&OpenGLBorrowedTextureDescriptor::new(
+                    extent.clone(),
+                    64,
+                    64,
+                    context.descriptor(),
+                    1,
+                    glow::TEXTURE_2D,
+                ))
+            }
         }
     }
 
@@ -224,6 +253,17 @@ impl OwnedTextureTestContext {
             }
             Self::Vulkan(_) => {
                 let Ok(frame) = session.acquire_vulkan_owned_texture_frame() else {
+                    return false;
+                };
+                let metadata = frame.frame().unwrap();
+                let matches = (metadata.width, metadata.height)
+                    == (expected.width, expected.height)
+                    && metadata.scale_factor == expected.scale_factor;
+                frame.close().unwrap();
+                matches
+            }
+            Self::OpenGL(_) => {
+                let Ok(frame) = session.acquire_opengl_owned_texture_frame() else {
                     return false;
                 };
                 let metadata = frame.frame().unwrap();
