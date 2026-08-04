@@ -32,6 +32,17 @@ private external fun heapFree(address: Int)
 )
 private external fun heapClear(address: Int, length: Int)
 
+@JsFun("(text) => globalThis.__maplibreNativeC.lengthBytesUTF8(text)")
+private external fun heapUtf8Length(text: String): Int
+
+@JsFun(
+  "(text, address, capacity) => { globalThis.__maplibreNativeC.stringToUTF8(text, address, capacity) }"
+)
+private external fun heapWriteUtf8(text: String, address: Int, capacity: Int)
+
+@JsFun("(address) => globalThis.__maplibreNativeC.UTF8ToString(address)")
+private external fun heapReadUtf8(address: Int): String
+
 @JsFun("(address) => globalThis.__maplibreNativeC.HEAPU8[address]")
 private external fun heapLoadByte(address: Int): Int
 
@@ -141,6 +152,23 @@ internal object Heap {
     }
     return bytes.toInt()
   }
+
+  /** Bytes a null-terminated copy of [text] occupies, including the terminator. */
+  fun utf8Size(text: String): Int = heapUtf8Length(text) + 1
+
+  /**
+   * Writes [text] at [pointer] as null-terminated UTF-8.
+   *
+   * The caller sizes the region with [utf8Size]; the module's own writer handles the encoding, so
+   * nothing here re-implements it.
+   */
+  fun storeUtf8(pointer: HeapPointer, text: String) {
+    heapWriteUtf8(text, pointer.address, utf8Size(text))
+  }
+
+  /** Reads a null-terminated UTF-8 string, copying it into Kotlin before it can be invalidated. */
+  fun loadUtf8(pointer: HeapPointer): String =
+    if (pointer.address == 0) "" else heapReadUtf8(pointer.address)
 
   fun loadByte(pointer: HeapPointer): Byte = heapLoadByte(pointer.address).toByte()
 
