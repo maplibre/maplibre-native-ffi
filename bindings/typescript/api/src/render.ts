@@ -13,17 +13,35 @@
  */
 
 import { MaplibreError } from "./errors.ts";
+import type { ScreenPoint } from "./geo.ts";
+import { writeSize } from "./internal/callbacks.ts";
 import { HandleState } from "./internal/handle.ts";
-import { writeJsonValue, writeStringView } from "./internal/json-encode.ts";
+import {
+  stringView,
+  writeJsonValue,
+  writeStringView,
+} from "./internal/json-encode.ts";
 import type { Scope } from "./internal/memory.ts";
 import type { Native } from "./internal/native.ts";
 import { asInt32, asUint32 } from "./internal/numbers.ts";
 import { attachHandleState, handleStateOf } from "./internal/private.ts";
+import { readQueriedFeature } from "./internal/query-decode.ts";
 import type { Ptr } from "./internal/transport.ts";
 import type { JsonValue } from "./json.ts";
 import type { Map } from "./map.ts";
+import type {
+  QueriedFeature,
+  RenderedFeatureQueryOptions,
+  RenderedQueryGeometry,
+  SourceFeatureQueryOptions,
+} from "./query.ts";
 import { EP } from "./raw/entrypoints.ts";
-import { MLN_OPENGL_CONTEXT_PLATFORM } from "./raw/enums.ts";
+import {
+  MLN_OPENGL_CONTEXT_PLATFORM,
+  MLN_RENDERED_FEATURE_QUERY_OPTION_FIELD,
+  MLN_RENDERED_QUERY_GEOMETRY_TYPE,
+  MLN_SOURCE_FEATURE_QUERY_OPTION_FIELD,
+} from "./raw/enums.ts";
 import { MLN_FEATURE_STATE_SELECTOR_FIELD } from "./raw/enums.ts";
 import type { RecordLayout } from "./raw/layouts.ts";
 
@@ -152,6 +170,114 @@ export class RenderSession {
       });
       throw error;
     }
+  }
+
+  /**
+   * Reports the features this session has rendered at a place on screen.
+   *
+   * The answer depends on which tiles are loaded and what the last frame
+   * placed, which is why it belongs to a session rather than to the map.
+   */
+  queryRenderedFeatures(
+    geometry: RenderedQueryGeometry,
+    options: RenderedFeatureQueryOptions = {},
+  ): readonly QueriedFeature[] {
+    const id = this.#state.use("RenderSession.queryRenderedFeatures");
+    const native = this.#state.native;
+    const result = native.scope((scope) => {
+      const layout = native.layout("mln_rendered_feature_query_options");
+      const storage = scope.allocateZeroed(layout.size, layout.align);
+      native.structValue(
+        scope,
+        EP.mln_rendered_feature_query_options_default,
+        storage,
+      );
+      let mask = 0;
+      if (options.layerIds !== undefined) {
+        native.memory.writePointer(
+          (storage + BigInt(layout.fields.layer_ids!.offset)) as Ptr,
+          writeStringViews(native, scope, options.layerIds),
+        );
+        writeSize(
+          native,
+          (storage + BigInt(layout.fields.layer_id_count!.offset)) as Ptr,
+          options.layerIds.length,
+        );
+        mask |=
+          MLN_RENDERED_FEATURE_QUERY_OPTION_FIELD.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
+      }
+      if (options.filter !== undefined) {
+        native.memory.writePointer(
+          (storage + BigInt(layout.fields.filter!.offset)) as Ptr,
+          writeJsonValue(native, scope, options.filter),
+        );
+      }
+      native.memory
+        .view(storage, layout.size)
+        .setUint32(layout.fields.fields!.offset, mask, true);
+
+      const outResult = scope.allocateZeroed(8);
+      native.checked(scope, EP.mln_render_session_query_rendered_features, [
+        id,
+        writeQueryGeometry(native, scope, geometry),
+        storage,
+        outResult,
+      ]);
+      return native.memory.view(outResult, 8).getBigUint64(0, true);
+    });
+    return drainQueryResult(native, result);
+  }
+
+  /** Reports the features a source holds, whether or not they are rendered. */
+  querySourceFeatures(
+    sourceId: string,
+    options: SourceFeatureQueryOptions = {},
+  ): readonly QueriedFeature[] {
+    const id = this.#state.use("RenderSession.querySourceFeatures");
+    const native = this.#state.native;
+    const result = native.scope((scope) => {
+      const layout = native.layout("mln_source_feature_query_options");
+      const storage = scope.allocateZeroed(layout.size, layout.align);
+      native.structValue(
+        scope,
+        EP.mln_source_feature_query_options_default,
+        storage,
+      );
+      let mask = 0;
+      if (options.sourceLayerIds !== undefined) {
+        native.memory.writePointer(
+          (storage + BigInt(layout.fields.source_layer_ids!.offset)) as Ptr,
+          writeStringViews(native, scope, options.sourceLayerIds),
+        );
+        writeSize(
+          native,
+          (storage +
+            BigInt(layout.fields.source_layer_id_count!.offset)) as Ptr,
+          options.sourceLayerIds.length,
+        );
+        mask |=
+          MLN_SOURCE_FEATURE_QUERY_OPTION_FIELD.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
+      }
+      if (options.filter !== undefined) {
+        native.memory.writePointer(
+          (storage + BigInt(layout.fields.filter!.offset)) as Ptr,
+          writeJsonValue(native, scope, options.filter),
+        );
+      }
+      native.memory
+        .view(storage, layout.size)
+        .setUint32(layout.fields.fields!.offset, mask, true);
+
+      const outResult = scope.allocateZeroed(8);
+      native.checked(scope, EP.mln_render_session_query_source_features, [
+        id,
+        stringView(native, scope, sourceId),
+        storage,
+        outResult,
+      ]);
+      return native.memory.view(outResult, 8).getBigUint64(0, true);
+    });
+    return drainQueryResult(native, result);
   }
 
   /** Renders the map's latest update, reporting whether there was one. */
@@ -930,3 +1056,128 @@ export const ATTACH: {
     );
   },
 };
+
+/** Writes an `mln_rendered_query_geometry` for a rendered-feature query. */
+function writeQueryGeometry(
+  native: Native,
+  scope: Scope,
+  geometry: RenderedQueryGeometry,
+): Ptr {
+  const layout = native.layout("mln_rendered_query_geometry");
+  const storage = scope.allocateZeroed(layout.size, layout.align);
+  const point = native.layout("mln_screen_point");
+  const data = (storage + BigInt(layout.fields.data!.offset)) as Ptr;
+  const view = native.memory.view(storage, layout.size);
+  view.setUint32(layout.fields.size!.offset, layout.size, true);
+
+  const writePoint = (at: Ptr, value: ScreenPoint): void => {
+    const pointView = native.memory.view(at, point.size);
+    pointView.setFloat64(point.fields.x!.offset, value.x, true);
+    pointView.setFloat64(point.fields.y!.offset, value.y, true);
+  };
+
+  switch (geometry.kind) {
+    case "point":
+      view.setUint32(
+        layout.fields.type!.offset,
+        MLN_RENDERED_QUERY_GEOMETRY_TYPE.MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT,
+        true,
+      );
+      writePoint(data, geometry.point);
+      return storage;
+    case "box": {
+      view.setUint32(
+        layout.fields.type!.offset,
+        MLN_RENDERED_QUERY_GEOMETRY_TYPE.MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
+        true,
+      );
+      const box = native.layout("mln_screen_box");
+      writePoint((data + BigInt(box.fields.min!.offset)) as Ptr, geometry.min);
+      writePoint((data + BigInt(box.fields.max!.offset)) as Ptr, geometry.max);
+      return storage;
+    }
+    case "lineString": {
+      view.setUint32(
+        layout.fields.type!.offset,
+        MLN_RENDERED_QUERY_GEOMETRY_TYPE.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING,
+        true,
+      );
+      const span = native.layout("mln_screen_point_span");
+      const array = scope.allocateZeroed(
+        Math.max(point.size * geometry.points.length, 1),
+        point.align,
+      );
+      geometry.points.forEach((value, index) => {
+        writePoint((array + BigInt(index * point.size)) as Ptr, value);
+      });
+      native.memory.writePointer(
+        (data + BigInt(span.fields.points!.offset)) as Ptr,
+        array,
+      );
+      writeSize(
+        native,
+        (data + BigInt(span.fields.point_count!.offset)) as Ptr,
+        geometry.points.length,
+      );
+      return storage;
+    }
+  }
+}
+
+/** Writes a borrowed array of string views, which both query options take. */
+function writeStringViews(
+  native: Native,
+  scope: Scope,
+  values: readonly string[],
+): Ptr {
+  const layout = native.layout("mln_string_view");
+  const array = scope.allocateZeroed(
+    Math.max(layout.size * values.length, 1),
+    layout.align,
+  );
+  values.forEach((value, index) => {
+    writeStringView(
+      native,
+      scope,
+      (array + BigInt(index * layout.size)) as Ptr,
+      value,
+    );
+  });
+  return array;
+}
+
+/** Copies every feature a query result holds, then releases the result. */
+function drainQueryResult(native: Native, result: bigint): QueriedFeature[] {
+  try {
+    const count = native.scope((scope) => {
+      const out = scope.allocateZeroed(8);
+      native.checked(scope, EP.mln_feature_query_result_count, [result, out]);
+      return native.readSize(out);
+    });
+    const features: QueriedFeature[] = [];
+    for (let index = 0; index < count; index += 1) {
+      features.push(
+        native.scope((scope) => {
+          const layout = native.layout("mln_queried_feature");
+          const storage = scope.allocateZeroed(layout.size, layout.align);
+          native.memory
+            .view(storage, layout.size)
+            .setUint32(layout.fields.size!.offset, layout.size, true);
+          native.checked(scope, EP.mln_feature_query_result_get, [
+            result,
+            BigInt(index),
+            storage,
+          ]);
+          return readQueriedFeature(native, storage);
+        }),
+      );
+    }
+    return features;
+  } finally {
+    // The result handle is released whether the copy succeeded or not: it is
+    // native storage this call acquired and nothing else can reach.
+    native.scope((scope) => {
+      native.raw(scope, EP.mln_feature_query_result_destroy, [result]);
+    });
+  }
+}

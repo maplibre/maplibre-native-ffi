@@ -124,6 +124,15 @@ export {
   ResourceResponseStatus,
 } from "./resource-request.ts";
 export {
+  boxQuery,
+  lineStringQuery,
+  pointQuery,
+  type QueriedFeature,
+  type RenderedFeatureQueryOptions,
+  type RenderedQueryGeometry,
+  type SourceFeatureQueryOptions,
+} from "./query.ts";
+export {
   ANY_RESOURCE_KIND,
   ResourceKind,
   type ResourceRewriteRule,
