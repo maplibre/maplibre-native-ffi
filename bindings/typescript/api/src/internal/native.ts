@@ -12,6 +12,7 @@ import { ENTRYPOINTS } from "../raw/entrypoints.ts";
 import { MLN_STATUS } from "../raw/enums.ts";
 import { LAYOUTS, type RecordLayout } from "../raw/layouts.ts";
 import { Caller, statusFromSlot } from "./call.ts";
+import { takeForcedStatus } from "./faults.ts";
 import { Memory, type Scope } from "./memory.ts";
 import { decodeUtf8 } from "./text.ts";
 import type { Ptr, Transport } from "./transport.ts";
@@ -52,6 +53,12 @@ export class Native {
    * carrying the diagnostic the call itself produced.
    */
   checked(scope: Scope, entrypoint: number, args: readonly bigint[]): void {
+    // A fault the conformance suite arranged reports without running the call:
+    // the rule under test is what this binding does when native code refuses.
+    const forced = takeForcedStatus(entrypoint);
+    if (forced !== undefined) {
+      throw this.statusError(entrypoint, forced, "");
+    }
     const result = this.caller.invoke(scope, entrypoint, args);
     const status = statusFromSlot(result.raw);
     if (status !== MLN_STATUS.MLN_STATUS_OK) {

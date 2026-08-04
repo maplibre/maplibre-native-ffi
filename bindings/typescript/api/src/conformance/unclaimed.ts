@@ -40,11 +40,6 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
 
   // Handle lifetime.
   {
-    id: "BND-041",
-    reason: "unwritten",
-    note: "needs fault injection into native destroy, which no seam offers yet",
-  },
-  {
     id: "BND-044",
     reason: "inapplicable",
     note: "JavaScript finalization is not a cleanup hook this binding runs native release from",
@@ -57,12 +52,7 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
   {
     id: "BND-047",
     reason: "unwritten",
-    note: "handles are separate classes here, so this needs an internal seam to forge a mismatch",
-  },
-  {
-    id: "BND-048",
-    reason: "unwritten",
-    note: "the leak channel exists and no case drives a best-effort cleanup failure",
+    note: "handles are separate classes here, so a mismatch needs a seam that forges an id of the wrong kind, which faults.ts does not do",
   },
   { id: "BND-049", reason: "inapplicable", note: NO_SECOND_THREAD },
 
@@ -70,7 +60,7 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
   {
     id: "BND-066",
     reason: "unwritten",
-    note: "needs fault injection into a copy that follows a native snapshot",
+    note: "the seam can force the copy to fail, and whether the snapshot was given back is not observable through the public API",
   },
 
   // Maps, queries, and style.
@@ -100,7 +90,7 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
   {
     id: "BND-169",
     reason: "unwritten",
-    note: "needs fault injection into native frame release, which no seam offers yet",
+    note: "the seam can force the release to fail; no case drives it yet",
   },
   {
     id: "BND-172",

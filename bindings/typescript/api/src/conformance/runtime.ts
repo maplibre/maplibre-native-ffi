@@ -5,8 +5,10 @@
 import { errorKindForStatus, MaplibreError } from "../errors.ts";
 import { RuntimeEventType } from "../events.ts";
 import { decodePayload } from "../internal/event-decode.ts";
+import { clearForcedStatuses, forceStatus } from "../internal/faults.ts";
 import { nativeOf } from "../internal/private.ts";
 import { NetworkStatus } from "../maplibre.ts";
+import { EP } from "../raw/entrypoints.ts";
 import { MLN_RUNTIME_EVENT_PAYLOAD_TYPE } from "../raw/enums.ts";
 import type { ConformanceGroup } from "./harness.ts";
 import { EMPTY_STYLE, pumpFor, withRuntime } from "./harness.ts";
@@ -227,6 +229,41 @@ export const RUNTIME_GROUP: ConformanceGroup = {
             "a payload of the expected size is decoded",
           );
         });
+      },
+    },
+    {
+      name: "keeps a handle live when native release refuses",
+      spec: ["BND-041", "BND-048"],
+      run({ maplibre, expect }) {
+        const runtime = maplibre.createRuntime();
+        try {
+          const map = runtime.createMap({ width: 64, height: 64 });
+          // Nothing a caller can do makes a destroy fail, so it is arranged.
+          forceStatus(EP.mln_map_destroy, -5);
+          try {
+            expect.equal(
+              expect.throws(() => map.close(), "a destroy that refuses").kind,
+              "nativeError",
+              "the failure is reported rather than swallowed",
+            );
+            // A handle whose release failed is still a handle: the native map
+            // is still there, and treating it as gone would leak it.
+            expect.equal(map.isClosed, false, "the map is still live");
+            expect.equal(
+              map.getSize().width,
+              64,
+              "and still usable, because nothing was released",
+            );
+          } finally {
+            clearForcedStatuses();
+          }
+
+          map.close();
+          expect.equal(map.isClosed, true, "a later release closed it");
+        } finally {
+          clearForcedStatuses();
+          runtime.close();
+        }
       },
     },
     {

@@ -80,7 +80,7 @@ mkdir -p "$package"
   -sALLOW_MEMORY_GROWTH=1 \
   -sINITIAL_MEMORY=512MB \
   -sSTACK_SIZE=1MB \
-  -sPTHREAD_POOL_SIZE=64 \
+  -sPTHREAD_POOL_SIZE=192 \
   -sFETCH=1 \
   -sUSE_ZLIB=1 \
   -sFULL_ES3=1 \
