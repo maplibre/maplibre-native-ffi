@@ -197,10 +197,11 @@ profile["bundle-info"]["bundle-name"] = bundle
 # restricts installation to a device list cannot serve an emulator that reports
 # no udid, so this one carries a release distribution instead, which is not
 # device-bound.
-profile["type"] = "release"
-profile["app-distribution-type"] = "os_integration"
+# The template is a debug profile that expired in 2024. Its shape is what the
+# device's parser expects, so only the dates change: a release profile needs a
+# distribution type the parser accepts, and guessing at one costs more than
+# leaving the template's own kind in place.
 profile["validity"] = {"not-before": 1600000000, "not-after": 2500000000}
-profile.pop("debug-info", None)
 # The device's parser wants these named on a release profile.
 profile["bundle-info"]["app-identifier"] = "maplibre-native-ffi-conformance"
 profile.setdefault("app-privilege-capabilities", [])
