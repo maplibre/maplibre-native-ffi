@@ -433,3 +433,75 @@ export class ProviderRegistration implements Registration {
     this.#allocations.length = 0;
   }
 }
+
+/** One tile a custom geometry source was asked about. */
+export interface CustomGeometryTile {
+  readonly z: number;
+  readonly x: number;
+  readonly y: number;
+}
+
+/** The zoom the adapter's retirement sentinel uses, which no real tile has. */
+const RETIREMENT_ZOOM = 0xff;
+const TILE_RECORD_BYTES = 16;
+
+/**
+ * A custom geometry source's tile callbacks.
+ *
+ * MapLibre asks for a tile on one of its own threads and expects nothing back,
+ * so the request is copied and queued. The source's state stays reachable until
+ * the adapter's retirement sentinel arrives, because native code can be inside
+ * a fetch until then.
+ */
+export class CustomGeometryRegistration implements Registration {
+  readonly kind = RecordKind.customGeometryTile;
+  readonly #native: Native;
+  readonly #onFetch: (tile: CustomGeometryTile) => void;
+  readonly #onCancel: ((tile: CustomGeometryTile) => void) | undefined;
+  readonly id: bigint;
+  #retired = false;
+
+  constructor(
+    native: Native,
+    registry: CallbackRegistry,
+    onFetch: (tile: CustomGeometryTile) => void,
+    onCancel?: (tile: CustomGeometryTile) => void,
+  ) {
+    this.#native = native;
+    this.#onFetch = onFetch;
+    this.#onCancel = onCancel;
+    this.id = registry.register(this);
+  }
+
+  deliver(record: Ptr): void {
+    // The tile arrived by value and was copied into this record, so its fields
+    // come from the record rather than from anything native still owns.
+    const bytes = this.#native.transport.readForeign(record, TILE_RECORD_BYTES);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const cancelled = view.getUint32(0, true) !== 0;
+    const tile: CustomGeometryTile = {
+      z: view.getUint32(4, true),
+      x: view.getUint32(8, true),
+      y: view.getUint32(12, true),
+    };
+    if (tile.z === RETIREMENT_ZOOM) {
+      // The retirement sentinel, not a tile. Native can no longer reach this
+      // registration, so the handlers stop here.
+      this.#retired = true;
+      return;
+    }
+    if (cancelled) {
+      this.#onCancel?.(tile);
+      return;
+    }
+    this.#onFetch(tile);
+  }
+
+  retire(): void {
+    this.#retired = true;
+  }
+
+  get isRetired(): boolean {
+    return this.#retired;
+  }
+}

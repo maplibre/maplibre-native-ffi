@@ -39,6 +39,21 @@ export {
   TileOperation,
 } from "./events.ts";
 export {
+  type CoordinateSpan,
+  emptyGeometry,
+  type Feature,
+  type FeatureIdentifier,
+  type GeoJson,
+  geoJsonFeature,
+  geoJsonFeatureCollection,
+  geoJsonGeometry,
+  type Geometry,
+  lineStringGeometry,
+  pointGeometry,
+  polygonGeometry,
+  type PolygonRings,
+} from "./geojson.ts";
+export {
   type EdgeInsets,
   edgeInsetsEquals,
   type LatLng,
@@ -49,7 +64,9 @@ export {
   screenPointEquals,
 } from "./geo.ts";
 export { AbiMismatchError } from "./internal/node-transport.ts";
+export type { CustomGeometryTile } from "./internal/callbacks.ts";
 export {
+  type CustomGeometrySourceOptions,
   Map,
   MapMode,
   type MapOptions,

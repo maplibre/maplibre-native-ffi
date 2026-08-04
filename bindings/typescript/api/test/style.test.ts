@@ -3,6 +3,10 @@
  */
 
 import {
+  type CustomGeometryTile,
+  emptyGeometry,
+  geoJsonFeatureCollection,
+  geoJsonGeometry,
   jsonArray,
   jsonDouble,
   jsonEquals,
@@ -11,6 +15,9 @@ import {
   jsonObject,
   jsonString,
   jsonUint,
+  lineStringGeometry,
+  pointGeometry,
+  polygonGeometry,
   type JsonValue,
   type Map,
   MaplibreError,
@@ -216,5 +223,97 @@ describe("style images", () => {
       // The binding owns this: reading past the buffer would be the alternative.
       expect((error as MaplibreError).kind).toBe("invalidInput");
     }
+  });
+});
+
+describe("custom geometry sources", () => {
+  it("asks this host for a tile and takes the answer", () => {
+    const map = loadedMap();
+    const asked: CustomGeometryTile[] = [];
+    map.addCustomGeometrySource(
+      "hosted",
+      {
+        onFetchTile: (tile) => {
+          asked.push(tile);
+          // Answering inline is allowed; a host may also answer later.
+          map.setCustomGeometryTileData(
+            "hosted",
+            tile,
+            geoJsonFeatureCollection([
+              {
+                geometry: pointGeometry({ latitude: 0, longitude: 0 }),
+                properties: [{ name: "kind", value: jsonString("origin") }],
+                identifier: { kind: "uint", value: 7n },
+              },
+            ]),
+          );
+        },
+      },
+      { minZoom: 0, maxZoom: 4 },
+    );
+    expect(map.hasStyleSource("hosted")).toBe(true);
+
+    // A layer over the source is what makes MapLibre ask for its tiles.
+    map.addStyleLayer(
+      jsonFrom({ id: "hosted-circles", type: "circle", source: "hosted" }),
+    );
+    expect(map.hasStyleLayer("hosted-circles")).toBe(true);
+
+    // Nothing renders here, so MapLibre may never ask; what this proves is that
+    // the source registers, the layer binds to it, and answering a tile the
+    // host names is accepted.
+    map.setCustomGeometryTileData(
+      "hosted",
+      { z: 0, x: 0, y: 0 },
+      geoJsonGeometry(emptyGeometry),
+    );
+    expect(asked.every((tile) => tile.z !== 0xff)).toBe(true);
+  });
+
+  it("carries a whole geometry tree across the boundary", () => {
+    const map = loadedMap();
+    map.addCustomGeometrySource("shapes", { onFetchTile: () => {} });
+    // Every variant the descriptor graph has, in one value, so a wrong offset
+    // or a lost count fails here rather than in one caller's shape.
+    map.setCustomGeometryTileData(
+      "shapes",
+      { z: 1, x: 0, y: 0 },
+      geoJsonFeatureCollection([
+        {
+          geometry: {
+            kind: "collection",
+            geometries: [
+              pointGeometry({ latitude: 1, longitude: 2 }),
+              lineStringGeometry([
+                { latitude: 0, longitude: 0 },
+                { latitude: 1, longitude: 1 },
+              ]),
+              polygonGeometry([
+                [
+                  { latitude: 0, longitude: 0 },
+                  { latitude: 0, longitude: 1 },
+                  { latitude: 1, longitude: 1 },
+                  { latitude: 0, longitude: 0 },
+                ],
+              ]),
+              {
+                kind: "multiPolygon",
+                polygons: [
+                  [
+                    [
+                      { latitude: 2, longitude: 2 },
+                      { latitude: 2, longitude: 3 },
+                      { latitude: 3, longitude: 3 },
+                      { latitude: 2, longitude: 2 },
+                    ],
+                  ],
+                ],
+              },
+            ],
+          },
+          identifier: { kind: "string", value: "everything" },
+        },
+      ]),
+    );
   });
 });

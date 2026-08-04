@@ -9,7 +9,15 @@
 import type { AnimationOptions, CameraOptions } from "./camera.ts";
 import { MaplibreError } from "./errors.ts";
 import { MapIdentity, NamedValue } from "./events.ts";
-import { writeSize } from "./internal/callbacks.ts";
+import type { GeoJson } from "./geojson.ts";
+import {
+  type CallbackRegistry,
+  CustomGeometryListener,
+  CustomGeometryRegistration,
+  type CustomGeometryTile,
+  writeSize,
+} from "./internal/callbacks.ts";
+import { writeGeoJson } from "./internal/geojson-encode.ts";
 import { HandleState } from "./internal/handle.ts";
 import { stringView, writeJsonValue } from "./internal/json-encode.ts";
 import type { Native } from "./internal/native.ts";
@@ -30,7 +38,11 @@ import type { Ptr } from "./internal/transport.ts";
 import type { JsonValue } from "./json.ts";
 import { MapProjection } from "./projection.ts";
 import { EP } from "./raw/entrypoints.ts";
-import { MLN_MAP_MODE, MLN_STYLE_IMAGE_OPTION_FIELD } from "./raw/enums.ts";
+import {
+  MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_FIELD,
+  MLN_MAP_MODE,
+  MLN_STYLE_IMAGE_OPTION_FIELD,
+} from "./raw/enums.ts";
 import { RenderSession, type VulkanOwnedTextureDescriptor } from "./render.ts";
 import type { Runtime } from "./runtime.ts";
 
@@ -95,21 +107,30 @@ export interface MapSize {
   readonly scaleFactor: number;
 }
 
+/** How a custom geometry source is configured. */
+export interface CustomGeometrySourceOptions {
+  readonly minZoom?: number;
+  readonly maxZoom?: number;
+}
+
 export class Map {
   readonly #state: HandleState;
   readonly #identity: MapIdentity;
   readonly #runtime: object;
+  readonly #callbacks: CallbackRegistry;
 
   private constructor(
     native: Native,
     id: bigint,
     runtimeState: HandleState,
     runtime: object,
+    callbacks: CallbackRegistry,
   ) {
     this.#state = new HandleState(native, "Map", id, runtimeState);
     this.#state.watchForLeaks(this);
     this.#identity = new MapIdentity(id);
     this.#runtime = runtime;
+    this.#callbacks = callbacks;
     attachHandleState(this, this.#state);
     registerMap(runtime, id, this);
   }
@@ -125,7 +146,12 @@ export class Map {
   }
 
   /** @internal */
-  static create(runtime: Runtime, native: Native, options: MapOptions): Map {
+  static create(
+    runtime: Runtime,
+    native: Native,
+    callbacks: CallbackRegistry,
+    options: MapOptions,
+  ): Map {
     const id = native.scope((scope) => {
       const layout = native.layout("mln_map_options");
       const storage = scope.allocateZeroed(layout.size);
@@ -167,7 +193,7 @@ export class Map {
       return native.memory.view(outMap, 8).getBigUint64(0, true);
     });
     try {
-      return new Map(native, id, handleStateOf(runtime), runtime);
+      return new Map(native, id, handleStateOf(runtime), runtime, callbacks);
     } catch (error) {
       native.scope((scope) => {
         native.raw(scope, EP.mln_map_destroy, [id]);
@@ -514,6 +540,97 @@ export class Map {
       EP.mln_map_remove_style_image,
       imageId,
     );
+  }
+
+  /**
+   * Adds a source whose tiles this host supplies.
+   *
+   * MapLibre asks for a tile on one of its own threads and expects nothing
+   * back, so the request is copied and the handler runs on this context. Answer
+   * with `setCustomGeometryTileData`, whenever the data is ready.
+   */
+  addCustomGeometrySource(
+    sourceId: string,
+    handlers: {
+      readonly onFetchTile: (tile: CustomGeometryTile) => void;
+      readonly onCancelTile?: (tile: CustomGeometryTile) => void;
+    },
+    options: CustomGeometrySourceOptions = {},
+  ): void {
+    const id = this.#state.use("Map.addCustomGeometrySource");
+    const native = this.#state.native;
+    const registration = new CustomGeometryRegistration(
+      native,
+      this.#callbacks,
+      handlers.onFetchTile,
+      handlers.onCancelTile,
+    );
+    native.scope((scope) => {
+      const layout = native.layout("mln_custom_geometry_source_options");
+      const storage = scope.allocateZeroed(layout.size, layout.align);
+      native.structValue(
+        scope,
+        EP.mln_custom_geometry_source_options_default,
+        storage,
+      );
+      const view = native.memory.view(storage, layout.size);
+      native.memory.writePointer(
+        (storage + BigInt(layout.fields.fetch_tile!.offset)) as Ptr,
+        native.transport.listenerAddress(CustomGeometryListener.fetch),
+      );
+      if (handlers.onCancelTile !== undefined) {
+        native.memory.writePointer(
+          (storage + BigInt(layout.fields.cancel_tile!.offset)) as Ptr,
+          native.transport.listenerAddress(CustomGeometryListener.cancel),
+        );
+      }
+      native.memory.writePointer(
+        (storage + BigInt(layout.fields.user_data!.offset)) as Ptr,
+        registration.id as Ptr,
+      );
+      let mask = 0;
+      if (options.minZoom !== undefined) {
+        view.setFloat64(layout.fields.min_zoom!.offset, options.minZoom, true);
+        mask |=
+          MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_FIELD.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
+      }
+      if (options.maxZoom !== undefined) {
+        view.setFloat64(layout.fields.max_zoom!.offset, options.maxZoom, true);
+        mask |=
+          MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_FIELD.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM;
+      }
+      view.setUint32(layout.fields.fields!.offset, mask, true);
+
+      native.checked(scope, EP.mln_map_add_custom_geometry_source, [
+        id,
+        stringView(native, scope, sourceId),
+        storage,
+      ]);
+    });
+  }
+
+  /** Supplies the data for one tile a custom geometry source asked about. */
+  setCustomGeometryTileData(
+    sourceId: string,
+    tile: CustomGeometryTile,
+    data: GeoJson,
+  ): void {
+    const id = this.#state.use("Map.setCustomGeometryTileData");
+    const native = this.#state.native;
+    native.scope((scope) => {
+      const layout = native.layout("mln_canonical_tile_id");
+      const tileStorage = scope.allocateZeroed(layout.size, layout.align);
+      const view = native.memory.view(tileStorage, layout.size);
+      view.setUint32(layout.fields.z!.offset, asUint32(tile.z, "tile z"), true);
+      view.setUint32(layout.fields.x!.offset, asUint32(tile.x, "tile x"), true);
+      view.setUint32(layout.fields.y!.offset, asUint32(tile.y, "tile y"), true);
+      native.checked(scope, EP.mln_map_set_custom_geometry_source_tile_data, [
+        id,
+        stringView(native, scope, sourceId),
+        tileStorage,
+        writeGeoJson(native, scope, data),
+      ]);
+    });
   }
 
   /**

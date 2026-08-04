@@ -385,7 +385,7 @@ export class Runtime {
    */
   createMap(options: MapOptions): Map {
     this.#state.use("Runtime.createMap");
-    return Map.create(this, this.#state.native, options);
+    return Map.create(this, this.#state.native, this.#callbacks, options);
   }
 
   /** Acquires a wake source that releases this runtime's parked owner thread. */
