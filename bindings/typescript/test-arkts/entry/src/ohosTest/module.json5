@@ -4,27 +4,19 @@
     "type": "feature",
     "description": "Runs the MapLibre Native conformance suite on ArkTS.",
     "mainElement": "TestAbility",
-    "deviceTypes": ["default", "phone", "tablet"],
+    "deviceTypes": [
+      "default"
+    ],
     "deliveryWithInstall": true,
     "installationFree": false,
-    "pages": "$profile:main_pages",
     "abilities": [
       {
         "name": "TestAbility",
         "srcEntry": "./ets/testability/TestAbility.ets",
         "description": "The ability the test runner starts.",
-        "icon": "$media:icon",
-        "label": "$string:TestAbility_label",
-        "exported": true,
-        "startWindowIcon": "$media:icon",
-        "startWindowBackground": "$color:start_window_background",
-        "skills": [
-          {
-            "actions": ["action.system.home"],
-            "entities": ["entity.system.home"]
-          }
-        ]
+        "exported": true
       }
-    ]
+    ],
+    "virtualMachine": "ark"
   }
 }
