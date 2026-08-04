@@ -67,7 +67,7 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
   {
     id: "BND-159",
     reason: "unwritten",
-    note: "rules install, replace, and clear while a map is live; proving headers reach matching requests needs a request to expose the headers it carries, which neither the C API nor this binding does — it needs an HTTP endpoint the suite controls",
+    note: "rules install, replace, and clear while a map is live; proving a header reaches a request needs the library to make one, and it does not. A `node:http` endpoint was built and pointed at through `setStyleUrl`, and after ten seconds of pumping it was never contacted — so the blocker is upstream of headers: whatever issues an HTTP request for a style is not running under the conformance runtime. Find that before building the endpoint again",
   },
   {
     id: "BND-162",
