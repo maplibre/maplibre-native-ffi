@@ -577,6 +577,68 @@ export const RESOURCES_GROUP: ConformanceGroup = {
       },
     },
     {
+      name: "reports a cancelled request before a late answer",
+      spec: ["BND-148"],
+      run({ maplibre, expect }) {
+        withRuntime(maplibre, (runtime, open) => {
+          let held: ResourceRequest | undefined;
+          runtime.setResourceProvider(
+            [{ url: "late://", matchPrefix: true, useRequestedUrl: true }],
+            (request) => {
+              held ??= request;
+            },
+          );
+
+          const map = open({ width: 64, height: 64 });
+          map.setStyleUrl("late://style.json");
+          const pump = (): void => {
+            runtime.pump(25);
+            maplibre.deliverCallbacks();
+            while (runtime.pollEvent() !== undefined) {
+              // Drained so the queue does not hold the pump open.
+            }
+          };
+          for (
+            let attempt = 0;
+            attempt < 40 && held === undefined;
+            attempt += 1
+          ) {
+            pump();
+          }
+          const request = expect.defined(held, "the claimed request");
+          expect.ok(!request.isCancelled, "nothing has cancelled it yet");
+
+          // MapLibre stops wanting this one when the map is pointed elsewhere.
+          // The host is not told; it asks, which is why a provider that takes
+          // its time checks before doing the work.
+          map.setStyleJson(EMPTY_STYLE);
+          let cancelled = false;
+          for (let attempt = 0; attempt < 200 && !cancelled; attempt += 1) {
+            pump();
+            cancelled = request.isCancelled;
+          }
+          expect.ok(cancelled, "the request reports that it was cancelled");
+
+          // An answer that arrives after the cancellation is refused, and the
+          // refusal is the library's own status mapped to a public kind rather
+          // than something this binding decided.
+          const late = expect.throws(
+            () =>
+              request.complete({
+                bytes: new TextEncoder().encode(EMPTY_STYLE),
+              }),
+            "answering a request that was cancelled",
+          );
+          expect.equal(late.kind, "invalidState", "the mapped native status");
+          expect.contains(
+            late.diagnostic,
+            "cancelled",
+            "carrying the library's own diagnostic",
+          );
+        });
+      },
+    },
+    {
       name: "keeps a released request from reaching a later one",
       spec: ["BND-151"],
       run({ maplibre, expect }) {

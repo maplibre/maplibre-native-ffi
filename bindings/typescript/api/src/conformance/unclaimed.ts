@@ -87,11 +87,6 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
     reason: "inapplicable",
     note: NO_SECOND_THREAD,
   },
-  {
-    id: "BND-148",
-    reason: "unwritten",
-    note: "cancellation observed before a late completion is untested",
-  },
   { id: "BND-153", reason: "inapplicable", note: NO_SECOND_THREAD },
   {
     id: "BND-158",
