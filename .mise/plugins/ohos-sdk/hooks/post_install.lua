@@ -3,9 +3,14 @@ local file = require("file")
 
 -- The archive holds one directory per host, each a set of component archives, and
 -- mise leaves whatever prefix the publisher used above them in place. Reduce that
--- to the components for this host, then unpack the native and device-tool
--- components, so the install directory looks the same whichever archive produced
--- it.
+-- to the components for this host, then unpack the components below, so the
+-- install directory looks the same whichever archive produced it.
+--
+-- `ets` carries the ArkTS compiler and declarations, which is what lets an
+-- application module be built here. DevEco Studio drives that through hvigor,
+-- which is not published anywhere public, but hvigor is an orchestrator: the
+-- tools it calls — the ArkTS compiler, `app_packing_tool.jar`,
+-- `hap-sign-tool.jar`, and the debug signing material — all ship in this SDK.
 
 local function quote(path)
   return "'" .. path:gsub("'", "'\\''") .. "'"
@@ -64,7 +69,7 @@ function PLUGIN:PostInstall(ctx)
   )
 
   local archives = {}
-  for _, component in ipairs({ "native", "toolchains" }) do
+  for _, component in ipairs({ "native", "toolchains", "ets" }) do
     local matches = lines(
       run(
         "find "
@@ -99,5 +104,13 @@ function PLUGIN:PostInstall(ctx)
   local hdc = root .. "/toolchains/hdc"
   if not file.exists(hdc) then
     error("the installed SDK has no device connector at " .. hdc)
+  end
+  -- What an application module is packed and signed with, so a missing
+  -- component is reported at install rather than at the first build.
+  for _, tool in ipairs({ "app_packing_tool.jar", "hap-sign-tool.jar" }) do
+    local path = root .. "/toolchains/lib/" .. tool
+    if not file.exists(path) then
+      error("the installed SDK has no " .. tool .. " at " .. path)
+    end
   end
 end
