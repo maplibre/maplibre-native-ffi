@@ -122,8 +122,14 @@ with open(target, "w") as handle:
     json.dump(manifest, handle)
 PYTHON
 printf '{"src":["pages/Index"]}\n' >"$work/resources/base/profile/main_pages.json"
-"$toolchains/restool" -i "$work/resources" -o "$work" -p "$bundle_id" -r ResourceTable \
-  >/dev/null 2>&1 || true
+# The device's manifest parser requires the icon, label, and pages a module
+# names, so the resources they point at are compiled rather than skipped.
+cp -r "$source_dir/entry/src/ohosTest/resources/." "$work/resources/"
+mkdir -p "$work/compiled"
+# restool reads the module manifest beside the resources it compiles.
+cp "$work/module.json" "$work/resources/module.json"
+"$toolchains/restool" -i "$work/resources" -o "$work/compiled" \
+  -p "$bundle_id" -r ResourceTable -f
 
 # The packing tool empties its own working directory on the way out, whatever
 # paths it is given, so it is run from the scratch directory rather than from
@@ -141,7 +147,7 @@ mkdir -p "$work/pack"
     --json-path ../module.json \
     --ets-path ../modules.abc \
     --lib-path ../libs \
-    --resources-path ../resources \
+    --resources-path ../compiled/resources \
     --out-path "../$module-unsigned.hap"
 )
 

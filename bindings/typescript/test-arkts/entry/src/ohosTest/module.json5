@@ -14,9 +14,14 @@
         "name": "TestAbility",
         "srcEntry": "./ets/testability/TestAbility.ets",
         "description": "The ability the test runner starts.",
-        "exported": true
+        "exported": true,
+        "icon": "$media:icon",
+        "label": "$string:TestAbility_label",
+        "startWindowIcon": "$media:icon",
+        "startWindowBackground": "$color:start_window_background"
       }
     ],
-    "virtualMachine": "ark"
+    "virtualMachine": "ark",
+    "pages": "$profile:main_pages"
   }
 }

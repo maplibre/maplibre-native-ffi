@@ -1,0 +1,6 @@
+{
+  "string": [
+    { "name": "app_name", "value": "MapLibre Conformance" },
+    { "name": "TestAbility_label", "value": "Conformance" }
+  ]
+}
