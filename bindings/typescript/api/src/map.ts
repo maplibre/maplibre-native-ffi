@@ -7,7 +7,9 @@
  */
 
 import type { AnimationOptions, CameraOptions } from "./camera.ts";
+import { MaplibreError } from "./errors.ts";
 import { MapIdentity, NamedValue } from "./events.ts";
+import { writeSize } from "./internal/callbacks.ts";
 import { HandleState } from "./internal/handle.ts";
 import { stringView, writeJsonValue } from "./internal/json-encode.ts";
 import type { Native } from "./internal/native.ts";
@@ -28,7 +30,7 @@ import type { Ptr } from "./internal/transport.ts";
 import type { JsonValue } from "./json.ts";
 import { MapProjection } from "./projection.ts";
 import { EP } from "./raw/entrypoints.ts";
-import { MLN_MAP_MODE } from "./raw/enums.ts";
+import { MLN_MAP_MODE, MLN_STYLE_IMAGE_OPTION_FIELD } from "./raw/enums.ts";
 import { RenderSession, type VulkanOwnedTextureDescriptor } from "./render.ts";
 import type { Runtime } from "./runtime.ts";
 
@@ -72,6 +74,18 @@ export interface MapOptions {
   readonly mode?: MapMode;
   /** Whether this map decodes FastPFOR-encoded MLT tiles. */
   readonly fastPforEnabled?: boolean;
+}
+
+/** An image the style can name, in premultiplied RGBA. */
+export interface StyleImage {
+  readonly width: number;
+  readonly height: number;
+  /** Premultiplied RGBA bytes, row-major, copied at the boundary. */
+  readonly pixels: Uint8Array;
+  /** How many image pixels one logical pixel is. */
+  readonly pixelRatio?: number;
+  /** Whether the image is a signed distance field the style may recolor. */
+  readonly sdf?: boolean;
 }
 
 /** The map's logical viewport. */
@@ -398,6 +412,108 @@ export class Map {
   createProjection(): MapProjection {
     this.#state.use("Map.createProjection");
     return MapProjection.create(this.#state.native, this);
+  }
+
+  /**
+   * Adds an image the style can name, or replaces one it already has.
+   *
+   * The pixels are premultiplied RGBA and are copied at the boundary, so the
+   * caller may reuse or mutate its buffer afterwards.
+   */
+  setStyleImage(imageId: string, image: StyleImage): void {
+    const id = this.#state.use("Map.setStyleImage");
+    const native = this.#state.native;
+    const expected = image.width * image.height * 4;
+    if (image.pixels.length < expected) {
+      throw new MaplibreError(
+        "invalidInput",
+        `a ${image.width}x${image.height} premultiplied RGBA image needs ` +
+          `${expected} bytes, and this one has ${image.pixels.length}`,
+      );
+    }
+    native.scope((scope) => {
+      const layout = native.layout("mln_premultiplied_rgba8_image");
+      const storage = scope.allocateZeroed(layout.size, layout.align);
+      const view = native.memory.view(storage, layout.size);
+      view.setUint32(layout.fields.size!.offset, layout.size, true);
+      view.setUint32(
+        layout.fields.width!.offset,
+        asUint32(image.width, "width"),
+        true,
+      );
+      view.setUint32(
+        layout.fields.height!.offset,
+        asUint32(image.height, "height"),
+        true,
+      );
+      view.setUint32(layout.fields.stride!.offset, image.width * 4, true);
+      const pixels = scope.allocate(expected, 1);
+      native.memory
+        .bytes(pixels, expected)
+        .set(image.pixels.subarray(0, expected));
+      native.memory.writePointer(
+        (storage + BigInt(layout.fields.pixels!.offset)) as Ptr,
+        pixels,
+      );
+      // The C API checks the byte length against the extent and the stride
+      // rather than deriving it, so a short buffer is caught before it reads.
+      writeSize(
+        native,
+        (storage + BigInt(layout.fields.byte_length!.offset)) as Ptr,
+        expected,
+      );
+
+      const optionsLayout = native.layout("mln_style_image_options");
+      const options = scope.allocateZeroed(
+        optionsLayout.size,
+        optionsLayout.align,
+      );
+      native.structValue(scope, EP.mln_style_image_options_default, options);
+      const optionsView = native.memory.view(options, optionsLayout.size);
+      let mask = 0;
+      if (image.pixelRatio !== undefined) {
+        // A four-byte field: writing a double here would run over `sdf`.
+        optionsView.setFloat32(
+          optionsLayout.fields.pixel_ratio!.offset,
+          image.pixelRatio,
+          true,
+        );
+        mask |= MLN_STYLE_IMAGE_OPTION_FIELD.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
+      }
+      if (image.sdf !== undefined) {
+        optionsView.setUint8(
+          optionsLayout.fields.sdf!.offset,
+          image.sdf ? 1 : 0,
+        );
+        mask |= MLN_STYLE_IMAGE_OPTION_FIELD.MLN_STYLE_IMAGE_OPTION_SDF;
+      }
+      optionsView.setUint32(optionsLayout.fields.fields!.offset, mask, true);
+
+      native.checked(scope, EP.mln_map_set_style_image, [
+        id,
+        stringView(native, scope, imageId),
+        storage,
+        options,
+      ]);
+    });
+  }
+
+  /** Reports whether the loaded style has this image. */
+  hasStyleImage(imageId: string): boolean {
+    return this.#styleMemberCheck(
+      "Map.hasStyleImage",
+      EP.mln_map_style_image_exists,
+      imageId,
+    );
+  }
+
+  /** Removes an image, reporting whether there was one to remove. */
+  removeStyleImage(imageId: string): boolean {
+    return this.#styleMemberCheck(
+      "Map.removeStyleImage",
+      EP.mln_map_remove_style_image,
+      imageId,
+    );
   }
 
   /**

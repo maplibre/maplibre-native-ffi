@@ -49,7 +49,13 @@ export {
   screenPointEquals,
 } from "./geo.ts";
 export { AbiMismatchError } from "./internal/node-transport.ts";
-export { Map, MapMode, type MapOptions, type MapSize } from "./map.ts";
+export {
+  Map,
+  MapMode,
+  type MapOptions,
+  type MapSize,
+  type StyleImage,
+} from "./map.ts";
 export {
   type LogCallbackOptions,
   LogEvent,

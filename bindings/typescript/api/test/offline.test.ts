@@ -10,7 +10,6 @@ import {
   AmbientCacheOperation,
   MaplibreError,
   Maplibre,
-  type OfflineOperationId,
   type Runtime,
   RuntimeEventType,
 } from "../src/index.ts";
@@ -42,11 +41,8 @@ async function offlineRuntime(): Promise<Runtime> {
   return runtime;
 }
 
-/** Pumps until the named operation reports that it finished. */
-function awaitCompletion(
-  created: Runtime,
-  operation: OfflineOperationId,
-): boolean {
+/** Pumps until an operation reports that it finished. */
+function awaitCompletion(created: Runtime): boolean {
   for (let attempt = 0; attempt < 200; attempt += 1) {
     created.pump(25);
     for (
@@ -67,7 +63,7 @@ describe("offline operations", () => {
     const created = await offlineRuntime();
     const operation = created.startOfflineRegionList();
     expect(operation).toBeGreaterThan(0n);
-    expect(awaitCompletion(created, operation)).toBe(true);
+    expect(awaitCompletion(created)).toBe(true);
 
     const regions = created.takeOfflineRegionList(operation);
     expect(regions).toEqual([]);
@@ -84,13 +80,13 @@ describe("offline operations", () => {
       AmbientCacheOperation.clear,
     );
     expect(operation).toBeGreaterThan(0n);
-    expect(awaitCompletion(created, operation)).toBe(true);
+    expect(awaitCompletion(created)).toBe(true);
   });
 
   it("discards an operation whose result nobody takes", async () => {
     const created = await offlineRuntime();
     const operation = created.startOfflineRegionList();
-    expect(awaitCompletion(created, operation)).toBe(true);
+    expect(awaitCompletion(created)).toBe(true);
     created.discardOfflineOperation(operation);
     // The operation is gone, so taking its result now fails.
     expect(() => created.takeOfflineRegionList(operation)).toThrow(

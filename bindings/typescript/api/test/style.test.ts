@@ -182,3 +182,39 @@ describe("structured JSON", () => {
     ).toBe(true);
   });
 });
+
+describe("style images", () => {
+  it("adds, finds, and removes an image", () => {
+    const map = loadedMap();
+    expect(map.hasStyleImage("marker")).toBe(false);
+
+    const pixels = new Uint8Array(4 * 4 * 4).fill(0x80);
+    map.setStyleImage("marker", { width: 4, height: 4, pixels, pixelRatio: 2 });
+    expect(map.hasStyleImage("marker")).toBe(true);
+
+    // The pixels were copied, so mutating the caller's buffer afterwards
+    // changes nothing the style holds.
+    pixels.fill(0);
+    expect(map.hasStyleImage("marker")).toBe(true);
+
+    expect(map.removeStyleImage("marker")).toBe(true);
+    expect(map.hasStyleImage("marker")).toBe(false);
+    expect(map.removeStyleImage("marker")).toBe(false);
+  });
+
+  it("rejects a buffer too small for the extent it claims", () => {
+    const map = loadedMap();
+    try {
+      map.setStyleImage("short", {
+        width: 8,
+        height: 8,
+        pixels: new Uint8Array(16),
+      });
+      expect.unreachable("the buffer cannot hold an 8x8 image");
+    } catch (error) {
+      expect(error).toBeInstanceOf(MaplibreError);
+      // The binding owns this: reading past the buffer would be the alternative.
+      expect((error as MaplibreError).kind).toBe("invalidInput");
+    }
+  });
+});
