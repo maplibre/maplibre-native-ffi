@@ -57,11 +57,6 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
   { id: "BND-049", reason: "inapplicable", note: NO_SECOND_THREAD },
 
   // Values and events.
-  {
-    id: "BND-066",
-    reason: "unwritten",
-    note: "the seam can force the copy to fail, and whether the snapshot was given back is not observable through the public API",
-  },
 
   // Maps, queries, and style.
   { id: "BND-123", reason: "inapplicable", note: NO_SECOND_THREAD },

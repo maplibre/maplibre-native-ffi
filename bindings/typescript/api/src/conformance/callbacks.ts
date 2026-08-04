@@ -7,9 +7,11 @@
  */
 
 import { RuntimeEventType } from "../events.ts";
+import { clearForcedStatuses, forceStatus } from "../internal/faults.ts";
 import { LogSeverityMask } from "../logging.ts";
 import type { Map } from "../map.ts";
 import type { Maplibre } from "../maplibre.ts";
+import { EP } from "../raw/entrypoints.ts";
 import {
   ResourceErrorReason,
   type ResourceRequest,
@@ -189,6 +191,42 @@ export const OFFLINE_GROUP: ConformanceGroup = {
           );
         } finally {
           runtime.close();
+        }
+      },
+    },
+    {
+      name: "gives a native list back when copying out of it fails",
+      spec: ["BND-066"],
+      async run({ maplibre, expect, cacheDirectory }) {
+        const runtime = maplibre.createRuntime({
+          cachePath: `${await cacheDirectory()}/cache.db`,
+        });
+        try {
+          const operation = runtime.startOfflineRegionList();
+          expect.ok(awaitCompletion(runtime), "the operation completed");
+
+          // Taking the result acquires a native list and then copies out of
+          // it. A copy that fails must still give the list back, and no call a
+          // caller can make fails there, so it is arranged.
+          forceStatus(EP.mln_offline_region_list_count, -5);
+          try {
+            expect.throws(
+              () => runtime.takeOfflineRegionList(operation),
+              "a copy that refuses after the list was acquired",
+            );
+          } finally {
+            clearForcedStatuses();
+          }
+
+          // The list was given back rather than leaked, so the runtime closes
+          // without a live child holding it open. A leaked list would keep it.
+          runtime.close();
+          expect.equal(runtime.isClosed, true, "the runtime closed cleanly");
+        } finally {
+          if (!runtime.isClosed) {
+            clearForcedStatuses();
+            runtime.close();
+          }
         }
       },
     },
