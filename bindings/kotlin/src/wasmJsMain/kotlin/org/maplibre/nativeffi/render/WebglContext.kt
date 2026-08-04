@@ -99,31 +99,36 @@ private external fun submitReadPixels(
 /**
  * A WebGL context on the thread this binding's maps render on, and the GL work a host does there.
  *
- * Every other platform hands a render target a context the host made with its own platform API, and
- * a browser host cannot: the handle a [WebglContextDescriptor] carries is an index into the
- * Emscripten module's own table, so a context the page created with `canvas.getContext("webgl2")`
- * is not one native can look up. This is where a host gets one that native can.
+ * Every other platform hands a render target a context the host made with its own graphics API, and
+ * a browser host cannot make one at all. The handle a [WebglContextDescriptor] carries is an index
+ * into the Emscripten module's own context table, so a context the page created with
+ * `canvas.getContext("webgl2")` names nothing native can look up. A WebGL context also belongs to
+ * the agent that created it, and the agent that renders is the thread this binding places
+ * owner-affine work on rather than the page. The entry points that satisfy both conditions are
+ * inside the module this binding distributes, so this is where a host reaches them.
  *
- * A WebGL context belongs to the thread that created it, and the thread that renders is the one the
- * module owns, so the context is created there — and so is everything else here. WebGL has no share
- * groups, so a texture belongs to the one context it was made in; a host that wants to create a
- * texture for a caller-owned target, or to put a rendered one on the page, issues those GL calls in
- * this context, on that thread. That is what [createTexture] and [presentTexture] are.
+ * That is why a context is the binding's to make here and the host's everywhere else. On a desktop
+ * or a phone the graphics API is EGL, Metal, or Vulkan, which the host genuinely owns; in a browser
+ * it is this module and this module's thread.
  *
- * This lives in the test source set rather than in the binding, because creating a context is the
- * host's job. A host owns its canvases and decides which of them a map draws onto; a binding that
- * created its own could never share one with the host's other rendering.
+ * WebGL has no share groups, so a texture belongs to the one context it was made in. A host that
+ * wants a texture for a caller-owned target, or wants a rendered one on the page, issues those GL
+ * calls in this context on that thread, which is what [createTexture] and [presentTexture] are.
  *
  * The canvas behind the context is either a page canvas reserved with [reserveCanvas] — whose
  * `<canvas>` element keeps displaying whatever this draws, with no copy — or a private
  * `OffscreenCanvas` on the owner thread, which nothing displays and which a host reads back from.
+ *
+ * Every call here reaches the owner thread, so every call belongs inside a
+ * [maplibreScope][org.maplibre.nativeffi.maplibreScope], as on every other path into this binding.
+ * [reserveCanvas] is the exception, because it runs before that thread exists.
  *
  * Closing is what releases the context, and there is no finalizer behind it: a browser host cannot
  * recover leaked resources by restarting a process. Close it only after every render target that
  * borrowed it has been detached or destroyed, because the C API borrows the handle for a target's
  * lifetime.
  */
-internal class WebglContext private constructor(private val handle: Int) : AutoCloseable {
+public class WebglContext private constructor(private val handle: Int) : AutoCloseable {
   private val core =
     BorrowedResourceCore("WebglContext") {
       Dispatcher.submitTask("mln_browser_webgl_context_destroy") { dispatcher, token ->
@@ -137,7 +142,7 @@ internal class WebglContext private constructor(private val handle: Int) : AutoC
    * A fresh descriptor each call, because a descriptor is mutable: a shared one that a caller
    * changed would point every later target at whatever it was changed to.
    */
-  fun descriptor(): WebglContextDescriptor = core.withOpenResource {
+  public fun descriptor(): WebglContextDescriptor = core.withOpenResource {
     WebglContextDescriptor(handle)
   }
 
@@ -164,7 +169,7 @@ internal class WebglContext private constructor(private val handle: Int) : AutoC
    * The context's contents survive. Resizing a canvas reallocates its drawing buffer and nothing
    * else, so every texture, buffer, and program the session built stays as it was.
    */
-  fun resizeCanvas(width: Int, height: Int) {
+  public fun resizeCanvas(width: Int, height: Int) {
     Status.requireArgument(width > 0) { "width must be positive, but was $width" }
     Status.requireArgument(height > 0) { "height must be positive, but was $height" }
     requireOpen()
@@ -199,7 +204,7 @@ internal class WebglContext private constructor(private val handle: Int) : AutoC
    * returns: a browser composites a canvas when the task that drew into it ends, and that task is
    * the owner thread's, not the page's.
    */
-  fun presentTexture(texture: Int, width: Int, height: Int) {
+  public fun presentTexture(texture: Int, width: Int, height: Int) {
     Status.requireArgument(texture != 0) { "texture must name a texture" }
     Status.requireArgument(width > 0) { "width must be positive, but was $width" }
     Status.requireArgument(height > 0) { "height must be positive, but was $height" }
@@ -227,7 +232,7 @@ internal class WebglContext private constructor(private val handle: Int) : AutoC
    * [destroyTexture] is what releases it — before this context is closed, or with it, since closing
    * a context releases everything made in it.
    */
-  fun createTexture(width: Int, height: Int): Int {
+  public fun createTexture(width: Int, height: Int): Int {
     Status.requireArgument(width > 0) { "width must be positive, but was $width" }
     Status.requireArgument(height > 0) { "height must be positive, but was $height" }
     requireOpen()
@@ -254,11 +259,13 @@ internal class WebglContext private constructor(private val handle: Int) : AutoC
    * blits onto.
    *
    * This is the expensive way to use a frame: it stalls the owner thread until the GPU is done, and
-   * it copies every pixel through the module's heap. It exists so that a test can tell a frame that
-   * was never drawn from a frame that was drawn and never composited, which are the same failure
-   * from the page's side and completely different underneath.
+   * it copies every pixel through the module's heap. A host that only wants the frame seen presents
+   * it instead. Reading back is for a host that consumes the pixels itself — encoding an image,
+   * comparing two frames — and for telling a frame that was never drawn from a frame that was drawn
+   * and never composited, which are the same symptom from the page's side and completely different
+   * underneath.
    */
-  fun readPixels(texture: Int, width: Int, height: Int): ByteArray {
+  public fun readPixels(texture: Int, width: Int, height: Int): ByteArray {
     Status.requireArgument(width > 0) { "width must be positive, but was $width" }
     Status.requireArgument(height > 0) { "height must be positive, but was $height" }
     requireOpen()
@@ -289,7 +296,7 @@ internal class WebglContext private constructor(private val handle: Int) : AutoC
   }
 
   /** Releases a texture from [createTexture], once no target borrows it any more. */
-  fun destroyTexture(texture: Int) {
+  public fun destroyTexture(texture: Int) {
     requireOpen()
     Dispatcher.submitTask("mln_browser_webgl_texture_destroy") { dispatcher, token ->
       submitTextureDestroy(dispatcher, handle, texture, token)
@@ -298,7 +305,7 @@ internal class WebglContext private constructor(private val handle: Int) : AutoC
 
   override fun close(): Unit = core.close()
 
-  companion object {
+  public companion object {
     /**
      * Claims the `<canvas>` element with this `id` for the thread maps render on.
      *
@@ -310,8 +317,12 @@ internal class WebglContext private constructor(private val handle: Int) : AutoC
      * This is what makes presentation zero-copy: [createForCanvas] builds a context whose default
      * framebuffer is that canvas, so a surface target's frame — or a texture [presentTexture] blits
      * onto it — appears on the page without being copied anywhere.
+     *
+     * Called from the page rather than from inside a
+     * [maplibreScope][org.maplibre.nativeffi.maplibreScope]: only the agent holding a canvas can
+     * give it away, and the thread that receives it does not exist yet.
      */
-    fun reserveCanvas(id: String) {
+    public fun reserveCanvas(id: String) {
       Dispatcher.reserveCanvas(id)
     }
 
@@ -321,10 +332,8 @@ internal class WebglContext private constructor(private val handle: Int) : AutoC
      * [width] and [height] size that canvas's drawing buffer in device pixels, which for a surface
      * target is the target's physical extent and for a texture target is the size anything
      * [presentTexture] shows must fit.
-     *
-     * Call this inside a `maplibreScope`, like every other call that reaches the owner thread.
      */
-    fun createForCanvas(id: String, width: Int, height: Int): WebglContext {
+    public fun createForCanvas(id: String, width: Int, height: Int): WebglContext {
       Status.requireArgument(id.isNotEmpty()) { "a canvas id must not be empty" }
       return create(id, width, height)
     }
@@ -332,12 +341,12 @@ internal class WebglContext private constructor(private val handle: Int) : AutoC
     /**
      * Creates a WebGL2 context against a private `OffscreenCanvas` the owner thread makes.
      *
-     * Nothing displays that canvas, which is what a test or a host that reads frames back wants. A
-     * texture target renders into a framebuffer of its own rather than into it, so for one the size
-     * bounds nothing the map draws and only has to be positive, because a zero-sized canvas has no
-     * drawing buffer to create a context against.
+     * Nothing displays that canvas, which is what a host that reads frames back wants. A texture
+     * target renders into a framebuffer of its own rather than into it, so for one the size bounds
+     * nothing the map draws and only has to be positive, because a zero-sized canvas has no drawing
+     * buffer to create a context against.
      */
-    fun create(width: Int, height: Int): WebglContext = create("", width, height)
+    public fun createOffscreen(width: Int, height: Int): WebglContext = create("", width, height)
 
     private fun create(id: String, width: Int, height: Int): WebglContext {
       Status.requireArgument(width > 0) { "width must be positive, but was $width" }

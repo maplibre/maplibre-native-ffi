@@ -42,6 +42,42 @@ no additional TLS package.
 The other runtimes are `maplibre-native-ffi-runtime-opengl` and
 `maplibre-native-ffi-runtime-metal`.
 
+### In a browser
+
+The wasmJs target calls a prelinked WebAssembly module that the page fetches,
+rather than a library that a host loads through a foreign-function interface.
+That module is linked against WebGL already, so this target takes no runtime
+dependency for a backend. Depend on the binding, and take the module from the
+`browser-module` archive that the wasmJs artifact carries.
+
+```kotlin title="build.gradle.kts"
+val browserModule: Configuration by configurations.creating
+
+dependencies {
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi:0.1.0-SNAPSHOT")
+  browserModule(
+    "org.maplibre.nativeffi:maplibre-native-ffi-wasm-js:0.1.0-SNAPSHOT:browser-module@zip"
+  )
+}
+```
+
+Resolve that configuration and unpack the archive into the directory that serves
+your page. It holds `maplibre_native_c.mjs`, `maplibre_native_c.wasm`, and
+`maplibre_native_c-abi.json`. The binding fetches the first at
+`./maplibre_native_c.mjs` and resolves the other two against it, so all three
+belong in one directory. Pass a URL of your own to the loader when that
+directory is somewhere else.
+
+Take the archive at the version you depend on. The binding reads the ABI
+manifest before it instantiates the module, and a module built from different
+headers than the binding was generated from fails to load.
+
+Serve every response cross-origin isolated, with
+`Cross-Origin-Opener-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp`. The module runs MapLibre on
+threads of its own, which need `SharedArrayBuffer`, and the workers those
+threads run in are documents that lose the isolation without the headers.
+
 ## Rust
 
 Depend on the `maplibre-native-ffi` crate from Git and enable one backend feature.

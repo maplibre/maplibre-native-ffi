@@ -37,7 +37,7 @@ class RenderSessionBrowserTest {
     browserTest {
       maplibreScope {
         withMap(WIDTH, HEIGHT) { _, map ->
-          val context = WebglContext.create(WIDTH, HEIGHT)
+          val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
           try {
             val descriptor = context.descriptor()
             assertNotEquals(0, descriptor.context)
@@ -74,7 +74,7 @@ class RenderSessionBrowserTest {
   fun eachAttachFamilyProducesTheSameSessionShape(): Promise<JsAny?> = browserTest {
     maplibreScope {
       withMap(WIDTH, HEIGHT) { _, map ->
-        val context = WebglContext.create(WIDTH, HEIGHT)
+        val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
         try {
           // A session-owned texture target: the session allocates the texture and hands frames
           // back through its own accessors.
@@ -151,7 +151,7 @@ class RenderSessionBrowserTest {
   fun resizeAndSetTargetChangeTheExtentTheSessionRendersAt(): Promise<JsAny?> = browserTest {
     maplibreScope {
       withMap(WIDTH, HEIGHT) { runtime, map ->
-        val context = WebglContext.create(WIDTH, HEIGHT)
+        val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
         try {
           val session =
             map.attachOpenGLOwnedTexture(
@@ -330,7 +330,7 @@ class RenderSessionBrowserTest {
               height = HEIGHT
             },
           )
-        val context = WebglContext.create(WIDTH, HEIGHT)
+        val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
         try {
           val session =
             map.attachOpenGLOwnedTexture(
@@ -360,7 +360,7 @@ class RenderSessionBrowserTest {
 
   /** Runs [body] with a session on a context sized for it, closing both afterwards. */
   private fun <T> withSession(map: MapHandle, body: (WebglContext, RenderSessionHandle) -> T): T {
-    val context = WebglContext.create(WIDTH, HEIGHT)
+    val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
     try {
       val session =
         map.attachOpenGLOwnedTexture(

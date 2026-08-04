@@ -59,6 +59,7 @@ PROJECT_LABELS = {
     "bindings-kotlin-android": "Kotlin/Android",
     "bindings-kotlin-jvm": "Kotlin/JVM",
     "bindings-kotlin-native": "Kotlin/Native",
+    "bindings-kotlin-wasm": "Kotlin/Wasm",
 }
 
 
@@ -106,6 +107,7 @@ def command_support(command: str) -> tuple[str, str] | None:
             "androidBuild": "bindings-kotlin-android",
             "jvmTest": "bindings-kotlin-jvm",
             "nativeTest": "bindings-kotlin-native",
+            "wasmJsTest": "bindings-kotlin-wasm",
         }.get(action)
         if project_id is None:
             return None
@@ -119,6 +121,7 @@ def command_support(command: str) -> tuple[str, str] | None:
             "test",
             "jvmTest",
             "nativeTest",
+            "wasmJsTest",
             "run",
             "test:android-emulator",
             "test:ios-simulator",

@@ -29,6 +29,7 @@ MODULES = {
     "maplibre-native-ffi-runtime-vulkan-android",
     "maplibre-native-ffi-runtime-vulkan-jvm",
     "maplibre-native-ffi-runtime-vulkan-linuxx64",
+    "maplibre-native-ffi-wasm-js",
 }
 
 # Modules with public Kotlin API. Their javadoc jars must carry the Dokka site,
@@ -41,6 +42,7 @@ API_BEARING_MODULES = {
     "maplibre-native-ffi-jvm",
     "maplibre-native-ffi-linuxx64",
     "maplibre-native-ffi-macosarm64",
+    "maplibre-native-ffi-wasm-js",
 }
 
 ROOT_TARGET_MODULES = {
@@ -51,6 +53,7 @@ ROOT_TARGET_MODULES = {
         "jvm": "maplibre-native-ffi-jvm",
         "linuxX64": "maplibre-native-ffi-linuxx64",
         "macosArm64": "maplibre-native-ffi-macosarm64",
+        "wasmJs": "maplibre-native-ffi-wasm-js",
     },
     "maplibre-native-ffi-runtime-opengl": {
         "android": "maplibre-native-ffi-runtime-opengl-android",
@@ -382,6 +385,38 @@ def verify_native(root: pathlib.Path) -> None:
                     raise SystemExit(f"{interop} is missing {expected}")
 
 
+BROWSER_MODULE_FILES = {
+    "maplibre_native_c.mjs",
+    "maplibre_native_c.wasm",
+    "maplibre_native_c-abi.json",
+}
+
+
+def verify_browser(root: pathlib.Path) -> None:
+    """A browser host fetches the module rather than linking it, so the wasmJs
+    publication carries it as a classified archive instead of taking it from a
+    runtime module. The binding reads the ABI manifest before it instantiates
+    anything, so an archive missing any of the three publishes a binding no page
+    can load."""
+    archive = one(
+        module_files(root, "maplibre-native-ffi-wasm-js", "-browser-module.zip"),
+        "browser module archive",
+    )
+    with zipfile.ZipFile(archive) as zip_file:
+        names = set(zip_file.namelist())
+        missing = sorted(BROWSER_MODULE_FILES - names)
+        if missing:
+            raise SystemExit(f"{archive} is missing {missing}")
+        with zip_file.open("maplibre_native_c-abi.json") as stream:
+            json.load(stream)
+        # The module is statically linked, so it redistributes MapLibre Native and every vendored
+        # dependency inside the wasm. Shipping it without their notices is a licensing defect that
+        # nothing about the archive makes visible, which is why it is checked before publication
+        # rather than left to a reader.
+        if not any(name.startswith("licenses/") and not name.endswith("/") for name in names):
+            raise SystemExit(f"{archive} carries no third-party notices under licenses/")
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         print(
@@ -395,6 +430,7 @@ def main() -> int:
     verify_android_runtime_independence(root)
     verify_jvm(root)
     verify_native(root)
+    verify_browser(root)
     return 0
 
 

@@ -767,6 +767,15 @@ For host-owned backend resources, the binding does not release or synchronize
 those resources. The caller keeps them valid for the C API's documented borrow
 window.
 
+Where the host graphics API is the binding's own module, the binding supplies
+those resources instead. A browser host cannot make a WebGL context a render
+target accepts: the handle in a WebGL context descriptor indexes the module's
+own table, and a context belongs to the agent that created it, which is the
+thread the binding places owner-affine work on. The browser binding therefore
+exposes context creation, canvas reservation and resize, texture creation and
+destruction, presentation, and readback as public API. Every other target leaves
+those to the host, which owns EGL, Metal, or Vulkan itself.
+
 The public handle exposes:
 
 - `resize` for session kinds that support resize;

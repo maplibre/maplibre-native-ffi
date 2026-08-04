@@ -35,7 +35,8 @@ private external fun instance(): MaplibreNativeCModule?
  * interleaving, so the first caller to arrive publishes the promise every later one awaits.
  *
  * A rejected load clears the memo, so a transient network failure can be retried. The digest check
- * happens before the import, so a mismatched module is never instantiated at all.
+ * happens before the import, so a mismatched module is never instantiated at all, and a rejection
+ * that does reach an instance terminates that instance's worker pool before it rethrows.
  */
 @OptIn(ExperimentalWasmJsInterop::class)
 @JsFun(
@@ -59,15 +60,16 @@ private external fun instance(): MaplibreNativeCModule?
     url = resolved
     if (globalThis.__maplibreNativeCLoading) return globalThis.__maplibreNativeCLoading
     // The manifest beside the module is a preflight, not the authority: rejecting a mismatch here
-    // avoids starting a 16-worker pthread pool for a module that is about to be refused, and a
-    // refused instance has no shutdown path. The module's own digest is still checked below, since
-    // a sidecar only vouches for whatever file happens to sit next to it.
+    // means a module that is about to be refused never starts a 16-worker pthread pool at all,
+    // rather than starting one that the catch below has to terminate. The module's own digest is
+    // still checked there, since a sidecar only vouches for whatever file happens to sit next to
+    // it.
     const loading = fetch(new URL('maplibre_native_c-abi.json', url).href)
       .then((response) => {
         if (!response.ok) {
           // Refused rather than skipped. The manifest ships with the module, so its absence means
-          // a broken deployment -- and proceeding would start a sixteen-worker pthread pool for a
-          // module that may then be rejected with no way to shut it down.
+          // a broken deployment, and proceeding would start a sixteen-worker pthread pool for a
+          // module that may then be rejected anyway.
           throw new Error(
             'no ABI manifest beside the module at ' + url + ', so the binding cannot check what ' +
             'it is about to instantiate')
@@ -104,40 +106,53 @@ private external fun instance(): MaplibreNativeCModule?
       })
       .then((factory) => factory.default({ locateFile: (path) => new URL(path, url).href }))
       .then((module) => {
-        // Checked before the module becomes reachable, so a failure leaves no
-        // half-usable instance behind for a caller that retries after catching
-        // it. The digest settles the headers; these settle how a call is packed
-        // and whether the browser support this binding needs is present at all.
-        for (const name of required) {
-          if (typeof module[name] !== 'function') {
-            throw new Error(
-              'the module at ' + url + ' is missing ' + name + ', so it was not built as a ' +
-              'browser module this binding can drive')
+        try {
+          // Checked before the module becomes reachable, so a failure leaves no
+          // half-usable instance behind for a caller that retries after catching
+          // it. The digest settles the headers; these settle how a call is packed
+          // and whether the browser support this binding needs is present at all.
+          for (const name of required) {
+            if (typeof module[name] !== 'function') {
+              throw new Error(
+                'the module at ' + url + ' is missing ' + name + ', so it was not built as a ' +
+                'browser module this binding can drive')
+            }
           }
-        }
-        for (const name of runtime) {
-          if (module[name] === undefined) {
-            throw new Error(
-              'the module at ' + url + ' is missing the ' + name + ' runtime helper, so it was ' +
-              'not built as a browser module this binding can drive')
+          for (const name of runtime) {
+            if (module[name] === undefined) {
+              throw new Error(
+                'the module at ' + url + ' is missing the ' + name + ' runtime helper, so it was ' +
+                'not built as a browser module this binding can drive')
+            }
           }
+          // The authority. The preflight above only saw a file beside the module, which a cache or
+          // a partial deploy can make a different generation entirely; this is the module itself.
+          const digest = module.UTF8ToString(module._mln_browser_headers_digest())
+          if (digest !== expectedDigest) {
+            throw new Error(
+              'the module at ' + url + ' was built from different headers than this binding was ' +
+              'generated from (module ' + digest + ', binding ' + expectedDigest + ')')
+          }
+          const actual = module._mln_browser_dispatch_protocol()
+          if (actual !== expectedProtocol) {
+            throw new Error(
+              'the module at ' + url + ' packs calls for protocol ' + actual + ', but this ' +
+              'binding packs for ' + expectedProtocol)
+          }
+          globalThis.__maplibreNativeC = module
+          return null
+        } catch (error) {
+          // The factory spawns the worker pool before it resolves, so by the time any of the
+          // checks above can run there are sixteen workers alive that only this instance refers
+          // to. Clearing the memo below lets a host retry, and a retry that left the pool standing
+          // would add sixteen more each time -- which is what a CDN serving a stale wasm behind a
+          // fresh manifest produces. Emscripten's own pool teardown is what `exit` runs, and the
+          // link exports it for this; a module that reaches here without it is one of the modules
+          // this binding is in the middle of refusing, so its absence is tolerated rather than
+          // reported over the failure that matters.
+          module.PThread?.terminateAllThreads?.()
+          throw error
         }
-        // The authority. The preflight above only saw a file beside the module, which a cache or
-        // a partial deploy can make a different generation entirely; this is the module itself.
-        const digest = module.UTF8ToString(module._mln_browser_headers_digest())
-        if (digest !== expectedDigest) {
-          throw new Error(
-            'the module at ' + url + ' was built from different headers than this binding was ' +
-            'generated from (module ' + digest + ', binding ' + expectedDigest + ')')
-        }
-        const actual = module._mln_browser_dispatch_protocol()
-        if (actual !== expectedProtocol) {
-          throw new Error(
-            'the module at ' + url + ' packs calls for protocol ' + actual + ', but this ' +
-            'binding packs for ' + expectedProtocol)
-        }
-        globalThis.__maplibreNativeC = module
-        return null
       })
       .catch((error) => { globalThis.__maplibreNativeCLoading = null; throw error })
     globalThis.__maplibreNativeCLoading = loading
@@ -287,5 +302,9 @@ internal object BrowserModule {
       // registered, which is exactly the late, misattributed failure this list exists to prevent.
       "addFunction",
       "removeFunction",
+      // The worker pool's teardown, which is the only way to release the sixteen workers a module
+      // spawned before this binding could decide whether to keep it. See the catch in
+      // verifyAndInstantiate.
+      "PThread",
     )
 }

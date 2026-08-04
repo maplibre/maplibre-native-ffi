@@ -1,3 +1,6 @@
+import org.gradle.api.publish.PublishingExtension
+import org.gradle.api.publish.maven.MavenPublication
+import org.gradle.api.tasks.bundling.Zip
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -42,9 +45,23 @@ val browserModuleSourceDir =
     .map(rootProject::file)
     .orElse(rootProject.layout.buildDirectory.dir("browser-module-unconfigured").map { it.asFile })
 val browserModuleConfigured = providers.gradleProperty("maplibre.browser.moduleDir").isPresent
-// The three files the wasmJs test page serves. Collected into a directory of their own so the test
-// harness serves the module and nothing else out of the browser build tree.
+// The module, its wasm, and its ABI manifest. They travel together or a host cannot check what it
+// loaded: the loader fetches the manifest beside the module before it instantiates anything, and
+// refuses a module that arrives without one.
+val browserModuleFiles =
+  listOf("maplibre_native_c.mjs", "maplibre_native_c.wasm", "maplibre_native_c-abi.json")
+// Where those three are collected. A directory of their own, so both the test harness and the
+// published archive carry the module and nothing else out of the browser build tree.
 val packagedBrowserModule = layout.buildDirectory.dir("wasmJsBrowserModule")
+// The third-party notices, which the install prefix keeps two levels above lib/browser.
+//
+// The module is statically linked: MapLibre Native and its vendored dependencies are inside the
+// wasm, so an archive carrying only this repository's LICENSE redistributes them without their
+// notices. The JVM runtime jars already ship these from the same prefix, and the browser archive is
+// the same redistribution by a different route.
+val browserNoticeDir = browserModuleSourceDir.map {
+  it.parentFile.parentFile.resolve("share/maplibre-native-c/licenses")
+}
 val testBrowserPath =
   providers
     .environmentVariable("MLN_FFI_TEST_BROWSER")
@@ -234,17 +251,67 @@ tasks.named<Test>("jvmTest") {
   }
 }
 
-// The module, its wasm, and its ABI manifest travel together: the loader fetches the manifest
-// beside the module before it instantiates anything, and refuses a module that arrives without one.
 val packageBrowserModule =
   tasks.register<Sync>("packageBrowserModule") {
     group = "build"
-    description = "Collects the prelinked Emscripten module that the wasmJs browser tests load."
-    from(browserModuleSourceDir) {
-      include("maplibre_native_c.mjs", "maplibre_native_c.wasm", "maplibre_native_c-abi.json")
-    }
+    description = "Collects the prelinked Emscripten module that a browser host loads."
+    from(browserModuleSourceDir) { include(browserModuleFiles) }
     into(packagedBrowserModule)
   }
+
+// The same three files as one archive. Every other platform ships a library that a host loads
+// through its own foreign-function interface, and the runtime publications carry that library. A
+// browser host has no link step and no loader path, so what it consumes is the linked module
+// itself, served beside its page. That makes the module a classified artifact on the wasmJs
+// publication rather than a runtime of its own. The archive is flat because the binding resolves
+// the wasm and the manifest against the module's own URL, so unpacking it into the directory that
+// serves the page is the whole installation.
+val browserModuleArchive =
+  tasks.register<Zip>("browserModuleArchive") {
+    group = "build"
+    description =
+      "Archives the prelinked Emscripten module that a browser host serves beside its page."
+    dependsOn(packageBrowserModule)
+    archiveBaseName.set("$mavenArtifact-wasm-js")
+    archiveVersion.set(mavenVersion)
+    archiveClassifier.set("browser-module")
+    destinationDirectory.set(layout.buildDirectory.dir("libs"))
+    from(packagedBrowserModule)
+    from(rootProject.file("LICENSE"))
+    from(browserNoticeDir) { into("licenses") }
+    // A missing file would otherwise be skipped silently and publish an archive that no host can
+    // load. Plain values rather than providers, because this runs under the configuration cache.
+    val collectedModule = packagedBrowserModule.get().asFile
+    val expectedFiles = browserModuleFiles
+    val notices = browserNoticeDir.get()
+    doFirst {
+      val missing = expectedFiles.filterNot { collectedModule.resolve(it).isFile }
+      check(missing.isEmpty()) {
+        "The browser module archive is missing $missing. Build the module with " +
+          "`mise run build emscripten-wasm32-webgl` and name it with " +
+          "-Pmaplibre.browser.moduleDir=build/emscripten-wasm32-webgl/install/lib/browser."
+      }
+      // Refused rather than shipped without them: publishing a statically linked module with no
+      // third-party notices is a licensing defect, and it is invisible in the resulting archive.
+      check(notices.isDirectory && notices.listFiles().orEmpty().isNotEmpty()) {
+        "The browser module archive found no third-party notices at $notices. They are installed " +
+          "beside the module, so name an install prefix's lib/browser with " +
+          "-Pmaplibre.browser.moduleDir=build/emscripten-wasm32-webgl/install/lib/browser."
+      }
+    }
+  }
+
+// The binding fetches the module at run time rather than linking it, so a consumer that resolves
+// the wasmJs variant alone has nothing to fetch. Attaching the archive here is what puts the module
+// under the same coordinates and the same version as the binding that checks its ABI digest.
+plugins.withId("maven-publish") {
+  extensions.configure<PublishingExtension> {
+    publications
+      .withType<MavenPublication>()
+      .matching { it.name == "wasmJs" }
+      .configureEach { artifact(browserModuleArchive) }
+  }
+}
 
 tasks.named<KotlinJsTest>("wasmJsBrowserTest") {
   dependsOn(packageBrowserModule)

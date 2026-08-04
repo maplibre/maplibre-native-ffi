@@ -4,6 +4,7 @@ import kotlin.js.JsAny
 import kotlin.js.Promise
 import kotlin.wasm.WasmExport
 import org.maplibre.nativeffi.internal.wasm.Dispatcher
+import org.maplibre.nativeffi.internal.wasm.PromisingStack
 import org.maplibre.nativeffi.internal.wasm.SuspensionGate
 import org.maplibre.nativeffi.internal.wasm.awaitOrThrow
 
@@ -29,7 +30,9 @@ internal fun maplibreScopeEntry(): Int {
   val block = pendingBlock ?: return 0
   pendingBlock = null
   return try {
-    block()
+    // This frame, and nothing above it, is what makes a suspension legal. Marked so that a call
+    // reaching the owner thread from anywhere else reports the missing scope instead of trapping.
+    PromisingStack.entered(block)
     1
   } catch (failure: Throwable) {
     // Carried out rather than thrown across the promising boundary, where it would arrive as an

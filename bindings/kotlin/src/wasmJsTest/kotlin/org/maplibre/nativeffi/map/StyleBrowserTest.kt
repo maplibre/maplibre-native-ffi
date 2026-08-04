@@ -491,17 +491,16 @@ class StyleBrowserTest {
   }
 
   /**
-   * The one style workflow a browser cannot carry.
+   * The one style workflow this binding does not carry yet.
    *
-   * MapLibre invokes a custom geometry source's tile callbacks synchronously on worker threads, and
-   * a worker cannot enter the page's WebAssembly instance. Unlike the resource provider, whose
-   * request the module's thunk can forward to the page and wait for, this callback runs while the
-   * map is blocked on it, so the page turn that would answer never comes. It is refused rather than
-   * left half-working, and asserted here so it is not quietly "fixed" into something that
-   * deadlocks.
+   * MapLibre invokes a custom geometry source's tile callbacks on native worker threads, which
+   * cannot enter the page's WebAssembly instance where a host's callback body lives. Both callbacks
+   * return `void`, so an asynchronous proxy is what would carry them, and the browser module has
+   * none yet. The source is refused for now rather than added and left silently starved of tiles.
+   * Asserted here so that whoever adds the proxy sees this test fail and states the new behavior.
    */
   @Test
-  fun aCustomGeometrySourceIsRefusedWithTheReasonItCannotWork(): Promise<JsAny?> = browserTest {
+  fun aCustomGeometrySourceIsRefusedUntilItsAsyncProxyExists(): Promise<JsAny?> = browserTest {
     maplibreScope {
       withMap { _, map ->
         map.setStyleJson(EMPTY_STYLE_JSON)

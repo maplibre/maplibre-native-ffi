@@ -278,7 +278,7 @@ class QueryBrowserTest {
   }
 
   private fun <T> withSession(map: MapHandle, body: (RenderSessionHandle) -> T): T {
-    val context = WebglContext.create(WIDTH, HEIGHT)
+    val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
     try {
       val session =
         map.attachOpenGLOwnedTexture(

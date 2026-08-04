@@ -109,10 +109,52 @@ internal object CallbackScope {
   fun isInside(): Boolean = depth > 0
 }
 
-// A "may this frame suspend?" predicate beyond the above deliberately does not live here.
-// Suspendability is a
-// property of one stack, not of the module: while a public stack is parked, a callback can enter
-// Kotlin on a stack that is *not* promising, and a global flag would report the parked stack's
-// answer to it. Two scopes completing out of order defeat save-and-restore for the same reason.
-// The dispatch path carries an explicit per-invocation token instead, so a callback frame is
-// constructed with `canSuspend = false` and cannot consult anything ambient.
+/**
+ * Tracks whether the calling frame stands on a stack that `WebAssembly.promising` entered.
+ *
+ * Parking on a promise is legal only on such a stack, and `maplibreScope` is what establishes one.
+ * A host that calls an owner-affine API without it would otherwise get a virtual-machine trap or an
+ * opaque JavaScript error from inside a suspending import, naming neither the scope nor the call --
+ * and forgetting the scope is easy, because every other target's actuals are ordinary synchronous
+ * functions with no wrapper around them. So the dispatch path asks this first and fails closed.
+ *
+ * Suspendability is a property of one stack rather than of the module, which is why this is more
+ * than a flag set for the length of a scope. While a scope is parked, its promising stack is not
+ * running: anything that enters Kotlin meanwhile -- a queued log record, a proxied callback, a
+ * host's own timer -- arrives on a fresh page stack that may not park. [parked] is what makes those
+ * frames read as what they are, by surrendering the count for exactly as long as the suspension
+ * lasts.
+ *
+ * A plain counter because a Kotlin/Wasm module is one thread, and one scope at a time because
+ * [SuspensionGate] serializes them, so the count is only ever zero or one.
+ */
+internal object PromisingStack {
+  private var depth = 0
+
+  /** Runs [body] as the body of a promising stack. */
+  fun <T> entered(body: () -> T): T {
+    depth++
+    try {
+      return body()
+    } finally {
+      depth--
+    }
+  }
+
+  /**
+   * Runs [body], which unwinds this stack to the event loop and is resumed on it.
+   *
+   * The count is given back for the duration, so that anything entering Kotlin while this stack is
+   * away is told it may not park -- which it may not, being on a stack of its own.
+   */
+  fun <T> parked(body: () -> T): T {
+    depth--
+    try {
+      return body()
+    } finally {
+      depth++
+    }
+  }
+
+  fun isInside(): Boolean = depth > 0
+}

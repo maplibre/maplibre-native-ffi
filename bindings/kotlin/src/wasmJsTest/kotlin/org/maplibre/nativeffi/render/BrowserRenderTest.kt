@@ -42,7 +42,7 @@ class BrowserRenderTest {
         try {
           // The context has to exist before the target that borrows it, and it outlives the
           // session: the C API borrows the handle for the target's lifetime.
-          val context = WebglContext.create(WIDTH, HEIGHT)
+          val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
           try {
             map.setStyleJson(BACKGROUND_STYLE_JSON)
             val session =

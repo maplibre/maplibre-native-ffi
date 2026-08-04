@@ -44,13 +44,16 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
 // - BND-158, BND-159 — outgoing HTTP header transforms. The browser's fetch transport follows
 //   redirects itself, so a transformed header cannot be kept out of a cross-origin hop. Asserted
 //   as permanently unsupported by `RuntimeHandleBrowserTest` instead.
-// - BND-124 — custom geometry source callback teardown. MapLibre invokes those callbacks
-//   synchronously on worker threads, which cannot enter the page's WebAssembly instance, so the
-//   source cannot be created at all. Asserted as refused by `StyleBrowserTest` instead.
 // - BND-156, BND-157 — queued provider routes. This binding does not route provider requests
 //   through `mln_adapter_queued_resource_provider`.
 // - BND-160's Metal and Vulkan halves — the browser module is built with OpenGL only. The
 //   unsupported-backend errors those attach paths report are covered.
+//
+// **Not implemented yet in this module.**
+// - BND-124 — custom geometry source callback teardown. MapLibre invokes those callbacks on worker
+//   threads, which cannot enter the page's WebAssembly instance where a host's callback body
+//   lives, and the browser module carries no asynchronous proxy to reach it. Asserted as refused by
+//   `StyleBrowserTest` until it does.
 //
 // **No seam for the injected failure.** The C API cannot be made to produce these here, and this
 // binding has no internal hook that would:

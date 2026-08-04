@@ -333,13 +333,21 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   }
 
   /**
-   * Reports that the browser cannot serve a custom geometry source.
+   * Reports that this binding does not carry a custom geometry source yet.
    *
-   * The C API documents both tile callbacks as running on arbitrary native worker threads, and an
-   * Emscripten function trampoline installed on the page cannot be called from one. Queuing the
-   * request back to the page is not a way out either: the worker waits inside the callback, so the
-   * page's turn that would service the queue never runs and the map stops. This is the same limit
-   * that leaves resource providers unsupported here.
+   * This binding runs Kotlin/Wasm on the page, so a host's callback body lives there, and MapLibre
+   * invokes `fetch_tile` and `cancel_tile` on arbitrary native worker threads, which cannot enter
+   * the page's WebAssembly instance. Reaching the host from one therefore means proxying the call
+   * to where the host code already is.
+   *
+   * That is work this module has not done for these two callbacks. Both return `void`, so an
+   * asynchronous proxy is what they want: the worker copies the tile id, posts it, and returns
+   * without waiting, and the tile's data reaches MapLibre later through
+   * [setCustomGeometrySourceTileData], which this binding already implements. The synchronous proxy
+   * that `src/browser/sync_callback.c` uses for the resource provider is the wrong shape here,
+   * because that one blocks its worker until the page answers and only exists because the C API
+   * demands a decision back. Beyond the proxy, `cancel_tile` is best-effort — it may repeat and may
+   * race `fetch_tile` — so the page's side needs cancellation state of its own.
    */
   public actual fun addCustomGeometrySource(
     sourceId: String,
@@ -347,9 +355,9 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   ) {
     throw UnsupportedFeatureException(
       MaplibreStatus.UNSUPPORTED.nativeCode,
-      "A custom geometry source is not supported by the browser binding. MapLibre invokes its " +
-        "tile callbacks synchronously on worker threads, which cannot call into the page's " +
-        "WebAssembly instance.",
+      "A custom geometry source is not implemented by the browser binding yet. MapLibre invokes " +
+        "its tile callbacks on native worker threads, which reach a callback body on the page " +
+        "only through an asynchronous proxy that the browser module does not yet carry.",
     )
   }
 

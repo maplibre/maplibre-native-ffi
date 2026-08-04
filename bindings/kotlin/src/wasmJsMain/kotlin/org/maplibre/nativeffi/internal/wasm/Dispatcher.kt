@@ -113,6 +113,27 @@ internal object Dispatcher {
   private var nextToken = 1
 
   /**
+   * Calls that have been counted but whose answers have not been taken.
+   *
+   * This is what the drain's lifetime is decided by. A caller counts itself here before it submits,
+   * so the count already covers the window in which a caller could park with nothing submitted yet
+   * -- which is the window an empty-turn drain would stop in.
+   *
+   * A plain counter, with no synchronization, because everything that touches it runs on the page's
+   * single agent. The owner thread reaches this binding only through the completion ring.
+   */
+  private var outstanding = 0
+
+  /**
+   * Whether a drain turn is scheduled.
+   *
+   * Read by the test that says the drain stops once nothing is outstanding, which is otherwise
+   * unobservable from a page: an idle drain and a stopped one both do nothing visible.
+   */
+  val isDraining: Boolean
+    get() = draining
+
+  /**
    * Diagnostics the drain has collected, by the token of the call that produced each.
    *
    * A message reaches the page only here, in the completion, because the C API's own is
@@ -203,17 +224,7 @@ internal object Dispatcher {
     fill: (NativeCall.Slots) -> Unit,
     read: (HeapPointer) -> T,
   ): T {
-    // A callback frame was entered from native and is not a promising stack, so parking here would
-    // trap; and it runs while a scope may be parked, so dispatching would put a second call in
-    // flight that the gate exists to prevent. The binding specification already requires callback
-    // code to hand owner-thread work back rather than calling these APIs, so this reports that
-    // rather than trying to serve it.
-    if (CallbackScope.isInside()) {
-      throw Status.invalidState(
-        "$name cannot be called from inside a MapLibre callback. Hand the work back to the " +
-          "thread that owns the runtime and call it there."
-      )
-    }
+    requireDispatchable(name)
     val dispatcher = require()
     val entry = NativeCall.index(name)
     val bytes = (slotCount + 1) * SLOT_BYTES
@@ -223,28 +234,74 @@ internal object Dispatcher {
       val token = nextToken++
       if (nextToken == TOKEN_WRAP) nextToken = 1
       beginWait(token)
-      startDraining()
-      if (!submitCall(dispatcher, entry, scratch.address, slotCount, result.address, token)) {
-        resolveCall(token, 0)
-        awaitCall(token)
-        throw Status.invalidState(
-          "The MapLibre Native browser module refused a call to $name; too many calls are " +
-            "already outstanding, or its owner thread is stopping."
-        )
+      outstanding++
+      try {
+        startDraining()
+        if (!submitCall(dispatcher, entry, scratch.address, slotCount, result.address, token)) {
+          resolveCall(token, 0)
+          park(token)
+          throw Status.invalidState(
+            "The MapLibre Native browser module refused a call to $name; too many calls are " +
+              "already outstanding, or its owner thread is stopping."
+          )
+        }
+        val invoked = park(token)
+        // Taken whatever the outcome, so a message never outlives the call it belongs to, and
+        // published before the status is read: [read] is where the status becomes an exception, and
+        // the diagnostic that exception copies has to be this call's.
+        NativeDiagnostics.setProxiedDiagnostic(diagnostics.remove(token) ?: "")
+        if (invoked == 0) {
+          throw Status.invalidState(
+            "The MapLibre Native browser module could not invoke $name with $slotCount slots."
+          )
+        }
+        read(result)
+      } finally {
+        outstanding--
       }
-      val invoked = awaitCall(token)
-      // Taken whatever the outcome, so a message never outlives the call it belongs to, and
-      // published before the status is read: [read] is where the status becomes an exception, and
-      // the diagnostic that exception copies has to be this call's.
-      NativeDiagnostics.setProxiedDiagnostic(diagnostics.remove(token) ?: "")
-      if (invoked == 0) {
-        throw Status.invalidState(
-          "The MapLibre Native browser module could not invoke $name with $slotCount slots."
-        )
-      }
-      read(result)
     }
   }
+
+  /**
+   * Refuses a call that this stack cannot park on, before anything native is reached.
+   *
+   * Two frames cannot park, and both would otherwise trap inside [awaitCall] rather than report
+   * anything a host can act on.
+   *
+   * A callback frame was entered from native, so it is not a promising stack; it also runs while a
+   * scope may be parked, so dispatching from it would put a second call in flight that the
+   * suspension gate exists to prevent. The binding specification already requires callback code to
+   * hand owner-thread work back rather than calling these APIs, so this reports that rather than
+   * trying to serve it. It is checked first because it is the more specific of the two.
+   *
+   * Anything else outside a `maplibreScope` is a host that left the scope out, which is the easy
+   * mistake to make: every other target's actuals are ordinary synchronous functions, so nothing in
+   * shared host code carries a wrapper here.
+   */
+  private fun requireDispatchable(name: String) {
+    if (CallbackScope.isInside()) {
+      throw Status.invalidState(
+        "$name cannot be called from inside a MapLibre callback. Hand the work back to the " +
+          "thread that owns the runtime and call it there."
+      )
+    }
+    if (!PromisingStack.isInside()) {
+      throw Status.invalidState(
+        "$name must be called inside maplibreScope { }. This binding reaches the thread that " +
+          "owns its runtimes by parking the calling stack on a promise, and WebAssembly allows " +
+          "that only on a stack that maplibreScope established."
+      )
+    }
+  }
+
+  /**
+   * Waits for [token]'s answer, with this stack away from the page while it waits.
+   *
+   * [awaitCall] unwinds to the event loop, so for as long as it has not returned, this stack is not
+   * the one running. Surrendering the promising count says exactly that, which is what makes a call
+   * placed from a page task that ran meanwhile report the missing scope rather than trap.
+   */
+  private fun park(token: Int): Int = PromisingStack.parked { awaitCall(token) }
 
   /**
    * Places one of the module's own entry points on the owner thread.
@@ -260,30 +317,28 @@ internal object Dispatcher {
    * it unchanged: the owner thread writes it, so nothing may read or release it until this returns.
    */
   fun submitTask(name: String, submit: (dispatcher: Int, token: Int) -> Boolean) {
-    // Same reasoning as in [call]: a callback frame was entered from native, so it is not a
-    // promising stack and cannot park, and it runs while a scope may already be parked.
-    if (CallbackScope.isInside()) {
-      throw Status.invalidState(
-        "$name cannot be called from inside a MapLibre callback. Hand the work back to the " +
-          "thread that owns the runtime and call it there."
-      )
-    }
+    requireDispatchable(name)
     val dispatcher = require()
     val token = nextToken++
     if (nextToken == TOKEN_WRAP) nextToken = 1
     beginWait(token)
-    startDraining()
-    if (!submit(dispatcher, token)) {
-      resolveCall(token, 0)
-      awaitCall(token)
-      throw Status.invalidState(
-        "The MapLibre Native browser module refused a call to $name; too many calls are " +
-          "already outstanding, or its owner thread is stopping."
-      )
+    outstanding++
+    try {
+      startDraining()
+      if (!submit(dispatcher, token)) {
+        resolveCall(token, 0)
+        park(token)
+        throw Status.invalidState(
+          "The MapLibre Native browser module refused a call to $name; too many calls are " +
+            "already outstanding, or its owner thread is stopping."
+        )
+      }
+      // A task has no index and no slot count, so nothing about it can be rejected the way a table
+      // call can be; the completion is only what says the owner thread has finished writing.
+      park(token)
+    } finally {
+      outstanding--
     }
-    // A task has no index and no slot count, so nothing about it can be rejected the way a table
-    // call can be; the completion is only what says the owner thread has finished writing.
-    awaitCall(token)
   }
 
   private fun startDraining() {
@@ -310,8 +365,16 @@ internal object Dispatcher {
         resolveCall(token, Heap.loadInt(out + 4))
       }
     }
-    // Kept running for the dispatcher's life. A caller parks before its call is submitted, so a
-    // drain that stopped on an empty turn could park a caller with nothing left to wake it.
+    // Stopped on the count rather than on an empty turn. A caller registers its wait and counts
+    // itself before its call is submitted, so an empty turn says nothing about whether a park is
+    // still coming -- a drain that stopped on one could leave a caller with nothing left to wake
+    // it. The count closes that window, and stopping matters because the alternative is a
+    // zero-delay task rescheduling itself for as long as the page is open, burning a browser task
+    // per turn on a map that is doing nothing.
+    if (outstanding == 0) {
+      draining = false
+      return
+    }
     scheduleDrain(::drainTurn)
   }
 
@@ -326,9 +389,15 @@ internal object Dispatcher {
     val dispatcher = handle
     if (dispatcher == 0) return
     handle = 0
-    draining = false
+    // `draining` is left as it is. A turn may already be scheduled, and clearing the flag would let
+    // a restart schedule a second one beside it -- two loops each rescheduling the other's
+    // successor. The scheduled turn is what clears the flag, on the first turn that finds no
+    // dispatcher.
+    //
     // Nothing is outstanding by now, so anything still here belongs to a caller that never
-    // resumed; it would otherwise be handed to whichever token matched it after a restart.
+    // resumed; both would otherwise be carried into a restart, the count as a drain that never
+    // stops and a message as one handed to whichever token matched it.
+    outstanding = 0
     diagnostics.clear()
     // The canvases went with the thread and cannot come back: a page gives control of a canvas
     // away once, and the element it gave away is not drawable again. Carrying the reservations

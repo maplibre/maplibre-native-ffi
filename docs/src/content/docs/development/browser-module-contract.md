@@ -304,3 +304,10 @@ The ABI manifest records the same digest and protocol. A host checks the
 manifest before instantiating and the module's own values afterwards. The first
 check refuses a mismatched module before its worker pool starts. The manifest
 describes whatever file sits beside the module; the module describes itself.
+
+A host that refuses an instance it has already built terminates that instance's
+worker pool with `PThread.terminateAllThreads()`, which the link exports for
+this. The factory spawns sixteen workers before it resolves, so a rejection that
+only dropped its reference to the module would leave all sixteen running, and a
+host retrying against a cache serving a stale `.wasm` behind a fresh manifest
+would add sixteen more on every attempt.

@@ -41,6 +41,7 @@ prepare_native_inputs() {
         android-arm64-vulkan
         android-x64-egl
         android-x64-vulkan
+        emscripten-wasm32-webgl
         linux-x64-egl
         linux-x64-vulkan
       )
@@ -152,6 +153,18 @@ publish_linux_leaves() {
     LinuxX64 -- \
     "$@" \
     -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-x64-vulkan"
+
+  # A browser host fetches the prelinked module rather than loading a library, so
+  # the wasmJs publication carries that module as a classified archive instead of
+  # depending on a runtime publication. The module comes out of the browser
+  # package the same way every other target's library does, which is why this
+  # publishes from the partition that has the Emscripten artifact.
+  publish_tasks \
+    :bindings:kotlin \
+    "$repository" \
+    WasmJs -- \
+    "$@" \
+    -Pmaplibre.browser.moduleDir="$install_root/emscripten-wasm32-webgl/lib/browser"
 }
 
 publish_apple_leaves() {

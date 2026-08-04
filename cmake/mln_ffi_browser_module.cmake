@@ -114,8 +114,12 @@ function(mln_ffi_add_browser_module target api_target)
       -sALLOW_TABLE_GROWTH=1
       # Descriptors cross as bytes, handles as 64-bit values, and a browser host
       # attaches its own canvas, so the heap views, the string helpers, and the
-      # GL registry are all part of the contract.
-      "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPU16,HEAPU32,HEAPF32,HEAPF64,GL,addFunction,removeFunction,UTF8ToString,stringToUTF8,lengthBytesUTF8"
+      # GL registry are all part of the contract. PThread is there for one
+      # reason: the factory spawns the worker pool before it resolves, so a host
+      # that rejects the instance it just built -- over a digest, a protocol, or
+      # a missing entry point -- holds sixteen workers it has no other way to
+      # release, and every retry would add sixteen more.
+      "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPU16,HEAPU32,HEAPF32,HEAPF64,GL,PThread,addFunction,removeFunction,UTF8ToString,stringToUTF8,lengthBytesUTF8"
       "-sEXPORTED_FUNCTIONS=@${export_list}"
       # A worker-owned render target draws into a canvas the page transferred to
       # it, which is the only way a thread that may block can also draw.
