@@ -46,6 +46,13 @@ bindings/typescript/scripts/stage-runtime.sh "$usage_preset"
 pnpm --filter @maplibre/native-ffi run build
 '''
 
+[tasks."test:wasm"]
+description = "Run the conformance suite over the WebAssembly transport."
+usage = 'arg "[preset]" default="emscripten-wasm32-webgl"'
+depends = [{ task = "build-wasm", args = ["{{usage.preset}}"] }, "build"]
+dir = "../.."
+run = 'cd bindings/typescript/api && pnpm exec vitest run test/wasm.test.ts'
+
 [tasks.build-wasm]
 description = "Link the WebAssembly runtime payload."
 usage = 'arg "[preset]" default="emscripten-wasm32-webgl"'

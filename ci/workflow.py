@@ -166,6 +166,11 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
                 f"mise run //bindings/dart:build:mobile {preset}",
             ]
         )
+    elif target_platform == "emscripten":
+        # The browser target builds a payload rather than an executable, so its
+        # suites are declared like a desktop platform's rather than run through
+        # a device shell.
+        commands.extend(suite_commands(source, preset))
     elif target_platform in DESKTOP:
         commands.extend(suite_commands(source, preset))
     return commands
