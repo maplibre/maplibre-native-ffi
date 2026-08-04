@@ -346,6 +346,12 @@ export class Runtime {
         BigInt.asUintN(64, milliseconds),
       ]);
     });
+    // A pump is where a host returns from waiting, so it is also where records
+    // MapLibre's threads queued while it waited become deliveries. A transport
+    // that can wake this context has already scheduled a drain, and draining
+    // again finds nothing; one that cannot — WebAssembly, whose workers reach
+    // no other agent — delivers here or not at all.
+    this.#callbacks.drain();
   }
 
   /** Takes one queued event, or `undefined` when the queue is empty. */

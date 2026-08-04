@@ -7,11 +7,14 @@
  * its own, and library-owned memory is reachable through the same views instead
  * of through a copy call.
  *
- * The module is a portable JavaScript-host build. Nothing here touches `window`,
- * `document`, or a canvas: a browser, Node, Bun, and Deno all instantiate the
- * same artifact.
+ * Nothing here touches `window`, `document`, or a canvas, so a browser, Node,
+ * Bun, and Deno all instantiate the same artifact. What is not portable is the
+ * module's own default resource loading: MapLibre's Emscripten HTTP source is
+ * Emscripten Fetch, which is XHR, so a non-browser host serves resources
+ * through a resource provider until a host-injected network adapter exists.
  */
 
+import { MaplibreError } from "../errors.ts";
 import { ABI_FINGERPRINT, ABI_HEADER_DIGEST } from "../raw/fingerprint.ts";
 import { AbiMismatchError } from "./node-transport.ts";
 import type { Ptr, Slab, Transport } from "./transport.ts";
@@ -25,6 +28,14 @@ import type { Ptr, Slab, Transport } from "./transport.ts";
  */
 export interface WasmModule {
   HEAPU8: Uint8Array;
+  /**
+   * The module's memory.
+   *
+   * Emscripten refreshes its `HEAP*` views in whichever agent grew the memory,
+   * so a worker that grows it leaves this agent's views short. The memory
+   * object itself always names the live buffer.
+   */
+  wasmMemory?: WebAssembly.Memory;
   _malloc(size: number): number;
   _free(pointer: number): void;
   _mln_abi_fingerprint(): number;
@@ -78,11 +89,24 @@ export function wasmTransport(module: WasmModule): Transport {
    * The current linear memory.
    *
    * Growing the memory replaces the buffer, so it is read per use rather than
-   * captured. Offsets survive growth; the views over them do not.
+   * captured. It comes from the memory object rather than from `HEAPU8`,
+   * because Emscripten refreshes those views only in the agent that grew the
+   * memory: a MapLibre worker that grows it would otherwise leave this agent
+   * reading a buffer that ends before the record it was handed.
    */
-  const memory = (): ArrayBuffer => module.HEAPU8.buffer as ArrayBuffer;
+  const memory = (): ArrayBuffer =>
+    (module.wasmMemory?.buffer ?? module.HEAPU8.buffer) as ArrayBuffer;
 
-  let drain: (() => void) | undefined;
+  /** Rejects a pointer no wasm32 address can be, before it reaches a view. */
+  const offsetOf = (pointer: Ptr, what: string): number => {
+    if (pointer < 0n || pointer > 0xffff_ffffn) {
+      throw new MaplibreError(
+        "invalidArgument",
+        `${what} is not a wasm32 address: ${pointer}`,
+      );
+    }
+    return Number(pointer);
+  };
 
   return {
     abi: "wasm32",
@@ -128,21 +152,51 @@ export function wasmTransport(module: WasmModule): Transport {
 
     readForeign(pointer: Ptr, length: number): Uint8Array {
       // Library allocations live in the same memory, so this is a copy out of a
-      // view rather than a call across a boundary.
-      const offset = Number(pointer);
-      return new Uint8Array(memory().slice(offset, offset + length));
+      // view rather than a call across a boundary. `slice` clamps rather than
+      // rejecting, so the range is checked first: a short copy would surface
+      // later as a decode failure that names nothing.
+      const offset = offsetOf(pointer, "a foreign pointer");
+      if (!Number.isInteger(length) || length < 0) {
+        throw new MaplibreError(
+          "invalidInput",
+          `a foreign read length must be a count, not ${length}`,
+        );
+      }
+      const buffer = memory();
+      if (offset === 0 || offset + length > buffer.byteLength) {
+        throw new MaplibreError(
+          "invalidArgument",
+          `a ${length}-byte read at ${pointer} leaves this module's memory`,
+        );
+      }
+      return new Uint8Array(buffer.slice(offset, offset + length));
     },
 
     readForeignCString(pointer: Ptr): string | null {
       if (pointer === 0n) {
         return null;
       }
+      const start = offsetOf(pointer, "a foreign string pointer");
       const bytes = new Uint8Array(memory());
-      let end = Number(pointer);
-      while (bytes[end] !== 0 && end < bytes.length) {
+      if (start >= bytes.length) {
+        throw new MaplibreError(
+          "invalidArgument",
+          `a string at ${pointer} starts outside this module's memory`,
+        );
+      }
+      let end = start;
+      while (end < bytes.length && bytes[end] !== 0) {
         end += 1;
       }
-      return decoder.decode(bytes.subarray(Number(pointer), end));
+      if (end === bytes.length) {
+        // No terminator before the end of memory, so this address named
+        // something else.
+        throw new MaplibreError(
+          "invalidArgument",
+          `a string at ${pointer} has no terminator inside this module's memory`,
+        );
+      }
+      return decoder.decode(bytes.subarray(start, end));
     },
 
     entrypointName(entrypoint: number): string | null {
@@ -168,24 +222,19 @@ export function wasmTransport(module: WasmModule): Transport {
       return module._mln_abi_queue_depth();
     },
 
-    startRecordNotifications(sink: () => void): void {
-      // MapLibre's threads are Web Workers here, and a worker cannot call into
-      // this context directly. The queue is drained when the host pumps, which
-      // is the same moment a browser would have been woken.
-      drain = sink;
+    startRecordNotifications(): void {
+      // MapLibre's threads are Web Workers here, and a worker cannot schedule
+      // work on this agent through the C queue's notifier. Delivery is driven
+      // by the host instead: a pump delivers what arrived, which is the same
+      // moment a notifier would have woken it.
     },
 
     stopRecordNotifications(): void {
-      drain = undefined;
+      // Nothing was installed, so nothing is removed.
     },
 
     transferIssue: (handle) => module._mln_abi_transfer_issue(handle),
     transferClaim: (token) => module._mln_abi_transfer_claim(token),
     transferDiscard: (token) => module._mln_abi_transfer_discard(token),
-
-    /** @internal Lets the pump deliver what the workers queued. */
-    get pendingDrain(): (() => void) | undefined {
-      return drain;
-    },
-  } as Transport;
+  };
 }

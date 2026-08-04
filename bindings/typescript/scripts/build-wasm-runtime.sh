@@ -2,9 +2,15 @@
 # Links the WebAssembly runtime payload.
 #
 # The native build installs a static library, so the payload is linked here with
-# the shared host-support shim on top of it. The result is a portable
-# JavaScript-host module: it names no DOM global, so a browser, Node, Bun, and
-# Deno all instantiate the same artifact.
+# the shared host-support shim on top of it.
+#
+# The module instantiates in a browser, in Node, in Bun, and in Deno, and the
+# whole binding API works in all four. Its *default* resource loading does not:
+# MapLibre's Emscripten HTTP source is Emscripten Fetch, which is XHR, so a
+# non-browser host serves resources through a resource provider of its own until
+# a host-injected network adapter exists. The WebGL and OffscreenCanvas options
+# below are likewise for the browser; a non-browser host uses the non-rendering
+# API domains.
 set -euo pipefail
 
 preset="${1:?usage: build-wasm-runtime.sh <preset>}"

@@ -5,8 +5,9 @@
  * pointer is differs. Running the same cases against both is what says the
  * shared layer is actually shared rather than merely written once.
  *
- * The module is a portable JavaScript-host build, so Node instantiates the same
- * artifact a browser would.
+ * Node instantiates the same artifact a browser would. The cases avoid the
+ * module's default HTTP path, which is Emscripten Fetch and so needs XHR: a
+ * non-browser host serves resources through a provider instead.
  */
 
 import {
@@ -38,7 +39,8 @@ if (!existsSync(modulePath)) {
 
 const createRuntime = (await import(modulePath))
   .default as () => Promise<WasmModule>;
-const maplibre = Maplibre.fromTransport(wasmTransport(await createRuntime()));
+const module_ = await createRuntime();
+const maplibre = Maplibre.fromTransport(wasmTransport(module_));
 
 const assertions: Expect = {
   equal(actual, expected, what) {
@@ -75,4 +77,26 @@ describe("the WebAssembly transport", () => {
       }
     });
   }
+});
+
+describe("WebAssembly memory bounds", () => {
+  it("refuses a read that leaves the module's memory", () => {
+    const transport = wasmTransport(module_);
+    // `slice` would clamp rather than reject, so a stale pointer would become a
+    // short copy that fails somewhere else with a message naming nothing.
+    expect(() => transport.readForeign(0xffff_fff0n as never, 64)).toThrow(
+      MaplibreError,
+    );
+    expect(() => transport.readForeign(0n as never, 1)).toThrow(MaplibreError);
+    expect(() => transport.readForeignCString(0xffff_fff0n as never)).toThrow(
+      MaplibreError,
+    );
+    // A wasm32 module has no address this large at all.
+    expect(() => transport.readForeign((1n << 40n) as never, 1)).toThrow(
+      MaplibreError,
+    );
+    // The null pointer is the one address that reads as absent rather than
+    // failing, because the C API uses it for an absent string.
+    expect(transport.readForeignCString(0n as never)).toBeNull();
+  });
 });
