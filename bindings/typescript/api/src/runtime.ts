@@ -26,6 +26,7 @@ import {
   type AmbientCacheOperation,
   type OfflineOperationId,
   type OfflineRegion,
+  type OfflineRegionStatus,
   OfflineRegionDefinitionType,
 } from "./offline.ts";
 import { EP } from "./raw/entrypoints.ts";
@@ -619,6 +620,66 @@ export class Runtime {
     });
     this.#rewriteRules?.release();
     this.#rewriteRules = undefined;
+  }
+
+  /**
+   * Starts reading one region's download status.
+   *
+   * Offline work is asynchronous: this names an operation and the answer
+   * arrives as a runtime event, which `takeOfflineRegionStatus` then collects.
+   */
+  startOfflineRegionStatus(regionId: bigint): OfflineOperationId {
+    const id = this.#state.use("Runtime.startOfflineRegionStatus");
+    const native = this.#state.native;
+    return native.scope((scope) => {
+      const out = scope.allocateZeroed(8);
+      native.checked(scope, EP.mln_runtime_offline_region_get_status_start, [
+        id,
+        asUint64(regionId, "region id"),
+        out,
+      ]);
+      return native.memory
+        .view(out, 8)
+        .getBigUint64(0, true) as OfflineOperationId;
+    });
+  }
+
+  /** Collects the status a completed operation produced, copied out of native storage. */
+  takeOfflineRegionStatus(operation: OfflineOperationId): OfflineRegionStatus {
+    const id = this.#state.use("Runtime.takeOfflineRegionStatus");
+    const native = this.#state.native;
+    return native.scope((scope) => {
+      const layout = native.layout("mln_offline_region_status");
+      const storage = scope.allocateZeroed(layout.size, layout.align);
+      native.memory
+        .view(storage, layout.size)
+        .setUint32(layout.fields.size!.offset, layout.size, true);
+      native.checked(
+        scope,
+        EP.mln_runtime_offline_region_get_status_take_result,
+        [id, asUint64(operation, "operation id"), storage],
+      );
+      const view = native.memory.view(storage, layout.size);
+      const count = (field: string): bigint =>
+        view.getBigUint64(layout.fields[field]!.offset, true);
+      return {
+        downloadState: view.getUint32(
+          layout.fields.download_state!.offset,
+          true,
+        ),
+        completedResourceCount: count("completed_resource_count"),
+        completedResourceSize: count("completed_resource_size"),
+        completedTileCount: count("completed_tile_count"),
+        completedTileSize: count("completed_tile_size"),
+        requiredTileCount: count("required_tile_count"),
+        requiredResourceCount: count("required_resource_count"),
+        requiredResourceCountIsPrecise:
+          view.getUint8(
+            layout.fields.required_resource_count_is_precise!.offset,
+          ) !== 0,
+        complete: view.getUint8(layout.fields.complete!.offset) !== 0,
+      };
+    });
   }
 
   /**

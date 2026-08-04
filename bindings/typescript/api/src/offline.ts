@@ -80,3 +80,18 @@ export interface OfflineRegion {
   /** The host-supplied bytes this region was created with. */
   readonly metadata: Uint8Array;
 }
+
+/** What one region has downloaded, copied out of native storage. */
+export interface OfflineRegionStatus {
+  /** The region's download state, as the C API numbers it. */
+  readonly downloadState: number;
+  readonly completedResourceCount: bigint;
+  readonly completedResourceSize: bigint;
+  readonly completedTileCount: bigint;
+  readonly completedTileSize: bigint;
+  readonly requiredTileCount: bigint;
+  readonly requiredResourceCount: bigint;
+  /** Whether `requiredResourceCount` is exact rather than an estimate. */
+  readonly requiredResourceCountIsPrecise: boolean;
+  readonly complete: boolean;
+}

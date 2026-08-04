@@ -48,11 +48,6 @@ export const UNCLAIMED: readonly UnclaimedCase[] = [
     note: "a failed explicit release is proven; the requirement is about the leak channel a best-effort cleanup reports through, which is the finalizer path BND-044 also needs",
   },
   {
-    id: "BND-085",
-    reason: "unwritten",
-    note: "the binding wraps only the region list; `mln_runtime_offline_region_create_start`, `_delete_start`, `_get_status_start` and their take-result pairs exist in C and are not exposed, so there is no region to observe",
-  },
-  {
     id: "BND-088",
     reason: "inapplicable",
     note:

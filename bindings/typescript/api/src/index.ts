@@ -107,6 +107,7 @@ export {
   AmbientCacheOperation,
   type OfflineOperationId,
   type OfflineRegion,
+  type OfflineRegionStatus,
   OfflineRegionDefinitionType,
 } from "./offline.ts";
 export { MapProjection } from "./projection.ts";

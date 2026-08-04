@@ -6,11 +6,13 @@
  * context.
  */
 
+import type { MaplibreError } from "../errors.ts";
 import { RuntimeEventType } from "../events.ts";
 import { clearForcedStatuses, forceStatus } from "../internal/faults.ts";
 import { LogSeverityMask } from "../logging.ts";
 import type { Map } from "../map.ts";
 import type { Maplibre } from "../maplibre.ts";
+import type { OfflineRegionStatus } from "../offline.ts";
 import { EP } from "../raw/entrypoints.ts";
 import type { ResourceRequestInfo } from "../resource-request.ts";
 import {
@@ -227,6 +229,65 @@ export const OFFLINE_GROUP: ConformanceGroup = {
             clearForcedStatuses();
             runtime.close();
           }
+        }
+      },
+    },
+    {
+      name: "reports a region's status through the event model",
+      spec: ["BND-085"],
+      async run({ maplibre, expect, cacheDirectory }) {
+        const runtime = maplibre.createRuntime({
+          cachePath: `${await cacheDirectory()}/cache.db`,
+        });
+        try {
+          // An empty database holds no region, so this names one that is not
+          // there. The point is the shape of the answer: offline work reports
+          // through an operation and an event rather than returning, and a
+          // failure has to arrive the same way a result would.
+          const operation = runtime.startOfflineRegionStatus(1n);
+          expect.ok(operation > 0n, "an operation id");
+          expect.ok(
+            awaitCompletion(runtime),
+            "the operation completed through the runtime event model",
+          );
+
+          // Whether a missing region is an error or an empty status is the
+          // library's decision. What this binding owes is that the answer is
+          // copied out and reaches the caller either way, rather than being
+          // invented or lost.
+          let status: OfflineRegionStatus | undefined;
+          let refused: MaplibreError | undefined;
+          try {
+            status = runtime.takeOfflineRegionStatus(operation);
+          } catch (error) {
+            refused = error as MaplibreError;
+          }
+          if (refused !== undefined) {
+            expect.ok(
+              refused.diagnostic.length > 0 || refused.kind.length > 0,
+              "a refusal names why",
+            );
+          } else {
+            const answered = expect.defined(status, "a status");
+            expect.equal(
+              typeof answered.complete,
+              "boolean",
+              "the status was copied out as public values",
+            );
+            expect.equal(
+              typeof answered.completedTileCount,
+              "bigint",
+              "counts keep their full domain",
+            );
+          }
+
+          // Either way the operation is spent, so replaying it is refused.
+          expect.throws(
+            () => runtime.takeOfflineRegionStatus(operation),
+            "taking a spent operation's result again",
+          );
+        } finally {
+          runtime.close();
         }
       },
     },
