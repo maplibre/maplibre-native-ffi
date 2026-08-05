@@ -70,3 +70,8 @@ commands = [{ task = "//bindings/python:test" }]
 [[suites]]
 platforms = ["linux", "macos", "windows"]
 commands = [{ task = "//bindings/dart:build" }]
+
+# Run Rust browser tests against the Emscripten build.
+[[suites]]
+platforms = ["emscripten"]
+commands = [{ task = "//bindings/rust:test:browser" }]

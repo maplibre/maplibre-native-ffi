@@ -1013,6 +1013,7 @@ name = "maplibre-native-ffi"
 version = "0.0.0"
 dependencies = [
  "ash",
+ "bindgen",
  "bitflags 2.13.0",
  "glow",
  "glutin_egl_sys",
@@ -1045,6 +1046,7 @@ version = "0.0.0"
 dependencies = [
  "bindgen",
  "flate2",
+ "mln-ffi-platform",
  "serde",
  "serde_json",
  "sha2",

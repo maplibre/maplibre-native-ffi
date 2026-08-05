@@ -52,10 +52,27 @@ The build script downloads the matching native artifact.
 maplibre-native-ffi = { git = "https://github.com/maplibre/maplibre-native-ffi", features = ["vulkan"] }
 ```
 
-The other features are `opengl` and `metal`.
+The other features are `opengl`, `metal`, and `webgpu`. WebGPU has no published
+native artifact.
 
 Set `MAPLIBRE_NATIVE_C_INSTALL_DIR` to an install prefix to use your own build
 instead.
+
+Native Rust builds use the shared C library. Static consumers link both archives
+listed by the prefix's pkg-config file.
+
+### Browser
+
+The crate also builds for `wasm32-unknown-emscripten` from a source checkout.
+Cargo compiles the Rust platform crate from its repository path so the final
+module contains one Rust standard library. The build needs an Emscripten install
+prefix, the consumer-wide options in
+`share/maplibre-native-c/emscripten-link-flags.txt`, and a standard library
+rebuilt with atomics. `mise run //bindings/rust:test:browser` shows the complete
+invocation.
+
+A browser host must be cross-origin isolated. A blocking entry point also needs
+`-sPROXY_TO_PTHREAD` so the module thread can service JavaScript.
 
 ## Python
 
