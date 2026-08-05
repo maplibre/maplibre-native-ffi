@@ -52,10 +52,6 @@ endfunction()
 
 function(mln_ffi_install_c_api_complete_static_archive target)
   get_target_property(MLN_FFI_INSTALL_ARCHIVE ${target} MLN_FFI_INSTALL_ARCHIVE)
-  # A platform that merges nothing leaves this unset -- see
-  # mln_ffi_configure_complete_static_archive() and the browser's `none` archive
-  # format. The rest of the prefix, headers and pkg-config included, still
-  # installs; the artifact such a platform distributes instead is its own task.
   if(NOT MLN_FFI_INSTALL_ARCHIVE)
     return()
   endif()
@@ -63,6 +59,46 @@ function(mln_ffi_install_c_api_complete_static_archive target)
     FILES "${MLN_FFI_INSTALL_ARCHIVE}"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+endfunction()
+
+function(mln_ffi_install_emscripten_options)
+  if(NOT EMSCRIPTEN)
+    return()
+  endif()
+  set(link_options)
+  set(compile_options)
+  foreach(dependencies mln_ffi_platform_dependencies mln_ffi_render_dependencies)
+    foreach(kind LINK COMPILE)
+      get_target_property(options ${dependencies} INTERFACE_${kind}_OPTIONS)
+      if(options AND NOT options MATCHES "-NOTFOUND$")
+        string(TOLOWER "${kind}" kind_lower)
+        list(APPEND ${kind_lower}_options ${options})
+      endif()
+    endforeach()
+  endforeach()
+  if(NOT link_options)
+    return()
+  endif()
+  list(REMOVE_DUPLICATES link_options)
+
+  set(link_options_file "${CMAKE_CURRENT_BINARY_DIR}/emscripten-link-flags.txt")
+  list(JOIN link_options "\n" link_options_lines)
+  file(WRITE "${link_options_file}" "${link_options_lines}\n")
+  install(
+    FILES "${link_options_file}"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/maplibre-native-c"
+    COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+
+  list(JOIN link_options " " pkg_config_link_options)
+  set(MLN_FFI_PKG_CONFIG_LIBS
+      "${MLN_FFI_PKG_CONFIG_LIBS} ${pkg_config_link_options}"
+      PARENT_SCOPE)
+
+  list(REMOVE_DUPLICATES compile_options)
+  list(JOIN compile_options " " pkg_config_compile_options)
+  set(MLN_FFI_PKG_CONFIG_CFLAGS
+      "${MLN_FFI_PKG_CONFIG_CFLAGS} ${pkg_config_compile_options}"
+      PARENT_SCOPE)
 endfunction()
 
 function(mln_ffi_install_c_api_shared_target target)
@@ -87,6 +123,11 @@ function(mln_ffi_install_c_api_library target)
   get_target_property(MLN_FFI_C_API_LIBRARY_TYPE ${target} TYPE)
   set(MLN_FFI_PKG_CONFIG_CFLAGS "")
   set(MLN_FFI_PKG_CONFIG_RPATH_FLAGS "")
+  get_target_property(MLN_FFI_PKG_CONFIG_ARCHIVES mln_ffi_platform_dependencies
+                      MLN_FFI_PKG_CONFIG_ARCHIVES)
+  if(NOT MLN_FFI_PKG_CONFIG_ARCHIVES)
+    set(MLN_FFI_PKG_CONFIG_ARCHIVES "")
+  endif()
   get_target_property(MLN_FFI_PKG_CONFIG_LIBS mln_ffi_platform_dependencies
                       MLN_FFI_PKG_CONFIG_LIBS)
   if(NOT MLN_FFI_PKG_CONFIG_LIBS)
@@ -103,6 +144,7 @@ function(mln_ffi_install_c_api_library target)
   get_target_property(MLN_FFI_TARGET_PLATFORM mln_ffi_platform_dependencies
                       MLN_FFI_TARGET_PLATFORM)
   mln_ffi_resolve_git_sha()
+  mln_ffi_install_emscripten_options()
 
   set(pc_file "${CMAKE_CURRENT_BINARY_DIR}/maplibre-native-c.pc")
   set(artifact_file
@@ -147,15 +189,17 @@ function(mln_ffi_install_c_api_library target)
     FILES "${pc_file}"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/pkgconfig"
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
-  get_target_property(MLN_FFI_INSTALL_LIBRARY_FILES mln_ffi_render_dependencies
-                      MLN_FFI_INSTALL_LIBRARY_FILES)
-  if(MLN_FFI_INSTALL_LIBRARY_FILES
-     AND NOT MLN_FFI_INSTALL_LIBRARY_FILES MATCHES "-NOTFOUND$")
-    install(
-      FILES ${MLN_FFI_INSTALL_LIBRARY_FILES}
-      DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-      COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
-  endif()
+  foreach(dependencies mln_ffi_platform_dependencies mln_ffi_render_dependencies)
+    get_target_property(MLN_FFI_INSTALL_LIBRARY_FILES ${dependencies}
+                        MLN_FFI_INSTALL_LIBRARY_FILES)
+    if(MLN_FFI_INSTALL_LIBRARY_FILES
+       AND NOT MLN_FFI_INSTALL_LIBRARY_FILES MATCHES "-NOTFOUND$")
+      install(
+        FILES ${MLN_FFI_INSTALL_LIBRARY_FILES}
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+    endif()
+  endforeach()
   get_target_property(MLN_FFI_INSTALL_INCLUDE_DIRS mln_ffi_render_dependencies
                       MLN_FFI_INSTALL_INCLUDE_DIRS)
   if(MLN_FFI_INSTALL_INCLUDE_DIRS

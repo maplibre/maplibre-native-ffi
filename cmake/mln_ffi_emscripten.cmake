@@ -21,10 +21,6 @@ set(MLN_FFI_EMSCRIPTEN_STACK_SIZE "1MB"
 # require the page to be cross-origin isolated (COOP/COEP), which is a
 # deployment constraint for anything embedding a browser build.
 add_compile_options(-pthread)
-add_link_options(
-  -pthread "-sPTHREAD_POOL_SIZE=${MLN_FFI_EMSCRIPTEN_PTHREAD_POOL_SIZE}"
-  "-sINITIAL_MEMORY=${MLN_FFI_EMSCRIPTEN_INITIAL_MEMORY}"
-  "-sSTACK_SIZE=${MLN_FFI_EMSCRIPTEN_STACK_SIZE}")
 
 # WebGPU is asynchronous in a browser and MapLibre calls it synchronously, so
 # the emdawnwebgpu port implements emwgpuWaitAny by suspending the calling
@@ -55,4 +51,3 @@ if(MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
         "Emscripten suspension link option for emdawnwebgpu (-sASYNCIFY=1 or -sJSPI)")
 endif()
 add_compile_options(-fwasm-exceptions)
-add_link_options(-fwasm-exceptions)

@@ -463,6 +463,9 @@ pub fn addMaplibreNativeIncludes(b: *std.Build, module_: *std.Build.Module, opti
 /// Callers provide all filesystem paths explicitly so the helper works both from this
 /// package and from external consumers with a different build root layout.
 pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: LinkOptions) void {
+    if (options.target.result.os.tag == .emscripten) {
+        @panic("Emscripten consumers must link the installed archives with emcc");
+    }
     addMaplibreNativeIncludes(b, module_, .{
         .include_dirs = options.include_dirs,
         .target = options.target,

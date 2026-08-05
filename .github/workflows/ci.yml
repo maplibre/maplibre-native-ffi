@@ -458,6 +458,19 @@ jobs:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test emscripten-wasm32-webgl
+      - name: Archive native artifact
+        run: mise run archive-native emscripten-wasm32-webgl
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          emscripten-wasm32-webgl
+          build/packages/native/dist/maplibre-native-c-emscripten-wasm32-webgl.tar.gz
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-emscripten-wasm32-webgl-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-emscripten-wasm32-webgl.tar.gz
+          if-no-files-found: error
 
   target-emscripten-wasm32-webgpu:
     name: target / emscripten-wasm32-webgpu
@@ -479,6 +492,19 @@ jobs:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test emscripten-wasm32-webgpu
+      - name: Archive native artifact
+        run: mise run archive-native emscripten-wasm32-webgpu
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          emscripten-wasm32-webgpu
+          build/packages/native/dist/maplibre-native-c-emscripten-wasm32-webgpu.tar.gz
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-emscripten-wasm32-webgpu-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-emscripten-wasm32-webgpu.tar.gz
+          if-no-files-found: error
 
   target-macos-arm64-metal:
     name: target / macos-arm64-metal

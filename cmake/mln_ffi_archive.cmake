@@ -1,5 +1,4 @@
-# Assembles the single static archive the project distributes. Every archive the
-# C API is built from is merged into it, so a consumer links one file.
+# Assembles the primary static archive that the project distributes.
 #
 # The platform describes the result through properties on
 # mln_ffi_platform_dependencies; nothing here knows which compiler produced the
@@ -139,17 +138,7 @@ endfunction()
 function(mln_ffi_configure_complete_static_archive target)
   get_target_property(MLN_FFI_ARCHIVE_FORMAT mln_ffi_platform_dependencies
                       MLN_FFI_ARCHIVE_FORMAT)
-  # A platform that distributes something other than an archive of native
-  # objects declares `none` and merges nothing. Browser builds are linked into a
-  # wasm module by emcc, and merging wasm archives needs an MRI script rather
-  # than the relocatable link the elf format uses.
-  #
-  # MLN_FFI_INSTALL_ARCHIVE stays unset, which is what tells
-  # mln_ffi_install_c_api_complete_static_archive() there is no archive to
-  # install.
-  #
-  # TODO(browser-packaging): give the browser a distributable artifact -- see
-  # #37 phase D, which also covers the prelinked module JS consumers need.
+  # A platform that declares `none` installs no primary static archive.
   if(MLN_FFI_ARCHIVE_FORMAT STREQUAL "none")
     return()
   endif()
@@ -181,6 +170,9 @@ function(mln_ffi_configure_complete_static_archive target)
     mln_ffi_elf_archive_commands(
       MLN_FFI_ARCHIVE_COMMANDS "${MLN_FFI_COMPLETE_STATIC_OBJECT}"
       "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}" ${MLN_FFI_INPUT_ARCHIVES})
+  elseif(MLN_FFI_ARCHIVE_FORMAT STREQUAL "wasm")
+    set(MLN_FFI_ARCHIVE_COMMANDS COMMAND "${CMAKE_AR}" qcL
+        "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}" ${MLN_FFI_INPUT_ARCHIVES})
   else()
     message(FATAL_ERROR "Unsupported archive format: ${MLN_FFI_ARCHIVE_FORMAT}")
   endif()

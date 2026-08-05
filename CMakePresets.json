@@ -300,11 +300,13 @@
     {
       "name": "emscripten-wasm32-webgl",
       "configurePreset": "emscripten-wasm32-webgl",
+      "targets": ["install"],
       "jobs": 0
     },
     {
       "name": "emscripten-wasm32-webgpu",
       "configurePreset": "emscripten-wasm32-webgpu",
+      "targets": ["install"],
       "jobs": 0
     },
     {
@@ -524,6 +526,18 @@
     }
   ],
   "packagePresets": [
+    {
+      "name": "emscripten-wasm32-webgl",
+      "configurePreset": "emscripten-wasm32-webgl",
+      "generators": ["TGZ"],
+      "configurations": ["Release"]
+    },
+    {
+      "name": "emscripten-wasm32-webgpu",
+      "configurePreset": "emscripten-wasm32-webgpu",
+      "generators": ["TGZ"],
+      "configurations": ["Release"]
+    },
     {
       "name": "linux-x64-egl",
       "configurePreset": "linux-x64-egl",
