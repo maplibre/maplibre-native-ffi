@@ -16,6 +16,7 @@ repository.workspace = true
 metal = []
 opengl = []
 vulkan = []
+webgpu = []
 
 [build-dependencies]
 bindgen = "0.72.1"
