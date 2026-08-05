@@ -124,7 +124,10 @@ const assertions: Expect = {
 
 /** `bigint` has no JSON form, and these comparisons are for small values. */
 function replacer(_key: string, value: unknown): unknown {
-  return typeof value === "bigint" ? value.toString() : value;
+  // Marked, so a bigint cannot compare equal to the string of the same digits.
+  // Every address in this binding crosses as a bigint, so an unmarked one would
+  // let a case pass against a value of the wrong type.
+  return typeof value === "bigint" ? `${value}n` : value;
 }
 
 /** What this runner loads, so a case restricted to another one is skipped. */
