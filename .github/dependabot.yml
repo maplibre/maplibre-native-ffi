@@ -67,11 +67,11 @@ updates:
     groups:
       npm:
         patterns: ["*"]
-  # The root covers the solution and `Directory.Packages.props`; the binding
-  # directory is listed for its own `.config/dotnet-tools.json`, which is only
-  # discovered from the directory that holds it.
+  # The root covers the solution and `Directory.Packages.props`. Every other
+  # directory here holds a `.config/dotnet-tools.json`, which is only discovered
+  # from the directory that holds it, so each manifest needs its own entry.
   - package-ecosystem: nuget
-    directories: ["/", "/bindings/dotnet"]
+    directories: ["/", "/bindings/dotnet", "/bindings/dotnet/docfx"]
     schedule:
       interval: weekly
     cooldown:

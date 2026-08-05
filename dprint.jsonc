@@ -16,6 +16,10 @@
     "**/*.lock.yml",
     "uv.lock",
     "Cargo.lock",
+    // Every .NET tool manifest is rewritten in the SDK's own style by the
+    // command that updates it, Dependabot included, so formatting them turns
+    // each tool update into a hygiene failure.
+    "**/.config/dotnet-tools.json",
     "src/platform/rust/about.hbs",
     "bindings/kotlin/src/jvmMain/generated/**",
     "gradlew",

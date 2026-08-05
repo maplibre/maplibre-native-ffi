@@ -13,7 +13,7 @@ sources = [
 run = "dotnet tool restore --tool-manifest .config/dotnet-tools.json --verbosity quiet && dotnet tool restore --tool-manifest bindings/dotnet/.config/dotnet-tools.json --verbosity quiet"
 
 [tasks.generate]
-run = "scripts/generate-clangsharp.sh"
+run = "python scripts/generate-clangsharp.py"
 
 [tasks.api]
 description = "Generate DocFX HTML API reference for the .NET binding."
