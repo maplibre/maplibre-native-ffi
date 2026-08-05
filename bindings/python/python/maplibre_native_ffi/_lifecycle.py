@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import warnings as _warnings
 from collections.abc import Callable
+from contextlib import suppress
 from types import TracebackType
 from typing import Any, Self
 
@@ -53,12 +54,10 @@ class WarnUnclosedMixin:
         raise NotImplementedError
 
     def __del__(self) -> None:
-        try:
+        # Finalizers cannot report warning-delivery failures, including during
+        # interpreter shutdown when Python globals may be partially torn down.
+        with suppress(BaseException):
             warn_unclosed(self._handle_name, getattr(self, "closed", True))
-        except AttributeError, RuntimeError, Warning:
-            # Finalizers may run during interpreter shutdown, with Python
-            # globals half torn down or warnings promoted to exceptions.
-            return
 
 
 class NativeHandleMixin(WarnUnclosedMixin, ContextHandleMixin):

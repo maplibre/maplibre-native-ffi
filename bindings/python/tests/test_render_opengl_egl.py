@@ -26,7 +26,12 @@ try:
         EglPbufferSurface,
         EglUnavailableError,
     )
-except (ImportError, OSError, RuntimeError) as error:  # pragma: no cover
+except (
+    AttributeError,
+    ImportError,
+    OSError,
+    RuntimeError,
+) as error:  # pragma: no cover
     skip_or_fail_fixture_setup(
         f"EGL Python render fixtures are unavailable: {error}",
         "opengl",

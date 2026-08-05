@@ -1,4 +1,3 @@
-import concurrent.futures
 import contextlib
 import http.server
 import math
@@ -3411,12 +3410,21 @@ def test_resource_provider_can_complete_request_from_another_thread() -> None:
             map_handle.set_style_url("custom://cross-thread-style.json")
             handle = _wait_for_provider_handle(runtime, handles)
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                completed = executor.submit(
-                    handle.complete,
+            completed = threading.Event()
+
+            def complete() -> None:
+                handle.complete(
                     resource.ResourceResponse(bytes=_EMPTY_STYLE_BYTES),
                 )
-                completed.result(timeout=2)
+                completed.set()
+
+            thread = threading.Thread(target=complete, daemon=True)
+            thread.start()
+            assert completed.wait(timeout=2), (
+                "cross-thread resource completion did not return"
+            )
+            thread.join(timeout=2)
+            assert not thread.is_alive()
             _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
 
 
@@ -3620,15 +3628,16 @@ def test_resource_request_release_race_with_cancellation_checks_closes_cleanly()
                         saw_closed.set()
                         stop.set()
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                probe = executor.submit(probe_cancelled)
-                try:
-                    assert started.wait(timeout=2)
-                    handle.close()
-                    assert saw_closed.wait(timeout=2)
-                finally:
-                    stop.set()
-                probe.result(timeout=2)
+            probe = threading.Thread(target=probe_cancelled, daemon=True)
+            probe.start()
+            try:
+                assert started.wait(timeout=2)
+                handle.close()
+                assert saw_closed.wait(timeout=2)
+            finally:
+                stop.set()
+                probe.join(timeout=2)
+            assert not probe.is_alive(), "cancellation probe did not return"
             with pytest.raises(mln.InvalidStateError, match="already closed"):
                 handle.is_cancelled()
 
