@@ -4,8 +4,8 @@ namespace Maplibre.NativeFfi.Map;
 
 /// <summary>Viewport options descriptor.</summary>
 /// <remarks>
-/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
-/// instance unmodified while it is a key in a hash-based collection.
+/// Compares and hashes by property value; keep an instance unmodified while it is a key in a
+/// hash-based collection.
 /// </remarks>
 public sealed record ViewportOptions
 {
@@ -17,8 +17,8 @@ public sealed record ViewportOptions
 
 /// <summary>Tile tuning options descriptor.</summary>
 /// <remarks>
-/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
-/// instance unmodified while it is a key in a hash-based collection.
+/// Compares and hashes by property value; keep an instance unmodified while it is a key in a
+/// hash-based collection.
 /// </remarks>
 public sealed record TileOptions
 {
@@ -32,8 +32,8 @@ public sealed record TileOptions
 
 /// <summary>Projection mode options descriptor.</summary>
 /// <remarks>
-/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
-/// instance unmodified while it is a key in a hash-based collection.
+/// Compares and hashes by property value; keep an instance unmodified while it is a key in a
+/// hash-based collection.
 /// </remarks>
 public sealed record ProjectionModeOptions
 {

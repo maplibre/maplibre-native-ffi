@@ -1,9 +1,6 @@
 // Marks a request as serving an offline download, which Mapbox endpoints bill
-// separately from ordinary map use.
-//
-// This is a property of the request rather than of any one transport, so every
-// HTTP file source the C API ships resolves the URL the same way: a host that
-// switches between the native and browser builds sees the same requests go out.
+// separately from ordinary map use. Every HTTP file source the C API ships
+// resolves the URL through here, so the requests match across builds.
 
 #pragma once
 

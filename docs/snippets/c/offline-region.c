@@ -6,8 +6,7 @@
 #include <string.h>
 
 // Pumps until the completion event for this operation arrives, and returns the
-// operation's own result status. A host with a frame loop reads that event in
-// the loop instead of blocking here.
+// operation's own result status.
 static mln_status await_operation(
   mln_runtime runtime, mln_offline_operation_id operation_id
 ) {

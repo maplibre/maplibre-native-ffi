@@ -1,5 +1,4 @@
-// The app shell: command-line parsing, the SDL window, the two loops on their
-// two threads, and the shutdown ordering between them.
+// App shell: command-line parsing, the SDL window, and the two loops.
 
 #include <SDL3/SDL.h>
 #include <maplibre_native_c.h>
@@ -16,8 +15,8 @@
 #include "util.h"
 #include "viewport.h"
 
-/// Backstop for the runtime loop's park. The render loop's wake source is what
-/// normally releases it, so this only bounds a pump that nothing signals.
+/// Backstop for a parked pump that nothing signals; the wake source is what
+/// normally releases it.
 static constexpr int64_t park_timeout_milliseconds = 100;
 
 typedef struct runtime_loop_args {
@@ -28,8 +27,7 @@ typedef struct runtime_loop_args {
 } runtime_loop_args;
 
 static app_error runtime_loop_body(runtime_loop_args* args, map_state* state) {
-  // The render loop signals this to release the parked pump, so a camera
-  // command or a shutdown request lands without waiting out the bound below.
+  // The render loop signals this to release the parked pump.
   mln_wake_source wake = MLN_HANDLE_NULL;
   const mln_status wake_status =
     mln_runtime_wake_source_acquire(state->runtime, &wake);
@@ -38,7 +36,6 @@ static app_error runtime_loop_body(runtime_loop_args* args, map_state* state) {
     return APP_ERROR_WAKE_SOURCE_FAILED;
   }
 
-  // Reused across drains, so applying a batch allocates nothing.
   command_list batch = {};
 
   map_channel_publish(args->channel, state->map, wake);
@@ -51,9 +48,6 @@ static app_error runtime_loop_body(runtime_loop_args* args, map_state* state) {
     if (error != APP_OK) {
       break;
     }
-    // This thread has no display to pace it, so it takes its cadence from the
-    // runtime's own work and parks in between. The bound is a backstop for
-    // work that queues nothing on the owner thread, not the cadence.
     const mln_status pump_status =
       mln_runtime_pump(state->runtime, park_timeout_milliseconds);
     if (pump_status != MLN_STATUS_OK) {
@@ -77,8 +71,7 @@ static app_error runtime_loop_body(runtime_loop_args* args, map_state* state) {
 }
 
 /// Owns the runtime and the map for their whole lifetime, on a thread that is
-/// not the one presenting. It never touches the render session: the render
-/// loop attaches its own against the map published here.
+/// not the one presenting.
 static int runtime_loop(void* userdata) {
   runtime_loop_args* args = userdata;
 
@@ -94,18 +87,15 @@ static int runtime_loop(void* userdata) {
     map_channel_fail(args->channel, error);
   }
 
-  // However this loop exits, the render loop still owns the session, and a
-  // map with an attached session cannot be destroyed. The body publishes any
-  // failure before this point, so the render loop stops, closes its session,
-  // and requests shutdown; only then is the map destroyed.
+  // A map with an attached session cannot be destroyed, so wait for the render
+  // loop to close its session first.
   map_channel_await_shutdown(args->channel);
   map_state_deinit(&state);
   return 0;
 }
 
 /// One render-loop iteration: input, resize handling, and at most one
-/// consumed render request. Runs inside the frame scope the active backend
-/// opened, so every early return still closes it.
+/// consumed render request. Runs inside the frame scope the caller opened.
 static app_error render_loop_iteration(
   SDL_Window* window, render_target* target, viewport* current_viewport,
   command_queue* commands, render_request* request, map_channel* channel,
@@ -128,12 +118,8 @@ static app_error render_loop_iteration(
       case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
         *current_viewport = viewport_get(window);
         viewport_log("resized viewport", *current_viewport);
-        // Every mode follows a resize without losing its session: the ones
-        // the session sizes resize in place, and a caller-owned target
-        // allocates a replacement and hands it over.
         MAP_TRY(render_target_resize(target, *current_viewport));
-        // The session resize enqueued the new extent to the map's owner
-        // thread, so release its parked pump the way an input command does.
+        // The resize is queued to the map's owner thread; release its pump.
         map_channel_wake_runtime_loop(channel);
         render_request_set(request);
         break;
@@ -142,9 +128,6 @@ static app_error render_loop_iteration(
           controller, &event, commands, *current_viewport
         );
         if (result.handled) {
-          // Release the runtime loop's parked pump so the command just
-          // queued is applied on this frame rather than after the parking
-          // bound.
           map_channel_wake_runtime_loop(channel);
         }
         if (result.camera_changed) {
@@ -157,8 +140,8 @@ static app_error render_loop_iteration(
 
   MAP_TRY(render_target_finish_frame(target));
 
-  // Consume before rendering, so a request the runtime loop publishes
-  // during the render call is not discarded.
+  // Consume before rendering, so a request published during the render call is
+  // not discarded.
   if (render_request_consume(request)) {
     bool rendered = false;
     MAP_TRY(render_target_render_update(target, *current_viewport, &rendered));
@@ -167,8 +150,7 @@ static app_error render_loop_iteration(
     }
   }
 
-  // Stand-in for a display-refresh subscription until the host loop is
-  // display-paced; see the frame loop section of the example spec.
+  // Stand-in for a display-refresh subscription.
   sleep_milliseconds(8);
   return APP_OK;
 }
@@ -180,8 +162,6 @@ static app_error render_loop(
   viewport* current_viewport, command_queue* commands, render_request* request,
   map_channel* channel
 ) {
-  // The runtime loop creates the map; this loop attaches its own session
-  // against it and owns that session for the rest of the run.
   mln_map map = MLN_HANDLE_NULL;
   while (!map_channel_try_map(channel, &map)) {
     app_error failure;
@@ -308,7 +288,7 @@ int main(int argc, char** argv) {
   viewport_log("initial viewport", current_viewport);
 
   // The graphics context, the render session, and every presentation resource
-  // belong to this thread, which owns the window and its display callbacks.
+  // belong to this thread, which owns the window.
   render_target* target = nullptr;
   error = render_target_init(&target, window, current_viewport, mode);
   if (error != APP_OK) {

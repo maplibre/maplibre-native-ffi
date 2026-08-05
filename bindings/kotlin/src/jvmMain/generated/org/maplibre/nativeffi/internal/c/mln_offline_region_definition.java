@@ -148,7 +148,7 @@ public class mln_offline_region_definition {
         private static final GroupLayout $LAYOUT = MemoryLayout.unionLayout(
             mln_offline_tile_pyramid_region_definition.layout().withName("tile_pyramid"),
             mln_offline_geometry_region_definition.layout().withName("geometry")
-        ).withName("$anon$619:3");
+        ).withName("$anon$616:3");
 
         /**
          * The layout of this union

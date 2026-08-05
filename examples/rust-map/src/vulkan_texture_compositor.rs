@@ -34,14 +34,13 @@ pub struct VulkanTextureCompositor {
     command_buffer: vk::CommandBuffer,
     image_available: vk::Semaphore,
     /// One present-wait semaphore per swapchain image, indexed by the acquired
-    /// image. The frame fence proves a submit finished, but only the next
-    /// acquire of the same image proves its present consumed the semaphore, so
-    /// a single reused semaphore is a race the presentation engine may lose.
+    /// image. Only the next acquire of the same image proves its present
+    /// consumed the semaphore, so a single reused semaphore races.
     render_finished: Vec<vk::Semaphore>,
     in_flight: vk::Fence,
     viewport: Viewport,
-    /// Set when the surface reports the swapchain no longer matches it. The
-    /// next frame rebuilds the swapchain before it draws.
+    /// Set when the surface has outgrown the swapchain; the next frame rebuilds
+    /// it before drawing.
     swapchain_stale: bool,
     closed: bool,
 }
@@ -92,12 +91,9 @@ impl VulkanTextureCompositor {
         Ok(compositor)
     }
 
-    /// Rebuilds the swapchain at a new size.
-    ///
-    /// The replacement is created before the retired swapchain is destroyed and
-    /// names it as `old_swapchain`, so the presentation engine hands the surface
-    /// over directly. Destroying it first leaves a gap that MoltenVK fills with
-    /// presents that succeed but reach no drawable the window still shows.
+    /// Rebuilds the swapchain at a new size. The replacement names the retired
+    /// swapchain as `old_swapchain` and is created before it is destroyed;
+    /// destroying first makes MoltenVK present to no visible drawable.
     pub fn resize(&mut self, viewport: Viewport) -> Result<(), vk::Result> {
         self.wait_idle()?;
         self.destroy_swapchain_dependents();
@@ -197,8 +193,7 @@ impl VulkanTextureCompositor {
 
     /// Samples the image view into the swapchain, reporting whether the frame
     /// reached the screen. A swapchain the surface has outgrown presents
-    /// nothing, so the caller keeps its redraw pending and draws again once the
-    /// replacement is built.
+    /// nothing, so the caller keeps its redraw pending.
     pub(crate) fn draw_image_view(
         &mut self,
         image_view: vk::ImageView,
@@ -209,8 +204,6 @@ impl VulkanTextureCompositor {
                 .wait_for_fences(&[self.in_flight], true, u64::MAX)?
         };
 
-        // The frame about to present is the first content a replacement
-        // swapchain could show, so this is the moment a stale one is rebuilt.
         if self.swapchain_stale {
             self.resize(self.viewport)?;
         }
@@ -226,16 +219,13 @@ impl VulkanTextureCompositor {
             ) {
                 Ok(acquired) => acquired,
                 Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
-                    // The surface outgrew this swapchain, so nothing reaches
-                    // the screen until the replacement is built.
                     self.swapchain_stale = true;
                     return Ok(false);
                 }
                 Err(error) => return Err(error),
             };
             if suboptimal {
-                // Still presentable, but the surface has moved on; rebuild the
-                // swapchain before the next frame.
+                // Still presentable, but rebuild before the next frame.
                 self.swapchain_stale = true;
             }
 

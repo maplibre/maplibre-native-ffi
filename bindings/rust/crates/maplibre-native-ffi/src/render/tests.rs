@@ -74,10 +74,8 @@ fn create_owned_texture_session(
     Err("no configured render backend offers an owned texture test session".into())
 }
 
-/// Whether this build can attach an owned texture session for the tests above.
-///
-/// Every backend the C API offers one for qualifies, so long as the fixture can
-/// build a context for it.
+/// Whether this build can attach an owned texture session the fixture can
+/// build a context for.
 fn has_test_owned_texture_session_backend() -> bool {
     let backends = crate::supported_render_backends();
     backends.intersects(RenderBackendMask::METAL | RenderBackendMask::VULKAN)
@@ -103,9 +101,7 @@ fn has_opengl_test_context_backend() -> bool {
     }
     #[cfg(not(any(target_os = "linux", target_os = "android", target_os = "windows")))]
     {
-        // The Rust test helper only implements Linux EGL and Windows WGL.
-        // macOS EGL remains covered by bindings that can create a test context
-        // and by the map examples until this helper grows a native EGL path.
+        // The Rust test helper implements only Linux EGL and Windows WGL.
         false
     }
 }
@@ -168,8 +164,8 @@ fn create_opengl_borrowed_texture_session(
 enum OwnedTextureTestContext {
     Metal(MetalTestContext),
     Vulkan(Box<VulkanTestContext>),
-    // Boxed for the same reason Vulkan is: the context is several kilobytes
-    // and every other variant is a handful of bytes.
+    // Boxed: the context is several kilobytes and the other variants are a
+    // handful of bytes.
     OpenGL(Box<OpenGLTestContext>),
 }
 
@@ -192,10 +188,10 @@ impl OwnedTextureTestContext {
         }
     }
 
-    /// Hands the session a placeholder replacement of this context's own
-    /// backend. The session's kind is checked before the descriptor, so the
-    /// placeholder handle is never dereferenced — but the setter has to match
-    /// the backend, or an unsupported build would answer instead of the kind.
+    /// Hands the session a placeholder target of this context's own backend.
+    /// The setter must match the backend, or an unsupported build answers in
+    /// place of the target-kind rejection. The placeholder is never
+    /// dereferenced, because the kind is checked before the descriptor.
     fn set_placeholder_borrowed_target(
         &self,
         session: &RenderSessionHandle,
@@ -339,9 +335,9 @@ impl EglTestContext {
     fn new() -> std::result::Result<Self, Box<dyn StdError>> {
         let lib = load_egl_library()?;
         let egl = load_egl_bindings(&lib)?;
-        // Mesa's surfaceless platform is what a desktop Linux run without a
-        // display server draws on. The device EGL implementations ship no such
-        // platform and hand out the default display instead.
+        // A desktop Linux run without a display server needs Mesa's surfaceless
+        // platform. Device EGL implementations ship no such platform, so they
+        // take the default display.
         #[cfg(any(target_env = "ohos", target_os = "android"))]
         let display = unsafe { egl.GetDisplay(egl::DEFAULT_DISPLAY as *mut c_void) };
         #[cfg(any(target_env = "ohos", target_os = "android"))]
@@ -1010,9 +1006,8 @@ impl OpenGLBorrowedTexture {
                 glow::TEXTURE_MAG_FILTER,
                 glow::NEAREST as i32,
             );
-            // Zeroed rather than left undefined: a test that reads this back
-            // to prove the session rendered into it needs a known starting
-            // value, or undefined contents could pass for a rendered frame.
+            // Zeroed so that a readback proving the session rendered into this
+            // texture cannot pass on undefined contents.
             let blank = vec![0_u8; (width as usize) * (height as usize) * 4];
             context.gl.tex_image_2d(
                 glow::TEXTURE_2D,
@@ -1032,9 +1027,8 @@ impl OpenGLBorrowedTexture {
         Ok(texture)
     }
 
-    /// Allocates a replacement in this helper's own context, the way a host that
-    /// reallocates on resize does. The outgoing texture stays live so the caller
-    /// can hand the replacement over before releasing it.
+    /// Allocates a replacement in this helper's own context. The outgoing
+    /// texture stays live until the caller adopts the replacement.
     fn allocate_replacement(
         &self,
         width: u32,
@@ -1728,8 +1722,7 @@ fn set_target_hands_a_live_session_a_new_borrowed_texture() {
     ));
     assert!(session.render_update().unwrap());
 
-    // A caller-owned texture is sized by its owner, so resizing is not the way
-    // to follow a host that changed size.
+    // A caller-owned texture is sized by its owner, so resize is unsupported.
     let resized_extent = RenderTargetExtent::new(96, 64, 1.0);
     let resize_error = session
         .resize(
@@ -1758,11 +1751,9 @@ fn set_target_hands_a_live_session_a_new_borrowed_texture() {
         .adopt(replacement, physical_width, physical_height)
         .unwrap();
 
-    // The session stayed live across the replacement and renders into the
-    // texture it was just given, once the map has caught up to the new size.
     // QUERY_STYLE_JSON paints this background over every pixel it covers, so
-    // finding it in a texture that started zeroed means this session rendered
-    // into the one it was handed.
+    // finding it in a texture that started zeroed means the session rendered
+    // into the replacement.
     const QUERY_STYLE_BACKGROUND_RGBA: [u8; 4] = [0xd8, 0xf1, 0xff, 0xff];
     assert!(
         texture.read_rgba().unwrap().iter().all(|byte| *byte == 0),
@@ -1805,15 +1796,13 @@ fn set_target_reports_unsupported_for_a_session_owned_texture() {
         create_owned_texture_session(&map.attach_ref().unwrap(), extent.clone())
             .expect("Metal or Vulkan owned texture test session should attach when supported");
 
-    // A session-owned texture is sized and replaced by its session. The setter
-    // has to be this build's own backend, or "not supported by this build"
-    // would answer in place of the target-kind rejection under test.
+    // The setter must be this build's own backend, or "not supported by this
+    // build" answers in place of the target-kind rejection under test.
     let error = context
         .set_placeholder_borrowed_target(&session, &extent)
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::Unsupported);
 
-    // The rejection left the session usable.
     assert!(session.render_update().is_ok());
 
     session.close().unwrap();
@@ -1824,10 +1813,9 @@ fn set_target_reports_unsupported_for_a_session_owned_texture() {
 #[test]
 // Spec coverage: BND-176.
 fn set_target_reports_unsupported_for_a_session_owned_opengl_texture() {
-    // The Metal and Vulkan case is covered by the test above, whose owned
-    // texture fixture supports only those two backends. OpenGL has its own
-    // owned texture fixture, so an OpenGL-only build covers the same rejection
-    // here rather than skipping it.
+    // The owned texture fixture above covers Metal and Vulkan only. OpenGL has
+    // its own fixture, so an OpenGL-only build covers the same rejection here
+    // rather than skipping it.
     if !has_opengl_test_context_backend() {
         return;
     }
@@ -1850,7 +1838,6 @@ fn set_target_reports_unsupported_for_a_session_owned_opengl_texture() {
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::Unsupported);
 
-    // The rejection left the session usable.
     assert!(session.render_update().is_ok());
 
     session.close().unwrap();
@@ -1884,7 +1871,6 @@ fn set_target_reports_unsupported_for_a_target_kind_the_session_does_not_have() 
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::Unsupported);
 
-    // The rejected call left the session usable.
     assert!(session.render_update().is_ok());
 
     session.close().unwrap();
@@ -1895,9 +1881,8 @@ fn set_target_reports_unsupported_for_a_target_kind_the_session_does_not_have() 
 #[test]
 // Spec coverage: BND-167, BND-168, and BND-173.
 fn frame_native_pointer_round_trips_address_without_plain_native_pointer() {
-    // Rust ties backend frame handles to the borrowed frame lifetime; successful
-    // frame release consumes the owner, so stale released handles cannot expose
-    // backend pointers through safe public APIs.
+    // A backend frame pointer is tied to the borrowed frame, so a released
+    // handle cannot expose one through a safe API.
     // SAFETY: Test uses a dummy opaque address and does not dereference it.
     let pointer = unsafe { FrameNativePointer::<'_>::from_ptr(0x4321usize as *mut u8) };
     // SAFETY: Test only verifies address reconstruction while the typed frame borrow is live.
@@ -1993,8 +1978,8 @@ fn failed_frame_release_leaves_frame_live_for_later_release() {
     FRAME_RELEASE_STATUS.store(sys::MLN_STATUS_INVALID_STATE, Ordering::SeqCst);
     FRAME_RELEASE_COUNT.store(0, Ordering::SeqCst);
     let session = Rc::new(RenderSessionState {
-        // SAFETY: The fake handle is never dereferenced. The fake destroy
-        // function only reports success so RenderSessionState drop is harmless.
+        // SAFETY: The fake handle is never dereferenced, and the fake destroy
+        // only reports success, so dropping the state is harmless.
         handle: unsafe {
             ThreadAffineNativeHandle::from_handle(
                 sys::mln_render_session(0x0400_0000_0000_002a),
@@ -2032,9 +2017,8 @@ fn failed_frame_release_leaves_frame_live_for_later_release() {
 }
 
 #[test]
-// The map scale factor is fixed at creation and keeps selecting sprites,
-// glyphs, and raster tiles. Matching the preserved creation double stays quiet,
-// while rendering at a different scale warns instead of failing.
+// The map scale factor is fixed at creation, so rendering a target at another
+// scale warns instead of failing.
 fn scale_factor_warnings_compare_the_preserved_creation_double() {
     if !has_test_owned_texture_session_backend() {
         return;
@@ -2057,8 +2041,8 @@ fn scale_factor_warnings_compare_the_preserved_creation_double() {
 
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     // 32.1 differs from its native float representation by more than the
-    // warning tolerance, so this verifies comparisons use the preserved
-    // creation double.
+    // warning tolerance, so a comparison against anything but the preserved
+    // creation double would warn here.
     let map = MapHandle::with_options(&runtime, &MapOptions::new(1, 1, 32.1)).unwrap();
     let (_context, session) = create_owned_texture_session(
         &map.attach_ref().unwrap(),
@@ -2074,11 +2058,9 @@ fn scale_factor_warnings_compare_the_preserved_creation_double() {
     assert_eq!(mismatch_warnings[0].0, LogSeverity::Warning);
     assert!(mismatch_warnings[0].1.contains('2'));
 
-    // Resizing to the map's scale factor is consistent and stays quiet.
     session.resize(1, 1, 32.1).unwrap();
     assert_eq!(warnings.lock().unwrap().len(), 1);
 
-    // Resizing back to a different scale factor warns again.
     session.resize(1, 1, 2.0).unwrap();
     assert_eq!(warnings.lock().unwrap().len(), 2);
 }
@@ -2242,8 +2224,7 @@ fn rendered_box_queries_clip_to_the_viewport() {
     let mut options = RenderedFeatureQueryOptions::default();
     options.layer_ids = Some(vec!["point-circle".into()]);
 
-    // Over-covering the viewport is the obvious way to ask for everything on
-    // screen, and must answer like the viewport itself.
+    // A box that over-covers the viewport answers like the viewport itself.
     let oversized = RenderedQueryGeometry::box_(ScreenBox::new(
         ScreenPoint::new(-4096.0, -4096.0),
         ScreenPoint::new(4096.0, 4096.0),
@@ -2317,15 +2298,14 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
         wait_for_rendered_feature(&runtime, &session, &geometry, &options, "rendered cluster");
 
     // Native matches cluster_id by exact JSON value type, so the copied feature
-    // must keep the unsigned alternative to resolve on the way back in.
+    // keeps the unsigned alternative to resolve on the way back in.
     assert!(matches!(
         feature_member(&cluster.feature, "cluster_id"),
         Some(&JsonValue::UInt(_))
     ));
 
-    // The rendered cluster exists only because the typed GeoJSON adder passed
-    // GeoJsonSourceOptions::cluster, and weight_sum is produced by the
-    // cluster_properties aggregation lowered through the same options.
+    // weight_sum comes from the cluster_properties aggregation lowered through
+    // GeoJsonSourceOptions.
     assert_eq!(numeric_member(&cluster.feature, "point_count"), Some(3.0));
     assert_eq!(numeric_member(&cluster.feature, "weight_sum"), Some(6.0));
 
@@ -2343,9 +2323,8 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
     };
     assert!(!children.is_empty());
 
-    // An unsigned limit bounds the collection, and an unsigned offset selects a
-    // later leaf. Native ignores arguments of another type and falls back to ten
-    // leaves at offset zero, so both bounds must move the observed result.
+    // Native ignores arguments of another type and falls back to ten leaves at
+    // offset zero, so both unsigned bounds must move the observed result.
     let first = single_cluster_leaf(&session, &cluster.feature, 0);
     let second = single_cluster_leaf(&session, &cluster.feature, 1);
     assert_ne!(
@@ -2372,11 +2351,10 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
     runtime.close().unwrap();
 }
 
-/// A host frame loop renders far more frames than a graphics queue keeps in
-/// flight at once. On Apple targets each frame takes objects that a pool owns
-/// until it drains, and Metal blocks a queue that reaches its in-flight command
-/// buffer limit, so a library that leaves draining to the host wedges partway
-/// through a loop like this one.
+/// Metal blocks a queue that reaches its in-flight command buffer limit, and on
+/// Apple targets each frame takes objects an autorelease pool owns until it
+/// drains, so a library that leaves draining to the host wedges partway through
+/// a long loop.
 #[test]
 fn sustained_render_loop_outlasts_the_graphics_queue_depth() {
     if !has_test_owned_texture_session_backend() {
@@ -2394,9 +2372,8 @@ fn sustained_render_loop_outlasts_the_graphics_queue_depth() {
     map.set_style_json(CLUSTER_BASE_STYLE_JSON).unwrap();
     render_available_updates(&runtime, &session, 3);
 
-    // Metal allows 64 command buffers in flight per queue, and a frame takes
-    // several, so this many frames clears that limit many times over. Each
-    // camera change gives the next frame something to draw.
+    // Metal allows 64 command buffers in flight per queue and a frame takes
+    // several, so this many frames clears that limit many times over.
     const TARGET_FRAMES: u32 = 256;
     let mut rendered_frames = 0;
     let mut step = 0;
@@ -2427,9 +2404,7 @@ fn sustained_render_loop_outlasts_the_graphics_queue_depth() {
 }
 
 #[test]
-// Spec coverage: BND-163, BND-174. A session is owned by the thread that attached it and
-// holds no Rust retention of the map, so native is what keeps the map alive:
-// destroying a map with an attached session fails.
+// Spec coverage: BND-163 and BND-174.
 fn owned_texture_session_enforces_single_session_and_blocks_map_close() {
     if !has_test_owned_texture_session_backend() {
         return;
@@ -2463,9 +2438,8 @@ fn owned_texture_session_enforces_single_session_and_blocks_map_close() {
 }
 
 #[test]
-// Spec coverage: BND-042. The C API rejects destroying a map that still has an
-// attached session and allows destroying one whose session detached, so the
-// binding's parent retention ends at detach rather than at close.
+// Spec coverage: BND-042. The binding's parent retention ends at detach rather
+// than at close.
 fn detached_session_releases_the_parent_map_retention() {
     if !has_test_owned_texture_session_backend() {
         return;
@@ -2510,10 +2484,9 @@ fn resize_updates_owned_texture_frame_extent() {
             resized_extent.scale_factor,
         )
         .unwrap();
-    // The map applies the new logical size on its next pump, and a static map
-    // renders only on request. Requesting the still image before the size lands
-    // spends it on an update the session's size gate discards, and nothing
-    // publishes another, so pump the resize through first.
+    // A static map renders only on request, and the map applies the new logical
+    // size on its next pump. Requesting the still image first spends it on an
+    // update the session's size gate discards, so pump the resize through.
     runtime.pump(Some(Duration::ZERO)).unwrap();
     map.request_still_image().unwrap();
     let deadline = Instant::now() + Duration::from_secs(5);
@@ -2551,9 +2524,8 @@ fn map_size_follows_attach_and_resize_and_keeps_the_creation_scale_factor() {
     let map = MapHandle::with_options(&runtime, &static_map_options(64, 32, 2.0)).unwrap();
     assert_eq!(map.size().unwrap(), (64, 32, 2.0));
 
-    // A session enqueues the map size for the map's owner thread rather than
-    // setting it in place, because the session may be owned by another thread,
-    // so the map keeps its previous size until the runtime is pumped.
+    // A session enqueues the map size for the map's owner thread, so the map
+    // keeps its previous size until the runtime is pumped.
     let (_context, session) = create_owned_texture_session(
         &map.attach_ref().unwrap(),
         RenderTargetExtent::new(32, 16, 1.0),
@@ -2575,11 +2547,9 @@ fn map_size_follows_attach_and_resize_and_keeps_the_creation_scale_factor() {
 #[test]
 // Spec coverage: BND-048.
 //
-// A session is owned by the thread that attached it and holds no Rust retention
-// of the map, so nothing stops a host from dropping the map first. The C API
-// refuses that destroy, and an infallible `Drop` cannot return the error, so it
-// reports the address instead of discarding it. Swallowing it would leave the
-// native map unreachable with its runtime pinned live forever, silently.
+// Nothing stops a host from dropping the map while a session is live. The C API
+// rejects that destroy, and an infallible `Drop` cannot return the error, so it
+// reports the handle instead of discarding it.
 fn dropping_a_map_with_an_attached_session_reports_a_leak() {
     if !has_test_owned_texture_session_backend() {
         return;
@@ -2607,9 +2577,9 @@ fn dropping_a_map_with_an_attached_session_reports_a_leak() {
     assert_eq!(reported[0].type_name, "mln_map");
     assert_ne!(reported[0].id, 0);
 
-    // The reported handle is what makes the leak recoverable rather than just
-    // observable: closing the session unblocks the destroy this Drop could not
-    // complete. Without it the runtime below would stay pinned forever.
+    // The reported handle makes the leak recoverable: closing the session
+    // unblocks the destroy that Drop could not complete, and without it the
+    // runtime below would stay pinned forever.
     session.close().unwrap();
     // SAFETY: the handle came from a map whose Rust wrapper was dropped without
     // destroying it, and its session is now closed, so this is the one
@@ -2622,8 +2592,7 @@ fn dropping_a_map_with_an_attached_session_reports_a_leak() {
 
 #[test]
 // Spec coverage: BND-196. Dropping a map destroys it, so the reference names a
-// released handle. The C API rejects that id rather than binding the session to
-// whatever map is created next.
+// released handle that the C API rejects.
 fn dropping_a_map_makes_its_attach_refs_stale() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
@@ -2631,8 +2600,8 @@ fn dropping_a_map_makes_its_attach_refs_stale() {
 
     drop(map);
 
-    // Creating another map reuses the slot the drop freed, which is what makes
-    // this prove the generation rather than the slot merely being empty.
+    // The replacement reuses the slot the drop freed, so this proves the
+    // generation check rather than an empty slot.
     let replacement = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
 
     let error = attach_ref
@@ -2649,9 +2618,8 @@ fn dropping_a_map_makes_its_attach_refs_stale() {
 }
 
 #[test]
-// Spec coverage: BND-196. A `MapAttachRef` can outlive the `MapHandle` it came
-// from. The C API issues each map a generational handle and rejects a released
-// one, so a stale reference cannot attach a session to a later map.
+// Spec coverage: BND-196. A `MapAttachRef` can outlive its `MapHandle`, and the
+// generational handle keeps a stale reference from attaching to a later map.
 fn a_stale_attach_ref_reports_a_stale_map() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
@@ -2673,11 +2641,7 @@ fn a_stale_attach_ref_reports_a_stale_map() {
 }
 
 #[test]
-// Spec coverage: BND-193, BND-195.
-//
-// A `MapAttachRef` crosses to another native thread, which attaches its own
-// render session against a map it does not own and renders a real frame while
-// the map is pumped where it was created.
+// Spec coverage: BND-193 and BND-195.
 fn a_second_thread_attaches_a_session_and_renders() {
     if !has_test_owned_texture_session_backend() {
         return;
@@ -2705,14 +2669,14 @@ fn a_second_thread_attaches_a_session_and_renders() {
                 }
             }
             assert!(rendered, "worker thread should render the map");
-            // Closing here proves the session is destroyed on the thread that
-            // attached it, which is what frees the map to close below.
+            // The session must be destroyed on the thread that attached it,
+            // which is what frees the map to close below.
             session.close().unwrap();
         });
         let deadline = Instant::now() + Duration::from_secs(10);
         while !worker.is_finished() && Instant::now() < deadline {
-            // A short park rather than zero: this waits on the worker, so
-            // spinning would burn the deadline before it made progress.
+            // A short park rather than zero: spinning would burn the deadline
+            // before the worker made progress.
             runtime.pump(Some(Duration::from_millis(2))).unwrap();
             while runtime.poll_event().unwrap().is_some() {}
         }
@@ -2725,9 +2689,6 @@ fn a_second_thread_attaches_a_session_and_renders() {
 
 #[test]
 // Spec coverage: BND-194.
-//
-// Every session call is rejected on a thread that did not attach the session,
-// and the session stays bound and usable on the thread that did.
 fn session_calls_are_rejected_on_a_foreign_thread() {
     if !has_test_owned_texture_session_backend() {
         return;
@@ -2742,8 +2703,7 @@ fn session_calls_are_rejected_on_a_foreign_thread() {
     .expect("owned texture test session should attach when supported");
 
     // The handle is `!Send`, so a foreign thread can only reach the session
-    // through the raw handle the binding wraps. That is the boundary native
-    // enforces, and this proves the binding surfaces it as a typed error.
+    // through the raw handle the binding wraps.
     let native = session.inner.native().unwrap();
     let kind = std::thread::scope(|scope| {
         scope
@@ -2854,9 +2814,8 @@ fn render_update_without_pending_update_reports_false_and_keeps_session_live() {
 }
 
 #[test]
-// Rust regression: failed readback before native has produced a readable frame
-// must preserve caller-owned buffer bytes even though BND-166 covers the later
-// deterministic metadata/capacity/read path.
+// Rust regression: a readback that fails before native has produced a readable
+// frame must leave the caller's buffer bytes untouched.
 fn texture_readback_without_rendered_frame_maps_native_invalid_state() {
     if !has_test_owned_texture_session_backend() {
         return;
@@ -3094,9 +3053,8 @@ fn opengl_attach_calls_report_unsupported_when_backend_unavailable() {
 }
 
 #[test]
-// Spec coverage: BND-102. Rendered frames are what advance a camera
-// transition, so a session-backed map is the fixture that can run an ease to
-// completion instead of ending it early.
+// Spec coverage: BND-102. Rendered frames advance a camera transition, so only
+// a session-backed map can run an ease to completion.
 fn identified_camera_transition_reports_its_end_once_when_it_runs_to_completion() {
     if !has_test_owned_texture_session_backend() {
         return;
@@ -3156,8 +3114,8 @@ fn identified_camera_transition_reports_its_end_once_when_it_runs_to_completion(
 
     assert_eq!(finished_transition_ids, vec![31]);
     assert!(saw_animated_did_change);
-    // The transition reached the requested camera, so it ended by running to
-    // completion rather than by being superseded or cancelled.
+    // Reaching the requested camera shows the transition ran to completion
+    // rather than being superseded or cancelled.
     let settled = map.camera().unwrap();
     assert!((settled.zoom.unwrap() - 12.0).abs() < 1e-6);
 

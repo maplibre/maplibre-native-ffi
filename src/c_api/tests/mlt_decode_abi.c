@@ -1,12 +1,5 @@
 // MLT tile decoding driven by mln_map_options.fast_pfor_enabled.
 //
-// This is semantic behavior, which src/c_api/tests/README.md places in the
-// binding suites rather than here. It lives in this suite because replaying
-// recorded tile bytes needs a resource provider wired to a render session and a
-// feature query, and no binding suite has that harness yet. Once one does, this
-// belongs alongside it in every binding that supports the style and query
-// domains, and this file can go.
-//
 // The fixtures are the pair upstream uses for the same feature
 // (test/tile/vector_tile.test.cpp, VectorTileData.MLTParseResults): one tile
 // encoded with FastPFOR and one without, both carrying "water" and "admin"
@@ -26,8 +19,7 @@
   ((mln_string_view){.data = (text), .size = sizeof(text) - 1})
 
 // The source carries "encoding":"mlt" so the tiles parse as MapLibre Tiles, and
-// the layer exists because a source only loads tiles once a layer references
-// it.
+// a layer references it because a source only loads tiles once one does.
 static const char mlt_style_json[] =
   "{\"version\":8,\"name\":\"mlt\",\"sources\":{\"mlt-source\":{"
   "\"type\":\"vector\",\"encoding\":\"mlt\","
@@ -41,8 +33,8 @@ typedef struct mlt_tile_provider {
   atomic_int served;
 } mlt_tile_provider;
 
-// Serves the recorded tile for every request the map makes. The style is set
-// inline, so tiles are the only resource that reaches the network file source.
+// Serves the recorded tile for every request. The style is set inline, so tiles
+// are the only resource that reaches the network file source.
 static uint32_t serve_recorded_tile(
   void* user_data, const mln_resource_request* request,
   mln_resource_request_handle handle
@@ -62,10 +54,9 @@ static uint32_t serve_recorded_tile(
   return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
 
-// Renders and pumps until the source reports features or the attempts run out,
-// then returns the final count. Tiles arrive through a worker thread, so the
-// count stays zero until the map has both parsed the tile and folded it into
-// the render tree.
+// Renders and pumps until the source reports features or the attempts run out.
+// Tiles arrive through a worker thread, so the count stays zero until the map
+// has parsed the tile and folded it into the render tree.
 static size_t query_admin_feature_count(
   mln_runtime runtime, mln_render_session session
 ) {
@@ -102,7 +93,7 @@ static size_t query_admin_feature_count(
 }
 
 // Loads one recorded MLT tile through a map created with the given FastPFOR
-// setting and reports how many "admin" features the source yields.
+// setting and returns the "admin" feature count the source yields.
 static size_t decode_recorded_tile(
   const char* fixture_relative_path, bool fast_pfor_enabled
 ) {
@@ -158,9 +149,6 @@ static size_t decode_recorded_tile(
   return count;
 }
 
-// This verifies a map decodes an MLT tile that uses FastPFOR integer encodings
-// only when it was created with fast_pfor_enabled, and that the setting leaves
-// tiles without those encodings alone.
 static void fast_pfor_option_gates_mlt_tile_decoding(void) {
   TEST_ASSERT_GREATER_THAN_UINT32(
     0, (uint32_t)decode_recorded_tile("map/issue12432/0-0-0-fastpfor.mlt", true)

@@ -2,11 +2,8 @@ package org.maplibre.nativeffi.internal.lifecycle
 
 /**
  * Handle values for tests that exercise binding-owned bookkeeping without a live native object.
- *
- * Each value carries the kind byte the C API assigns to the type it stands in for, so a synthetic
- * handle that reaches a diagnostic reads as an obviously fabricated handle of the right kind rather
- * than a plausible one. Passing one to the C API is rejected as a handle this process never
- * created.
+ * Each value carries the kind byte the C API assigns to the type it stands in for, and the C API
+ * rejects it as a handle this process never created.
  */
 internal object SyntheticHandles {
   fun runtime(ordinal: Long = 1): NativeRuntime = NativeRuntime(kind(0x01) or ordinal)

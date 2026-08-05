@@ -63,10 +63,7 @@ public sealed unsafe class MapHandle : IDisposable
 
     internal MlnMap Handle => state.Handle;
 
-    /// <summary>
-    /// The issued native handle id, readable after close so the runtime can
-    /// unregister this wrapper.
-    /// </summary>
+    /// <summary>The issued native handle id, readable after close.</summary>
     internal ulong NativeId => nativeId;
 
     /// <summary>Whether this wrapper has successfully closed its native handle.</summary>
@@ -134,10 +131,8 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>
-    /// Gets the map's logical viewport size in UI pixels and its pixel ratio. The size starts at
-    /// the creation width and height, and follows the attach and resize rules documented on
-    /// <see cref="MapOptions"/>. The scale factor is fixed for the lifetime of the map and is
-    /// independent of any render target's scale factor.
+    /// Gets the map's logical viewport size in UI pixels and its pixel ratio. The scale factor is
+    /// fixed for the lifetime of the map and is independent of any render target's scale factor.
     /// </summary>
     public (uint Width, uint Height, double ScaleFactor) GetSize()
     {
@@ -196,9 +191,7 @@ public sealed unsafe class MapHandle : IDisposable
     /// <summary>Eases to the camera descriptor with animation options.</summary>
     /// <remarks>
     /// A <see langword="null" /> <paramref name="animation" />, or one with no
-    /// <c>Duration</c>, uses the native default duration of zero, so the camera
-    /// reaches the target immediately and nothing is animated. Set <c>Duration</c>
-    /// explicitly to animate.
+    /// <c>Duration</c>, uses a duration of zero. Set <c>Duration</c> to animate.
     /// </remarks>
     public void EaseTo(CameraOptions camera, AnimationOptions? animation)
     {
@@ -215,11 +208,9 @@ public sealed unsafe class MapHandle : IDisposable
 
     /// <summary>Flies to the camera descriptor with animation options.</summary>
     /// <remarks>
-    /// <see cref="FlyTo" /> is the one camera command that derives a duration when
-    /// none is given: a <see langword="null" /> <paramref name="animation" />, or
-    /// one with no <c>Duration</c>, flies at a default velocity of 1.2 rho-screenfuls
-    /// per second, so the duration scales with the distance travelled. Set
-    /// <c>Duration</c> explicitly to pin it.
+    /// Unlike the other camera commands, a <see langword="null" />
+    /// <paramref name="animation" />, or one with no <c>Duration</c>, derives a
+    /// duration from the distance travelled at 1.2 rho-screenfuls per second.
     /// </remarks>
     public void FlyTo(CameraOptions camera, AnimationOptions? animation)
     {
@@ -243,8 +234,7 @@ public sealed unsafe class MapHandle : IDisposable
     /// <summary>Moves the map by a screen delta with animation options.</summary>
     /// <remarks>
     /// A <see langword="null" /> <paramref name="animation" />, or one with no
-    /// <c>Duration</c>, eases with the native default duration of zero, so the
-    /// change applies instantly; see <see cref="EaseTo" />.
+    /// <c>Duration</c>, applies the change instantly; see <see cref="EaseTo" />.
     /// </remarks>
     public void MoveByAnimated(double deltaX, double deltaY, AnimationOptions? animation)
     {
@@ -271,8 +261,7 @@ public sealed unsafe class MapHandle : IDisposable
     /// <summary>Scales the map around a screen anchor with animation options.</summary>
     /// <remarks>
     /// A <see langword="null" /> <paramref name="animation" />, or one with no
-    /// <c>Duration</c>, eases with the native default duration of zero, so the
-    /// change applies instantly; see <see cref="EaseTo" />.
+    /// <c>Duration</c>, applies the change instantly; see <see cref="EaseTo" />.
     /// </remarks>
     public void ScaleByAnimated(double scale, ScreenPoint? anchor, AnimationOptions? animation)
     {
@@ -299,8 +288,7 @@ public sealed unsafe class MapHandle : IDisposable
     /// <summary>Rotates around two screen points with animation options.</summary>
     /// <remarks>
     /// A <see langword="null" /> <paramref name="animation" />, or one with no
-    /// <c>Duration</c>, eases with the native default duration of zero, so the
-    /// change applies instantly; see <see cref="EaseTo" />.
+    /// <c>Duration</c>, applies the change instantly; see <see cref="EaseTo" />.
     /// </remarks>
     public void RotateByAnimated(ScreenPoint first, ScreenPoint second, AnimationOptions? animation)
     {
@@ -326,8 +314,7 @@ public sealed unsafe class MapHandle : IDisposable
     /// <summary>Pitches the map by a delta in degrees with animation options.</summary>
     /// <remarks>
     /// A <see langword="null" /> <paramref name="animation" />, or one with no
-    /// <c>Duration</c>, eases with the native default duration of zero, so the
-    /// change applies instantly; see <see cref="EaseTo" />.
+    /// <c>Duration</c>, applies the change instantly; see <see cref="EaseTo" />.
     /// </remarks>
     public void PitchByAnimated(double pitch, AnimationOptions? animation)
     {
@@ -349,10 +336,8 @@ public sealed unsafe class MapHandle : IDisposable
 
     /// <summary>Marks whether a host-driven gesture is in progress.</summary>
     /// <remarks>
-    /// A host that decodes its own pointer gestures sets this to <see langword="true"/> when a
-    /// gesture starts and back to <see langword="false"/> when it ends, so the camera commands
-    /// issued in between belong to one live gesture. The flag stays set until the host clears it,
-    /// so pair every <see langword="true"/> with a <see langword="false"/>.
+    /// The flag stays set until the host clears it: pair every
+    /// <see langword="true"/> with a <see langword="false"/>.
     /// </remarks>
     public void SetGestureInProgress(bool inProgress)
     {
@@ -608,13 +593,10 @@ public sealed unsafe class MapHandle : IDisposable
 
     /// <summary>Loads a style URL through MapLibre Native style APIs.</summary>
     /// <remarks>
-    /// Loading is asynchronous, so a style that is missing, unreachable, or
-    /// malformed still returns normally here and reports through a
-    /// <see cref="RuntimeEventType.MapLoadingFailed" /> runtime event. Watch the
-    /// runtime event queue to observe style load failures. A well-formed style
-    /// that MapLibre rejects semantically, such as an unknown <c>version</c> or a
-    /// layer naming a missing source, produces neither an exception nor an event:
-    /// MapLibre logs it and renders what it can.
+    /// Loading is asynchronous: a style that is missing, unreachable, or malformed
+    /// returns normally here and reports through a
+    /// <see cref="RuntimeEventType.MapLoadingFailed" /> runtime event. A style
+    /// MapLibre rejects semantically produces neither an exception nor an event.
     /// </remarks>
     public void SetStyleUrl(string url)
     {
@@ -625,13 +607,10 @@ public sealed unsafe class MapHandle : IDisposable
 
     /// <summary>Loads inline style JSON through MapLibre Native style APIs.</summary>
     /// <remarks>
-    /// Malformed JSON is reported twice: this call throws the parse error
-    /// synchronously, and the same message also arrives as a
-    /// <see cref="RuntimeEventType.MapLoadingFailed" /> runtime event. Handle both
-    /// so a queued failure event is not a surprise. A well-formed style that
-    /// MapLibre rejects semantically, such as an unknown <c>version</c> or a layer
-    /// naming a missing source, produces neither an exception nor an event:
-    /// MapLibre logs it and renders what it can.
+    /// Malformed JSON is reported twice: this call throws the parse error, and the
+    /// same message also arrives as a
+    /// <see cref="RuntimeEventType.MapLoadingFailed" /> runtime event. A style
+    /// MapLibre rejects semantically produces neither an exception nor an event.
     /// </remarks>
     public void SetStyleJson(string json)
     {
@@ -643,13 +622,9 @@ public sealed unsafe class MapHandle : IDisposable
 
     /// <summary>Gets the style document this map's style was last parsed from.</summary>
     /// <remarks>
-    /// This is the loaded document, not a serialization of the live style: the
-    /// string passed to <see cref="SetStyleJson" />, or the response body fetched
-    /// for <see cref="SetStyleUrl" />. Runtime mutations such as adding a layer do
-    /// not change it, and a failed parse leaves the previously parsed document in
-    /// place. The result is byte-for-byte the string given to
-    /// <see cref="SetStyleJson" />, so it can be handed back unchanged. The result
-    /// is empty when no document has been parsed; a parsed document is never empty.
+    /// This is the loaded document, not a serialization of the live style: runtime
+    /// mutations do not change it, and a failed parse leaves the previously parsed
+    /// document in place. The result is empty when no document has been parsed.
     /// </remarks>
     public string GetLoadedStyleJson() =>
         CopyMapText(
@@ -659,14 +634,10 @@ public sealed unsafe class MapHandle : IDisposable
 
     /// <summary>Gets the URL this map's style was last requested from.</summary>
     /// <remarks>
-    /// Unlike <see cref="GetLoadedStyleJson" />, this is live rather than load-time
-    /// state: <see cref="SetStyleUrl" /> records the URL when the request is made,
-    /// before the response arrives or the document parses, and
-    /// <see cref="SetStyleJson" /> clears it. The two can disagree while a load is
-    /// in flight or after one fails. The result is empty when no URL bytes are
-    /// available, which covers a style loaded from inline JSON, a map that has
-    /// loaded no style, and a URL load requested with an empty string. These cases
-    /// are not distinguishable here.
+    /// <see cref="SetStyleUrl" /> records the URL when the request is made, before
+    /// the response arrives, and <see cref="SetStyleJson" /> clears it, so this can
+    /// disagree with <see cref="GetLoadedStyleJson" />. The result is empty for
+    /// inline JSON, for a map with no style, and for an empty URL alike.
     /// </remarks>
     public string GetStyleUrl() =>
         CopyMapText(
@@ -898,8 +869,7 @@ public sealed unsafe class MapHandle : IDisposable
     /// <summary>Adds a GeoJSON source that loads data from a URL.</summary>
     /// <remarks>
     /// <paramref name="options" /> is fixed when the source is created;
-    /// <see cref="SetGeoJsonSourceUrl" /> and <see cref="SetGeoJsonSourceData" /> keep the options
-    /// the source was added with.
+    /// <see cref="SetGeoJsonSourceUrl" /> and <see cref="SetGeoJsonSourceData" /> keep it.
     /// </remarks>
     public void AddGeoJsonSourceUrl(string sourceId, string url, GeoJsonSourceOptions? options)
     {
@@ -934,8 +904,7 @@ public sealed unsafe class MapHandle : IDisposable
     /// <summary>Adds a GeoJSON source with inline data.</summary>
     /// <remarks>
     /// <paramref name="options" /> is fixed when the source is created;
-    /// <see cref="SetGeoJsonSourceUrl" /> and <see cref="SetGeoJsonSourceData" /> keep the options
-    /// the source was added with.
+    /// <see cref="SetGeoJsonSourceUrl" /> and <see cref="SetGeoJsonSourceData" /> keep it.
     /// </remarks>
     public void AddGeoJsonSourceData(string sourceId, GeoJson data, GeoJsonSourceOptions? options)
     {
@@ -1212,7 +1181,6 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Copies a style image's stretchable intervals when it exists.</summary>
-    /// <remarks>Probes the required counts, then copies.</remarks>
     public (
         IReadOnlyList<ImageStretch> StretchX,
         IReadOnlyList<ImageStretch> StretchY
@@ -1312,8 +1280,7 @@ public sealed unsafe class MapHandle : IDisposable
             Array.Resize(ref bytes, checked((int)byteLength));
         }
 
-        // Native storage keeps no empty-versus-absent distinction for stretches, so an image
-        // without intervals reports them as absent.
+        // Native storage keeps no empty-versus-absent distinction for stretches.
         var stretches = StyleImageStretches(imageId);
         return new StyleImage(
             new PremultipliedRgba8Image(
@@ -1690,9 +1657,9 @@ public sealed unsafe class MapHandle : IDisposable
 
     /// <summary>Sets the style's global transition options.</summary>
     /// <remarks>
-    /// Null duration and delay clear the style-wide override, so this call replaces the whole
-    /// transition configuration rather than merging into it. Loading a style replaces these
-    /// options with the ones that style declares, so apply an override after the style loads.
+    /// This replaces the whole transition configuration rather than merging into it, and null
+    /// duration and delay clear the style-wide override. Loading a style replaces these options,
+    /// so apply an override after the style loads.
     /// </remarks>
     public void SetStyleTransitionOptions(StyleTransitionOptions options)
     {
@@ -1808,10 +1775,6 @@ public sealed unsafe class MapHandle : IDisposable
     /// <summary>Gets one layer's source ID, empty when it carries none.</summary>
     public string GetLayerSourceId(string layerId) => CopyLayerText(layerId, sourceLayer: false);
 
-    /// <summary>
-    /// Probes the required length, then copies. A null buffer with zero capacity is a size probe
-    /// the C API answers with OK.
-    /// </summary>
     private delegate mln_status CopyMapTextCall(
         MlnMap map,
         sbyte* text,
@@ -1959,9 +1922,7 @@ public sealed unsafe class MapHandle : IDisposable
     /// <summary>Destroys the map on its owner thread.</summary>
     /// <remarks>
     /// Closing discards this map's queued runtime events and its recorded loading
-    /// failure without a flush and without a terminal event. Snapshot any mirrored
-    /// state you still need before closing, and drive teardown from the close
-    /// result rather than awaiting an event.
+    /// failure without a flush and without a terminal event.
     /// </remarks>
     public void Close()
     {

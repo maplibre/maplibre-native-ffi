@@ -14,20 +14,15 @@ internal interface RenderTarget : AutoCloseable {
   fun needsMetalAutoreleasePool(): Boolean = false
 
   /**
-   * Follows a resized host, keeping the session attached.
-   *
-   * Surface and owned-texture targets are sized by the session, so they resize in place. A
-   * caller-owned texture is sized by this example instead, so it allocates one at the new size and
-   * hands it to the live session. Either way the session keeps its renderer, which is what keeps
-   * the map from going cold on every window resize.
+   * Follows a resized host, keeping the session attached so its renderer stays warm. Surface and
+   * owned-texture targets resize in place; a caller-owned texture is reallocated at the new size
+   * and handed to the live session.
    */
   fun resize(viewport: Viewport)
 
   /**
-   * Renders the latest map update, and reports whether a frame reached the screen.
-   *
-   * A false result means no map update was available yet, or the host had no drawable to present
-   * into. The render loop keeps its redraw pending and retries.
+   * Renders the latest map update, and reports whether a frame reached the screen. False means no
+   * map update was available yet, or the host had no drawable to present into.
    */
   fun renderUpdate(): Boolean
 
@@ -52,11 +47,8 @@ internal interface RenderTarget : AutoCloseable {
       RenderTargetExtent(viewport.width(), viewport.height(), viewport.scaleFactor())
 
     /**
-     * Detaches a session whose handover failed, before the targets it may hold are released.
-     *
-     * A native error may mean the session took the replacement before failing, and a caller cannot
-     * tell that apart from a rejection that came first, so neither target is safe to release while
-     * the session is still attached to one of them.
+     * Detaches a session whose handover failed, before the targets it may hold are released. A
+     * failed handover leaves it unknown which target the session holds.
      */
     fun detachSuppressed(error: RuntimeException, session: RenderSessionHandle) {
       try {

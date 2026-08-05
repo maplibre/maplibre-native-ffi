@@ -1,8 +1,5 @@
-// The map state module: the runtime and the map, owned for their whole
-// lifetime by the runtime loop thread.
-//
-// The render target is not here: it belongs to the render loop thread, which
-// owns the window and the graphics context.
+// The runtime and the map, owned for their whole lifetime by the runtime loop
+// thread.
 
 #ifndef C_MAP_MAP_STATE_H
 #define C_MAP_MAP_STATE_H
@@ -22,9 +19,8 @@ typedef struct map_state {
 );
 void map_state_deinit(map_state* state);
 
-/// Applies every queued camera command on the map's owner thread.
-///
-/// `batch` is owned by the runtime loop and reused across drains.
+/// Applies every queued camera command on the map's owner thread. `batch` is
+/// owned by the runtime loop and reused across drains.
 [[nodiscard]] app_error map_state_apply_commands(
   map_state* state, command_queue* commands, command_list* batch
 );

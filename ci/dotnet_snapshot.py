@@ -98,8 +98,8 @@ def package(args: argparse.Namespace) -> None:
                 destination.mkdir(parents=True, exist_ok=True)
                 for library in libraries:
                     shutil.copy2(library, destination / library.name)
-                # The libraries bundle third-party code, so the notices
-                # `mln_ffi_install_licenses` puts in the archive travel with them.
+                # The libraries bundle third-party code, so the archive's
+                # license notices travel with them.
                 notices = next(extracted.glob("**/share/*/licenses"), None)
                 if notices is None:
                     raise SystemExit(f"{preset} archive carries no licenses")
@@ -194,11 +194,9 @@ def mirror(args: argparse.Namespace) -> None:
                 content = response.read()
         except urllib.error.HTTPError as error:
             if error.code == 404:
-                # The live site has no feed before the first .NET snapshot
-                # publishes, and a docs-only deploy must not fail over that;
-                # an absent root simply carries nothing forward. Sleet
-                # registrations also cite virtual catalog URIs whose data is
-                # embedded in the registration rather than materialized.
+                # The live site has no feed until the first .NET snapshot
+                # publishes, and Sleet registrations cite virtual catalog URIs
+                # that are never materialized.
                 continue
             raise
         destination.write_bytes(content)
@@ -217,9 +215,8 @@ def mirror(args: argparse.Namespace) -> None:
                     lower_version = version.lower()
                     root = f"{source}flatcontainer/{lower_id}/{lower_version}/"
                     pending.append(f"{root}{lower_id}.nuspec")
-                    # The package bytes themselves: a restore fetches these,
-                    # and no document on the feed links to them, so a mirror
-                    # that only follows links carries a feed that 404s.
+                    # No document on the feed links to the package bytes, so
+                    # only an explicit fetch mirrors what a restore needs.
                     pending.append(f"{root}{lower_id}.{lower_version}.nupkg")
 
 

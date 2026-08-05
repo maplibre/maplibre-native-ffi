@@ -18,13 +18,11 @@ pub fn set_network_status(status: NetworkStatus) -> Result<()> {
 }
 
 /// Sets MapLibre Native's process-global network status from a raw C value.
-///
-/// This helper is for bridge tests and native status conversion paths. Public
-/// bindings should normally map their language enum first so unknown values can
-/// fail before crossing the C boundary.
+/// Public bindings should map their own enum first so unknown values fail
+/// before crossing the C boundary.
 pub fn set_network_status_raw(raw_status: u32) -> Result<()> {
-    // SAFETY: The raw value is passed by value. The C API validates the enum
-    // domain and reports invalid values as MLN_STATUS_INVALID_ARGUMENT.
+    // SAFETY: The C API validates the enum domain and reports invalid values
+    // as MLN_STATUS_INVALID_ARGUMENT.
     check(unsafe { sys::mln_network_status_set(raw_status) })
 }
 

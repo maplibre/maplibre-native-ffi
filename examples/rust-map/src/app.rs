@@ -1,9 +1,6 @@
 //! The render loop: window, input decoding, graphics context, and the render
-//! session, all owned by the winit event-loop thread.
-//!
-//! The runtime and the map live on the spawned runtime loop thread. This loop
-//! reaches the map exactly once, to attach its own session, and otherwise talks
-//! to that thread through [`crate::channel`].
+//! session, all owned by the winit event-loop thread. The runtime and the map
+//! live on the spawned runtime loop thread, reached through [`crate::channel`].
 
 use std::error::Error;
 use std::sync::Arc;
@@ -22,8 +19,7 @@ use crate::viewport::Viewport;
 
 pub struct App {
     target: Option<RenderTarget>,
-    /// Releases the runtime loop's parked pump, so a queued camera command is
-    /// applied now rather than after its parking bound.
+    /// Releases the runtime loop's parked pump so queued work is applied now.
     wake: Arc<maplibre_native_ffi::WakeSource>,
     runtime_thread: Option<JoinHandle<()>>,
     commands: Sender<CameraCommand>,
@@ -59,8 +55,6 @@ impl App {
                 .spawn(move || map_state::run(viewport, command_queue, attach_sender, shared))?
         };
 
-        // The runtime loop creates the map; this loop attaches its own session
-        // against it and owns that session for the rest of the run.
         let handles = match attach_queue.recv() {
             Ok(handles) => handles,
             Err(_) => {
@@ -120,9 +114,8 @@ impl App {
             WindowEvent::RedrawRequested => self.render_or_exit(),
             event => {
                 if self.input.handle(&event, &self.commands, self.viewport) {
-                    // Release the runtime loop's parked pump so the command just
-                    // queued is applied on this frame rather than after its
-                    // parking bound.
+                    // Release the parked pump so the queued command is applied
+                    // on this frame.
                     let _ = self.wake.signal();
                     self.shared.request_render();
                     self.window.request_redraw();
@@ -131,7 +124,8 @@ impl App {
         }
     }
 
-    /// One render loop iteration. It never calls `pump` or `poll_event`.
+    /// One render loop iteration. The runtime loop owns `pump` and
+    /// `poll_event`.
     pub fn step(&mut self) {
         if let Some(error) = self.shared.failure() {
             eprintln!("runtime loop failed: {error}");
@@ -159,10 +153,6 @@ impl App {
             return Ok(());
         }
         self.graphics.resize(next)?;
-        // Every mode follows a resize without losing its session: the ones the
-        // session sizes resize in place, and a caller-owned target allocates a
-        // replacement and hands it over. Closing and attaching again is
-        // reserved for a target the live session cannot take at all.
         self.target
             .as_mut()
             .expect("render target is open")
@@ -182,8 +172,7 @@ impl App {
         if self.closed || self.viewport.is_empty() {
             return Ok(());
         }
-        // Consume before rendering, so a request the runtime loop publishes
-        // during the render call survives.
+        // Consume first, so a request published during the render survives.
         if !self.shared.consume_render_request() {
             return Ok(());
         }
@@ -193,10 +182,8 @@ impl App {
             .expect("render target is open")
             .render_update(&self.graphics)?
         {
-            // Nothing reached the screen. The map applies a new logical size on
-            // the runtime loop's next `pump`, so an attach or resize leaves
-            // nothing to render until then, and a host swapchain with no image
-            // to present into skips the frame. Keep the request and retry.
+            // Nothing reached the screen: the map applies a new logical size on
+            // the runtime loop's next pump, so retry.
             self.shared.request_render();
         }
         Ok(())
@@ -231,8 +218,7 @@ impl App {
             append_error(&mut first_error, error.to_string());
         }
         self.shared.request_shutdown();
-        // Release the pump so shutdown is observed now rather than after the
-        // parking bound expires.
+        // Release the pump so shutdown is observed now.
         let _ = self.wake.signal();
         if let Some(runtime_thread) = self.runtime_thread.take()
             && runtime_thread.join().is_err()
@@ -286,9 +272,8 @@ fn immediate_exit(code: i32) -> ! {
         fn _exit(status: std::ffi::c_int) -> !;
     }
 
-    // SAFETY: `_exit` terminates the process without running native teardown.
-    // The example uses it on close because the current macOS Vulkan stack can
-    // abort while MapLibre native tears down thread-local state after the window
-    // has closed. The operating system reclaims the example's resources.
+    // SAFETY: `_exit` terminates without running native teardown, which the
+    // macOS Vulkan stack can abort during after the window has closed. The
+    // operating system reclaims the example's resources.
     unsafe { _exit(code) }
 }

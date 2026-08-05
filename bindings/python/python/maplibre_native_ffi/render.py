@@ -149,9 +149,8 @@ class RenderTargetExtent:
     def physical_size(self) -> tuple[int, int]:
         """Return the physical device-pixel size as ceil(logical * scale_factor).
 
-        Session-owned texture targets and surface targets are sized this way.
-        Borrowed texture targets state their physical size instead, because not
-        every physical size is reachable from a logical extent.
+        Session-owned texture targets and surface targets are sized this way;
+        borrowed texture targets state their physical size instead.
         """
         return _native.render_target_extent_physical_size(
             self.width, self.height, self.scale_factor
@@ -240,8 +239,7 @@ class MetalBorrowedTextureDescriptor:
     """Metal caller-owned texture attachment descriptor."""
 
     extent: RenderTargetExtent
-    # The texture is sized by its owner, so the physical size is stated rather
-    # than derived from extent.
+    # Sized by its owner, not derived from extent.
     physical_width: int
     physical_height: int
     texture: NativePointer = NativePointer(0)
@@ -260,8 +258,7 @@ class VulkanBorrowedTextureDescriptor:
     """Vulkan caller-owned texture attachment descriptor."""
 
     extent: RenderTargetExtent
-    # The image is sized by its owner, so the physical size is stated rather
-    # than derived from extent.
+    # Sized by its owner, not derived from extent.
     physical_width: int
     physical_height: int
     context: VulkanContextDescriptor = VulkanContextDescriptor()
@@ -285,8 +282,7 @@ class OpenGLBorrowedTextureDescriptor:
     """OpenGL caller-owned texture attachment descriptor."""
 
     extent: RenderTargetExtent
-    # The texture is sized by its owner, so the physical size is stated rather
-    # than derived from extent.
+    # Sized by its owner, not derived from extent.
     physical_width: int
     physical_height: int
     context: OpenGLContextDescriptor = EglContextDescriptor()
@@ -305,7 +301,6 @@ class TextureImageInfo:
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> "TextureImageInfo":
-        """Build metadata from private native values."""
         return cls(
             width=raw["width"],
             height=raw["height"],
@@ -323,7 +318,6 @@ class PremultipliedRgba8Image:
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> "PremultipliedRgba8Image":
-        """Build an image from private native values."""
         return cls(info=TextureImageInfo._from_native(raw["info"]), data=raw["data"])
 
 
@@ -340,7 +334,6 @@ class MetalOwnedTextureFrame:
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> "MetalOwnedTextureFrame":
-        """Build frame metadata from private native values."""
         return cls(
             generation=raw["generation"],
             width=raw["width"],
@@ -365,7 +358,6 @@ class VulkanOwnedTextureFrame:
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> "VulkanOwnedTextureFrame":
-        """Build frame metadata from private native values."""
         return cls(
             generation=raw["generation"],
             width=raw["width"],
@@ -393,7 +385,6 @@ class OpenGLOwnedTextureFrame:
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> "OpenGLOwnedTextureFrame":
-        """Build frame metadata from private native values."""
         return cls(
             generation=raw["generation"],
             width=raw["width"],
@@ -459,16 +450,13 @@ class RenderSessionHandle(NativeHandleMixin):
 
         Surface and session-owned texture targets resize in place. A
         caller-owned texture target is sized by its owner and reports
-        :class:`UnsupportedFeatureError`: allocate a texture at the new size and
-        hand it over with the ``set_*_borrowed_texture_target`` method for the
-        backend, which keeps this session.
+        :class:`UnsupportedFeatureError`; hand over a new texture with the
+        backend's ``set_*_borrowed_texture_target`` method instead.
 
-        This session keeps its renderer across a resize, so renderer-held state
-        such as feature state carries over. A scale factor that differs from
-        this session's current one is the exception: a renderer compiles its
-        shaders for one pixel ratio, so that resize starts a new one with
-        renderer-held state empty. The same exception applies to every
-        ``set_*_target`` method, which otherwise keeps the renderer.
+        The session keeps its renderer, and renderer-held state such as feature
+        state carries over. A new scale factor is the exception: it starts a
+        fresh renderer with that state empty. The same exception applies to
+        every ``set_*_target`` method.
         """
         self._native.resize(width, height, scale_factor)
 
@@ -484,19 +472,12 @@ class RenderSessionHandle(NativeHandleMixin):
     def set_metal_surface_target(self, descriptor: MetalSurfaceDescriptor) -> None:
         """Present this attached surface session through a new surface.
 
-        A host surface can be destroyed and recreated while the map goes on
-        living, which is what Android rotation, a Flutter ``SurfaceProducer``
-        lifecycle change, and a window resize that reallocates all look like
-        from here. Replacing the surface in place keeps this session's
-        renderer, and with it the tile pyramid, glyph and image atlases, symbol
-        placement, and feature state.
-
-        The descriptor names the same graphics context this session attached
-        with, and its extent applies as a resize does. A descriptor whose
-        ``context.device`` is neither null nor this session's device raises
-        :class:`InvalidArgumentError` and leaves this session rendering into the
-        surface it has. The session assigns the layer its own device and pixel
-        format, so the layer itself carries nothing that has to match.
+        The session keeps its renderer, and with it the tile pyramid, atlases,
+        symbol placement, and feature state. The descriptor's extent applies as
+        a resize does. A ``context.device`` that is neither null nor this
+        session's device raises :class:`InvalidArgumentError` and leaves this
+        session rendering into the surface it has. The session assigns the layer
+        its own device and pixel format.
         """
         self._set_target(
             self._native.set_metal_surface_target,
@@ -509,9 +490,8 @@ class RenderSessionHandle(NativeHandleMixin):
         """Present this attached surface session through a new surface.
 
         See :meth:`set_metal_surface_target` for what replacing a surface
-        preserves. The outgoing ``VkSurfaceKHR`` must still be valid: this
-        session holds a swapchain built from it, and Vulkan destroys every
-        swapchain before its surface.
+        preserves. The outgoing ``VkSurfaceKHR`` must still be valid, since this
+        session holds a swapchain built from it.
         """
         self._set_target(
             self._native.set_vulkan_surface_target,
@@ -530,10 +510,9 @@ class RenderSessionHandle(NativeHandleMixin):
         """Present this attached surface session through a new surface.
 
         See :meth:`set_metal_surface_target` for what replacing a surface
-        preserves. The new surface is made current on the next render, so a
-        host may hand over a replacement for one it has already destroyed. A
-        surface accepted here can still prove unusable, which the next
-        :meth:`render_update` reports rather than this call.
+        preserves. The new surface is made current on the next render, so a host
+        may hand over a replacement for one it has already destroyed, and an
+        unusable surface is reported by the next :meth:`render_update`.
         """
         platform, first, second, share, get_proc = _opengl_context_parts(
             descriptor.context
@@ -554,20 +533,14 @@ class RenderSessionHandle(NativeHandleMixin):
     ) -> None:
         """Render this attached texture session into a new caller-owned texture.
 
-        A caller-owned texture is sized by its owner, so a host that follows a
-        resize reallocates rather than resizing and :meth:`resize` reports
-        :class:`UnsupportedFeatureError`. Handing the replacement over here
-        keeps this session's renderer instead, so the map does not go cold on
-        every resize.
-
-        The replacement belongs to the device this session attached with, which
-        raises :class:`InvalidArgumentError` otherwise, and carries the pixel
-        format it attached with, which raises :class:`UnsupportedFeatureError`
-        otherwise. Both leave this session rendering into the texture it has. The
-        caller owns the replacement and keeps it valid until the next
-        replacement, detach, or close. This session never retained the outgoing
-        texture, never releases it, and never reads it here, so a host that
-        already released it hands over the replacement all the same.
+        This is how a caller-owned texture target resizes, and the session keeps
+        its renderer. The replacement must belong to the device this session
+        attached with, which raises :class:`InvalidArgumentError` otherwise, and
+        carry the pixel format it attached with, which raises
+        :class:`UnsupportedFeatureError` otherwise; both leave this session
+        rendering into the texture it has. The caller owns the replacement and
+        keeps it valid until the next replacement, detach, or close. The session
+        never retains or reads the outgoing texture.
         """
         self._set_target(
             self._native.set_metal_borrowed_texture_target,
@@ -583,9 +556,8 @@ class RenderSessionHandle(NativeHandleMixin):
         """Render this attached texture session into a new caller-owned image.
 
         See :meth:`set_metal_borrowed_texture_target` for what replacing a
-        target preserves. The replacement carries the format and both layouts
-        this session attached with, since its render pass was built around
-        them.
+        target preserves. The replacement must carry the format and both layouts
+        this session attached with, since its render pass was built around them.
         """
         self._set_target(
             self._native.set_vulkan_borrowed_texture_target,
@@ -612,9 +584,9 @@ class RenderSessionHandle(NativeHandleMixin):
         """Render this attached texture session into a new caller-owned texture.
 
         See :meth:`set_metal_borrowed_texture_target` for what replacing a
-        target preserves. The replacement belongs to the context this session
-        attached with, or one in its share group, and the host context must be
-        current on this thread.
+        target preserves. The replacement must belong to the context this
+        session attached with or one in its share group, and that context must
+        be current on this thread.
         """
         platform, first, second, share, get_proc = _opengl_context_parts(
             descriptor.context
@@ -637,10 +609,8 @@ class RenderSessionHandle(NativeHandleMixin):
         """Process the latest map render update for this target.
 
         The map retains its latest update, so repeated calls re-render it and
-        return True again; use this to redraw on demand after resize or surface
-        expose, and gate frame loops on render-update-available events instead
-        of the return value. Returns False when no frame was rendered. That is
-        a normal transient: call again on the next frame rather than wait for
+        return True again. Returns False when no frame was rendered, which is a
+        normal transient: call again on the next frame rather than wait for
         another render-update event.
         """
         return bool(self._native.render_update())
@@ -648,14 +618,10 @@ class RenderSessionHandle(NativeHandleMixin):
     def detach(self) -> DetachedRenderSessionHandle:
         """Detach backend resources and return a close-only handle.
 
-        Detach ends this session's hold on the map, so a detached session
-        leaves the map free to close. Close the returned handle whenever it
-        suits the host; it stays destroyable after the map closes because a
-        detached session no longer reaches its map.
+        Detach ends this session's hold on the map, leaving the map free to
+        close. The returned handle stays destroyable after the map closes.
         """
         native = self._native.detach()
-        # The original wrapper can remain observable through `detached`, but it
-        # no longer retains the map after native detach succeeds.
         self._map = None
         return DetachedRenderSessionHandle._from_native(native)  # noqa: SLF001
 
@@ -745,15 +711,9 @@ class RenderSessionHandle(NativeHandleMixin):
         """Query a feature extension from the latest render session state.
 
         The `supercluster` extension reads the `cluster_id` feature property and
-        the `limit` and `offset` arguments as `JsonUInt`. Other numeric types are
-        treated as absent: a `cluster_id` that is not `JsonUInt` returns a
-        `FeatureExtensionResultType.VALUE` result holding `None` instead of a
-        `FeatureExtensionResultType.FEATURE_COLLECTION` result,
-        and a `limit` or `offset` that is not `JsonUInt` leaves `leaves` at the
-        native defaults of ten leaves at offset zero. Note that
-        `json.from_python` converts a Python `int` to `JsonInt`; build these
-        arguments with `JsonUInt`. Queried feature properties keep their JSON
-        value type, so a queried cluster feature can be passed back unmodified.
+        the `limit` and `offset` arguments as `JsonUInt`, and treats other
+        numeric types as absent. `json.from_python` converts a Python `int` to
+        `JsonInt`, so build these arguments with `JsonUInt`.
         """
         from .query import FeatureExtensionResult
 

@@ -141,16 +141,12 @@ func TestMapAnimatedCameraCommandsUseOptionalAnimationOptions(t *testing.T) {
 	}
 }
 
-// cameraTransitionTally summarizes the camera events queued since the last
-// drain.
 type cameraTransitionTally struct {
 	finishedIDs       []uint64
 	sawDidChange      bool
 	lastDidChangeCode int32
 }
 
-// drainCameraTransitionEvents polls the runtime until its event queue is empty
-// and reports the camera transition events it observed.
 func drainCameraTransitionEvents(t *testing.T, runtime *RuntimeHandle) cameraTransitionTally {
 	t.Helper()
 	var tally cameraTransitionTally
@@ -219,7 +215,6 @@ func TestMapCameraTransitionIDReportsEachTerminalOutcomeOnce(t *testing.T) {
 		t.Fatalf("zero-duration did-change code = %d, want %d", tally.lastDidChangeCode, CameraChangeModeImmediate)
 	}
 
-	// A running transition stays silent until something ends it.
 	running := AnimationOptions{}.WithDurationMS(5000).WithTransitionID(11)
 	if err := m.EaseTo(camera.WithZoom(12), &running); err != nil {
 		t.Fatalf("EaseTo(running transition): %v", err)
@@ -243,7 +238,6 @@ func TestMapCameraTransitionIDReportsEachTerminalOutcomeOnce(t *testing.T) {
 		t.Fatalf("superseded did-change code = %d, want %d", tally.lastDidChangeCode, CameraChangeModeAnimated)
 	}
 
-	// Cancellation ends the surviving transition, again exactly once.
 	if err := m.CancelTransitions(); err != nil {
 		t.Fatalf("CancelTransitions(): %v", err)
 	}
@@ -252,7 +246,6 @@ func TestMapCameraTransitionIDReportsEachTerminalOutcomeOnce(t *testing.T) {
 		t.Fatalf("cancelled transition finished IDs = %v, want [12]", tally.finishedIDs)
 	}
 
-	// Animation options that leave the transition ID absent stay silent.
 	silent := AnimationOptions{}.WithDurationMS(0)
 	if err := m.EaseTo(camera.WithZoom(14), &silent); err != nil {
 		t.Fatalf("EaseTo(absent transition ID): %v", err)
@@ -293,8 +286,8 @@ func TestMapCameraTransitionIDReportsCompletionOnceWhenPumped(t *testing.T) {
 		t.Fatalf("EaseTo(): %v", err)
 	}
 
-	// Advancing a transition needs the map to update, which a repaint request
-	// drives without touching the camera.
+	// A transition only advances when the map updates; a repaint request drives
+	// that without touching the camera.
 	var finishedIDs []uint64
 	deadline := time.Now().Add(10 * time.Second)
 	for len(finishedIDs) == 0 && time.Now().Before(deadline) {
@@ -309,7 +302,6 @@ func TestMapCameraTransitionIDReportsCompletionOnceWhenPumped(t *testing.T) {
 		t.Fatalf("completed transition finished IDs = %v, want [21]", finishedIDs)
 	}
 
-	// The completed transition stays finished across further updates.
 	for range make([]struct{}, 50) {
 		if err := m.RequestRepaint(); err != nil {
 			t.Fatalf("RequestRepaint(): %v", err)

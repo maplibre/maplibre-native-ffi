@@ -8,9 +8,8 @@ using Xunit;
 namespace Maplibre.NativeFfi.Tests;
 
 /// <summary>
-/// Handle-identity behaviour the C API owns, reached through the internal
-/// handle accessors because the safe public API has no way to express these
-/// calls.
+/// Handle-identity behaviour the C API owns, reached through internal handle
+/// accessors because the safe public API cannot express these calls.
 /// </summary>
 public sealed unsafe class NativeHandleIdentityTests
 {

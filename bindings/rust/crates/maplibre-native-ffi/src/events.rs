@@ -10,12 +10,9 @@ pub use maplibre_core::events::{
 };
 pub(crate) use maplibre_core::{OfflineRegionDownloadState, RuntimeEventType};
 
-/// Identity for a map owned by a runtime.
-///
-/// The value is the map's native handle, which names one map for the life of
-/// the process, so comparing an id against a released map's id never matches a
-/// later one. It carries no ownership; map operations go through
-/// [`MapHandle`](crate::MapHandle).
+/// Identity for a map owned by a runtime. The value is the map's native handle,
+/// which names one map for the life of the process. It carries no ownership;
+/// map operations go through [`MapHandle`](crate::MapHandle).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MapId(u64);
 
@@ -46,14 +43,11 @@ pub enum RuntimeEventSource {
 pub struct RuntimeEvent {
     pub event_type: RuntimeEventType,
     pub source: RuntimeEventSource,
-    /// Secondary event detail whose meaning `event_type` selects.
-    ///
-    /// Camera will-change and did-change events carry a
-    /// [`CameraChangeMode`](crate::CameraChangeMode), which decodes as
-    /// `CameraChangeMode::from_raw(code as u32)`. Offline operation-completion
-    /// events carry the operation's native status value. Map loading-failure
-    /// events carry the ordinal of MapLibre Native's internal load error kind,
-    /// whose text is in `message`. Every other event type carries 0.
+    /// Secondary event detail whose meaning `event_type` selects. Camera
+    /// change events decode as
+    /// `CameraChangeMode::from_raw(code as u32)`, offline operation-completion
+    /// events carry the operation's native status, and map loading-failure
+    /// events carry a load error ordinal whose text is in `message`.
     pub code: i32,
     pub message: Option<String>,
     pub payload: RuntimeEventPayload,

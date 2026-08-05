@@ -81,11 +81,10 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-# The sys crate emits its own rpath, but cargo:rustc-link-arg only covers that
-# crate's link targets, so the core and umbrella test binaries need the library
-# located at run time. Resolving it here instead of through RUSTFLAGS keeps the
-# preset out of the compiler command line, which is what sccache keys on: every
-# preset would otherwise get its own copy of every dependency crate.
+# The sys crate's rpath covers only its own link targets, so the core and
+# umbrella test binaries need the library located at run time. Resolving it here
+# rather than through RUSTFLAGS keeps the preset out of the compiler command
+# line, which sccache keys on.
 lib_dirs="$native_install_dir/lib"
 if [[ -n "${MLN_FFI_VULKAN_LOADER_DIR:-}" ]]; then
   lib_dirs="$lib_dirs:$MLN_FFI_VULKAN_LOADER_DIR"
@@ -260,8 +259,7 @@ fi
 [tasks."test:download"]
 description = "Test the sys crate against a downloaded native snapshot archive."
 dir = "../.."
-# Stops at maplibre-native-ffi-sys on purpose. Only the build script's acquisition
-# path is under test, and the crates above it track the C API at this commit
-# while the snapshot release publishes on its own schedule, so they stop
-# compiling whenever it lags a header change.
+# Stops at maplibre-native-ffi-sys: only the build script's acquisition path is
+# under test, and the crates above it stop compiling whenever the snapshot
+# release lags a header change in this commit.
 run = 'env -u MAPLIBRE_NATIVE_C_INSTALL_DIR cargo test -p maplibre-native-ffi-sys'

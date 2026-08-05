@@ -12,9 +12,8 @@ type CameraOptions struct {
 	Center         *LatLng
 	CenterAltitude *float64
 	Padding        *EdgeInsets
-	// Anchor is input-only: JumpTo, EaseTo, and FlyTo honor it as the screen
-	// point the camera pivots around, and MapLibre leaves it nil on every read
-	// path, including Camera and the CameraFor* fit helpers.
+	// Anchor is input-only: JumpTo, EaseTo, and FlyTo pivot the camera around
+	// this screen point, and every read path reports it as nil.
 	Anchor      *ScreenPoint
 	Zoom        *float64
 	Bearing     *float64
@@ -23,8 +22,7 @@ type CameraOptions struct {
 	FieldOfView *float64
 }
 
-// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
-// compares the optional fields by pointer identity.
+// Equal reports whether two descriptors hold the same field values.
 func (options CameraOptions) Equal(other CameraOptions) bool {
 	return equalPointer(options.Center, other.Center) &&
 		equalPointer(options.CenterAltitude, other.CenterAltitude) &&
@@ -163,34 +161,17 @@ type AnimationOptions struct {
 	MinZoom    *float64
 	Easing     *UnitBezier
 	// TransitionID is a caller-chosen identity for the transition these options
-	// start. When it is set, the transition emits one
-	// RuntimeEventMapCameraTransitionFinished event carrying this value in its
-	// RuntimeEventCameraTransitionFinishedPayload. MapLibre Native passes the
-	// value through without interpreting it, so callers pick their own scheme,
-	// such as a monotonically increasing counter.
-	//
-	// Each transition emits that event exactly once, whichever way it ends:
-	// running to completion, being superseded by a later camera command, being
-	// cancelled by CancelTransitions, or completing instantly as a
-	// zero-duration jump. A command this API rejects, such as one carrying a
-	// non-finite enabled camera field, starts no transition and emits no such
-	// event. MapLibre Native reports the moment a transition releases the camera
-	// and does not report which of those outcomes occurred, so the event
-	// establishes transition identity rather than a completion reason. A host
-	// that needs to tell completion from cancellation compares the resulting
-	// camera against the requested one, or tracks which transition ID is
-	// current.
-	//
-	// The event is queued on the runtime that owns the map and is drained by
-	// RuntimeHandle.PollEvent. For a transition that runs to completion, it is
-	// queued immediately before that transition's
-	// RuntimeEventMapCameraDidChange event. Leaving the field absent emits no
-	// such event.
+	// start. When it is set, the transition emits exactly one
+	// RuntimeEventMapCameraTransitionFinished event carrying this value,
+	// whether it completes, is superseded, or is cancelled. The event marks the
+	// moment the transition releases the camera and carries no outcome, so a
+	// host that must tell completion from cancellation compares the resulting
+	// camera or tracks which transition ID is current. A command this API
+	// rejects starts no transition and emits no event.
 	TransitionID *uint64
 }
 
-// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
-// compares the optional fields by pointer identity.
+// Equal reports whether two descriptors hold the same field values.
 func (options AnimationOptions) Equal(other AnimationOptions) bool {
 	return equalPointer(options.DurationMS, other.DurationMS) &&
 		equalPointer(options.Velocity, other.Velocity) &&
@@ -229,9 +210,7 @@ func (options AnimationOptions) WithEasing(easing UnitBezier) AnimationOptions {
 }
 
 // WithTransitionID returns a copy that stamps a caller-chosen identity on the
-// transition these options start, so the transition reports its end once
-// through a RuntimeEventMapCameraTransitionFinished event. See
-// AnimationOptions.TransitionID.
+// transition these options start. See AnimationOptions.TransitionID.
 func (options AnimationOptions) WithTransitionID(transitionID uint64) AnimationOptions {
 	options.TransitionID = new(uint64)
 	*options.TransitionID = transitionID
@@ -283,8 +262,7 @@ type CameraFitOptions struct {
 	Pitch   *float64
 }
 
-// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
-// compares the optional fields by pointer identity.
+// Equal reports whether two descriptors hold the same field values.
 func (options CameraFitOptions) Equal(other CameraFitOptions) bool {
 	return equalPointer(options.Padding, other.Padding) &&
 		equalPointer(options.Bearing, other.Bearing) &&
@@ -347,9 +325,9 @@ const (
 	BoundsConstraintUnbounded
 )
 
-// BoundsConstraint is the geographic constraint applied to the map camera center. An unbounded
-// constraint leaves the camera center free, so the map pans across the antimeridian. This differs
-// from world bounds of -90/-180 to 90/180, which clamp longitude to that range.
+// BoundsConstraint is the geographic constraint applied to the map camera
+// center. An unbounded constraint lets the map pan across the antimeridian,
+// unlike world bounds of -90/-180 to 90/180, which clamp longitude.
 type BoundsConstraint struct {
 	Kind BoundsConstraintKind
 	// Bounds is read when Kind is BoundsConstraintBounded.
@@ -365,8 +343,7 @@ type BoundOptions struct {
 	MaxPitch *float64
 }
 
-// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
-// compares the optional fields by pointer identity.
+// Equal reports whether two descriptors hold the same field values.
 func (options BoundOptions) Equal(other BoundOptions) bool {
 	return equalBoundsConstraint(options.Bounds, other.Bounds) &&
 		equalPointer(options.MinZoom, other.MinZoom) &&
@@ -381,8 +358,7 @@ func (options BoundOptions) WithBounds(bounds LatLngBounds) BoundOptions {
 	return options
 }
 
-// WithUnbounded returns a copy that leaves the camera center unconstrained, so the map pans across
-// the antimeridian.
+// WithUnbounded returns a copy that leaves the camera center unconstrained.
 func (options BoundOptions) WithUnbounded() BoundOptions {
 	options.Bounds = &BoundsConstraint{Kind: BoundsConstraintUnbounded}
 	return options
@@ -484,8 +460,7 @@ type FreeCameraOptions struct {
 	Orientation *Quaternion
 }
 
-// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
-// compares the optional fields by pointer identity.
+// Equal reports whether two descriptors hold the same field values.
 func (options FreeCameraOptions) Equal(other FreeCameraOptions) bool {
 	return equalPointer(options.Position, other.Position) &&
 		equalPointer(options.Orientation, other.Orientation)
@@ -575,8 +550,7 @@ type ViewportOptions struct {
 	FrustumOffset    *EdgeInsets
 }
 
-// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
-// compares the optional fields by pointer identity.
+// Equal reports whether two descriptors hold the same field values.
 func (options ViewportOptions) Equal(other ViewportOptions) bool {
 	return equalPointer(options.NorthOrientation, other.NorthOrientation) &&
 		equalPointer(options.ConstrainMode, other.ConstrainMode) &&
@@ -664,8 +638,7 @@ type TileOptions struct {
 	LODMode           *TileLODMode
 }
 
-// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
-// compares the optional fields by pointer identity.
+// Equal reports whether two descriptors hold the same field values.
 func (options TileOptions) Equal(other TileOptions) bool {
 	return equalPointer(options.PrefetchZoomDelta, other.PrefetchZoomDelta) &&
 		equalPointer(options.LODMinRadius, other.LODMinRadius) &&
@@ -754,8 +727,7 @@ type ProjectionModeOptions struct {
 	YSkew       *float64
 }
 
-// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
-// compares the optional fields by pointer identity.
+// Equal reports whether two descriptors hold the same field values.
 func (options ProjectionModeOptions) Equal(other ProjectionModeOptions) bool {
 	return equalPointer(options.Axonometric, other.Axonometric) &&
 		equalPointer(options.XSkew, other.XSkew) &&

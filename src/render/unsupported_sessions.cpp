@@ -1,19 +1,10 @@
 // The surface and texture session entry points for the backends this build does
 // not carry.
 //
-// Every backend's session file used to define the other backends' stubs as
-// well, so each stub existed once per backend and the copies drifted: the
-// OpenGL build's Metal and Vulkan stubs had fallen a null check and an overflow
-// check behind, which made the same C call report a different status depending
-// on which backend the library was built with. One definition per entry point,
-// guarded by the backend the build selected, keeps them in step, and adding a
-// backend means adding its own session file plus one guard here rather than a
-// stub in every other backend's file.
-//
-// The order these validate in is part of what a host sees, so it matches the
-// backend-native attach paths step for step: the map, then the descriptor, then
-// the output handle, then the scaled extent. Only once all of those pass does
-// the caller hear that the backend is missing.
+// The validation order is part of what a host sees, so it matches the
+// backend-native attach paths step for step: the map, the descriptor, the
+// output handle, then the scaled extent. Only once all of those pass does the
+// caller hear that the backend is missing.
 
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
@@ -55,8 +46,7 @@ auto validate_owned_texture_extent(const mln_render_target_extent& extent)
 }
 
 // A frame belongs to a session rather than a descriptor, so this checks the
-// session handle and the frame's own size, mirroring the backend-native
-// acquire and release paths.
+// session handle and the frame's own size.
 template <typename Frame>
 auto validate_texture_frame(
   mln_render_session texture, const Frame* frame, const char* message

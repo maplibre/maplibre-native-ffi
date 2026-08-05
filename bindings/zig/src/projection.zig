@@ -24,8 +24,7 @@ const ProjectionLease = struct {
     }
 };
 
-// The C API issues each projection a generational handle and rejects a released
-// one, so this holds only the state this binding owns on top of it.
+// Binding-owned state keyed by the C API's generational projection handle.
 var projection_registry_lock = std.atomic.Value(bool).init(false);
 var projection_registry: std.AutoHashMapUnmanaged(c.mln_map_projection, *ProjectionState) = .empty;
 

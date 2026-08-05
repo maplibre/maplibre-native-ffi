@@ -29,9 +29,8 @@ typedef enum mln_rendered_query_geometry_type : uint32_t {
 /**
  * Screen-space box in logical map pixels.
  *
- * Corners may be given in any order, and may extend past the viewport. Rendered
- * queries normalize the corners and clip the box to the viewport, so a box that
- * over-covers the viewport queries everything visible.
+ * Corners may be given in any order and may extend past the viewport. Rendered
+ * queries normalize the corners and clip the box to the viewport.
  */
 typedef struct mln_screen_box {
   mln_screen_point min;
@@ -212,11 +211,6 @@ MLN_API mln_status mln_render_session_query_source_features(
 
 /**
  * Queries a feature extension from the latest render session state.
- *
- * Feature extensions are renderer-scoped in MapLibre Native: the cluster index
- * an extension reads lives on the render-side source inside a live renderer,
- * not on the style source, which is why this query hangs off the session rather
- * than off a map or a source ID.
  *
  * The session renderer must already exist. source_id, feature, extension,
  * extension_field, and arguments are borrowed for the duration of the call.

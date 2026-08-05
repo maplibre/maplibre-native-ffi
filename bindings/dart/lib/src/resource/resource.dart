@@ -246,10 +246,7 @@ final class ResourceUrlRewriteRule {
   /// - `\` matches the next character literally, and a trailing `\` matches
   ///   itself.
   ///
-  /// Confining `*` to one path segment is what makes a host pattern hold:
-  /// `https://*.example.com/**` matches every subdomain of example.com, and a
-  /// request for `https://attacker.example/x.example.com/tile` matches it
-  /// nowhere. Use `**` wherever a pattern spans path segments, as in
+  /// Use `**` wherever a pattern spans path segments, as in
   /// `https://tiles.example.com/**` for one whole host.
   final bool matchGlob;
 

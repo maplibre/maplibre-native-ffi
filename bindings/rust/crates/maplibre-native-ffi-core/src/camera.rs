@@ -18,10 +18,8 @@ pub struct CameraOptions {
     pub pitch: Option<f64>,
     pub center_altitude: Option<f64>,
     pub padding: Option<EdgeInsets>,
-    /// Screen-space anchor for jump, ease, and fly commands.
-    ///
-    /// This field is input-only: MapLibre Native applies it to camera commands
-    /// and never reports it back, so it is always `None` on a camera read.
+    /// Screen-space anchor for jump, ease, and fly commands. Input-only:
+    /// a camera read always reports `None`.
     pub anchor: Option<ScreenPoint>,
     pub roll: Option<f64>,
     pub field_of_view: Option<f64>,
@@ -101,25 +99,12 @@ pub struct AnimationOptions {
     pub easing: Option<UnitBezier>,
     /// Caller-chosen identity for the transition these options start.
     ///
-    /// When set, the transition emits exactly one runtime event of type
-    /// `RuntimeEventType::MapCameraTransitionFinished` carrying this value in
-    /// its [`CameraTransitionFinishedEvent`](crate::CameraTransitionFinishedEvent)
-    /// payload. The value passes through uninterpreted, so callers pick their
-    /// own scheme, such as a monotonically increasing counter.
-    ///
-    /// The event arrives for every terminal outcome: running to completion,
-    /// being superseded by a later camera command, being cancelled by
-    /// `cancel_transitions`, or completing instantly as a zero-duration jump. A
-    /// command this API rejects, such as one carrying a non-finite enabled
-    /// camera field, starts no transition and emits no such event. MapLibre
-    /// Native reports the
-    /// moment the transition releases the camera without naming which outcome
-    /// occurred, so the event establishes transition identity rather than a
-    /// completion reason. A host that needs to tell completion from
-    /// cancellation compares the resulting camera against the requested one,
-    /// or tracks which transition ID is current.
-    ///
-    /// Leaving this field absent emits no such event.
+    /// When set, the transition emits exactly one
+    /// `RuntimeEventType::MapCameraTransitionFinished` event carrying this
+    /// value in its
+    /// [`CameraTransitionFinishedEvent`](crate::CameraTransitionFinishedEvent)
+    /// payload. The event arrives for every terminal outcome and does not name
+    /// which one occurred. Leaving this absent emits no such event.
     pub transition_id: Option<u64>,
 }
 

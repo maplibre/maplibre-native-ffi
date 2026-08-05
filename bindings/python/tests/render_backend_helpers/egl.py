@@ -9,12 +9,11 @@ import sys
 
 
 if sys.platform != "darwin":
-    # These fixtures render into pbuffers and never present, so they ask for the
-    # surfaceless platform. EGL_DEFAULT_DISPLAY resolves to whichever platform
-    # libEGL was built for, commonly x11, which fails to initialize on a host
-    # with no display server. Mesa reads this on the first EGL call, which is
-    # the route PyOpenGL leaves open: it hands back a null wrapper from
-    # eglGetPlatformDisplay. The C and Zig fixtures name the platform directly.
+    # These fixtures render into pbuffers and never present, so they need the
+    # surfaceless platform. EGL_DEFAULT_DISPLAY resolves to whatever libEGL was
+    # built for, commonly x11, which fails to initialize with no display server.
+    # PyOpenGL returns a null wrapper from eglGetPlatformDisplay, so the env var
+    # Mesa reads on the first EGL call is the only route.
     os.environ.setdefault("EGL_PLATFORM", "surfaceless")
 
 if sys.platform == "darwin":
@@ -275,8 +274,8 @@ class EglBorrowedTexture:
                 GL.GL_TEXTURE_WRAP_T,
                 GL.GL_CLAMP_TO_EDGE,
             )
-            # Zeroed rather than left undefined: a test that reads this back
-            # to prove a session rendered into it needs a known starting value.
+            # Zeroed rather than undefined: readback tests need a known
+            # starting value.
             blank = (ctypes.c_ubyte * (width * height * 4))()
             GL.glTexImage2D(
                 GL.GL_TEXTURE_2D,

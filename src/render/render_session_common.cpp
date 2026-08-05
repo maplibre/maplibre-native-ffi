@@ -203,8 +203,7 @@ auto opengl_surface_descriptor_default() noexcept
   };
 }
 
-// A host owns its WebGPU device, so a session needs one handed to it. The
-// instance and queue are optional: neither session kind needs the instance, and
+// The instance and queue are optional: no session kind needs the instance, and
 // a null queue means the device's default queue.
 auto validate_webgpu_context(const mln_webgpu_context_descriptor& context)
   -> mln_status {
@@ -331,8 +330,8 @@ auto opengl_context_matches(
              lhs.data.egl.config == rhs.data.egl.config &&
              lhs.data.egl.share_context == rhs.data.egl.share_context;
     case MLN_OPENGL_CONTEXT_PLATFORM_WEBGL:
-      // A WebGL context is the whole descriptor, and its drawable travels with
-      // it, so the handle is all there is to compare under either strictness.
+      // A WebGL context carries its own drawable, so the handle is all there is
+      // to compare under either strictness.
       return lhs.data.webgl.context == rhs.data.webgl.context;
     case MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED:
       break;
@@ -700,12 +699,9 @@ auto to_screen_line_string(
 }
 
 // Normalizes a query box and intersects it with the viewport. Native tile-space
-// query geometry saturates at a few tiles past a tile's own bounds, so a box
-// that over-covers the viewport can degrade into an empty answer instead of the
-// visible features. Clipping to the viewport is lossless for a box: the
-// intersection of a screen-space box with the viewport is the same box over the
-// only region that can hold rendered features. Returns nullopt when the box
-// lies entirely outside the viewport, which holds no rendered features.
+// query geometry saturates a few tiles past a tile's own bounds, so a box that
+// over-covers the viewport degrades into an empty answer. Returns nullopt when
+// the box lies entirely outside the viewport.
 auto clip_screen_box_to_viewport(
   mln_screen_box box, uint32_t width, uint32_t height
 ) -> std::optional<mbgl::ScreenBox> {
@@ -945,10 +941,9 @@ auto create_feature_extension_result(
   );
 }
 
-// The map's scale factor is fixed at creation and still selects sprites,
-// glyphs, and raster tiles, while the session's scale factor drives geometry
-// and shaders. A mismatch renders correctly sized geometry against imagery
-// chosen for a different density, so warn instead of failing the call.
+// The map's scale factor is fixed at creation and selects sprites, glyphs, and
+// raster tiles; the session's drives geometry and shaders. A mismatch renders
+// correctly sized geometry against imagery chosen for a different density.
 auto warn_on_scale_factor_mismatch(mln_map map, double scale_factor) -> void {
   constexpr auto tolerance = 1e-6;
   const auto creation_scale_factor = mln::core::map_scale_factor(map);
@@ -995,8 +990,6 @@ auto RenderSessionScheduler::drain() -> void {
     }
     draining_ = true;
   }
-  // Clear the flag on every exit, including a throwing task. Leaving it set
-  // would silently stop this session from ever delivering results again.
   const auto clear_draining = DrainGuard{*this};
   while (true) {
     auto batch = std::vector<std::function<void()>>{};
@@ -1080,10 +1073,8 @@ auto attach_render_session(
     return output_status;
   }
 
-  // The attaching thread owns the session for its whole lifetime. The session
-  // records its own thread rather than inheriting the map's, which is what lets
-  // a host attach where its graphics context is current while the map stays on
-  // the runtime loop thread.
+  // The attaching thread owns the session for its whole lifetime, and need not
+  // be the map's thread.
   session->owner_thread = std::this_thread::get_id();
 
   const auto map = session->map;
@@ -1095,21 +1086,16 @@ auto attach_render_session(
   try {
     // Set before priming: renderer_backend() dispatches on kind.
     session->kind = kind;
-    // Create the backend's graphics context here, on the thread that will drive
-    // the session and where the host's context is current. WGL resolves
-    // wglCreateContextAttribsARB through wglGetProcAddress, which needs a
-    // current context, and shares against the host context by checking whether
-    // it is current on *this* thread. This is why attach must be called on the
-    // render loop thread rather than the map's: a graphics context cannot be
-    // current on two threads at once.
-    // Vulkan and Metal activate() are no-ops, so this costs them nothing.
+    // Create the backend's graphics context on the thread that will drive the
+    // session, where the host's context is current: WGL resolves
+    // wglCreateContextAttribsARB through wglGetProcAddress and shares against
+    // the host context only if it is current on this thread.
     if (auto* backend = renderer_backend(handle); backend != nullptr) {
       const auto prime = mbgl::gfx::BackendScope{*backend};
     }
 
-    // Only now that the graphics setup has succeeded. The map applies this on
-    // its own thread, so a size queued before a throwing prime would still land
-    // and resize the map to an extent whose attach failed.
+    // After the graphics setup succeeds: the map applies this on its own
+    // thread, so a size queued before a throwing prime would still land.
     const auto size_status =
       map_post_set_size(map, session->width, session->height);
     if (size_status != MLN_STATUS_OK) {
@@ -1184,16 +1170,9 @@ auto render_session_resize(
     return size_status;
   }
   warn_on_scale_factor_mismatch(live->map, scale_factor);
-  // Keep the renderer. mbgl::Renderer reads the backend renderable's size at
-  // the top of every frame, so a resized target is all it needs, and holding on
-  // to it carries the tile pyramid, glyph and image atlases, symbol placement,
-  // and feature state across the resize instead of rebuilding them cold.
-  //
-  // The backends hold up the other half of this bargain: a resize preserves
-  // whatever the renderer keys cached GPU state against, which on Vulkan means
-  // the render pass. Pixel ratio is the exception, fixed when a Renderer is
-  // constructed and baked into its shaders, so a scale factor change is the one
-  // resize that still starts over.
+  // Keep the renderer across a resize, which carries the tile pyramid, atlases,
+  // symbol placement, and feature state. Pixel ratio is the exception: it is
+  // fixed when a Renderer is constructed and baked into its shaders.
   if (scale_factor != live->scale_factor) {
     live->renderer.reset();
   }
@@ -1266,17 +1245,10 @@ auto render_session_set_target(
     try {
       return replace(*live);
     } catch (...) {
-      // The backend threw partway through swapping targets, so whatever the
-      // renderer caches against may already be gone. Retire it before the
-      // exception carries on to the C boundary, so the session cannot come back
-      // from MLN_STATUS_NATIVE_ERROR still holding pipelines built against a
-      // target that no longer exists.
-      //
-      // Backends report the failures they can see coming — a mismatched target,
-      // a query they could not answer — so reaching here means a swap was
-      // already under way. It cannot be unwound: a Vulkan swapchain is gone
-      // before its replacement is built. The session is left for the host to
-      // destroy, which the headers say.
+      // A throw means the swap was already under way and cannot be unwound, so
+      // whatever the renderer caches against may be gone. Retire the renderer
+      // before the exception reaches the C boundary; the host destroys the
+      // session.
       live->renderer.reset();
       throw;
     }
@@ -1287,16 +1259,11 @@ auto render_session_set_target(
     return replace_status;
   }
 
-  // Land the session's own bookkeeping before anything that can fail again.
-  // Everything past this point describes the target the backend now holds, so a
-  // later failure leaves a session that is merely waiting for the map to catch
-  // up, which is the same state an ordinary resize passes through.
+  // Land the session's own bookkeeping before anything that can fail again, so
+  // a later failure leaves only a session waiting for the map to catch up.
   //
-  // The same bargain a resize strikes: the renderer carries the tile pyramid,
-  // glyph and image atlases, symbol placement, and feature state over to the
-  // new target. The pixel ratio is the one thing it cannot carry, being fixed
-  // when a renderer is built and baked into its shaders. Anything else the
-  // compiled state would not match was refused above rather than rebuilt here.
+  // As with a resize, the renderer carries its caches to the new target. Pixel
+  // ratio is the exception: it is baked into the renderer's shaders.
   if (extent.scale_factor != live->scale_factor) {
     live->renderer.reset();
   }
@@ -1366,12 +1333,9 @@ auto render_session_render_update(
   auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
   // Deliver tile and resource results first: destroying the tiles they retire
-  // is what enqueues the GPU-release work that map_run_render_jobs() drains.
-  //
-  // Before the early returns below, not after. When this session owns the
-  // thread's scheduler, this queue is the only place those results land, and it
-  // drains nowhere else. Returning without draining would strand them whenever
-  // there is no update to render, which is exactly the window a resize opens.
+  // enqueues the GPU-release work that map_run_render_jobs() drains. This must
+  // stay ahead of the early returns below, or a frame with no update to render
+  // strands them.
   live->scheduler.drain();
   map_run_render_jobs(live->map);
 
@@ -1380,13 +1344,11 @@ auto render_session_render_update(
     return MLN_STATUS_OK;
   }
 
-  // The map applies its logical size on its own thread, so a resize leaves this
-  // session holding an update built for the previous extent while the render
-  // target has already changed. Rendering it anyway would take the projection
-  // from the update's logical size but the viewport and scissor from the
-  // backend's physical size, producing a visibly stretched frame. Wait for the
-  // update that matches instead. This cannot stall: Transform::resize
-  // publishes a new update unless the size is already what we want.
+  // The map applies its logical size on its own thread, so after a resize an
+  // update built for the previous extent would take its projection from the
+  // update but its viewport from the backend, producing a stretched frame.
+  // Waiting cannot stall: Transform::resize publishes a new update unless the
+  // size already matches.
   if (
     update->transformState.getSize() != mbgl::Size{live->width, live->height}
   ) {
@@ -1429,8 +1391,7 @@ auto render_session_render_update(
     set_native_stage_error("rendering update", exception);
     return MLN_STATUS_NATIVE_ERROR;
   }
-  // Absorb results that landed from worker threads during the render, so they
-  // do not wait a whole frame.
+  // Absorb results that landed from worker threads during the render.
   live->scheduler.drain();
   if (live->kind == RenderSessionKind::Texture) {
     auto frame_rendered = true;
@@ -1460,20 +1421,16 @@ auto render_session_detach(mln_render_session session) -> mln_status {
   }
 
   // Tear the renderer down before releasing the map's slot. The renderer holds
-  // the map's forwarding observer, which the map's frontend owns, and queued
-  // work can reach it while it drains. Releasing the slot first would let the
-  // map owner thread see no attached session and destroy the map — freeing that
-  // observer underneath the drain and reset below.
+  // the map's forwarding observer, which the map's frontend owns; releasing the
+  // slot first lets the map owner thread destroy the map and free that observer
+  // underneath the drain and reset below.
   {
     auto current = ScopedCurrentScheduler{live->scheduler};
-    // Let queued results land while the renderer they target still exists.
     live->scheduler.drain();
     live->renderer.reset();
     live->surface.backend.reset();
     live->texture.backend.reset();
-    // Anything enqueued during teardown is a mailbox receive or a bindOnce
-    // continuation whose target is already gone, so running it would be a
-    // no-op. Drop it rather than execute arbitrary work mid-teardown.
+    // Anything enqueued during teardown targets something already gone.
     live->scheduler.discard();
   }
 

@@ -1,13 +1,9 @@
 from collections.abc import Callable, Sequence
 from typing import Any, TypeAlias
 
-# PyO3 currently documents hand-maintained .pyi files as the stable path for
-# typing extension modules, while generated stubs remain under active
-# development and only support inline Rust modules. This module is still exposed
-# through a function-style #[pymodule], so keep this stub explicit until we can
-# evaluate a generated-stub workflow.
+# Hand-maintained: PyO3's generated stubs only support inline Rust modules, and
+# this module uses a function-style #[pymodule].
 # https://pyo3.rs/main/python-typing-hints
-# https://pyo3.rs/main/type-stub
 
 _Point: TypeAlias = tuple[float, float]
 _Vec3: TypeAlias = tuple[float, float, float]

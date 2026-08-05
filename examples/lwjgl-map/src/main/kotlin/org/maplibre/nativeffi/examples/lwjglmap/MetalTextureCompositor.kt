@@ -18,11 +18,9 @@ internal class MetalTextureCompositor(graphicsContext: GraphicsContext) : AutoCl
   }
 
   /**
-   * Samples the texture into the layer's next drawable, and reports whether it presented.
-   *
-   * A minimized or occluded window has no drawable to hand out, and the drawable pool is
-   * momentarily empty under load. Both are transient, so the frame is skipped rather than failed:
-   * the caller's render request stays pending and the draw retries once a drawable is available.
+   * Samples the texture into the layer's next drawable, and reports whether it presented. A
+   * minimized window and an exhausted drawable pool are both transient, so a missing drawable skips
+   * the frame rather than failing it.
    */
   fun drawTexture(texture: Long): Boolean {
     var passDescriptor = NULL

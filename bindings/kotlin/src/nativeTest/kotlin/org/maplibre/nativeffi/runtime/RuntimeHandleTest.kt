@@ -57,7 +57,7 @@ import platform.posix.usleep
 
 @OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class)
 class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
-  // BND-001, BND-040, BND-041: runtime identity, release, and ABI guard behavior.
+  // BND-001, BND-040, BND-041.
 
   @Test
   fun closeReleasesRuntimeOnceAndInvalidatesWrapper() {
@@ -115,7 +115,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     assertEquals(0, creates)
   }
 
-  // BND-122: callback replacement retains existing state and releases failed replacement state.
+  // BND-122.
 
   @Test
   fun resourceProviderAndTransformReplacementPathsRetainAndClearCallbackState() {
@@ -187,7 +187,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
   }
 
   // BND-101, BND-140, BND-141, BND-142, BND-143, BND-144, BND-145, BND-146,
-  // BND-147, BND-148, BND-149: style loading with resource transform/provider behavior.
+  // BND-147, BND-148, BND-149.
 
   @Test
   fun resourceTransformRewritesNetworkStyleUrlAndCanBeClearedAfterMapCreation() {
@@ -282,8 +282,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     }
   }
 
-  // BND-154: an installed provider is consulted, a replacement takes over while a
-  // map is live, and a cleared provider leaves requests to the network file source.
+  // BND-154.
   @Test
   fun resourceProviderIsConsultedUntilClearedWhileMapIsLive() {
     val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
@@ -309,7 +308,6 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
         loadUnservedStyle(runtime, map, "jar:file:/packaged/first.json")
         assertTrue(firstCalls.load() > 0)
 
-        // Replacing the provider while a map is live is part of the C API contract.
         runtime.setResourceProvider(
           ResourceProviderCallback { _, _ ->
             secondCalls.addAndFetch(1)
@@ -521,7 +519,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     }
   }
 
-  // BND-044, BND-046: owner-thread calls report copied diagnostics and leave handles retryable.
+  // BND-044, BND-046.
 
   @Test
   fun runtimeOwnerThreadCallFromAnotherNativeThreadReportsCopiedDiagnostic() {
@@ -654,8 +652,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     }
   }
 
-  // BND-080, BND-081, BND-082, BND-083, BND-085, BND-086, BND-087: runtime
-  // event copy, polling, stale-source, and unknown-domain behavior.
+  // BND-080, BND-081, BND-082, BND-083, BND-085, BND-086, BND-087.
 
   @Test
   fun pumpProcessesStyleLoadedEventAndPollingDrainsQueue() {
@@ -810,7 +807,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     }
   }
 
-  // BND-084: offline operation token validation, retryability, and consumption behavior.
+  // BND-084.
 
   @Test
   fun offlineOperationTakeMethodsValidateExpectedOperationKindBeforeNativeCall() {
@@ -936,8 +933,8 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
   }
 
   /**
-   * Loads a style URL whose scheme no file source serves, so the loading failure that names the
-   * scheme and the URL proves the request reached the network file source.
+   * Loads a style URL whose scheme no file source serves; the failure names the scheme and URL,
+   * proving the request reached the network file source.
    */
   private fun loadUnservedStyle(runtime: RuntimeHandle, map: MapHandle, styleUrl: String) {
     map.setStyleUrl(styleUrl)

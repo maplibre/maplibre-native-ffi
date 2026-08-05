@@ -55,14 +55,12 @@ impl ResourceRequestHandle {
     }
 
     /// Completes the request. A completion attempt that reaches native code
-    /// closes this handle, even when native reports a non-OK status. Binding
-    /// validation failures that happen before native code is called leave the
-    /// handle live so completion can be retried with a valid response.
+    /// closes this handle, even when native reports a non-OK status; a binding
+    /// validation failure leaves the handle live so completion can be retried.
     ///
-    /// When a provider callback completes inline and then returns
-    /// [`ResourceProviderDecision::PassThrough`], the wrapper still returns the
-    /// native `Handle` decision. Native code must not also pass the completed
-    /// request through to its own networking path.
+    /// A callback that completes inline and then returns
+    /// [`ResourceProviderDecision::PassThrough`] still reports the native
+    /// `Handle` decision.
     pub fn complete(&self, response: ResourceResponse) -> Result<()> {
         self.state.complete(&response)
     }
@@ -159,8 +157,8 @@ unsafe extern "C" fn resource_provider_trampoline(
         return UNKNOWN_PROVIDER_DECISION;
     };
     // SAFETY: user_data is installed from ResourceProviderState::descriptor and
-    // remains valid until replacement or runtime teardown. The callback state is
-    // Send + Sync because native may invoke it from worker/network threads.
+    // remains valid until replacement or runtime teardown. Native may invoke
+    // this from worker or network threads.
     unsafe { state.as_ref() }.invoke(request, handle)
 }
 
@@ -226,10 +224,9 @@ impl ResourceTransformState {
         match replacement {
             Some(replacement) if !replacement.is_empty() => {
                 // SAFETY: out_response was checked by
-                // initialize_resource_transform_response. The helper copies the
-                // temporary Rust string into C API-managed callback scratch
-                // storage that remains live while native copies it after this
-                // trampoline returns.
+                // initialize_resource_transform_response, and the helper copies
+                // the string into C API-managed scratch storage that outlives
+                // this trampoline.
                 unsafe {
                     sys::mln_resource_transform_response_set_url(
                         out_response,
@@ -253,8 +250,8 @@ unsafe extern "C" fn resource_transform_trampoline(
         return sys::MLN_STATUS_INVALID_ARGUMENT;
     };
     // SAFETY: user_data is installed from ResourceTransformState::descriptor
-    // and remains valid until the runtime replaces/clears the transform or is
-    // destroyed. The callback state itself is Send + Sync.
+    // and remains valid until the runtime replaces or clears the transform or
+    // is destroyed.
     unsafe { state.as_ref() }.invoke(kind, url, out_response)
 }
 
@@ -416,8 +413,8 @@ mod tests {
 
     fn fake_handle() -> ResourceRequestHandle {
         reset_fake_handle_state();
-        // A synthetic request handle: it reaches only the fake functions above,
-        // never the C API, and the safe public API cannot build one.
+        // A synthetic request handle that reaches only the fake functions above,
+        // never the C API.
         ResourceRequestHandle::from_raw_with_fns(
             sys::mln_resource_request_handle(0x0c00_0000_0000_0034),
             fake_fns(),

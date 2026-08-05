@@ -8,8 +8,6 @@ static mln_string_view sv(const char* text) {
   return (mln_string_view){.data = text, .size = strlen(text)};
 }
 
-// Style-spec JSON crosses the boundary as a descriptor graph. One small helper
-// per value type keeps the call sites short.
 static mln_json_value json_string(const char* text) {
   return (mln_json_value){
     .size = sizeof(mln_json_value),

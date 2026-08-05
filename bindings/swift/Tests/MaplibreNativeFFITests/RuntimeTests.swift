@@ -89,10 +89,10 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
   try runtime.clearResourceTransform()
 }
 
-/// Requests a style URL whose scheme no file source serves, then pumps the
-/// runtime until the matching map loading failure arrives. The failure proves
-/// the request reached the C API network file source, where the runtime-scoped
-/// resource provider applies. Returns the copied failure message.
+/// Requests a style URL whose scheme no file source serves, pumps until the
+/// matching loading failure arrives, and returns its message. The failure
+/// proves the request reached the network file source, where the
+/// runtime-scoped resource provider applies.
 private func loadProbeStyle(
   runtime: RuntimeHandle,
   map: MapHandle,
@@ -137,8 +137,7 @@ private func loadProbeStyle(
   #expect(firstFailure?.contains("\"jar\"") == true)
   #expect(firstCalls.callCount > 0)
 
-  // Replacing the provider while a map is live is part of the contract, and
-  // the previous provider stops being consulted once the call returns.
+  // The previous provider stops being consulted once the call returns.
   let secondCalls = ResourceProviderCallCounter()
   try runtime.setResourceProvider { _, _ in
     secondCalls.recordCall()

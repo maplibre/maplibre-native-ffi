@@ -1,11 +1,10 @@
 package maplibre
 
-// Structural comparison helpers for the option structs. Optional fields are pointers, so the
-// built-in == operator compares pointer identity rather than the values behind them; the Equal
-// methods built on these helpers compare the values.
+// Structural comparison helpers for the option structs, whose optional fields
+// are pointers.
 
-// equalPointer reports whether two optional fields hold equal values. A nil pointer marks an
-// absent field and is equal only to another nil pointer.
+// equalPointer reports whether two optional fields hold equal values. A nil
+// pointer marks an absent field and is equal only to another nil pointer.
 func equalPointer[T comparable](left, right *T) bool {
 	if left == nil || right == nil {
 		return left == nil && right == nil
@@ -22,8 +21,8 @@ func clonePointer[T any](value *T) *T {
 	return cloned
 }
 
-// equalStrings reports whether two optional string lists are equal. A nil list marks an absent
-// field and is never equal to an empty list, matching how the field masks are populated.
+// equalStrings reports whether two optional string lists are equal. A nil list
+// marks an absent field and is never equal to an empty list.
 func equalStrings(left, right []string) bool {
 	if (left == nil) != (right == nil) || len(left) != len(right) {
 		return false
@@ -36,8 +35,8 @@ func equalStrings(left, right []string) bool {
 	return true
 }
 
-// equalBoundsConstraint reports whether two optional camera center constraints are equal. The
-// bounds value is compared for the bounded case, which is the case that reads it.
+// equalBoundsConstraint reports whether two optional camera center constraints
+// are equal. Bounds are compared only for the bounded case, which reads them.
 func equalBoundsConstraint(left, right *BoundsConstraint) bool {
 	if left == nil || right == nil {
 		return left == nil && right == nil

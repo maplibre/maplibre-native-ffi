@@ -1,14 +1,10 @@
 // Raw C ABI coverage: what a render session keeps when its target changes.
 //
 // The session renderer is not reachable through the C API, so these tests probe
-// for its existence through mln_render_session_dump_debug_logs(), which reports
+// for it with mln_render_session_dump_debug_logs(), which reports
 // MLN_STATUS_INVALID_STATE while no renderer exists and MLN_STATUS_OK once one
-// does. That is a probe for the renderer's identity only, not for its contents:
-// it says whether a resize kept the renderer, which is the precondition for the
-// tile pyramid, atlases, symbol placement, and feature state surviving with it.
-// It is chosen over the other renderer-requiring entry points because it leaves
-// the renderer alone, where clear_data() would empty the very state a later
-// assertion might want to look at.
+// does. It is the one renderer-requiring entry point that leaves the renderer's
+// state intact.
 
 #include <stdbool.h>
 
@@ -17,7 +13,7 @@
 #include "unity.h"
 
 // Renders until the session reports a frame, which is when it builds its
-// renderer. Returns whether one was rendered before the attempts ran out.
+// renderer. Returns whether a frame arrived before the attempts ran out.
 static bool render_until_frame(
   mln_runtime runtime, mln_render_session session
 ) {
@@ -37,9 +33,8 @@ static bool render_until_frame(
   return false;
 }
 
-// Whether the session currently holds a renderer. Distinguishes the missing
-// renderer from a backend failure, which reports NATIVE_ERROR, so a broken
-// backend cannot read as a retired renderer.
+// Whether the session currently holds a renderer. A backend failure reports
+// NATIVE_ERROR, so it cannot read as a retired renderer.
 static bool has_renderer(mln_render_session session) {
   const mln_status status = mln_render_session_dump_debug_logs(session);
   if (status == MLN_STATUS_INVALID_STATE) {
@@ -49,8 +44,6 @@ static bool has_renderer(mln_render_session session) {
   return true;
 }
 
-// A resize changes the size of the target and nothing the renderer caches
-// against, so the renderer carries over.
 static void resize_keeps_the_session_renderer(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -75,9 +68,9 @@ static void resize_keeps_the_session_renderer(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// The pixel ratio is fixed when a renderer is built and baked into its shaders,
-// so a scale factor change is the one resize that starts over. The replacement
-// is built lazily on the next render.
+// The pixel ratio is baked into the renderer's shaders when it is built, so a
+// scale factor change is the one resize that retires it. The replacement is
+// built lazily on the next render.
 static void scale_factor_change_rebuilds_the_session_renderer(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -106,13 +99,8 @@ static void scale_factor_change_rebuilds_the_session_renderer(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A session-owned texture is allocated and sized by its session, so following a
-// host resize means resizing rather than handing over a new target.
-//
-// The session is checked before the descriptor, which is what makes this
-// reachable: the descriptors here are defaults that no backend would accept, so
-// a validation order that looked at them first would report a malformed
-// descriptor and never reach the question being asked.
+// The descriptors here are defaults no backend would accept, so this test only
+// reaches the session check because validation looks at the session first.
 static void set_target_rejects_a_session_owned_texture(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -144,7 +132,6 @@ static void set_target_rejects_a_session_owned_texture(void) {
     mln_webgpu_borrowed_texture_set_target(fixture.session, &webgpu)
   );
 
-  // A surface descriptor names a target this session does not have at all.
   const mln_metal_surface_descriptor metal_surface =
     mln_metal_surface_descriptor_default();
   const mln_vulkan_surface_descriptor vulkan_surface =
@@ -174,9 +161,8 @@ static void set_target_rejects_a_session_owned_texture(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A retired session handle is reported as such whatever the descriptor says,
-// which is what lets a host tell a lost session apart from a build that lacks
-// the backend it asked for.
+// A stale session is reported as invalid whatever the descriptor says, so a
+// host can tell a lost session from a build without that backend.
 static void set_target_rejects_a_stale_session(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

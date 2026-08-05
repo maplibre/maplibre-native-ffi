@@ -1,11 +1,5 @@
-// Supplies the MapLibre Native C library as a code asset, which is what the
-// `@Native` declarations in `lib/src/internal/c/maplibre_native_c.g.dart`
-// resolve against at run time.
-//
-// The library comes from a local build when one is configured, and otherwise
-// from the published snapshot release. That contract is specified in
-// docs/src/content/docs/development/binding-specification.md under "Native
-// Artifact Acquisition"; the Rust build script implements the same one.
+// Supplies the MapLibre Native C library as a code asset, from a local build
+// when one is configured and otherwise from the published snapshot release.
 
 import 'dart:convert';
 import 'dart:io';
@@ -20,9 +14,8 @@ import 'package:maplibre_native_ffi/src/internal/c/native_asset.dart';
 /// File naming the install prefix of a native library built from this
 /// repository, written by the mise tasks before they invoke Dart.
 ///
-/// Build hooks run in a semi-hermetic environment that strips arbitrary
-/// environment variables, so the prefix arrives in a file rather than in
-/// `MLN_FFI_NATIVE_LIBRARY` the way it does for the other bindings.
+/// Build hooks run with a stripped environment, so the prefix arrives in a file
+/// rather than in `MLN_FFI_NATIVE_LIBRARY`.
 const String installPrefixPointer = '.dart_tool/maplibre_native_install_dir';
 
 const String _libraryName = 'maplibre-native-c';
@@ -51,10 +44,8 @@ void main(List<String> arguments) async {
     );
 
     // Some presets install runtime libraries beside the C API library and load
-    // them through it: `macos-arm64-egl` ships ANGLE's libEGL and libGLESv2,
-    // resolved relative to the loader. Bundling only the C API library would
-    // leave those behind, so declare them too and let the SDK place them
-    // together.
+    // them through it, resolved relative to the loader, so they have to be
+    // declared as assets too.
     for (final sibling in _siblingLibraries(
       library,
       input.config.code.targetOS,
@@ -75,9 +66,8 @@ void main(List<String> arguments) async {
 /// Rejects an install prefix that does not match what this build asked for.
 ///
 /// The pointer names whichever preset was built last, and a library file name
-/// alone does not distinguish `android-arm64` from `android-x64`, or either
-/// from a host `linux-x64` build. The descriptor records what the artifact was
-/// built for, so it is what decides.
+/// alone does not distinguish one target from another, so the artifact
+/// descriptor decides.
 void _verifyLocalPrefix(Uri prefix, BuildInput input) {
   final descriptor = _descriptor(prefix);
   final expected = _targetPlatform(input.config.code);
@@ -89,9 +79,8 @@ void _verifyLocalPrefix(Uri prefix, BuildInput input) {
     );
   }
 
-  // Only an explicit request conflicts. Absent one, the prefix's own renderer
-  // is the answer: a local build is a deliberate choice of artifact, so the
-  // platform default the download path applies has nothing to say about it.
+  // Only an explicit request conflicts; absent one, the prefix's own renderer
+  // is the answer rather than the download path's platform default.
   final backend = _requestedBackend(input);
   if (backend != null && descriptor['renderBackend'] != backend) {
     throw StateError(
@@ -156,10 +145,8 @@ Future<Uri> _installPrefix(BuildInput input, BuildOutputBuilder output) async {
   // this hook.
   output.dependencies.add(pointer.absolute.uri);
   if (pointer.existsSync()) {
-    // A pointer that names a prefix without a library, or one built for
-    // another target, is a broken configuration rather than an absent one.
-    // Downloading instead would turn an explicit opt-out of the network into a
-    // silent opt-in, so this fails and says how to get out of it.
+    // A pointer that names an unusable prefix fails rather than downloading:
+    // the pointer is an explicit opt-out of the network.
     final prefix = Uri.directory(pointer.readAsStringSync().trim());
     _verifyLocalPrefix(prefix, input);
     _libraryFile(prefix, input.config.code);
@@ -199,9 +186,8 @@ const Map<String, String> _appleDesktop = {
 };
 const Map<String, String> _appleMobile = {'metal': 'metal'};
 
-/// The presets `.github/workflows/snapshots.yml` publishes a shared library
-/// for, keyed by the target they serve. The OpenHarmony presets build from
-/// source and ship no archive, so they are absent here.
+/// The presets the snapshot release publishes a shared library for, keyed by
+/// the target they serve. The OpenHarmony presets ship no archive.
 const Map<String, ({String defaultBackend, Map<String, String> backends})>
 _platformTargets = {
   'linux-x64': (defaultBackend: 'vulkan', backends: _openglEgl),
@@ -241,22 +227,13 @@ _Preset _resolvePreset(BuildInput input) {
 
 /// Downloads and extracts the archive for [preset] unless it is already cached.
 ///
-/// The snapshot release is floating: its asset URLs never change, so a cache
-/// keyed on the URL would serve stale bytes forever. `SHA256SUMS` changing is
-/// the exact signal that the artifacts moved, so its digest is the cache key.
+/// The snapshot release is floating, so its asset URLs never change and the
+/// `SHA256SUMS` digest is the cache key instead.
 ///
-/// A publish replaces `SHA256SUMS` and the archives as separate assets, so a
-/// build that starts mid-publish can pair one generation's checksum with the
-/// other's bytes. That reads as a mismatch without either file being corrupt,
-/// so a mismatch is retried once against a freshly fetched checksum file. A
-/// mismatch that survives an unchanged checksum stays fatal, which is what
-/// keeps a genuinely corrupt download out of the cache.
-///
-/// The retry gives up every cached answer with it — the offline fallback and
-/// the cache hit alike. Once bytes have failed verification the release is no
-/// longer trustworthy for this build, and answering that from disk, whether on
-/// a later timeout or on a digest already present, would hide an unverified
-/// download behind an older artifact.
+/// A build that starts mid-publish can pair one generation's checksum with
+/// another's bytes, so a mismatch is retried once against a freshly fetched
+/// checksum file and is fatal after that. The retry takes no cached answer,
+/// neither the offline fallback nor a cache hit.
 Future<Uri> _downloadPrefix(
   BuildInput input,
   _Preset preset, {
@@ -281,10 +258,6 @@ Future<Uri> _downloadPrefix(
   final prefix = Directory.fromUri(
     cacheDirectory.uri.resolve('${sha256.convert(utf8.encode(checksums))}/'),
   );
-  // A retry after a mismatch takes no cache hit either. A checksum file that
-  // crossed back to an older generation resolves to a digest already on disk,
-  // which would answer the failed verification from the cache without proving
-  // any fresh bytes.
   if (prefix.existsSync() && !afterMismatch) {
     return prefix.uri;
   }
@@ -297,8 +270,7 @@ Future<Uri> _downloadPrefix(
     archive = await _fetch('$_releaseBaseUrl/$_snapshotTag/$archiveName');
   } on Object catch (error) {
     // A publish race can list an archive in SHA256SUMS before uploading it.
-    // Only the fetch falls back; the checksum check below stays fatal, so a
-    // corrupt download is never papered over with a stale artifact.
+    // Only the fetch falls back; the checksum check below stays fatal.
     if (afterMismatch) {
       rethrow;
     }
@@ -352,12 +324,10 @@ void _extract(
         continue;
       }
       // `Uri.resolve` collapses `..`, so a name that starts with the expected
-      // root can still land outside the scratch tree. Rust's tar reader rejects
-      // traversal for us; this is the equivalent guard. It compares resolved
-      // filesystem paths rather than URI paths, so a separator that only the
-      // platform treats as one — a backslash on Windows — cannot slip between
-      // the two spellings, and it requires that separator so that a sibling
-      // sharing the scratch directory's name as a prefix is not accepted.
+      // root can still land outside the scratch tree. The comparison is on
+      // resolved filesystem paths, and requires a trailing separator, so a
+      // Windows backslash and a sibling directory sharing the scratch name as
+      // a prefix are both rejected.
       final target = scratch.uri.resolve(entry.name);
       final targetPath = File.fromUri(target).absolute.path;
       final scratchPath = scratch.absolute.path.endsWith(Platform.pathSeparator)
@@ -422,10 +392,9 @@ Uri _reuseCached(Directory cacheDirectory, _Preset preset, Object error) {
   return cached.last.uri;
 }
 
-/// Bounds every request, so a host that accepts the connection and then stops
-/// answering fails into the cache fallback rather than hanging the build. The
-/// whole-request bound covers the body too, so it allows for a slow link
-/// pulling a 30 MB archive.
+/// Bounds every request so a stalled host fails into the cache fallback rather
+/// than hanging the build. The request bound covers the body too, so it allows
+/// for a slow link pulling a 30 MB archive.
 const Duration _connectTimeout = Duration(seconds: 30);
 const Duration _requestTimeout = Duration(minutes: 10);
 
@@ -490,18 +459,14 @@ Map<String, Object?> _descriptor(Uri prefix) {
 
 /// Compares the checkout's public headers against the downloaded artifact's.
 ///
-/// A git dependency pinned at one commit gets whatever the floating release
-/// currently holds, which is built from another. Comparing commits would warn
-/// constantly, because the publish is gated on input digests and the artifact's
-/// commit lags by design. Differing headers are the condition that matters.
+/// The artifact's commit lags this checkout by design, so differing headers
+/// rather than differing commits are the condition worth warning about.
 void _warnOnHeaderSkew(
   BuildInput input,
   BuildOutputBuilder output,
   Uri prefix,
   _Preset preset,
 ) {
-  // The package sits at bindings/dart, and both git and path dependencies carry
-  // the whole checkout.
   final checkoutInclude = input.packageRoot.resolve('../../include/');
   final checkout = _publicHeaders(checkoutInclude);
   final artifact = _publicHeaders(prefix.resolve('include/'));
@@ -509,8 +474,7 @@ void _warnOnHeaderSkew(
     return;
   }
 
-  // Editing a public header in a path dependency has to rerun this hook, or
-  // the warning it produces goes stale against the declarations it describes.
+  // Editing a public header in a path dependency must rerun this hook.
   for (final name in checkout.keys) {
     output.dependencies.add(checkoutInclude.resolve(name));
   }

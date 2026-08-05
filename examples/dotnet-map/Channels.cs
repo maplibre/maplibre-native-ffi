@@ -10,9 +10,8 @@ namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 /// <summary>A camera change decoded on the render loop and applied on the map's owner thread.</summary>
 /// <remarks>
-/// Commands carry deltas rather than absolute targets wherever the map's current camera is an
-/// input, because reading the camera and writing the new one has to happen together on the thread
-/// that owns the map. A null animation means the command applies immediately.
+/// Commands carry deltas wherever the current camera is an input, because the read and the write
+/// have to happen together on the owner thread. A null animation applies the command immediately.
 /// </remarks>
 internal abstract record CameraCommand;
 
@@ -44,9 +43,8 @@ internal sealed class CommandQueue
 
     /// <summary>
     /// Released by <see cref="Push" /> so a queued command reaches the runtime loop without waiting
-    /// out its parking bound. The runtime loop parks inside the native pump rather than on a host
-    /// event, so the native wake source is what releases it; that also wakes the loop for the
-    /// runtime's own work, which a host event cannot see.
+    /// out its parking bound. The runtime loop parks inside the native pump, so only the native
+    /// wake source releases it.
     /// </summary>
     public Action? OnEnqueue { get; set; }
 
@@ -65,10 +63,6 @@ internal sealed class CommandQueue
 }
 
 /// <summary>One-bit signal that a frame is worth drawing.</summary>
-/// <remarks>
-/// The render loop consumes before it renders and sets again when nothing was rendered, so a
-/// request the runtime loop publishes during a render is not lost.
-/// </remarks>
 internal sealed class RenderRequest
 {
     private int value = 1;
@@ -78,7 +72,6 @@ internal sealed class RenderRequest
         Volatile.Write(ref value, 1);
     }
 
-    /// <summary>Reads and clears the request in one step.</summary>
     public bool Consume()
     {
         return Interlocked.Exchange(ref value, 0) == 1;
@@ -87,12 +80,9 @@ internal sealed class RenderRequest
 
 /// <summary>
 /// Publishes the map from the runtime loop to the render loop, and carries shutdown and failure
-/// the other way.
+/// the other way. The render loop uses the published handle only to attach its own session; every
+/// other map call stays on the runtime loop.
 /// </summary>
-/// <remarks>
-/// The render loop holds the published handle only to attach its own session, which native serves
-/// from any thread; every other map call stays on the runtime loop.
-/// </remarks>
 internal sealed class MapChannel : IDisposable
 {
     private static readonly TimeSpan MapPollInterval = TimeSpan.FromMilliseconds(1);
@@ -116,8 +106,8 @@ internal sealed class MapChannel : IDisposable
     /// <summary>Render loop: releases the runtime loop's parked pump.</summary>
     public void WakeRuntimeLoop()
     {
-        // The runtime loop clears this before disposing, but the two run on different threads, so
-        // tolerate losing the race. A missed wake costs the parking bound, nothing more.
+        // The runtime loop clears this before disposing on another thread; a lost race costs one
+        // parking bound.
         try
         {
             wake?.Signal();
@@ -143,13 +133,12 @@ internal sealed class MapChannel : IDisposable
     }
 
     /// <summary>
-    /// Render loop: asks the runtime loop to stop. Called only after the render session is closed,
+    /// Render loop: asks the runtime loop to stop. Call only after closing the render session,
     /// because the map cannot be destroyed before then.
     /// </summary>
     public void RequestShutdown()
     {
         shutdownRequested.Set();
-        // Release the pump so shutdown is observed now rather than after the parking bound expires.
         WakeRuntimeLoop();
     }
 
@@ -165,7 +154,6 @@ internal sealed class MapChannel : IDisposable
         Interlocked.CompareExchange(ref failure, ExceptionDispatchInfo.Capture(error), null);
     }
 
-    /// <summary>Rethrows the recorded failure with its original stack trace.</summary>
     public void ThrowIfFailed()
     {
         Volatile.Read(ref failure)?.Throw();

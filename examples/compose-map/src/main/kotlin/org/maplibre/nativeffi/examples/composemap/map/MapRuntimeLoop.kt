@@ -23,9 +23,8 @@ import org.maplibre.nativeffi.runtime.WakeSource
  * presenting.
  *
  * Native owner-thread checks are keyed on the OS thread, so this is a plain [Thread] rather than a
- * coroutine dispatcher or a pooled executor. The loop never touches the render session: the render
- * loop attaches its own session against the map published here, and closes it before [close] lets
- * this loop destroy the map.
+ * coroutine dispatcher or a pooled executor. The render loop attaches its own session against the
+ * map published here, and closes it before [close] destroys the map.
  */
 internal class MapRuntimeLoop(
   private val initialExtent: SurfaceExtent,
@@ -96,13 +95,10 @@ internal class MapRuntimeLoop(
       failure = error
     } finally {
       publishedMap = null
-      // The render loop owns the session and only sees `failure` on a later
-      // frame. Native refuses to destroy a map that still has one attached, so
-      // wait for the render loop to close it and shut this loop down. Bounded,
-      // so a render loop that already stopped cannot wedge teardown.
+      // A map with an attached session cannot be destroyed, so wait for the render loop to close
+      // its session. Bounded, so a render loop that already stopped cannot wedge teardown.
       awaitShutdown()
-      // A wake source is its own native handle and outlives the runtime, so
-      // closing the runtime does not release it.
+      // A wake source is its own native handle, so closing the runtime does not release it.
       commands.onEnqueue = null
       wake?.close()
       wake = null
@@ -131,23 +127,19 @@ internal class MapRuntimeLoop(
       batch.clear()
       commands.drainInto(batch)
       batch.forEach { command -> apply(map, command) }
-      // This thread has no display to pace it, so it takes its cadence from the runtime's own
-      // work and parks in between. The render loop signals the wake source, so the bound is a
-      // backstop rather than the cadence.
+      // This thread has no display to pace it, so the pump's park is the cadence.
       runtime.pump(PARK_TIMEOUT_MS)
       if (drainEvents(runtime, map)) {
-        // Compose draws on demand, so a map update is worth a frame only if something asks for
-        // one. Tiles, style loads, and animation ticks all arrive here with no host input behind
-        // them, and the frame after a resize is one of them.
+        // Compose draws on demand, so tiles, style loads, and animation ticks reach the screen
+        // only if something asks for a frame.
         requestRender()
       }
     }
   }
 
   /**
-   * Applies one decoded camera command on the map's owner thread, which is why the
-   * read-modify-write commands read the current camera here rather than on the render loop that
-   * produced them.
+   * Applies one decoded camera command on the map's owner thread, so read-modify-write commands
+   * read the current camera here rather than on the render loop that produced them.
    */
   private fun apply(map: MapHandle, command: CameraCommand) {
     when (command) {
@@ -212,10 +204,7 @@ internal class MapRuntimeLoop(
 
   private companion object {
     private const val STYLE_URL = "https://tiles.openfreemap.org/styles/bright"
-    /**
-     * Backstop for the runtime loop's park. The render loop's wake source is what normally releases
-     * it, so this only bounds a pump that nothing signals.
-     */
+    /** Backstop bound for a parked pump that nothing signals. */
     private const val PARK_TIMEOUT_MS = 100L
 
     /** Bound on waiting for the render loop to close its session at teardown. */

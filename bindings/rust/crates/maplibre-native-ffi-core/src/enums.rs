@@ -56,13 +56,9 @@ bitflags::bitflags! {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum AmbientCacheOperation {
-    /// Reset the ambient cache database.
     ResetDatabase,
-    /// Pack the ambient cache database.
     PackDatabase,
-    /// Mark ambient cache resources as invalid.
     Invalidate,
-    /// Clear ambient cache resources.
     Clear,
 }
 
@@ -195,8 +191,6 @@ pub enum SourceType {
 }
 
 impl SourceType {
-    /// Converts a raw C ABI source type value into a Rust value, preserving
-    /// future values.
     pub fn from_raw(raw: u32) -> Self {
         match raw {
             sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN => Self::Unknown,
@@ -212,7 +206,6 @@ impl SourceType {
         }
     }
 
-    /// Returns the raw C ABI source type value.
     pub fn raw_value(self) -> u32 {
         match self {
             Self::Unknown => sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN,
@@ -608,11 +601,8 @@ impl RuntimeEventType {
 }
 
 /// Camera change kind carried in the `code` of camera will-change and
-/// did-change events.
-///
-/// Decode it with `CameraChangeMode::from_raw(event.code as u32)`. The C API
-/// stores this enum's `uint32_t` value in the event's signed `code` field, so
-/// the cast reinterprets the same bits.
+/// did-change events. Decode it with
+/// `CameraChangeMode::from_raw(event.code as u32)`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum CameraChangeMode {
@@ -764,7 +754,6 @@ pub enum LogSeverity {
 }
 
 impl LogSeverity {
-    /// Returns the raw C ABI value for this severity.
     pub fn raw_value(self) -> u32 {
         match self {
             Self::Info => sys::MLN_LOG_SEVERITY_INFO,
@@ -809,7 +798,6 @@ pub enum LogEvent {
 }
 
 impl LogEvent {
-    /// Returns the raw C ABI value for this event category.
     pub fn raw_value(self) -> u32 {
         match self {
             Self::General => sys::MLN_LOG_EVENT_GENERAL,

@@ -116,9 +116,8 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
       throwWrongThread('$typeName belongs to a different Dart isolate');
     }
     if (_threadToken() != _ownerThreadToken) {
-      // Same isolate, different native thread. Every native call on this handle
-      // would now fail, including close, which would leak it permanently. Say
-      // why here rather than let the C API report a bare wrong-thread status.
+      // Same isolate, different native thread: every native call on this
+      // handle would now fail, including close, which leaks it permanently.
       throwWrongThread(
         '$typeName is owned by a native thread its isolate has since left. '
         'The Dart VM moves an isolate between native threads when it resumes '

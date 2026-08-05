@@ -112,10 +112,8 @@ private func drainCameraEvents(_ runtime: RuntimeHandle) throws
   #expect(size.scaleFactor == 2.0)
 }
 
-/// Terminal outcomes a headless map reaches without rendering frames: a
-/// zero-duration ease, a transition superseded by a later camera command, and a
-/// cancelled transition. Running a transition to completion needs a live render
-/// session, which this suite has no fixture for.
+/// Covers the terminal outcomes a headless map reaches without rendering
+/// frames. Running a transition to completion needs a live render session.
 @Test func cameraTransitionIdReportsTerminalOutcomesOnce() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
@@ -204,9 +202,6 @@ private func drainCameraEvents(_ runtime: RuntimeHandle) throws
   }
 }
 
-/// This verifies that the geographic constraint reports and applies the
-/// unbounded state distinctly from world bounds, which the southwest/northeast
-/// pair alone cannot express.
 @Test func cameraBoundsDistinguishUnboundedFromWorldBounds() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))

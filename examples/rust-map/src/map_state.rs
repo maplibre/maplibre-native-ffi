@@ -1,9 +1,6 @@
 //! The runtime loop: runtime and map, owned for their whole lifetime by one
-//! spawned thread.
-//!
-//! The render target is not here. It belongs to the render loop thread, which
-//! owns the window and the graphics context and attaches its own session
-//! against the map published from this thread.
+//! spawned thread. The render loop attaches its own session against the map
+//! reference published from here.
 
 use std::error::Error;
 use std::sync::Arc;
@@ -22,24 +19,20 @@ use crate::viewport::Viewport;
 const STYLE_URL: &str = "https://tiles.openfreemap.org/styles/bright";
 
 // TODO(map-example-spec): Replace fixed pacing with a host condition variable
-// woken by the render loop. See Cadence.
+// woken by the render loop.
 const LOOP_PERIOD: Duration = Duration::from_millis(4);
 
-/// Backstop for the runtime loop's park. The render loop's wake source is what
-/// normally releases it, so this only bounds a pump that nothing signals.
+/// Backstop for the park; the render loop's wake source normally releases it.
 const PARK_TIMEOUT: Duration = Duration::from_millis(100);
 
-/// What the runtime loop hands the render loop once the map exists: the map
-/// reference to attach against, and the wake source that releases its park.
+/// What the runtime loop hands the render loop once the map exists.
 pub struct RuntimeLoopHandles {
     pub attach_ref: MapAttachRef,
     pub wake: Arc<maplibre_native_ffi::WakeSource>,
 }
 
-/// Runs the runtime loop until the render loop asks for shutdown.
-///
-/// Failures land in [`Shared::fail`] rather than propagating, because this is a
-/// thread body; the render loop reports them.
+/// Runs the runtime loop until the render loop asks for shutdown. Failures land
+/// in [`Shared::fail`] for the render loop to report.
 pub fn run(
     viewport: Viewport,
     commands: Receiver<CameraCommand>,
@@ -54,14 +47,12 @@ pub fn run(
         }
     };
 
-    // `attach` is consumed here, so the render loop stops waiting for the map
-    // as soon as this loop stops publishing one.
     if let Err(error) = pump(&state, &commands, attach, &shared) {
         shared.fail(error.to_string());
     }
 
-    // The render loop closes its session before it requests shutdown, and a map
-    // with an attached session cannot be destroyed, so wait for that signal.
+    // A map with an attached session cannot be destroyed, so wait for the
+    // render loop to close its session and request shutdown.
     while !shared.shutdown_requested() {
         thread::sleep(LOOP_PERIOD);
     }
@@ -76,9 +67,8 @@ fn pump(
     attach: Sender<RuntimeLoopHandles>,
     shared: &Shared,
 ) -> Result<(), Box<dyn Error>> {
-    // Publishing the attach reference is what lets the render loop create and
-    // own its session, and the wake source is how it releases the park below.
-    // Every other map call stays on this thread.
+    // The attach reference and wake source are the only handles that leave this
+    // thread; every other map call stays here.
     let handles = RuntimeLoopHandles {
         attach_ref: state.map.attach_ref()?,
         wake: Arc::new(state.runtime.wake_source()?),
@@ -90,9 +80,8 @@ fn pump(
 
     while !shared.shutdown_requested() {
         state.apply_commands(commands)?;
-        // This thread has no display to pace it, so it takes its cadence from
-        // the runtime's own work and parks in between. The render loop signals
-        // the wake source, so the bound is a backstop rather than the cadence.
+        // No display paces this thread, so it parks in the pump until the
+        // runtime has work or the render loop signals the wake source.
         state.runtime.pump(Some(PARK_TIMEOUT))?;
         if state.drain_events()? {
             shared.request_render();
@@ -157,9 +146,8 @@ impl MapState {
         Ok(())
     }
 
-    /// Applies one decoded camera command. Runs on the map's owner thread,
-    /// which is why the read-modify-write commands read the current camera here
-    /// rather than on the render loop that produced them.
+    /// Applies one decoded camera command on the map's owner thread, where
+    /// read-modify-write commands also read the current camera.
     fn apply(&self, command: CameraCommand) -> maplibre_native_ffi::Result<()> {
         let map = &self.map;
         match command {

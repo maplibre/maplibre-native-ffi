@@ -23,18 +23,14 @@
 #include <emscripten.h>
 #include <emscripten/html5.h>
 
-// A fixture renders into its own texture and never presents, so it needs a GL
-// context but no on-page canvas. Each one gets a private OffscreenCanvas on
-// whichever thread asked for it, because an OffscreenCanvas belongs to a single
-// thread and the suite attaches sessions from more than one.
-//
-// The registry is GL.offscreenCanvases rather than specialHTMLTargets:
-// findCanvasEventTarget(), which is what resolves the selector under
-// -sOFFSCREENCANVAS_SUPPORT, searches the former and never consults the latter.
-//
-// An entry carries the OffscreenCanvas under both names its consumers unwrap:
-// emscripten's WebGL path and emdawnwebgpu's surface creation each look for
-// `offscreenCanvas`, while emscripten's own transfer path stores `canvas`.
+// A fixture needs a GL context but no on-page canvas, and an OffscreenCanvas
+// belongs to a single thread, so each fixture gets its own on the calling
+// thread. The registry must be GL.offscreenCanvases, where
+// findCanvasEventTarget() resolves the selector under
+// -sOFFSCREENCANVAS_SUPPORT.
+// The entry carries the canvas under both names its consumers unwrap:
+// `offscreenCanvas` for WebGL and emdawnwebgpu, `canvas` for the transfer
+// path.
 EM_JS(
   void, mln_test_register_offscreen_canvas,
   (const char* name, int width, int height), {
@@ -71,11 +67,9 @@ EM_JS(void, mln_test_unregister_offscreen_canvas, (const char* name), {
 #endif
 
 // Per-thread record of the handles these helpers created. A failing assertion
-// longjmps out of the test body, so the test's own teardown never runs and the
-// handles it holds would otherwise stay live: the next test on this thread
-// would then fail to create a runtime and the single real failure would look
-// like a suite-wide outage. Tracking is thread local so the owner thread's
-// teardown leaves a worker thread's runtime alone.
+// longjmps out of the test body, so suite teardown reclaims what the test still
+// holds. Tracking is thread local so one thread's teardown leaves another
+// thread's runtime alone.
 #if defined(_MSC_VER) && !defined(__clang__)
 #define MLN_FFI_TEST_THREAD_LOCAL __declspec(thread)
 #else
@@ -84,9 +78,8 @@ EM_JS(void, mln_test_unregister_offscreen_canvas, (const char* name), {
 
 #define MLN_FFI_TEST_TRACKED_CAPACITY 8
 
-// Sessions are tracked by value. The caller's fixture usually lives on the test
-// stack frame, which an aborting assertion unwinds before teardown runs, so a
-// pointer to it would dangle.
+// Tracked by value: the caller's fixture usually lives on a test stack frame an
+// aborting assertion unwinds before teardown runs.
 typedef struct tracked_session {
   mln_render_session session;
   void* backend_state;
@@ -100,9 +93,8 @@ static MLN_FFI_TEST_THREAD_LOCAL tracked_session
   tracked_sessions[MLN_FFI_TEST_TRACKED_CAPACITY];
 static MLN_FFI_TEST_THREAD_LOCAL size_t tracked_session_count;
 
-// Fails before the caller creates the handle. Dropping an overflow silently
-// would leave a live map outside teardown, and failing after creation would
-// strand the very handle that overflowed, so both cascade the same way.
+// Fails before the handle exists: failing after creation would strand the very
+// handle that overflowed.
 static void reserve_map_slot(void) {
   if (tracked_map_count >= MLN_FFI_TEST_TRACKED_CAPACITY) {
     TEST_FAIL_MESSAGE(
@@ -190,10 +182,8 @@ mln_map mln_test_create_map(mln_runtime runtime) {
   return mln_test_create_map_with_options(runtime, &options);
 }
 
-// Untracking happens only after the destroy succeeds. A destroy that is
-// temporarily invalid -- destroying a map that still has a render session
-// attached -- longjmps out of the assertion below, and the handle has to stay
-// tracked so teardown can still reclaim it.
+// Untracking happens only after the destroy succeeds, so a handle whose destroy
+// is rejected for now stays tracked for teardown to reclaim.
 void mln_test_destroy_runtime(mln_runtime runtime) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_destroy(runtime));
   if (tracked_runtime == runtime) {
@@ -212,8 +202,7 @@ uint8_t* mln_test_read_fixture(const char* relative_path, size_t* out_size) {
   }
 #if defined(__EMSCRIPTEN__)
   // The browser suite embeds its fixtures in the module at a fixed virtual
-  // path, so unlike a native run there is no checkout path to keep out of the
-  // objects. See mln_configure_browser_c_api_test().
+  // path.
   const char* fixture_dir = "/fixtures";
 #else
   const char* fixture_dir = getenv("MLN_FFI_TEST_FIXTURE_DIR");
@@ -295,9 +284,8 @@ struct mln_test_thread {
 #endif
 };
 
-// The release has to happen here rather than in each entry function: a thread
-// that returns still holding its graphics device is not reported as exited on
-// the browser WebGPU target, so every thread the suite starts owes it.
+// Every thread the suite starts releases its graphics device here: on browser
+// WebGPU a thread that returns still holding one is never reported as exited.
 #if defined(_WIN32)
 static DWORD WINAPI thread_trampoline(LPVOID argument) {
   mln_test_thread* thread = argument;
@@ -380,16 +368,10 @@ typedef struct egl_state {
 } egl_state;
 
 // These fixtures render into pbuffers and never present, so they name the
-// surfaceless platform rather than taking the default one.
-//
-// EGL_DEFAULT_DISPLAY resolves to whichever platform libEGL was built for,
-// which is commonly x11. A host without a display server then fails
-// eglInitialize() with EGL_NOT_INITIALIZED, and every fixture reports that it
-// could not create a context. The Rust fixtures already ask this way; see
-// EglTestContext in bindings/rust.
-//
-// Android and OpenHarmony keep the default display, whose EGL serves their own
-// window systems.
+// surfaceless platform: EGL_DEFAULT_DISPLAY resolves to whatever libEGL was
+// built for, commonly x11, which fails eglInitialize() without a display
+// server. Android and OpenHarmony keep the default display, whose EGL serves
+// their own window systems.
 static EGLDisplay get_egl_display(void) {
 #if defined(__APPLE__)
   const EGLAttrib attributes[] = {
@@ -523,27 +505,22 @@ typedef struct webgpu_state {
   WGPUDevice device;
 } webgpu_state;
 
-// A host owns the WebGPU device, so the suite stands in for one and requests
-// its own. Adapter and device requests are futures; the suite runs on a worker,
-// where waiting on them is legal, so this blocks rather than unwinding the test
-// into a callback.
+// The suite stands in for the host that owns the WebGPU device. Adapter and
+// device requests are futures, and the suite runs on a worker where blocking on
+// them is legal.
 static bool await_future(WGPUInstance instance, WGPUFuture future) {
-  // Bounded, so a browser without a WebGPU adapter fails the fixture rather
-  // than hanging the suite until the runner's timeout. Software adapter and
-  // device creation is well under a second even on a contended runner, so this
-  // is generous rather than a performance assertion -- and it is paid once per
-  // thread, not once per fixture.
-  //
-  // A non-zero timeout is only legal on an instance that asked for timed waits;
-  // see create_webgpu_device().
+  // Bounded so a browser without a WebGPU adapter fails the fixture rather
+  // than hanging until the runner's timeout; software device creation is well
+  // under a second. A non-zero timeout is legal only on an instance that asked
+  // for timed waits.
   const uint64_t timeout_ns = UINT64_C(5) * 1000U * 1000U * 1000U;
   WGPUFutureWaitInfo wait = {.future = future, .completed = false};
   const WGPUWaitStatus status =
     wgpuInstanceWaitAny(instance, 1, &wait, timeout_ns);
   if (status != WGPUWaitStatus_Success || !wait.completed) {
-    // Worth printing: emdawnwebgpu reports why it refused a wait through
-    // DEBUG_PRINTF, which an optimised build compiles out, so the status is the
-    // only thing that separates a timeout from a rejected wait.
+    // emdawnwebgpu reports a refused wait through DEBUG_PRINTF, which an
+    // optimised build compiles out, so the status is all that separates a
+    // timeout from a rejected wait.
     fprintf(
       stderr, "waiting on a WebGPU future failed (status %d, completed %d)\n",
       (int)status, (int)wait.completed
@@ -575,23 +552,16 @@ static void on_device(
   }
 }
 
-// A host owns one device and hands it to every session it attaches, so the
-// suite holds one per thread rather than building a fresh software device for
-// each fixture. Per thread rather than per process because emdawnwebgpu keeps
-// WebGPU objects in the JS realm of the worker that created them, and the suite
-// attaches sessions from more than one thread.
-//
-// The device outlives every fixture on its thread and goes away with the
-// process, which is why destroy_backend_state() releases nothing.
+// One device per thread, not per process: emdawnwebgpu keeps WebGPU objects in
+// the JS realm of the worker that created them. The device outlives every
+// fixture on its thread, so destroy_backend_state() releases nothing.
 static _Thread_local webgpu_state thread_webgpu_state;
 static _Thread_local bool thread_webgpu_attempted;
 
 static bool create_webgpu_device(webgpu_state* state) {
-  // Waiting on a future with a timeout has to be asked for up front: otherwise
-  // wgpuInstanceWaitAny rejects every non-zero timeout instead of waiting, and
-  // the bound in await_future() becomes an immediate failure. The capability
-  // needs Asyncify, which the emdawnwebgpu port enables, and wgpuCreateInstance
-  // returns NULL when it is asked for without it.
+  // Timed waits have to be asked for up front, or wgpuInstanceWaitAny rejects
+  // every non-zero timeout. The capability needs Asyncify, which the
+  // emdawnwebgpu port enables; without it wgpuCreateInstance returns NULL.
   WGPUInstanceDescriptor instance_descriptor = {
     .capabilities = {.timedWaitAnyEnable = true},
   };
@@ -678,9 +648,8 @@ typedef struct webgl_state {
 
 static atomic_uint webgl_canvas_counter;
 
-// The browser owns the context a session renders into, so the fixture creates a
-// real WebGL2 context on the page's canvas and hands it over, the way a browser
-// host would. The canvas comes from emcc's HTML shell.
+// The fixture creates a real WebGL2 context and hands it over, the way a
+// browser host would.
 static bool create_backend_state(void** out_state, void* out_context) {
   webgl_state* state = calloc(1, sizeof(*state));
   if (state == NULL) {
@@ -695,11 +664,10 @@ static bool create_backend_state(void** out_state, void* out_context) {
   attributes.depth = EM_TRUE;
   attributes.stencil = EM_TRUE;
   attributes.antialias = EM_FALSE;
-  // The suite renders into its own texture rather than presenting, so the
-  // context needs no drawing buffer preservation.
+  // The suite renders into its own texture rather than presenting.
   attributes.preserveDrawingBuffer = EM_FALSE;
-  // The context stays on the thread that created it; nothing renders to the
-  // page, so there is no swap to take over and nothing to proxy.
+  // The context stays on the thread that created it, and nothing renders to
+  // the page, so there is no swap to proxy.
   attributes.explicitSwapControl = EM_FALSE;
   attributes.proxyContextToMainThread = EMSCRIPTEN_WEBGL_CONTEXT_PROXY_DISALLOW;
 
@@ -1044,11 +1012,9 @@ static void destroy_backend_state(void* opaque_state) {
 
 void mln_test_release_thread_gpu_resources(void) {
   if (thread_webgpu_state.device != NULL) {
-    // Destroy rather than only release: emdawnwebgpu takes a runtime keepalive
-    // when the device is created and returns it when device.lost settles, which
-    // destroying is what resolves. Releasing alone drops the handle and leaves
-    // the keepalive standing, and on this target a thread holding one is never
-    // reported as exited.
+    // Destroy rather than only release: emdawnwebgpu returns the device's
+    // runtime keepalive when device.lost settles, which only destroying
+    // resolves.
     wgpuDeviceDestroy(thread_webgpu_state.device);
     wgpuDeviceRelease(thread_webgpu_state.device);
   }
@@ -1061,21 +1027,12 @@ void mln_test_release_thread_gpu_resources(void) {
   thread_webgpu_state = (webgpu_state){0};
   thread_webgpu_attempted = false;
 #if defined(__EMSCRIPTEN__)
-  // device.lost resolves through the JS job queue, and the keepalive comes back
-  // in its continuation, so the thread has to reach its event loop before the
-  // count settles. emscripten_sleep() suspends and resumes through a task,
-  // which is what lets those jobs run; the ordinary sleep helper blocks the
-  // thread with Atomics.wait instead and would never let them run at all.
-  //
-  // Waiting on the count rather than on a fixed number of yields, because what
-  // matters is that it reached zero: the thread is reported as exited only if
-  // it does, and a thread that is never reported leaves its joiner blocked for
-  // good. Bounded so a keepalive that never comes back fails the run here,
-  // where the cause is named, instead of at the runner's timeout.
-  //
-  // Aborting is what makes that bound mean anything: the joiner blocks whether
-  // or not the wait gave up, so returning would only add a line to the log the
-  // timeout eventually prints. The page shell reports an abort as a failure.
+  // device.lost resolves through the JS job queue, so the thread has to reach
+  // its event loop before the keepalive count settles. emscripten_sleep()
+  // suspends and resumes through a task, which lets those jobs run; the
+  // blocking sleep helper uses Atomics.wait and never would. The wait is on the
+  // count itself, bounded, and aborts on expiry, because a thread that keeps a
+  // keepalive is never reported as exited and blocks its joiner for good.
   for (unsigned int attempt = 0;
        attempt < 1000 && emscripten_runtime_keepalive_check(); attempt += 1) {
     emscripten_sleep(1);

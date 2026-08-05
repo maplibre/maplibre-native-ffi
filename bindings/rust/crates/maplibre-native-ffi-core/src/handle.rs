@@ -11,10 +11,6 @@ pub type StatusDestroyFn<T> = unsafe extern "C" fn(T) -> sys::mln_status;
 pub type InfallibleDestroyFn<T> = unsafe extern "C" fn(T);
 
 /// A C handle type: a transparent newtype over the 64-bit id the C API issues.
-///
-/// `bindgen` generates one newtype per handle so a map cannot be passed where a
-/// runtime is expected. This trait is what lets the shared handle state hold any
-/// of them without giving up that distinction.
 pub trait NativeHandle: Copy {
     fn to_raw(self) -> u64;
     fn from_raw(raw: u64) -> Self;
@@ -52,18 +48,13 @@ native_handle!(
     sys::mln_feature_extension_result,
 );
 
-/// A native handle a best-effort release could not destroy.
-///
-/// Rust releases handles deterministically, so this reports the one case a
-/// destructor cannot: the native destroy was attempted and refused. The handle
-/// stays live, and the address is reported here rather than dropped silently.
+/// A native handle a destructor attempted to destroy and could not. The handle
+/// stays live.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NativeHandleLeak {
     /// The native type name, such as `mln_map`.
     pub type_name: &'static str,
-    /// The handle id that was not destroyed. An id names one object for the
-    /// life of the process, so it is greppable against the log line that
-    /// created it.
+    /// The handle id that was not destroyed.
     pub id: u64,
 }
 
@@ -73,11 +64,7 @@ static LEAK_REPORTER: Mutex<Option<LeakReporter>> = Mutex::new(None);
 
 /// Installs the process-wide reporter for handles a destructor could not
 /// destroy, replacing any previous one, and returns whether one was installed.
-///
-/// The most common cause is dropping a parent handle before its child: the C
-/// API refuses to destroy a map that still has a render session attached, and
-/// an infallible `Drop` has nowhere to return that error. Explicit `close`
-/// still reports it through the normal error path.
+/// Explicit `close` reports the same failure through the normal error path.
 pub fn set_leak_reporter(reporter: Option<LeakReporter>) -> bool {
     let mut slot = LEAK_REPORTER
         .lock()
@@ -94,19 +81,15 @@ pub fn report_leak(leak: NativeHandleLeak) {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     if let Some(reporter) = slot.as_ref() {
-        // A caller-installed reporter is arbitrary code, and this runs from
-        // `Drop`. Letting it unwind through a destructor during another unwind
-        // aborts the process, so a panicking reporter loses its report instead.
+        // The reporter is arbitrary caller code running from `Drop`; unwinding
+        // through a destructor during another unwind aborts the process.
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| reporter(leak)));
     }
 }
 
-/// Bridge-neutral native pointer ownership state.
-///
-/// `NativeHandleState` tracks whether a native handle pointer is still live and
-/// centralizes close-once behavior. It intentionally does not encode public Rust
-/// handle policy such as `!Send`, parent retention, owner-thread checks, or
-/// finalizer dispatch.
+/// Tracks whether a native handle is still live and centralizes close-once
+/// behavior. Public handle policy such as `!Send`, parent retention, and
+/// owner-thread checks lives above this.
 #[derive(Debug)]
 pub struct NativeHandleState<T> {
     id: Cell<Option<NonZeroU64>>,
@@ -198,13 +181,10 @@ impl<T: NativeHandle> NativeHandleState<T> {
         unsafe { destroy(handle) };
     }
 
-    /// Marks the handle as intentionally leaked and returns its address for
-    /// diagnostics or host-runtime finalizer reporting.
-    ///
-    /// This does not call the destroy function. Use it only on paths where the
-    /// caller deliberately avoids destroying thread-affine native state, such as
-    /// a GC finalizer running on an arbitrary host thread. It consumes logical
-    /// ownership of the handle state: future close calls become no-ops.
+    /// Marks the handle as intentionally leaked and returns its id for
+    /// diagnostics. This does not call the destroy function, and later close
+    /// calls become no-ops. Use it only where the caller must avoid destroying
+    /// thread-affine native state, such as a finalizer on an arbitrary thread.
     pub fn leak_for_report(&self) -> Option<u64> {
         let id = self.id.get()?;
         self.id.set(None);
@@ -344,11 +324,8 @@ mod tests {
 
     use super::*;
 
-    /// A synthetic handle type for close-once tests.
-    ///
-    /// The safe public API cannot express a handle built from an integer, so
-    /// these tests reach past it deliberately. Nothing here crosses into the C
-    /// API: the destroy functions below only count calls.
+    /// A synthetic handle type for close-once tests. Nothing here crosses into
+    /// the C API: the destroy functions below only count calls.
     #[repr(transparent)]
     #[derive(Debug, Clone, Copy)]
     struct TestHandle(u64);
@@ -417,9 +394,7 @@ mod tests {
     }
 
     #[test]
-    // Spec coverage: BND-066. This injects a post-acquire copy failure at
-    // Rust's shared native result-handle guard, which every snapshot/list/result
-    // copier uses, instead of repeating the same guard behavior per domain.
+    // Spec coverage: BND-066.
     fn native_handle_drop_releases_owned_pointer_after_copy_error() {
         let _lock = DESTROY_COUNT_LOCK.lock().unwrap();
         DESTROY_COUNT.store(0, Ordering::SeqCst);
@@ -478,8 +453,8 @@ mod tests {
     fn native_handle_state_closes_infallible_once() {
         let _lock = DESTROY_COUNT_LOCK.lock().unwrap();
         DESTROY_COUNT.store(0, Ordering::SeqCst);
-        // SAFETY: ptr points to live test storage, and count_destroy only
-        // records calls.
+        // SAFETY: count_destroy only records calls and never dereferences the
+        // handle.
         let state = unsafe { NativeHandleState::from_handle(TEST_HANDLE, "test_handle") }.unwrap();
 
         // SAFETY: count_destroy is the matching fake destroy function for this

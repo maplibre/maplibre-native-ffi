@@ -152,9 +152,8 @@ const MetalTextureCompositor = struct {
 
     fn drawMetalTexture(self: *MetalTextureCompositor, metal_texture: *anyopaque) !bool {
         const drawable = self.view.layer.msgSend(objc.Object, "nextDrawable", .{});
-        // A minimized or occluded window has no drawable to hand out, so the
-        // frame is skipped rather than failed; the caller's render request
-        // stays pending and the draw retries once one is available.
+        // A minimized or occluded window has no drawable, so skip the frame
+        // rather than fail.
         if (drawable.value == null) return false;
 
         const drawable_texture = drawable.getProperty(objc.Object, "texture");
@@ -214,8 +213,8 @@ const MetalOwnedTextureBackend = struct {
         return self;
     }
 
-    /// Attaches the render session on this thread, which is the render loop
-    /// thread that owns the graphics resources above and will own the session.
+    /// Attaches the render session on this thread, which becomes its owner
+    /// thread for the session's whole life.
     fn attach(self: *MetalOwnedTextureBackend, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
         self.session = try self.attachRenderTarget(map, viewport);
     }
@@ -290,8 +289,8 @@ const MetalBorrowedTextureBackend = struct {
         return self;
     }
 
-    /// Attaches the render session on this thread, which is the render loop
-    /// thread that owns the graphics resources above and will own the session.
+    /// Attaches the render session on this thread, which becomes its owner
+    /// thread for the session's whole life.
     fn attach(self: *MetalBorrowedTextureBackend, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
         self.session = try self.attachRenderTarget(map, viewport);
     }
@@ -302,12 +301,8 @@ const MetalBorrowedTextureBackend = struct {
         self.compositor.deinit();
     }
 
-    /// Follows a resized window.
-    ///
-    /// This example sizes the borrowed texture, not the session, so following a
-    /// resize means allocating one at the new size and handing it to the live
-    /// session. The session stays live, which is what keeps the map from going
-    /// cold on every resize.
+    /// Follows a resized window: allocates a texture at the new size and hands
+    /// it to the live session, which stays attached.
     fn resize(self: *MetalBorrowedTextureBackend, viewport: types.Viewport) !void {
         const session = try self.session.textureHandle();
         self.compositor.resize(viewport);
@@ -320,16 +315,13 @@ const MetalBorrowedTextureBackend = struct {
             .physical_height = viewport.physical_height,
             .texture = maplibre.NativePointer.fromPtr(replacement.value.?),
         }) catch |err| {
-            // A native error may mean the session took the replacement
-            // before failing, and nothing here can tell that apart from a
-            // rejection that came first, so detach before either target is
-            // released; errdefer releases the replacement next.
+            // The session may have taken the replacement before failing, so
+            // detach before either texture is released.
             session.detach() catch {};
             diagnostics.logError("Metal borrowed texture set target failed", err, null);
             return types.AppError.TextureResizeFailed;
         };
-        // Only once the session has taken the replacement, so a rejected one
-        // leaves this target on the texture it already had.
+        // Released only once the session has taken the replacement.
         self.borrowed_texture.release();
         self.borrowed_texture = replacement;
     }
@@ -378,8 +370,8 @@ const MetalSurfaceBackend = struct {
         return self;
     }
 
-    /// Attaches the render session on this thread, which is the render loop
-    /// thread that owns the graphics resources above and will own the session.
+    /// Attaches the render session on this thread, which becomes its owner
+    /// thread for the session's whole life.
     fn attach(self: *MetalSurfaceBackend, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
         self.session = try self.attachRenderTarget(map, viewport);
     }

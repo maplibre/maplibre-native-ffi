@@ -22,21 +22,14 @@ public struct MapOptions: Equatable, Sendable {
   /// Initial logical height in UI pixels, replaced by the extent of the first
   /// attached render session.
   public var height: UInt32
-  /// UI-to-device pixel scale, fixed for the lifetime of the map.
-  ///
-  /// This selects sprites, glyphs, and raster tiles for every frame. Render
-  /// targets carry their own scale factor for geometry, so attaching or
-  /// resizing a session with a different one logs a warning and renders styled
-  /// imagery chosen for this density.
+  /// UI-to-device pixel scale, fixed for the lifetime of the map. It selects
+  /// sprites, glyphs, and raster tiles; a render session attached or resized
+  /// with a different scale factor logs a warning.
   public var scaleFactor: Double
   public var mode: MapMode
   /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
-  /// encodings, fixed for the lifetime of the map.
-  ///
-  /// Enable this on maps that read vector sources created with
-  /// ``StyleVectorTileEncoding/mlt`` from a tile set that uses FastPFOR. A map
-  /// created with this `false` decodes every other MLT encoding and logs a tile
-  /// parse warning for the FastPFOR ones.
+  /// encodings, fixed for the lifetime of the map. A map created with this
+  /// `false` logs a tile parse warning for such tiles.
   public var fastPFOREnabled: Bool
 
   public init(
@@ -115,14 +108,7 @@ public final class MapHandle {
   }
 
   /// Produces a `Sendable` reference to this map for attaching a render
-  /// session.
-  ///
-  /// A render session is owned by the thread that attaches it, which need not
-  /// be
-  /// the map's owner thread. ``MapHandle`` is not `Sendable`, so this is how
-  /// the
-  /// thread driving a render loop names the map it renders while the map itself
-  /// stays on the runtime owner thread.
+  /// session from a thread other than the map's owner thread.
   public func attachRef() throws -> MapAttachRef {
     // Resolve once so a closed map fails here rather than at the first attach.
     _ = try requireLiveHandle()
@@ -202,16 +188,12 @@ public final class MapHandle {
     resetCallbackRetentionState()
   }
 
-  /// Loads a style URL through MapLibre Native style APIs.
+  /// Loads a style URL.
   ///
-  /// Loading is asynchronous, so a style that is missing, unreachable, or
-  /// malformed still returns normally here and reports through a
-  /// map-loading-failed runtime event. Watch the runtime event queue to observe
-  /// style load failures.
-  ///
-  /// A well-formed style that MapLibre rejects semantically, such as an
-  /// unknown `version` or a layer naming a missing source, produces neither
-  /// an error nor an event: MapLibre logs it and renders what it can.
+  /// Loading is asynchronous: a missing, unreachable, or malformed style still
+  /// returns normally here and reports through a map-loading-failed runtime
+  /// event. A style MapLibre rejects semantically, such as one with an unknown
+  /// `version`, produces neither an error nor an event.
   public func setStyleURL(_ url: String) throws {
     try mapNativeFailure {
       try NativeString.withCString(url) { url in
@@ -221,15 +203,12 @@ public final class MapHandle {
     }
   }
 
-  /// Loads inline style JSON through MapLibre Native style APIs.
+  /// Loads inline style JSON.
   ///
-  /// Malformed JSON is reported twice: this call throws the parse error
-  /// synchronously, and the same message also arrives as a map-loading-failed
-  /// runtime event. Handle both so a queued failure event is not a surprise.
-  ///
-  /// A well-formed style that MapLibre rejects semantically, such as an
-  /// unknown `version` or a layer naming a missing source, produces neither
-  /// an error nor an event: MapLibre logs it and renders what it can.
+  /// Malformed JSON is reported twice: this call throws the parse error, and
+  /// the same message arrives as a map-loading-failed runtime event. A style
+  /// MapLibre rejects semantically, such as one with an unknown `version`,
+  /// produces neither an error nor an event.
   public func setStyleJSON(_ json: String) throws {
     try mapNativeFailure {
       try NativeString.withCString(json) { json in
@@ -239,19 +218,10 @@ public final class MapHandle {
     }
   }
 
-  /// Copies the style document this map's style was last parsed from.
-  ///
-  /// This is the loaded document, not a serialization of the live style: the
-  /// string passed to ``setStyleJSON(_:)``, or the response body fetched for
-  /// ``setStyleURL(_:)``. Runtime mutations such as adding a layer do not
-  /// change
-  /// it, and a failed parse leaves the previously parsed document in place. The
-  /// result is byte-for-byte the string given to ``setStyleJSON(_:)``, so it
-  /// can
-  /// be handed back unchanged.
-  ///
-  /// The result is empty when no document has been parsed. A parsed document is
-  /// never empty.
+  /// Copies the style document this map's style was last parsed from, byte for
+  /// byte, rather than a serialization of the live style. Runtime mutations do
+  /// not change it, and a failed parse leaves the previous document in place.
+  /// The result is empty when no document has been parsed.
   public func loadedStyleJSON() throws -> String {
     try mapNativeFailure {
       try NativeStyle
@@ -263,14 +233,10 @@ public final class MapHandle {
 
   /// Copies the URL this map's style was last requested from.
   ///
-  /// Unlike ``loadedStyleJSON()``, this is live rather than load-time state:
   /// ``setStyleURL(_:)`` records the URL when the request is made, before the
-  /// response arrives or the document parses, and ``setStyleJSON(_:)`` clears
-  /// it. The two can disagree while a load is in flight or after one fails.
-  ///
-  /// The result is empty when no URL bytes are available, which covers a style
-  /// loaded from inline JSON, a map that has loaded no style, and a URL load
-  /// requested with an empty string. These cases are not distinguishable here.
+  /// document parses, so this can disagree with ``loadedStyleJSON()`` while a
+  /// load is in flight or after one fails. The result is empty for inline JSON,
+  /// for a map that has loaded no style, and for an empty URL alike.
   public func styleURL() throws -> String {
     try mapNativeFailure {
       try NativeStyle
@@ -398,12 +364,8 @@ public final class MapHandle {
     }
   }
 
-  /// Marks whether a host-driven gesture is in progress.
-  ///
-  /// A host that decodes its own pointer gestures sets this to `true` when a
-  /// gesture starts and back to `false` when it ends, so the camera commands
-  /// issued in between belong to one live gesture. The flag stays set until the
-  /// host clears it, so pair every `true` with a `false`.
+  /// Marks whether a host-driven gesture is in progress. The flag stays set
+  /// until the host clears it, so pair every `true` with a `false`.
   public func setGestureInProgress(_ inProgress: Bool) throws {
     try mapNativeFailure {
       try checkStatus(mln_map_set_gesture_in_progress(

@@ -324,8 +324,8 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       )
     )
     val info = textureImageInfo(outInfo)
-    // An empty destination reaches native code as the null pointer and zero capacity that mean a
-    // size probe, which succeeds without copying, so recheck the capacity here.
+    // Native reads an empty destination as a size probe rather than a copy, so the
+    // capacity is rechecked here.
     buffer.ensureCapacity(info.byteLength)
     return info
   }

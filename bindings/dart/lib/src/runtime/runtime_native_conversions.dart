@@ -271,8 +271,7 @@ void _invokeTileCallback(
   try {
     callback(CanonicalTileId(z: tileId.z, x: tileId.x, y: tileId.y));
   } catch (_) {
-    // Listener callbacks are asynchronous notifications; exceptions are
-    // contained so they never escape through native callback machinery.
+    // An exception must not escape into native callback machinery.
   }
 }
 

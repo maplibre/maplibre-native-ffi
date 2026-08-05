@@ -50,7 +50,7 @@ import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 
 @OptIn(ExperimentalForeignApi::class)
 class QueryStructsTest : org.maplibre.nativeffi.NativeTestBase() {
-  // BND-060, BND-061, BND-066, BND-106: query options and copied query results.
+  // BND-060, BND-061, BND-066, BND-106.
 
   @Test
   fun featureQueryResultCopiesFeaturePropertiesSourceLayerStateAndUnknownIds() {

@@ -37,9 +37,8 @@ type JSONValue struct {
 	Object JSONMembers
 }
 
-// Equal reports whether two JSON values are structurally equal, comparing only the field the type
-// selects and preserving array element order, object member order, and repeated member names. Use
-// this instead of ==, which does not compile for structs holding slices.
+// Equal reports whether two JSON values are structurally equal. Array element
+// order, object member order, and repeated member names are significant.
 func (v JSONValue) Equal(other JSONValue) bool {
 	if v.Type != other.Type {
 		return false

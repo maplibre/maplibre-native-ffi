@@ -6,10 +6,9 @@ marks a path as not an input, and the last matching rule wins, so a component
 narrows or widens what it inherits from `shared` and from the components it
 depends on.
 
-No rule is a catch-all: every tracked path must match some rule of every
-component, which is what `ci:check-snapshot-scopes` enforces. A new top-level
-entry therefore fails that check until someone classifies it, rather than
-having its publishing impact decided by default.
+No rule is a catch-all. Every tracked path must match some rule of every
+component, which `ci:check-snapshot-scopes` enforces, so a new top-level entry
+fails that check until someone classifies it.
 """
 
 from __future__ import annotations
@@ -25,14 +24,11 @@ from typing import NamedTuple
 
 CONFIG = pathlib.Path("ci/snapshots.toml")
 
-# Each component's last publish is recorded as a floating tag pointing at the
-# commit it published from. Their own namespace keeps them clear of the
-# `unstable-native-snapshot` release tag, which has to move before its assets
-# upload and so cannot mark a publish that succeeded.
+# Each component's last publish is a floating tag on the commit it published
+# from. The `unstable-native-snapshot` release tag moves before its assets
+# upload, so it cannot mark a publish that succeeded.
 STATE_TAGS = "snapshot-state"
 
-# Uncovered paths are listed rather than counted, up to a length that still
-# reads as an error message.
 SAMPLE = 20
 
 

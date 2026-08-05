@@ -10,10 +10,6 @@ const int expectedCAbiVersion = 0;
 
 /// Callback adapter entry points this binding registers with native code, plus
 /// the ABI check that gates every use of them.
-///
-/// The generated declarations are `@Native` externals bound to the code asset
-/// `hook/build.dart` supplies, so they need no library handle and callers reach
-/// them directly. What remains here is what a raw declaration cannot express.
 final class MaplibreNativeCApi {
   MaplibreNativeCApi._() {
     ensureAbiVersion();
@@ -69,16 +65,10 @@ bool _abiVersionChecked = false;
 
 /// Validates the native C ABI once, before the binding relies on it.
 ///
-/// The generated declarations are `@Native` externals, so calling one no longer
-/// forces a lazily created API object into existence the way reading a field on
-/// it did. Call this as the first statement of any public entry point that can
-/// reach C without a handle this isolate already created: the statics on
-/// [Maplibre], and the types built to cross isolates. Everything else is
-/// reachable only through such an entry point.
-///
-/// The status checkers call it too, which costs one bool read and keeps a
-/// missed entry point from going unreported. That is a backstop rather than a
-/// gate, because the call it checks has already run by then.
+/// Call this as the first statement of any public entry point that can reach C
+/// without a handle this isolate already created: the statics on [Maplibre],
+/// and the types built to cross isolates. Everything else is reachable only
+/// through such an entry point. The status checkers call it as a backstop.
 void ensureAbiVersion() {
   if (_abiVersionChecked) {
     return;

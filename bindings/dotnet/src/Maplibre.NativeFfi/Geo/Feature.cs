@@ -26,8 +26,8 @@ public abstract record FeatureIdentifier
 
 /// <summary>GeoJSON feature value.</summary>
 /// <remarks>
-/// <see cref="Properties"/> compares member by member, preserving order and repeated member names.
-/// Construction and <c>with</c> snapshot the caller's list.
+/// <see cref="Properties"/> compares member by member, preserving order and repeated member
+/// names, and is snapshotted on construction and <c>with</c>.
 /// </remarks>
 public sealed record Feature(
     Geometry Geometry,

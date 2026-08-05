@@ -317,10 +317,9 @@ impl BorrowedImage {
 
 impl Drop for BorrowedImage {
     fn drop(&mut self) {
-        // SAFETY: The image view, image, and memory were created from this live
-        // device and are destroyed in reverse dependency order. BorrowedImage
-        // is only constructable after all three handles are non-null, so Drop
-        // runs unconditionally.
+        // SAFETY: All three handles were created from this live device, are
+        // non-null once BorrowedImage exists, and are destroyed in reverse
+        // dependency order.
         unsafe {
             self.device.destroy_image_view(self.view, None);
             self.device.destroy_image(self.image, None);

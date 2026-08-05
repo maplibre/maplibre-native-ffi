@@ -27,9 +27,8 @@ kotlin {
     compileSdk = libs.versions.android.compileSdk.get().toInt()
     minSdk = libs.versions.android.minSdk.get().toInt()
 
-    // The AAR carries the Rustls platform verifier that the native TLS stack
-    // calls over JNI. Nothing on a JVM classpath references it, so an app that
-    // minifies keeps it only through this rule.
+    // The native TLS stack calls the Rustls platform verifier over JNI, and nothing
+    // on the classpath references it, so only this rule survives minification.
     optimization {
       consumerKeepRules.file(
         rootProject.file("bindings/rustls-platform-verifier-android/consumer-rules.pro")

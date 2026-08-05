@@ -81,7 +81,7 @@ class MapHandleTest {
           assertEquals("roads", map.layerSourceLayer("fill"))
           assertEquals("geo", map.layerSourceId("fill"))
 
-          // A layer type that takes no source is rejected, not silently ignored.
+          // A background layer takes no source.
           assertFailsWith<InvalidArgumentException> { map.setLayerSourceLayer("bg", "roads") }
 
           // An unset zoom range crosses the boundary as infinities.
@@ -117,15 +117,14 @@ class MapHandleTest {
           },
         )
         .use { map ->
-          // A map with no style yet reports no duration or delay. The placement flag always
-          // reports, because MapLibre Native always holds a value for it.
+          // Duration and delay are absent until a style loads; the placement flag always
+          // holds a value.
           val empty = map.styleTransitionOptions()
           assertNull(empty.durationMs)
           assertNull(empty.delayMs)
           assertEquals(true, empty.enablePlacementTransitions)
 
-          // The style parser fills in its own 300ms duration for a style that declares no
-          // transition.
+          // The style parser supplies a 300ms default duration.
           map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
           val parsed = map.styleTransitionOptions()
           assertEquals(300.0, parsed.durationMs)
@@ -138,7 +137,7 @@ class MapHandleTest {
           assertEquals(true, declared.enablePlacementTransitions)
 
           // A present zero stays distinguishable from an absent field, and an absent field
-          // clears what the style declared rather than merging into it.
+          // clears what the style declared.
           val options =
             StyleTransitionOptions().apply {
               durationMs = 0.0
@@ -147,7 +146,7 @@ class MapHandleTest {
           map.setStyleTransitionOptions(options)
           assertEquals(options, map.styleTransitionOptions())
 
-          // Omitting the flag leaves the cross-fade on rather than clearing it.
+          // Omitting the flag leaves the cross-fade on.
           map.setStyleTransitionOptions(StyleTransitionOptions().apply { durationMs = 250.0 })
           assertEquals(true, map.styleTransitionOptions().enablePlacementTransitions)
 
@@ -252,7 +251,7 @@ class MapHandleTest {
     }
   }
 
-  // BND-109: source inspection copies reconstructible URL and inline TileJSON state.
+  // BND-109.
 
   @Test
   fun styleSourceInfoCopiesUrlAndInlineTileMetadataPastNativeLifetime() {
@@ -851,8 +850,7 @@ class MapHandleTest {
     }
   }
 
-  // BND-087, BND-102: camera transitions report their identity through runtime events, and
-  // camera change events type their code.
+  // BND-087, BND-102.
 
   @Test
   fun cameraTransitionIdsReportEveryTerminalOutcomeOnce() {
@@ -867,25 +865,23 @@ class MapHandleTest {
       )
 
     try {
-      // A zero-duration ease resolves inside the call and reports its end right away. An id above
-      // Long.MAX_VALUE round-trips as the unsigned bit pattern the caller passed in.
+      // A zero-duration ease resolves inside the call. An id above Long.MAX_VALUE
+      // round-trips as the unsigned bit pattern the caller passed in.
       val instantId = (Long.MAX_VALUE.toULong() + 1UL).toLong()
       map.easeTo(CameraOptions().apply { zoom = 2.0 }, transitionAnimation(instantId, 0.0))
       val instant = drainCameraEvents(runtime)
       assertEquals(listOf(instantId), instant.finishedTransitionIds)
       assertEquals(CameraChangeMode.IMMEDIATE, instant.lastChangeMode)
 
-      // A running transition stays silent until it releases the camera.
       map.easeTo(CameraOptions().apply { zoom = 12.0 }, transitionAnimation(11L, 5_000.0))
       assertEquals(emptyList(), drainCameraEvents(runtime).finishedTransitionIds)
 
-      // A later camera command supersedes it, ending the transition it replaced.
+      // A later camera command supersedes the running transition, ending it.
       map.easeTo(CameraOptions().apply { zoom = 13.0 }, transitionAnimation(12L, 5_000.0))
       val superseded = drainCameraEvents(runtime)
       assertEquals(listOf(11L), superseded.finishedTransitionIds)
       assertEquals(CameraChangeMode.ANIMATED, superseded.lastChangeMode)
 
-      // Cancellation ends the superseding transition.
       map.cancelTransitions()
       assertEquals(listOf(12L), drainCameraEvents(runtime).finishedTransitionIds)
 
@@ -930,7 +926,7 @@ class MapHandleTest {
       assertEquals(listOf(21L), finished)
       assertEquals(5.0, map.camera.zoom ?: 0.0, 1e-6)
 
-      // The completed transition reports its end once; later pumping adds nothing.
+      // The transition reports its end once; later pumping adds nothing.
       repeat(100) {
         runtime.pump(0)
         finished += drainCameraEvents(runtime).finishedTransitionIds
@@ -1192,18 +1188,17 @@ class MapHandleTest {
           },
         )
         .use { map ->
-          // Nothing parsed and nothing requested yet.
           assertEquals("", map.loadedStyleJson())
           assertEquals("", map.styleUrl())
 
-          // The document reads back byte-for-byte, so it can be reloaded unchanged.
+          // The document reads back byte-for-byte.
           map.setStyleJson(styleJson)
           assertEquals(styleJson, map.loadedStyleJson())
           // Inline JSON clears the URL.
           assertEquals("", map.styleUrl())
 
-          // The URL is request state, recorded before the load can succeed, while
-          // the document still reports the style that last parsed.
+          // setStyleUrl records request state before the load can succeed; the document
+          // still reports the style that last parsed.
           map.setStyleUrl("https://example.com/style.json")
           assertEquals("https://example.com/style.json", map.styleUrl())
           assertEquals(styleJson, map.loadedStyleJson())

@@ -17,7 +17,6 @@ static void read_features(mln_feature_query_result result) {
     const mln_status got =
       mln_feature_query_result_get(result, index, &feature);
     if (got != MLN_STATUS_OK) continue;
-    // feature.feature holds this feature's geometry and properties.
   }
   // #endregion read
 }
@@ -40,8 +39,7 @@ void list_source_features(mln_render_session session) {
   if (queried != MLN_STATUS_OK) return;
 
   read_features(result);
-  // Copy retained values before this line; every feature view belongs to the
-  // result.
+  // Every feature view belongs to the result; copy retained values first.
   mln_feature_query_result_destroy(result);
   // #endregion query
 }

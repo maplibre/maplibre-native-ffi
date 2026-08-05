@@ -127,12 +127,8 @@ impl RenderTarget {
         })
     }
 
-    /// Follows a resized host.
-    ///
-    /// A caller-owned texture is sized by this example, not by the session, so
-    /// following a resize means allocating one at the new size and handing it
-    /// over. The session stays live either way, which is what keeps the map
-    /// from going cold every time the window changes size.
+    /// Resizes without closing the session; a caller-owned texture is replaced
+    /// with one at the new size and handed over.
     pub fn resize(
         &mut self,
         graphics: &GraphicsContext,
@@ -173,15 +169,10 @@ impl RenderTarget {
                     replacement.texture(),
                     replacement.target(),
                 );
-                // A native error may mean the session took the replacement before
-                // failing, and nothing here can tell that apart from a rejection
-                // that came first. Rust's detach consumes the handle, which this
-                // borrow cannot do, so leave the replacement alone: deleting it is
-                // the only way to hand the session a dangling texture.
+                // On failure the session may already hold the replacement, so
+                // leak it rather than hand the session a dangling texture.
                 session.set_opengl_borrowed_texture_target(&descriptor)?;
                 compositor.resize(viewport);
-                // Only once the session has taken the replacement, so a rejected
-                // one leaves this target on the texture it already had.
                 let outgoing = std::mem::replace(&mut **texture, replacement);
                 outgoing.close(Some(opengl));
                 Ok(())

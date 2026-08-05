@@ -27,7 +27,7 @@ import platform.posix.usleep
 
 @OptIn(ExperimentalForeignApi::class)
 class MapCameraControlsTest : org.maplibre.nativeffi.NativeTestBase() {
-  // BND-102, BND-103: camera commands, transitions, viewport state, and projection helpers.
+  // BND-102, BND-103.
 
   @Test
   fun mapCameraAndViewportControlsRoundTripThroughNativeCalls() {
@@ -174,8 +174,7 @@ class MapCameraControlsTest : org.maplibre.nativeffi.NativeTestBase() {
     }
   }
 
-  // BND-087, BND-102: camera transitions report their identity through runtime events, and
-  // camera change events type their code.
+  // BND-087, BND-102.
 
   @Test
   fun cameraTransitionIdsReportEveryTerminalOutcomeOnce() {
@@ -190,25 +189,23 @@ class MapCameraControlsTest : org.maplibre.nativeffi.NativeTestBase() {
           },
         )
       try {
-        // A zero-duration ease resolves inside the call and reports its end right away. An id above
-        // Long.MAX_VALUE round-trips as the unsigned bit pattern the caller passed in.
+        // A zero-duration ease resolves inside the call. An id above Long.MAX_VALUE
+        // round-trips as the unsigned bit pattern the caller passed in.
         val instantId = (Long.MAX_VALUE.toULong() + 1UL).toLong()
         map.easeTo(CameraOptions().apply { zoom = 2.0 }, transitionAnimation(instantId, 0.0))
         val instant = drainCameraEvents(runtime)
         assertEquals(listOf(instantId), instant.finishedTransitionIds)
         assertEquals(CameraChangeMode.IMMEDIATE, instant.lastChangeMode)
 
-        // A running transition stays silent until it releases the camera.
         map.easeTo(CameraOptions().apply { zoom = 12.0 }, transitionAnimation(11L, 5_000.0))
         assertEquals(emptyList(), drainCameraEvents(runtime).finishedTransitionIds)
 
-        // A later camera command supersedes it, ending the transition it replaced.
+        // A later camera command supersedes the running transition, ending it.
         map.easeTo(CameraOptions().apply { zoom = 13.0 }, transitionAnimation(12L, 5_000.0))
         val superseded = drainCameraEvents(runtime)
         assertEquals(listOf(11L), superseded.finishedTransitionIds)
         assertEquals(CameraChangeMode.ANIMATED, superseded.lastChangeMode)
 
-        // Cancellation ends the superseding transition.
         map.cancelTransitions()
         assertEquals(listOf(12L), drainCameraEvents(runtime).finishedTransitionIds)
 
@@ -255,7 +252,7 @@ class MapCameraControlsTest : org.maplibre.nativeffi.NativeTestBase() {
         assertEquals(listOf(21L), finished)
         assertEquals(5.0, assertNotNull(map.camera.zoom), 0.000001)
 
-        // The completed transition reports its end once; later pumping adds nothing.
+        // The transition reports its end once; later pumping adds nothing.
         repeat(100) {
           runtime.pump(0)
           finished += drainCameraEvents(runtime).finishedTransitionIds

@@ -31,8 +31,7 @@ import platform.posix.usleep
 
 @OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class)
 class LogCallbackStateTest : org.maplibre.nativeffi.NativeTestBase() {
-  // BND-120, BND-121, BND-122, BND-123: log callback install, replacement,
-  // host-language failure containment, and races.
+  // BND-120, BND-121, BND-122, BND-123.
 
   @Test
   fun processGlobalLogCallbackCopiesRecordsContainsHostFailuresAndClearsState() {

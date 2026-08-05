@@ -6,10 +6,9 @@ import org.maplibre.nativeffi.geo.ScreenPoint
 /**
  * A camera change decoded on the render loop and applied on the map's owner thread.
  *
- * Commands carry deltas rather than absolute targets wherever the map's current camera is an input,
- * because reading the camera and writing the new one has to happen together on the thread that owns
- * the map. Coordinates are already logical map units: the render loop owns the viewport, so it
- * converts them.
+ * Commands carry deltas rather than absolute targets, because reading the camera and writing the
+ * new one has to happen together on the thread that owns the map. Coordinates are logical map
+ * units, converted by the render loop that owns the viewport.
  */
 internal sealed interface CameraCommand {
   data object CancelTransitions : CameraCommand
@@ -29,10 +28,8 @@ internal sealed interface CameraCommand {
 }
 
 /**
- * One-bit signal that a frame is worth drawing.
- *
- * The render loop consumes before it renders and sets again when nothing was rendered, so a request
- * the runtime loop publishes during a render is not lost.
+ * One-bit signal that a frame is worth drawing. The render loop consumes before it renders and sets
+ * again when nothing was rendered, so a request published during a render is not lost.
  */
 internal class RenderRequest {
   private val value = AtomicBoolean(true)

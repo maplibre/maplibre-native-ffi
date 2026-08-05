@@ -9,11 +9,8 @@ import kotlin.math.hypot
 import org.maplibre.nativeffi.geo.ScreenPoint
 
 /**
- * Decodes touch input into camera commands.
- *
- * This runs on the render loop (the UI thread), which does not own the map, so it only produces
- * commands; the runtime loop applies them on the map's owner thread. Anything needing the current
- * viewport is converted to logical map coordinates here, where the viewport lives.
+ * Decodes touch input into camera commands. This runs on the UI thread, which does not own the map,
+ * so it only produces commands; the runtime loop applies them on the map's owner thread.
  */
 internal class InputController(context: Context, private val enqueue: (CameraCommand) -> Unit) {
   private val density = context.resources.displayMetrics.density.takeIf { it > 0f } ?: 1f
@@ -61,8 +58,6 @@ internal class InputController(context: Context, private val enqueue: (CameraCom
       when (event.actionMasked) {
         MotionEvent.ACTION_DOWN -> {
           enqueue(CameraCommand.CancelTransitions)
-          // The deltas that follow belong to one live gesture, so the map hears about the gesture
-          // rather than a stream of unrelated camera commands.
           enqueue(CameraCommand.SetGestureInProgress(true))
           beginPan(event)
         }
@@ -177,10 +172,7 @@ internal class InputController(context: Context, private val enqueue: (CameraCom
       }
     }
 
-    /**
-     * Every path that ends a gesture, including `ACTION_CANCEL`, runs through here, so the mark the
-     * gesture set is always paired with a clear.
-     */
+    /** Every path that ends a gesture, including `ACTION_CANCEL`, runs through here. */
     private fun reset() {
       if (mode != Mode.NONE) {
         enqueue(CameraCommand.SetGestureInProgress(false))

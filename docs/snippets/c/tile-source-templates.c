@@ -16,8 +16,7 @@ static mln_json_value json_string(const char* text) {
   };
 }
 
-// Builds {"id": ..., "type": ..., "source": ...} and appends it. An empty
-// before-layer ID puts the layer on top of the style.
+// An empty before-layer ID puts the layer on top of the style.
 static mln_status add_layer(
   mln_map map, const char* layer_id, const char* layer_type,
   const char* source_id

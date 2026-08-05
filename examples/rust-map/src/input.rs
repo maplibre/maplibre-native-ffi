@@ -16,12 +16,8 @@ const KEYBOARD_PITCH: f64 = 5.0;
 const KEYBOARD_ANIMATION_MS: f64 = 160.0;
 const RESET_ANIMATION_MS: f64 = 220.0;
 
-/// Decodes host input into camera commands.
-///
-/// This runs on the render loop, which does not own the map, so it only
-/// produces commands; the runtime loop applies them on the map's owner thread.
-/// Anything needing the current viewport is converted to logical map
-/// coordinates here, where the viewport lives.
+/// Decodes host input into camera commands on the render loop, converting to
+/// logical map coordinates. The runtime loop applies the commands.
 #[derive(Default)]
 pub struct Controller {
     left_down: bool,
@@ -46,8 +42,7 @@ impl Controller {
         println!("  0: reset pitch and bearing");
     }
 
-    /// Reports whether the camera changed, so the render loop can set the
-    /// render request.
+    /// Reports whether the camera changed.
     pub fn handle(
         &mut self,
         event: &WindowEvent,
@@ -120,12 +115,10 @@ impl Controller {
             _ => return false,
         }
         if state == ElementState::Pressed {
-            // Queued ahead of the drag's own commands, so the transition stops
-            // before the first delta lands.
+            // Cancel first, so the running transition stops before the first
+            // delta.
             push(commands, CameraCommand::CancelTransitions);
         }
-        // The deltas in between belong to one live gesture, so the map hears
-        // about the gesture rather than a stream of unrelated camera commands.
         if self.dragging() != was_dragging {
             push(
                 commands,
@@ -229,9 +222,8 @@ fn zoom(scale: f64, anchor: ScreenPoint) -> CameraCommand {
     }
 }
 
-/// A closed queue means the runtime loop already stopped, which the render loop
-/// reports through the shared failure. Dropping the command keeps input
-/// decoding free of error handling.
+/// Drops the command if the queue is closed; the runtime loop has stopped and
+/// the render loop reports that through the shared failure.
 fn push(commands: &Sender<CameraCommand>, command: CameraCommand) {
     let _ = commands.send(command);
 }

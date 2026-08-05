@@ -9,8 +9,7 @@ import "C"
 import "unsafe"
 
 // Descriptor inspection helpers live outside _test.go because Go test files
-// cannot import C directly. They stay unexported and support ABI materialization
-// tests for cgo-only struct and union fields.
+// cannot import C directly.
 type vulkanContextDescriptorFields struct {
 	Size                     uint32
 	Instance                 uintptr

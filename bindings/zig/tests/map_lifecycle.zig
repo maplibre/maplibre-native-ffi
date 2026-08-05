@@ -61,7 +61,6 @@ test "loaded style document and URL read back what was loaded" {
     defer handles.runtime.close() catch @panic("runtime close failed");
     defer handles.map.close() catch @panic("map close failed");
 
-    // Nothing parsed and nothing requested yet.
     var empty_json = try handles.map.copyLoadedStyleJson(testing.allocator);
     defer empty_json.deinit();
     try testing.expectEqualStrings("", empty_json.value);
@@ -75,7 +74,6 @@ test "loaded style document and URL read back what was loaded" {
     defer loaded.deinit();
     try testing.expectEqualStrings(support.style_json, loaded.value);
 
-    // Inline JSON clears the URL.
     var cleared_url = try handles.map.copyStyleUrl(testing.allocator);
     defer cleared_url.deinit();
     try testing.expectEqualStrings("", cleared_url.value);
@@ -163,8 +161,6 @@ test "map creation accepts FastPFOR decoding" {
     defer map.close() catch @panic("map close failed");
 }
 
-// Unset fields take the C API defaults rather than values this binding repeats,
-// so mln_map_options_default() stays the single source for them.
 test "unset map options take the C creation defaults" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");

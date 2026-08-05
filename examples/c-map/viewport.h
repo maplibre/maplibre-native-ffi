@@ -1,5 +1,5 @@
-// The viewport module: reads the window's logical size, physical size, and
-// content scale from SDL, and derives the logical map extent from them.
+// Reads the window's logical size, physical size, and content scale from SDL,
+// and derives the logical map extent from them.
 
 #ifndef C_MAP_VIEWPORT_H
 #define C_MAP_VIEWPORT_H

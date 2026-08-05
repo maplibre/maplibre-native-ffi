@@ -17,10 +17,7 @@ const (
 )
 
 type inputController struct {
-	dragMode dragMode
-	// dragButton is the button that started the live drag. A drag belongs to
-	// one button, so a second button pressed during it neither restarts it nor
-	// ends it early.
+	dragMode   dragMode
 	dragButton uint8
 	lastX      float64
 	lastY      float64
@@ -59,10 +56,8 @@ func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent,
 	if event == nil {
 		return false
 	}
-	// A drag already owns the pointer, so a second button joins it rather than
-	// starting a drag of its own. Its position leaves the live drag's baseline
-	// alone, so the next delta still measures from where the owning button last
-	// was.
+	// A second button pressed during a live drag joins it, leaving the drag
+	// baseline alone.
 	if input.dragMode != dragNone {
 		return false
 	}
@@ -75,17 +70,14 @@ func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent,
 	input.lastY = cursor.Y
 	input.dragMode = mode
 	input.dragButton = event.Button
-	// Queued ahead of the drag's own commands, so the transition stops before
-	// the first delta lands.
+	// Cancel first, so the running transition stops before the first delta.
 	cancelQueued := enqueueCameraCommand(commands, cameraCommand{kind: commandCancelTransitions})
-	// The deltas that follow belong to one live gesture, so the map hears about
-	// the gesture rather than a stream of unrelated camera commands.
 	gestureQueued := enqueueCameraCommand(commands, cameraCommand{kind: commandSetGestureInProgress, inProgress: true})
 	return cancelQueued || gestureQueued
 }
 
-// handleMouseButtonUp ends the drag once, when the button that started it comes
-// up, so the gesture mark the drag set is always paired with a clear.
+// handleMouseButtonUp ends the drag only for the button that started it, so the
+// gesture bracket stays paired.
 func (input *inputController) handleMouseButtonUp(event *sdl.MouseButtonEvent, commands *commandQueue, v viewport) bool {
 	if event == nil || (event.Button != sdl.ButtonLeft && event.Button != sdl.ButtonRight) {
 		return false

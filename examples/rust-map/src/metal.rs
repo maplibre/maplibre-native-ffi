@@ -126,11 +126,8 @@ impl MetalTextureCompositor {
     }
 
     /// Samples texture into the layer's next drawable, and reports whether it
-    /// presented.
-    ///
-    /// A minimized or occluded window has no drawable to hand out, so the frame
-    /// is skipped rather than failed; the caller's render request stays pending
-    /// and the draw retries once one is available.
+    /// presented. A minimized or occluded window has no drawable, so the frame
+    /// is skipped rather than failed.
     pub fn draw_texture(
         &mut self,
         texture: &ProtocolObject<dyn MTLTexture>,

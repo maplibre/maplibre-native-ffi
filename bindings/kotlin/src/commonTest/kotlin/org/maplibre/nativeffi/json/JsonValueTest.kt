@@ -4,7 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class JsonValueTest {
-  // BND-067: Kotlin stores uint64 JSON values in a signed carrier with documented bit patterns.
+  // BND-067.
 
   @Test
   fun unsignedValuesUseDocumentedLongBitPatternCarrier() {
@@ -14,7 +14,7 @@ class JsonValueTest {
     assertEquals(ULong.MAX_VALUE, value.value.toULong())
   }
 
-  // BND-067: structured JSON keeps object member order and repeated member names.
+  // BND-067.
 
   @Test
   fun objectValuesPreserveMemberOrderAndDuplicateKeys() {

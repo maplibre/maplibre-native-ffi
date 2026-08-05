@@ -353,13 +353,11 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     public bool IsClosed => state.IsClosed;
 
     /// <summary>
-    /// Resizes this attached render session. Surface and owned-texture sessions resize in place.
-    /// Borrowed texture targets are sized by their owner and throw an unsupported-feature error:
-    /// allocate a texture at the new size and hand it over with the set-target method for the
-    /// backend, such as <see cref="SetOpenGLBorrowedTextureTarget"/>, which keeps this session. The
-    /// session keeps its renderer across a resize, so renderer-held state such as feature state
-    /// carries over; a scale factor change is the exception, starting a new renderer with that state
-    /// empty. Map state such as camera, style, and sources survives either way.
+    /// Resizes this attached render session. Surface and owned-texture sessions resize in place;
+    /// a borrowed texture target throws an unsupported-feature error, since its owner sizes it —
+    /// hand over a new texture with the backend's set-target method instead. A resize keeps the
+    /// session's renderer and renderer-held state such as feature state, unless the scale factor
+    /// changes, which starts a new renderer with that state empty.
     /// </summary>
     public void Resize(uint width, uint height, double scaleFactor)
     {
@@ -368,16 +366,11 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     }
 
     /// <summary>
-    /// Presents this attached surface session through a new surface. A host surface can be destroyed
-    /// and recreated while the map goes on living, which is what Android rotation, a Flutter surface
-    /// producer lifecycle change, and a window resize that reallocates all look like from here.
-    /// Replacing the surface in place keeps this session's renderer, and with it the tile pyramid,
-    /// glyph and image atlases, symbol placement, and feature state. The descriptor names the same
-    /// graphics context this session attached with, and its extent applies as <see cref="Resize"/>
-    /// applies one. A descriptor whose context device is neither null nor this session's device
-    /// throws an invalid-argument error and leaves this session rendering into the surface it has.
-    /// The session assigns the layer its own device and pixel format, so the layer itself carries
-    /// nothing that has to match.
+    /// Presents this attached surface session through a new surface, keeping the session's renderer
+    /// and its cached state. The descriptor must name the same graphics context this session
+    /// attached with; one whose context device is neither null nor this session's device throws an
+    /// invalid-argument error and leaves this session rendering into the surface it has. The
+    /// descriptor's extent applies as <see cref="Resize"/> applies one.
     /// </summary>
     public void SetMetalSurfaceTarget(MetalSurfaceDescriptor descriptor)
     {
@@ -389,10 +382,9 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     /// <summary>
     /// Presents this attached surface session through a new surface. See
     /// <see cref="SetMetalSurfaceTarget"/> for what replacing a surface preserves. The outgoing
-    /// VkSurfaceKHR must still be valid: this session holds a swapchain built from it, and Vulkan
-    /// destroys every swapchain before its surface. The replacement reports the color format and
-    /// surface-transform support this session compiled a render pass and shaders for; one that does
-    /// not throws an unsupported-feature error.
+    /// VkSurfaceKHR must still be valid, since this session holds a swapchain built from it. The
+    /// replacement must report the color format and surface-transform support this session
+    /// compiled a render pass and shaders for, or it throws an unsupported-feature error.
     /// </summary>
     public void SetVulkanSurfaceTarget(VulkanSurfaceDescriptor descriptor)
     {
@@ -405,8 +397,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     /// Presents this attached surface session through a new surface. See
     /// <see cref="SetMetalSurfaceTarget"/> for what replacing a surface preserves. The new surface is
     /// made current on the next render, so a host may hand over a replacement for one it has already
-    /// destroyed. A surface accepted here can still prove unusable, which the next
-    /// <see cref="RenderUpdate"/> reports rather than this call.
+    /// destroyed, and an unusable surface is reported by the next <see cref="RenderUpdate"/>.
     /// </summary>
     public void SetOpenGLSurfaceTarget(OpenGLSurfaceDescriptor descriptor)
     {
@@ -416,18 +407,13 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     }
 
     /// <summary>
-    /// Renders this attached texture session into a new caller-owned texture. A caller-owned texture
-    /// is sized by its owner, so a host that follows a resize reallocates rather than resizing and
-    /// <see cref="Resize"/> throws an unsupported-feature error. Handing the replacement over here
-    /// keeps this session's renderer instead, so the map does not go cold on every resize, unless
-    /// the scale factor changes, which starts a new renderer for the new pixel ratio. The
-    /// replacement belongs to the device this session attached with, which throws an
-    /// invalid-argument error otherwise, and carries the pixel format it attached with, which throws
-    /// an unsupported-feature error otherwise. Both leave this session rendering into the texture it
-    /// has. The caller owns the replacement and keeps it valid until
-    /// the next replacement, detach, or dispose. This session never retained the outgoing texture,
-    /// never releases it, and never reads it here, so a host that already released it hands over the
-    /// replacement all the same.
+    /// Renders this attached texture session into a new caller-owned texture, keeping the session's
+    /// renderer unless the scale factor changes, which starts a new renderer. The replacement must
+    /// belong to the device this session attached with, which throws an invalid-argument error
+    /// otherwise, and carry the pixel format it attached with, which throws an unsupported-feature
+    /// error otherwise; both leave this session rendering into the texture it has. The caller owns
+    /// the replacement and keeps it valid until the next replacement, detach, or dispose. The
+    /// outgoing texture is neither read nor released here.
     /// </summary>
     public void SetMetalBorrowedTextureTarget(MetalBorrowedTextureDescriptor descriptor)
     {
@@ -439,8 +425,8 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     /// <summary>
     /// Renders this attached texture session into a new caller-owned image. See
     /// <see cref="SetMetalBorrowedTextureTarget"/> for what replacing a target preserves. The
-    /// replacement carries the format and both layouts this session attached with, since its render
-    /// pass was built around them.
+    /// replacement must carry the format and both layouts this session attached with, since its
+    /// render pass was built around them.
     /// </summary>
     public void SetVulkanBorrowedTextureTarget(VulkanBorrowedTextureDescriptor descriptor)
     {
@@ -463,12 +449,9 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     }
 
     /// <summary>
-    /// Renders the latest available map render update. The map retains its
-    /// latest update, so repeated calls re-render it and return true again;
-    /// use this to redraw on demand after resize or surface expose, and gate
-    /// frame loops on render-update-available events instead of the return
-    /// value. Returns false when no frame was rendered. That is a normal
-    /// transient: call again on the next frame rather than wait for
+    /// Renders the latest available map render update. The map retains its latest update, so
+    /// repeated calls re-render it and return true again. Returns false when no frame was
+    /// rendered, which is a normal transient: call again on the next frame rather than wait for
     /// another render-update event.
     /// </summary>
     public bool RenderUpdate()
@@ -548,16 +531,12 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     /// Queries a feature extension from the latest render session state.
     /// </summary>
     /// <remarks>
-    /// The <c>supercluster</c> extension reads the <c>cluster_id</c> feature
-    /// property and the <c>limit</c> and <c>offset</c> arguments as
-    /// <c>JsonValue.UInt</c>. Other numeric types are treated as absent: a
-    /// <c>cluster_id</c> that is not <c>JsonValue.UInt</c> returns a
-    /// <c>FeatureExtensionResult.Value</c> holding <c>JsonValue.Null</c>
-    /// instead of a feature collection, and a <c>limit</c> or <c>offset</c>
-    /// that is not <c>JsonValue.UInt</c> leaves <c>leaves</c> at the native
-    /// defaults of ten leaves at offset zero. Queried feature properties keep
-    /// their JSON value type, so a queried cluster feature can be passed back
-    /// unmodified.
+    /// The <c>supercluster</c> extension reads <c>cluster_id</c>, <c>limit</c>,
+    /// and <c>offset</c> as <c>JsonValue.UInt</c> and treats other numeric types
+    /// as absent: a non-<c>UInt</c> <c>cluster_id</c> yields a
+    /// <c>FeatureExtensionResult.Value</c> holding <c>JsonValue.Null</c>, and a
+    /// non-<c>UInt</c> <c>limit</c> or <c>offset</c> falls back to ten leaves at
+    /// offset zero.
     /// </remarks>
     public FeatureExtensionResult QueryFeatureExtension(
         string sourceId,
@@ -625,9 +604,8 @@ public sealed unsafe class RenderSessionHandle : IDisposable
                 )
             );
         }
-        // An empty destination reaches native code as the null pointer and zero capacity that
-        // mean a size probe, which succeeds without copying. Report the buffer as too small
-        // unless the frame really carries no bytes.
+        // An empty destination reaches native code as a size probe, which succeeds without
+        // copying, so report the buffer as too small unless the frame carries no bytes.
         if (buffer.ByteLength == 0 && info.byte_length > 0)
         {
             throw new InvalidArgumentException(

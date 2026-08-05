@@ -1,18 +1,16 @@
 #pragma once
 
 // Looks up a GL entry point in the client library, for the generated table in
-// mbgl::platform. Resolution goes through the same helpers the EGL context uses
-// and needs no current context, so the table can initialize before a display
-// exists.
+// mbgl::platform. Resolution needs no current context, so the table can
+// initialize before a display exists.
 
 #include <type_traits>
 
 #include "render/opengl/egl_common.hpp"
 
 #if !defined(__linux__)
-// The resolver below only knows how to open a Linux GL client library, and it
-// returns null everywhere else, which would leave the whole table null and fail
-// on the first GL call. Other platforms link their loader instead.
+// The resolver below only opens a Linux GL client library and returns null
+// elsewhere, leaving the whole table null. Other platforms link their loader.
 #error "the generated GL table is Linux only"
 #endif
 

@@ -3,14 +3,9 @@ package org.maplibre.nativeffi.internal.lifecycle
 import kotlin.jvm.JvmInline
 
 /**
- * A handle the C API issued.
- *
- * The C API spells every handle as one integer type, so each kind gets its own value class here to
- * keep the kinds distinct at compile time. [raw] names one object for the life of the process,
- * carries no ownership, and is safe to copy, compare, and hash. Zero is the null handle.
- *
- * These are distinct from `NativePointer`, which borrows a backend-native address such as a Metal
- * texture or a Vulkan device.
+ * A handle the C API issued. The C API spells every handle as one integer type, so each kind gets
+ * its own value class here to stay distinct at compile time. [raw] carries no ownership and is safe
+ * to copy, compare, and hash. Zero is the null handle.
  */
 internal sealed interface NativeHandle {
   val raw: Long

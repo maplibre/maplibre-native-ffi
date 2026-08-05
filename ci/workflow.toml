@@ -6,10 +6,10 @@ commands = [
   { task = "//examples/rust-map:check", exclude = ["macos-arm64-egl"] },
 ]
 
-# Acquiring the native library from the snapshot release is not exercised
-# anywhere else: every other binding step is handed a local install prefix. One
-# platform is enough, since the download path differs only in which preset it
-# resolves.
+# Every other binding step is handed a local install prefix, so this is the only
+# coverage of acquiring the native library from the snapshot release. The
+# download path differs only in which preset it resolves, so one platform is
+# enough.
 [[suites]]
 platforms = ["linux"]
 commands = [
@@ -65,10 +65,8 @@ commands = [{ task = "//examples/c-map:build" }]
 platforms = ["linux", "macos", "windows"]
 commands = [{ task = "//bindings/python:test" }]
 
-# TODO(#412): Re-enable //bindings/dart:test after thread-affine ownership is
-# safe across isolate migration; affected test processes can otherwise wedge
-# until timeout. Keep analyze/build in CI so the binding still appears in the
-# generated support matrix as build-only.
+# TODO(#412): Re-enable //bindings/dart:test once thread-affine ownership is
+# safe across isolate migration; test processes otherwise wedge until timeout.
 [[suites]]
 platforms = ["linux", "macos", "windows"]
 commands = [{ task = "//bindings/dart:build" }]

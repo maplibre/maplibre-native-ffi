@@ -4,10 +4,9 @@
 
 void setUp(void) {}
 
-// Unity runs this even when a test body aborted through a failing assertion, so
-// it is the one place that reliably sees handles a test left behind. Reclaiming
-// them here keeps a single genuine failure from cascading into every later test
-// that needs a runtime on this thread.
+// Unity runs this even after a test body aborts on a failing assertion, so
+// reclaiming leaked handles here keeps one failure from cascading into every
+// later test that needs a runtime on this thread.
 void tearDown(void) {
   if (!mln_test_reclaim_thread_resources()) {
     return;
@@ -37,10 +36,9 @@ int main(void) {
   run_runtime_wake_abi_tests();
   run_style_values_abi_tests();
   const int failures = UNITY_END();
-  // main() runs on a pthread under -sPROXY_TO_PTHREAD and owes the same release
-  // as any other thread: holding a graphics device past the entry point keeps
-  // the runtime alive, and the suite would print its summary and then never
-  // exit, leaving the runner with no status to report.
+  // main() runs on a pthread under -sPROXY_TO_PTHREAD, where a graphics device
+  // held past the entry point keeps the runtime alive and the process never
+  // exits.
   mln_test_release_thread_gpu_resources();
   return failures;
 }

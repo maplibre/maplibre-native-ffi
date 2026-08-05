@@ -16,7 +16,7 @@ import org.maplibre.nativeffi.runtime.RuntimeHandle
 
 @OptIn(ExperimentalForeignApi::class)
 class MapProjectionHandleTest : org.maplibre.nativeffi.NativeTestBase() {
-  // BND-043, BND-103: projection handles are independent snapshots with projection helpers.
+  // BND-043, BND-103.
 
   @Test
   fun projectionOwnsStandaloneSnapshotAndClosesIndependently() {

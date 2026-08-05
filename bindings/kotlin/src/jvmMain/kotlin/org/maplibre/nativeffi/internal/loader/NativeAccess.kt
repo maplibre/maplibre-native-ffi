@@ -5760,8 +5760,8 @@ internal object NativeAccess {
   /**
    * Invokes a downcall, passing each handle as the integer the C API declares.
    *
-   * `MethodHandle.invokeWithArguments` is untyped, so a handle wrapper reaching it would compile
-   * and then fail at run time. Converting here means no call site can get it wrong.
+   * `MethodHandle.invokeWithArguments` is untyped, so an unconverted handle wrapper would fail only
+   * at run time.
    */
   private fun MethodHandle.invokeNative(vararg args: Any?): Any? =
     invokeWithArguments(args.map { if (it is NativeHandle) it.raw else it })

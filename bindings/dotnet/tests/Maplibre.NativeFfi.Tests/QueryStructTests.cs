@@ -225,8 +225,6 @@ public sealed unsafe class QueryStructTests
         Assert.Same(FeatureIdentifier.Null.Instance, feature.Identifier);
     }
 
-    // Support invariant for copied query output: malformed native discriminants
-    // fail deterministically instead of fabricating public feature values.
     [Fact]
     public void UnknownNativeFeatureDiscriminantsThrow()
     {

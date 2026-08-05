@@ -138,10 +138,10 @@ type ResourceTransformRequest struct {
 }
 
 // ResourceTransformCallback rewrites network resource URLs. Native code may
-// invoke it on worker or network threads. The request data is copied for Go; do
-// not call MapLibre map/runtime APIs from the callback. Return replace=false or
-// an empty URL to keep the original URL. Panics become native callback errors,
-// and replacement URLs containing embedded NUL are rejected.
+// invoke it on worker or network threads, so it must not call MapLibre map or
+// runtime APIs. Return replace=false or an empty URL to keep the original URL.
+// Panics become native callback errors, and replacement URLs containing
+// embedded NUL are rejected.
 type ResourceTransformCallback func(ResourceTransformRequest) (replacementURL string, replace bool)
 
 // HttpHeaderTransformRequest describes an outgoing HTTP attempt after URL
@@ -164,11 +164,10 @@ type HttpHeader struct {
 type HttpHeaderTransformCallback func(HttpHeaderTransformRequest) []HttpHeader
 
 // ResourceProviderCallback intercepts network resource requests. Native code may
-// invoke it on worker or network threads. The request data is copied for Go; do
-// not call MapLibre map/runtime APIs from the callback. If it returns
-// ResourceProviderDecisionHandle, complete or close the provided handle from a
-// C-permitted thread. Panics return an unknown decision unless the handle was
-// already completed.
+// invoke it on worker or network threads, so it must not call MapLibre map or
+// runtime APIs. After returning ResourceProviderDecisionHandle, complete or
+// close the provided handle. Panics return an unknown decision unless the
+// handle was already completed.
 type ResourceProviderCallback func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision
 
 // ResourceRequestHandle owns a provider-selected native request handle.

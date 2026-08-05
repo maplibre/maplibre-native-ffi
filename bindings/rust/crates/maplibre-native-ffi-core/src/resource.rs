@@ -412,9 +412,7 @@ impl ResourceRequestHandleState {
     /// # Safety
     ///
     /// `handle` must be a live native resource request handle borrowed from a
-    /// provider callback, and `fns` must match that handle. This state machine
-    /// coordinates completion, cancellation checks, provider decision
-    /// finalization, and provider-owned release.
+    /// provider callback, and `fns` must match that handle.
     pub unsafe fn new(
         handle: sys::mln_resource_request_handle,
         fns: ResourceRequestHandleFns,
@@ -698,7 +696,7 @@ mod tests {
         CANCELLED_STARTED.store(false, Ordering::SeqCst);
         CANCELLED_FINISHED.store(false, Ordering::SeqCst);
         // SAFETY: This synthetic handle reaches only the fake functions above,
-        // never the C API. The safe public API cannot build one.
+        // never the C API.
         unsafe {
             ResourceRequestHandleState::new(
                 sys::mln_resource_request_handle(0x0c00_0000_0000_0034),

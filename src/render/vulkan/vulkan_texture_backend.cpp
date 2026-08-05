@@ -64,13 +64,11 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     create_framebuffers();
   }
 
-  // Rebuilds everything sized with the texture and deliberately keeps the
-  // render pass. mbgl keys its Vulkan pipeline cache on the render pass handle,
-  // and that cache lives in the renderer's shader registry, so destroying the
-  // pass here would strand every cached pipeline behind a dead key — and hand a
-  // recycled handle a cache hit on a pipeline built for the pass that used to
-  // own it. Attachment formats and layouts are the same at every size, so the
-  // pass stays correct as it is.
+  // Rebuilds everything sized with the texture and keeps the render pass. mbgl
+  // keys its pipeline cache on the render pass handle, so destroying the pass
+  // strands every cached pipeline and lets a recycled handle hit a pipeline
+  // built for a different pass. Attachment formats and layouts do not vary with
+  // size.
   void resize_sampled(vk::Extent2D sampled_extent) {
     backend.getDevice()->waitIdle(backend.getDispatcher());
     swapchainFramebuffers.clear();
@@ -87,9 +85,6 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
 
   // Whether a replacement image can use the render pass this resource already
   // has, which needs the format and both layouts the pass was built around.
-  // mbgl keys its pipeline cache on that pass, and the Metal and Vulkan
-  // contexts cache more against it besides, so a mismatch is refused rather
-  // than rebuilt.
   [[nodiscard]] auto matches_borrowed(
     const mln_vulkan_borrowed_texture_descriptor& descriptor
   ) const -> bool {
@@ -101,8 +96,7 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
   }
 
   // Renders into a different caller-owned image from here on. The caller has
-  // already established that it matches the live render pass, which is why that
-  // pass is kept.
+  // already established that it matches the live render pass, which is kept.
   void set_borrowed(
     const mln_vulkan_borrowed_texture_descriptor& descriptor, uint32_t width,
     uint32_t height
@@ -228,10 +222,9 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     }
   }
 
-  // Idempotent, like mbgl::vulkan::SurfaceRenderableResource::initRenderPass():
-  // a live pass is left alone so the pipelines mbgl cached against it stay
-  // reachable. Whoever changes an attachment format or layout drops the pass
-  // first, which is the signal that those pipelines go too.
+  // Idempotent: a live pass is left alone so the pipelines mbgl cached against
+  // it stay reachable. A caller changing an attachment format or layout must
+  // drop the pass first, which also retires those pipelines.
   void create_render_pass(
     vk::ImageLayout initial_layout, vk::ImageLayout final_layout
   ) {
@@ -347,8 +340,7 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
   bool usesBorrowedImage = false;
   vk::Image borrowedImage;
   vk::ImageView borrowedImageView;
-  // What the live render pass was built around, so a replacement target can be
-  // measured against it.
+  // What the live render pass was built around, for matching replacements.
   vk::ImageLayout initial_layout_ = vk::ImageLayout::eUndefined;
   vk::ImageLayout final_layout_ = vk::ImageLayout::eUndefined;
 };
@@ -424,7 +416,7 @@ void VulkanTextureBackend::set_borrowed_target(
   }
   // The resource first, then this backend's own view of the target, so a
   // framebuffer that fails to build cannot leave the backend naming an image it
-  // is not rendering into.
+  // does not render into.
   getResource<VulkanTextureRenderableResource>().set_borrowed(
     descriptor, new_size.width, new_size.height
   );

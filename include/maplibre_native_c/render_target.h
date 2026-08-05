@@ -52,12 +52,7 @@ typedef struct mln_vulkan_context_descriptor {
   void* get_device_proc_addr;
 } mln_vulkan_context_descriptor;
 
-/**
- * WebGPU backend context fields shared by WebGPU render targets.
- *
- * A browser host owns its WebGPU device, so a session borrows these rather than
- * creating any of them.
- */
+/** WebGPU backend context fields shared by WebGPU render targets. */
 typedef struct mln_webgpu_context_descriptor {
   uint32_t size;
   /** Borrowed WGPUInstance. Optional for texture sessions. */
@@ -119,12 +114,7 @@ typedef struct mln_egl_context_descriptor {
   void* get_proc_address;
 } mln_egl_context_descriptor;
 
-/**
- * WebGL context fields shared by OpenGL render targets in the browser.
- *
- * The browser owns the context; a session renders into it rather than creating
- * one of its own, so it is shared rather than exclusively held.
- */
+/** WebGL context fields shared by OpenGL render targets in the browser. */
 typedef struct mln_webgl_context_descriptor {
   uint32_t size;
   /** Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE. Must be positive. */
@@ -147,13 +137,8 @@ typedef struct mln_opengl_context_descriptor {
  * Computes the physical device-pixel size of a logical render target extent.
  *
  * Each dimension is ceil(logical * scale_factor). Session-owned texture targets
- * and surface targets are sized this way, so callers that allocate host
- * resources alongside them can use this instead of repeating the formula.
- *
- * Caller-owned borrowed texture targets state their physical size directly and
- * do not derive it; see texture.h. Not every physical size is reachable from a
- * logical extent, so a caller that starts from a physical size it does not
- * control states that size rather than solving for a logical extent.
+ * and surface targets are sized this way. Caller-owned borrowed texture targets
+ * state their physical size directly; see texture.h.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

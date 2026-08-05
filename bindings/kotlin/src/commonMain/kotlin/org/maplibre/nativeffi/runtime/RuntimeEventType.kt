@@ -3,14 +3,11 @@ package org.maplibre.nativeffi.runtime
 import kotlin.jvm.JvmInline
 
 /**
- * Runtime event type copied from the native event queue.
+ * Runtime event type copied from the native event queue. It selects the meaning of
+ * [RuntimeEvent.code] and the [RuntimeEventPayload] variant behind [RuntimeEvent.payload].
  *
- * This is an open domain: MapLibre Native may report a value that has no named constant here, so a
- * `when` over this type needs an `else` branch. Unknown values are preserved as their raw
- * [nativeValue] rather than collapsed to a known constant.
- *
- * The type selects the meaning of [RuntimeEvent.code] and the [RuntimeEventPayload] variant behind
- * [RuntimeEvent.payload].
+ * This is an open domain: a value may have no named constant here, so a `when` over this type needs
+ * an `else` branch.
  */
 @JvmInline
 public value class RuntimeEventType(public val nativeValue: Int) {
@@ -54,11 +51,7 @@ public value class RuntimeEventType(public val nativeValue: Int) {
      */
     public val OFFLINE_OPERATION_COMPLETED: RuntimeEventType = RuntimeEventType(22)
 
-    /**
-     * A camera transition that carried
-     * [org.maplibre.nativeffi.camera.AnimationOptions.transitionId] released the camera.
-     * [RuntimeEvent.payload] carries [RuntimeEventPayload.CameraTransitionFinished].
-     */
+    /** [RuntimeEvent.payload] carries [RuntimeEventPayload.CameraTransitionFinished]. */
     public val MAP_CAMERA_TRANSITION_FINISHED: RuntimeEventType = RuntimeEventType(23)
 
     internal fun fromNative(nativeValue: UInt): RuntimeEventType = fromNative(nativeValue.toInt())

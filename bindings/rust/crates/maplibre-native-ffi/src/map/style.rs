@@ -28,59 +28,37 @@ use crate::{
 impl super::MapHandle {
     /// Loads a style URL through MapLibre Native style APIs.
     ///
-    /// Loading is asynchronous, so a style that fails to fetch or parse still
+    /// Loading is asynchronous: a style that fails to fetch or parse still
     /// returns `Ok` here and reports through a later loading-failed runtime
-    /// event. Watch the event stream for load outcomes.
-    ///
-    /// Unsupported style versions and other parse failures report a
-    /// loading-failed event; callers must not treat syntactically valid JSON as
-    /// a successful style load until the event stream confirms it.
+    /// event. Watch the event stream for the load outcome.
     pub fn set_style_url(&self, url: &str) -> Result<()> {
         let map = self.inner.native()?;
         let url = maplibre_core::string::c_string(url)?;
-        // SAFETY: map is live and url is a NUL-terminated UTF-8 string valid
-        // for the duration of this command. The C API copies/consumes it before
-        // returning.
+        // SAFETY: map is live and url is a NUL-terminated UTF-8 string the C
+        // API consumes before returning.
         maplibre_core::check(unsafe { sys::mln_map_set_style_url(map, url.as_ptr()) })?;
         Ok(())
     }
 
     /// Loads inline style JSON through MapLibre Native style APIs.
     ///
-    /// Malformed JSON is reported twice: this call returns the parse error
-    /// synchronously, and the same message also arrives as a loading-failed
-    /// runtime event. Handle both, so an event-driven loop stays consistent
-    /// with the call site.
-    ///
-    /// Unsupported style versions and other parse failures return an error and
-    /// also report a loading-failed event. Callers must not equate syntactically
-    /// valid JSON with a supported style document.
+    /// A parse failure is reported twice: this call returns the error, and the
+    /// same message arrives as a loading-failed runtime event.
     pub fn set_style_json(&self, json: &str) -> Result<()> {
         let map = self.inner.native()?;
         let json = maplibre_core::string::c_string(json)?;
-        // SAFETY: map is live and json is a NUL-terminated UTF-8 string valid
-        // for the duration of this command. The C API copies/consumes it before
-        // returning. Inline JSON style replacement completes before a successful
-        // return, so old custom geometry callback state can be released after.
+        // SAFETY: map is live and json is a NUL-terminated UTF-8 string the C
+        // API consumes before returning. Style replacement completes before a
+        // successful return, so the old callback state can be released after.
         maplibre_core::check(unsafe { sys::mln_map_set_style_json(map, json.as_ptr()) })?;
         self.inner.clear_custom_geometry_sources();
         Ok(())
     }
 
-    /// Copies the style document this map's style was last parsed from.
-    ///
-    /// This is the loaded document, not a serialization of the live style: the
-    /// string passed to [`Self::set_style_json`], or the response body fetched
-    /// for [`Self::set_style_url`]. Runtime mutations such as adding a layer or
-    /// setting a paint property do not change it, and a failed parse leaves the
-    /// previously parsed document in place.
-    ///
-    /// The result is byte-for-byte the string given to [`Self::set_style_json`],
-    /// so it can be handed back to that method unchanged.
-    ///
-    /// An empty string means no document has been parsed: no style has loaded
-    /// yet, or every load so far failed to parse. A parsed document is never
-    /// empty.
+    /// Copies the style document this map's style was last parsed from: the
+    /// string given to [`Self::set_style_json`] or the body fetched for
+    /// [`Self::set_style_url`], byte for byte. Runtime mutations do not change
+    /// it. An empty string means no document has been parsed.
     pub fn loaded_style_json(&self) -> Result<String> {
         let map = self.inner.native()?;
         // SAFETY: map is live, and each call writes only through the pointers
@@ -94,16 +72,10 @@ impl super::MapHandle {
 
     /// Copies the URL this map's style was last requested from.
     ///
-    /// Unlike [`Self::loaded_style_json`], this is live rather than load-time
-    /// state: [`Self::set_style_url`] records the URL when the request is made,
-    /// before the response arrives or the document parses, and
-    /// [`Self::set_style_json`] clears it. The two can disagree while a load is
-    /// in flight or after one fails.
-    ///
-    /// An empty string means no URL bytes are available. That covers a style
-    /// loaded from inline JSON, a map that has loaded no style, and a URL load
-    /// requested with an empty string, which the C API accepts. These cases are
-    /// not distinguishable here.
+    /// [`Self::set_style_url`] records the URL when the request is made, before
+    /// the response arrives, and [`Self::set_style_json`] clears it, so this can
+    /// disagree with [`Self::loaded_style_json`] while a load is in flight. An
+    /// empty string means no URL bytes are available.
     pub fn style_url(&self) -> Result<String> {
         let map = self.inner.native()?;
         // SAFETY: map is live, and each call writes only through the pointers
@@ -117,12 +89,9 @@ impl super::MapHandle {
 
     /// Adds a custom geometry source to the current style.
     ///
-    /// The callback state is scoped to this map's current style. It is released
-    /// on source removal, map close/drop, successful inline JSON style
-    /// replacement, or after runtime event polling observes that the loaded
-    /// style no longer contains the source. Native may invoke callbacks from
-    /// worker threads; callbacks should queue owner-thread work before calling
-    /// map APIs.
+    /// The callback state is scoped to this map's current style and released
+    /// when the source or the style goes away. Native may invoke callbacks from
+    /// worker threads, so queue owner-thread work before calling map APIs.
     pub fn add_custom_geometry_source(
         &self,
         source_id: &str,
@@ -857,10 +826,7 @@ impl super::MapHandle {
     }
 
     /// Adds a GeoJSON source that loads data from a URL.
-    ///
-    /// MapLibre Native fixes `options` when the source is created, so
-    /// [`Self::set_geojson_source_url`] and [`Self::set_geojson_source_data`]
-    /// keep the options the source was added with.
+    /// `options` are fixed at creation; later data or URL updates keep them.
     pub fn add_geojson_source_url(
         &self,
         source_id: &str,
@@ -885,10 +851,7 @@ impl super::MapHandle {
     }
 
     /// Adds a GeoJSON source with inline data.
-    ///
-    /// MapLibre Native fixes `options` when the source is created, so
-    /// [`Self::set_geojson_source_url`] and [`Self::set_geojson_source_data`]
-    /// keep the options the source was added with.
+    /// `options` are fixed at creation; later data or URL updates keep them.
     pub fn add_geojson_source_data(
         &self,
         source_id: &str,
@@ -1133,12 +1096,9 @@ impl super::MapHandle {
         unsafe { maplibre_core::json::copy_json_snapshot(out.get()) }
     }
 
-    /// Sets the style's global transition options.
-    ///
-    /// Omitted duration and delay clear the style-wide override, so this call
-    /// replaces the whole transition configuration rather than merging into it.
-    /// Loading a style replaces these options with the ones that style
-    /// declares, so apply an override after the style loads.
+    /// Sets the style's global transition options. This replaces the whole
+    /// configuration rather than merging, and loading a style replaces it
+    /// again, so apply an override after the style loads.
     pub fn set_style_transition_options(&self, options: &StyleTransitionOptions) -> Result<()> {
         let map = self.inner.native()?;
         let raw = maplibre_core::style::style_transition_options_to_native(options);

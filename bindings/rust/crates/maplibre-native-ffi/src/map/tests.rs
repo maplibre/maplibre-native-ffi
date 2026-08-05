@@ -66,7 +66,6 @@ fn nine_patch_style_image_round_trips_stretch_content_and_text_fit() {
     );
     assert!(map.style_image_stretches("missing").unwrap().is_none());
 
-    // A backwards interval is rejected by C.
     let mut bad = StyleImageOptions::default();
     bad.stretch_x = Some(vec![ImageStretch::new(2.0, 1.0)]);
     let error = map.set_style_image("bad", &image, Some(&bad)).unwrap_err();
@@ -83,14 +82,11 @@ fn layer_base_accessors_round_trip_through_real_c_abi() {
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(STYLE_WITH_IDS_JSON).unwrap();
 
-    // A layer with a source round-trips source-layer and source id.
     assert_eq!(map.layer_source_layer("geo-fill").unwrap(), "");
     map.set_layer_source_layer("geo-fill", "roads").unwrap();
     assert_eq!(map.layer_source_layer("geo-fill").unwrap(), "roads");
     assert_eq!(map.layer_source_id("geo-fill").unwrap(), "geo");
 
-    // A layer type that takes no source is rejected rather than silently
-    // ignored, and reads back as empty.
     let error = map
         .set_layer_source_layer("background", "roads")
         .unwrap_err();
@@ -117,7 +113,6 @@ fn layer_base_accessors_round_trip_through_real_c_abi() {
         StyleLayerVisibility::None
     );
 
-    // An unknown raw visibility passes through to C, which rejects it.
     let error = map
         .set_layer_visibility("geo-fill", StyleLayerVisibility::Unknown(900))
         .unwrap_err();
@@ -207,7 +202,6 @@ fn loaded_style_document_and_url_read_back_what_was_loaded() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
-    // Nothing parsed and nothing requested yet.
     assert_eq!(map.loaded_style_json().unwrap(), "");
     assert_eq!(map.style_url().unwrap(), "");
 
@@ -217,8 +211,8 @@ fn loaded_style_document_and_url_read_back_what_was_loaded() {
     // Inline JSON clears the URL.
     assert_eq!(map.style_url().unwrap(), "");
 
-    // The URL is request state, recorded before the load can succeed, while the
-    // document still reports the style that last parsed.
+    // The URL records the request before the load succeeds; the document still
+    // reports the style that last parsed.
     map.set_style_url("https://example.com/style.json").unwrap();
     assert_eq!(map.style_url().unwrap(), "https://example.com/style.json");
     assert_eq!(map.loaded_style_json().unwrap(), VALID_STYLE_JSON);
@@ -411,8 +405,7 @@ fn geojson_source_helpers_accept_options_and_keep_them_across_updates() {
         Some(SourceType::GeoJson)
     );
 
-    // Updates carry no options of their own; the source keeps what it was added
-    // with.
+    // Updates carry no options; the source keeps what it was added with.
     map.set_geojson_source_data("geojson-url", &data).unwrap();
     map.set_geojson_source_url("geojson-data", "https://example.com/points.geojson")
         .unwrap();
@@ -431,8 +424,8 @@ fn clustered_geojson_source_requires_a_feature_collection() {
     let mut options = GeoJsonSourceOptions::default();
     options.cluster = Some(true);
 
-    // MapLibre Native engages clustering for feature collections only, so these
-    // used to tile unclustered instead of honouring the requested option.
+    // MapLibre Native clusters feature collections only; anything else tiles
+    // unclustered instead of honouring the requested option.
     let bare = GeoJson::Geometry(Geometry::Point(LatLng::new(0.0, 0.0)));
     let error = map
         .add_geojson_source_data("quakes", &bare, Some(&options))
@@ -459,8 +452,8 @@ fn clustered_geojson_source_requires_a_feature_collection() {
     // The constraint belongs to clustering alone, and the rejected ID stays free.
     map.add_geojson_source_data("quakes", &bare, None).unwrap();
 
-    // An empty feature collection carries nothing to cluster, so it stays
-    // accepted and a later update supplies the features to cluster.
+    // An empty feature collection is accepted; a later update supplies the
+    // features to cluster.
     let empty = GeoJson::FeatureCollection(Vec::new());
     map.add_geojson_source_data("pending", &empty, Some(&options))
         .unwrap();
@@ -487,8 +480,7 @@ fn clustered_geojson_source_reports_non_point_geometry() {
         ),
     ]);
 
-    // Supercluster reads every feature geometry as a point, so this used to
-    // surface a bare variant access message from inside MapLibre Native.
+    // Supercluster reads every feature geometry as a point.
     let error = map
         .add_geojson_source_data("quakes", &mixed, Some(&options))
         .unwrap_err();
@@ -719,9 +711,9 @@ fn custom_geometry_source_state_releases_detached_sources_on_style_loaded_event(
 
     let source_id = maplibre_native_ffi_core::string::string_view("custom");
     let mut removed = false;
-    // SAFETY: map is live, source_id is valid for this call, and removed
-    // points to writable storage. This bypasses the binding cleanup path to
-    // model native style replacement detaching the source.
+    // SAFETY: map is live, source_id is valid for this call, and removed points
+    // to writable storage. The raw call bypasses binding cleanup to model
+    // native style replacement detaching the source.
     let status = unsafe {
         sys::mln_map_remove_style_source(map.inner.handle.handle(), source_id.raw(), &mut removed)
     };
@@ -812,22 +804,22 @@ fn style_transition_options_round_trip_through_the_real_c_api() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
-    // A map with no style yet reports no duration or delay. The placement flag
-    // always reports, because MapLibre Native always holds a value for it.
+    // MapLibre Native always holds a placement flag, so it reports even before
+    // a style is loaded.
     let empty = map.style_transition_options().unwrap();
     assert_eq!(empty.duration_ms, None);
     assert_eq!(empty.delay_ms, None);
     assert_eq!(empty.enable_placement_transitions, Some(true));
 
-    // The style parser fills in its own 300ms duration for a style that
-    // carries no transition member at all.
+    // The style parser fills in its own 300ms duration when the style carries
+    // no transition member.
     map.set_style_json(VALID_STYLE_JSON).unwrap();
     let parsed = map.style_transition_options().unwrap();
     assert_eq!(parsed.duration_ms, Some(300.0));
     assert_eq!(parsed.delay_ms, None);
 
-    // A style that carries a transition member reports only what that member
-    // names, so a delay-only transition replaces that default with no duration.
+    // A transition member reports only what it names, so a delay-only
+    // transition replaces that default with no duration.
     map.set_style_json(STYLE_WITH_DELAY_ONLY_TRANSITION_JSON)
         .unwrap();
     let delay_only = map.style_transition_options().unwrap();
@@ -840,8 +832,8 @@ fn style_transition_options_round_trip_through_the_real_c_api() {
     assert_eq!(declared.delay_ms, Some(100.0));
     assert_eq!(declared.enable_placement_transitions, Some(true));
 
-    // A present zero stays distinguishable from an omitted field, and omitting
-    // a field clears what the style declared rather than merging into it.
+    // A present zero stays distinguishable from an omitted field, and an
+    // omitted field clears what the style declared rather than merging into it.
     let mut options = StyleTransitionOptions::default();
     options.duration_ms = Some(0.0);
     options.enable_placement_transitions = Some(false);
@@ -853,8 +845,7 @@ fn style_transition_options_round_trip_through_the_real_c_api() {
     assert_eq!(applied.delay_ms, None);
     assert_eq!(applied.enable_placement_transitions, Some(false));
 
-    // Omitting the flag leaves the cross-fade on rather than clearing it, so an
-    // omitted field stays distinguishable from the cleared one just applied.
+    // Omitting the flag leaves the cross-fade on rather than clearing it.
     let mut duration_only = StyleTransitionOptions::default();
     duration_only.duration_ms = Some(250.0);
     map.set_style_transition_options(&duration_only).unwrap();
@@ -1023,7 +1014,7 @@ struct CameraEventTally {
     did_change_followed_finish: bool,
 }
 
-/// Drains the queued runtime events and tallies the camera events among them.
+/// Tallies the camera events among the queued runtime events.
 ///
 /// The transition-finished event is queued while the camera command that ends
 /// the transition runs, so polling alone observes it.
@@ -1071,7 +1062,7 @@ fn identified_camera_transitions_report_each_terminal_outcome_once() {
     let _ = drain_camera_events(&runtime);
 
     // A zero-duration ease resolves inside the call, so its end is reported
-    // ahead of the did-change event for the same instant jump.
+    // ahead of the did-change event for the same jump.
     map.ease_to(&camera, Some(&identified_ease(0, 0.0)))
         .unwrap();
     let tally = drain_camera_events(&runtime);
@@ -1079,7 +1070,6 @@ fn identified_camera_transitions_report_each_terminal_outcome_once() {
     assert!(tally.did_change_followed_finish);
     assert_eq!(tally.did_change_modes, vec![CameraChangeMode::Immediate]);
 
-    // A running transition stays silent until something ends it.
     camera.zoom = Some(12.0);
     map.ease_to(&camera, Some(&identified_ease(11, 5_000.0)))
         .unwrap();
@@ -1094,13 +1084,12 @@ fn identified_camera_transitions_report_each_terminal_outcome_once() {
     assert_eq!(tally.finished_transition_ids, vec![11]);
     assert_eq!(tally.did_change_modes, vec![CameraChangeMode::Animated]);
 
-    // Cancelling ends the superseding transition.
     map.cancel_transitions().unwrap();
     let tally = drain_camera_events(&runtime);
     assert_eq!(tally.finished_transition_ids, vec![12]);
 
-    // Leaving the identity absent keeps the transition silent, so the present
-    // zero ID above stayed distinguishable from an omitted one.
+    // An absent identity keeps the transition silent, so the present zero ID
+    // above stayed distinguishable from an omitted one.
     camera.zoom = Some(14.0);
     map.ease_to(&camera, Some(&AnimationOptions::default()))
         .unwrap();
@@ -1143,7 +1132,6 @@ fn unbounded_and_world_bounds_constrain_the_camera_differently() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
-    // A pristine map reports the unbounded constraint, not world bounds.
     assert_eq!(
         map.bounds().unwrap().bounds,
         Some(BoundsConstraint::Unbounded)
@@ -1203,8 +1191,8 @@ fn a_released_map_id_replayed_after_a_new_map_reports_it_stale() {
     let released = first.inner.native().unwrap();
     first.close().unwrap();
 
-    // The released slot is the one the next map takes, so the replayed id
-    // names a retired generation of a slot that is live again.
+    // The next map takes the released slot, so the replayed id names a retired
+    // generation of a slot that is live again.
     let second = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
     let mut width = 0;
@@ -1216,7 +1204,6 @@ fn a_released_map_id_replayed_after_a_new_map_reports_it_stale() {
     assert_eq!(status, sys::MLN_STATUS_INVALID_ARGUMENT);
     assert!(maplibre_native_ffi_core::error::capture_thread_diagnostic().contains("stale"));
 
-    // The live map is unaffected by the replay.
     assert_eq!(second.size().unwrap().0, MapOptions::default().width);
     second.close().unwrap();
     runtime.close().unwrap();
@@ -1229,7 +1216,7 @@ fn a_map_id_passed_to_a_runtime_operation_reports_invalid_argument() {
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
     // `mln_map` and `mln_runtime` are distinct newtypes, so this call has no
-    // expression in the safe API and needs the raw id.
+    // expression in the safe API.
     let wrong_kind = sys::mln_runtime(map.inner.native().unwrap().0);
     // SAFETY: the value is well-formed; the C API rejects it on its kind tag.
     let status = unsafe { sys::mln_runtime_pump(wrong_kind, 0) };

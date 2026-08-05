@@ -1,6 +1,5 @@
-// Attaching each kind of render target to a live map, replacing the target of
-// an attached session, and releasing the two in order. OpenGL through EGL here;
-// Metal and Vulkan use their own descriptor types and attach functions.
+// Attaching each kind of OpenGL render target to a live map, replacing the
+// target of an attached session, and releasing the two in order.
 
 #include <maplibre_native_c.h>
 
@@ -57,8 +56,8 @@ mln_render_session attach_to_host_texture(
   descriptor.extent.height = logical_height;
   descriptor.extent.scale_factor = scale_factor;
 
-  // Stated rather than derived from the logical extent. These must equal the
-  // texture's level-0 dimensions. The session cannot verify them on ES 3.0.
+  // These must equal the texture's level-0 dimensions; the session cannot
+  // verify them on ES 3.0.
   descriptor.physical_width = (uint32_t)(logical_width * scale_factor);
   descriptor.physical_height = (uint32_t)(logical_height * scale_factor);
 
@@ -80,8 +79,8 @@ mln_status resize_session(
 ) {
   // #region resize
   // Surface and session-owned texture targets resize in place. A borrowed
-  // texture reports an unsupported status here, because its size comes from
-  // the texture that the host allocated.
+  // texture takes its size from the host's texture and reports an unsupported
+  // status here.
   return mln_render_session_resize(session, width, height, scale_factor);
   // #endregion resize
 }

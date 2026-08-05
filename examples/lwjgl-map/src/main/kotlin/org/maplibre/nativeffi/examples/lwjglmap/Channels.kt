@@ -11,9 +11,8 @@ import org.maplibre.nativeffi.runtime.WakeSource
 /**
  * A camera change decoded on the render loop and applied on the map's thread.
  *
- * Commands carry deltas rather than absolute targets wherever the map's current camera is an input,
- * because reading the camera and writing the new one has to happen together on the thread that owns
- * the map.
+ * Commands carry deltas rather than absolute targets, because reading the camera and writing the
+ * new one has to happen together on the thread that owns the map.
  */
 internal sealed interface CameraCommand {
   data object CancelTransitions : CameraCommand
@@ -43,21 +42,16 @@ internal sealed interface CameraCommand {
 /**
  * Pending camera commands, filled by the render loop and drained by the runtime loop.
  *
- * The queue grows rather than dropping. Its commands are deltas and a gesture bracket, and neither
- * survives being discarded: a dropped delta is motion the drag never gets back, and a dropped
- * bracket leaves every delta after it attributed to no gesture. Growing does not block the render
- * loop either, and only a stalled runtime loop grows it at all.
+ * The queue grows rather than dropping: its commands are deltas and a gesture bracket, and
+ * discarding either corrupts the gesture.
  */
 internal class CommandQueue {
-  // The pending deque is swapped out on every drain, so the lock is its own object rather than the
-  // deque a caller happens to be holding.
   private val lock = Any()
   private var pending = ArrayDeque<CameraCommand>()
 
   /**
    * Released by [push] so a queued command reaches the runtime loop without waiting out its parking
-   * bound. Set once the runtime loop has published its wake source; enqueues before that need no
-   * wake, because the loop has not started parking yet.
+   * bound. Set once the runtime loop has published its wake source.
    */
   @Volatile var onEnqueue: (() -> Unit)? = null
 
@@ -66,14 +60,8 @@ internal class CommandQueue {
     onEnqueue?.invoke()
   }
 
-  /**
-   * Runtime loop: hands the pending deque over and takes [out] in exchange, so the two ping-pong
-   * and the locked section is the swap alone. A render loop pushing during a drain waits on that,
-   * not on the size of the backlog or of the batch just applied.
-   */
+  /** Runtime loop: hands the pending deque over and takes [out] in exchange. */
   fun drain(out: ArrayDeque<CameraCommand>): ArrayDeque<CameraCommand> {
-    // Clearing nulls every slot of the batch just applied, so it happens before the lock is taken.
-    // Only the runtime loop holds [out] at this point; the queue is still filling the other deque.
     out.clear()
     return synchronized(lock) {
       val drained = pending
@@ -84,10 +72,8 @@ internal class CommandQueue {
 }
 
 /**
- * One-bit signal that a frame is worth drawing.
- *
- * The render loop consumes before it renders and sets again when nothing was rendered, so a request
- * the runtime loop publishes during a render is not lost.
+ * One-bit signal that a frame is worth drawing. The render loop consumes before it renders and sets
+ * again when nothing was rendered, so a request published during a render is not lost.
  */
 internal class RenderRequest {
   private val requested = AtomicBoolean(true)
@@ -104,8 +90,7 @@ internal class RenderRequest {
  * carries shutdown and failure the other way.
  *
  * The render loop uses the published handle only to attach its own render session, which native
- * serves from any thread; every other map call stays on the runtime loop. It signals the wake
- * source to release the runtime loop's parked pump.
+ * serves from any thread; every other map call stays on the runtime loop.
  */
 internal class MapChannel {
   private val map = AtomicReference<MapHandle?>(null)
@@ -133,7 +118,6 @@ internal class MapChannel {
    */
   fun requestShutdown() {
     shutdown.set(true)
-    // Release the pump so shutdown is observed now rather than after the parking bound expires.
     wakeRuntimeLoop()
   }
 
@@ -141,7 +125,7 @@ internal class MapChannel {
 
   /**
    * Runtime loop: blocks until [requestShutdown], or until the bound expires, so a render loop that
-   * already stopped without signalling cannot wedge teardown.
+   * stopped without signalling cannot wedge teardown.
    */
   fun awaitShutdown() {
     val deadline = System.nanoTime() + SHUTDOWN_WAIT.inWholeNanoseconds

@@ -65,13 +65,10 @@ internal interface NativeSurfaceBridge : AutoCloseable {
 }
 
 /**
- * Confines producer-side work to one native thread.
- *
- * The render session is affine to the thread that attached it, so this thread's identity has to
- * stay stable for the session's lifetime. `newSingleThreadExecutor` is documented as starting a
- * replacement if its worker dies, which would break that. It cannot die here: every task arrives
- * through [run], which submits it, so a `Throwable` is captured into the returned `Future` and
- * rethrown to the caller rather than escaping the worker.
+ * Confines producer-side work to one native thread. The render session is affine to the thread that
+ * attached it, so this thread's identity has to stay stable for the session's lifetime. Every task
+ * arrives through [run], which submits it, so a `Throwable` reaches the caller through the `Future`
+ * instead of escaping and letting the executor replace its worker.
  */
 internal class NativeSurfaceRendererDispatcher(threadName: String) : AutoCloseable {
   private val threadRef = AtomicReference<Thread?>()

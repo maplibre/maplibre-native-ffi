@@ -10,9 +10,8 @@ bitflags = "2.10.0"
 maplibre-native-ffi-core = { path = "../maplibre-native-ffi-core" }
 maplibre-native-ffi-sys = { path = "../maplibre-native-ffi-sys" }
 
-# Cargo enables a dependency's features only where that dependency is declared,
-# so the render backend has to be selectable from here for anyone depending on
-# this crate alone. See maplibre-native-ffi-sys for why at most one applies.
+# Re-exported so the render backend is selectable by crates that depend on this
+# crate alone. Enable at most one.
 [features]
 metal = ["maplibre-native-ffi-sys/metal"]
 opengl = ["maplibre-native-ffi-sys/opengl"]

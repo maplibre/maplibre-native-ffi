@@ -125,7 +125,6 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
         extensions.add(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME)
       }
       if (VK_EXT_DEBUG_UTILS_EXTENSION_NAME in available) {
-        // Enable the extension when present so validation layers can attach during local runs.
         extensions.add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME)
       }
       val extensionBuffer = stringBuffer(stack, extensions)
@@ -293,8 +292,8 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
       }
     }
 
-    // Enumeration helpers that return heap values push their own frame so callers can invoke them
-    // once per physical device without the intermediate buffers piling up on a single stack frame.
+    // Enumeration helpers that return heap values push their own stack frame, so calling them once
+    // per physical device does not pile intermediate buffers onto one frame.
 
     private fun instanceExtensions(): Set<String> {
       MemoryStack.stackPush().use { stack ->

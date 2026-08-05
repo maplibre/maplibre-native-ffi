@@ -4,7 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class GeometryTest {
-  // BND-069: public geometry values snapshot caller-owned nested collections.
+  // BND-069.
 
   @Test
   fun geometryValuesSnapshotNestedCollections() {

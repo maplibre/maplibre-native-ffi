@@ -15,8 +15,8 @@ import org.maplibre.nativeffi.internal.status.Status
 open class NativeTestBase {
   @BeforeTest
   fun installNativeTestLogCallback() {
-    // Kotlin/Native test events share the process output stream with native logs.
-    // Consume MapLibre records so async native logging cannot corrupt Gradle's test report.
+    // Native logs share the process output stream with Kotlin/Native test events, so
+    // consume MapLibre records to keep them out of Gradle's test report.
     Status.check(mln_log_set_callback(staticCFunction(::consumeNativeTestLog), null))
   }
 

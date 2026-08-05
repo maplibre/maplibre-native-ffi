@@ -117,9 +117,7 @@ class MapMode(NativeIntEnum):
 class MapOptions:
     """Options used when creating a map.
 
-    A field left as ``None`` takes the C API default, matching
-    :class:`RuntimeOptions`, so these defaults never drift from
-    ``mln_map_options``.
+    A field left as ``None`` takes the C API default.
     """
 
     width: int | None = None
@@ -140,7 +138,6 @@ class MapViewportOptions:
 
     @classmethod
     def _from_native(cls, raw: dict[str, object]) -> "MapViewportOptions":
-        """Build viewport options from private native bridge values."""
         frustum_offset = raw["frustum_offset"]
         return cls(
             north_orientation=NorthOrientation(raw["north_orientation"])
@@ -171,7 +168,6 @@ class MapTileOptions:
 
     @classmethod
     def _from_native(cls, raw: dict[str, object]) -> "MapTileOptions":
-        """Build tile options from private native bridge values."""
         return cls(
             prefetch_zoom_delta=raw["prefetch_zoom_delta"],
             lod_min_radius=raw["lod_min_radius"],
@@ -266,9 +262,8 @@ def _bounds_parts(
             (box.northeast.latitude, box.northeast.longitude),
         )
     elif constraint is not None and not isinstance(constraint, Unbounded):
-        # Annotations do not bind at runtime, so an unsupported value would
-        # otherwise read as "leave the geographic constraint alone" and the
-        # caller would see a silent no-op instead of a rejection.
+        # Annotations do not bind at runtime; without this an unsupported
+        # value would read as "leave the constraint alone".
         raise InvalidArgumentError(
             "BoundOptions.bounds must be Bounded, Unbounded, or None, "
             f"not {type(constraint).__name__}"
@@ -309,9 +304,8 @@ def _animation_parts(
     )
     transition_id = animation.transition_id
     if transition_id is not None and not 0 <= transition_id < 2**64:
-        # PyO3 extracts this as `Option<u64>` and raises a bare OverflowError
-        # before the binding's error conversion runs, so range-check it here to
-        # keep invalid binding-owned input on the documented error shape.
+        # PyO3 raises a bare OverflowError extracting `Option<u64>` before the
+        # binding's error conversion runs.
         raise InvalidArgumentError(
             f"AnimationOptions.transition_id must fit in 64 unsigned bits, "
             f"not {transition_id}"
@@ -547,9 +541,7 @@ class MapHandle(NativeHandleMixin):
 
         Closing discards this map's queued runtime events and its recorded
         loading failure. There is no flush and no terminal event, so read any
-        state you mirror from events before closing, and treat close as the end
-        of this map's event stream rather than awaiting an event during
-        teardown.
+        state you mirror from events before closing.
         """
         self._native.close()
         self._runtime._unregister_map(self)  # noqa: SLF001
@@ -589,10 +581,8 @@ class MapHandle(NativeHandleMixin):
     def get_size(self) -> tuple[int, int, float]:
         """Return the map's logical width, height, and pixel ratio.
 
-        The size starts at the creation width and height, and follows the
-        attach and resize rules documented on MapOptions. The scale factor is
-        fixed for the lifetime of the map and is independent of any render
-        target's scale factor.
+        The scale factor is fixed for the lifetime of the map and is
+        independent of any render target's scale factor.
         """
         return self._native.get_size()
 
@@ -639,59 +629,40 @@ class MapHandle(NativeHandleMixin):
     def set_style_url(self, url: str) -> None:
         """Load a style URL through MapLibre Native style APIs.
 
-        Loading is asynchronous, so a style that fails to fetch or parse still
-        returns normally here and reports through a later loading-failed
-        runtime event. Watch the event stream for load outcomes.
-
-        A well-formed style whose contents are semantically invalid, such as an
-        unknown "version" or a layer naming a missing source, loads without an
-        error and without an event: MapLibre Native logs it and renders what it
-        can.
+        Loading is asynchronous: a style that fails to fetch or parse returns
+        normally here and reports through a later loading-failed runtime event.
+        A well-formed style with semantically invalid contents loads without an
+        error and without an event.
         """
         self._native.set_style_url(url)
 
     def set_style_json(self, json: str) -> None:
         """Load inline style JSON through MapLibre Native style APIs.
 
-        Malformed JSON is reported twice: this call raises the parse error
-        synchronously, and the same message also arrives as a loading-failed
-        runtime event. Handle both, so an event-driven loop stays consistent
-        with the call site.
-
-        A well-formed style whose contents are semantically invalid, such as an
-        unknown "version" or a layer naming a missing source, loads without an
-        error and without an event: MapLibre Native logs it and renders what it
-        can.
+        Malformed JSON is reported twice: this call raises the parse error, and
+        the same message also arrives as a loading-failed runtime event. A
+        well-formed style with semantically invalid contents loads without an
+        error and without an event.
         """
         self._native.set_style_json(json)
 
     def get_loaded_style_json(self) -> str:
         """Return the style document this map's style was last parsed from.
 
-        This is the loaded document, not a serialization of the live style: the
-        string passed to set_style_json(), or the response body fetched for
-        set_style_url(). Runtime mutations such as adding a layer do not change
-        it, and a failed parse leaves the previously parsed document in place.
-        The result is byte-for-byte the string given to set_style_json(), so it
-        can be handed back unchanged.
-
-        The result is empty when no document has been parsed. A parsed document
-        is never empty.
+        This is the loaded document, not a serialization of the live style, so
+        runtime mutations do not change it and a failed parse leaves the
+        previously parsed document in place. The result is empty when no
+        document has been parsed.
         """
         return self._native.copy_loaded_style_json()
 
     def get_style_url(self) -> str:
         """Return the URL this map's style was last requested from.
 
-        Unlike get_loaded_style_json(), this is live rather than load-time
-        state: set_style_url() records the URL when the request is made, before
-        the response arrives or the document parses, and set_style_json() clears
-        it. The two can disagree while a load is in flight or after one fails.
-
-        The result is empty when no URL bytes are available, which covers a
-        style loaded from inline JSON, a map that has loaded no style, and a URL
-        load requested with an empty string. These cases are not distinguishable
-        here.
+        set_style_url() records the URL before the response arrives, and
+        set_style_json() clears it, so this can disagree with
+        get_loaded_style_json() while a load is in flight or after one fails.
+        The result is empty when no URL bytes are available.
         """
         return self._native.copy_style_url()
 
@@ -955,10 +926,9 @@ class MapHandle(NativeHandleMixin):
     def set_style_transition_options(self, options: StyleTransitionOptions) -> None:
         """Set the style's global transition options.
 
-        Absent duration and delay clear the style-wide override, so this call
-        replaces the whole transition configuration rather than merging into it.
-        Loading a style replaces these options with the ones that style
-        declares, so apply an override after the style loads.
+        This call replaces the whole transition configuration rather than
+        merging into it. Loading a style replaces these options with the ones
+        that style declares, so apply an override after the style loads.
         """
         self._native.set_style_transition_options(
             options.duration_ms,
@@ -1207,9 +1177,8 @@ class MapHandle(NativeHandleMixin):
     ) -> None:
         """Apply a camera ease transition command.
 
-        An absent `animation`, or an animation with no duration, eases over
-        zero duration: the camera reaches the target before this call returns,
-        with no runtime pump in between. Set a duration to animate over time.
+        An absent `animation`, or one with no duration, reaches the target
+        before this call returns, with no runtime pump in between.
         """
         self._native.ease_to(*_camera_parts(camera), _animation_parts(animation))
 
@@ -1220,10 +1189,9 @@ class MapHandle(NativeHandleMixin):
     ) -> None:
         """Apply a camera fly transition command.
 
-        Fly is the one camera command that animates by default: an absent
-        `animation`, or an animation with no duration, derives a duration from
-        a default velocity of 1.2 screenfuls per second, so the camera is still
-        en route when this call returns and advances as the runtime is pumped.
+        Fly animates by default: an absent `animation`, or one with no
+        duration, derives a duration from a velocity of 1.2 screenfuls per
+        second, so the camera advances as the runtime is pumped.
         """
         self._native.fly_to(*_camera_parts(camera), _animation_parts(animation))
 
@@ -1308,8 +1276,7 @@ class MapHandle(NativeHandleMixin):
         """Apply an animated screen-space pan command.
 
         Native routes this delta through the ease transition, so an absent
-        `animation`, or an animation with no duration, applies the pan
-        instantly like `ease_to`. Set a duration to animate over time.
+        `animation`, or one with no duration, applies the pan instantly.
         """
         self._native.move_by_animated(delta_x, delta_y, _animation_parts(animation))
 
@@ -1327,8 +1294,7 @@ class MapHandle(NativeHandleMixin):
         """Apply an animated screen-space zoom command.
 
         Native routes this delta through the ease transition, so an absent
-        `animation`, or an animation with no duration, applies the zoom
-        instantly like `ease_to`. Set a duration to animate over time.
+        `animation`, or one with no duration, applies the zoom instantly.
         """
         raw_anchor = (anchor.x, anchor.y) if anchor is not None else None
         self._native.scale_by_animated(scale, raw_anchor, _animation_parts(animation))
@@ -1346,8 +1312,7 @@ class MapHandle(NativeHandleMixin):
         """Apply an animated screen-space rotate command.
 
         Native routes this delta through the ease transition, so an absent
-        `animation`, or an animation with no duration, applies the rotation
-        instantly like `ease_to`. Set a duration to animate over time.
+        `animation`, or one with no duration, applies the rotation instantly.
         """
         self._native.rotate_by_animated(
             (first.x, first.y),
@@ -1367,29 +1332,24 @@ class MapHandle(NativeHandleMixin):
         """Apply an animated pitch delta command.
 
         Native routes this delta through the ease transition, so an absent
-        `animation`, or an animation with no duration, applies the pitch
-        instantly like `ease_to`. Set a duration to animate over time.
+        `animation`, or one with no duration, applies the pitch instantly.
         """
         self._native.pitch_by_animated(pitch, _animation_parts(animation))
 
     def cancel_transitions(self) -> None:
         """Cancel active camera transitions.
 
-        A cancelled transition that carried an ``AnimationOptions``
-        ``transition_id`` reports its end through a
-        ``MAP_CAMERA_TRANSITION_FINISHED`` runtime event, the same event a
-        transition that runs to completion reports.
+        A cancelled transition carrying a ``transition_id`` reports its end
+        through a ``MAP_CAMERA_TRANSITION_FINISHED`` runtime event.
         """
         self._native.cancel_transitions()
 
     def set_gesture_in_progress(self, in_progress: bool) -> None:
         """Mark whether a host-driven gesture is in progress.
 
-        A host that decodes its own pointer gestures sets this to ``True``
-        when a gesture starts and back to ``False`` when it ends, so the
-        camera commands issued in between belong to one live gesture. The
-        flag stays set until the host clears it, so pair every ``True`` with
-        a ``False``.
+        Camera commands issued while the flag is set belong to one gesture. The
+        flag stays set until the host clears it, so pair every ``True`` with a
+        ``False``.
         """
         self._native.set_gesture_in_progress(in_progress)
 

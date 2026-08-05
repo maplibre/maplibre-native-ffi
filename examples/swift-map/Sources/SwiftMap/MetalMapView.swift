@@ -2,17 +2,10 @@ import AppKit
 import MaplibreNativeFFI
 import QuartzCore
 
-/// The display-paced render loop.
-///
-/// This view runs on the main thread, which is the render loop thread: it owns
-/// the window, input decoding, the Metal objects, and the render session for
-/// the session's whole lifetime. The runtime and the map live on the runtime
-/// loop thread this view starts, and ``Channels`` is the only state that
-/// crosses between the two.
-///
-/// Input handlers never touch the map. They decode events into camera commands,
-/// because a read-modify-write camera change has to run whole on the map's own
-/// thread.
+/// The display-paced render loop. This view runs on the main thread and owns
+/// the window, input decoding, the Metal objects, and the render session. The
+/// runtime and the map live on the runtime loop thread it starts, reached
+/// through ``Channels``.
 @MainActor
 final class MetalMapView: NSView {
   private let metalLayer = CAMetalLayer()
@@ -75,8 +68,8 @@ final class MetalMapView: NSView {
     }
   }
 
-  /// Closes the session before the runtime loop closes the map, because native
-  /// refuses to destroy a map that still has a session attached.
+  /// Closes the session before the runtime loop closes the map; a map with an
+  /// attached session cannot be destroyed.
   @objc private func shutdown() {
     guard !isShutDown else { return }
     isShutDown = true
@@ -155,7 +148,8 @@ final class MetalMapView: NSView {
 
   private func startTimerIfNeeded() {
     guard timer == nil else { return }
-    // TODO(map-example-spec): Replace fixed NSTimer with a display-paced host loop. See Frame loop.
+    // TODO(map-example-spec): Replace fixed NSTimer with a display-paced host
+    // loop.
     timer = Timer
       .scheduledTimer(withTimeInterval: 1.0 / 60.0,
                       repeats: true)
@@ -167,10 +161,6 @@ final class MetalMapView: NSView {
 
   /// Starts the runtime loop once a non-empty viewport is known, because the
   /// map takes its initial extent from it.
-  ///
-  /// The runtime loop needs a native thread whose identity is stable for its
-  /// whole life, so it is a `Thread` rather than a `DispatchQueue`, an `actor`,
-  /// or a `Task`.
   private func startRuntimeLoopIfNeeded(viewport: Viewport) {
     guard runtimeLoop == nil, !isShutDown else { return }
     let loop = RuntimeLoopThread(channels: channels, viewport: viewport)
@@ -193,17 +183,13 @@ final class MetalMapView: NSView {
 
     do {
       graphics.resize(viewport)
-      // Every mode follows a resize without losing its session: the ones the
-      // session sizes resize in place, and the caller-owned texture allocates a
-      // replacement and hands it over.
       try renderTarget?.resize(graphics: graphics, viewport: viewport)
       currentViewport = viewport
       channels.setRenderRequest()
       startRuntimeLoopIfNeeded(viewport: viewport)
     } catch {
-      // A failed resize leaves the render target detached, so stop driving it
-      // rather than letting the next tick render through a session that is no
-      // longer attached to anything.
+      // A failed resize leaves the render target detached, so stop the timer
+      // rather than render through a detached session.
       print(error)
       timer?.invalidate()
       timer = nil
@@ -211,11 +197,8 @@ final class MetalMapView: NSView {
     }
   }
 
-  /// Attaches the render session on this thread.
-  ///
-  /// Attach records the calling thread as the session's owner, so it happens
-  /// here, where the Metal objects live and where every later session call
-  /// runs.
+  /// Attaches the render session on this thread. Attach records the calling
+  /// thread as the session's owner, and every later session call runs here.
   private func attachIfNeeded() {
     guard renderTarget == nil,
           let graphics,
@@ -254,9 +237,7 @@ final class MetalMapView: NSView {
     else { return }
 
     do {
-      // Consume the request before rendering, so one the runtime loop publishes
-      // during the render call is not discarded, and set it again when nothing
-      // was rendered.
+      // Consume first, so a request published during the render survives.
       if channels.consumeRenderRequest() {
         let rendered = try renderTarget.renderUpdate()
         if !rendered {

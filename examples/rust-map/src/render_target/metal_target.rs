@@ -37,12 +37,8 @@ impl RenderTarget {
         }
     }
 
-    /// Follows a resized host.
-    ///
-    /// A caller-owned texture is sized by this example, not by the session, so
-    /// following a resize means allocating one at the new size and handing it
-    /// over. The session stays live either way, which is what keeps the map
-    /// from going cold every time the window changes size.
+    /// Resizes without closing the session; a caller-owned texture is replaced
+    /// with one at the new size and handed over.
     pub fn resize(
         &mut self,
         graphics: &GraphicsContext,
@@ -60,17 +56,12 @@ impl RenderTarget {
                     replacement.pointer(),
                 );
                 if let Err(error) = session.set_metal_borrowed_texture_target(&descriptor) {
-                    // A native error may mean the session took the replacement
-                    // before failing, and nothing here can tell that apart from
-                    // a rejection that came first. Rust's detach consumes the
-                    // handle, which this borrow cannot do, so keep the
-                    // replacement alive instead: releasing it is the only way
-                    // to hand the session a dangling texture.
+                    // On failure the session may already hold the replacement,
+                    // so keep it alive rather than hand over a dangling
+                    // texture.
                     std::mem::forget(replacement);
                     return Err(error);
                 }
-                // Only once the session has taken it, so a rejected replacement
-                // leaves this target on the texture it already had.
                 **texture = replacement;
                 Ok(())
             }
@@ -98,8 +89,6 @@ impl RenderTarget {
                 let draw_result = compositor.draw(&frame);
                 let close_result = frame.close().map_err(|error| error.into_error());
                 match (draw_result, close_result) {
-                    // A draw that presented nothing reports no frame rendered.
-                    // The render request stays pending and the frame retries.
                     (Ok(presented), Ok(())) => Ok(presented),
                     (Err(draw_error), Ok(())) => Err(draw_error),
                     (Ok(_), Err(close_error)) => Err(close_error),

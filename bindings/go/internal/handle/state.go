@@ -16,11 +16,8 @@ type DestroyFunc[T ~uint64] func(T) int32
 // still live.
 var ErrLiveChildren = errors.New("handle has live children")
 
-// State stores close-once state for one owned native handle.
-//
-// The C API issues generational handles and rejects a released one, so this
-// tracks close-once ownership rather than identity. The zero handle means
-// closed.
+// State stores close-once state for one owned native handle. The zero handle
+// means closed.
 type State[T ~uint64] struct {
 	mu        sync.Mutex
 	cond      *sync.Cond
@@ -33,7 +30,7 @@ type State[T ~uint64] struct {
 }
 
 // Borrow serializes one use of a native handle against release, so a close
-// waits for in-flight cgo calls rather than racing them.
+// waits for in-flight cgo calls.
 type Borrow[T ~uint64] struct {
 	state  *State[T]
 	handle T

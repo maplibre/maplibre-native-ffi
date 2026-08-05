@@ -10,7 +10,7 @@ import org.maplibre.nativeffi.internal.c.mln_string_view
 
 @OptIn(ExperimentalForeignApi::class)
 class CoreStructsTest : org.maplibre.nativeffi.NativeTestBase() {
-  // BND-063: borrowed native string views are copied using explicit lengths.
+  // BND-063.
 
   @Test
   fun stringViewsPreserveEmbeddedNulWithExplicitLength() {

@@ -148,7 +148,7 @@ public class mln_feature_extension_result_info {
         private static final GroupLayout $LAYOUT = MemoryLayout.unionLayout(
             MapLibreNativeC.C_POINTER.withName("value"),
             mln_feature_collection.layout().withName("feature_collection")
-        ).withName("$anon$125:3");
+        ).withName("$anon$124:3");
 
         /**
          * The layout of this union

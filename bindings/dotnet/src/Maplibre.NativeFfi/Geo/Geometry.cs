@@ -4,9 +4,8 @@ namespace Maplibre.NativeFfi.Geo;
 
 /// <summary>Immutable geometry tree used by Maplibre descriptors and copied results.</summary>
 /// <remarks>
-/// Coordinate lists compare element by element, so geometries built from distinct list instances
-/// holding the same coordinates compare equal. Construction and <c>with</c> snapshot the caller's
-/// lists at every level, so later caller mutation does not change the geometry.
+/// Coordinate lists compare element by element. Construction and <c>with</c> snapshot the caller's
+/// lists at every level.
 /// </remarks>
 public abstract record Geometry
 {

@@ -7,10 +7,9 @@ import (
 	"testing"
 )
 
-// A session-owned texture session is the one live render session this suite can
-// attach, so it covers the target kinds SetTarget rejects. Replacing a target
-// the host owns needs a host-allocated surface or texture, which this suite has
-// no way to create.
+// A session-owned texture session is the only session this suite can create, so
+// it covers only the target kinds SetTarget rejects; replacing a host-owned
+// target would need a host-allocated surface or texture.
 func TestSetTargetRejectsOtherTargetKindsDarwin(t *testing.T) {
 	if !SupportedRenderBackends().Has(RenderBackendMetal) {
 		t.Skip("Metal texture sessions are not supported by this build")

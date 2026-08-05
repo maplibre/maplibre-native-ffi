@@ -34,9 +34,8 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
     private CommandBuffer commandBuffer;
     private VulkanSemaphore imageAvailable;
 
-    // One semaphore per swapchain image. Each present waits on the semaphore that its own submit
-    // signalled, so a later submit never signals one that a pending present still waits on. Vulkan
-    // forbids that overlap, and it shows as half-drawn frames.
+    // One semaphore per swapchain image: Vulkan forbids signalling a semaphore that a pending
+    // present still waits on, which shows up as half-drawn frames.
     private VulkanSemaphore[] renderFinished = [];
     private Fence inFlight;
     private Viewport viewport;
@@ -128,8 +127,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
             "vkWaitForFences"
         );
 
-        // A suboptimal swapchain still presents, so the frame that reported it reaches the screen
-        // and the replacement is built here, ahead of the next draw.
+        // Rebuild here rather than when suboptimal was reported, so that frame still presents.
         if (swapchainStale)
         {
             RecreateSwapchain();
@@ -152,7 +150,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
 
         if (acquire == Result.SuboptimalKhr)
         {
-            // Still presentable, but the surface has moved on; rebuild before the next frame.
+            // Still presentable; rebuild before the next frame.
             swapchainStale = true;
         }
         else if (acquire != Result.Success)

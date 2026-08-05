@@ -60,14 +60,11 @@ pub const AnimationOptions = struct {
     velocity: ?f64 = null,
     min_zoom: ?f64 = null,
     easing: ?UnitBezier = null,
-    /// Caller-chosen identity for the transition these options start.
-    ///
-    /// When set, the transition reports its end once through a
-    /// `map_camera_transition_finished` runtime event carrying this value, as
-    /// described on `CameraTransitionFinishedPayload`. MapLibre Native passes
-    /// the value through without interpreting it, so callers pick their own
-    /// scheme, such as a monotonically increasing counter. Leaving it absent
-    /// reports no such event.
+    /// Caller-chosen identity for the transition these options start. When set,
+    /// the transition reports its end once through a
+    /// `map_camera_transition_finished` runtime event carrying this value; when
+    /// absent, no such event is reported. The value is passed through
+    /// uninterpreted.
     transition_id: ?u64 = null,
 };
 
@@ -77,8 +74,8 @@ pub const CameraFitOptions = struct {
     pitch: ?f64 = null,
 };
 
-/// Geographic constraint applied to the map camera center. The unbounded case leaves the camera
-/// center free, so the map pans across the antimeridian. This differs from world bounds of
+/// Geographic constraint applied to the map camera center. The unbounded case
+/// leaves the center free to pan across the antimeridian, unlike world bounds of
 /// -90/-180 to 90/180, which clamp longitude to that range.
 pub const BoundsConstraint = union(enum) {
     bounded: LatLngBounds,
@@ -233,10 +230,8 @@ pub const StyleRasterDemEncoding = union(enum) {
     }
 };
 
-/// Whether a style layer draws.
-///
-/// This is an open domain: MapLibre Native may report a value with no named field here, so a
-/// `switch` over this type needs an `else` branch.
+/// Whether a style layer draws. This is an open domain, so a `switch` over it
+/// needs an `else` branch.
 pub const StyleLayerVisibility = union(enum) {
     visible,
     none,
@@ -270,15 +265,14 @@ pub const StyleTileSourceOptions = struct {
     raster_encoding: ?StyleRasterDemEncoding = null,
 };
 
-/// Options for GeoJSON sources. MapLibre Native fixes these options when the source is created, so
-/// setGeoJsonSourceUrl and setGeoJsonSourceData keep the options the source was added with.
+/// Options for GeoJSON sources, fixed when the source is created.
 pub const StyleGeoJsonSourceOptions = struct {
     min_zoom: ?f64 = null,
     max_zoom: ?f64 = null,
     tolerance: ?f64 = null,
     cluster_max_zoom: ?f64 = null,
-    /// Cluster aggregation expressions keyed by property name, as a JSON object whose members
-    /// follow the MapLibre Style Spec clusterProperties form.
+    /// Cluster aggregation expressions as a JSON object in the MapLibre Style
+    /// Spec `clusterProperties` form.
     cluster_properties: ?JsonValue = null,
     tile_size: ?u32 = null,
     buffer: ?u32 = null,
@@ -286,8 +280,8 @@ pub const StyleGeoJsonSourceOptions = struct {
     cluster_min_points: ?u32 = null,
     line_metrics: ?bool = null,
     cluster: ?bool = null,
-    /// Applies data updates synchronously, so data set through setGeoJsonSourceData reaches the
-    /// next rendered frame instead of being tiled on a worker and shown in a later one.
+    /// Applies data updates synchronously, so data set through
+    /// `setGeoJsonSourceData` reaches the next rendered frame.
     synchronous_update: ?bool = null,
 
     /// Copies this descriptor and recursively owns all nested cluster-property storage.
@@ -329,10 +323,8 @@ pub const ImageContent = struct {
     bottom: f32,
 };
 
-/// How a stretchable image fits text along one axis.
-///
-/// This is an open domain: MapLibre Native may report a value with no named field here, so a
-/// `switch` over this type needs an `else` branch.
+/// How a stretchable image fits text along one axis. This is an open domain, so
+/// a `switch` over it needs an `else` branch.
 pub const StyleImageTextFit = union(enum) {
     stretch_or_shrink,
     stretch_only,
@@ -361,8 +353,8 @@ pub const StyleImageTextFit = union(enum) {
 pub const StyleImageOptions = struct {
     pixel_ratio: ?f32 = null,
     sdf: ?bool = null,
-    /// Stretchable intervals along each axis. A present empty slice stays distinguishable from
-    /// an absent one. Borrowed for the call.
+    /// Stretchable intervals along each axis, borrowed for the call. A present
+    /// empty slice stays distinguishable from an absent one.
     stretch_x: ?[]const ImageStretch = null,
     stretch_y: ?[]const ImageStretch = null,
     /// Content box used when icon-text-fit applies.
@@ -371,25 +363,19 @@ pub const StyleImageOptions = struct {
     text_fit_height: ?StyleImageTextFit = null,
 };
 
-/// The style's global transition options.
-///
-/// These control how the style animates paint property changes and whether symbol placement
-/// changes cross-fade. They are distinct from camera animation options and from the per-property
-/// transitions a style declares.
+/// The style's global transition options, covering paint property changes and
+/// symbol placement cross-fade. These are distinct from camera animation
+/// options and from the per-property transitions a style declares.
 pub const StyleTransitionOptions = struct {
-    /// Transition duration in milliseconds. Absent falls back to the duration the style declares
-    /// for each transitioning property.
+    /// Transition duration in milliseconds. Absent falls back to the duration
+    /// the style declares for each transitioning property.
     duration_ms: ?f64 = null,
-    /// Transition delay in milliseconds. Absent falls back to the delay the style declares for
-    /// each transitioning property.
+    /// Transition delay in milliseconds. Absent falls back to the delay the
+    /// style declares for each transitioning property.
     delay_ms: ?f64 = null,
-    /// Whether symbol placement changes cross-fade. Absent leaves the cross-fade on, which is
-    /// MapLibre Native's own default.
-    ///
-    /// Clearing it makes symbol placement changes apply to the next rendered frame. Hosts that
-    /// move symbol-backed features at pointer frequency clear it for the duration of the
-    /// interaction so the rendered symbol keeps up. Reading the options always reports it,
-    /// because MapLibre Native always holds a value for it.
+    /// Whether symbol placement changes cross-fade. Absent leaves the
+    /// cross-fade on; clearing it applies placement changes to the next
+    /// rendered frame. Reads always report a value.
     enable_placement_transitions: ?bool = null,
 };
 
@@ -400,8 +386,8 @@ pub const StyleImageInfo = struct {
     byte_length: usize,
     pixel_ratio: f32,
     sdf: bool,
-    /// Interval counts for the stretchable axes. Read the intervals themselves with
-    /// copyStyleImageStretches.
+    /// Interval counts for the stretchable axes. Read the intervals themselves
+    /// with `copyStyleImageStretches`.
     stretch_x_count: usize = 0,
     stretch_y_count: usize = 0,
     /// Content box, absent when the image carries none.
@@ -1253,8 +1239,8 @@ pub fn premultipliedRgba8ImageToNative(value: PremultipliedRgba8Image) c.mln_pre
     return raw;
 }
 
-/// Materializes native image options. The stretch slices are borrowed, so `value` and the
-/// scratch buffers it points at must outlive the native call.
+/// Materializes native image options. The stretch slices are borrowed, so
+/// `value` and the scratch buffers must outlive the native call.
 pub fn styleImageOptionsToNative(
     value: StyleImageOptions,
     stretch_x: []c.mln_image_stretch,

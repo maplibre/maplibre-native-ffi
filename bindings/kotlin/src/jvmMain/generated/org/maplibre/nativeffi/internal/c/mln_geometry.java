@@ -163,7 +163,7 @@ public class mln_geometry {
             mln_multi_line_geometry.layout().withName("multi_line_string"),
             mln_multi_polygon_geometry.layout().withName("multi_polygon"),
             mln_geometry_collection.layout().withName("geometry_collection")
-        ).withName("$anon$405:3");
+        ).withName("$anon$402:3");
 
         /**
          * The layout of this union

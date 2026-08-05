@@ -1,6 +1,5 @@
-// Browser HTTP via emscripten_fetch. The transport stays browser-native so it
-// respects CORS, cookies, and the page cache; this file owns the native request
-// lifecycle and maps fetch results into MapLibre responses.
+// Browser HTTP via emscripten_fetch, so requests respect CORS, cookies, and the
+// page cache.
 
 #include <algorithm>
 #include <atomic>
@@ -45,16 +44,10 @@ namespace {
 // requests below OnlineFileSource's platform-wide concurrency limit.
 constexpr auto maxActiveFetches = std::size_t{16};
 
-// Deadline for one fetch, after which the browser reports a failure and the
-// request hands its slot back. Without it a server that accepts a connection
-// and then stalls holds its slot forever, and 16 such requests park every later
-// one.
-//
-// This is a deliberate browser-only policy rather than parity with the native
-// sources: an XHR exposes a whole-request deadline and nothing narrower, so
-// bounding a stalled connection here also bounds a transfer that is still
-// making progress. A request the browser cannot finish inside the deadline
-// fails with a connection error, which MapLibre retries.
+// Deadline for one fetch, after which the request hands its slot back with a
+// connection error that MapLibre retries. Without it a stalled server holds its
+// slot forever. An XHR exposes only a whole-request deadline, so this also
+// bounds a transfer that is still making progress.
 constexpr auto fetchTimeout = Seconds{30};
 
 std::atomic_uint64_t nextRequestId = 1;
@@ -198,21 +191,13 @@ auto makeResponse(const Resource& resource, emscripten_fetch_t* fetch)
 
 // The thread every fetch is issued on.
 //
-// emscripten_fetch performs its request on the calling thread and reports it
-// through that thread's event loop. Every MapLibre thread parks in its run loop
-// rather than returning to one, so a fetch issued from one is never reported at
-// all: the request reaches the server and the response is dropped.
-//
-// This thread exists to have an event loop. Its entry takes a runtime keepalive
-// and returns, which leaves the worker alive servicing JavaScript, and work
-// reaches it through the proxying queue. The first request queue starts the
-// worker and the last one releases its keepalive, so a host that destroys all
-// browser HTTP sources does not retain a worker forever. Responses travel back
-// through util::AsyncTask, which wakes a parked run loop through a condition
-// variable and so needs no event loop on the receiving side.
-//
-// A thread of its own rather than the main runtime thread, which a host is free
-// to block: nothing here should depend on how a host drives the runtime.
+// emscripten_fetch reports through the calling thread's event loop, and every
+// MapLibre thread parks in its run loop instead of returning to one, so a fetch
+// issued from one is never reported. This thread's entry takes a runtime
+// keepalive and returns, leaving a worker that services JavaScript; work
+// reaches it through the proxying queue. The first request queue starts it and
+// the last releases the keepalive. Responses travel back through
+// util::AsyncTask, which needs no event loop on the receiving side.
 class TransportThread {
  public:
   static auto instance() -> TransportThread& {
@@ -327,15 +312,11 @@ class FetchRequestQueue {
   bool pumpRequested_ = false;
 };
 
-// A request outlives the call that made it: the browser reports a fetch
-// whenever it pleases, delivery runs on the owner's run loop, and the caller
-// can cancel anywhere in between. One rule keeps those paths from colliding.
-//
-// Everything a request holds -- the queue's transport slot, the fetch handle,
-// the caller's callback -- is claimed by taking it out of the member that holds
-// it while `mutex_` is held. Whoever claims it owns it and is the only one that
-// releases it, so cancellation, fetch completion, and delivery can race freely:
-// exactly one of them observes each resource and the others find nothing to do.
+// A request outlives the call that made it, and cancellation, fetch completion,
+// and delivery race freely. The rule: everything a request holds — the queue's
+// transport slot, the fetch handle, the caller's callback — is claimed by
+// taking it out of its member under `mutex_`, and whoever claims it is the only
+// one that releases it.
 //
 // A request never holds a reference to itself. The caller's AsyncRequest owns
 // it until cancellation, the queue owns every request it activated, an
@@ -364,7 +345,7 @@ class FetchRequestState
   }
 
   // Records the transport slot the queue just handed out. The request gives it
-  // back exactly once, whichever way it ends.
+  // back exactly once, however it ends.
   void takeSlot() {
     std::scoped_lock lock(mutex_);
     slotHeld_ = true;
@@ -380,9 +361,8 @@ class FetchRequestState
     // No handle outstanding.
     None,
     // A fetch is in flight and its terminal callback closes the handle. Set
-    // before emscripten_fetch() so the window in which the handle exists but
-    // the
-    // request has not stored it yet still has an owner.
+    // before emscripten_fetch() so the handle has an owner even before the
+    // request stores it.
     Callback,
     // The request took the handle away from the callback and closes it itself.
     Request,
@@ -406,8 +386,7 @@ class FetchRequestState
   const uint64_t id_;
   const Resource resource_;
   // The URL the transport requests, which is the resource's own unless it is an
-  // offline download. Resolved once here so the request start path, the header
-  // transform, and any retry all see the same URL.
+  // offline download. Resolved once so every path sees the same URL.
   const std::string url_;
   const std::weak_ptr<FetchRequestQueue> queue_;
 
@@ -526,11 +505,9 @@ auto FetchRequestState::buildRequestHeaders() const -> RequestHeaders {
   return headers;
 }
 
-// Hands the request to the transport thread, which is the only thread whose
-// event loop runs and so the only one a fetch can report to. Everything from
-// here happens there, including the bookkeeping after emscripten_fetch()
-// returns, so the request's own rules about who claims what are unchanged --
-// only the thread they run on is.
+// Hands the request to the transport thread, the only one a fetch can report
+// to. Everything from here runs there, including the bookkeeping after
+// emscripten_fetch() returns.
 void FetchRequestState::startOnTransport() {
   auto self = shared_from_this();
   if (TransportThread::instance().run([self]() { self->start(); })) {
@@ -587,9 +564,8 @@ void FetchRequestState::start() {
   }
 
   // The fetch owns a reference to the request until the terminal callback
-  // releases it. Every fetch reports exactly once -- including when a close
-  // below aborts it -- so that callback is the only thing that frees this, and
-  // `holder` is not ours to touch once the fetch has it.
+  // releases it. Every fetch reports exactly once, including when a close
+  // aborts it, so `holder` must not be touched once the fetch has it.
   auto* holder = new std::shared_ptr<FetchRequestState>(shared_from_this());
   attributes.userData = holder;
 
@@ -637,19 +613,16 @@ void FetchRequestState::start() {
 void FetchRequestState::closeClaimedFetch(
   emscripten_fetch_t* claimedFetch, pthread_t transportThread
 ) {
-  // Aborts the transfer, on the thread that owns the handle. Emscripten reports
-  // the abort to onFetchComplete() from inside this call, which finds the
-  // handle claimed and leaves it here.
-  //
-  // Cancellation can arrive after the shared transport has started another
-  // pthread. The XHR remains local to the generation that created it, so the
-  // recorded thread remains its target until the close completes.
+  // Aborts the transfer on the thread that owns the handle. The XHR is local to
+  // the transport generation that created it, so `transportThread` stays its
+  // target even after another generation has started. Emscripten reports the
+  // abort to onFetchComplete() from inside this call, which finds the handle
+  // claimed and leaves it here.
   if (pthread_equal(pthread_self(), transportThread)) {
     emscripten_fetch_close(claimedFetch);
   } else {
-    // The queued stop follows work already sent to this pthread. If proxying
-    // nevertheless fails, leaving the handle allocated is safer than touching
-    // worker-local XHR state from another pthread.
+    // If proxying fails, leaking the handle beats touching worker-local XHR
+    // state from another pthread.
     static_cast<void>(TransportThread::runOn(transportThread, [claimedFetch]() {
       emscripten_fetch_close(claimedFetch);
     }));
@@ -672,10 +645,9 @@ void FetchRequestState::cancel() {
       return;
     }
     canceled_ = true;
-    // The caller is gone, so the callback and the delivery task are the
-    // request's to drop. Dropping the task also takes any delivery it has
-    // already queued back out of the run loop, so a response cannot sit in the
-    // wasm heap waiting for a pump that will never come.
+    // Dropping the task also removes any delivery it already queued from the
+    // run loop, so a response cannot sit in the wasm heap awaiting a pump that
+    // will never come.
     callback_ = nullptr;
     delivery = std::move(delivery_);
     if (transport_ == Transport::Callback) {
@@ -723,10 +695,9 @@ void FetchRequestState::completeFetch(emscripten_fetch_t* completedFetch) {
   {
     std::scoped_lock lock(mutex_);
     if (transport_ != Transport::Callback) {
-      // Cancellation claimed the handle and is inside emscripten_fetch_close()
-      // right now, which is what reported this abort. Closing the handle and
-      // finishing the request are the claimer's, so there is nothing to do here
-      // and nothing left to read out of `completedFetch`.
+      // Cancellation claimed the handle and is inside emscripten_fetch_close(),
+      // which reported this abort. It closes the handle and finishes the
+      // request, and `completedFetch` holds nothing left to read.
       return;
     }
     // Claimed before reading the response, so a cancellation that arrives while

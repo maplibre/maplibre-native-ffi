@@ -1,14 +1,9 @@
 #define MLN_BUILDING_C
 
 // Adapts synchronous MapLibre callback contracts to hosts that can only receive
-// callbacks asynchronously through void listener functions. See
-// include/maplibre_native_c/callback_adapter.h for what this layer promises and
-// which hosts it serves.
+// callbacks asynchronously through void listener functions.
 //
-// Everything here runs on MapLibre's own threads. It copies borrowed payloads
-// into native-owned records, decides from native-owned routing tables when a
-// result is needed immediately, and only ever hands records to a host through a
-// void listener.
+// Everything here runs on MapLibre's own threads.
 
 #include <algorithm>
 #include <condition_variable>
@@ -78,8 +73,8 @@ auto matches_rule(std::uint32_t rule_kind, std::uint32_t request_kind) -> bool {
          rule_kind == request_kind;
 }
 
-// Compares one non-wildcard pattern element against one candidate character,
-// and reports how many pattern characters it spans. Zero reports no match.
+// Returns how many pattern characters the element at `index` spans, or zero
+// when it does not match `candidate`.
 auto literal_span(std::string_view pattern, std::size_t index, char candidate)
   -> std::size_t {
   const auto element = pattern[index];
@@ -93,14 +88,10 @@ auto literal_span(std::string_view pattern, std::size_t index, char candidate)
 }
 
 // Matches one glob pattern against a candidate URL, in the language
-// callback_adapter.h documents.
-//
-// Confining '*' to one path segment is what the host patterns rely on, so a
-// wildcard run stops at a '/' unless the pattern spelled '**'. The latest run
-// of each kind stays available as a backtrack point, so an exhausted '*' can
-// yield to an earlier '**'. This costs at most the product of the two lengths.
-// Matching allocates nothing and never recurses, so a host pattern cannot
-// overflow the MapLibre thread this runs on.
+// callback_adapter.h documents. A '*' run stops at a '/' unless the pattern
+// spelled '**'. Matching is iterative and allocation-free so that a host
+// pattern cannot overflow the MapLibre thread this runs on; the worst case
+// costs the product of the two lengths.
 auto glob_matches(std::string_view pattern, std::string_view candidate)
   -> bool {
   auto pattern_index = std::size_t{0};
@@ -187,10 +178,8 @@ static_assert(
   "a queued provider route selects glob matching with the shared flag bit"
 );
 
-// Compares one rule's url against the candidate URL under the rule's flags. A
-// null url, an absent candidate, or a flag bit outside known_flags describes no
-// URL family this version can compare, so such a rule claims nothing rather
-// than everything.
+// A null url, an absent candidate, or a flag bit outside known_flags matches
+// nothing rather than everything.
 auto url_matches(
   std::uint32_t flags, std::uint32_t known_flags, const char* url,
   const char* candidate
@@ -211,7 +200,6 @@ auto has_flag(std::uint32_t flags, mln_adapter_resource_route_flags flag)
   return (flags & static_cast<std::uint32_t>(flag)) != 0;
 }
 
-// Compares one route's url against the request URL its flags select.
 auto route_matches_url(
   const AdapterQueuedResourceProviderRoute& route,
   const mln_resource_request& request
@@ -326,8 +314,7 @@ void queue_log_retirement(mln_adapter_log_record_listener listener) noexcept {
   try {
     listener(nullptr);
   } catch (...) {
-    // The callback has already been removed from native dispatch. Listener
-    // delivery is notification-only at this boundary.
+    // Listener delivery is notification-only at this boundary.
   }
 }
 
@@ -363,8 +350,6 @@ extern "C" MLN_API void mln_adapter_handle_leak_report(void* token) noexcept {
   if (leak != nullptr) {
     static_cast<void>(std::fputs("maplibre_native_ffi: leaked ", stderr));
     static_cast<void>(std::fputs(leak->type_name.c_str(), stderr));
-    // A handle id names one object for the life of the process, so printing it
-    // lets a reader match the report against the log line that created it.
     static_cast<void>(std::fprintf(
       stderr, " handle %llu", static_cast<unsigned long long>(leak->handle)
     ));
@@ -576,8 +561,8 @@ extern "C" MLN_API auto mln_adapter_queued_resource_provider_callback(
   void* user_data, const mln_resource_request* request,
   mln_resource_request_handle handle
 ) noexcept -> std::uint32_t {
-  // Each route decides which URL it compares, so an absent URL is left to route
-  // matching rather than rejected up front.
+  // Each route decides which URL it compares, so route matching handles an
+  // absent URL.
   if (user_data == nullptr || request == nullptr || handle == MLN_HANDLE_NULL) {
     return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
   }

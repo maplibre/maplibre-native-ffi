@@ -163,7 +163,7 @@ public class mln_json_value {
             mln_string_view.layout().withName("string_value"),
             mln_json_array.layout().withName("array_value"),
             mln_json_object.layout().withName("object_value")
-        ).withName("$anon$462:3");
+        ).withName("$anon$459:3");
 
         /**
          * The layout of this union

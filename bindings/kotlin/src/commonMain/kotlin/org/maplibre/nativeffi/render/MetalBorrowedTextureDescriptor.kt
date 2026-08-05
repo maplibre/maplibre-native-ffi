@@ -11,20 +11,14 @@ public class MetalBorrowedTextureDescriptor(
 ) {
   public var extent: RenderTargetExtent = extent
 
-  /**
-   * Physical texture size in device pixels. The texture is sized by its owner, so this is stated
-   * rather than derived from [extent].
-   */
+  /** Physical texture size in device pixels, stated by the texture's owner rather than derived. */
   public var physicalWidth: Int = physicalWidth
     set(value) {
       Status.requireArgument(value >= 0) { "physicalWidth must be non-negative" }
       field = value
     }
 
-  /**
-   * Physical texture size in device pixels. The texture is sized by its owner, so this is stated
-   * rather than derived from [extent].
-   */
+  /** Physical texture size in device pixels, stated by the texture's owner rather than derived. */
   public var physicalHeight: Int = physicalHeight
     set(value) {
       Status.requireArgument(value >= 0) { "physicalHeight must be non-negative" }

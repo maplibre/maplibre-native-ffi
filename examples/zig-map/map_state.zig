@@ -6,9 +6,6 @@ const diagnostics = @import("diagnostics.zig");
 const types = @import("types.zig");
 
 /// Runtime and map, owned for their whole lifetime by the runtime loop thread.
-///
-/// The render target is not here: it belongs to the render loop thread, which
-/// owns the window and the graphics context.
 pub const MapState = struct {
     allocator: std.mem.Allocator,
     diagnostic_store: *maplibre.DiagnosticStore,
@@ -58,9 +55,8 @@ pub const MapState = struct {
         self.allocator.destroy(self.diagnostic_store);
     }
 
-    /// Applies every queued camera command on the map's owner thread.
-    ///
-    /// `batch` is owned by the runtime loop and reused across drains.
+    /// Applies every queued camera command on the map's owner thread. `batch`
+    /// is owned by the runtime loop and reused across drains.
     pub fn applyCommands(
         self: *MapState,
         commands: *channel.CommandQueue,
@@ -73,9 +69,8 @@ pub const MapState = struct {
     }
 };
 
-/// Applies one decoded camera command. Runs on the map's owner thread, which is
-/// why the read-modify-write commands read the current camera here rather than
-/// on the render loop that produced them.
+/// Applies one decoded camera command. Runs on the map's owner thread, so the
+/// read-modify-write commands read the current camera here.
 pub fn applyCameraCommand(
     map: *maplibre.MapHandle,
     command: channel.CameraCommand,

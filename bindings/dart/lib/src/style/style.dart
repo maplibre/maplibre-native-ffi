@@ -506,10 +506,7 @@ final class StyleImageOptions {
   final StyleImageTextFit? textFitHeight;
 }
 
-/// The style's global transition options.
-///
-/// These control how the style animates paint property changes and whether
-/// symbol placement changes cross-fade. They are distinct from camera animation
+/// The style's global transition options, distinct from camera animation
 /// options and from the per-property transitions a style declares.
 final class StyleTransitionOptions {
   /// Creates style transition options.
@@ -528,13 +525,8 @@ final class StyleTransitionOptions {
   final double? delayMs;
 
   /// Whether symbol placement changes cross-fade. Absent leaves the cross-fade
-  /// on, which is MapLibre Native's own default.
-  ///
-  /// Clearing it makes symbol placement changes apply to the next rendered
-  /// frame. Hosts that move symbol-backed features at pointer frequency clear
-  /// it for the duration of the interaction so the rendered symbol keeps up.
-  /// Reading the options always reports it, because MapLibre Native always
-  /// holds a value for it.
+  /// on; clearing it makes placement changes apply to the next rendered frame.
+  /// Reading the options always reports a value.
   final bool? enablePlacementTransitions;
 
   @override

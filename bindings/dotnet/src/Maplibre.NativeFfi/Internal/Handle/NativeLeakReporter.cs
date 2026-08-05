@@ -10,8 +10,7 @@ internal enum NativeLeakReportKind
 
 /// <param name="Handle">
 /// The C API handle id the leak is about, or zero when the leaked resource is
-/// binding-allocated memory rather than a C API handle. Backend-native
-/// addresses never appear here; they belong to <see cref="NativePointer" />.
+/// binding-allocated memory. Backend-native addresses never appear here.
 /// </param>
 internal readonly record struct NativeLeakReport(
     NativeLeakReportKind Kind,

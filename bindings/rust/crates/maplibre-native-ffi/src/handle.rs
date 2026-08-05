@@ -59,13 +59,8 @@ impl<T: NativeHandle> ThreadAffineNativeHandle<T> {
 
 impl<T: NativeHandle> Drop for ThreadAffineNativeHandle<T> {
     fn drop(&mut self) {
-        // Drop keeps Rust's owner-thread behavior while delegating close-once
-        // state tracking to core. It cannot return an error and must not panic,
-        // so a refused destroy leaves the pointer live and is reported through
-        // the leak channel instead of being discarded. The common cause is
-        // dropping a map that still has a render session attached: the C API
-        // refuses that destroy, and the native map would otherwise be
-        // unreachable with its runtime pinned live.
+        // Drop cannot return an error and must not panic, so a destroy that
+        // reports failure leaves the handle live and goes to the leak channel.
         let id = self.state.id().unwrap_or_default();
         // SAFETY: from_handle binds this Rust handle to the matching C API
         // destroy function for its owned native handle.
@@ -100,11 +95,9 @@ mod tests {
     static DESTROY_STATUS: AtomicI32 = AtomicI32::new(sys::MLN_STATUS_OK);
     static DESTROY_TEST_LOCK: Mutex<()> = Mutex::new(());
 
-    /// A synthetic map handle for close-once tests.
-    ///
-    /// It reaches only `count_destroy` below, never the C API, and the safe
-    /// public API cannot build one. The kind byte matches a map so a value that
-    /// escapes into a diagnostic reads as a synthetic map handle.
+    /// A synthetic map handle for close-once tests. It reaches only
+    /// `count_destroy` below, never the C API. The kind byte matches a map so
+    /// a value escaping into a diagnostic reads as one.
     const TEST_HANDLE: sys::mln_map = sys::mln_map(0x0200_0000_0000_002a);
 
     unsafe extern "C" fn count_destroy(handle: sys::mln_map) -> sys::mln_status {

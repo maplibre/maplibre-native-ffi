@@ -9,19 +9,15 @@
 
 namespace mln::core {
 
-// Public handles are 64-bit generational ids. Each id carries the generation of
-// the slot it came from, so a retired handle's generation never matches that
-// slot again and a stale handle resolves to nothing instead of to whichever
-// object holds the slot now.
-//
-// Layout, most significant bit first:
+// Public handles are 64-bit generational ids, laid out most significant bit
+// first:
 //
 //   bits 63..56  kind        1..255; 0 never appears in a live handle
 //   bits 55..36  index       slot within this kind's table
 //   bits 35..0   generation  slot reuse counter, starting at 1
 //
-// A live handle always carries a nonzero kind, so the value 0 is the null
-// handle for every type and cannot collide with a real one.
+// A live handle always carries a nonzero kind, so 0 is the null handle for
+// every type.
 enum class HandleKind : std::uint8_t {
   Runtime = 1,
   Map = 2,
@@ -71,9 +67,8 @@ inline constexpr auto handle_max_index =
   return handle & handle_max_generation;
 }
 
-// Why a well-formed handle did not resolve. Every fault reports
-// MLN_STATUS_INVALID_ARGUMENT; the distinction lives in the message so a host
-// can tell a released handle from a mismatched or forged one.
+// Why a handle did not resolve. Every fault reports
+// MLN_STATUS_INVALID_ARGUMENT; the distinction appears only in the message.
 enum class HandleFault : std::uint8_t {
   Null,
   NotAHandle,
@@ -82,8 +77,7 @@ enum class HandleFault : std::uint8_t {
   Stale,
 };
 
-// Spells the C typedef name for a kind, or nullptr when the byte names no
-// registered kind.
+// Returns the C typedef name for a kind, or nullptr for an unregistered kind.
 [[nodiscard]] auto handle_kind_name(std::uint8_t kind) noexcept -> const char*;
 
 // Records the thread-local diagnostic for a handle that failed to resolve.
@@ -91,8 +85,8 @@ auto set_handle_fault_error(
   HandleKind expected, std::uint64_t handle, HandleFault fault
 ) noexcept -> void;
 
-// Classifies a handle that failed to resolve, given whether its index fell
-// within the table's high-water mark.
+// `index_in_range` reports whether the handle's index fell within the table's
+// high-water mark.
 [[nodiscard]] auto classify_handle_fault(
   HandleKind expected, std::uint64_t handle, bool index_in_range
 ) noexcept -> HandleFault;
@@ -106,8 +100,7 @@ auto set_handle_fault_error(
 template <typename Object>
 struct HandleTraits;
 
-// Thrown when a kind's index space is full. Every insert site sits inside
-// mln::c_api::status_boundary, which reports it as MLN_STATUS_NATIVE_ERROR.
+// Thrown when a kind's index space is full.
 class HandleTableExhausted final : public std::runtime_error {
  public:
   using std::runtime_error::runtime_error;
@@ -116,8 +109,7 @@ class HandleTableExhausted final : public std::runtime_error {
 // A per-kind slot table mapping generational ids to owned objects.
 //
 // Locking contract: no entry point holds two handle-table mutexes at once.
-// Keep it that way — the tables are independent, and a second edge would need
-// an ordering rule the rest of the C API does not have.
+// There is no ordering rule between tables.
 template <typename Object>
 class HandleTable {
  public:
@@ -154,10 +146,9 @@ class HandleTable {
   // Borrows the object a handle names, or returns nullptr after recording the
   // thread-local diagnostic.
   //
-  // The returned pointer outlives this call's lock, so callers must be on a
-  // thread that cannot concurrently retire the handle. That is exactly the
-  // owner-thread contract every thread-affine type already carries. Callers on
-  // a foreign thread hold mutex() and use resolve_locked(), or lease().
+  // The returned pointer outlives this call's lock, so the caller must be on a
+  // thread that cannot concurrently retire the handle. A foreign thread holds
+  // mutex() and uses resolve_locked(), or uses lease().
   [[nodiscard]] auto resolve(std::uint64_t handle) const -> Object* {
     const std::scoped_lock lock(mutex_);
     return resolve_locked(handle);
@@ -171,10 +162,9 @@ class HandleTable {
     return object;
   }
 
-  // Same lookup without touching thread-local diagnostics, for code reachable
-  // from a MapLibre worker thread or a deferred callback, where writing an
-  // error would clobber the diagnostic of an unrelated entry point on the same
-  // stack.
+  // Same lookup without touching thread-local diagnostics. Use this from a
+  // MapLibre worker thread or a deferred callback, where writing an error would
+  // clobber the diagnostic of an unrelated entry point on the same stack.
   [[nodiscard]] auto try_resolve(std::uint64_t handle) const noexcept
     -> Object* {
     const std::scoped_lock lock(mutex_);
@@ -188,8 +178,7 @@ class HandleTable {
   }
 
   // Keeps the object readable after this table's lock is released. Available
-  // only for kinds whose teardown tolerates running on a foreign thread, so a
-  // lease can never move an owner-thread object's destructor off its owner.
+  // only for kinds whose teardown tolerates running on a foreign thread.
   [[nodiscard]] auto lease(std::uint64_t handle) const
     -> std::shared_ptr<Object>
     requires(Traits::leasable)
@@ -233,7 +222,7 @@ class HandleTable {
       free_indices_.push_back(static_cast<std::uint32_t>(index));
     }
     // A slot whose generation is exhausted is retired instead of recycled, so
-    // a handle value is never reused even in the limit.
+    // a handle value is never reused.
     return object;
   }
 

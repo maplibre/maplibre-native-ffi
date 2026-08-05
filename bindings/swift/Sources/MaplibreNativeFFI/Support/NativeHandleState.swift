@@ -58,21 +58,12 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     }
   }
 
-  /// Runs `use` with the handle and with release held off until it returns.
-  ///
-  /// Handles whose release is confined to one thread get this ordering from the
-  /// owner-thread rule
-  /// and can call native directly after `requireLive()`. Handles the host may
-  /// use and release from
-  /// different threads use this instead, so a release that begins mid-call
-  /// waits for the call to
-  /// finish. That is what keeps a losing race reporting this wrapper's own
-  /// closed-handle error
-  /// instead of the C API's rejection of an id retired underneath it.
+  /// Runs `use` with the handle and holds off release until it returns. Use
+  /// this for handles the host may use and release from different threads;
+  /// handles confined to one thread can call native after `requireLive()`.
   ///
   /// `use` runs outside the lock, so concurrent uses proceed together. Calling
-  /// `closeOnce` from
-  /// inside `use` on the same thread would wait on itself.
+  /// `closeOnce` from inside `use` on the same thread deadlocks.
   func withLive<T>(_ use: (Handle) throws -> T) throws -> T {
     let handle = try lock.withLock {
       let handle = try requireLiveLocked()
@@ -93,9 +84,8 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
       switch state {
       case let .live(handle):
         state = .closing(handle)
-        // Closing turns new uses away from here on. Uses that already passed
-        // their liveness check
-        // still hold the handle, so wait for them before destroying it.
+        // Uses that already passed their liveness check still hold the handle,
+        // so wait for them before destroying it.
         while activeUses > 0 {
           lock.wait()
         }

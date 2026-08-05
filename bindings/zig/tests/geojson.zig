@@ -167,8 +167,8 @@ test "GeoJSON source options carry cluster settings and reject malformed cluster
     const rank_expression = [_]maplibre.JsonValue{ .{ .string = "get" }, .{ .string = "rank" } };
     const total_expression = [_]maplibre.JsonValue{ .{ .string = "+" }, .{ .array = rank_expression[0..] } };
     const cluster_properties = [_]maplibre.JsonMember{.{ .key = "total", .value = .{ .array = total_expression[0..] } }};
-    // MapLibre Native parses the aggregation expressions while the descriptor is borrowed, so a
-    // source that adds successfully proves the nested cluster property tree crossed the boundary.
+    // The aggregation expressions are parsed while the descriptor is borrowed,
+    // so a successful add proves the nested tree crossed the boundary.
     try map.addGeoJsonSourceData(
         testing.allocator,
         "clustered",

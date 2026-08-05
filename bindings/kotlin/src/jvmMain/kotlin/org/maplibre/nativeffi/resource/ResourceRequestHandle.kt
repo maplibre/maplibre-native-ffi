@@ -56,14 +56,9 @@ internal constructor(private val handle: NativeResourceRequest) : AutoCloseable 
   /**
    * Releases the native request once the wrapper becomes unreachable.
    *
-   * Request handles carry no owner-thread affinity, so reclaiming one from the cleanup thread stays
-   * within the cleanup-hook contract that keeps runtime, map, projection, and render-session
-   * handles on their owner thread. [ResourceRequestHandleCore] first closes the public state, waits
-   * for active completion and cancellation borrows to finish, and releases only when the provider
-   * still owns the request.
-   *
-   * This holds the ownership state alone. Holding the wrapper would keep it reachable from the
-   * cleanup registry and suppress every reclaim.
+   * Request handles carry no owner-thread affinity, so the cleanup thread may reclaim one. This
+   * holds the ownership state alone; holding the wrapper would keep it reachable and suppress every
+   * reclaim.
    */
   private class CloseWhenUnreachableAction(private val core: ResourceRequestHandleCore) : Runnable {
     override fun run() {

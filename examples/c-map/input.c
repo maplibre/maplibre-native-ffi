@@ -77,10 +77,8 @@ static input_result handle_mouse_button_down(
   input_controller* controller, const SDL_MouseButtonEvent* button,
   command_queue* commands, viewport current_viewport
 ) {
-  // A drag already owns the pointer, so a second button joins it rather than
-  // starting a drag of its own. Its position leaves the live drag's baseline
-  // alone, so the next delta still measures from where the owning button last
-  // was.
+  // A second button joins the live drag rather than starting one, leaving the
+  // drag's baseline position alone.
   if (controller->drag_mode != DRAG_MODE_NONE) {
     return (input_result){.handled = true};
   }
@@ -95,13 +93,10 @@ static input_result handle_mouse_button_down(
   controller->last_x = cursor.x;
   controller->last_y = cursor.y;
 
-  // Queued ahead of the drag's own commands, so the transition stops before
-  // the first delta lands.
+  // Queued first, so any transition stops before the first delta lands.
   command_queue_push(
     commands, (camera_command){.kind = CAMERA_COMMAND_CANCEL_TRANSITIONS}
   );
-  // The deltas that follow belong to one live gesture, so the map hears about
-  // the gesture rather than a stream of unrelated camera commands.
   command_queue_push(
     commands, (camera_command){
                 .kind = CAMERA_COMMAND_SET_GESTURE_IN_PROGRESS,
@@ -113,8 +108,8 @@ static input_result handle_mouse_button_down(
   return (input_result){.handled = true};
 }
 
-/// Every path that ends a drag runs through here, so the gesture mark the
-/// drag set is always paired with a clear.
+/// Every path that ends a drag runs through here, so the gesture bracket the
+/// drag opened is always closed.
 static void end_drag(input_controller* controller, command_queue* commands) {
   if (controller->drag_mode == DRAG_MODE_NONE) {
     return;
@@ -136,8 +131,7 @@ static input_result handle_mouse_button_up(
   if (button->button != SDL_BUTTON_LEFT && button->button != SDL_BUTTON_RIGHT) {
     return (input_result){};
   }
-  // Releasing a button that joined the drag leaves the drag running, so the
-  // drag ends once, when the button that started it comes up.
+  // The drag ends once, when the button that started it comes up.
   if (button->button != controller->drag_button) {
     return (input_result){.handled = true};
   }

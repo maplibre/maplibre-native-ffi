@@ -112,16 +112,12 @@ internal sealed class NativeHandleState<T>
     /// Runs <paramref name="use" /> with the handle and with release held off until it returns.
     /// </summary>
     /// <remarks>
-    /// Handles whose release is confined to one thread get this ordering from the owner-thread rule
-    /// and can call native directly after reading <see cref="Handle" />. Handles the host may use
-    /// and release from different threads use this instead, so a release that begins mid-call waits
-    /// for the call to finish. That is what keeps a losing race reporting this wrapper's own
-    /// closed-handle error instead of the C API's rejection of an id retired underneath it.
-    /// <para>
-    /// <paramref name="use" /> runs outside the lock, so concurrent uses proceed together. Calling
-    /// <see cref="Close" /> from inside <paramref name="use" /> on the same thread would wait on
-    /// itself.
-    /// </para>
+    /// Handles the host may use and release from different threads go through this, so a release
+    /// that begins mid-call waits for the call to finish and a losing race reports this wrapper's
+    /// closed-handle error rather than the C API's rejection of a retired id. Owner-thread-only
+    /// handles get that ordering from the owner-thread rule and can read <see cref="Handle" />
+    /// directly. <paramref name="use" /> runs outside the lock; calling <see cref="Close" /> from
+    /// inside it on the same thread deadlocks.
     /// </remarks>
     internal TResult WithLive<TResult>(Func<T, TResult> use)
     {
@@ -244,8 +240,7 @@ internal sealed class NativeHandleState<T>
 
         releaseInProgress = true;
 
-        // Marking the release turns new uses away from here on. Uses that already read the handle
-        // still hold it, so wait for them before destroying it.
+        // Uses that already read the handle still hold it; wait for them before destroying it.
         while (activeUses > 0)
         {
             Monitor.Wait(gate);

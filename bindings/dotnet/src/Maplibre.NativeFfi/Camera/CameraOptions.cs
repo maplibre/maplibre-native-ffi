@@ -2,11 +2,8 @@ using Maplibre.NativeFfi.Geo;
 
 namespace Maplibre.NativeFfi.Camera;
 
-/// <summary>Camera change kinds reported by camera will-change and did-change events.</summary>
-/// <remarks>
-/// A camera will-change or did-change runtime event carries this value in its raw
-/// <c>Code</c> field.
-/// </remarks>
+/// <summary>Camera change kinds reported in the raw <c>Code</c> field of camera
+/// will-change and did-change runtime events.</summary>
 public enum CameraChangeMode : uint
 {
     /// <summary>The camera reached its new value without an animated transition.</summary>
@@ -18,8 +15,8 @@ public enum CameraChangeMode : uint
 
 /// <summary>Mutable camera descriptor used for camera snapshots and commands.</summary>
 /// <remarks>
-/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
-/// instance unmodified while it is a key in a hash-based collection.
+/// Compares and hashes by property value; keep an instance unmodified while it is a key in a
+/// hash-based collection.
 /// </remarks>
 public sealed record CameraOptions
 {
@@ -29,8 +26,7 @@ public sealed record CameraOptions
 
     /// <summary>
     /// Input-only screen point the camera pivots around. Jump, ease, and fly honor
-    /// it; MapLibre leaves it <see langword="null" /> on every read path, including
-    /// camera snapshots and the camera-for-bounds helpers.
+    /// it; every read path leaves it <see langword="null" />.
     /// </summary>
     public ScreenPoint? Anchor { get; set; }
     public double? Zoom { get; set; }
@@ -42,8 +38,8 @@ public sealed record CameraOptions
 
 /// <summary>Camera animation descriptor.</summary>
 /// <remarks>
-/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
-/// instance unmodified while it is a key in a hash-based collection.
+/// Compares and hashes by property value; keep an instance unmodified while it is a key in a
+/// hash-based collection.
 /// </remarks>
 public sealed record AnimationOptions
 {
@@ -54,32 +50,20 @@ public sealed record AnimationOptions
 
     /// <summary>Caller-chosen identity for the transition these options start.</summary>
     /// <remarks>
-    /// <para>
-    /// When set, the transition emits one map camera transition-finished runtime event carrying
-    /// this value in its <c>RuntimeEventPayload.CameraTransitionFinished</c> payload. The value
-    /// passes through to MapLibre Native uninterpreted, so callers pick their own scheme, such as
-    /// a monotonically increasing counter.
-    /// </para>
-    /// <para>
-    /// Each transition emits that event exactly once, whichever way it ends: running to
-    /// completion, being superseded by a later camera command, being cancelled by
-    /// <c>MapHandle.CancelTransitions</c>, or completing instantly as a zero-duration jump. A
-    /// command this API rejects, such as one carrying a non-finite enabled camera field, starts no
-    /// transition and emits no such event. MapLibre Native reports the
-    /// moment a transition releases the camera and does not report which of those outcomes
-    /// occurred, so the event establishes transition identity rather than a completion reason. A
-    /// host that needs to tell completion from cancellation compares the resulting camera against
-    /// the requested one, or tracks which transition ID is current.
-    /// </para>
-    /// <para>Leaving this property null emits no such event.</para>
+    /// When set, the transition emits exactly one map camera transition-finished runtime event
+    /// carrying this value in its <c>RuntimeEventPayload.CameraTransitionFinished</c> payload,
+    /// whether it completes, is superseded, or is cancelled; the event establishes transition
+    /// identity rather than a completion reason. A rejected camera command starts no transition
+    /// and emits no event, and neither does leaving this property null. The value passes through
+    /// uninterpreted, so callers pick their own scheme.
     /// </remarks>
     public ulong? TransitionId { get; set; }
 }
 
 /// <summary>Camera fitting descriptor.</summary>
 /// <remarks>
-/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
-/// instance unmodified while it is a key in a hash-based collection.
+/// Compares and hashes by property value; keep an instance unmodified while it is a key in a
+/// hash-based collection.
 /// </remarks>
 public sealed record CameraFitOptions
 {
@@ -98,7 +82,7 @@ public abstract record BoundsConstraint
 
     /// <summary>
     /// Leaves the camera center unconstrained, so the map pans freely across the antimeridian.
-    /// This differs from world bounds of -90/-180 to 90/180, which clamp longitude to that range.
+    /// This differs from world bounds of -90/-180 to 90/180, which clamp longitude.
     /// </summary>
     public sealed record Unbounded : BoundsConstraint
     {
@@ -110,8 +94,8 @@ public abstract record BoundsConstraint
 
 /// <summary>Camera bound constraint descriptor.</summary>
 /// <remarks>
-/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
-/// instance unmodified while it is a key in a hash-based collection.
+/// Compares and hashes by property value; keep an instance unmodified while it is a key in a
+/// hash-based collection.
 /// </remarks>
 public sealed record BoundOptions
 {
@@ -124,8 +108,8 @@ public sealed record BoundOptions
 
 /// <summary>Free camera descriptor.</summary>
 /// <remarks>
-/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
-/// instance unmodified while it is a key in a hash-based collection.
+/// Compares and hashes by property value; keep an instance unmodified while it is a key in a
+/// hash-based collection.
 /// </remarks>
 public sealed record FreeCameraOptions
 {

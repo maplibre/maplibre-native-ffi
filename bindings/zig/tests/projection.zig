@@ -5,8 +5,8 @@ const maplibre = @import("maplibre_native_ffi");
 
 const center = maplibre.LatLng{ .latitude = 37.7749, .longitude = -122.4194 };
 
-// The camera center projects to the middle of the viewport, so tests that check
-// that state the extent instead of leaning on the creation default.
+// The camera center projects to the middle of the viewport, so these tests
+// state the extent rather than lean on the creation default.
 const viewport_extent: u32 = 512;
 
 fn expectCenterPoint(point: maplibre.ScreenPoint) !void {

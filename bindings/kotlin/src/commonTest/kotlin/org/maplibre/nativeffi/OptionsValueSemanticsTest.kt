@@ -40,10 +40,8 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 import org.maplibre.nativeffi.style.VectorTileEncoding
 
 /**
- * BND-070: option descriptors compare and hash by field value, and copies are independent.
- *
- * Each case lists one mutator per declared field. A field left out of the descriptor's equality
- * fails its mutator assertion, so adding a field without extending equality fails here.
+ * BND-070. Each case lists one mutator per declared field, so adding a field without extending
+ * equality fails the mutator assertion.
  */
 class OptionsValueSemanticsTest {
   private fun <T : Any> assertValueSemantics(
@@ -448,7 +446,7 @@ class OptionsValueSemanticsTest {
 
   @Test
   fun queryOptionsSnapshotCallerOwnedLayerIds() {
-    // BND-069: neither the descriptor nor its copy observes later mutation of the caller's list.
+    // BND-069.
     val layerIds = mutableListOf("a")
     val options = RenderedFeatureQueryOptions().apply { this.layerIds = layerIds }
     val copy = options.copy()
@@ -468,7 +466,7 @@ class OptionsValueSemanticsTest {
 
   @Test
   fun styleImageOptionsSnapshotCallerOwnedStretches() {
-    // BND-069: neither the descriptor nor its copy observes later mutation of the caller's list.
+    // BND-069.
     val stretchX = mutableListOf(ImageStretch(0.0f, 1.0f))
     val options =
       StyleImageOptions().apply {

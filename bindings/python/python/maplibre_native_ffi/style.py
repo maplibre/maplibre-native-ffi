@@ -73,8 +73,7 @@ class GeoJsonSourceOptions:
     cluster: bool | None = None
     synchronous_update: bool | None = None
     """Applies data updates synchronously, so data set through
-    `set_geojson_source_data` reaches the next rendered frame instead of being
-    tiled on a worker and shown in a later one."""
+    `set_geojson_source_data` reaches the next rendered frame."""
 
     def __post_init__(self) -> None:
         for name in ("tile_size", "buffer", "cluster_radius", "cluster_min_points"):
@@ -148,7 +147,6 @@ class StyleSourceInfo:
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> "StyleSourceInfo":
-        """Build source metadata from private native bridge values."""
         return cls(
             source_type=StyleSourceType(raw["source_type"]),
             is_volatile=raw["is_volatile"],
@@ -229,7 +227,6 @@ class StyleImageInfo:
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> "StyleImageInfo":
-        """Build style image metadata from private native bridge values."""
         content = raw["content"]
         text_fit_width = raw["text_fit_width"]
         text_fit_height = raw["text_fit_height"]
@@ -257,8 +254,8 @@ class StyleTransitionOptions:
     """The style's global transition options.
 
     These control how the style animates paint property changes and whether
-    symbol placement changes cross-fade. They are distinct from camera animation
-    options and from the per-property transitions a style declares.
+    symbol placement changes cross-fade, and are distinct from camera animation
+    options.
     """
 
     duration_ms: float | None = None
@@ -269,18 +266,11 @@ class StyleTransitionOptions:
     style declares for each transitioning property."""
     enable_placement_transitions: bool | None = None
     """Whether symbol placement changes cross-fade. `None` leaves the cross-fade
-    on, which is MapLibre Native's own default.
-
-    Clearing it makes symbol placement changes apply to the next rendered frame.
-    Hosts that move symbol-backed features at pointer frequency clear it for the
-    duration of the interaction so the rendered symbol keeps up. Reading the
-    options always reports it, because MapLibre Native always holds a value for
-    it.
-    """
+    on. Clearing it makes symbol placement changes apply to the next rendered
+    frame. Reading the options always reports a value."""
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> "StyleTransitionOptions":
-        """Build transition options from private native bridge values."""
         return cls(
             duration_ms=raw["duration_ms"],
             delay_ms=raw["delay_ms"],
@@ -298,7 +288,6 @@ class StyleImage:
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> "StyleImage":
-        """Build a copied style image from private native bridge values."""
         info = StyleImageInfo._from_native(raw["info"])
         return cls(
             image=PremultipliedRgba8Image(
@@ -348,7 +337,6 @@ class CustomGeometrySourceEvent:
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> "CustomGeometrySourceEvent":
-        """Build an event from private native values."""
         return cls(
             event_type=CustomGeometrySourceEventType(raw["kind"]),
             tile_id=CanonicalTileId(z=raw["z"], x=raw["x"], y=raw["y"]),

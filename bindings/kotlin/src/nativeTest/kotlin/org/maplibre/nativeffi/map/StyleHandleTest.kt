@@ -46,7 +46,7 @@ import org.maplibre.nativeffi.style.VectorTileEncoding
 
 @OptIn(ExperimentalForeignApi::class)
 class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
-  // BND-062: unknown output discriminators keep raw native values.
+  // BND-062.
 
   @Test
   fun sourceTypePreservesUnknownRawNativeValues() {
@@ -62,7 +62,7 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     assertEquals(999, RasterDemEncoding(999).nativeValue)
   }
 
-  // BND-124: style-scoped callback state follows native source lifetime and reload events.
+  // BND-124.
 
   @Test
   fun customGeometrySourceApisKeepCallbackStateMapScoped() {
@@ -312,7 +312,7 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     }
   }
 
-  // BND-105: typed layer base accessors round-trip through native style state.
+  // BND-105.
 
   @Test
   fun layerBaseAccessorsRoundTripThroughNativeStyle() {
@@ -338,7 +338,7 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals("roads", map.layerSourceLayer("fill"))
       assertEquals("geo", map.layerSourceId("fill"))
 
-      // A layer type that takes no source is rejected rather than silently ignored.
+      // A background layer takes no source.
       assertFailsWith<InvalidArgumentException> { map.setLayerSourceLayer("bg", "roads") }
       assertEquals("", map.layerSourceId("bg"))
 
@@ -377,15 +377,14 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
         },
       )
     try {
-      // A map with no style yet reports no duration or delay. The placement flag always
-      // reports, because MapLibre Native always holds a value for it.
+      // Duration and delay are absent until a style loads; the placement flag always
+      // holds a value.
       val empty = map.styleTransitionOptions()
       assertNull(empty.durationMs)
       assertNull(empty.delayMs)
       assertEquals(true, empty.enablePlacementTransitions)
 
-      // The style parser fills in its own 300ms duration for a style that declares no
-      // transition.
+      // The style parser supplies a 300ms default duration.
       map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
       val parsed = map.styleTransitionOptions()
       assertEquals(300.0, parsed.durationMs)
@@ -397,8 +396,8 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(100.0, declared.delayMs)
       assertEquals(true, declared.enablePlacementTransitions)
 
-      // A present zero stays distinguishable from an absent field, and an absent field clears
-      // what the style declared rather than merging into it.
+      // A present zero stays distinguishable from an absent field, and an absent field
+      // clears what the style declared.
       val options =
         StyleTransitionOptions().apply {
           durationMs = 0.0
@@ -407,7 +406,7 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       map.setStyleTransitionOptions(options)
       assertEquals(options, map.styleTransitionOptions())
 
-      // Omitting the flag leaves the cross-fade on rather than clearing it.
+      // Omitting the flag leaves the cross-fade on.
       map.setStyleTransitionOptions(StyleTransitionOptions().apply { durationMs = 250.0 })
       assertEquals(true, map.styleTransitionOptions().enablePlacementTransitions)
 
@@ -424,7 +423,7 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     }
   }
 
-  // BND-101, BND-105, BND-069: style loading and workflows use copied public values.
+  // BND-101, BND-105, BND-069.
 
   @Test
   fun styleSourceAndLayerJsonApisCallNativeAndCopyDescriptors() {
@@ -631,7 +630,7 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     }
   }
 
-  // BND-109: source inspection copies reconstructible URL and inline TileJSON state.
+  // BND-109.
 
   @Test
   fun styleSourceInfoCopiesUrlAndInlineTileMetadataPastNativeLifetime() {
@@ -744,8 +743,8 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       )
       assertEquals(SourceType.GEOJSON, map.styleSourceType("points"))
 
-      // A clustered source indexes every feature as a point, so native rejects
-      // replacement data that is not a feature collection.
+      // A clustered source indexes every feature as a point, so native rejects data
+      // that is not a feature collection.
       assertFailsWith<InvalidArgumentException> {
         map.setGeoJsonSourceData("points", GeoJson.GeometryValue(Geometry.Point(LatLng(1.0, 1.0))))
       }

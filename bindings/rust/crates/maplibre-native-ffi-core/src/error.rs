@@ -87,9 +87,8 @@ pub fn check(status: i32) -> Result<()> {
 }
 
 pub fn capture_thread_diagnostic() -> String {
-    // SAFETY: The C API returns a thread-local, NUL-terminated string pointer
-    // that is valid until the next diagnostic-writing C API call on this thread.
-    // This helper copies it immediately and treats a defensive null as empty.
+    // SAFETY: The returned thread-local string stays valid until the next
+    // diagnostic-writing C API call on this thread; this copies it immediately.
     unsafe { copy_c_string_lossy(sys::mln_thread_last_error_message()) }
 }
 

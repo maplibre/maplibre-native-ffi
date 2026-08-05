@@ -101,18 +101,14 @@ final class RuntimeHandle {
   /// Creates a runtime on the current native thread.
   ///
   /// Do not `await` I/O on this isolate while the runtime or any handle under it
-  /// is live. The C API keys its owner-thread checks on the OS thread, and the
-  /// Dart VM moves an isolate to another OS thread when it resumes from awaited
-  /// I/O. Every call on the handle then fails with `wrongThread`, including
-  /// [close], which leaves the native runtime undestroyable for the rest of the
-  /// process. See the package README and
-  /// https://github.com/maplibre/maplibre-native-ffi/issues/412.
+  /// is live. Owner-thread checks key on the OS thread, and the Dart VM may
+  /// resume an isolate on a different one, after which every call on the handle
+  /// fails with `wrongThread` — including [close].
   factory RuntimeHandle.create({
     RuntimeOptions options = const RuntimeOptions(),
   }) {
-    // Ahead of the native call, not just ahead of storing the handle: an
-    // incompatible library would otherwise create a runtime that the failing
-    // check below leaves no way to destroy.
+    // Check before the native call: an incompatible library would otherwise
+    // create a runtime that the failed check leaves no way to destroy.
     ensureAbiVersion();
     return withNativeArena((arena) {
       final nativeOptions = arena<raw.mln_runtime_options>();
@@ -131,20 +127,15 @@ final class RuntimeHandle {
 
   /// Advances this runtime, parking the owner isolate until there is work.
   ///
-  /// The default zero [timeout] drains without parking, which is what a host
-  /// driven by a callback it does not own wants. A null timeout parks until
-  /// something sets the runtime's wake flag. A negative timeout is a caller
-  /// mistake rather than a request for an unbounded park, so it collapses to no
-  /// wait.
-  ///
-  /// Native work, a queued runtime event, and [WakeSource.signal] all set the
-  /// wake flag, and this call clears it before returning. Drain events with
+  /// The default zero [timeout] drains without parking; a null timeout parks
+  /// until the wake flag is set; a negative timeout collapses to no wait.
+  /// Native work, a queued runtime event, and [WakeSource.signal] each set the
+  /// wake flag, which this call clears before returning. Drain events with
   /// [pollEvent] after every return.
   ///
   /// A non-null, non-zero [timeout] blocks the calling isolate's event loop for
-  /// the duration of the park. Other isolates keep running. Acquire a
-  /// [WakeSource] with [acquireWakeSource] so another isolate can release this
-  /// one for host-driven work such as submitted tasks or shutdown.
+  /// the duration of the park. Acquire a [WakeSource] with [acquireWakeSource]
+  /// so another isolate can release this one.
   void pump({Duration? timeout = Duration.zero}) {
     _check(
       raw.mln_runtime_pump(_handle.raw, _pumpTimeoutMilliseconds(timeout)),
@@ -634,19 +625,15 @@ int _pumpTimeoutMilliseconds(Duration? timeout) {
 
 /// Releases a runtime owner isolate parked in [RuntimeHandle.pump].
 ///
-/// A wake source reaches native wake state that carries its own
-/// synchronization and holds no owner-isolate pointer, so [signal] runs from
-/// any isolate. Sending one to another isolate copies the wrapper around that
-/// shared native handle: every copy may signal, and exactly one copy calls
-/// [close], after every isolate that signals has finished.
+/// [signal] runs from any isolate. Sending a wake source to another isolate
+/// copies the wrapper around one shared native handle: every copy may signal,
+/// and exactly one copy calls [close], after every signalling isolate has
+/// finished.
 ///
-/// A wake source outlives its runtime. Signalling after the runtime closes
-/// succeeds and does nothing.
-///
-/// Unlike the binding's owner-isolate handles, this one carries no native
-/// finalizer, because a [Finalizable] class cannot cross an isolate boundary
-/// and cross-isolate signalling is the reason this handle exists. An unclosed
-/// wake source therefore leaks silently rather than reporting itself.
+/// A wake source outlives its runtime; signalling after the runtime closes
+/// does nothing. It carries no native finalizer, because a [Finalizable] class
+/// cannot cross an isolate boundary, so an unclosed wake source leaks
+/// silently.
 final class WakeSource {
   WakeSource._(this._handle);
 
@@ -660,8 +647,7 @@ final class WakeSource {
   /// A signal raised while the owner isolate is running sets the flag, so the
   /// next [RuntimeHandle.pump] returns without parking.
   void signal() {
-    // Signalling is the one runtime operation meant to be called from another
-    // isolate, so it cannot assume the ABI check has already run there.
+    // Reachable from an isolate that has not yet run the ABI check.
     ensureAbiVersion();
     final handle = _handle;
     if (handle == null) {
@@ -677,8 +663,7 @@ final class WakeSource {
       return;
     }
     _handle = null;
-    // Releasing is as irreversible as signalling, and reachable first from a
-    // fresh isolate for the same reason.
+    // Reachable from an isolate that has not yet run the ABI check.
     ensureAbiVersion();
     raw.mln_wake_source_destroy(handle.raw);
   }
@@ -1573,10 +1558,8 @@ final class MapOptions {
   /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
   /// encodings, fixed for the lifetime of the map.
   ///
-  /// Enable this on maps that read vector sources created with
-  /// `VectorTileEncoding.mlt` from a tile set that uses FastPFOR. A map created
-  /// with this false decodes every other MLT encoding and logs a tile parse
-  /// warning for the FastPFOR ones.
+  /// A map created with this false decodes every other MLT encoding and logs a
+  /// tile parse warning for the FastPFOR ones.
   final bool fastPforEnabled;
 
   @override
@@ -1691,29 +1674,20 @@ final class MapHandle {
 
   /// Returns the style document this map's style was last parsed from.
   ///
-  /// This is the loaded document, not a serialization of the live style: the
-  /// string passed to [setStyleJson], or the response body fetched for
-  /// [setStyleUrl]. Runtime mutations such as adding a layer do not change it,
-  /// and a failed parse leaves the previously parsed document in place. The
-  /// result is byte-for-byte the string given to [setStyleJson], so it can be
-  /// handed back unchanged.
-  ///
-  /// The result is empty when no document has been parsed. A parsed document is
-  /// never empty.
+  /// This is the loaded document, not a serialization of the live style:
+  /// runtime mutations do not change it, and a failed parse leaves the
+  /// previously parsed document in place. The result is empty when no document
+  /// has been parsed.
   String getLoadedStyleJson() {
     return _copyMapText(_handle, raw.mln_map_copy_loaded_style_json);
   }
 
   /// Returns the URL this map's style was last requested from.
   ///
-  /// Unlike [getLoadedStyleJson], this is live rather than load-time state:
-  /// [setStyleUrl] records the URL when the request is made, before the response
-  /// arrives or the document parses, and [setStyleJson] clears it. The two can
-  /// disagree while a load is in flight or after one fails.
-  ///
-  /// The result is empty when no URL bytes are available, which covers a style
-  /// loaded from inline JSON, a map that has loaded no style, and a URL load
-  /// requested with an empty string. These cases are not distinguishable here.
+  /// [setStyleUrl] records the URL when the request is made, before the
+  /// response arrives, and [setStyleJson] clears it, so this can disagree with
+  /// [getLoadedStyleJson] while a load is in flight or after one fails. The
+  /// result is empty when no URL bytes are available.
   String getStyleUrl() {
     return _copyMapText(_handle, raw.mln_map_copy_style_url);
   }
@@ -1750,13 +1724,10 @@ final class MapHandle {
   /// A reference to this map for attaching a render session, safe to send to
   /// another isolate.
   ///
-  /// A render session belongs to the isolate that attached it, which need not be
-  /// the map's, and attaching only requires the map to be live. A [MapHandle]
-  /// cannot cross isolates, so this carries the map's handle id instead. Every
-  /// other map call stays on the map's own isolate.
-  ///
-  /// The reference does not keep the map alive. Attaching after the map closes
-  /// reports invalid argument, because the id is stale from the close onward.
+  /// A render session belongs to the isolate that attached it, which need not
+  /// be the map's; every other map call stays on the map's own isolate. The
+  /// reference does not keep the map alive, and attaching after the map closes
+  /// reports invalid argument.
   MapAttachRef attachRef() => MapAttachRef._(_handle.raw);
 
   /// Copies the current camera snapshot.
@@ -1880,10 +1851,8 @@ final class MapHandle {
 
   /// Marks whether a host-driven gesture is in progress.
   ///
-  /// A host that decodes its own pointer gestures sets this to `true` when a
-  /// gesture starts and back to `false` when it ends, so the camera commands
-  /// issued in between belong to one live gesture. The flag stays set until the
-  /// host clears it, so pair every `true` with a `false`.
+  /// The flag stays set until the host clears it, so pair every `true` with a
+  /// `false`.
   void setGestureInProgress(bool inProgress) {
     _check(raw.mln_map_set_gesture_in_progress(_handle.raw, inProgress));
   }
@@ -3175,10 +3144,9 @@ final class MapHandle {
 
   /// Sets the style's global transition options.
   ///
-  /// Absent duration and delay clear the style-wide override, so this call
-  /// replaces the whole transition configuration rather than merging into it.
-  /// Loading a style replaces these options with the ones that style declares,
-  /// so apply an override after the style loads.
+  /// This replaces the whole transition configuration rather than merging into
+  /// it, and loading a style replaces it again with the style's own options, so
+  /// apply an override after the style loads.
   void setStyleTransitionOptions(StyleTransitionOptions options) {
     withNativeArena((arena) {
       final nativeOptions = arena<raw.mln_style_transition_options>();
@@ -3521,5 +3489,3 @@ final class MapHandle {
     _pendingUrlStyleCallbacks.clear();
   }
 }
-
-/// Standalone projection helper snapshot from a map transform.

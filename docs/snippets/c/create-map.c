@@ -28,7 +28,6 @@ mln_status open_map(
   options.height = height;
 
   // Fixed for the map's life. It selects sprites, glyphs, and raster tiles.
-  // Pass the density that the map will render at.
   options.scale_factor = scale_factor;
 
   return mln_map_create(runtime, &options, out_map);

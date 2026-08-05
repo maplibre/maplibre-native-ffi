@@ -7,10 +7,7 @@ internal interface IRenderTarget : IDisposable
 {
     bool Render();
 
-    /// <summary>
-    /// Follows a resized host without losing the session: a target the session sizes resizes in
-    /// place, and a caller-owned one hands the live session a replacement at the new size.
-    /// </summary>
+    /// <summary>Follows a resized host without detaching the session.</summary>
     void Resize(Viewport viewport);
 }
 
@@ -293,10 +290,8 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
     }
 
     /// <summary>
-    /// Follows a resized host. A caller-owned texture is sized by this example rather than by the
-    /// session, so following a resize means allocating one at the new size and handing it over. The
-    /// session keeps its renderer across the handover, which is what keeps the map from going cold
-    /// every time the window changes size.
+    /// Allocates a texture at the new size and hands it to the live session, which keeps its
+    /// renderer across the handover.
     /// </summary>
     public void Resize(Viewport viewport)
     {
@@ -341,11 +336,9 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
     }
 
     /// <summary>
-    /// Hands the live session a replacement texture, then retires the outgoing one. Order matters:
-    /// a rejected replacement is released rather than leaked and the session keeps the texture it
-    /// already had. A native error may instead mean the session took the replacement before
-    /// failing, and nothing here can tell that apart, so the session is detached before either
-    /// texture is released.
+    /// Hands the live session a replacement texture, then retires the outgoing one. A failed
+    /// handover may or may not have left the session holding the replacement, so detach before
+    /// releasing either texture.
     /// </summary>
     private void HandOver(IDisposable replacement, Action setTarget, Viewport viewport)
     {
@@ -482,8 +475,8 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
         }
     }
 
-    // Attach and set-target describe the same texture the same way: the replacement a resize hands
-    // over has to match what the session attached with.
+    // Attach and set-target share these descriptors: a resize replacement has to be described the
+    // same way the session attached with.
     private static MetalBorrowedTextureDescriptor Describe(
         MetalBorrowedTexture texture,
         Viewport viewport

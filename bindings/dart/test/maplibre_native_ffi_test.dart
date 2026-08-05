@@ -525,11 +525,9 @@ void main() {
       liveToken.waitUntilRetired();
       return true;
     });
-    // Completion is the one-shot operation; release is idempotent by design,
-    // so racing two completions is what can have a single winner. Teardown
-    // starts first because closing a map or runtime must not follow an await
-    // on this isolate: the Dart VM may resume it on another native thread and
-    // the owner-thread check would reject the close.
+    // Completion is one-shot, so racing two of them can have a single winner.
+    // Teardown starts first because closing a map or runtime must not follow
+    // an await on this isolate.
     final race = Future.wait([
       Isolate.run(() => _completeTokenAlias(liveToken)),
       Isolate.run(() => _completeTokenAlias(liveToken)),
@@ -1823,10 +1821,9 @@ void main() {
       ]);
       final worker = await ready.first as SendPort;
 
-      // Every await below this line would be a hazard: the VM may resume an
-      // isolate on another OS thread after an asynchronous suspension, and
-      // runtime calls are owner-thread affine. The worker handshake is finished
-      // above so this isolate owns the runtime from creation through close.
+      // No await below this line: the VM may resume an isolate on another OS
+      // thread, and runtime calls are owner-thread affine. The worker
+      // handshake finishes above so this isolate owns the runtime throughout.
       final runtime = RuntimeHandle.create(
         options: const RuntimeOptions(cachePath: ':memory:'),
       );
@@ -1921,17 +1918,14 @@ void main() {
     // A MapHandle cannot cross isolates, so the reference carries the address.
     final attachRef = map.attachRef();
 
-    // Close before awaiting. The isolate may resume on a different OS thread
-    // after an await, which would make these handles unusable; see the README's
-    // draft deviation. The reference outliving them is the point here.
+    // Close before awaiting: the isolate may resume on a different OS thread
+    // after an await, which would make these handles unusable. The reference
+    // outliving them is the point here.
     map.close();
     runtime.close();
 
-    // Attaching from another isolate must reach the C API. The extent is valid
-    // so the binding's own checks pass and native answers: it validates the map
-    // before the descriptor, and this one has been retired. Before the session
-    // was decoupled from the map's isolate, this threw wrongThread from the
-    // binding without ever calling native.
+    // The extent is valid, so the binding's own checks pass and the attach
+    // reaches native, which validates the retired map id before the descriptor.
     final diagnostic = await Isolate.run(() {
       try {
         attachRef.attachMetalSurface(

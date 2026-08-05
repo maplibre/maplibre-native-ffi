@@ -35,7 +35,7 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
 
 @OptIn(ExperimentalForeignApi::class)
 class DescriptorValidationTest : org.maplibre.nativeffi.NativeTestBase() {
-  // BND-104: invalid map, projection, descriptor, and structured-value inputs report public errors.
+  // BND-104.
 
   @Test
   fun signedCarriersRejectNegativeUnsignedValues() {
@@ -66,7 +66,7 @@ class DescriptorValidationTest : org.maplibre.nativeffi.NativeTestBase() {
 
   @Test
   fun enumInputsRejectUnknownSentinelsBeforeNativeCalls() {
-    // BND-068: unknown enum values are rejected before they cross into C input APIs.
+    // BND-068.
     assertFailsWith<InvalidArgumentException> {
       MapHandle.mapOptionsForTesting(MapOptions().apply { mapMode = MapMode(900) }) {}
     }

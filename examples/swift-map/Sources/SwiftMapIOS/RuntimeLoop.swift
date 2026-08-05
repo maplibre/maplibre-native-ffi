@@ -2,23 +2,18 @@ import Foundation
 import MaplibreNativeFFI
 import os
 
-/// The runtime loop.
+/// The runtime loop, owning the runtime and the map for their whole lifetime.
+/// The render loop attaches its own session against the reference published
+/// here. It keeps running across view and app lifecycle transitions, so loading
+/// continues while the view is off screen.
 ///
-/// Owns the runtime and the map for their whole lifetime, on a thread that is
-/// not the one presenting. It never touches the render session: the render loop
-/// attaches its own against the reference published here. It keeps running
-/// across view and app lifecycle transitions, so loading continues while the
-/// view is off screen.
-///
-/// This is a dedicated `Thread` on purpose. Native owner-thread checks are
-/// keyed on the OS thread, and a serial `DispatchQueue` guarantees
-/// serialization but not thread affinity, so a queue, an `actor`, or a `Task`
-/// here would produce nondeterministic `MLN_STATUS_WRONG_THREAD` failures. On
-/// Apple platforms the view and its window belong to the main thread, so main
-/// is the render loop and this is the thread that gets spawned.
+/// This must be a dedicated `Thread`: native owner-thread checks are keyed on
+/// the OS thread, and a serial `DispatchQueue`, an `actor`, or a `Task` may run
+/// successive blocks on different threads. The view and its window belong to
+/// the main thread, which is therefore the render loop.
 final class RuntimeLoopThread: Thread {
-  /// Backstop for this loop's park. The render loop's wake source is what
-  /// normally releases it, so this only bounds a pump that nothing signals.
+  /// Backstop for this loop's park; the render loop's wake source normally
+  /// releases it.
   private static let parkTimeout = 0.1
 
   /// Bound on waiting for the render loop to close its session during teardown.
@@ -49,15 +44,9 @@ final class RuntimeLoopThread: Thread {
 
   private func run() throws {
     let state = try MapState(viewport: initialViewport)
-    // However this loop exits, the render loop still owns the session, and a
-    // map
-    // with an attached session cannot be destroyed. On the failure path the
-    // render loop has not closed it yet, so wait for the shutdown signal before
-    // closing rather than failing and swallowing the error.
-    //
-    // Everything below publishes its failure before this wait runs, so the
-    // render loop sees it, closes its session, and releases us. Waiting first
-    // would stall until the bound expires.
+    // A map with an attached session cannot be destroyed, so wait for the
+    // render loop to close its session. Failures are published before this
+    // wait runs, so the render loop sees them and releases the wait.
     defer {
       channels.waitForShutdown(timeout: Self.shutdownWaitTimeout)
       do {
@@ -76,16 +65,12 @@ final class RuntimeLoopThread: Thread {
 
   private func pumpUntilShutdown(state: MapState) throws {
     let attachRef = try state.attachRef()
-    // The render loop signals this to release the parked pump, so a queued
-    // command or a shutdown
-    // request lands without waiting out the bound below.
     let wake = try state.wakeSource()
-    // A wake source is its own native handle and outlives the runtime, so
-    // closing the runtime does not release it.
+    // A wake source is its own native handle: closing the runtime does not
+    // release it.
     defer { try? wake.close() }
     channels.publish(attachRef: attachRef, wake: wake)
 
-    // Reused across drains, so applying a batch allocates nothing.
     var batch: [CameraCommand] = []
 
     while !channels.isShutdownRequested, channels.failureMessage == nil {
@@ -93,11 +78,8 @@ final class RuntimeLoopThread: Thread {
       for command in batch {
         try state.apply(command)
       }
-      // This thread has no display to pace it, so it takes its cadence from the
-      // runtime's own
-      // work and parks in between. The render loop signals the wake source, so
-      // the bound is a
-      // backstop rather than the cadence.
+      // No display paces this thread, so it parks in the pump until the
+      // runtime has work or the render loop signals the wake source.
       try state.pump(timeout: Self.parkTimeout)
       if try state.drainEvents() {
         channels.setRenderRequest()

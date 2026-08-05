@@ -29,11 +29,9 @@ import org.lwjgl.glfw.GLFW.glfwSetScrollCallback
 import org.maplibre.nativeffi.geo.ScreenPoint
 
 /**
- * Decodes GLFW input into camera commands.
- *
- * GLFW delivers these callbacks on the render loop thread, which does not own the map, so this only
- * produces commands; the runtime loop applies them on the map's thread. Anything needing the
- * current viewport is converted here, where the viewport lives.
+ * Decodes GLFW input into camera commands. GLFW delivers these callbacks on the render loop thread,
+ * which does not own the map, so this only produces commands; the runtime loop applies them on the
+ * map's thread.
  */
 internal class InputController(
   private val window: Long,
@@ -90,12 +88,9 @@ internal class InputController(
           if (action == GLFW_PRESS) true else if (action == GLFW_RELEASE) false else rightDown
     }
     if (action == GLFW_PRESS) {
-      // Queued ahead of the drag's own commands, so the transition stops before the first delta
-      // lands.
+      // Queued ahead of the drag's own commands, so the transition stops before the first delta.
       commands.push(CameraCommand.CancelTransitions)
     }
-    // The deltas in between belong to one live gesture, so the map hears about the gesture rather
-    // than a stream of unrelated camera commands.
     if (dragging != wasDragging) {
       commands.push(CameraCommand.SetGestureInProgress(dragging))
     }
@@ -105,8 +100,7 @@ internal class InputController(
     get() = leftDown || rightDown
 
   private fun onScroll(yOffset: Double) {
-    // GLFW reports OS-adjusted scroll deltas; use them directly so trackpads with natural
-    // scrolling behave like the host platform expects.
+    // GLFW reports OS-adjusted scroll deltas, so natural scrolling needs no correction here.
     val scale = 2.0.pow(yOffset * 0.25)
     commands.push(CameraCommand.ScaleBy(scale, ScreenPoint(cursorX, cursorY)))
     renderRequest.set()

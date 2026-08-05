@@ -135,8 +135,6 @@ public sealed unsafe class RuntimeEventTests
     [Fact]
     public void OfflineRegionObservationEventsMaterializeCopiedPublicPayloads()
     {
-        // Support invariant for BND-085: event materialization covers native
-        // observation payloads deterministically while asserting public payload values.
         var statusPayload = new mln_runtime_event_offline_region_status
         {
             size = (uint)Unsafe.SizeOf<mln_runtime_event_offline_region_status>(),

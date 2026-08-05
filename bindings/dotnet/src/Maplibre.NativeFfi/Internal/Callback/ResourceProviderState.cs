@@ -26,8 +26,8 @@ internal sealed unsafe class ResourceProviderState : IDisposable
 
     internal bool IsHandleAllocatedForTest => handle != 0;
 
-    // A handle carrying the resource-request kind byte, so anything that
-    // reports it reads as an obviously synthetic handle of the right kind.
+    // Carries the resource-request kind byte so it reads as an obviously
+    // synthetic handle of the right kind.
     private static MlnResourceRequest SyntheticRequestForTest => new(0x0C00_0000_0000_0001);
 
     internal uint HandleForTest(mln_resource_request* request)

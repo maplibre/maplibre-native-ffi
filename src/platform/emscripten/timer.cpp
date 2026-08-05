@@ -49,9 +49,8 @@ class TimerState : public platform::emscripten::RunLoopWake::Runnable,
       active = false;
       wake->removeRunnable(shared_from_this());
     } else {
-      // The run loop reads the new due time when this returns, both to wait for
-      // it and to arrange the wake for it, so a repeat needs no notify of its
-      // own -- one here would only report the timer as ready before it is.
+      // The run loop reads the new due time when this returns, so a repeat
+      // needs no notify: one would report the timer ready before it is.
       due = Clock::now() + repeat;
     }
 

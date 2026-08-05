@@ -2,8 +2,7 @@
 ///
 /// `tool/ffigen.dart` stamps [nativeAssetId] into the generated `@Native`
 /// annotations and `hook/build.dart` declares the asset under the same name.
-/// A mismatch between them surfaces only at run time, as a failure to resolve
-/// the asset, so both read it from here.
+/// A mismatch only surfaces at run time, so both read it from here.
 library;
 
 /// Asset name within this package, as `hook/build.dart` declares it.

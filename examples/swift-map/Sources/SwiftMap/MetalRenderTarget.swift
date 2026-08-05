@@ -41,12 +41,9 @@ final class MetalGraphicsContext {
   }
 }
 
-/// The render session and its mode-specific resources.
-///
-/// Everything here belongs to the render loop thread. Attach records the
-/// calling thread as the session's owner for the session's lifetime, so this
-/// type is created, resized, rendered, and closed on the one thread that owns
-/// the Metal objects it draws with.
+/// The render session and its mode-specific resources. Attach records the
+/// calling thread as the session's owner, so every call here runs on the render
+/// loop thread that owns the Metal objects.
 @MainActor
 enum MetalRenderTarget {
   case ownedTexture(
@@ -61,9 +58,6 @@ enum MetalRenderTarget {
   case nativeSurface(session: RenderSessionHandle)
 
   /// Attaches a session against the map the runtime loop published.
-  ///
-  /// The attach reference is the only part of the map that crosses threads; the
-  /// map handle itself stays on the runtime loop.
   static func attach(
     mode: RenderTargetMode,
     attachRef: MapAttachRef,
@@ -92,12 +86,8 @@ enum MetalRenderTarget {
     }
   }
 
-  /// Follows a resized host.
-  ///
-  /// A caller-owned texture is sized by this example rather than by the
-  /// session, so following a resize means allocating one at the new size and
-  /// handing it over. The session stays live either way, which is what keeps
-  /// the map from going cold every time the window changes size.
+  /// Resizes without closing the session; a caller-owned texture is replaced
+  /// with one at the new size and handed over.
   mutating func resize(
     graphics: MetalGraphicsContext,
     viewport: Viewport
@@ -124,18 +114,12 @@ enum MetalRenderTarget {
             texture: replacement.pointer
           ))
       } catch {
-        // A native error may mean the session took the replacement before
-        // failing, and nothing here can tell that apart from a rejection that
-        // came first, so the session may be holding either texture. Detach
-        // before either one is released, which is what happens next as this
-        // scope unwinds.
+        // The session may hold either texture, and both are released as this
+        // scope unwinds, so detach first.
         try? session.detach()
         throw error
       }
       compositor.resize(viewport)
-      // Only once the session has taken the replacement: a throw above leaves
-      // the session on the texture this case still holds, and releases the
-      // replacement instead.
       self = .borrowedTexture(
         session: session,
         compositor: compositor,
@@ -151,11 +135,8 @@ enum MetalRenderTarget {
   }
 
   /// Renders the latest map update, reporting whether a frame was presented.
-  ///
-  /// The map applies a new logical size on the runtime loop's next `pump`,
-  /// so this reports no update for a few iterations after attach or resize.
-  /// The compositor paths also report false when the layer hands out no
-  /// drawable. That is normal: the render loop keeps pacing and asks again.
+  /// This reports false for a few iterations after attach or resize, because
+  /// the map applies a new logical size on the runtime loop's next pump.
   func renderUpdate() throws -> Bool {
     switch self {
     case let .ownedTexture(session, compositor):
@@ -299,12 +280,8 @@ final class MetalTextureCompositor {
   }
 
   /// Samples the texture into the layer's next drawable, reporting whether the
-  /// frame was presented.
-  ///
-  /// A minimized or occluded window legitimately has no drawable, and the
-  /// drawable pool can be momentarily empty, so this reports false instead of
-  /// failing the frame. The caller keeps its render request pending and draws
-  /// again once a drawable is available.
+  /// frame was presented. An occluded window or an empty drawable pool yields
+  /// no drawable, which is reported as false rather than failing the frame.
   func draw(texture: any MTLTexture) throws -> Bool {
     guard let drawable = layer.nextDrawable() else { return false }
     let passDescriptor = MTLRenderPassDescriptor()

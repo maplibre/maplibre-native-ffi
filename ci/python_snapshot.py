@@ -22,8 +22,7 @@ import zipfile
 
 BACKENDS = {"vulkan", "opengl", "metal"}
 NAME = "maplibre-native-ffi"
-# Wheel filenames and dist-info directories use the escaped distribution name,
-# so derive it rather than spelling it twice and letting the two drift.
+# Wheel filenames and dist-info directories use the escaped distribution name.
 WHEEL_NAME = NAME.replace("-", "_")
 VERSION = re.compile(r"0\.1\.0\.dev\d{12}\Z")
 

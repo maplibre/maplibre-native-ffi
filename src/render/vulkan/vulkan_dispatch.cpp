@@ -11,7 +11,6 @@ auto vulkan_system_get_instance_proc_addr() noexcept
   static PFN_vkGetInstanceProcAddr get_instance_proc_addr =
     []() noexcept -> PFN_vkGetInstanceProcAddr {
     try {
-      // MapLibre Native reaches the loader through this same search order.
       static const vk::detail::DynamicLoader loader;
       return loader.getProcAddress<PFN_vkGetInstanceProcAddr>(
         "vkGetInstanceProcAddr"

@@ -283,13 +283,10 @@ def test_metal_borrowed_texture_set_target_renders_into_the_replacement() -> Non
 def test_metal_surface_set_target_presents_through_a_new_surface() -> None:
     """Spec coverage: BND-175.
 
-    A host surface can be destroyed and recreated while the map goes on living,
-    and this session keeps rendering afterward.
-
+    A host surface can be destroyed and recreated while the map goes on living.
     This verifies that the handoff is accepted, that the map takes the extent
-    handed with it, and that the session stays usable. Observing presentation
-    through the replacement layer needs a drawable-counting layer, which the
-    Zig binding's equivalent test has and this one does not.
+    handed with it, and that the session stays usable; it does not observe
+    presentation through the replacement layer.
     """
     with _metal_context() as context:
         with _metal_surface(context) as surface:

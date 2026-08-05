@@ -1,7 +1,5 @@
 // The Metal render target: an SDL Metal view bridged to the C API through a
-// CAMetalLayer and an MTLDevice, a fullscreen-triangle compositor whose MSL
-// source compiles at startup, and the three render-target modes behind the
-// uniform interface in render.h.
+// CAMetalLayer and an MTLDevice, plus a fullscreen-triangle compositor.
 //
 // The example stays plain C, so every Metal and Cocoa call goes through typed
 // objc_msgSend casts rather than an Objective-C translation unit.
@@ -271,9 +269,8 @@ static void metal_compositor_resize(
 }
 
 /// Samples texture into the layer's next drawable. Reports false without
-/// presenting when the layer has no drawable to hand out, which a minimized
-/// or occluded window legitimately has not; the caller's render request stays
-/// pending and the draw retries once one is available.
+/// presenting when the layer has no drawable, as a minimized or occluded
+/// window legitimately has not.
 static app_error metal_compositor_draw_texture(
   metal_compositor* compositor, id texture, bool* out_presented
 ) {
@@ -527,12 +524,8 @@ void render_target_deinit(render_target* target) {
   free(target);
 }
 
-/// Follows a resized window in borrowed-texture mode.
-///
-/// This example sizes the borrowed texture, not the session, so following a
-/// resize means allocating one at the new size and handing it to the live
-/// session. The session stays live, which is what keeps the map from going
-/// cold on every resize.
+/// Follows a resized window in borrowed-texture mode: allocates a texture at
+/// the new size and hands it to the live session, which stays attached.
 static app_error resize_borrowed(
   render_target* target, viewport current_viewport
 ) {
@@ -552,17 +545,15 @@ static app_error resize_borrowed(
   const mln_status status =
     mln_metal_borrowed_texture_set_target(target->session.handle, &descriptor);
   if (status != MLN_STATUS_OK) {
-    // A native error may mean the session took the replacement before
-    // failing, and nothing here can tell that apart from a rejection that
-    // came first, so detach before either target is released.
+    // The session may have taken the replacement before failing, so detach
+    // before either texture is released.
     mln_render_session_detach(target->session.handle);
     diagnostics_log_status("Metal borrowed texture set target failed", status);
     target->as.borrowed.texture = previous;
     release_object(&replacement);
     return APP_ERROR_TEXTURE_RESIZE_FAILED;
   }
-  // Only once the session has taken the replacement, so a rejected one leaves
-  // this target on the texture it already had.
+  // Released only once the session has taken the replacement.
   release_object(&previous);
   return APP_OK;
 }

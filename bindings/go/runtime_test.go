@@ -196,8 +196,8 @@ func TestRuntimePumpWakesForNativeWorkAndForAWakeSource(t *testing.T) {
 	}
 	quiesce(t, runtime)
 
-	// The style is malformed, so native reports the failure from its own threads
-	// and the failure reaches the parked owner thread.
+	// Native reports the malformed style from its own threads; the failure has
+	// to reach the parked owner thread.
 	if err := mapHandle.SetStyleURL("unsupported://style.json"); err != nil {
 		t.Fatalf("SetStyleURL(): %v", err)
 	}
@@ -230,8 +230,8 @@ func TestRuntimePumpWakesForNativeWorkAndForAWakeSource(t *testing.T) {
 		t.Fatal("the parked owner thread never saw the loading failure")
 	}
 
-	// A source signalled from another goroutine matches a host's submission path,
-	// and the park it releases has no other work to end it.
+	// Nothing else ends the park below, so only the signal from the other
+	// goroutine can release it.
 	source, err := runtime.WakeSource()
 	if err != nil {
 		t.Fatalf("WakeSource(): %v", err)
@@ -253,8 +253,7 @@ func TestRuntimePumpWakesForNativeWorkAndForAWakeSource(t *testing.T) {
 		t.Fatalf("Signal(): %v", err)
 	}
 
-	// A wake source stays usable after its runtime closes, so hosts tear the two
-	// down in either order.
+	// A wake source stays usable after its runtime closes.
 	if err := mapHandle.Close(); err != nil {
 		t.Fatalf("map Close(): %v", err)
 	}

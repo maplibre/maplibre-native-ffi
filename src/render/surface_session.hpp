@@ -15,10 +15,9 @@ auto opengl_surface_descriptor_default() noexcept
 auto webgpu_surface_descriptor_default() noexcept
   -> mln_webgpu_surface_descriptor;
 // The backend-independent half of surface descriptor validation: pointer, size,
-// nested size, extent, and the handles the descriptor declares required. The
-// backend that owns a descriptor adds whatever probing needs its own headers
-// and loader on top; every other build reaches this through the unsupported
-// stub, so both learn the same verdict from one definition.
+// nested size, extent, and the handles the descriptor declares required.
+// Builds without the backend reach this through the unsupported stub, so both
+// report the same verdict.
 //
 // `require_supported_provider` is false wherever no OpenGL context can be
 // created, so a host probing for OpenGL still hears about a malformed

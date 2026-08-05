@@ -1,5 +1,4 @@
-// The backend-agnostic slice of the render target: the attached session
-// handle, tagged with which family of session functions applies to it, and
+// The backend-agnostic slice of the render target: the attached session and
 // the extent a viewport maps to.
 
 #ifndef C_MAP_RENDER_TARGET_H

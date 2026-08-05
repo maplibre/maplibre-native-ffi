@@ -12,12 +12,9 @@ import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.OpenGLContextDescriptor
 
 /**
- * The EGL context.
- *
- * The display, the config, and the share context are independent of any one host surface: EGL keeps
- * them across a window that is destroyed and recreated, which is what a rotation and a trip to the
- * background look like from here. Only the window surface is rebuilt, so a session attached against
- * this context is pointed at the replacement rather than closed.
+ * The EGL context. The display, the config, and the share context survive a window that is
+ * destroyed and recreated; only the window surface is rebuilt, so a session attached against this
+ * context is pointed at the replacement rather than closed.
  */
 internal class EglGraphicsContext
 private constructor(
@@ -29,11 +26,9 @@ private constructor(
   override val backendName: String = "opengl-egl"
 
   /**
-   * Where a parked session presents while the platform has taken the window away.
-   *
-   * An EGL surface session always names a surface, and this one stays valid with no window behind
-   * it, so the session survives the gap holding something it can still make current when it closes.
-   * Nothing renders into it: the view stops scheduling frames while [hasSurface] is false.
+   * Where a parked session presents while the platform has taken the window away. An EGL session
+   * always names a surface, and this one stays valid with no window behind it, so the session has
+   * something to make current when it closes. Nothing renders into it.
    */
   private var parkedSurface: EGLSurface = EGL14.EGL_NO_SURFACE
 
@@ -55,16 +50,14 @@ private constructor(
 
   override fun setSurface(surface: Surface): Boolean {
     if (hasSurface) {
-      // The window this context already presents through, handed back after a size or format
-      // change. An EGL window surface follows its window's size, so there is nothing to rebuild;
-      // the session takes the new extent through the descriptor it is handed.
+      // An EGL window surface follows its window's size, so a size or format change rebuilds
+      // nothing here; the session takes the new extent through the descriptor.
       return true
     }
     val next = EGL14.eglCreateWindowSurface(display, config, surface, WINDOW_ATTRIBUTES, 0)
     if (next == EGL14.EGL_NO_SURFACE) {
-      // Reported rather than thrown. A display or context that can no longer serve a window
-      // surface is what a lost EGL context looks like from here, and the caller answers that by
-      // building this context and its session again.
+      // A display that can no longer serve a window surface is what a lost EGL context looks like,
+      // so report it and let the caller rebuild.
       Log.w(TAG, eglFailure("creating an EGL window surface"))
       return false
     }
@@ -77,8 +70,7 @@ private constructor(
       return true
     }
     if (!ensureParkedSurface()) {
-      // Nowhere for a session to park, so this context cannot outlive the window after all. The
-      // caller closes the session before the window surface goes with this context.
+      // Nowhere for a session to park, so this context cannot outlive the window.
       return false
     }
     EGL14.eglDestroySurface(display, windowSurface)
@@ -144,8 +136,7 @@ private constructor(
           EGL14.EGL_RENDERABLE_TYPE,
           EGL_OPENGL_ES3_BIT,
           EGL14.EGL_SURFACE_TYPE,
-          // The parking surface is a pbuffer, and a session makes it current with the context it
-          // was given at attach, so one config has to serve both kinds of surface.
+          // One config has to serve both the window surface and the pbuffer parking surface.
           EGL14.EGL_WINDOW_BIT or EGL14.EGL_PBUFFER_BIT,
           EGL14.EGL_RED_SIZE,
           8,

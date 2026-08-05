@@ -35,7 +35,7 @@ import platform.posix.pthread_tVar
 
 @OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class)
 class MapHandleTest : org.maplibre.nativeffi.NativeTestBase() {
-  // BND-042, BND-100, BND-190, BND-191: map creation, child lifetime, and owner-thread errors.
+  // BND-042, BND-100, BND-190, BND-191.
 
   @Test
   fun mapCreationOptionsMaterializeExtentScaleAndMode() {
@@ -253,8 +253,8 @@ class MapHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     val released = first.nativeHandle()
     first.close()
 
-    // The released slot is the one the next map takes, so the replayed id
-    // names a retired generation of a slot that is live again.
+    // The next map takes the released slot, so the replayed id names a retired
+    // generation of a slot that is live again.
     val second =
       MapHandle.create(
         runtime,
@@ -268,7 +268,6 @@ class MapHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status)
       assertTrue(error.message!!.contains("stale"), error.message!!)
 
-      // The live map is unaffected by the replay.
       mapSizeForTesting(second.nativeHandle())
     } finally {
       second.close()
@@ -289,8 +288,8 @@ class MapHandleTest : org.maplibre.nativeffi.NativeTestBase() {
         },
       )
     try {
-      // NativeMap and NativeRuntime are distinct value classes, so this call
-      // has no expression in the safe API and needs the raw id.
+      // NativeMap and NativeRuntime are distinct value classes, so this call has no
+      // expression in the safe API and needs the raw id.
       val error =
         assertFailsWith<InvalidArgumentException> {
           Status.check(mln_runtime_pump(map.nativeHandle().rawHandleValue, 0))
@@ -374,18 +373,17 @@ private fun closeMapOnNativeThread(raw: COpaquePointer?): COpaquePointer? {
           },
         )
         .use { map ->
-          // Nothing parsed and nothing requested yet.
           assertEquals("", map.loadedStyleJson())
           assertEquals("", map.styleUrl())
 
-          // The document reads back byte-for-byte, so it can be reloaded unchanged.
+          // The document reads back byte-for-byte.
           map.setStyleJson(styleJson)
           assertEquals(styleJson, map.loadedStyleJson())
           // Inline JSON clears the URL.
           assertEquals("", map.styleUrl())
 
-          // The URL is request state, recorded before the load can succeed, while
-          // the document still reports the style that last parsed.
+          // setStyleUrl records request state before the load can succeed; the document
+          // still reports the style that last parsed.
           map.setStyleUrl("https://example.com/style.json")
           assertEquals("https://example.com/style.json", map.styleUrl())
           assertEquals(styleJson, map.loadedStyleJson())

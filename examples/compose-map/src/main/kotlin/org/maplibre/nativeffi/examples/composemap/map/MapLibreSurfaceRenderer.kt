@@ -15,9 +15,8 @@ import org.maplibre.nativeffi.render.RenderSessionHandle
  * The render loop.
  *
  * [render] runs on the bridge's producer thread, which owns the host graphics context and the
- * borrowed texture, so that thread attaches the render session, renders through it, hands it each
- * texture the bridge allocates for a resize, and closes it. It touches the map only to attach,
- * which native serves from any thread.
+ * borrowed texture, so that thread attaches the render session, renders through it, and closes it.
+ * It touches the map only to attach, which native serves from any thread.
  *
  * Input decoding runs on the Compose thread and only enqueues camera commands; [MapRuntimeLoop]
  * applies them on the thread that owns the map.
@@ -58,9 +57,8 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     val loop = ensureRuntimeLoop(frame.extent)
     loop.failure?.let { error ->
       if (failureReported.compareAndSet(false, true)) {
-        // Close for the same reason the render failure below does: the caller stops driving
-        // frames, so nothing else would close this session, and the runtime loop is already
-        // waiting on it to close before it can destroy the map.
+        // The caller stops driving frames after this, so nothing else would close the session the
+        // runtime loop is waiting on before it can destroy the map.
         close()
         throw IllegalStateException("map runtime loop failed", error)
       }
@@ -70,8 +68,8 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     return try {
       renderAttached(map, frame)
     } catch (error: Throwable) {
-      // The caller records a failure and stops driving frames, so nothing else would close this
-      // session. The runtime loop would then keep pumping a map it can never destroy.
+      // The caller stops driving frames after this, so nothing else would close the session the
+      // runtime loop is waiting on before it can destroy the map.
       close()
       throw error
     }
@@ -80,8 +78,6 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
   private fun renderAttached(map: MapHandle, frame: NativeSurfaceFrame): NativeSurfaceRenderResult {
     val attached = ensureAttachedRenderSession(map, frame)
 
-    // Consume before rendering, so a request the runtime loop publishes during the render call is
-    // not discarded.
     if (!renderRequest.consume()) {
       return NativeSurfaceRenderResult.Skipped
     }
@@ -89,7 +85,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
       return NativeSurfaceRenderResult.Rendered
     }
     // The map applies a new logical size on the runtime loop's next pump, so an attach or resize
-    // is followed by frames with nothing to render. Keep pacing and retry.
+    // is followed by frames with nothing to render.
     requestRender()
     return NativeSurfaceRenderResult.Skipped
   }
@@ -106,8 +102,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     surfaceSession = null
     val owner = ownerSession
     ownerSession = null
-    // The render loop closes the session before the runtime loop closes the map: a map with an
-    // attached session cannot be destroyed.
+    // A map with an attached session cannot be destroyed, so the session closes first.
     if (renderSession != null && owner != null) {
       owner.withRendererAccess {
         closeRenderSession()
@@ -191,14 +186,9 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
   }
 
   /**
-   * Renders through a session that is already attached to the texture this frame carries.
-   *
-   * Skiko reallocates its texture on every resize, so the frame arrives with a new one whenever the
-   * window changes size. That is not a new session: as long as the texture belongs to the same
-   * graphics context the session attached with, handing it over keeps the session's renderer, and
-   * with it the tile pyramid, glyph and image atlases, and symbol placement, so the map stays warm
-   * across the resize. Closing and attaching again is reserved for the context itself changing,
-   * which is a session this one's renderer holds nothing usable for.
+   * Renders through a session attached to the texture this frame carries. Skiko reallocates its
+   * texture on every resize; handing the replacement to the live session keeps its renderer warm,
+   * so a session is closed and reattached only when the graphics context itself changes.
    */
   private fun ensureAttachedRenderSession(
     map: MapHandle,
@@ -213,10 +203,8 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
         try {
           borrowed.setTarget(existing.session)
         } catch (error: RuntimeException) {
-          // A native error may mean the session took the replacement before failing, and nothing
-          // here can tell that apart from a rejection that came first. Skiko owns both textures and
-          // frees the outgoing one as soon as it moves on, so closing the session is the only way
-          // to be sure it is holding neither by the time that happens.
+          // A failed handover leaves it unknown which texture the session holds, and Skiko frees
+          // the outgoing one as soon as it moves on, so close the session.
           try {
             closeRenderSession()
           } catch (cleanupError: Exception) {

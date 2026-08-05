@@ -88,7 +88,6 @@ class ByteRange:
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> "ByteRange":
-        """Build a byte range from private native values."""
         return cls(start=raw["start"], end=raw["end"])
 
 
@@ -115,7 +114,6 @@ class ResourceRequest:
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> "ResourceRequest":
-        """Build a copied request from private native values."""
         raw_range = raw["range"]
         return cls(
             requested_url=raw["requested_url"],
@@ -142,7 +140,6 @@ class ResourceTransformRequest:
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> "ResourceTransformRequest":
-        """Build a copied transform request from private native values."""
         return cls(kind=ResourceKind(raw["kind"]), url=raw["url"])
 
 
@@ -181,7 +178,6 @@ class ResourceResponse:
     retry_after_unix_ms: int | None = None
 
     def _to_native(self) -> dict[str, Any]:
-        """Return private native bridge values for this response."""
         return {
             "status": self.status.native_code,
             "error_reason": self.error_reason.native_code,
@@ -263,8 +259,6 @@ ResourceProviderCallback = Callable[
 def _adapt_resource_transform_callback(
     callback: ResourceTransformCallback,
 ) -> Callable[[dict[str, Any]], str | None]:
-    """Adapt a public resource transform callback for the native bridge."""
-
     def adapted(raw_request: dict[str, Any]) -> str | None:
         return callback(ResourceTransformRequest._from_native(raw_request))
 
@@ -286,8 +280,6 @@ def _adapt_http_header_transform_callback(
 def _adapt_resource_provider_callback(
     callback: ResourceProviderCallback,
 ) -> Callable[[dict[str, Any], Any], int]:
-    """Adapt a public resource provider callback for the native bridge."""
-
     def adapted(raw_request: dict[str, Any], native_handle: Any) -> int:
         handle = ResourceRequestHandle._from_native(native_handle)  # noqa: SLF001
         try:

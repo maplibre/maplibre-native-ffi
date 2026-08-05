@@ -49,17 +49,14 @@ typedef struct mln_webgpu_surface_descriptor {
   /** Borrowed WebGPU context. device is required. */
   mln_webgpu_context_descriptor context;
   /**
-   * Borrowed WGPUSurface. Required. The host creates it from whatever it
-   * presents to, which in a browser is a canvas, and keeps it alive for the
-   * session. The session configures it for this device and extent, and
-   * unconfigures it when the session ends.
+   * Borrowed WGPUSurface. Required, and must stay alive for the session. The
+   * session configures it for this device and extent, and unconfigures it when
+   * the session ends.
    */
   void* surface;
   /**
-   * WGPUTextureFormat to configure the surface with. Required. The host names
-   * it because a surface reports what it supports through its adapter, which
-   * this descriptor does not carry; a browser host takes it from
-   * navigator.gpu.getPreferredCanvasFormat().
+   * WGPUTextureFormat to configure the surface with. Required. A browser host
+   * takes it from navigator.gpu.getPreferredCanvasFormat().
    */
   uint32_t format;
 } mln_webgpu_surface_descriptor;
@@ -72,10 +69,8 @@ typedef struct mln_opengl_surface_descriptor {
   /** Borrowed OpenGL context provider data. */
   mln_opengl_context_descriptor context;
   /**
-   * Borrowed platform surface handle. For WGL this is an HDC, and for EGL an
-   * EGLSurface; both are required, because such a context needs a surface to
-   * become current. A WebGL context is created against its canvas and carries
-   * that binding, so it names the surface already and this is null there.
+   * Borrowed platform surface handle: an HDC for WGL and an EGLSurface for EGL,
+   * both required. Null for WebGL, whose context carries its canvas binding.
    */
   void* surface;
 } mln_opengl_surface_descriptor;
@@ -112,11 +107,10 @@ mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;
  * The map need only be live, so a host may attach on the thread that drives its
  * render loop while the map stays on the runtime loop thread. Attach creates
  * the session's graphics resources on the calling thread, so the host resources
- * named by descriptor must be usable there; for OpenGL that means the host
- * context must be current on this thread. The session retains descriptor->layer
- * and optional descriptor->context.device. It renders into the layer and
- * presents through it. On success, *out_session receives a handle the caller
- * destroys with mln_render_session_destroy().
+ * named by descriptor must be usable there. The session retains
+ * descriptor->layer and optional descriptor->context.device, and renders into
+ * and presents through the layer. On success, *out_session receives a handle
+ * the caller destroys with mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -140,8 +134,7 @@ MLN_API mln_status mln_metal_surface_attach(
  * The map need only be live, so a host may attach on the thread that drives its
  * render loop while the map stays on the runtime loop thread. Attach creates
  * the session's graphics resources on the calling thread, so the host resources
- * named by descriptor must be usable there; for OpenGL that means the host
- * context must be current on this thread. The session renders to
+ * named by descriptor must be usable there. The session renders to
  * descriptor->surface and presents through it. The Vulkan device must support
  * VK_KHR_swapchain, and the queue family must support graphics and presentation
  * to descriptor->surface. Vulkan handles are borrowed and must remain valid
@@ -170,9 +163,9 @@ MLN_API mln_status mln_vulkan_surface_attach(
  * The map need only be live, so a host may attach on the thread that drives its
  * render loop while the map stays on the runtime loop thread. Attach creates
  * the session's graphics resources on the calling thread, so the host resources
- * named by descriptor must be usable there; for OpenGL that means the host
- * context must be current on this thread. The session renders to
- * descriptor->surface and presents through the selected context provider. WGL
+ * named by descriptor must be usable there, so the host context must be current
+ * on this thread. The session renders to descriptor->surface and presents
+ * through the selected context provider. WGL
  * surfaces present with SwapBuffers(HDC), and EGL surfaces present with
  * eglSwapBuffers(EGLDisplay, EGLSurface). OpenGL context handles are borrowed
  * and must remain valid until detach or destroy. On success, *out_session
@@ -201,12 +194,11 @@ MLN_API mln_status mln_opengl_surface_attach(
  * render loop while the map stays on the runtime loop thread. Attach creates
  * the session's graphics resources on the calling thread, so the host resources
  * named by descriptor must be usable there; a WebGPU object belongs to the
- * agent that created it, so that is the thread the surface and device came
- * from. The session configures descriptor->surface for this device and extent,
- * takes its current texture each frame, and presents through it. The surface,
- * device, and instance are borrowed and must remain valid until detach or
- * destroy. On success, *out_session receives a handle the caller destroys with
- * mln_render_session_destroy().
+ * agent that created it. The session configures descriptor->surface for this
+ * device and extent, takes its current texture each frame, and presents through
+ * it. The surface, device, and instance are borrowed and must remain valid
+ * until detach or destroy. On success, *out_session receives a handle the
+ * caller destroys with mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -225,18 +217,16 @@ MLN_API mln_status mln_webgpu_surface_attach(
 /**
  * Presents an attached Metal surface session through a new surface.
  *
- * A host surface can be destroyed and recreated while the map goes on living,
- * which is what Android rotation, a Flutter SurfaceProducer lifecycle change,
- * and a window resize that reallocates all look like from here. This replaces
- * the presentation surface in place, so the session keeps its renderer along
- * with the tile pyramid, glyph and image atlases, symbol placement, and feature
- * state set through mln_render_session_set_feature_state().
+ * Use this when a host destroys and recreates its surface while the map lives
+ * on. The presentation surface is replaced in place, so the session keeps its
+ * renderer along with the tile pyramid, glyph and image atlases, symbol
+ * placement, and feature state set through
+ * mln_render_session_set_feature_state().
  *
  * descriptor->context must name the graphics context or device the session
  * attached with; a null Metal device names none and is accepted. A target on a
- * different context is a different session: destroy this one with
- * mln_render_session_destroy() and attach again, accepting a cold renderer.
- * That is also the path to take when a graphics context is genuinely lost.
+ * different context, or a lost graphics context, requires destroying the
+ * session with mln_render_session_destroy() and attaching again.
  *
  * The new extent applies exactly as mln_render_session_resize() applies one,
  * including how the next mln_render_session_render_update() waits for the map
@@ -246,10 +236,8 @@ MLN_API mln_status mln_webgpu_surface_attach(
  *
  * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
  * target is touched and leaves the session rendering into the one it had.
- * MLN_STATUS_NATIVE_ERROR is the only one that can mean a replacement was
- * already under way, which cannot be unwound; it can also come from a check
- * made before anything was touched, and the two do not read differently here.
- * Treat it as a session to destroy with mln_render_session_destroy().
+ * MLN_STATUS_NATIVE_ERROR may mean a replacement was already under way, which
+ * cannot be unwound; destroy the session with mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -272,31 +260,23 @@ MLN_API mln_status mln_metal_surface_set_target(
 /**
  * Presents an attached Vulkan surface session through a new surface.
  *
- * See mln_metal_surface_set_target() for what replacing a surface preserves and
- * when a host reaches for it. descriptor->context must name the same instance,
- * physical device, device, and graphics queue the session attached with, and
- * the new descriptor->surface must be presentable from that queue family.
+ * See mln_metal_surface_set_target() for what replacing a surface preserves,
+ * when a host reaches for it, and how failures are reported.
+ * descriptor->context must name the same instance, physical device, device, and
+ * graphics queue the session attached with, and the new descriptor->surface
+ * must be presentable from that queue family.
  *
- * The outgoing VkSurfaceKHR must still be valid when this is called. The
- * session holds a swapchain built from it, and Vulkan requires every swapchain
- * to be destroyed before its surface, which this does. A host that has to
- * release its surface first destroys the session with
- * mln_render_session_destroy() instead and attaches again afterward. Metal and
- * OpenGL carry no such requirement; see mln_opengl_surface_set_target().
+ * The outgoing VkSurfaceKHR must still be valid when this is called, because
+ * Vulkan requires the session's swapchain to be destroyed before its surface. A
+ * host that has to release its surface first destroys the session with
+ * mln_render_session_destroy() and attaches again afterward. Metal and OpenGL
+ * carry no such requirement.
  *
  * The replacement must report the color format and the surface-transform
  * support this session already compiled a render pass and shaders for.
  * MLN_STATUS_UNSUPPORTED reports one that does not, with the session still
- * rendering into the surface it has, and destroying the session and attaching
- * again is what changes either. Both are read from the replacement before
- * anything is torn down.
- *
- * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
- * target is touched and leaves the session rendering into the one it had.
- * MLN_STATUS_NATIVE_ERROR is the only one that can mean a replacement was
- * already under way, which cannot be unwound; it can also come from a check
- * made before anything was touched, and the two do not read differently here.
- * Treat it as a session to destroy with mln_render_session_destroy().
+ * rendering into the surface it has; destroy the session and attach again to
+ * change either.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -320,12 +300,11 @@ MLN_API mln_status mln_vulkan_surface_set_target(
 /**
  * Presents an attached OpenGL surface session through a new surface.
  *
- * See mln_metal_surface_set_target() for what replacing a surface preserves and
- * when a host reaches for it. descriptor->context must name the context
- * provider data the session attached with, so the session's own context, and
- * every object the renderer holds in it, stays current across the change. The
- * new surface is made current on the next render, which lets a host replace a
- * surface it has already destroyed.
+ * See mln_metal_surface_set_target() for what replacing a surface preserves,
+ * when a host reaches for it, and how failures are reported.
+ * descriptor->context must name the context provider data the session attached
+ * with. The new surface is made current on the next render, so a host may
+ * replace a surface it has already destroyed.
  *
  * Because nothing is made current here, a surface this call accepts can still
  * turn out to be unusable. An HDC whose pixel format does not match the
@@ -333,15 +312,7 @@ MLN_API mln_status mln_vulkan_surface_set_target(
  * next mln_render_session_render_update() as MLN_STATUS_NATIVE_ERROR rather
  * than by this function. The session stays destroyable in that state.
  *
- * A lost OpenGL context is a different matter: nothing in it survives, and the
- * session is destroyed and attached again.
- *
- * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
- * target is touched and leaves the session rendering into the one it had.
- * MLN_STATUS_NATIVE_ERROR is the only one that can mean a replacement was
- * already under way, which cannot be unwound; it can also come from a check
- * made before anything was touched, and the two do not read differently here.
- * Treat it as a session to destroy with mln_render_session_destroy().
+ * A lost OpenGL context requires destroying the session and attaching again.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -362,10 +333,9 @@ MLN_API mln_status mln_opengl_surface_set_target(
 /**
  * Presents an attached WebGPU surface session through a new surface.
  *
- * The replacement names the same device as the session attached with, because
- * every resource the renderer holds was created on it, and the same format,
- * because the render pipelines were built for it. The session unconfigures the
- * surface it had and configures the replacement for this extent.
+ * The replacement must name the device and format the session attached with.
+ * The session unconfigures the surface it had and configures the replacement
+ * for this extent.
  *
  * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
  * target is touched and leaves the session rendering into the one it had.

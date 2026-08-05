@@ -33,9 +33,8 @@ pub const RenderSessionRegistration = struct {
 var custom_geometry_state_registry_lock = std.Io.Mutex.init;
 var custom_geometry_state_registry: std.ArrayList(*CustomGeometrySourceState) = .empty;
 
-// Maps a map handle to the state this binding owns on top of it: the diagnostic
-// store, the close-once flag, and the attached-session count. A released handle
-// never collides with a live key, because the C API never reuses a handle value.
+// Keyed by map handle; the C API never reuses a handle value, so a released
+// handle never collides with a live key.
 var map_registry_lock = std.atomic.Value(bool).init(false);
 var map_registry: std.AutoHashMapUnmanaged(c.mln_map, *MapState) = .empty;
 
@@ -53,8 +52,7 @@ pub const MapMode = enum {
     }
 };
 
-/// Map creation options. A null field takes the C API default, matching
-/// `RuntimeOptions`, so these defaults never drift from `mln_map_options`.
+/// Map creation options. A null field takes the C API default.
 pub const MapOptions = struct {
     /// Initial logical width in UI pixels, replaced by the extent of the first
     /// attached render session.
@@ -62,21 +60,16 @@ pub const MapOptions = struct {
     /// Initial logical height in UI pixels, replaced by the extent of the first
     /// attached render session.
     height: ?u32 = null,
-    /// UI-to-device pixel scale, fixed for the lifetime of the map.
-    ///
-    /// This selects sprites, glyphs, and raster tiles for every frame. Render
-    /// targets carry their own scale factor for geometry, so attaching or
-    /// resizing a session with a different one logs a warning and renders
-    /// styled imagery chosen for this density.
+    /// UI-to-device pixel scale, fixed for the lifetime of the map, selecting
+    /// sprites, glyphs, and raster tiles. A render session attached or resized
+    /// with a different scale factor logs a warning and still renders styled
+    /// imagery chosen for this density.
     scale_factor: ?f64 = null,
     mode: ?MapMode = null,
     /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
-    /// encodings, fixed for the lifetime of the map.
-    ///
-    /// Enable this on maps that read vector sources created with
-    /// `VectorTileEncoding.mlt` from a tile set that uses FastPFOR. A map
-    /// created with this false decodes every other MLT encoding and logs a tile
-    /// parse warning for the FastPFOR ones.
+    /// encodings, fixed for the lifetime of the map. A map created with this
+    /// false decodes every other MLT encoding and logs a tile parse warning for
+    /// the FastPFOR ones.
     fast_pfor_enabled: ?bool = null,
 };
 
@@ -156,15 +149,12 @@ pub const MapHandle = enum(c.mln_map) {
         return mapIdForHandle(self);
     }
 
-    /// Loads inline style JSON through MapLibre Native style APIs.
+    /// Loads inline style JSON.
     ///
-    /// Malformed JSON is reported twice: this call returns the parse error
-    /// synchronously, and the same message also arrives as a map-loading-failed
-    /// runtime event. Handle both so a queued failure event is not a surprise.
-    ///
-    /// A well-formed style that MapLibre rejects semantically, such as an
-    /// unknown `version` or a layer naming a missing source, produces neither an
-    /// error nor an event: MapLibre logs it and renders what it can.
+    /// Malformed JSON is reported twice: as a synchronous parse error here and
+    /// as a map-loading-failed runtime event. A well-formed style that MapLibre
+    /// rejects semantically produces neither; MapLibre logs it and renders what
+    /// it can.
     pub fn setStyleJson(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -177,16 +167,12 @@ pub const MapHandle = enum(c.mln_map) {
         clearCustomGeometrySourceStates(self);
     }
 
-    /// Loads a style URL through MapLibre Native style APIs.
+    /// Loads a style URL.
     ///
-    /// Loading is asynchronous, so a style that is missing, unreachable, or
-    /// malformed still returns success here and reports through a
-    /// map-loading-failed runtime event. Watch the runtime event queue to
-    /// observe style load failures.
-    ///
-    /// A well-formed style that MapLibre rejects semantically, such as an
-    /// unknown `version` or a layer naming a missing source, produces neither an
-    /// error nor an event: MapLibre logs it and renders what it can.
+    /// Loading is asynchronous: a missing, unreachable, or malformed style
+    /// still returns success here and reports through a map-loading-failed
+    /// runtime event. A well-formed style that MapLibre rejects semantically
+    /// produces neither; MapLibre logs it and renders what it can.
     pub fn setStyleUrl(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -198,15 +184,11 @@ pub const MapHandle = enum(c.mln_map) {
         try status.checkStatus(c.mln_map_set_style_url(native_map, url_z.ptr), diagnosticStore(self));
     }
 
-    /// Copies the style document this map's style was last parsed from.
-    ///
-    /// This is the loaded document, not a serialization of the live style: the bytes passed to
-    /// `setStyleJson`, or the response body fetched for `setStyleUrl`. Runtime mutations such as
-    /// adding a layer do not change it, and a failed parse leaves the previously parsed document
-    /// in place. The copy is byte-for-byte the value given to `setStyleJson`, so it can be handed
-    /// back unchanged.
-    ///
-    /// The value is empty when no document has been parsed. A parsed document is never empty.
+    /// Copies the style document this map's style was last parsed from: the
+    /// bytes passed to `setStyleJson` or the response body fetched for
+    /// `setStyleUrl`, not a serialization of the live style. Runtime mutations
+    /// do not change it, and a failed parse leaves the previous document in
+    /// place. The value is empty when no document has been parsed.
     pub fn copyLoadedStyleJson(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -214,15 +196,11 @@ pub const MapHandle = enum(c.mln_map) {
         return self.copyMapText(allocator, c.mln_map_copy_loaded_style_json);
     }
 
-    /// Copies the URL this map's style was last requested from.
-    ///
-    /// Unlike `copyLoadedStyleJson`, this is live rather than load-time state: `setStyleUrl`
-    /// records the URL when the request is made, before the response arrives or the document
-    /// parses, and `setStyleJson` clears it. The two can disagree while a load is in flight.
-    ///
-    /// The value is empty when no URL bytes are available, which covers a style loaded from inline
-    /// JSON, a map that has loaded no style, and a URL load requested with an empty string. These
-    /// cases are not distinguishable here.
+    /// Copies the URL this map's style was last requested from. `setStyleUrl`
+    /// records it when the request is made, before the response arrives, and
+    /// `setStyleJson` clears it, so it can disagree with `copyLoadedStyleJson`
+    /// while a load is in flight. The value is empty for an inline-JSON style,
+    /// a map with no style, and an empty URL alike.
     pub fn copyStyleUrl(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -361,8 +339,8 @@ pub const MapHandle = enum(c.mln_map) {
         return self.copyLayerText(allocator, layer_id, c.mln_map_copy_layer_source_id);
     }
 
-    /// Probes the required length, then copies. A null buffer with zero capacity is a size probe
-    /// the C API answers with OK.
+    /// A null buffer with zero capacity is a size probe the C API answers with
+    /// OK.
     fn copyMapText(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -595,7 +573,8 @@ pub const MapHandle = enum(c.mln_map) {
         return values.styleSourceTypeFromNative(raw_type);
     }
 
-    /// Copies one source's retained metadata into a value that remains valid independently of the map.
+    /// Copies one source's retained metadata into a value that stays valid
+    /// independently of the map.
     pub fn getStyleSourceInfo(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -874,11 +853,9 @@ pub const MapHandle = enum(c.mln_map) {
         return try copyJsonSnapshot(allocator, snapshot, diagnosticStore(self));
     }
 
-    /// Sets the style's global transition options.
-    ///
-    /// Absent duration and delay clear the style-wide override, so this call replaces the whole
-    /// transition configuration rather than merging into it. Loading a style replaces these
-    /// options with the ones that style declares, so apply an override after the style loads.
+    /// Sets the style's global transition options, replacing the whole
+    /// configuration: absent duration and delay clear the style-wide override.
+    /// Loading a style replaces these options, so apply an override afterwards.
     pub fn setStyleTransitionOptions(
         self: *MapHandle,
         options: values.StyleTransitionOptions,
@@ -1062,8 +1039,8 @@ pub const MapHandle = enum(c.mln_map) {
         );
     }
 
-    /// Copies one runtime style image's stretchable intervals, or null when no image carries
-    /// `image_id`. Probes the required counts, then copies.
+    /// Copies one runtime style image's stretchable intervals, or null when no
+    /// image carries `image_id`.
     pub fn copyStyleImageStretches(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -1399,9 +1376,9 @@ pub const MapHandle = enum(c.mln_map) {
         );
     }
 
-    /// Adds a GeoJSON source with inline data. MapLibre Native fixes options when the source is
-    /// created, so later setGeoJsonSourceData and setGeoJsonSourceUrl calls keep the options
-    /// passed here.
+    /// Adds a GeoJSON source with inline data. The options are fixed at
+    /// creation; later `setGeoJsonSourceData` and `setGeoJsonSourceUrl` calls
+    /// keep them.
     pub fn addGeoJsonSourceData(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -1437,9 +1414,9 @@ pub const MapHandle = enum(c.mln_map) {
         );
     }
 
-    /// Adds a GeoJSON source that loads from a URL. MapLibre Native fixes options when the source
-    /// is created, so later setGeoJsonSourceUrl and setGeoJsonSourceData calls keep the options
-    /// passed here.
+    /// Adds a GeoJSON source that loads from a URL. The options are fixed at
+    /// creation; later `setGeoJsonSourceUrl` and `setGeoJsonSourceData` calls
+    /// keep them.
     pub fn addGeoJsonSourceUrl(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -1589,12 +1566,9 @@ pub const MapHandle = enum(c.mln_map) {
         return loaded;
     }
 
-    /// Returns the map's logical viewport size in UI pixels and its pixel ratio.
-    ///
-    /// The size starts at the creation width and height, and follows the attach
-    /// and resize rules documented on MapOptions. The scale factor is fixed for
-    /// the lifetime of the map and is independent of any render target's scale
-    /// factor.
+    /// Returns the map's logical viewport size in UI pixels and its pixel
+    /// ratio. The scale factor is fixed for the lifetime of the map and is
+    /// independent of any render target's scale factor.
     pub fn getSize(self: *MapHandle) status.Error!struct { width: u32, height: u32, scale_factor: f64 } {
         var width: u32 = 0;
         var height: u32 = 0;

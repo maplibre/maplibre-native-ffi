@@ -5,8 +5,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class PublicApiSurfaceTests
 {
-    // Support invariant for the Architecture and Minimality requirements: this
-    // guards the supported .NET public surface against accidental API expansion.
     [Fact]
     public void ExpectedPublicTypesExist()
     {
@@ -211,8 +209,6 @@ public sealed class PublicApiSurfaceTests
         );
     }
 
-    // Support invariant for the Architecture requirements: internal/generated
-    // declarations stay outside the supported safe public API.
     [Fact]
     public void GeneratedAndInternalTypesStayOutOfPublicSurface()
     {
@@ -226,8 +222,6 @@ public sealed class PublicApiSurfaceTests
         Assert.DoesNotContain(publicTypes, type => type.Name == "NativeMethods");
     }
 
-    // Support invariant for the Architecture requirements: public signatures use
-    // binding values instead of raw C or host FFI carrier types.
     [Fact]
     public void PublicSurfaceDoesNotExposeRawPointersOrNativeSizedCarriers()
     {
@@ -279,8 +273,7 @@ public sealed class PublicApiSurfaceTests
         Assert.Empty(violations);
     }
 
-    // Support invariant for the NativePointer requirements: raw address conversion
-    // is explicitly borrowed backend interop, not ordinary handle construction.
+    // Raw address conversion is explicitly borrowed backend interop.
     [Fact]
     public void NativePointerUsesBorrowedAddressFactory()
     {
@@ -303,8 +296,7 @@ public sealed class PublicApiSurfaceTests
         );
     }
 
-    // Support invariant for the Minimality requirement: C# optional/default
-    // parameters create shortcut workflows outside the low-level C API shape.
+    // Default parameter values would create shortcut workflows outside the C API shape.
     [Fact]
     public void PublicSurfaceDoesNotUseDefaultParameterValues()
     {
@@ -329,8 +321,6 @@ public sealed class PublicApiSurfaceTests
         Assert.Empty(violations);
     }
 
-    // Support invariant for Handle copying: public code cannot fabricate live
-    // owned handles from ordinary constructors.
     [Fact]
     public void OwnedNativeHandlesDoNotExposePublicConstructors()
     {

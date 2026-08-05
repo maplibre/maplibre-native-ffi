@@ -65,9 +65,8 @@ auto url_scheme(std::string_view url) -> std::optional<std::string_view> {
   return scheme;
 }
 
-// Keeps enough URL context to identify the failing resource without copying
-// credentials into public diagnostics. Query and fragment values are omitted,
-// and RFC 3986 userinfo is removed from hierarchical URLs.
+// Strips the query, fragment, and RFC 3986 userinfo so a diagnostic never
+// carries credentials.
 auto diagnostic_url(std::string_view url) -> std::string {
   const auto query = url.find('?');
   const auto fragment = url.find('#');
@@ -97,9 +96,8 @@ auto unsupported_scheme_response(
   std::string_view scheme, const std::string& url, bool provider_declined
 ) -> mbgl::Response {
   auto response = mbgl::Response{};
-  // Reason::Other keeps this a terminal configuration error: it surfaces as
-  // MLN_RESOURCE_ERROR_REASON_OTHER, and the tile and source paths retry or
-  // silently absorb the reasons that describe transport and server state.
+  // Reason::Other makes this terminal; the transport and server reasons are
+  // retried or absorbed by the tile and source paths.
   response.error = std::make_unique<mbgl::Response::Error>(
     mbgl::Response::Error::Reason::Other,
     "unsupported URL scheme \"" + std::string{scheme} +
@@ -143,13 +141,10 @@ auto resource_kind_to_abi(mbgl::Resource::Kind kind) -> uint32_t {
   }
 }
 
-// Mirrors the per-kind normalization mbgl::OnlineFileSource applies before it
-// fetches, so a provider that replaces the network stack sees the same URL the
-// built-in path would have requested. Unknown and image resources carry no
-// canonical form, so they stay as requested. Normalization that rejects the URL
-// falls back to it as well, which keeps a provider reachable for requests the
-// native path refuses outright, such as a canonical source URL on a tile server
-// that requires an API key none was configured for.
+// Applies the per-kind normalization mbgl::OnlineFileSource would apply, so a
+// provider sees the URL the built-in path would have requested. Kinds with no
+// canonical form, and URLs normalization rejects, fall back to the request URL
+// so a provider stays reachable for requests the native path refuses.
 auto resolve_resource_url(
   const mbgl::ResourceOptions& resource_options, const mbgl::Resource& resource
 ) -> std::string {
@@ -231,14 +226,11 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
 
   auto request(const mbgl::Resource& resource, Callback callback)
     -> std::unique_ptr<mbgl::AsyncRequest> override {
-    // One snapshot serves every option read below, the way the online source
-    // takes one under its own lock per request.
     const auto options = resource_options_snapshot();
     auto provider_declined = false;
     if (can_request_network(resource)) {
-      // Keep the lease through the synchronous callback, then release it
-      // before falling through to native loading: the native source may invoke
-      // a transform that needs the runtime registry lock during teardown.
+      // Release the lease before falling through to native loading: the native
+      // source may invoke a transform that needs the runtime registry lock.
       const auto provider = acquire_resource_provider_for_platform_context(
         options.platformContext()
       );
@@ -320,21 +312,17 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
   }
 
  private:
-  // Hands out an options snapshot so option reads never race a replacement.
-  // The mutex guards nothing but this member and is released before any other
-  // lock is taken, which keeps it out of every lock-ordering edge this file
-  // already has with mbgl and the runtime registry.
+  // Snapshots the options so reads never race a replacement. The mutex guards
+  // only this member and is released before any other lock is taken.
   [[nodiscard]] auto resource_options_snapshot() const
     -> mbgl::ResourceOptions {
     const std::scoped_lock lock(resource_options_mutex_);
     return resource_options_.clone();
   }
 
-  // Reports the scheme of a URL the online source is unable to serve. The
-  // resource loader routes file, asset, mbtiles, and pmtiles URLs to their own
-  // sources ahead of the network, so anything left here reaches an HTTP
-  // client. A registered resource transform rewrites URLs inside the online
-  // source, so it keeps every scheme available.
+  // Reports the scheme of a URL the online source is unable to serve. A
+  // registered resource transform rewrites URLs inside the online source, so it
+  // keeps every scheme available.
   [[nodiscard]] static auto unsupported_network_scheme(
     const mbgl::ResourceOptions& options, const std::string& url
   ) -> std::optional<std::string_view> {

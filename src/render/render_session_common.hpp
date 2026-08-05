@@ -40,23 +40,11 @@ enum class TextureSessionFrameKind : uint8_t {
 };
 enum class TextureSessionMode : uint8_t { Owned, Borrowed };
 
-// A replacement target that the session's compiled GPU state cannot serve is
-// refused rather than accepted with a rebuild.
-//
-// The state in question is not all owned by the renderer. mbgl's Vulkan
-// pipeline cache lives in the renderer's shader registry, but the Metal context
-// caches a clip-mask pipeline keyed only on the renderable's address, and both
-// backends compile shader variants against properties of the target. Retiring
-// the renderer would leave the context's share of that behind, so a target that
-// does not match what is already compiled is reported as unsupported and the
-// host destroys the session and attaches again, which rebuilds all of it.
-//
-// Backends check this before they touch anything, so a refusal leaves the
+// Reports a target replacement the backend does not implement. Compiled GPU
+// state lives partly outside the renderer, so a target that state cannot serve
+// is refused instead of rebuilt; the host destroys the session and attaches
+// again. Backends check before mutating anything, so a refusal leaves the
 // session rendering into the target it already had.
-
-// Reports a target replacement the backend does not implement. Every backend
-// serves exactly one descriptor kind, and the session checks that before
-// dispatching, so reaching a default is a mismatch the caller can fix.
 auto unsupported_retarget(const char* message) -> mln_status;
 
 class SurfaceSessionBackend {
@@ -72,20 +60,17 @@ class SurfaceSessionBackend {
   virtual auto renderer_backend() -> mbgl::gfx::RendererBackend& = 0;
   virtual void resize(uint32_t physical_width, uint32_t physical_height) = 0;
 
-  // Whether the surface can take a frame right now. A false report makes the
-  // render update skip the frame and report nothing rendered, which is how a
-  // minimized or occluded window's surface, with no target to hand out, stays
-  // a retry rather than a failure. The default reports ready, for surfaces
-  // that never run dry.
+  // Whether the surface can take a frame right now. Not ready skips the frame
+  // and reports nothing rendered, so a minimized or occluded window is a retry
+  // rather than a failure.
   virtual auto prepare_frame(bool& out_ready) -> mln_status {
     out_ready = true;
     return MLN_STATUS_OK;
   }
 
   // Presents through a new host surface, keeping the graphics context and every
-  // resource the renderer holds against it. The descriptor names the same
-  // context as the one this session attached with; a backend rejects anything
-  // else, because a context change is what destroy-and-attach is for.
+  // resource the renderer holds against it. The descriptor must name the
+  // context this session attached with; a backend rejects anything else.
   virtual auto set_metal_target(const mln_metal_surface_descriptor& descriptor)
     -> mln_status {
     (void)descriptor;
@@ -134,15 +119,13 @@ class TextureSessionBackend {
     return headless_backend().getRendererBackend();
   }
   // Follows a new physical size. The default drops the renderable resource and
-  // rebuilds it lazily, which suits backends that cache nothing across it. A
-  // backend whose renderer keys cached GPU state on part of that resource
-  // overrides this to rebuild only what the size actually changed.
+  // rebuilds it lazily; a backend whose renderer keys cached GPU state on that
+  // resource overrides this to rebuild only what the size changed.
   virtual void resize(mbgl::Size size) { headless_backend().setSize(size); }
 
   // Renders into a new caller-owned texture, keeping the graphics context and
-  // every resource the renderer holds against it. The descriptor names the same
-  // context as the one this session attached with; a backend rejects anything
-  // else, because a context change is what destroy-and-attach is for.
+  // every resource the renderer holds against it. The descriptor must name the
+  // context this session attached with; a backend rejects anything else.
   virtual auto set_metal_borrowed_target(
     const mln_metal_borrowed_texture_descriptor& descriptor
   ) -> mln_status {
@@ -176,9 +159,8 @@ class TextureSessionBackend {
     );
   }
 
-  // Whether headless_backend().readStillImage() produces an image. A backend
-  // that cannot read pixels back says so here, so the C API answers
-  // UNSUPPORTED rather than reporting an empty image as a native error.
+  // Whether headless_backend().readStillImage() produces an image. False makes
+  // the C API answer UNSUPPORTED instead of reporting an empty image.
   [[nodiscard]] virtual auto supports_readback() const -> bool { return true; }
 
   virtual void prepare_render_resources() {}
@@ -215,22 +197,14 @@ class TextureSessionBackend {
   }
 };
 
-// The scheduler mbgl sees as current while a render session renders.
+// The scheduler mbgl sees as current while a render session renders. Work
+// created during a render — tile mailboxes, file-source requests, the
+// style-image-missing continuation — is delivered here, and must run on the
+// thread that owns the renderer: tile mailboxes mutate state that
+// RenderOrchestrator reads every frame.
 //
-// mbgl reaches for Scheduler::GetCurrent() from inside Renderer::render: every
-// tile builds its worker mailbox from it, so do file-source requests and the
-// style-image-missing continuation. Whatever it returns is where those results
-// come back. With no scheduler installed, GetCurrent() manufactures a
-// thread_local RunLoop that nobody pumps and those results are simply lost —
-// tiles never finish parsing, with no error to show for it.
-//
-// Delivering them on the map's run loop instead would be worse than wasteful:
-// tile mailboxes mutate state that RenderOrchestrator reads every frame, so it
-// would create a data race that does not exist today. They belong on the thread
-// that owns the renderer, which is this one.
-//
-// Lifetime is the session's, and mailboxes created during a render hold a
-// WeakPtr to it, so it outlives every message in flight.
+// Lifetime is the session's. Mailboxes created during a render hold a WeakPtr
+// to it, so it outlives every message in flight.
 class RenderSessionScheduler final : public mbgl::Scheduler {
  public:
   RenderSessionScheduler() = default;
@@ -248,10 +222,8 @@ class RenderSessionScheduler final : public mbgl::Scheduler {
   auto makeWeakPtr() -> mapbox::base::WeakPtr<mbgl::Scheduler> override {
     return weak_factory_.makeWeakPtr();
   }
-  // Only the owner thread can run this queue, and it is the current scheduler
-  // exactly while that thread is inside a session call. A caller anywhere else
-  // cannot wait for work only the owner will run, so this drains when it can
-  // and otherwise does nothing rather than running tasks off the owner thread.
+  // Only the owner thread may run this queue, so a caller on any other thread
+  // gets a no-op rather than tasks running off the owner thread.
   void waitForEmpty(
     const mbgl::util::SimpleIdentity = mbgl::util::SimpleIdentity::Empty
   ) override {
@@ -264,9 +236,7 @@ class RenderSessionScheduler final : public mbgl::Scheduler {
   // thread. Loops until the queue is empty, because a task may enqueue more.
   auto drain() -> void;
 
-  // Drops queued work without running it. Used during detach: every queued task
-  // is a mailbox receive or a bindOnce continuation guarded by a weak pointer
-  // that is already dead, so running them would be a no-op anyway.
+  // Drops queued work without running it, for detach.
   auto discard() -> void;
 
  private:
@@ -294,26 +264,13 @@ class RenderSessionScheduler final : public mbgl::Scheduler {
 };
 
 // Gives the calling thread a current mbgl scheduler for the duration of a
-// session call, but only when it does not already have one.
+// session call, but only when it does not already have one. A session sharing
+// its owner thread with the runtime keeps the runtime's run loop, which the
+// host pumps more often than it renders.
 //
-// Work created during a render — tile mailboxes, file-source requests, the
-// style-image-missing continuation — is delivered to whatever
-// Scheduler::GetCurrent() returned when it was created. Two cases:
-//
-//   - The session shares its owner thread with the runtime, which is the
-//     default. GetCurrent() is already that runtime's run loop, and the host
-//     pumps it every iteration through mln_runtime_pump(). Leave it alone:
-//     it drains more often than rendering does, and overriding it would strand
-//     results behind a render that the results themselves are needed to
-//     trigger.
-//   - The session was attached on a thread of its own, which has no scheduler.
-//     Install the session's, drained around each render. A host that gives a
-//     session its own thread runs a display-paced render loop by definition, so
-//     that queue drains continuously.
-//
-// GetCurrent(false) is deliberate: the default GetCurrent() would create a
-// thread_local RunLoop on a bare render thread, which permanently disqualifies
-// that thread from mln_runtime_create().
+// GetCurrent(false) is required: the default would create a thread_local
+// RunLoop on a bare render thread, which permanently disqualifies that thread
+// from mln_runtime_create().
 class ScopedCurrentScheduler {
  public:
   explicit ScopedCurrentScheduler(mbgl::Scheduler& scheduler)
@@ -355,8 +312,7 @@ struct mln_render_session_object {
   mln::core::RenderSessionKind kind = mln::core::RenderSessionKind::Surface;
   mln_map map = MLN_HANDLE_NULL;
   // The thread that attached the session, fixed for its lifetime. Set before
-  // the session is registered, so it is never default-constructed while any
-  // entry point can reach it.
+  // the session is registered.
   std::thread::id owner_thread;
   uint32_t width = 0;
   uint32_t height = 0;
@@ -480,28 +436,21 @@ auto validate_opengl_context(
 auto validate_webgpu_context(const mln_webgpu_context_descriptor& context)
   -> mln_status;
 
-// Whether two Vulkan context descriptors name the same device and queue, which
-// is what lets a session keep every resource the renderer allocated on it
-// across a target replacement.
+// Whether two Vulkan context descriptors name the same device and queue.
 auto vulkan_context_matches(
   const mln_vulkan_context_descriptor& lhs,
   const mln_vulkan_context_descriptor& rhs
 ) -> bool;
 
-// How strictly two OpenGL context descriptors have to agree for a session to
-// keep its own context — and every object the renderer holds in it — across a
-// target replacement.
-//
-// A surface target carries its own drawable, so only the share group has to
-// match: WGL makes the session's context current against whichever HDC the
-// target names, and a recreated window brings a new one. A texture target
-// carries no drawable, so the session keeps making its context current against
-// the handles it attached with, and those have to be the same ones.
+// How strictly two OpenGL context descriptors have to agree across a target
+// replacement. A surface target carries its own drawable, so only the share
+// group has to match; a texture target keeps making the session's context
+// current against the handles it attached with, so those must be identical.
 enum class OpenGLContextMatch : uint8_t { ShareGroup, Exact };
 
 // Whether two OpenGL context descriptors name the same host context. The
-// proc-address loader is left out either way: it is a way to reach a context,
-// not part of its identity.
+// proc-address loader is excluded: it is a way to reach a context, not part of
+// its identity.
 auto opengl_context_matches(
   const mln_opengl_context_descriptor& lhs,
   const mln_opengl_context_descriptor& rhs, OpenGLContextMatch strictness
@@ -520,8 +469,7 @@ inline auto set_session_extent(
 }
 
 // Borrowed targets are sized by their owner, so the caller states the physical
-// size instead of deriving it. Physical sizes that no logical extent maps onto,
-// such as an odd width at a scale factor of two, stay expressible this way.
+// size instead of deriving it from the logical extent and scale factor.
 inline auto set_borrowed_session_extent(
   mln_render_session_object& session, const mln_render_target_extent& extent,
   uint32_t physical_width, uint32_t physical_height
@@ -573,13 +521,9 @@ auto render_session_resize(
 enum class RetargetTargetKind : uint8_t { Surface, BorrowedTexture };
 
 // Checks that a session can take a replacement target of this kind, before any
-// descriptor is looked at.
-//
-// Entry points call this first so a retired handle, a foreign thread, or a
-// session of the wrong kind reports what it is, rather than whatever the
-// descriptor happened to be missing. This runs even in builds whose answer is
-// "that backend is not compiled in", so the status a caller gets does not
-// depend on which failure the build happens to notice first.
+// descriptor is read. Entry points call this first, including in builds without
+// that backend, so the reported status does not depend on which failure the
+// build notices first.
 auto validate_render_session_retarget(
   mln_render_session session, RetargetTargetKind kind,
   mln_render_session_object*& out_session
@@ -589,16 +533,11 @@ auto validate_render_session_retarget(
 using RenderTargetReplacer =
   std::function<mln_status(mln_render_session_object&)>;
 
-// Shared body behind every set-target entry point.
-//
-// Checks that the session is live, attached, owned by this thread, and of the
-// kind the descriptor targets, then calls `replace` to hand the descriptor to
-// the backend. On success the session takes the new extent, the map is resized
-// to match, and the renderer is kept unless the scale factor changed or the
-// backend reported that it rebuilt state the renderer caches against.
-//
-// The per-backend entry point validates its own descriptor first, including
-// that the graphics context is the one the session attached with.
+// Shared body behind every set-target entry point. Checks that the session is
+// live, attached, owned by this thread, and of the kind the descriptor targets,
+// then calls `replace`. On success the session takes the new extent and the
+// renderer is kept unless the scale factor changed. The per-backend entry point
+// validates its own descriptor first.
 auto render_session_set_target(
   mln_render_session session, RetargetTargetKind kind,
   const mln_render_target_extent& extent, uint32_t physical_width,

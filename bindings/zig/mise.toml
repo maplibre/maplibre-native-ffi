@@ -1,17 +1,13 @@
 [tools]
-# Zig 0.16.0 has no working Windows ARM64 story: the native aarch64 build exits
+# Zig 0.16.0 is unusable on Windows ARM64: the native aarch64 build exits
 # non-zero with no diagnostic while loading build.zig, and the x64 build under
-# emulation hangs in `zig build` until the job timeout. The Zig binding and
-# examples are skipped there; the C API tests are plain C and do not need Zig.
+# emulation hangs until the job timeout.
 "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] }
 
-# The manifest is at the repository root, so every command below names it with
-# `--build-file`, which makes the root the build root without moving the command
-# there. Setting `dir` would, and mise resolves a task's tools against the
-# directory it runs in: the root declares `core:zig` for Linux alone, where the
-# native build uses `zig cc`, and this file is what widens it to the platforms
-# the binding supports. A `cd` would work for the tasks, which cascade to Bash,
-# but not for this dependency provider, which runs in the platform shell.
+# Commands name the root manifest with `--build-file` rather than setting `dir`:
+# mise resolves tools against the directory a task runs in, and the `core:zig`
+# widened above must apply. A `cd` covers the tasks but not this dependency
+# provider, which runs in the platform shell.
 [deps.zig]
 auto = true
 description = "Fetch Zig package dependencies."

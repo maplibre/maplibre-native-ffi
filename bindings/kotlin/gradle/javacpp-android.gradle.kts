@@ -28,10 +28,8 @@ val androidSdkDirectory =
 val androidNdkPrebuilt = androidSdkDirectory.map {
   it.dir("ndk/$androidNdkVersion/toolchains/llvm/prebuilt/${hostPlatform.androidNdkPrebuiltTag}")
 }
-// Resolve the NOTICE from the SDK Gradle selected, which is the same SDK whose
-// NDK supplies the statically linked libc++. Reading ANDROID_HOME directly would
-// pair the bridge with a notice from a different NDK whenever local.properties
-// or ANDROID_SDK_ROOT selects another SDK.
+// Resolve the NOTICE from the SDK Gradle selected, whose NDK supplies the statically
+// linked libc++. ANDROID_HOME can point at a different SDK.
 val androidNdkNotice = androidSdkDirectory.map { it.file("ndk/$androidNdkVersion/NOTICE") }
 val repositoryRoot = rootProject.layout.projectDirectory.asFile
 
@@ -47,15 +45,13 @@ val generatedJavaCppClasses = layout.buildDirectory.dir("classes/javacppGenerate
 val javaCppConfigClasses = layout.buildDirectory.dir("classes/javacppConfig")
 val javaCppAndroidIncludes = layout.projectDirectory.dir("src/androidMain/javacpp")
 val javaCppAndroidCompatHeader = javaCppAndroidIncludes.file("javacpp_android_compat.h")
-// The C API library is the backend-specific payload of the runtime AARs, and any
-// Android host packages it. The JavaCPP bridge is private to this binding, so it
-// travels in this module's own AAR and stays out of a non-Kotlin host's APK.
+// The C API library ships in the backend runtime AARs; the JavaCPP bridge is private
+// to this binding and ships in this module's AAR.
 val packagedAndroidRuntimeLibs = layout.buildDirectory.dir("generated/jniLibs/runtime")
 @Suppress("UNCHECKED_CAST")
 val packagedAndroidBindingLibs =
   extensions.extraProperties["maplibreAndroidBindingLibsDirectory"] as Provider<Directory>
-// Snapshot publishing extracts the Android CMake packages produced by target CI here,
-// allowing the publication job to reuse them instead of rebuilding MapLibre Native.
+// Snapshot publishing extracts the Android CMake packages produced by target CI here.
 val prebuiltAndroidInstallRoot =
   providers.gradleProperty("maplibre.android.prebuiltInstallRoot").map(rootProject::file)
 // Target CI round-trips packages into each CMake preset's install directory.
@@ -130,8 +126,7 @@ val packageAndroidNativeLibraries =
   }
 
 // The bridge links the NDK C++ runtime statically, so this AAR redistributes
-// NDK-licensed code on its own and carries the notice with it rather than
-// leaning on a runtime AAR that a consumer resolves separately.
+// NDK-licensed code and must carry the notice itself.
 tasks.withType<Zip>().configureEach {
   if (name == "bundleAndroidMainAar") {
     from(androidNdkNotice) { into("META-INF/licenses/android-ndk") }
@@ -196,10 +191,9 @@ androidTargets.forEach { target ->
         "-include",
         "-Xcompiler",
         javaCppAndroidCompatHeader.asFile.absolutePath,
-        // The C API library links libc++ statically, so the bridge does too and
-        // the AARs redistribute no libc++_shared.so. --exclude-libs keeps the
-        // static runtime's symbols out of the dynamic table, which leaves the
-        // JNI entry points as the only symbols an app can bind to.
+        // The C API library links libc++ statically, so the bridge must too.
+        // --exclude-libs keeps the static runtime out of the dynamic symbol table,
+        // leaving the JNI entry points as the only bindable symbols.
         "-Xcompiler",
         "-static-libstdc++",
         "-Xcompiler",

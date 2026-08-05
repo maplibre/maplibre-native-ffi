@@ -417,7 +417,6 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 		}
 	}()
 
-	// A map with no style yet reports nothing set.
 	defaults, err := m.StyleTransitionOptions()
 	if err != nil {
 		t.Fatalf("StyleTransitionOptions(): %v", err)
@@ -493,7 +492,6 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 		t.Fatal("a duration-only literal disabled the placement cross-fade")
 	}
 
-	// Loading a style replaces the override with what that style declares.
 	if err := m.SetStyleJSON(transitionStyle); err != nil {
 		t.Fatalf("SetStyleJSON(transition style): %v", err)
 	}

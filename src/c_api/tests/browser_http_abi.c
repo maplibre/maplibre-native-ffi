@@ -1,14 +1,9 @@
 // The browser's HTTP transport, end to end: a style loaded from a real origin.
 //
-// This is the one test that puts a request on the network. Everything else in
-// the suite reads embedded fixtures or answers through a resource provider,
-// which is how a transport that reached the server and dropped every response
-// stayed invisible: emscripten_fetch reports through the calling thread's event
-// loop, and every MapLibre thread parks in its run loop instead of returning to
-// one. See src/platform/emscripten/http_file_source.cpp.
-//
-// The origin comes from the runner, which serves the style document; there is
-// no server on the other targets, so this covers the browser alone.
+// This is the one test that puts a request on the network; everything else in
+// the suite reads embedded fixtures or answers through a resource provider. The
+// origin comes from the browser runner, which serves the style document, so
+// this covers the browser target alone.
 
 #include "abi_tests.h"
 #include "test_support.h"
@@ -21,8 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-// The layer id the runner's document carries, which is what says the response
-// came from the server rather than from anywhere else.
+// The layer id the runner's document carries, which identifies the response as
+// the served one.
 static const char fixture_layer_id[] = "http-fixture";
 
 static mln_runtime_event empty_event(void) {
@@ -36,7 +31,7 @@ static mln_runtime_event empty_event(void) {
 
 // Waits for the style to load, or reports the failure the map produced instead.
 // A transport that never answers reports neither, so the timeout is the failure
-// this test exists to catch.
+// this test catches.
 static bool wait_for_style_loaded(
   mln_runtime runtime, mln_map map, char* out_message, size_t capacity
 ) {
@@ -106,8 +101,8 @@ static void style_loads_over_http_from_the_runner_origin(void) {
     return;
   }
 
-  // Which document loaded, not merely that one did: the runner answers this
-  // path alone, so a response from anywhere else carries a different layer.
+  // Checks which document loaded: a response from anywhere else carries a
+  // different layer.
   mln_style_id_list layers = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_list_style_layer_ids(map, &layers)
@@ -159,8 +154,7 @@ void run_browser_http_abi_tests(void) {
 
 #else
 
-// Reaching a real origin needs the server the browser runner hosts, so the
-// other targets cover HTTP through their own platform's transport tests.
+// Only the browser runner hosts the origin this test needs.
 void run_browser_http_abi_tests(void) {}
 
 #endif

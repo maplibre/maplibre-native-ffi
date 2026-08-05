@@ -11,8 +11,6 @@ namespace mln::core {
 
 namespace {
 
-// Renders a handle as hex so a host can correlate a diagnostic with the value
-// it passed. Decimal would bury the kind and index fields.
 auto handle_to_hex(std::uint64_t handle) -> std::string {
   constexpr auto digits = std::string_view{"0123456789abcdef"};
   auto text = std::string{"0x"};

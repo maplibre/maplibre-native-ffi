@@ -257,7 +257,6 @@ func TestMapReportsLoadedStyleDocumentAndURL(t *testing.T) {
 		}
 	}()
 
-	// Nothing parsed and nothing requested yet.
 	if document, err := m.LoadedStyleJSON(); err != nil || document != "" {
 		t.Fatalf("LoadedStyleJSON() before load = %q, %v, want \"\", nil", document, err)
 	}
@@ -265,7 +264,6 @@ func TestMapReportsLoadedStyleDocumentAndURL(t *testing.T) {
 		t.Fatalf("StyleURL() before load = %q, %v, want \"\", nil", url, err)
 	}
 
-	// The document reads back byte-for-byte, so it can be reloaded unchanged.
 	if err := m.SetStyleJSON(minimalStyleJSON); err != nil {
 		t.Fatalf("SetStyleJSON(): %v", err)
 	}
@@ -276,7 +274,6 @@ func TestMapReportsLoadedStyleDocumentAndURL(t *testing.T) {
 	if document != minimalStyleJSON {
 		t.Fatalf("LoadedStyleJSON() = %q, want %q", document, minimalStyleJSON)
 	}
-	// Inline JSON clears the URL.
 	if url, err := m.StyleURL(); err != nil || url != "" {
 		t.Fatalf("StyleURL() after inline JSON = %q, %v, want \"\", nil", url, err)
 	}

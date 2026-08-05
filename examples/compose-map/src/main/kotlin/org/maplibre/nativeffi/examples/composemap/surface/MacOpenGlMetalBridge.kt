@@ -87,11 +87,9 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
   @Volatile private var generation = 0L
   @Volatile private var renderedGeneration = 0L
 
-  // The Metal texture a frame last landed in, kept alive until one lands in its
-  // replacement. Skiko allocates a new texture for every resize and the map
-  // needs a frame or two to fill it, so this is what the consumer draws in
-  // between rather than having nothing to show. Only the Metal side is kept:
-  // the session already renders through the new ANGLE texture.
+  // The Metal texture a frame last landed in, kept alive until one lands in its replacement. Skiko
+  // allocates a new texture for every resize and the map needs a frame or two to fill it, so this
+  // is what the consumer draws in between.
   private var retiredTexture = NativeHandle(0)
   private var retiredPixelFormat = 0L
   @Volatile private var retiredGeneration = 0L
@@ -127,10 +125,8 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
     extent: SurfaceExtent,
     presentationTimeNanos: Long?,
   ): NativeSurfaceFrame {
-    // Through resize, so the Skiko device is resolved on this thread. Resolving
-    // it reaches the event dispatch thread, and this call arrives on it: asking
-    // for the device from the renderer thread instead would leave each waiting
-    // on the other.
+    // Resized here so the Skiko device is resolved on this thread: resolving it reaches the event
+    // dispatch thread, and asking from the renderer thread would leave each waiting on the other.
     if (importedTexture == null || extent != currentExtent) {
       resize(extent)
     }
@@ -153,8 +149,7 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
     if (target !is OpenGlTextureTarget) {
       return false
     }
-    // Only a texture this bridge still holds is safe to draw, which is the
-    // current one and the retired one behind it.
+    // Only a texture this bridge still holds is safe to draw.
     val texture: NativeHandle
     val format: Long
     when (target.generation) {
@@ -214,13 +209,12 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
 
     val oldTexture = metalTexture
     val oldPixelFormat = pixelFormat
-    // Resolved by the caller, on a thread that may ask Skiko for it. Reaching
-    // for it here would ask from the renderer thread, and answering that waits
-    // on the event dispatch thread, which is already waiting on this one.
+    // Resolved by the caller: asking Skiko from the renderer thread waits on the event dispatch
+    // thread, which is already waiting on this one.
     val requiredMetalDevice =
       checkNotNull(skikoDevice) { "The Skiko Metal device is resolved before this hop" }
-    // Only the device that allocated it can take it back, so a Skiko device change allocates
-    // rather than reusing and this bridge never names one device while holding the other's texture.
+    // Only the device that allocated a texture can take it back, so a Skiko device change
+    // allocates rather than reusing.
     val reusableTexture =
       if (metalDevice.address == requiredMetalDevice.ptr) oldTexture.address else 0L
     val newTextureAddress =
@@ -255,16 +249,14 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
     }
   }
 
-  // Holds the outgoing texture for the consumer to draw while the replacement
-  // is still empty. A texture nothing ever rendered into has nothing to show,
-  // and one from a device Skiko has replaced cannot be drawn on the new one.
+  // Holds the outgoing texture for the consumer to draw while the replacement is still empty. A
+  // texture from a device Skiko has replaced cannot be drawn on the new one.
   private fun retire(outgoing: NativeHandle, outgoingPixelFormat: Long, deviceChanged: Boolean) {
     if (outgoing.address == 0L) {
       return
     }
     if (deviceChanged) {
-      // Both belong to the device Skiko replaced, and neither can be drawn on
-      // the new one.
+      // Both belong to the device Skiko replaced.
       releaseMetalTexture(outgoing)
       releaseMetalTexture(retiredTexture)
       retiredTexture = NativeHandle(0)
@@ -273,8 +265,7 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
       return
     }
     if (renderedGeneration != generation) {
-      // Keeps whatever is already retired: it is still the last texture a frame
-      // landed in, and this one never held a frame at all.
+      // This one never held a frame, so whatever is already retired stays.
       releaseMetalTexture(outgoing)
       return
     }
@@ -284,8 +275,8 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
     retiredGeneration = generation
   }
 
-  // Runs a frame after the replacement first rendered, so the consumer's last
-  // recorded frame from the retired texture has been flushed by then.
+  // Released a frame after the replacement rendered, so the consumer's last recorded frame from
+  // the retired texture has been flushed.
   private fun releaseRetiredOnceReplaced() {
     if (retiredTexture.address == 0L || renderedGeneration != generation) {
       return

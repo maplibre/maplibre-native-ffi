@@ -42,9 +42,8 @@ class MetalTextureBackend final : public mbgl::mtl::RendererBackend,
 
  private:
   MTL::Texture* borrowed_texture_ = nullptr;
-  // Recorded when this session took borrowed_texture_, so a replacement is
-  // measured against a value rather than against a texture the host may already
-  // have released.
+  // Recorded when this session took borrowed_texture_, which it does not
+  // retain and the host may already have released.
   MTL::PixelFormat borrowed_pixel_format_ = MTL::PixelFormatInvalid;
 };
 

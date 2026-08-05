@@ -26,9 +26,8 @@ internal static class NativeLibraryResolver
         }
     }
 
-    // Silk.NET asks the OS loader for its native libraries by name, so it never searches the app's
-    // runtimes/<rid>/native directory where the NuGet package puts GLFW. Load GLFW through this
-    // resolver first; Silk.NET then finds the image already loaded under the same soname. Call this
+    // Silk.NET asks the OS loader for GLFW by name and never searches runtimes/<rid>/native, so
+    // load it here first; Silk.NET then finds the image already loaded under the same soname. Call
     // before touching any Silk.NET GLFW API.
     public static void PreloadGlfw()
     {
@@ -102,8 +101,7 @@ internal static class NativeLibraryResolver
 
     private static IEnumerable<string> CandidateLibraryDirectories()
     {
-        // Where the MapLibre install's runtime lands: the OpenGL presets ship
-        // ANGLE's libEGL beside the C API library, and the app copies both.
+        // The MapLibre install's runtime, including the ANGLE libEGL the OpenGL presets ship.
         yield return AppContext.BaseDirectory;
 
         // Where NuGet packages stage their native assets for a portable build.

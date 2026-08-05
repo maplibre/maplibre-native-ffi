@@ -9,7 +9,7 @@ import org.maplibre.nativeffi.error.InvalidArgumentException
 
 @OptIn(ExperimentalForeignApi::class)
 class NativeBufferTest : org.maplibre.nativeffi.NativeTestBase() {
-  // BND-166: readback buffers expose bounded mutable storage and reject invalid lifetime use.
+  // BND-166.
 
   @Test
   fun nativeBufferTracksCapacityAndRejectsAfterClose() {
@@ -47,7 +47,7 @@ class NativeBufferTest : org.maplibre.nativeffi.NativeTestBase() {
     }
   }
 
-  // BND-069: image descriptors snapshot caller-owned pixel arrays and return copies.
+  // BND-069.
 
   @Test
   fun premultipliedImagePixelsSnapshotAndReturnCopies() {

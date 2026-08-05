@@ -39,7 +39,7 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 
 @OptIn(ExperimentalForeignApi::class)
 class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
-  // BND-060, BND-061, BND-062, BND-066: style options, source info, and list cleanup.
+  // BND-060, BND-061, BND-062, BND-066.
 
   @Test
   fun styleOptionsInitializeDefaultsAndPresentZeroMasks() {

@@ -4,10 +4,8 @@ namespace Maplibre.NativeFfi;
 /// Borrowed opaque backend-native address.
 /// </summary>
 /// <remarks>
-/// <para>
 /// This value grants no memory access, transfers no ownership, and is accepted
 /// only by APIs whose C contract already accepts opaque host-owned handles.
-/// </para>
 /// </remarks>
 public readonly struct NativePointer : IEquatable<NativePointer>
 {

@@ -21,8 +21,7 @@ import org.maplibre.nativeffi.runtime.NetworkStatus
 
 @OptIn(ExperimentalForeignApi::class)
 class NativeStatusDiagnosticTest : org.maplibre.nativeffi.NativeTestBase() {
-  // BND-020, BND-021, BND-022, BND-023, BND-024, BND-025, BND-026:
-  // status mapping, diagnostic copies, and binding-owned diagnostics.
+  // BND-020, BND-021, BND-022, BND-023, BND-024, BND-025, BND-026.
 
   @Test
   fun deterministicNativeStatusProducersThrowMappedExceptionTypes() {

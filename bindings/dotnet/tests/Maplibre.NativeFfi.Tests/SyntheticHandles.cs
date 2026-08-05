@@ -8,9 +8,8 @@ namespace Maplibre.NativeFfi.Tests;
 /// </summary>
 /// <remarks>
 /// Each value carries the kind byte the C API assigns to the type it stands in
-/// for, so a synthetic handle that reaches a diagnostic reads as an obviously
-/// fabricated handle of the right kind rather than a plausible one. Passing one
-/// to the C API is rejected as a handle this process never created.
+/// for, so one reaching a diagnostic reads as an obviously fabricated handle of
+/// the right kind. The C API rejects these as handles it never created.
 /// </remarks>
 internal static class SyntheticHandles
 {

@@ -15,20 +15,14 @@ public class VulkanBorrowedTextureDescriptor(
 ) {
   public var extent: RenderTargetExtent = extent
 
-  /**
-   * Physical image size in device pixels. The image is sized by its owner, so this is stated rather
-   * than derived from [extent].
-   */
+  /** Physical image size in device pixels, stated by the image's owner rather than derived. */
   public var physicalWidth: Int = physicalWidth
     set(value) {
       Status.requireArgument(value >= 0) { "physicalWidth must be non-negative" }
       field = value
     }
 
-  /**
-   * Physical image size in device pixels. The image is sized by its owner, so this is stated rather
-   * than derived from [extent].
-   */
+  /** Physical image size in device pixels, stated by the image's owner rather than derived. */
   public var physicalHeight: Int = physicalHeight
     set(value) {
       Status.requireArgument(value >= 0) { "physicalHeight must be non-negative" }

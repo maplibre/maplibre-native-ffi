@@ -10,6 +10,7 @@ final class _TextureFrameLease {
   final void Function() release;
 }
 
+/// Standalone projection helper snapshot from a map transform.
 final class MapProjectionHandle {
   MapProjectionHandle._(NativeMapProjection handle)
     : _state = NativeHandleState(handle, 'MapProjectionHandle');
@@ -136,23 +137,21 @@ final class RenderSessionHandle {
   bool get isClosed => _state.isClosed;
 
   /// The session belongs to the isolate that attached it, which need not be the
-  /// map's. It holds no Dart reference to the map: native keeps the map alive by
-  /// refusing to destroy one that still has a session attached.
+  /// map's. It holds no Dart reference to the map; native reports an
+  /// invalid-state status for destroying a map that still has a session.
   NativeRenderSession get _handle => _state.handle;
 
   /// Resizes an attached render session.
   ///
   /// Surface and session-owned texture targets resize in place. A caller-owned
-  /// texture is sized by its owner and is rejected here: allocate one at the
-  /// new size and hand it over with [setMetalBorrowedTextureTarget] or its
-  /// Vulkan or OpenGL counterpart, which keeps this session.
+  /// texture is rejected here: allocate one at the new size and hand it over
+  /// with [setMetalBorrowedTextureTarget] or its Vulkan or OpenGL counterpart.
   ///
-  /// This session keeps its renderer across a resize, so renderer-held state
-  /// such as feature state carries over. A scale factor that differs from this
-  /// session's current one is the exception: a renderer compiles its shaders
-  /// for one pixel ratio, so that resize starts a new one with renderer-held
-  /// state empty. The same exception applies to every `setTarget` method, which
-  /// otherwise keeps the renderer.
+  /// The session keeps its renderer across a resize, so renderer-held state
+  /// such as feature state carries over. A scale factor that differs from the
+  /// session's current one starts a new renderer with that state empty, because
+  /// a renderer compiles its shaders for one pixel ratio; the same applies to
+  /// every `setTarget` method.
   void resize(int width, int height, {double scaleFactor = 1}) {
     _checkNoActiveTextureFrame('resize render session');
     _check(
@@ -162,19 +161,15 @@ final class RenderSessionHandle {
 
   /// Presents this attached surface session through a new Metal surface.
   ///
-  /// A host surface can be destroyed and recreated while the map goes on
-  /// living, which is what Android rotation, a Flutter `SurfaceProducer`
-  /// lifecycle change, and a window resize that reallocates all look like from
-  /// here. Replacing the surface in place keeps this session's renderer, and
-  /// with it the tile pyramid, glyph and image atlases, symbol placement, and
-  /// feature state.
+  /// Replacing the surface in place keeps this session's renderer and the state
+  /// it holds, such as the tile pyramid, atlases, and feature state.
   ///
   /// [descriptor] names the same graphics context this session attached with,
-  /// and its extent applies as [resize] applies one. A descriptor whose
-  /// context device is neither null nor this session's device throws an
+  /// and its extent applies as [resize] applies one. A descriptor whose context
+  /// device is neither null nor this session's device throws an
   /// [InvalidArgumentException] and leaves this session rendering into the
   /// surface it has. The session assigns the layer its own device and pixel
-  /// format, so the layer itself carries nothing that has to match.
+  /// format.
   void setMetalSurfaceTarget(MetalSurfaceDescriptor descriptor) {
     _checkNoActiveTextureFrame('set Metal surface target');
     withNativeArena((arena) {
@@ -203,9 +198,8 @@ final class RenderSessionHandle {
   ///
   /// See [setMetalSurfaceTarget] for what replacing a surface preserves. The
   /// new surface is made current on the next render, so a host may hand over a
-  /// replacement for one it has already destroyed. A surface accepted here can
-  /// still prove unusable, which the next [renderUpdate] reports rather than
-  /// this call.
+  /// replacement for one it has already destroyed, and an unusable surface is
+  /// reported by the next [renderUpdate] rather than by this call.
   void setOpenGLSurfaceTarget(OpenGLSurfaceDescriptor descriptor) {
     _checkNoActiveTextureFrame('set OpenGL surface target');
     withNativeArena((arena) {
@@ -218,19 +212,17 @@ final class RenderSessionHandle {
   /// Renders this attached texture session into a new caller-owned Metal
   /// texture.
   ///
-  /// A caller-owned texture is sized by its owner, so a host that follows a
-  /// resize reallocates rather than resizing and [resize] rejects the attempt.
-  /// Handing the replacement over here keeps this session's renderer instead,
-  /// so the map does not go cold on every resize.
+  /// Handing a reallocated texture over here keeps this session's renderer,
+  /// where [resize] rejects a caller-owned texture outright.
   ///
   /// The replacement belongs to the device this session attached with, which
   /// throws an [InvalidArgumentException] otherwise, and carries the pixel
   /// format it attached with, which throws an [UnsupportedFeatureException]
-  /// otherwise. Both leave this session rendering into the texture it has. The caller owns
-  /// the replacement and keeps it valid until the next replacement, [detach],
-  /// or [close]. This session never retained the outgoing texture, never
-  /// releases it, and never reads it here, so a host that already released it
-  /// hands over the replacement all the same.
+  /// otherwise; both leave this session rendering into the texture it has. The
+  /// caller owns the replacement and keeps it valid until the next replacement,
+  /// [detach], or [close]. The outgoing texture is neither read nor released
+  /// here, so a host that already released it may still hand over a
+  /// replacement.
   void setMetalBorrowedTextureTarget(
     MetalBorrowedTextureDescriptor descriptor,
   ) {
@@ -656,15 +648,11 @@ final class RenderSessionHandle {
 /// Releasable handle for a resource request owned by a Dart provider.
 ///
 /// This carries only the request's handle id, so it may be sent to another
-/// isolate and completed there. The C API validates the id on every call and
-/// rejects a released one, which makes completion and release process-wide
+/// isolate and completed there. Completion and release are process-wide
 /// one-shot operations even when copies of this handle race across isolates.
 extension type const ResourceRequestHandle._(NativeResourceRequest _handle) {
-  /// The handle, with the ABI validated first.
-  ///
-  /// Every native call below goes through this. Like [MapAttachRef], this type
-  /// is made to be sent to another isolate, where the memoized check has not
-  /// run yet, and both completing and releasing a request are irreversible.
+  /// The handle, with the ABI validated first: this type is made to be used
+  /// from an isolate where the memoized check has not run yet.
   NativeResourceRequest get _checked {
     ensureAbiVersion();
     return _handle;
@@ -706,16 +694,13 @@ extension type const ResourceRequestHandle._(NativeResourceRequest _handle) {
   }
 
   /// Blocks until this request is completed or released, wherever that happens.
-  ///
-  /// Only native can wait for that synchronously, so a host draining teardown
-  /// across isolates uses this rather than building its own rendezvous.
   void waitUntilRetired() {
     _check(raw.mln_resource_request_wait_until_retired(_checked.raw));
   }
 }
 
 /// Exposes an attach reference's map id for tests that must reach the C API
-/// with a raw id. The safe API has no way to express those calls.
+/// with a raw id.
 int mapAttachRefIdForTesting(MapAttachRef ref) => ref._mapId;
 
 /// CPU image readback metadata for a texture session frame.
@@ -1163,18 +1148,13 @@ final class OpenGLOwnedTextureFrame implements Finalizable {
 /// than on [MapHandle], because attaching is the one map operation that runs on
 /// the render session's isolate instead of the map's.
 ///
-/// This carries only the map's handle id, because a [MapHandle] cannot cross
-/// isolates. It does not keep the map alive: native refuses to destroy a map
-/// that still has a session attached, and validates the id under its own
-/// registry lock, so attaching against a closed map is rejected as stale rather
-/// than binding the session to a later map.
+/// This carries only the map's handle id and does not keep the map alive.
+/// Attaching against a closed map is rejected as stale rather than binding the
+/// session to a later map.
 ///
-/// Every attach opens with [ensureAbiVersion]. The check memoizes per isolate
-/// and this type exists to be used from an isolate that has run none of the
-/// binding yet, so an attach is routinely the first native call there — and it
-/// reaches C twice, once to fill the descriptor's defaults and once to attach.
-/// A session created by a mismatched library would never be returned, leaving
-/// the map attached with nothing able to detach it.
+/// Every attach opens with [ensureAbiVersion], because an attach is routinely
+/// the first native call on its isolate and a session created by a mismatched
+/// library would leave the map attached with nothing able to detach it.
 final class MapAttachRef {
   const MapAttachRef._(this._mapId);
 

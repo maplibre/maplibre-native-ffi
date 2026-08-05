@@ -7,8 +7,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed unsafe class ResourceResponseTests
 {
-    // Support invariant for resource provider callbacks: response byte buffers
-    // are cloned at the binding boundary.
     [Fact]
     public void ResourceResponseClonesBytesAtBoundary()
     {
@@ -21,8 +19,6 @@ public sealed unsafe class ResourceResponseTests
         Assert.Equal([1, 2, 3], response.Bytes);
     }
 
-    // Support invariant for resource provider callbacks: native response fields
-    // are materialized with binding-owned storage for the C callback window.
     [Fact]
     public void NativeResourceResponseCopiesOwnedFields()
     {

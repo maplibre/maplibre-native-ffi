@@ -7,8 +7,7 @@
 
 #include "types.h"
 
-/// Returns from the enclosing function when a fallible step fails, so setup
-/// sequences read as straight lines.
+/// Returns from the enclosing function when a fallible step fails.
 #define MAP_TRY(expr)                    \
   do {                                   \
     const app_error try_error_ = (expr); \

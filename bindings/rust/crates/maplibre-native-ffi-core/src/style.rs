@@ -96,10 +96,8 @@ pub fn tile_source_options_to_native(options: &TileSourceOptions) -> NativeTileS
     options.to_native()
 }
 
-/// Options for GeoJSON sources.
-///
-/// MapLibre Native fixes these options when the source is created, so updating
-/// a GeoJSON source's URL or data keeps the options it was added with.
+/// Options for GeoJSON sources. Fixed when the source is created; updating the
+/// source's URL or data keeps the options it was added with.
 #[derive(Debug, Clone, Default, PartialEq)]
 #[non_exhaustive]
 pub struct GeoJsonSourceOptions {
@@ -117,8 +115,7 @@ pub struct GeoJsonSourceOptions {
     pub line_metrics: Option<bool>,
     pub cluster: Option<bool>,
     /// Applies data updates synchronously, so data set through
-    /// `set_geojson_source_data` reaches the next rendered frame instead of
-    /// being tiled on a worker and shown in a later one.
+    /// `set_geojson_source_data` reaches the next rendered frame.
     pub synchronous_update: Option<bool>,
 }
 
@@ -551,11 +548,8 @@ pub fn style_image_options_to_native(options: &StyleImageOptions) -> NativeStyle
     NativeStyleImageOptions::new(options)
 }
 
-/// The style's global transition options.
-///
-/// These control how the style animates paint property changes and whether
-/// symbol placement changes cross-fade. They are distinct from camera animation
-/// options and from the per-property transitions a style declares.
+/// The style's global transition options, controlling how paint property
+/// changes animate and whether symbol placement changes cross-fade.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 #[non_exhaustive]
 pub struct StyleTransitionOptions {
@@ -566,14 +560,8 @@ pub struct StyleTransitionOptions {
     /// style declares for each transitioning property.
     pub delay_ms: Option<f64>,
     /// Whether symbol placement changes cross-fade. `None` leaves the
-    /// cross-fade on, which is MapLibre Native's own default.
-    ///
-    /// Clearing it makes symbol placement changes apply to the next rendered
-    /// frame. Hosts that move symbol-backed features at pointer frequency clear
-    /// it for the duration of the interaction so the rendered symbol keeps up.
-    ///
-    /// Reading the options always reports this, because MapLibre Native always
-    /// holds a value for it.
+    /// cross-fade on; clearing it applies placement changes to the next
+    /// rendered frame. A read always reports a value.
     pub enable_placement_transitions: Option<bool>,
 }
 

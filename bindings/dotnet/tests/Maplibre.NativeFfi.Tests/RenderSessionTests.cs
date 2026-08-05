@@ -547,8 +547,7 @@ public sealed unsafe class RenderSessionTests
     [Fact]
     public void OpenGLAttachFamiliesReturnPublicSessionHandlesAndKeepBorrowedHandlesOwnedByCaller()
     {
-        // Support invariant for BND-162 and BND-171: deterministic attach hooks
-        // verify .NET routes each public OpenGL attach path to the matching native family.
+        // Deterministic attach hooks record which native family each public path reaches.
         var attachCalls = new List<string>();
         var destroyed = new List<ulong>();
         using var methods = RenderSessionHandle.UseOpenGLAttachMethodsForTest(
@@ -645,8 +644,7 @@ public sealed unsafe class RenderSessionTests
     [Fact]
     public void SecondRenderSessionAttachInvalidStateLeavesFirstSessionOpen()
     {
-        // Support invariant for BND-163: the invalid-state branch is binding-visible
-        // but depends on native render-session state that is not deterministic here.
+        // The invalid-state branch depends on native state that is not deterministic here.
         var attachCalls = 0;
         using var methods = RenderSessionHandle.UseOpenGLAttachMethodsForTest(
             (_, _, outSession) =>
@@ -697,8 +695,6 @@ public sealed unsafe class RenderSessionTests
     [Fact]
     public void RenderUpdateWithoutPendingUpdateReportsFalseAndResizePassesExtent()
     {
-        // Support invariant for BND-164 and BND-165: resize/update assertions target
-        // public wrapper behavior while native no-update timing is deterministic.
         uint resizedWidth = 0;
         uint resizedHeight = 0;
         double resizedScale = 0;
@@ -734,8 +730,6 @@ public sealed unsafe class RenderSessionTests
     [Fact]
     public void MetalFrameConstructionFailureAfterNativeAcquireReleasesFrame()
     {
-        // Support invariant for BND-172: this covers binding cleanup after native
-        // frame acquisition when copying into the public handle fails.
         var acquireCalls = 0;
         var releaseCalls = 0;
         using var methods = RenderSessionHandle.UseMetalFrameMethodsForTest(

@@ -168,15 +168,13 @@ internal object OpenGLRenderTarget {
       try {
         session.setOpenGLBorrowedTextureTarget(borrowedDescriptor(context, viewport, replacement))
       } catch (error: RuntimeException) {
-        // A native error may mean the session took the replacement before failing, and nothing here
-        // can tell that apart from a rejection that came first, so detach before either target is
-        // released.
+        // A failed handover leaves it unknown which target the session holds, so detach before
+        // either is released.
         RenderTarget.detachSuppressed(error, session)
         RenderTarget.closeSuppressed(error, replacement)
         throw error
       }
-      // Only once the session has taken the replacement, so a rejected one leaves this target on
-      // the texture it already had.
+      // Released only once the session has taken the replacement.
       texture.close()
       texture = replacement
     }

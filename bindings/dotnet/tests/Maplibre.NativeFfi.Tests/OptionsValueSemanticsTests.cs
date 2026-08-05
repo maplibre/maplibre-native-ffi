@@ -10,9 +10,9 @@ using Xunit;
 namespace Maplibre.NativeFfi.Tests;
 
 /// <summary>
-/// BND-070: option descriptors compare and hash by property value, and <c>with</c> produces an
-/// independent instance. Each case lists one mutator per declared property, so a property left out
-/// of the record's equality fails its mutator assertion.
+/// Option descriptors compare and hash by property value, and <c>with</c> produces an independent
+/// instance. Each case lists one mutator per declared property, so a property left out of the
+/// record's equality fails its mutator assertion.
 /// </summary>
 public sealed class OptionsValueSemanticsTests
 {

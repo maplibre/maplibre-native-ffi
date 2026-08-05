@@ -43,7 +43,7 @@ import org.maplibre.nativeffi.map.ViewportOptions
 
 @OptIn(ExperimentalForeignApi::class)
 class MapStructsTest : org.maplibre.nativeffi.NativeTestBase() {
-  // BND-060, BND-061: representative input structs initialize defaults and optional field masks.
+  // BND-060, BND-061.
 
   @Test
   fun cameraAndAnimationOptionsInitializeDefaultsAndPresentZeroMasks() {

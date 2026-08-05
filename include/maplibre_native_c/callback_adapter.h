@@ -5,22 +5,12 @@
  *
  * MapLibre callback contracts are synchronous: logging and resource providers
  * return an immediate decision, and borrowed request payloads expire when the
- * callback returns. Some host runtimes cannot meet that contract. A host whose
- * callbacks are delivered asynchronously and return void has no way to answer
- * synchronously, and no way to read a payload that is already gone by the time
- * its user code runs.
- *
- * This layer answers on the host's behalf. It copies borrowed payloads into
- * native-owned records the host releases explicitly, applies native-owned
- * routing rules when a decision is needed immediately, and hands records to the
- * host through void listener functions. Host user code therefore runs on its
- * own execution context rather than on MapLibre worker, network, logging, or
- * render threads.
- *
- * A host that compiles its own native code writes this adaptation there
- * instead, in whatever form its runtime prefers. This header serves hosts that
- * consume the shared library through a pure foreign-function interface and have
- * no native compilation unit of their own.
+ * callback returns. This layer answers on behalf of hosts that cannot. It
+ * copies borrowed payloads into native-owned records the host releases
+ * explicitly, applies native-owned routing rules when a decision is needed
+ * immediately, and hands records to the host through void listener functions,
+ * so host user code runs on its own execution context rather than on MapLibre
+ * worker, network, logging, or render threads.
  *
  * This header is not part of the maplibre_native_c.h umbrella. Include it
  * directly when a binding needs it.
@@ -71,10 +61,9 @@ extern "C" {
 /// case-sensitive either way, and applies no URL parsing or normalization.
 ///
 /// Confining `*` to one path segment is what makes a host pattern hold:
-/// `https://*.example.com/**` matches every subdomain of example.com, and a
-/// request for `https://attacker.example/x.example.com/tile` matches it
-/// nowhere. Use `**` wherever a pattern spans path segments, as in
-/// `https://tiles.example.com/**` for one whole host.
+/// `https://*.example.com/**` matches every subdomain of example.com and never
+/// `https://attacker.example/x.example.com/tile`. Use `**` wherever a pattern
+/// spans path segments, as in `https://tiles.example.com/**` for one host.
 typedef enum mln_adapter_url_match_flags : uint32_t {
   MLN_ADAPTER_URL_MATCH_FLAGS_NONE = 0U,
   MLN_ADAPTER_URL_MATCH_GLOB = 1U << 0U,
@@ -279,9 +268,8 @@ typedef void (*mln_adapter_log_record_listener)(void* record);
  * Registration state for an adapted log callback.
  *
  * The consume field is the value reported to MapLibre for every dispatched
- * record, because the host cannot answer in time. The address of this struct
- * identifies the registration; it is borrowed and must stay valid until the
- * callback is replaced or cleared.
+ * record. The address of this struct identifies the registration; it is
+ * borrowed and must stay valid until the callback is replaced or cleared.
  */
 typedef struct mln_adapter_log_callback_state {
   mln_adapter_log_record_listener listener;
@@ -306,9 +294,9 @@ typedef struct mln_adapter_log_record {
 /**
  * Creates a token describing a handle the host has not closed yet.
  *
- * The token copies type_name and records handle so the report can name it.
- * Hosts attach the token to a finalizer so an unclosed handle can be reported
- * from a context that can no longer touch the handle itself.
+ * The token copies type_name and records handle so the report can name them.
+ * Hosts attach the token to a finalizer, which can no longer touch the handle
+ * itself.
  *
  * Returns null when the token cannot be allocated.
  */

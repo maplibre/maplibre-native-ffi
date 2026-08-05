@@ -181,15 +181,8 @@ pub struct OfflineOperationCompletedEvent {
 
 /// Camera transition-finished event payload.
 ///
-/// A transition reports its end once for every terminal outcome: running to
-/// completion, being superseded by a later camera command, being cancelled by
-/// `cancel_transitions`, or completing instantly as a zero-duration jump. A
-/// command this API rejects, such as one carrying a non-finite enabled camera
-/// field, starts no transition and emits no such event. MapLibre Native reports
-/// the
-/// moment the transition releases the camera without naming which outcome
-/// occurred, so this payload establishes transition identity rather than a
-/// completion reason.
+/// A transition reports its end once for every terminal outcome, and the
+/// payload names the transition rather than the outcome.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct CameraTransitionFinishedEvent {
@@ -236,15 +229,11 @@ pub enum RuntimeEventPayload {
 pub struct CopiedRuntimeEvent {
     pub event_type: RuntimeEventType,
     pub source: RawRuntimeEventSource,
-    /// Secondary event detail whose meaning `event_type` selects.
-    ///
-    /// Camera will-change and did-change events carry a
-    /// [`CameraChangeMode`](crate::CameraChangeMode), which decodes as
-    /// `CameraChangeMode::from_raw(code as u32)`. Offline
-    /// operation-completion events carry the operation's native status value.
-    /// Map loading-failure events carry the ordinal of MapLibre Native's
-    /// internal load error kind, whose text is in `message`. Every other event
-    /// type carries 0.
+    /// Secondary event detail whose meaning `event_type` selects. Camera
+    /// change events decode as
+    /// `CameraChangeMode::from_raw(code as u32)`, offline operation-completion
+    /// events carry the operation's native status, and map loading-failure
+    /// events carry a load error ordinal whose text is in `message`.
     pub code: i32,
     pub message: Option<String>,
     pub payload: RuntimeEventPayload,
@@ -391,9 +380,9 @@ fn copy_payload_struct<T>(raw: &sys::mln_runtime_event) -> Result<T> {
     }
 
     let mut value = mem::MaybeUninit::<T>::uninit();
-    // SAFETY: value points to size_of::<T>() writable bytes. The native event
-    // payload is valid for payload_size bytes until the next poll. Copying bytes
-    // avoids alignment assumptions about runtime-owned payload storage.
+    // SAFETY: value points to size_of::<T>() writable bytes and the event
+    // payload is valid for payload_size bytes until the next poll. The byte
+    // copy avoids assuming the payload storage is aligned for T.
     unsafe {
         ptr::copy_nonoverlapping(
             raw.payload.cast::<u8>(),
@@ -454,8 +443,7 @@ mod tests {
     fn unknown_payload_preserves_raw_type_bytes_message_and_source() {
         let bytes = [1u8, 2, 3, 4];
         let message = b"future payload";
-        // A synthetic map handle: the event carries an id, and this one names
-        // no live map, which is what this test wants.
+        // A synthetic map handle id that names no live map.
         let source = 0x0200_0000_0000_002a_u64;
         let raw = sys::mln_runtime_event {
             size: mem::size_of::<sys::mln_runtime_event>() as u32,

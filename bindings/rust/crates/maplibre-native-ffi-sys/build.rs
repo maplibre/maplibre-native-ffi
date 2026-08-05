@@ -49,10 +49,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .clang_arg("-std=c23")
         .clang_arg(format!("-I{}", include_dir.display()));
 
-    // bindgen parses through libclang, which has none of the clang driver's
-    // logic for locating an Apple SDK, and these headers include the SDK's
-    // stdint.h. Ask the toolchain where that SDK is. An SDKROOT the caller set
-    // already reaches libclang, so this fills in only when one is absent.
+    // libclang cannot locate an Apple SDK on its own, and these headers include
+    // the SDK's stdint.h. A caller-set SDKROOT already reaches libclang.
     if env::var_os("SDKROOT").is_none() {
         let target = env::var("TARGET")?;
         if let Some(sdk_path) = apple_sdk_name(&target_os, &target).and_then(apple_sdk_path) {
@@ -64,10 +62,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .allowlist_function("^mln_.*")
         .allowlist_type("^mln_.*")
         .allowlist_var("^MLN_.*")
-        // Every C handle is the same uint64_t, so a plain type alias would let
-        // a map be passed where a runtime is expected. A transparent newtype
-        // per handle keeps the distinction the opaque struct pointers used to
-        // give us, at no ABI cost.
+        // Every C handle is the same uint64_t; a transparent newtype per handle
+        // keeps a map from being passed where a runtime is expected.
         .new_type_alias(concat!(
             "^mln_(runtime|map|map_projection|render_session|wake_source",
             "|resource_request_handle|offline_region_snapshot",
@@ -89,9 +85,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 /// Locates the native install prefix, downloading a published snapshot archive
 /// when no local build was pointed at.
 fn native_install_dir() -> Result<PathBuf, Box<dyn Error>> {
-    // Ahead of the local prefix, not just the download: two backend features
-    // name mutually exclusive artifacts however the library arrives, and a
-    // prefix built for one of them would silently satisfy both requesters.
+    // Checked ahead of the local prefix so two enabled backend features fail
+    // however the library arrives.
     let backend = download::selected_backend()?;
     if let Some(install_dir) = env::var_os("MAPLIBRE_NATIVE_C_INSTALL_DIR") {
         return Ok(PathBuf::from(install_dir));
@@ -174,13 +169,10 @@ fn print_rerun_if_changed(path: &Path) {
 
 /// Acquires a native install prefix from the published snapshot release.
 ///
-/// The snapshot release is floating: its asset URLs never change, so a cache
-/// keyed on the URL would serve stale bytes forever. `SHA256SUMS` changing is
-/// the exact signal that the artifacts moved, so its digest is the cache key.
-///
-/// Documented in `docs/src/content/docs/development/binding-specification.md`
-/// under "Native Artifact Acquisition"; the Dart build hook implements the same
-/// contract.
+/// The release is floating and its asset URLs never change, so the cache is
+/// keyed on the digest of `SHA256SUMS` rather than on the URL. Contract:
+/// `docs/src/content/docs/development/binding-specification.md`, "Native
+/// Artifact Acquisition".
 mod download {
     use super::*;
 
@@ -200,7 +192,7 @@ mod download {
         platform: String,
         /// Render backend selector, matching the descriptor's `renderBackend`.
         /// Spelled `opengl` even where the preset suffix names the context
-        /// provider instead.
+        /// provider.
         backend: &'static str,
     }
 
@@ -226,10 +218,9 @@ mod download {
     const APPLE_MOBILE: &[(&str, &str)] = &[("metal", "metal")];
 
     /// The presets `.github/workflows/snapshots.yml` publishes a shared library
-    /// for. The OpenHarmony presets build from source and ship no archive, so
-    /// they are absent here; so are musl and windows-gnu, which no preset
-    /// targets. Device iOS is absent too: `ios-arm64-metal` ships only a static
-    /// archive, which needs Apple framework link metadata this does not emit.
+    /// for. OpenHarmony, musl, and windows-gnu ship no archive. Device iOS
+    /// ships only a static archive, which needs Apple framework link metadata
+    /// this does not emit.
     const PLATFORM_TARGETS: &[PlatformTarget] = &[
         PlatformTarget {
             os: "linux",
@@ -311,21 +302,11 @@ mod download {
         let preset = resolve_preset(backend)?;
         let cache_dir = cache_dir()?.join(&preset.name);
 
-        // Only an unreachable release falls back to the cache. A checksum or
-        // extraction failure is a real defect and stays fatal, so a corrupt
-        // download can never be papered over with a stale artifact.
-        //
-        // A publish replaces `SHA256SUMS` and the archives as separate assets,
-        // so a build starting mid-publish can pair one generation's checksum
-        // with the other's bytes. That reads as a mismatch without either file
-        // being corrupt, so the whole acquisition is retried once against a
-        // freshly fetched checksum file; a mismatch that survives is fatal.
-        //
-        // The retry gives up every cached answer with it — the offline fallback
-        // and the cache hit alike. Once bytes have failed verification the
-        // release is no longer trustworthy for this build, and answering that
-        // from disk, whether on a later timeout or on a digest already present,
-        // would hide an unverified download behind an older artifact.
+        // Only an unreachable release falls back to the cache; a checksum or
+        // extraction failure stays fatal. A publish replaces `SHA256SUMS` and
+        // the archives separately, so a build starting mid-publish sees a
+        // mismatch without either file being corrupt: retry once against a
+        // fresh checksum file, with every cached answer suppressed.
         let mut after_mismatch = false;
         let prefix = loop {
             match fetch_checksums()
@@ -353,13 +334,10 @@ mod download {
         Ok(prefix)
     }
 
-    /// Separates a release we could not reach from a defect in what it served.
-    /// A publish race can list an archive in `SHA256SUMS` before uploading it,
-    /// which should fall back to the cache; a checksum mismatch should not.
+    /// Separates a release we could not reach, which falls back to the cache,
+    /// from a defect in what it served, which does not.
     enum Failure {
         Unreachable(Box<dyn Error>),
-        /// A checksum that did not match its archive, which a publish crossing
-        /// generations produces without either file being corrupt.
         Mismatch(Box<dyn Error>),
         Fatal(Box<dyn Error>),
     }
@@ -372,11 +350,8 @@ mod download {
     }
 
     /// Downloads and extracts the archive unless the digest is already cached.
-    ///
-    /// `after_mismatch` suppresses the cache hit. A checksum file that crossed
-    /// back to an older generation resolves to a digest already on disk, which
-    /// would answer a failed verification from the cache without proving any
-    /// fresh bytes.
+    /// `after_mismatch` suppresses the cache hit so a failed verification is
+    /// never answered from disk.
     fn acquire(
         preset: &Preset,
         cache_dir: &Path,
@@ -423,10 +398,9 @@ mod download {
         Ok(prefix)
     }
 
-    /// Streams the archive through the digest and the decoder at once, so a
-    /// 25 MB download never has to be held in memory. The digest is checked
-    /// before the extracted tree is moved into place, so a corrupt download
-    /// cannot leave a usable cache entry behind.
+    /// Streams the archive through the digest and the decoder at once, so the
+    /// download is never held in memory. The digest is checked before the
+    /// extracted tree moves into place.
     fn extract(
         response: ureq::http::Response<ureq::Body>,
         scratch: &Path,
@@ -503,11 +477,9 @@ mod download {
             .map_err(|error| Unreachable(error.into()))
     }
 
-    /// Bounds every request, because ureq leaves both timeouts unset by
-    /// default. A host that accepts the connection and then stops answering
-    /// would otherwise hang the build instead of reaching the cache fallback.
-    /// The global bound covers the body too, so it allows for a slow link
-    /// pulling a 30 MB archive.
+    /// Bounds every request, because ureq leaves both timeouts unset and a host
+    /// that stops answering would hang the build. The global bound covers the
+    /// body, so it allows for a slow link pulling a 30 MB archive.
     fn agent() -> ureq::Agent {
         ureq::Agent::config_builder()
             .timeout_connect(Some(Duration::from_secs(30)))
@@ -618,12 +590,8 @@ mod download {
     }
 
     /// Compares the checkout's public headers against the downloaded prefix's.
-    ///
-    /// A git dependency pinned at one commit gets whatever the floating release
-    /// currently holds, which is built from another. Comparing commits would
-    /// warn constantly, because the publish is gated on input digests and the
-    /// artifact's commit lags by design. Differing headers are the condition
-    /// that actually matters.
+    /// The artifact's commit lags this checkout by design, so headers rather
+    /// than commits decide whether to warn.
     fn warn_on_header_skew(prefix: &Path, descriptor: &ArtifactDescriptor) {
         let Some(repo_root) = repo_root() else {
             return;
@@ -701,8 +669,8 @@ mod download {
         }
     }
 
-    /// The crate sits at `bindings/rust/crates/maplibre-native-ffi-sys`, and both
-    /// git and path dependencies carry the whole checkout.
+    /// The crate sits four levels below the checkout root, which both git and
+    /// path dependencies carry in full.
     fn repo_root() -> Option<PathBuf> {
         let manifest_dir = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR")?);
         let root = manifest_dir.ancestors().nth(4)?.to_path_buf();
@@ -712,9 +680,9 @@ mod download {
     }
 
     fn cache_dir() -> Result<PathBuf, Box<dyn Error>> {
-        // Build scripts run on the host, so this resolves the host's cache
-        // directory even when cross-compiling. Keeping the archives outside the
-        // target directory means `cargo clean` does not force a re-download.
+        // Resolves the host's cache directory even when cross-compiling.
+        // Archives live outside the target directory so `cargo clean` does not
+        // force a re-download.
         let base = if cfg!(windows) {
             env::var_os("LOCALAPPDATA").map(PathBuf::from)
         } else if cfg!(target_os = "macos") {

@@ -38,10 +38,9 @@ public abstract record RenderedQueryGeometry
 }
 
 /// <remarks>
-/// Compares and hashes by property value, comparing <see cref="LayerIds"/> element by element;
-/// <c>with</c> returns an independent instance. Assigning <see cref="LayerIds"/> snapshots the
-/// caller's list, so later caller mutation does not change this descriptor. Keep an instance
-/// unmodified while it is a key in a hash-based collection.
+/// Compares and hashes by property value, comparing <see cref="LayerIds"/> element by element.
+/// Assigning <see cref="LayerIds"/> snapshots the caller's list. Keep an instance unmodified
+/// while it is a key in a hash-based collection.
 /// </remarks>
 public sealed record RenderedFeatureQueryOptions
 {
@@ -66,9 +65,8 @@ public sealed record RenderedFeatureQueryOptions
 
 /// <remarks>
 /// Compares and hashes by property value, comparing <see cref="SourceLayerIds"/> element by
-/// element; <c>with</c> returns an independent instance. Assigning <see cref="SourceLayerIds"/>
-/// snapshots the caller's list, so later caller mutation does not change this descriptor. Keep an
-/// instance unmodified while it is a key in a hash-based collection.
+/// element. Assigning <see cref="SourceLayerIds"/> snapshots the caller's list. Keep an instance
+/// unmodified while it is a key in a hash-based collection.
 /// </remarks>
 public sealed record SourceFeatureQueryOptions
 {

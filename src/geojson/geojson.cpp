@@ -833,8 +833,8 @@ auto json_snapshot_get(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  // A snapshot carries no thread affinity, so another thread may destroy it
-  // mid-read. The lock spans the read for that reason.
+  // A snapshot carries no thread affinity, so the lock spans the read to keep
+  // another thread from destroying it mid-read.
   auto& table = handle_table<JsonSnapshotObject>();
   const std::scoped_lock lock(table.mutex());
   const auto* live = table.resolve_locked(snapshot);

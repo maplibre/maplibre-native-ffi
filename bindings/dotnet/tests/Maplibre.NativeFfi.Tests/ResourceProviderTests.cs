@@ -17,8 +17,6 @@ public sealed unsafe class ResourceProviderTests
     private const string StyleUrl = "https://example.test/style.json";
     private const string StyleJson = "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
-    // Support invariant for resource provider callbacks: request data is copied
-    // into language-owned values before user code receives it.
     [Fact]
     public void ResourceProviderCopiesRequestAndReturnsDecision()
     {
@@ -338,12 +336,8 @@ public sealed unsafe class ResourceProviderTests
         Assert.False(failedReplacement.IsHandleAllocatedForTest);
     }
 
-    // Covers the runtime-scoped provider lifecycle end to end: an installed
-    // provider is consulted, a replacement takes over while a map is live, and a
-    // cleared provider stops being consulted while requests keep reaching the
-    // network file source. Each transition also releases the rooted state of the
-    // provider it retires, which the C call guarantees is unreachable once it
-    // returns.
+    // Each transition also releases the rooted state of the provider it retires,
+    // which the C call guarantees is unreachable once it returns.
     [BindingSpecTest("BND-142")]
     [Fact]
     public void ResourceProviderIsConsultedUntilClearedWhileMapIsLive()
@@ -364,7 +358,6 @@ public sealed unsafe class ResourceProviderTests
         LoadProbeStyle(runtime, map, "jar:file:/packaged/first.json");
         Assert.True(Volatile.Read(ref firstCalls) > 0);
 
-        // Replacing the provider while a map is live is part of the contract.
         runtime.SetResourceProvider(
             (_, _) =>
             {

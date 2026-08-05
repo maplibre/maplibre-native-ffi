@@ -19,11 +19,9 @@ const (
 	RenderedQueryGeometryTypeLineString RenderedQueryGeometryType = RenderedQueryGeometryType(C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING)
 )
 
-// ScreenBox is a screen-space query rectangle in logical map pixels.
-//
-// Corners may be given in any order, and may extend past the viewport. Rendered
-// queries normalize the corners and clip the box to the viewport, so a box that
-// over-covers the viewport queries everything visible.
+// ScreenBox is a screen-space query rectangle in logical map pixels. Corners
+// may be given in any order and may extend past the viewport; rendered queries
+// normalize the corners and clip the box to the viewport.
 type ScreenBox struct {
 	Min ScreenPoint
 	Max ScreenPoint
@@ -58,8 +56,7 @@ type RenderedFeatureQueryOptions struct {
 	Filter   *JSONValue
 }
 
-// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
-// does not compile for structs holding slices.
+// Equal reports whether two descriptors hold the same field values.
 func (options RenderedFeatureQueryOptions) Equal(other RenderedFeatureQueryOptions) bool {
 	return equalStrings(options.LayerIDs, other.LayerIDs) &&
 		equalJSON(options.Filter, other.Filter)
@@ -71,8 +68,7 @@ type SourceFeatureQueryOptions struct {
 	Filter         *JSONValue
 }
 
-// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
-// does not compile for structs holding slices.
+// Equal reports whether two descriptors hold the same field values.
 func (options SourceFeatureQueryOptions) Equal(other SourceFeatureQueryOptions) bool {
 	return equalStrings(options.SourceLayerIDs, other.SourceLayerIDs) &&
 		equalJSON(options.Filter, other.Filter)
@@ -580,14 +576,11 @@ func (session *RenderSessionHandle) QuerySourceFeatures(sourceID string, options
 	return cFeatureQueryResultFeatures(result)
 }
 
-// QueryFeatureExtensions queries a feature extension from the latest render session state.
+// QueryFeatureExtensions queries a feature extension from the latest render
+// session state.
 //
-// The "supercluster" extension reads the "cluster_id" feature property and the "limit" and
-// "offset" arguments as JSONUint. Other numeric types are treated as absent: a "cluster_id"
-// that is not JSONUint returns a JSONValueTypeNull value result instead of a feature
-// collection, and a "limit" or "offset" that is not JSONUint leaves "leaves" at the native
-// defaults of ten leaves at offset zero. Queried feature properties keep their JSON value
-// type, so a queried cluster feature can be passed back unmodified.
+// The "supercluster" extension reads "cluster_id", "limit", and "offset" as
+// JSONUint and treats other numeric types as absent.
 func (session *RenderSessionHandle) QueryFeatureExtensions(sourceID string, feature Feature, extension string, extensionField string, arguments *JSONValue) (FeatureExtensionResult, error) {
 	ptr, release, err := session.ptr()
 	if err != nil {

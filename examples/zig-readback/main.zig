@@ -25,9 +25,7 @@ const RuntimeLoopArgs = struct {
 };
 
 /// Owns the runtime and the map for their whole lifetime, on one thread that is
-/// not the one presenting. It never touches the render session: the render loop
-/// attaches its own against the map published here, and closing it is what
-/// releases this loop to tear the map down.
+/// not the one presenting.
 fn runtimeLoop(args: RuntimeLoopArgs) void {
     runtimeLoopFallible(args) catch |err| args.shared.fail(err);
 }
@@ -53,20 +51,14 @@ fn runtimeLoopFallible(args: RuntimeLoopArgs) !void {
     try map.setStyleUrl(args.allocator, style_url);
     try map.requestStillImage();
 
-    // The render loop signals this so a closed session ends the loop without
-    // waiting out the parking bound below.
+    // The render loop signals this to release the parked pump.
     const wake = try runtime.wakeSource();
     defer wake.release();
 
-    // Only past the fallible setup above. The render loop can attach a session
-    // once the map is published, and native refuses to destroy a map that still
-    // has one, so wait for it to report the session closed before the deferred
-    // map close runs. Installing this earlier would deadlock a setup failure:
-    // the render loop would still be in awaitMap() with nothing to close.
-    //
-    // The body below publishes any failure before this wait runs, so the render
-    // loop sees it, closes its session, and releases us. Waiting first would
-    // stall until the render loop's own deadline.
+    // A map with an attached session cannot be destroyed, so wait for the render
+    // loop to close its session before the deferred map close. Installing this
+    // before the setup above would deadlock a setup failure: the render loop
+    // would still be in awaitMap() with nothing to close.
     defer shared.awaitSessionClosed();
     shared.publish(map, wake);
 
@@ -84,8 +76,6 @@ fn pumpUntilSessionCloses(
     const shared = args.shared;
     const map_id = try map.id();
     while (shared.failureValue() == null and !shared.sessionClosed()) {
-        // Headless readback has no display, so this loop takes its cadence from
-        // the runtime's own work and parks in between.
         runtime.pump(park_timeout_milliseconds) catch |err| {
             logLatestDiagnostic(diagnostic_store);
             return err;
@@ -119,8 +109,7 @@ pub fn main(init_args: std.process.Init) !void {
     try logAndValidateRenderBackend();
 
     // The graphics context belongs to this thread, which attaches the session,
-    // presents, and reads back. It stays current here for the whole run: no
-    // other thread ever needs it.
+    // presents, and reads back. It stays current here for the whole run.
     var context = try OwnedTextureContext.init();
     defer context.deinit();
 
@@ -153,24 +142,21 @@ fn renderOnThisThread(
     var session = try attachOwnedTexture(context, &map, .{
         .extent = .{ .width = width, .height = height, .scale_factor = 1.0 },
     });
-    // The session must be closed on every path, including failures: the runtime
-    // loop cannot destroy the map until it is.
+    // The runtime loop cannot destroy the map until this closes, so it must
+    // close on every path.
     defer session.close() catch {};
 
     var rendered_frame = false;
     const started = std.Io.Clock.awake.now(io);
     while (started.durationTo(std.Io.Clock.awake.now(io)).toNanoseconds() < 5 * std.time.ns_per_s) {
         if (shared.failureValue()) |err| return err;
-        // Attempt a frame every iteration rather than only when the runtime
-        // loop asks. In a still-image map the renderer refuses to build a tree
-        // until everything is loaded, and the work that advances loading is
-        // carried by the attempts themselves, so a loop that rendered only on
-        // request would stop as soon as map updates did.
+        // Attempt a frame every iteration rather than only when the runtime loop
+        // asks: in a still-image map the render attempts themselves advance
+        // loading.
         _ = shared.consumeRenderRequest();
         if (try session.renderUpdate()) rendered_frame = true;
-        // The still-image completion arrives through the map's run loop, so it
-        // can land before or after the frame that satisfied it. Finish only
-        // once both have happened.
+        // The still-image completion can land before or after the frame that
+        // satisfied it, so finish only once both have happened.
         if (shared.stillImageDone() and rendered_frame) break;
         try io.sleep(.fromMilliseconds(2), .awake);
     } else {
@@ -225,13 +211,9 @@ const OwnedTextureDescriptor = struct {
     extent: maplibre.RenderTargetExtent,
 };
 
-/// The whole cross-thread surface between the render loop, which owns the
-/// graphics context and the render session, and the runtime loop, which owns
-/// the runtime and the map.
-///
-/// Signals are atomics and the two non-scalar fields sit behind a mutex. Both
-/// loops pace themselves with bounded sleeps rather than blocking waits, which
-/// keeps this readable and matches how the example already waited.
+/// The cross-thread surface between the render loop, which owns the graphics
+/// context and the render session, and the runtime loop, which owns the runtime
+/// and the map.
 const Shared = struct {
     io: std.Io,
 
@@ -249,9 +231,8 @@ const Shared = struct {
     session_closed: std.atomic.Value(bool) = .init(false),
     /// Set by the runtime loop when the map has published a new render update.
     render_requested: std.atomic.Value(bool) = .init(false),
-    /// Set by the runtime loop when the still image completed. Rendering may
-    /// still be needed once more, so the render loop waits for both this and a
-    /// rendered frame.
+    /// Set by the runtime loop when the still image completed. The render loop
+    /// waits for both this and a rendered frame.
     still_image_done: std.atomic.Value(bool) = .init(false),
     failed: std.atomic.Value(bool) = .init(false),
 
@@ -296,8 +277,7 @@ const Shared = struct {
         return self.map;
     }
 
-    /// Waits for the runtime loop to create the map. There is nothing to attach
-    /// against until it does, so the render loop parks here at startup.
+    /// Waits for the runtime loop to create the map.
     fn awaitMap(self: *Shared) !maplibre.MapHandle {
         while (true) {
             if (self.failureValue()) |err| return err;
@@ -310,8 +290,8 @@ const Shared = struct {
         self.render_requested.store(true, .release);
     }
 
-    /// Consumes the render request before the caller renders, so a request the
-    /// runtime loop publishes during the render is not lost.
+    /// Consumes the render request before the caller renders, so a request
+    /// published during the render is not lost.
     fn consumeRenderRequest(self: *Shared) bool {
         return self.render_requested.swap(false, .acq_rel);
     }
@@ -355,8 +335,8 @@ const OwnedTextureContext = if (build_options.supports_opengl) OpenGLAttachConte
     }
 } else struct {};
 
-/// Attaches an owned-texture session to a map, on the render loop thread that
-/// owns the graphics context and will own the session.
+/// Attaches an owned-texture session on the calling thread, which becomes the
+/// session's owner thread.
 fn attachOwnedTexture(
     context: *OwnedTextureContext,
     map: *maplibre.MapHandle,
@@ -388,8 +368,8 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
 
     fn init() !OpenGLAttachContext {
         // WGL contexts need a Win32 device context with a selected pixel
-        // format. SDL gives us a hidden helper window for that without showing
-        // UI, but this is not truly surfaceless like the EGL pbuffer path.
+        // format, so this path uses a hidden SDL window rather than being
+        // surfaceless like the EGL pbuffer path.
         if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) return error.WglUnavailable;
         errdefer sdl.SDL_Quit();
 
@@ -427,9 +407,8 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
         sdl.SDL_Quit();
     }
 
-    /// A WGL context is current on one thread at a time. Attach happens on the
-    /// runtime thread and rendering on the main thread, so each makes the host
-    /// context current before its work and releases it after.
+    /// A WGL context is current on one thread at a time, so a thread must make
+    /// the host context current before its work and release it after.
     fn descriptor(self: *const OpenGLAttachContext) maplibre.OpenGLContextDescriptor {
         return .{ .wgl = .{
             .device_context = maplibre.NativePointer.fromPtr(@ptrCast(self.device_context)),
@@ -640,7 +619,6 @@ const VulkanAttachContext = if (build_options.supports_vulkan) struct {
         self.dispatch.deinit();
     }
 
-    /// Vulkan has no thread-current context, so the attach handoff is a no-op.
     fn descriptor(self: *const VulkanAttachContext) maplibre.VulkanContextDescriptor {
         return .{
             .instance = maplibre.NativePointer.fromPtr(@ptrCast(self.instance.?)),

@@ -14,22 +14,12 @@ pub struct MapOptions {
     /// Initial logical height in UI pixels, replaced by the extent of the first
     /// attached render session.
     pub height: u32,
-    /// UI-to-device pixel scale, fixed for the lifetime of the map.
-    ///
-    /// This selects sprites, glyphs, and raster tiles for every frame. Render
-    /// targets carry their own scale factor for geometry, so attaching or
-    /// resizing a session with a different one logs a warning and renders
-    /// styled imagery chosen for this density.
+    /// UI-to-device pixel scale used to select sprites, glyphs, and raster
+    /// tiles. Fixed for the lifetime of the map.
     pub scale_factor: f64,
     pub mode: MapMode,
     /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
-    /// encodings, fixed for the lifetime of the map.
-    ///
-    /// Enable this on maps that read vector sources created with
-    /// [`VectorTileEncoding::Mlt`](crate::enums::VectorTileEncoding::Mlt) from a
-    /// tile set that uses FastPFOR. A map created with this `false` decodes
-    /// every other MLT encoding and logs a tile parse warning for the FastPFOR
-    /// ones.
+    /// encodings. Fixed for the lifetime of the map.
     pub fast_pfor_enabled: bool,
 }
 

@@ -300,9 +300,8 @@ auto validate_vulkan_borrowed_texture_descriptor(
     set_thread_error("Vulkan handles must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  // Both spellings of "unspecified" are zero. The Vulkan build asserts that
-  // against VK_FORMAT_UNDEFINED and VK_IMAGE_LAYOUT_UNDEFINED, which this
-  // translation unit cannot name -- it is built without the Vulkan headers.
+  // VK_FORMAT_UNDEFINED and VK_IMAGE_LAYOUT_UNDEFINED are both zero; the Vulkan
+  // build asserts that, since this file is built without the Vulkan headers.
   if (descriptor->format == 0 || descriptor->final_layout == 0) {
     set_thread_error("Vulkan format and final_layout must be specified");
     return MLN_STATUS_INVALID_ARGUMENT;

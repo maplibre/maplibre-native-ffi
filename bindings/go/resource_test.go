@@ -17,9 +17,8 @@ func countingResourceProvider(calls *atomic.Int64) ResourceProviderCallback {
 	}
 }
 
-// loadProbeStyle points the map at a style URL that no file source serves, so the
-// failure event naming that URL proves the request reached the network file
-// source after any installed provider passed it through.
+// loadProbeStyle requests a style URL that no file source serves; the failure
+// event naming that URL proves the request reached the network file source.
 func loadProbeStyle(t *testing.T, runtime *RuntimeHandle, m *MapHandle, styleURL string) {
 	t.Helper()
 	if err := m.SetStyleURL(styleURL); err != nil {
@@ -41,10 +40,6 @@ func loadProbeStyle(t *testing.T, runtime *RuntimeHandle, m *MapHandle, styleURL
 	t.Fatalf("timed out waiting for a map loading failure naming %q", styleURL)
 }
 
-// This covers the runtime-scoped provider lifecycle end to end: an installed
-// provider is consulted, a replacement takes over while a map is live, and a
-// cleared provider stops being consulted while requests keep reaching the
-// network file source.
 func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -75,7 +70,6 @@ func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
 		t.Fatalf("installed provider calls = %d, want at least 1", got)
 	}
 
-	// Replacing the provider while a map is live is part of the contract.
 	if err := runtime.SetResourceProvider(countingResourceProvider(&secondCalls)); err != nil {
 		t.Fatalf("SetResourceProvider(replace): %v", err)
 	}
@@ -100,7 +94,6 @@ func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
 		t.Fatalf("cleared provider calls = %d, want %d", got, secondCallsAfterClear)
 	}
 
-	// Clearing an already cleared provider stays a successful no-op.
 	if err := runtime.ClearResourceProvider(); err != nil {
 		t.Fatalf("second ClearResourceProvider(): %v", err)
 	}
