@@ -92,6 +92,12 @@ internal object InjectedFaults {
    * destroys it. The failure is the one the module's allocator would have raised for that scratch,
    * because that is the failure the copy has: everything below this line reads native storage
    * through a block the page has to allocate first.
+   *
+   * What cannot be produced here is the *placement*, not the failure. A real allocation failure is
+   * ordinary now that the module reports one instead of aborting — `NativeBufferBrowserTest` asks
+   * for more heap than exists and gets it — but exhausting the heap in the window between native
+   * handing back a result handle and the page copying it would mean filling half a gigabyte and
+   * leaving it full for whichever test ran next.
    */
   fun beginResultCopy(handle: Long, bytes: Int) {
     if (!failResultCopies) return

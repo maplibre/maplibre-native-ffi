@@ -32,16 +32,21 @@ internal constructor(private val request: NativeResourceRequest) : AutoCloseable
     try {
       val nativeStatus =
         ResourceMarshal.withResponse(response) { descriptor ->
-          reachedNative = true
+          // Set once the call has come back rather than as the descriptor is handed to it. What
+          // sits between the two is page-side work that native never sees: resolving the entry
+          // point, and acquiring the block the arguments are packed into, which an exhausted heap
+          // refuses. A failure there is a completion that never reached C, and the request is still
+          // the host's one chance to answer -- so it has to stay answerable rather than be spent.
           NativeCall.call(
-            "mln_resource_request_complete",
-            COMPLETE_SLOTS,
-            { slots ->
-              slots.setLong(0, request.raw)
-              slots.setPointer(1, descriptor)
-            },
-            { Heap.loadInt(it) },
-          )
+              "mln_resource_request_complete",
+              COMPLETE_SLOTS,
+              { slots ->
+                slots.setLong(0, request.raw)
+                slots.setPointer(1, descriptor)
+              },
+              { Heap.loadInt(it) },
+            )
+            .also { reachedNative = true }
         }
       val nativeFailure =
         if (nativeStatus == MaplibreStatus.OK.nativeCode) null else Status.exception(nativeStatus)

@@ -14,6 +14,7 @@ import org.maplibre.nativeffi.assertPresentedColor
 import org.maplibre.nativeffi.backgroundStyle
 import org.maplibre.nativeffi.browserTest
 import org.maplibre.nativeffi.error.InvalidArgumentException
+import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.FeatureIdentifier
@@ -23,6 +24,7 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.internal.wasm.CustomGeometryBridge
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.maplibreScope
+import org.maplibre.nativeffi.nextPageTask
 import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
@@ -34,11 +36,47 @@ import org.maplibre.nativeffi.resource.ResourceResponse
 import org.maplibre.nativeffi.resource.ResourceResponseStatus
 import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.waitForMapEvent
 import org.maplibre.nativeffi.withMap
+
+/**
+ * Parks the calling stack until the page releases it, holding whatever it stands on.
+ *
+ * A suspending import, the same mechanism the binding's own waits use, so this parks a real stack
+ * rather than simulating one. It is called from inside a tile callback, whose delivery runs on a
+ * promising stack of its own — which is what makes parking there legal — and it holds that
+ * callback's gate for as long as it is parked. That is the whole point: it stands in for the host
+ * body that never returns, which is the case the binding's bounded close wait exists for.
+ *
+ * The resolver is left on the page rather than kept here, because the stack that releases it is not
+ * this one. One at a time: a second park would overwrite the first one's resolver and strand it.
+ */
+@JsFun(
+  """
+  new WebAssembly.Suspending(() => new Promise((resolve) => {
+    globalThis.__mlnTestReleaseParkedTile = () => resolve(0)
+  }))
+"""
+)
+private external fun parkUntilReleased(): Int
+
+/** Lets the parked callback body finish, reporting whether one was parked. */
+@JsFun(
+  """
+  () => {
+    const release = globalThis.__mlnTestReleaseParkedTile
+    globalThis.__mlnTestReleaseParkedTile = undefined
+    if (!release) return false
+    release()
+    return true
+  }
+"""
+)
+private external fun releaseParkedTile(): Boolean
 
 /**
  * A custom geometry source whose tiles this page supplies, end to end.
@@ -553,6 +591,109 @@ class CustomGeometrySourceBrowserTest {
         }
       }
     }
+
+  /**
+   * A map whose source teardown failed still gives its runtime up.
+   *
+   * Closing a map destroys it natively and then releases what the wrapper held on its account: the
+   * source registrations, the runtime's registry entry, and the retention that keeps the runtime
+   * from closing underneath it. Releasing a registration waits for a tile callback already inside
+   * its body, and on this target that wait is bounded rather than endless — a page has one thread,
+   * so a host body that never returns would otherwise leave the page waiting for it forever. This
+   * drives exactly that: a `fetchTile` parks and does not come back, so the wait reaches its limit
+   * and reports.
+   *
+   * The failure is not the claim. By the time it happens the map is destroyed and the wrapper is
+   * closed, so closing again does nothing and no later call can finish what the teardown did not —
+   * which makes the state this leaves behind permanent. The claim is therefore that the rest of the
+   * accounting happened anyway: **the runtime is still closable**. If it were not, a page would be
+   * left holding a runtime it can never close and a map that no longer exists, for its whole life,
+   * with nothing it could do about either.
+   *
+   * The parked body is released afterwards rather than abandoned, because the delivery queue runs
+   * one body at a time and a stack left parked in it would hold the queue for every test after this
+   * one.
+   */
+  @Test
+  fun aMapWhoseSourceTeardownFailedStillGivesUpItsRuntime(): Promise<JsAny?> = browserTest {
+    // Read from the callback and from the test, which on this target are two stacks and one thread,
+    // so neither can observe the other partway through a statement.
+    var parked = false
+    var finished = false
+    val callback =
+      object : CustomGeometrySourceCallback {
+        override fun fetchTile(tileId: CanonicalTileId) {
+          // Only the first tile parks. The rest return at once, so the source has exactly one body
+          // inside it when the teardown begins and the wait provably ends at its limit rather than
+          // on whichever body happened to be last.
+          if (parked) return
+          parked = true
+          parkUntilReleased()
+          finished = true
+        }
+
+        override fun cancelTile(tileId: CanonicalTileId) {}
+      }
+
+    maplibreScope {
+      val runtime = RuntimeHandle.create(RuntimeOptions())
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = WIDTH
+            height = HEIGHT
+          },
+        )
+      val registrationsBefore = CustomGeometryBridge.liveRegistrations
+      val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
+      val session =
+        map.attachOpenGLOwnedTexture(
+          OpenGLOwnedTextureDescriptor(RenderTargetExtent(WIDTH, HEIGHT, 1.0), context.descriptor())
+        )
+      map.setStyleJson(backgroundStyle(BACKGROUND_COLOR))
+      waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
+      map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(callback))
+      map.addStyleLayerJson(fillLayer(), "")
+      assertTrue(
+        renderUntil(runtime, session) { parked },
+        "no tile callback ever parked, so the teardown below had nothing to wait for",
+      )
+      assertEquals(registrationsBefore + 1, CustomGeometryBridge.liveRegistrations)
+
+      // Both are the map's children and neither is what this is about, so they go first and the
+      // close below is refused for the source alone.
+      session.close()
+      context.close()
+
+      val failure = assertFailsWith<InvalidStateException> { map.close() }
+      assertContains(failure.diagnostic, "never returned")
+      // The map is gone whatever the teardown did: native destroyed it, and a wrapper that called
+      // itself live afterwards would offer calls that could only fail.
+      assertTrue(map.isClosed, "a map whose teardown failed was left claiming to be open")
+      assertEquals(
+        registrationsBefore,
+        CustomGeometryBridge.liveRegistrations,
+        "a source whose wait timed out kept its registration, so a late tile could still reach it",
+      )
+
+      // The claim. A runtime the closed map still retained would refuse this for the life of the
+      // page, and nothing could release it.
+      val runtimeFailure = runCatching { runtime.close() }.exceptionOrNull()
+      assertNull(
+        runtimeFailure,
+        "the runtime could not be closed after its map's source teardown failed: $runtimeFailure",
+      )
+    }
+
+    assertTrue(releaseParkedTile(), "the callback body was not parked when the test finished")
+    var turns = 0
+    while (!finished && turns < TEARDOWN_ATTEMPTS) {
+      turns++
+      nextPageTask()
+    }
+    assertTrue(finished, "the released callback body never finished")
+  }
 
   /** Records what it was asked for, and whether anything arrived after its source was retired. */
   private class RecordingCallback : CustomGeometrySourceCallback {

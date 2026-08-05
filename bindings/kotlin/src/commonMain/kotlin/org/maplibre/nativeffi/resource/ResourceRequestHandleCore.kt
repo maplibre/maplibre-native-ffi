@@ -167,9 +167,25 @@ internal class ResourceRequestHandleCore(private val releaseNative: () -> Unit) 
       }
     }
 
+    /**
+     * Releases the native request if this wrapper owns it, and goes on owning it if that failed.
+     *
+     * The accounting is written first, because it is what makes the release happen once: two stacks
+     * reaching here together must not both call native. But a release that then failed never
+     * happened, and a reference that says otherwise is one nothing retries -- the request would
+     * stay open in native, with MapLibre waiting on it, for as long as the page lives. So the
+     * ownership goes back and the failure is reported, which leaves the next close able to try
+     * again.
+     */
     fun releaseIfOwned() {
-      if (state.compareAndSet(STATE_PROVIDER_OWNED, STATE_RELEASE_ACCOUNTED)) {
+      if (!state.compareAndSet(STATE_PROVIDER_OWNED, STATE_RELEASE_ACCOUNTED)) return
+      try {
         releaseNative()
+      } catch (error: Throwable) {
+        // Conditional, so that a release native has meanwhile been told about some other way is
+        // not handed back to this wrapper.
+        state.compareAndSet(STATE_RELEASE_ACCOUNTED, STATE_PROVIDER_OWNED)
+        throw error
       }
     }
 

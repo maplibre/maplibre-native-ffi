@@ -519,12 +519,6 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
      * holds the context open the way a render session holds its map open, and closing the context
      * first reports the live child instead.
      *
-     * The context comes off the descriptor rather than out of a lookup by handle, and that is what
-     * makes a stale descriptor safe. Emscripten's handles are allocated and freed, so the number in
-     * a descriptor from a closed context is one a later context can be given; a lookup by number
-     * would find that later context, retain it, and attach a target to a context the host never
-     * named. Resolving the object cannot confuse the two, however many contexts have come and gone.
-     *
      * Returns null for the WGL and EGL arms, which name a context from a graphics API this module
      * was not built against. Nothing here can retain one, and native is where a build's capability
      * is known, so those are passed down and refused there.
@@ -532,6 +526,33 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
     internal fun retainForTarget(
       context: OpenGLContextDescriptor
     ): HandleStateCore.ChildRetention? {
+      val owner = requireOpenForTarget(context) ?: return null
+      return owner.core.retainChild("RenderSessionHandle")
+    }
+
+    /**
+     * Reports that [context] still names an open context, and returns the one it names.
+     *
+     * The context comes off the descriptor rather than out of a lookup by handle, and that is what
+     * makes a stale descriptor safe. Emscripten's handles are allocated and freed, so the number in
+     * a descriptor from a closed context is one a later context can be given; a lookup by number
+     * would find that later context and hand a render target a context the host never named.
+     * Resolving the object cannot confuse the two, however many contexts have come and gone.
+     *
+     * Asked at every entry point that hands native a context descriptor, not only at attach. Native
+     * compares a WebGL descriptor by its handle alone — `opengl_context_matches` in
+     * `src/render/render_session_common.cpp` has nothing else to compare — so a retarget whose
+     * descriptor came from a closed context whose number has since come back matches the context
+     * the session is really rendering in and is accepted there. What that costs depends on what
+     * else was recycled: the texture the descriptor names may now belong to the replacement
+     * context, in which case the session renders into an unrelated texture, and otherwise the frame
+     * fails somewhere below the call that set the target. Both are the same mistake, and this is
+     * where it is still attributable.
+     *
+     * Returns null for the WGL and EGL arms, which this build was not compiled against and which
+     * carry no object to resolve; native is where a missing provider is refused.
+     */
+    internal fun requireOpenForTarget(context: OpenGLContextDescriptor): WebglContext? {
       if (context !is WebglContextDescriptor) return null
       // Total, because the descriptor's constructor is internal and descriptor() is its one caller.
       val owner = context.owner as WebglContext
@@ -544,7 +565,7 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
             "resolved."
         )
       }
-      return owner.core.retainChild("RenderSessionHandle")
+      return owner
     }
 
     /** One four-byte output: a context handle, a texture name, or a success flag. */

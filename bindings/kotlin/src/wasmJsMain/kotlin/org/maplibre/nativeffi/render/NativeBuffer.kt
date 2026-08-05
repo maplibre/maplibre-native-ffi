@@ -74,21 +74,41 @@ private constructor(private val address: Int, private val length: Long) : AutoCl
   public actual override fun close(): Unit = core.close()
 
   public actual companion object {
+    /**
+     * Takes [byteLength] bytes of the module's heap, or says why it could not.
+     *
+     * Two of the three ways this fails are the caller's, and they are separated because the remedy
+     * differs. A negative length, or one no 32-bit pointer could address, is a wrong argument. A
+     * length past the module's whole linear memory is also a wrong argument even though it looks
+     * like a shortage: the heap is fixed at link time, so nothing a host frees would ever make that
+     * request succeed. Only the third is a state failure — the heap is real but what is left of it
+     * is not enough — and that one is the allocator's to report.
+     *
+     * It does report it, rather than taking the page's module down, because this build links with
+     * `-sABORTING_MALLOC=0`. Emscripten's default is to abort on an allocation the heap cannot
+     * serve, which would make the check below unreachable and leave a host with no error at all.
+     */
     public actual fun allocate(byteLength: Long): NativeBuffer {
       Status.requireArgument(byteLength >= 0) { "byteLength must be non-negative" }
       // Pointers are 32 bits on this target, so a length native could not address is rejected here
-      // rather than becoming a truncated allocation.
+      // rather than becoming a truncated allocation. Asked before the module is, because a length
+      // this wrong is wrong whether or not a host has loaded anything.
       Status.requireArgument(byteLength <= Int.MAX_VALUE) {
         "byteLength must fit a 32-bit pointer on this target"
       }
       BrowserModule.require()
+      // Asked of the module rather than assumed from the link settings, so this stays right if the
+      // heap is linked at another size. It is a good deal tighter than the pointer bound above: the
+      // module's memory is half a gigabyte by default, where a 32-bit pointer addresses four.
+      val heapBytes = Heap.byteLength()
+      Status.requireArgument(byteLength <= heapBytes) {
+        "byteLength must not exceed the browser module's whole $heapBytes-byte heap"
+      }
       if (byteLength == 0L) return NativeBuffer(0, 0)
       val address = allocate(byteLength.toInt())
-      if (address == 0) {
-        throw Status.invalidState(
-          "The MapLibre Native browser module could not allocate $byteLength bytes"
-        )
-      }
+      // Shared with the scratch allocator's, because a caller cannot tell the two apart and two
+      // spellings of one failure drift the first time either is reworded.
+      if (address == 0) throw Heap.allocationFailure(byteLength.toInt())
       return NativeBuffer(address, byteLength)
     }
   }

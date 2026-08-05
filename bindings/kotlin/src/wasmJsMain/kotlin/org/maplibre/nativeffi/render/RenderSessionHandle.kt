@@ -125,9 +125,15 @@ internal constructor(
    * bound to, and `descriptor.surface` must be [NativePointer.NULL] as it was at attach. Resizing
    * the canvas's drawing buffer is the host's to do, on the thread that owns the context, and is
    * not something this binding can reach.
+   *
+   * The context in the descriptor is resolved the way an attach resolves it, for the reason
+   * `WebglContext.requireOpenForTarget` gives: native compares a WebGL context by its handle alone,
+   * so a descriptor from a closed context whose number has been recycled matches whatever holds
+   * that number now.
    */
   public actual fun setOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor) {
     activeFrame.ensureInactive("set target")
+    WebglContext.requireOpenForTarget(descriptor.context)
     live {
       Heap.withScratch(RenderMarshal.OPENGL_SURFACE_SIZEOF) { block ->
         RenderMarshal.writeOpenGLSurface(block, descriptor)
@@ -144,8 +150,18 @@ internal constructor(
     throw unsupportedBackend("Vulkan")
   }
 
+  /**
+   * Gives this session another texture to draw into, in the context it attached with.
+   *
+   * The context in the descriptor is resolved the way an attach resolves it, for the reason
+   * `WebglContext.requireOpenForTarget` gives: native compares a WebGL context by its handle alone,
+   * so a descriptor from a closed context whose number has been recycled matches whatever holds
+   * that number now — and the texture beside it, made in a context that is gone, names either
+   * nothing or something the replacement owns.
+   */
   public actual fun setOpenGLBorrowedTextureTarget(descriptor: OpenGLBorrowedTextureDescriptor) {
     activeFrame.ensureInactive("set target")
+    WebglContext.requireOpenForTarget(descriptor.context)
     live {
       Heap.withScratch(RenderMarshal.OPENGL_BORROWED_TEXTURE_SIZEOF) { block ->
         RenderMarshal.writeOpenGLBorrowedTexture(block, descriptor)

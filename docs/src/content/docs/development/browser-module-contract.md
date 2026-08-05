@@ -53,6 +53,27 @@ for a null result slot, and for null slots when the entry reads any. The result
 slot is unwritten in each case. Read it only after a true. Whatever status the C
 API itself returned arrives in the result slot.
 
+## Allocating from the module's heap
+
+The module's linear memory is fixed when it is linked, at 512 MiB by default,
+and does not grow. Everything a host sends down lives there: argument buffers,
+descriptors, strings, and readback pixels. A host takes that storage with
+`_malloc` and returns it with `_free`, so the heap is a resource that a host can
+exhaust.
+
+Exhausting it is reported. `_malloc` returns null for a request the heap cannot
+serve, which is the value a host checks before it writes anything into the
+block. A C++ allocation inside the module throws `std::bad_alloc` instead of
+returning null, and a C API call that fails that way returns a native-error
+status carrying the exception's message, which is the shape of every other
+native failure. A refused allocation takes no memory, so the module stays
+exactly as usable as it was before the request.
+
+One allocation failure is still fatal, and a host cannot catch it: one on a
+MapLibre worker thread, outside any call the host made. There is no C API
+boundary for the exception to reach, so it escapes and the module terminates. A
+host observes the page's module stop rather than an error.
+
 ## Running on an owner thread
 
 MapLibre blocks: it drains queues, makes synchronous cross-thread calls, and

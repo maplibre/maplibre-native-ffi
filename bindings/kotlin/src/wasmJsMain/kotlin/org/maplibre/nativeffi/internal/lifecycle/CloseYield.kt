@@ -61,6 +61,14 @@ private var waitingSince = 0.0
  * call, which is refused outside a `maplibreScope`. A stack without one is reported rather than
  * parked, because the alternative is a virtual-machine trap that names nothing.
  *
+ * **The park goes through [PromisingStack.parked], like every other one.** A close that waits is a
+ * stack that has left the page, so for the length of the wait it is not the stack running: whatever
+ * the page runs meanwhile -- a host's own timer, a queued log record, a proxied callback -- arrives
+ * on a stack of its own that may not park and is inside none of the callbacks this one entered.
+ * Waiting without saying so would leave the promising count standing while nothing promising was
+ * running, which is exactly the reading that lets a page task reach a suspending import and trap
+ * instead of being told which scope it left out.
+ *
  * **The wait is bounded**, because not everything is waiting for something that can arrive. A use
  * count held by a frame further up this same stack is the invariant the binding states and cannot
  * check in advance, and a callback body that never returns is a host's own; either would leave a
@@ -87,6 +95,6 @@ internal actual fun yieldWhileClosing() {
         "returned."
     )
   }
-  awaitTurn()
+  PromisingStack.parked { awaitTurn() }
   lastTurnEndedAt = nowMillis()
 }

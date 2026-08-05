@@ -1633,9 +1633,21 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         // The map took its sources with it, so nothing native can ask for a tile any more. The
         // registrations are released here rather than left holding the module's trampoline for the
         // life of the page.
-        clearCustomGeometrySources()
-        runtime.unregisterMap(this)
-        runtimeRetention.close()
+        //
+        // In a `try` because this is the one teardown in this binding whose cleanup can fail: a
+        // bridge waits for a tile callback already inside its body, and on this target that wait is
+        // bounded, so a host body that never returns makes it report rather than hang the page. By
+        // the time anything here runs the map is destroyed and this wrapper is closed, so a second
+        // `close` does nothing and there is no later call that could finish the job -- which makes
+        // the two lines below the last chance to take them. Skipping them would leave the runtime
+        // holding a destroyed map and refusing to close for the life of the page, which is a worse
+        // outcome than the failure that caused it and is not one the host could act on.
+        try {
+          clearCustomGeometrySources()
+        } finally {
+          runtime.unregisterMap(this)
+          runtimeRetention.close()
+        }
       },
     )
   }

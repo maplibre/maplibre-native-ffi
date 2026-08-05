@@ -22,6 +22,31 @@ set(MLN_FFI_EMSCRIPTEN_STACK_SIZE "1MB"
 # deployment constraint for anything embedding a browser build.
 add_compile_options(-pthread)
 
+# The heap above is fixed, so running out of it is a thing this module has to be
+# able to say rather than a thing that cannot happen. Emscripten's default says
+# it by aborting: `emscripten_resize_heap` calls `abortOnCannotGrowMemory` the
+# first time an allocation needs a byte past the initial memory, which takes the
+# whole module down and leaves a host holding handles it can no longer call and
+# no error it could have caught. Every null check above a `malloc` in this
+# repository is dead code under that default.
+#
+# So this build turns it off, and the two allocation paths then report instead.
+# `malloc` returns null, which the C code and the bindings check; `operator new`
+# throws `std::bad_alloc`, because the module links the exception-enabled
+# libc++abi that `-fwasm-exceptions` selects, and `mln::c_api::status_boundary`
+# catches it and returns MLN_STATUS_NATIVE_ERROR with its message. What is left
+# unreportable is an allocation deep on a MapLibre worker thread, where there is
+# no C API call to return to and an escaping `std::bad_alloc` terminates. That
+# is what the default did to every allocation anyway.
+#
+# Growth is a separate, capacity-shaped decision that this one does not make.
+# It moves the wall to MAXIMUM_MEMORY rather than removing it, so a browser
+# build still has to report the failure either way, and it replaces every
+# JavaScript view of the heap on each grow, so a binding holding one would have
+# to re-read it per access. A host that needs more memory raises
+# MLN_FFI_EMSCRIPTEN_INITIAL_MEMORY.
+add_link_options(-sABORTING_MALLOC=0)
+
 # WebGPU is asynchronous in a browser and MapLibre calls it synchronously, so
 # the emdawnwebgpu port implements emwgpuWaitAny by suspending the calling
 # thread. Emscripten offers two mechanisms for that, and the choice reaches

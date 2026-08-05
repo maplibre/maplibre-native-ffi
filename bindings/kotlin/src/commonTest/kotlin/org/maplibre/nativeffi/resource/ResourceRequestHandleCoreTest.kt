@@ -69,6 +69,39 @@ class ResourceRequestHandleCoreTest {
     assertEquals(1, completions)
   }
 
+  /**
+   * A release that failed leaves the request this wrapper's to release, rather than nobody's.
+   *
+   * Releasing is the one call a request handle makes that has no answer to report and no second
+   * chance: the wrapper accounts for it before calling native, so that two stacks closing together
+   * cannot both call. The failure this drives is what that accounting must not survive -- a page
+   * whose allocator refuses the block the call's arguments are packed into never reaches C at all,
+   * and a reference that recorded the release anyway would leave MapLibre waiting on a request
+   * nothing can now answer or retire.
+   *
+   * So the claim is about the state the failure left, not the error: the close reports it, and the
+   * close after it really does reach native.
+   */
+  @Test
+  fun aReleaseThatFailedLeavesTheRequestReleasableAgain() {
+    var attempts = 0
+    val core = ResourceRequestHandleCore {
+      attempts++
+      // Only the first, so that what the second close does is observable rather than another
+      // failure.
+      if (attempts == 1) error("the release never reached native")
+    }
+
+    assertEquals(
+      ResourceProviderDecision.HANDLE,
+      core.finishProviderDecision(ResourceProviderDecision.HANDLE),
+    )
+    assertFailsWith<IllegalStateException> { core.close() }
+    core.close()
+
+    assertEquals(2, attempts, "a failed release left the request accounted for but never given up")
+  }
+
   @Test
   fun completedHandleRejectsFurtherCompletion() {
     val core = ResourceRequestHandleCore {}

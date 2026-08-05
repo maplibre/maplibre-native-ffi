@@ -28,6 +28,12 @@ private external fun heapAllocate(size: Int): Int
 @JsFun("(address) => globalThis.__maplibreNativeC._free(address)")
 private external fun heapFree(address: Int)
 
+// A `double` rather than an `int`, because a module linked at Emscripten's 2 GiB maximum has a heap
+// length no Int holds, and a length that came back negative would make the bound it feeds accept
+// every request instead of refusing the ones past the heap.
+@JsFun("() => globalThis.__maplibreNativeC.HEAPU8.length")
+private external fun heapByteLength(): Double
+
 @JsFun(
   "(address, length) => { globalThis.__maplibreNativeC.HEAPU8.fill(0, address, address + length) }"
 )
@@ -157,6 +163,11 @@ internal object Heap {
     // happened. The check is a global read, which is nothing beside the allocation it guards.
     BrowserModule.require()
     val address = heapAllocate(size)
+    // Reachable, which it was not always: the module is linked with `-sABORTING_MALLOC=0`, so an
+    // exhausted heap returns null here rather than aborting the module out from under the page. The
+    // size is not checked against the heap first, the way a caller's own buffer length is, because
+    // that would put a boundary crossing on the path every call into this binding takes to say what
+    // the allocator is about to say anyway.
     if (address == 0) throw allocationFailure(size)
     heapClear(address, size)
     try {
@@ -167,14 +178,26 @@ internal object Heap {
   }
 
   /**
-   * The failure a scratch acquisition of [size] bytes reports when the module's allocator refuses.
+   * The failure an acquisition of [size] bytes reports when the module's allocator refuses.
    *
-   * Named rather than thrown inline because [InjectedFaults] raises the same one: a test that
-   * simulates an allocation failure has to produce the error a real one would, and two spellings of
-   * it would drift apart the first time this message changed.
+   * Named rather than thrown inline because three places raise it: this file's scratch, a
+   * [org.maplibre.nativeffi.render.NativeBuffer] a host asked for, and [InjectedFaults], which has
+   * to produce the error a real failure would. A caller cannot tell the three apart, and three
+   * spellings of one failure would drift the first time any of them was reworded.
    */
   fun allocationFailure(size: Int): MaplibreException =
     Status.invalidState("The MapLibre Native browser module could not allocate $size bytes")
+
+  /**
+   * The whole of the module's linear memory, in bytes.
+   *
+   * A ceiling rather than a reading. The heap is fixed at link time, so a request larger than this
+   * cannot be served however empty the heap is, and no amount of freeing would change that; a
+   * request smaller than it may still fail, because the same memory holds the module's code, its
+   * threads' stacks, and everything already allocated. So this bounds what a caller asks for and
+   * sizes nothing.
+   */
+  fun byteLength(): Long = heapByteLength().toLong()
 
   /**
    * Sizes an array of [count] elements, refusing one this target could not address.

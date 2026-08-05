@@ -164,6 +164,12 @@ internal object PromisingStack {
    * standing on from one that is suspended elsewhere, which is the difference between a wait it
    * must not make and one it must. This is the only place a stack parks, so it is the only place
    * either has to be said.
+   *
+   * The module has two suspending imports and they both come through here: `Dispatcher.awaitCall`,
+   * which waits for a call placed on the owner thread, and `CloseYield.awaitTurn`, which is how a
+   * draining close hands the page back to whatever it is waiting for. A park added anywhere else
+   * has to be routed through this too, because everything that reads the two counts reads them as
+   * belonging to the stack that is running.
    */
   fun <T> parked(body: () -> T): T {
     depth--

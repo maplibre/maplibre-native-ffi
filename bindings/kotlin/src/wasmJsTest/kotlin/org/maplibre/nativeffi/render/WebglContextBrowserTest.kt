@@ -130,6 +130,12 @@ class WebglContextBrowserTest {
    * no obligation to return it, and what it returns depends on everything else this page has
    * allocated, so the refusal is asserted either way; reuse is what sharpens it into the case the
    * test above cannot reach.
+   *
+   * Retargeting is asked the same question, at both entry points that take a context. It is the
+   * half with no second line of defence: an attach at least reaches a session that has no context
+   * yet, while `set_target` reaches one that does, and all native compares there is the handle — so
+   * a stale descriptor whose number has come back matches the context the session is really
+   * rendering in and is accepted.
    */
   @Test
   fun attachingWithAStaleDescriptorIsRefusedAfterItsHandleIsReused(): Promise<JsAny?> =
@@ -190,6 +196,54 @@ class WebglContextBrowserTest {
             // the stale descriptor rather than the handle it happens to carry. Only meaningful once
             // the number has actually been reused; otherwise this is an ordinary live context.
             if (reused) map.attachOpenGLOwnedTexture(descriptorFor(replacement)).close()
+
+            // The other way in. Each session below is attached with the live context and then
+            // offered the stale descriptor for the same target kind, so the only thing wrong with
+            // the retarget is the context it names.
+            val texture = replacement.createTexture(WIDTH, HEIGHT)
+            try {
+              val borrowed =
+                map.attachOpenGLBorrowedTexture(borrowedDescriptorFor(replacement, texture))
+              try {
+                assertStaleContextRefused(reused, stale.context, "a borrowed texture target") {
+                  borrowed.setOpenGLBorrowedTextureTarget(
+                    OpenGLBorrowedTextureDescriptor(
+                      RenderTargetExtent(WIDTH, HEIGHT, 1.0),
+                      WIDTH,
+                      HEIGHT,
+                      stale,
+                      texture,
+                      TEXTURE_2D,
+                    )
+                  )
+                }
+
+                // The same retarget with a descriptor from the context that is open goes through,
+                // so what was refused was the descriptor and not the call.
+                borrowed.setOpenGLBorrowedTextureTarget(borrowedDescriptorFor(replacement, texture))
+              } finally {
+                borrowed.close()
+              }
+            } finally {
+              replacement.destroyTexture(texture)
+            }
+
+            val surface = map.attachOpenGLSurface(surfaceDescriptorFor(replacement))
+            try {
+              assertStaleContextRefused(reused, stale.context, "a surface target") {
+                surface.setOpenGLSurfaceTarget(
+                  OpenGLSurfaceDescriptor(
+                    RenderTargetExtent(WIDTH, HEIGHT, 1.0),
+                    stale,
+                    NativePointer.NULL,
+                  )
+                )
+              }
+
+              surface.setOpenGLSurfaceTarget(surfaceDescriptorFor(replacement))
+            } finally {
+              surface.close()
+            }
           } finally {
             opened.forEach { it.close() }
           }
@@ -253,12 +307,75 @@ class WebglContextBrowserTest {
     }
   }
 
+  /**
+   * Asserts that [retarget] refuses a descriptor whose context is gone, and says what it cost.
+   *
+   * The refusal has to be the binding's own. Native refuses a *mismatched* handle by itself, so a
+   * retarget with a stale descriptor whose number was never reused already fails there — with a
+   * message about the context this session attached with, which says nothing about the descriptor
+   * having outlived what it named. Only the diagnostic tells the two apart, which is why this reads
+   * it rather than settling for the exception type.
+   */
+  private fun assertStaleContextRefused(
+    reused: Boolean,
+    handle: Int,
+    what: String,
+    retarget: () -> Unit,
+  ) {
+    val refusal =
+      try {
+        retarget()
+        null
+      } catch (error: InvalidArgumentException) {
+        error
+      }
+    if (refusal == null) {
+      fail(
+        "retargeting to $what with a descriptor from a closed context succeeded" +
+          if (reused) {
+            "; the handle $handle it carries now belongs to a different context, so the session " +
+              "would have rendered through one the host never named"
+          } else {
+            ", so a descriptor outliving its context is not refused at retarget at all"
+          }
+      )
+    }
+    assertEquals(MaplibreStatus.INVALID_ARGUMENT, refusal.status)
+    assertTrue(
+      refusal.diagnostic.contains("has been closed"),
+      "retargeting to $what reported ${refusal.diagnostic}, which is not the binding's own refusal",
+    )
+  }
+
   private fun descriptorFor(context: WebglContext) =
     OpenGLOwnedTextureDescriptor(RenderTargetExtent(WIDTH, HEIGHT, 1.0), context.descriptor())
+
+  private fun borrowedDescriptorFor(context: WebglContext, texture: Int) =
+    OpenGLBorrowedTextureDescriptor(
+      RenderTargetExtent(WIDTH, HEIGHT, 1.0),
+      WIDTH,
+      HEIGHT,
+      context.descriptor(),
+      texture,
+      TEXTURE_2D,
+    )
+
+  private fun surfaceDescriptorFor(context: WebglContext) =
+    OpenGLSurfaceDescriptor(
+      RenderTargetExtent(WIDTH, HEIGHT, 1.0),
+      context.descriptor(),
+      // A WebGL context is already bound to its canvas, so there is no drawable to name where every
+      // other OpenGL provider names one, and native refuses anything else here.
+      NativePointer.NULL,
+    )
 
   private companion object {
     const val WIDTH = 64
     const val HEIGHT = 32
+
+    // GL_TEXTURE_2D. The C API takes the GL enum unchanged, and this is the only target a render
+    // target can be attached to.
+    const val TEXTURE_2D = 3553
 
     /** Framebuffer zero, which is the canvas's own. */
     const val DEFAULT_FRAMEBUFFER = 0
