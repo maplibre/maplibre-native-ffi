@@ -464,11 +464,13 @@ jobs:
           mise run install-native-package
           emscripten-wasm32-webgl
           build/packages/native/dist/maplibre-native-c-emscripten-wasm32-webgl.tar.gz
-      - run: mise run //bindings/rust:test:browser emscripten-wasm32-webgl
       - run: mise run //bindings/kotlin:wasmJsTest
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/kotlin:wasmJsFinalShutdownTest
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/rust:test:browser emscripten-wasm32-webgl
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Upload native artifact
