@@ -36,6 +36,15 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 /** Bytes one C API handle occupies. Handles are 64-bit whatever a pointer is on this target. */
 private const val HANDLE_BYTES = 8
 
+/**
+ * What this wrapper is called where the module counts what its owner thread still owns.
+ *
+ * The same name the release bookkeeping uses, because both name it to a host: one in the failure
+ * for closing a parent that still has children, the other in the failure for shutting the module
+ * down with this still open.
+ */
+private const val TYPE_NAME = "RuntimeHandle"
+
 /** Bytes a `size_t` and a `bool` occupy on wasm32. */
 private const val SIZE_BYTES = 4
 private const val BOOL_BYTES = 1
@@ -54,7 +63,15 @@ private const val BOOL_BYTES = 1
  */
 public actual class RuntimeHandle private constructor(private val handle: NativeRuntime) :
   AutoCloseable {
-  private val core = HandleStateCore("RuntimeHandle", handle.raw)
+  private val core = HandleStateCore(TYPE_NAME, handle.raw)
+
+  init {
+    // Told to the dispatcher rather than kept here, because the question it answers is asked of the
+    // module: whether the thread this runtime was created on may be stopped. Every other
+    // owner-affine handle retains this one as a child, so a runtime that is still counted covers
+    // the maps, sessions, projections, operations and frames that cannot outlive it.
+    Dispatcher.retainHandle(TYPE_NAME)
+  }
 
   // The Kotlin end of each synchronous callback this runtime has registered. Native holds the
   // module's thunk for as long as the registration lasts, and these hold the callback the thunk
@@ -602,6 +619,10 @@ public actual class RuntimeHandle private constructor(private val handle: Native
         )
       },
       afterSuccess = {
+        // Native has destroyed it, so the owner thread no longer owns anything on this runtime's
+        // account and a shutdown is no longer refused for it. Here rather than before the call,
+        // because a destroy the C API refuses leaves the runtime live and closable again.
+        Dispatcher.releaseHandle(TYPE_NAME)
         // Destroying the runtime is what released its callbacks, so the host trampolines go here
         // rather than being left in the module's function table for the life of the page.
         resourceProvider?.close()

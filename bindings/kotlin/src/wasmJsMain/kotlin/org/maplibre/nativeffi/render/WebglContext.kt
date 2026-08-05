@@ -98,6 +98,15 @@ private external fun submitReadPixels(
 ): Boolean
 
 /**
+ * What this wrapper is called where the module counts what its owner thread still owns.
+ *
+ * The same name the release bookkeeping uses, because both name it to a host: one in the failure
+ * for closing a context a render target still holds, the other in the failure for shutting the
+ * module down while this is open.
+ */
+private const val TYPE_NAME = "WebglContext"
+
+/**
  * A WebGL context on the thread this binding's maps render on, and the GL work a host does there.
  *
  * Every other platform hands a render target a context the host made with its own graphics API, and
@@ -135,7 +144,15 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
   // brings. A render target retains this as a child, so the context outlives every target naming
   // it; and a destroy the module refuses restores the open state, so the wrapper is retryable
   // rather than spent while the native context is still there.
-  private val core = HandleStateCore("WebglContext", handle.toLong())
+  private val core = HandleStateCore(TYPE_NAME, handle.toLong())
+
+  init {
+    // Counted so that shutting the module down while this is open is refused and names it, rather
+    // than reaching the terminal failure a shutdown reports for anything it could not see. Every
+    // other owner-affine handle is covered by the runtime it retains; a context has no runtime
+    // behind it, so it is the one that has to say so itself.
+    Dispatcher.retainHandle(TYPE_NAME)
+  }
 
   /** Reports whether this context has been released. */
   public val isClosed: Boolean
@@ -144,12 +161,16 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
   /**
    * Returns a descriptor naming this context, for a render target to be attached with.
    *
-   * A fresh descriptor each call, because a descriptor is mutable: a shared one that a caller
-   * changed would point every later target at whatever it was changed to.
+   * The descriptor names this object and not merely its handle, which is what makes it safe to hold
+   * on to. Emscripten allocates a context handle and frees it when the context is destroyed, so the
+   * number is reused by the next context created afterwards; a descriptor that carried only the
+   * number would, once this context is closed, start naming whichever context inherited it and
+   * would attach a render target to that one instead. Carrying the object means a descriptor from a
+   * closed context stays a descriptor from a closed context.
    */
   public fun descriptor(): WebglContextDescriptor {
     requireOpen()
-    return WebglContextDescriptor(handle)
+    return WebglContextDescriptor(handle, this)
   }
 
   /**
@@ -320,9 +341,10 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
         }
         MaplibreStatus.OK.nativeCode
       },
-      // Removed only once native has really destroyed it, so a close that failed leaves the context
-      // findable and a descriptor naming it still attachable.
-      afterSuccess = { openContexts.remove(handle) },
+      // Only a destroy that happened stops the count. A refused submission leaves the native
+      // context there and this wrapper open for a retry, and releasing here would let a shutdown be
+      // accepted while it still exists.
+      afterSuccess = { Dispatcher.releaseHandle(TYPE_NAME) },
     )
   }
 
@@ -342,8 +364,20 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
      * Called from the page rather than from inside a
      * [maplibreScope][org.maplibre.nativeffi.maplibreScope]: only the agent holding a canvas can
      * give it away, and the thread that receives it does not exist yet.
+     *
+     * [id] may be any `id` an HTML document accepts, including one no CSS identifier can spell,
+     * within three limits the module imposes: no comma, because the ids cross to native as one
+     * comma-separated list; no ASCII whitespace, which that list trims off each entry and which
+     * HTML forbids in an `id` anyway; and at most 63 bytes of UTF-8, which is what the module's
+     * fixed-size canvas record holds.
+     *
+     * Those are checked here as well as at [createForCanvas], because transferring a canvas cannot
+     * be undone. A host that learned about a limit from the context failing would learn about it
+     * with the `<canvas>` element already given away for the page's whole life and nothing left
+     * able to draw into it.
      */
     public fun reserveCanvas(id: String) {
+      requireCanvasId(id)
       Dispatcher.reserveCanvas(id)
     }
 
@@ -353,11 +387,67 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
      * [width] and [height] size that canvas's drawing buffer in device pixels, which for a surface
      * target is the target's physical extent and for a texture target is the size anything
      * [presentTexture] shows must fit.
+     *
+     * [id] follows [reserveCanvas]'s rules, and names a canvas reserved there: the two spell the id
+     * differently on the way to the browser — a selector there, a registry key here — so an id both
+     * accept is what makes the pair name one element.
      */
     public fun createForCanvas(id: String, width: Int, height: Int): WebglContext {
-      Status.requireArgument(id.isNotEmpty()) { "a canvas id must not be empty" }
+      requireCanvasId(id)
       return create(id, width, height)
     }
+
+    /**
+     * Reports that [id] is a canvas id both halves of the module can name.
+     *
+     * A `<canvas>` reaches the owner thread through [reserveCanvas] and is found again here, and
+     * the two spell an id differently — a selector there, a registry key here — so an id has to
+     * survive both. What that rules out is narrower than what an HTML document accepts, and each
+     * exclusion is one of the two spellings:
+     * - A comma separates the ids in the list that crosses to native, so one inside an id would
+     *   split it into two that name nothing.
+     * - ASCII whitespace is trimmed off each entry of that list, so a reserved `" map "` transfers
+     *   the element `map` while a context asks the registry for `" map "` and finds nothing. HTML
+     *   forbids whitespace in an id anyway, so refusing is the honest answer rather than trimming
+     *   one and not the other.
+     * - The module carries the id in a record of [MAX_CANVAS_ID_BYTES] bytes with the terminator
+     *   inside it, so an id may encode to one byte fewer than that.
+     *
+     * Checked here rather than left to native because of *when* native checks. Reserving a canvas
+     * transfers it, transferring cannot be undone, and the module refuses the id only afterwards —
+     * so a host that learned about the limit from the failure would learn about it with the element
+     * already gone.
+     */
+    private fun requireCanvasId(id: String) {
+      Status.requireArgument(id.isNotEmpty()) { "a canvas id must not be empty" }
+      Status.requireArgument(',' !in id) { "a canvas id must not contain a comma, but was \"$id\"" }
+      Status.requireArgument(id.none(::isAsciiWhitespace)) {
+        "a canvas id must not contain whitespace, but was \"$id\""
+      }
+      Heap.requireCString(id, "canvas id")
+      // Encoded here rather than measured with Heap.utf8Size, which asks the module for the length
+      // and so needs the module loaded. Reserving happens before it is, which is the whole point of
+      // reserving, so this check has to be one Kotlin can make on its own.
+      val bytes = id.encodeToByteArray().size
+      Status.requireArgument(bytes < MAX_CANVAS_ID_BYTES) {
+        "a canvas id must be at most ${MAX_CANVAS_ID_BYTES - 1} bytes of UTF-8, but \"$id\" is " +
+          "$bytes"
+      }
+    }
+
+    /**
+     * The whitespace HTML forbids in an `id`, which is also what the module's id list trims.
+     *
+     * Narrower than [Char.isWhitespace], deliberately: that one also matches a non-breaking space
+     * and the other Unicode separators, which an HTML id may hold and which the module carries
+     * through untouched. Refusing those would refuse ids that work.
+     */
+    private fun isAsciiWhitespace(character: Char): Boolean =
+      character == ' ' ||
+        character == '\t' ||
+        character == '\n' ||
+        character == '\u000C' ||
+        character == '\r'
 
     /**
      * Creates a WebGL2 context against a private `OffscreenCanvas` the owner thread makes.
@@ -397,23 +487,8 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
             "canvas may not have been reserved before the owner thread started."
         )
       }
-      val context = WebglContext(handle)
-      openContexts[handle] = context
-      return context
+      return WebglContext(handle)
     }
-
-    /**
-     * The contexts this module has made and not yet destroyed, by the handle that names each.
-     *
-     * A [WebglContextDescriptor] carries the Emscripten handle and nothing else, because that is
-     * what the C API's descriptor carries. So the wrapper a descriptor came from is found here
-     * rather than travelling with it, which is what lets an attach retain the context it is about
-     * to borrow.
-     *
-     * A plain map with no synchronization, because a page is one agent and every context is created
-     * and released on it.
-     */
-    private val openContexts = mutableMapOf<Int, WebglContext>()
 
     /**
      * Retains the context a render target is about to borrow, for as long as that target lives.
@@ -424,6 +499,12 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
      * holds the context open the way a render session holds its map open, and closing the context
      * first reports the live child instead.
      *
+     * The context comes off the descriptor rather than out of a lookup by handle, and that is what
+     * makes a stale descriptor safe. Emscripten's handles are allocated and freed, so the number in
+     * a descriptor from a closed context is one a later context can be given; a lookup by number
+     * would find that later context, retain it, and attach a target to a context the host never
+     * named. Resolving the object cannot confuse the two, however many contexts have come and gone.
+     *
      * Returns null for the WGL and EGL arms, which name a context from a graphics API this module
      * was not built against. Nothing here can retain one, and native is where a build's capability
      * is known, so those are passed down and refused there.
@@ -432,17 +513,32 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
       context: OpenGLContextDescriptor
     ): HandleStateCore.ChildRetention? {
       if (context !is WebglContextDescriptor) return null
-      val owner =
-        openContexts[context.context]
-          ?: throw Status.invalidArgument(
-            "A WebGL context descriptor names the handle ${context.context}, which no open " +
-              "WebglContext has. A render target's context comes from WebglContext.descriptor() " +
-              "and stays open until every target that borrowed it is detached or closed."
-          )
+      // Total, because the descriptor's constructor is internal and descriptor() is its one caller.
+      val owner = context.owner as WebglContext
+      if (owner.isClosed) {
+        throw Status.invalidArgument(
+          "A WebGL context descriptor names a WebglContext that has been closed. A render target's " +
+            "context comes from WebglContext.descriptor() and stays open until every target that " +
+            "borrowed it is detached or closed; the handle ${context.context} it carries may " +
+            "since have been reused by another context, which is why this is refused rather than " +
+            "resolved."
+        )
+      }
       return owner.core.retainChild("RenderSessionHandle")
     }
 
     /** One four-byte output: a context handle, a texture name, or a success flag. */
     private const val FLAG_BYTES = 4
+
+    /**
+     * The bytes the module's fixed-size canvas record holds, terminator included.
+     *
+     * `MLN_BROWSER_WEBGL_CANVAS_ID_BYTES` in `src/browser/webgl_context.c`, and a real limit rather
+     * than a defensive one: the record is what lets the module copy a canvas key out from under its
+     * own lock into a stack buffer, and lets a create request carry the id by value to the owner
+     * thread, neither of which allocates. Sixty-three bytes is past what an element id needs, so
+     * the limit is stated and enforced rather than lifted.
+     */
+    private const val MAX_CANVAS_ID_BYTES = 64
   }
 }

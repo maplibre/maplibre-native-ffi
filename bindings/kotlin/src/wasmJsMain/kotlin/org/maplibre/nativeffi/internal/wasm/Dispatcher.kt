@@ -113,6 +113,49 @@ internal object Dispatcher {
   private var nextToken = 1
 
   /**
+   * Whether the owner thread has been stopped, which it can be only once.
+   *
+   * Stopping is final rather than a state a later call quietly starts over from. A handle is
+   * destroyable only on the thread that created it, so a thread started after a stop could not
+   * finish anything the previous one began: a lazy restart would take a handle the host still held,
+   * destroy it somewhere it never belonged, and report the C API's wrong-thread status for a thread
+   * the host was never told about. Refusing here is what turns every such use into one binding
+   * error that names the shutdown, and it costs a host nothing a browser was going to allow anyway
+   * -- a page gives a canvas away once, so the thread that presented can never be replaced by
+   * another that does.
+   */
+  private var stopped = false
+
+  /**
+   * Owner-affine handles this module has created and not yet destroyed, by wrapper type name.
+   *
+   * This is what makes the module's destroy-then-drain-then-stop contract checkable rather than
+   * advisory. Only the owner thread may destroy what it created, so stopping it while any of these
+   * is open loses that handle for the life of the page; the count says so at the moment the mistake
+   * is made, while the thread is still there to close them on.
+   *
+   * A runtime is what is counted, because it is what every other owner-affine handle hangs from: a
+   * map, a projection, a render session, an offline operation and a frame all retain their runtime
+   * as a child, so none of them can be open without the runtime that owns it being open too. A
+   * WebGL context is the one owner-affine handle with no runtime behind it, and it is not counted
+   * here; a context left open at shutdown is caught by [stopped] instead, as a refusal rather than
+   * as a stranded destroy.
+   *
+   * A plain list, because a page is one thread and every handle is created and released on it.
+   */
+  private val liveHandles = mutableListOf<String>()
+
+  /**
+   * What a shutdown would refuse to stop for.
+   *
+   * Read by the test that says a closed handle stops holding the module open. The other way to
+   * observe that is to shut down and see it accepted, which a suite cannot do: the shutdown is
+   * final, and the page it happened on has no map in it again.
+   */
+  val openHandles: List<String>
+    get() = liveHandles.toList()
+
+  /**
    * Calls that have been counted but whose answers have not been taken.
    *
    * This is what the drain's lifetime is decided by. A caller counts itself here before it submits,
@@ -170,6 +213,13 @@ internal object Dispatcher {
    * once.
    */
   fun reserveCanvas(id: String) {
+    if (stopped) {
+      throw Status.invalidState(
+        "The canvas \"$id\" cannot be reserved because the MapLibre Native browser module has been " +
+          "shut down. A reservation is only ever read as the owner thread starts, and that thread " +
+          "cannot start again."
+      )
+    }
     Status.requireArgument(id.isNotEmpty()) { "a canvas id must not be empty" }
     // The list crosses to native as one comma-separated string, which is the shape Emscripten's
     // transfer attribute takes, so a comma inside an id would split it into two that name nothing.
@@ -263,10 +313,16 @@ internal object Dispatcher {
   }
 
   /**
-   * Refuses a call that this stack cannot park on, before anything native is reached.
+   * Refuses a call this module cannot place, before anything native is reached.
    *
-   * Two frames cannot park, and both would otherwise trap inside [awaitCall] rather than report
-   * anything a host can act on.
+   * A shut-down module is asked about first, because it is the one refusal that has nothing to do
+   * with the calling stack: the owner thread is gone whoever asks and from wherever. This is the
+   * error a host sees for a handle that outlived the shutdown, and it is deliberately the whole
+   * story -- the alternative is starting a second thread that has never seen that handle, which
+   * answers with the C API's wrong-thread status and leaves the handle destroyable nowhere.
+   *
+   * The two below are stacks that cannot park, and both would otherwise trap inside [awaitCall]
+   * rather than report anything a host can act on.
    *
    * A callback frame was entered from native, so it is not a promising stack; it also runs while a
    * scope may be parked, so dispatching from it would put a second call in flight that the
@@ -279,6 +335,13 @@ internal object Dispatcher {
    * shared host code carries a wrapper here.
    */
   private fun requireDispatchable(name: String) {
+    if (stopped) {
+      throw Status.invalidState(
+        "$name cannot be called because the MapLibre Native browser module has been shut down. " +
+          "The thread that owned its runtimes has been stopped, and a handle it created can only " +
+          "ever be destroyed there, so this module starts no replacement for it."
+      )
+    }
     if (CallbackScope.isInside()) {
       throw Status.invalidState(
         "$name cannot be called from inside a MapLibre callback. Hand the work back to the " +
@@ -378,34 +441,64 @@ internal object Dispatcher {
     scheduleDrain(::drainTurn)
   }
 
+  /** Counts a handle only the owner thread can destroy, so a stop can refuse while it is open. */
+  fun retainHandle(typeName: String) {
+    liveHandles.add(typeName)
+  }
+
+  /** Stops counting one, after native has destroyed it. */
+  fun releaseHandle(typeName: String) {
+    liveHandles.remove(typeName)
+  }
+
   /**
-   * Stops the owner thread.
+   * Stops the owner thread, for good.
    *
    * The module's contract is destroy-then-drain-then-stop: a host closes its handles, lets their
-   * calls complete, and only then stops. Nothing here enforces that, because by this point the
-   * handles are gone and there is nothing left to ask.
+   * calls complete, and only then stops. The first of those is checked here rather than assumed,
+   * because it is the one a host can get wrong silently -- a handle that escaped its scope is still
+   * an ordinary live object, and stopping the only thread that could destroy it loses it with no
+   * complaint from anything. The second needs no check: `shutdownMaplibre` takes the same gate a
+   * scope does, and a call is outstanding only while its scope holds that gate.
+   *
+   * Refusing leaves the thread running, so a host can close what it named and stop again.
    */
   fun stop() {
+    if (liveHandles.isNotEmpty()) {
+      throw Status.invalidState(
+        "The MapLibre Native browser module cannot be shut down while ${liveHandles.size} handle(s) " +
+          "created on its owner thread are still open: ${openHandleSummary()}. Only that thread " +
+          "may destroy them, so stopping it now would lose them for the life of the page. Close " +
+          "them inside a maplibreScope first."
+      )
+    }
+    // Set whether or not a thread was ever started, because what this says is that the host is
+    // finished with the module rather than that a particular thread has gone.
+    stopped = true
     val dispatcher = handle
     if (dispatcher == 0) return
     handle = 0
-    // `draining` is left as it is. A turn may already be scheduled, and clearing the flag would let
-    // a restart schedule a second one beside it -- two loops each rescheduling the other's
-    // successor. The scheduled turn is what clears the flag, on the first turn that finds no
-    // dispatcher.
+    // `draining` is left as it is, and nothing will read it again: a turn may already be scheduled,
+    // and the one thing that could set it is a call, which is refused from here on. The scheduled
+    // turn clears the flag on the first turn that finds no dispatcher. `outstanding` and the
+    // diagnostics are left for the same reason -- nothing can reach them, and scrubbing state that
+    // no longer has a reader would only suggest it has one.
     //
-    // Nothing is outstanding by now, so anything still here belongs to a caller that never
-    // resumed; both would otherwise be carried into a restart, the count as a drain that never
-    // stops and a message as one handed to whichever token matched it.
-    outstanding = 0
-    diagnostics.clear()
-    // The canvases went with the thread and cannot come back: a page gives control of a canvas
-    // away once, and the element it gave away is not drawable again. Carrying the reservations
-    // into a restart would only make that restart fail, so a host that starts over supplies fresh
-    // elements.
-    reservedCanvases.clear()
+    // The canvases stay in the reservation list for the same reason. They went with the thread and
+    // cannot come back -- a page gives control of a canvas away once, and the element it gave away
+    // is not drawable again -- and a host that reserves after this is refused before the list is
+    // consulted at all.
     stopDispatcher(dispatcher)
   }
+
+  /** Names the open handles the way a refused close names live children: sorted, with counts. */
+  private fun openHandleSummary(): String =
+    liveHandles
+      .groupingBy { it }
+      .eachCount()
+      .entries
+      .sortedBy { it.key }
+      .joinToString(", ") { (name, count) -> if (count == 1) name else "$name x$count" }
 
   private const val SLOT_BYTES = 8
   private const val COMPLETION_BYTES = 8

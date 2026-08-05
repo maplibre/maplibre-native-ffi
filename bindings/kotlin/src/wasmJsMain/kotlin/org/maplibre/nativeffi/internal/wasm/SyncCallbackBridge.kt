@@ -6,6 +6,7 @@ import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.callback.CallbackGate
 import org.maplibre.nativeffi.internal.lifecycle.NativeResourceRequest
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.internal.wasm.generated.MlnResourceProviderDecision
 import org.maplibre.nativeffi.internal.wasm.generated.MlnResourceTransformResponse
 import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceRequestHandle
@@ -140,7 +141,11 @@ private constructor(private val callback: ResourceProviderCallback, private val 
 
   private fun invoke(request: HeapPointer, rawHandle: Long): Int {
     if (request.address == 0 || rawHandle == 0L) return UNKNOWN_DECISION
-    val lease = gate.enter() ?: return UNKNOWN_DECISION
+    // A gate that turns this away is one whose registration is retiring, which is the same nothing
+    // an unregistered token is, so it gets the same answer: pass through and let MapLibre load the
+    // resource. Failing it would show the map a missing tile for a teardown the host asked for.
+    val lease =
+      gate.enter() ?: return MlnResourceProviderDecision.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH
     return try {
       CallbackScope.inside {
         val requestHandle = ResourceRequestHandle.fromNative(NativeResourceRequest(rawHandle))
@@ -181,11 +186,20 @@ private constructor(private val callback: ResourceProviderCallback, private val 
     /**
      * Answers a request on behalf of the registration [token] names.
      *
-     * A token with no registration is one the runtime has already released, so the request passes
-     * through by way of the unknown decision rather than reaching a callback that has retired.
+     * A token with no registration is one the runtime has already released, and such a request
+     * passes through: nothing here can serve it, and MapLibre loading it the ordinary way is the
+     * right answer rather than a failure the map would show as a missing tile. It is deliberately
+     * not [UNKNOWN_DECISION], which the C API answers by failing the request — that is for a
+     * registration that was reached and could not decide, which is a different thing.
+     *
+     * Unreachable as the callers stand, because a registration is cleared with native before its
+     * token is dropped and `mln_runtime_set_resource_provider` returns only once no in-flight
+     * request can still reach the provider it replaced. Deciding it correctly anyway is what keeps
+     * that ordering an optimisation rather than the only thing holding a wrong answer back.
      */
     fun dispatch(token: Int, request: HeapPointer, rawHandle: Long): Int =
-      host.find(token)?.invoke(request, rawHandle) ?: UNKNOWN_DECISION
+      host.find(token)?.invoke(request, rawHandle)
+        ?: MlnResourceProviderDecision.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH
   }
 }
 

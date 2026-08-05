@@ -74,12 +74,20 @@ another attached to the same canvas. It returns null for the same reasons
 `mln_browser_dispatcher_create` does, and additionally when a named canvas is
 not in the document or control of it has already been transferred.
 
-These are element ids rather than selectors. Any id an HTML document accepts
-works, including one a CSS identifier cannot spell — a leading digit, a colon, a
-dot, a bracket — because the module escapes each id before it reaches the
-selector Emscripten resolves. A comma is the exception: it separates the list,
-so it cannot appear inside an entry. Surrounding whitespace is trimmed, and an
-id may not contain any.
+These are element ids rather than selectors. An id a CSS identifier cannot spell
+— a leading digit, a colon, a dot, a bracket — works, because the module escapes
+each id before it reaches the selector Emscripten resolves. Three limits apply.
+A comma separates the list, so it cannot appear inside an entry. Surrounding
+whitespace is trimmed, and an id may not contain any. And an id must fit the 64
+bytes, terminator included, that `mln_browser_webgl_context_create` accepts: a
+longer one can be transferred here and never named again, because a context is
+what a transferred canvas is for.
+
+**Transferring cannot be undone**, which is what makes those the caller's to
+check first. This call is the only moment a canvas can move, so a host that
+reserves an id no later call can name has given a `<canvas>` element away for
+the page's life with nothing left able to draw into it. A binding validates the
+id before it reaches this call rather than reporting the failure that follows.
 
 A canvas given away this way is no longer drawable from the page. The `<canvas>`
 element becomes a placeholder that displays what the owner thread renders, with
@@ -150,6 +158,14 @@ already destroyed its owner-affine handles and drained its outstanding calls: a
 runtime, map, or render session can only be destroyed on the thread that owns
 it.
 
+Neither reports anything, and one case is worth stating because a host cannot
+observe it. A stop reaches the thread as a wake, and a wake needs an allocation.
+When that allocation fails, the dispatcher is released where the stop was called
+and the thread is left holding the keepalive that keeps its worker alive, since
+the wake that failed was the only thing that could have reached it. The worker
+then survives for the document's lifetime. That is the lesser harm: the
+alternative leaks the dispatcher beside it and leaves the same worker running.
+
 `mln_browser_dispatcher_submit_task` places work the module itself owns on that
 thread. It takes no index and no slots, because its caller is another
 translation unit in this module rather than a host packing a buffer; everything
@@ -182,7 +198,11 @@ session, and destroy it there, after every target that borrowed the handle is
 detached or destroyed.
 
 Both take a canvas element id, and which kind of canvas it names decides what a
-session can do with the context.
+session can do with the context. The id is carried in a fixed-size record, which
+is what lets the module copy a canvas key out from under its own lock and carry
+a creation request by value to the owner thread without allocating, so **an id
+of 64 bytes or more, terminator included, is refused**. A truncated key would
+name a different canvas or none, so the length is refused rather than trimmed.
 
 - A page canvas the dispatcher was created with. What a surface session renders
   into that context's default framebuffer is composited onto the page's canvas

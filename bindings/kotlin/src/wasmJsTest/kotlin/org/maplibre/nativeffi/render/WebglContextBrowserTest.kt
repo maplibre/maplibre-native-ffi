@@ -8,6 +8,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
+import kotlin.test.fail
 import org.maplibre.nativeffi.browserTest
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
@@ -16,14 +17,23 @@ import org.maplibre.nativeffi.maplibreScope
 import org.maplibre.nativeffi.withMap
 
 /**
+ * Contexts to open while waiting for the module's allocator to hand a freed handle back.
+ *
+ * Bounded because a page holds only so many WebGL contexts, and the test asserts the refusal either
+ * way -- reuse sharpens it into the ABA case rather than being what it rests on.
+ */
+private const val REUSE_ATTEMPTS = 8
+
+/**
  * The lifetime of a WebGL context, which on this target the binding owns rather than the host.
  *
  * Everywhere else a render target's graphics context belongs to a host that made it with EGL,
  * Metal, or Vulkan, and keeping it valid for the target's borrow window is the host's job. Here the
- * context comes from this module, so keeping it valid is this binding's job — and the descriptor a
- * target attaches with carries only the Emscripten handle, which stays a positive integer long
- * after the context behind it is gone. So the checks below are the binding's own, and they are what
- * stands between a host and a render target working in a context that was destroyed underneath it.
+ * context comes from this module, so keeping it valid is this binding's job — and the Emscripten
+ * handle a target attaches by stays a positive integer long after the context behind it is gone,
+ * and is handed to the next context created. So the checks below are the binding's own, and they
+ * are what stands between a host and a render target working in a context that was destroyed
+ * underneath it, or in one it never named.
  */
 class WebglContextBrowserTest {
   // Spec coverage: BND-041, BND-042.
@@ -91,7 +101,7 @@ class WebglContextBrowserTest {
           }
         assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status)
         assertTrue(
-          error.diagnostic.contains("no open WebglContext"),
+          error.diagnostic.contains("has been closed"),
           "the refusal reported ${error.diagnostic}",
         )
 
@@ -105,6 +115,86 @@ class WebglContextBrowserTest {
       }
     }
   }
+
+  /**
+   * The same refusal once another context has been given the closed one's handle.
+   *
+   * Emscripten allocates a context handle with `malloc` and frees it on destroy, so the number is
+   * not an identity: destroy a context and the next one created takes the same number back. A
+   * binding that resolved a descriptor by number would find the *new* context, retain it, and
+   * render the map through a context the host never named — silently, because every check native
+   * can make still passes.
+   *
+   * So this closes a context and opens others until the number comes back. The allocator is under
+   * no obligation to return it, and what it returns depends on everything else this page has
+   * allocated, so the refusal is asserted either way; reuse is what sharpens it into the case the
+   * test above cannot reach.
+   */
+  @Test
+  fun attachingWithAStaleDescriptorIsRefusedAfterItsHandleIsReused(): Promise<JsAny?> =
+    browserTest {
+      maplibreScope {
+        withMap(WIDTH, HEIGHT) { _, map ->
+          val original = WebglContext.createOffscreen(WIDTH, HEIGHT)
+          val stale = original.descriptor()
+          original.close()
+
+          // Reuse is what makes this the ABA case rather than merely a closed-context case, but the
+          // module's allocator is under no obligation to hand the number straight back: what it
+          // returns depends on whatever else has been allocated in this page. So the number is
+          // hunted for rather than assumed, and every context opened on the way is kept open, since
+          // closing one would free the very number being waited for.
+          val opened = mutableListOf<WebglContext>()
+          var replacement = WebglContext.createOffscreen(WIDTH, HEIGHT)
+          opened.add(replacement)
+          while (
+            replacement.descriptor().context != stale.context && opened.size < REUSE_ATTEMPTS
+          ) {
+            replacement = WebglContext.createOffscreen(WIDTH, HEIGHT)
+            opened.add(replacement)
+          }
+          val reused = replacement.descriptor().context == stale.context
+          try {
+
+            // Caught rather than left to assertFailsWith. A session that attached holds the map
+            // open, so it would fail the map's own close on the way out, and that cleanup failure
+            // is what the report would show instead of this one. Released first, reported second.
+            val leaked =
+              try {
+                map.attachOpenGLOwnedTexture(
+                  OpenGLOwnedTextureDescriptor(RenderTargetExtent(WIDTH, HEIGHT, 1.0), stale)
+                )
+              } catch (error: InvalidArgumentException) {
+                assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status)
+                assertTrue(
+                  error.diagnostic.contains("has been closed"),
+                  "the refusal reported ${error.diagnostic}",
+                )
+                null
+              }
+            if (leaked != null) {
+              leaked.close()
+              fail(
+                "attaching with a descriptor from a closed context succeeded" +
+                  if (reused) {
+                    "; the handle ${stale.context} it carries now belongs to a different context, " +
+                      "so the session would have rendered through one the host never named"
+                  } else {
+                    ", so a descriptor outliving its context is not refused at all"
+                  }
+              )
+            }
+
+            // And the context that really holds that number still attaches, so what was refused was
+            // the stale descriptor rather than the handle it happens to carry. Only meaningful once
+            // the number has actually been reused; otherwise this is an ordinary live context.
+            if (reused) map.attachOpenGLOwnedTexture(descriptorFor(replacement)).close()
+          } finally {
+            opened.forEach { it.close() }
+          }
+        }
+      }
+    }
 
   @Test
   fun aContextCloseTheModuleRefusesLeavesItOpenForARetry(): Promise<JsAny?> = browserTest {

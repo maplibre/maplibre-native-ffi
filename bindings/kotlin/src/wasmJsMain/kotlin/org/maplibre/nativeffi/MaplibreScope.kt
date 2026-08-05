@@ -83,16 +83,34 @@ public suspend fun <T> maplibreScope(block: () -> T): T = SuspensionGate.withGat
 }
 
 /**
- * Stops the thread this binding's runtimes ran on.
- *
- * Suspending, and it takes the same gate [maplibreScope] does, because it must not run while a
- * scope is parked. Stopping there would leave that scope waiting on a completion nothing polls for
- * any more: its stack never resumes, its scratch is never freed, and any handle it had just created
- * is lost with the thread that alone could destroy it.
+ * Stops the thread this binding's runtimes ran on, for good.
  *
  * Called once, after every handle is closed. The module's own contract is destroy, then drain, then
  * stop: a call still in flight has storage the owner thread may still be writing, and an
  * owner-affine handle can only ever be destroyed on that thread.
+ *
+ * Suspending, and it takes the same gate [maplibreScope] does, because it must not run while a
+ * scope is parked. Stopping there would leave that scope waiting on a completion nothing polls for
+ * any more: its stack never resumes, its scratch is never freed, and any handle it had just created
+ * is lost with the thread that alone could destroy it. Holding that gate is also what makes the
+ * "drain" half of the contract hold by itself, since a call is outstanding only while the scope
+ * that placed it holds the same gate.
+ *
+ * **A handle still open refuses the shutdown**, naming what is open, the way closing a runtime with
+ * a live map does. The refusal leaves the owner thread running, so a host closes what was named and
+ * calls this again. It is the destroy half of the contract made checkable: a handle that outlived
+ * its scope is an ordinary live object, and stopping the one thread that could destroy it would
+ * otherwise lose it with nothing said.
+ *
+ * **This is final.** No later call starts another owner thread; every one reports an invalid-state
+ * failure naming the shutdown instead. A thread started afterwards would be a thread that has never
+ * seen the handles the host still holds, so it could only answer them with the C API's wrong-thread
+ * status -- and a page cannot restart the part that matters anyway, because a canvas given to a
+ * thread cannot be given to a second one. A host that has shut down and wants a map again reloads
+ * the page.
+ *
+ * @throws org.maplibre.nativeffi.error.InvalidStateException if a handle created on the owner
+ *   thread is still open.
  */
 public suspend fun shutdownMaplibre() {
   SuspensionGate.withGate { Dispatcher.stop() }

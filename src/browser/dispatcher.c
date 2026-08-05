@@ -774,6 +774,13 @@ MLN_API void mln_browser_dispatcher_destroy(
  * The thread drains what is queued, releases the dispatcher, and exits. The
  * caller must not touch the dispatcher after this returns.
  *
+ * When the stop cannot be posted to the thread -- the one allocation this
+ * needs, and so only under memory pressure -- the dispatcher is released here
+ * instead and the thread is left holding its keepalive, because nothing remains
+ * that can reach it. That is a worker that survives for the document's lifetime
+ * and is the lesser of the two harms; the alternative is leaking the dispatcher
+ * beside it.
+ *
  * **Stop with nothing outstanding and nothing live.** A call still in flight
  * has argument and result storage the worker may still be reading, and its
  * answer becomes uncollectable the moment this returns. An owner-affine handle
@@ -808,7 +815,39 @@ MLN_API void mln_browser_dispatcher_stop(
   // Safe to read the dispatcher here even though the thread may free it,
   // because the count taken above is what a free waits for: no wake can find
   // the count at zero until this one has run.
-  (void)mln_browser_dispatcher_wake(dispatcher);
+  if (mln_browser_dispatcher_wake(dispatcher)) {
+    return;
+  }
+
+  // The stop could not be posted, so the count taken above has to come back the
+  // way mln_browser_dispatcher_enqueue() takes its own back. Left standing it
+  // would be a wake that never arrives: no later drain could ever find the
+  // count at zero, so the keepalive would never be popped and neither the
+  // dispatcher nor the worker would ever be released -- a stop that returned
+  // successfully while leaving a thread alive for the document's lifetime.
+  pthread_mutex_lock(&dispatcher->mutex);
+  dispatcher->wakes--;
+  // Another wake still in flight is the better outcome, and needs nothing here:
+  // it finds the count at zero when it finishes, with the dispatcher stopping,
+  // and that is the drain that pops the keepalive and frees this. A queued call
+  // always has such a wake, because enqueue counts one before it publishes, so
+  // a count of zero here also says the queue is empty.
+  const bool orphaned = dispatcher->wakes == 0;
+  pthread_mutex_unlock(&dispatcher->mutex);
+  if (!orphaned) {
+    return;
+  }
+  // Nothing will ever run on this dispatcher again, and nothing but this call
+  // still refers to it -- the host must not touch it after a stop, and no wake
+  // is outstanding to read it. So it is released here.
+  //
+  // The worker is the part that cannot be recovered: its keepalive is held on
+  // its own thread and the only way to reach that thread is the wake that just
+  // failed. Releasing the dispatcher anyway is the lesser harm, and the same
+  // one mln_browser_dispatcher_destroy() settles for when its wake cannot be
+  // posted.
+  pthread_mutex_destroy(&dispatcher->mutex);
+  free(dispatcher);
 }
 
 /**

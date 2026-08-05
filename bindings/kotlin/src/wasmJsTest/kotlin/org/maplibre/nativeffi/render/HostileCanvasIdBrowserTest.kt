@@ -3,6 +3,8 @@ package org.maplibre.nativeffi.render
 import kotlin.js.JsAny
 import kotlin.js.Promise
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.PageCanvases
 import org.maplibre.nativeffi.assertPresentedColor
@@ -10,6 +12,9 @@ import org.maplibre.nativeffi.assertRenderedColor
 import org.maplibre.nativeffi.backgroundStyle
 import org.maplibre.nativeffi.browserTest
 import org.maplibre.nativeffi.drain
+import org.maplibre.nativeffi.error.InvalidArgumentException
+import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.maplibreScope
 import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
@@ -79,6 +84,81 @@ class HostileCanvasIdBrowserTest {
   }
 
   /**
+   * The id limits, refused where a host can still pick a different id.
+   *
+   * The module carries a canvas id in a fixed-size record and refuses a longer one, and the two
+   * calls that name a canvas sit either side of something irreversible: reserving transfers the
+   * `<canvas>` element to the owner thread, and Emscripten transfers only at `pthread_create`, so a
+   * host that got as far as a context failing would have given the element away for the page's
+   * whole life with nothing left able to draw into it. Refusing at both, and saying what the limit
+   * is, is what leaves the host a move.
+   */
+  @Test
+  fun anIdTooLongForTheModuleIsRefusedByBothCallsThatNameACanvas(): Promise<JsAny?> = browserTest {
+    // One byte past what the module's record holds, so it is the first id that cannot work.
+    val tooLong = "m".repeat(MAX_ID_BYTES)
+
+    val reserving =
+      assertFailsWith<InvalidArgumentException> { WebglContext.reserveCanvas(tooLong) }
+    assertEquals(MaplibreStatus.INVALID_ARGUMENT, reserving.status)
+    assertTrue(
+      reserving.diagnostic.contains("${MAX_ID_BYTES - 1} bytes"),
+      "the refusal did not name the limit: ${reserving.diagnostic}",
+    )
+
+    val creating =
+      assertFailsWith<InvalidArgumentException> {
+        WebglContext.createForCanvas(tooLong, WIDTH, HEIGHT)
+      }
+    assertTrue(
+      creating.diagnostic.contains("${MAX_ID_BYTES - 1} bytes"),
+      "the refusal did not name the limit: ${creating.diagnostic}",
+    )
+
+    // And the longest id that fits gets past the check, so what is refused above is the length
+    // rather than long ids in general. It fails at the canvas instead, because nothing reserved it.
+    maplibreScope {
+      val longest = "m".repeat(MAX_ID_BYTES - 1)
+      val error =
+        assertFailsWith<InvalidStateException> {
+          WebglContext.createForCanvas(longest, WIDTH, HEIGHT)
+        }
+      assertTrue(
+        error.diagnostic.contains(longest),
+        "the refusal was not the canvas's: ${error.diagnostic}",
+      )
+    }
+  }
+
+  /**
+   * An id with whitespace around it, which the module's id list would trim off one call and not the
+   * other.
+   *
+   * The ids cross to the owner thread as one comma-separated list, and the module trims ASCII
+   * whitespace from each entry, so reserving `" x "` transfers the element `x`. Creating a context
+   * asks Emscripten's registry for the id unchanged, finds no `" x "`, and fails — with the element
+   * already transferred. HTML forbids whitespace in an `id` anyway, so both calls refuse it rather
+   * than one of them silently meaning something else.
+   */
+  @Test
+  fun anIdWithSurroundingWhitespaceIsRefusedRatherThanTrimmed(): Promise<JsAny?> = browserTest {
+    val padded = " ${PageCanvases.HOSTILE} "
+    for (diagnostic in
+      listOf(
+        assertFailsWith<InvalidArgumentException> { WebglContext.reserveCanvas(padded) }.diagnostic,
+        assertFailsWith<InvalidArgumentException> {
+            WebglContext.createForCanvas(padded, WIDTH, HEIGHT)
+          }
+          .diagnostic,
+      )) {
+      assertTrue(
+        diagnostic.contains("whitespace"),
+        "the refusal did not name the reason: $diagnostic",
+      )
+    }
+  }
+
+  /**
    * Renders until the session has nothing left to draw, pumping the runtime in between.
    *
    * The first render after a new style still paints the old one, because a render draws whatever
@@ -116,5 +196,9 @@ class HostileCanvasIdBrowserTest {
 
     const val ATTEMPTS = 200
     const val PUMP_MILLIS = 2L
+
+    // MLN_BROWSER_WEBGL_CANVAS_ID_BYTES in src/browser/webgl_context.c, terminator included, so an
+    // id of this many bytes is the first one too long to carry.
+    const val MAX_ID_BYTES = 64
   }
 }
