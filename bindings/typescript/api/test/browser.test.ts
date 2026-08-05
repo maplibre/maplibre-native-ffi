@@ -114,6 +114,16 @@ function hostTexture(
 }
 
 /**
+ * This host has nothing to present through.
+ *
+ * A browser's WebGL context is bound to its canvas, so there is no surface
+ * object to name, and a case that would present says so by getting nothing.
+ */
+function hostSurface(): undefined {
+  return undefined;
+}
+
+/**
  * A page cannot listen on a port.
  *
  * The cases that fetch from an origin of their own declare the capability, and
@@ -220,6 +230,7 @@ describe("a browser hosting the WebAssembly payload", () => {
             loadPackage,
             renderContext,
             hostTexture,
+            hostSurface,
             httpOrigin,
           });
         });

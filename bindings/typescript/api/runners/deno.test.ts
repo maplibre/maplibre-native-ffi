@@ -7,11 +7,14 @@
  */
 
 import {
+  type Capability,
   CONFORMANCE,
   type Expect,
   groupsFor,
 } from "../src/conformance/index.ts";
 import { Maplibre, MaplibreError } from "../src/index.ts";
+import type { NativePointer, OpenGlContext } from "../src/render.ts";
+import { openHeadlessOpenGl } from "./headless-opengl.ts";
 import { startHttpOrigin } from "./http-origin.ts";
 
 const maplibre = await Maplibre.load();
@@ -34,17 +37,51 @@ async function cacheDirectory(): Promise<string> {
 }
 
 /**
- * No graphics context exists here.
+ * The one graphics context this process renders through.
  *
- * A case that needs one names the capability and this runner leaves it out, so
- * reaching this is a registration mistake rather than something to work around.
+ * A native host has none until it asks a driver for one, and only an OpenGL
+ * build can use the EGL context this asks for, so it asks only when the loaded
+ * library carries that backend. A host with no driver reports none at all, and
+ * the render cases are then left to a host that has one.
  */
-function hostTexture(): never {
-  throw new Error("this runtime has no graphics context to make a texture in");
+const graphics = maplibre.renderBackends.opengl
+  ? await openHeadlessOpenGl()
+  : undefined;
+
+function renderContext(): OpenGlContext {
+  if (graphics === undefined) {
+    throw new Error("this runtime has no graphics context to render through");
+  }
+  return graphics.context;
 }
 
-function renderContext(): never {
-  throw new Error("this runtime has no graphics context to render through");
+/**
+ * A texture this process owns, which a caller-owned target draws into.
+ *
+ * Made in the context the sessions attach to, so a session that shares with it
+ * can see the name, and kept by the host so a case can check the session left
+ * it alone.
+ */
+function hostTexture(
+  width: number,
+  height: number,
+): { texture: number; target: number } {
+  if (graphics === undefined) {
+    throw new Error(
+      "this runtime has no graphics context to make a texture in",
+    );
+  }
+  return graphics.texture(width, height);
+}
+
+/**
+ * The pbuffer the fixture made, when there is one.
+ *
+ * A surface session needs somewhere to present, and a headless host has this
+ * rather than a window.
+ */
+function hostSurface(): NativePointer | undefined {
+  return graphics?.surface;
 }
 
 const assertions: Expect = {
@@ -136,14 +173,18 @@ const TRANSPORT = "node-api";
 /**
  * What this runner can offer beyond the transport.
  *
- * No graphics context exists here, so the render-session cases are left to a
- * host that has one.
+ * The render-session cases are registered only when a context was made above,
+ * which is a property of the host and of the backend the loaded build carries
+ * rather than of the transport.
  */
-const CAPABILITIES = [
+const CAPABILITIES: Capability[] = [
   "packageResolution",
   "httpHeaderTransforms",
   "httpOrigin",
-] as const;
+];
+if (graphics !== undefined) {
+  CAPABILITIES.push("renderContext");
+}
 
 for (const group of groupsFor(CONFORMANCE, {
   transport: TRANSPORT,
@@ -157,6 +198,7 @@ for (const group of groupsFor(CONFORMANCE, {
         cacheDirectory,
         renderContext,
         hostTexture,
+        hostSurface,
         loadPackage,
         httpOrigin: startHttpOrigin,
       });

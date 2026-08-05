@@ -15,7 +15,7 @@ import { nativeOf } from "../internal/private.ts";
 import type { Transport } from "../internal/transport.ts";
 import type { Map } from "../map.ts";
 import type { Maplibre } from "../maplibre.ts";
-import type { OpenGlContext } from "../render.ts";
+import type { NativePointer, OpenGlContext } from "../render.ts";
 import type { Runtime } from "../runtime.ts";
 
 /** Assertions a case uses, which each runner maps onto its own framework. */
@@ -79,6 +79,15 @@ export interface CaseContext {
     width: number,
     height: number,
   ): { texture: number; target: number };
+  /**
+   * A surface a session can present through, when this host has one.
+   *
+   * A browser has none: a WebGL context is bound to its canvas, so there is no
+   * surface object to name. A host with EGL can make a pbuffer. `undefined`
+   * means this host cannot supply one, which is a different thing from a build
+   * that carries no surface sessions.
+   */
+  hostSurface(): NativePointer | undefined;
   /**
    * An HTTP origin the library can fetch from, recording what arrived.
    *

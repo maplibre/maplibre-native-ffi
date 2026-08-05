@@ -115,10 +115,11 @@ export const RENDER_SESSION_GROUP: ConformanceGroup = {
       name: "sends each attach path to its own C session family",
       spec: ["BND-162"],
       needs: NEEDS_CONTEXT,
-      run({ maplibre, expect, renderContext, hostTexture }) {
+      run({ maplibre, expect, renderContext, hostTexture, hostSurface }) {
         withRuntime(maplibre, (_runtime, open) => {
           const map = open(EXTENT);
           const context = renderContext();
+          const presentable = hostSurface();
           const hostOwned = hostTexture(EXTENT.width, EXTENT.height);
           const sessionOwnedTexture = { extent: EXTENT, context };
           const callerOwnedTexture = {
@@ -283,25 +284,50 @@ export const RENDER_SESSION_GROUP: ConformanceGroup = {
           // two texture families attach in that same build. Either answer is
           // the surface family's own: a path that had gone to a texture family
           // would have attached here, as those two just did.
-          const answer = expect.throws(
-            () => map.attachOpenGlSurface(surface),
-            "attaching a surface session whose descriptor is complete",
-          );
-          expect.equal(
-            answer.operation,
-            "mln_opengl_surface_attach",
-            "the C function that answered",
-          );
-          expect.equal(
-            answer.kind,
-            "unsupported",
-            "what the surface family carries in this build",
-          );
-          expect.contains(
-            answer.diagnostic,
-            "surface",
-            "the diagnostic names surface sessions",
-          );
+          if (presentable !== undefined) {
+            // This host can present, so the descriptor this binding built is
+            // taken all the way: a session comes back and renders. That is a
+            // stronger statement than any refusal, and the only one that says
+            // the surface arm of the context union is written correctly.
+            const session = map.attachOpenGlSurface({
+              ...surface,
+              surface: presentable,
+            });
+            try {
+              expect.equal(
+                session.isClosed,
+                false,
+                "a surface session attached and is live",
+              );
+              expect.equal(
+                typeof session.renderUpdate(),
+                "boolean",
+                "and answers an update",
+              );
+            } finally {
+              session.close();
+            }
+          } else {
+            // No surface to present through, so what is left is the answer the
+            // build gives for a descriptor it cannot honour. A build whose
+            // surface family is a stub reports unsupported; one that carries
+            // real surface sessions takes the descriptor seriously and refuses
+            // the stand-in handle instead. Either says the path reached the
+            // surface family, which is what this case is for.
+            const answer = expect.throws(
+              () => map.attachOpenGlSurface(surface),
+              "attaching a surface session whose descriptor is complete",
+            );
+            expect.equal(
+              answer.operation,
+              "mln_opengl_surface_attach",
+              "the C function that answered",
+            );
+            expect.ok(
+              answer.kind === "unsupported" || answer.kind === "nativeError",
+              `the surface family refused the stand-in, and reported ${answer.kind}`,
+            );
+          }
         });
       },
     },

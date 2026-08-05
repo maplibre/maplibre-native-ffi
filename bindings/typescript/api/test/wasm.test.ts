@@ -87,6 +87,16 @@ function hostTexture(): never {
   throw new Error("this runtime has no graphics context to make a texture in");
 }
 
+/**
+ * This host has nothing to present through.
+ *
+ * A browser's WebGL context is bound to its canvas, so there is no surface
+ * object to name, and a case that would present says so by getting nothing.
+ */
+function hostSurface(): undefined {
+  return undefined;
+}
+
 function renderContext(): never {
   throw new Error("this runtime has no graphics context to render through");
 }
@@ -183,6 +193,7 @@ describe("the WebAssembly transport", () => {
             loadPackage,
             renderContext,
             hostTexture,
+            hostSurface,
             httpOrigin,
           });
         });
