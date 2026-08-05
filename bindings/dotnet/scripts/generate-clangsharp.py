@@ -11,7 +11,6 @@ import shutil
 import subprocess
 import tempfile
 
-
 BINDING_DIR = pathlib.Path(__file__).resolve().parents[1]
 ROOT = BINDING_DIR.parents[1]
 MANIFEST = BINDING_DIR / ".config" / "dotnet-tools.json"
