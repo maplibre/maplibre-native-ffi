@@ -26,6 +26,21 @@ namespace Maplibre.NativeFfi.Internal.C
         public void* surface;
     }
 
+    internal unsafe partial struct mln_webgpu_surface_descriptor
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        public mln_render_target_extent extent;
+
+        public mln_webgpu_context_descriptor context;
+
+        public void* surface;
+
+        [NativeTypeName("uint32_t")]
+        public uint format;
+    }
+
     internal unsafe partial struct mln_opengl_surface_descriptor
     {
         [NativeTypeName("uint32_t")]
@@ -50,6 +65,9 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_opengl_surface_descriptor mln_opengl_surface_descriptor_default();
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_webgpu_surface_descriptor mln_webgpu_surface_descriptor_default();
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_metal_surface_attach([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_metal_surface_descriptor *")] mln_metal_surface_descriptor* descriptor, [NativeTypeName("mln_render_session *")] MlnRenderSession* out_session);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -59,6 +77,9 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_opengl_surface_attach([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_opengl_surface_descriptor *")] mln_opengl_surface_descriptor* descriptor, [NativeTypeName("mln_render_session *")] MlnRenderSession* out_session);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_webgpu_surface_attach([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_webgpu_surface_descriptor *")] mln_webgpu_surface_descriptor* descriptor, [NativeTypeName("mln_render_session *")] MlnRenderSession* out_session);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_metal_surface_set_target([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_metal_surface_descriptor *")] mln_metal_surface_descriptor* descriptor);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -66,5 +87,8 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_opengl_surface_set_target([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_opengl_surface_descriptor *")] mln_opengl_surface_descriptor* descriptor);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_webgpu_surface_set_target([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_webgpu_surface_descriptor *")] mln_webgpu_surface_descriptor* descriptor);
     }
 }

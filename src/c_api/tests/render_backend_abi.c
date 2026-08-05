@@ -164,6 +164,48 @@ static void webgpu_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
   );
 }
 
+static mln_webgpu_surface_descriptor webgpu_surface_descriptor(void) {
+  mln_webgpu_surface_descriptor value = mln_webgpu_surface_descriptor_default();
+  value.context.device = fake_handle;
+  value.surface = fake_handle;
+  // Any non-zero value: this reaches descriptor validation only, which rejects
+  // WGPUTextureFormat_Undefined and takes the rest as given.
+  value.format = 1;
+  return value;
+}
+static void clear_webgpu_surface(mln_webgpu_surface_descriptor* descriptor) {
+  descriptor->surface = NULL;
+}
+static void shrink_webgpu_surface(mln_webgpu_surface_descriptor* descriptor) {
+  descriptor->context.size = sizeof(mln_webgpu_context_descriptor) - 1;
+}
+
+// This verifies nulls, a non-null output handle, undersized descriptors, and
+// the required WebGPU surface handle.
+static void webgpu_surface_attach_rejects_unsafe_raw_inputs(void) {
+  EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(
+    mln_webgpu_surface_descriptor, webgpu_surface_descriptor,
+    mln_webgpu_surface_attach, clear_webgpu_surface, shrink_webgpu_surface
+  );
+}
+
+// A surface with no format cannot be configured, so the descriptor says so
+// rather than leaving the browser to report it after attach.
+static void webgpu_surface_attach_rejects_an_unspecified_format(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_webgpu_surface_descriptor descriptor = webgpu_surface_descriptor();
+  descriptor.format = 0;
+  mln_render_session session = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_webgpu_surface_attach(map, &descriptor, &session)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // This verifies nested extent sizing, physical size, and the required borrowed
 // WebGPU handles and format hidden by binding descriptors.
 static void webgpu_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
@@ -259,14 +301,23 @@ static void clear_opengl_context(mln_opengl_context_descriptor* context) {
   context->data.egl.share_context = NULL;
 #endif
 }
+// WGL and EGL need a surface alongside the context, so the surface is the
+// handle these check for. A WebGL context names its canvas itself and takes a
+// null surface, so there the context handle is the required one.
 static mln_opengl_surface_descriptor opengl_surface_descriptor(void) {
   mln_opengl_surface_descriptor value = mln_opengl_surface_descriptor_default();
   configure_opengl_context(&value.context);
+#if !defined(MLN_FFI_TEST_OPENGL_WEBGL)
   value.surface = fake_handle;
+#endif
   return value;
 }
 static void clear_opengl_surface(mln_opengl_surface_descriptor* descriptor) {
+#if defined(MLN_FFI_TEST_OPENGL_WEBGL)
+  clear_opengl_context(&descriptor->context);
+#else
   descriptor->surface = NULL;
+#endif
 }
 static void shrink_opengl_surface(mln_opengl_surface_descriptor* descriptor) {
   shrink_opengl_context(&descriptor->context);
@@ -305,6 +356,26 @@ static void opengl_surface_attach_rejects_unsafe_raw_inputs(void) {
     mln_opengl_surface_attach, clear_opengl_surface, shrink_opengl_surface
   );
 }
+
+#if defined(MLN_FFI_TEST_OPENGL_WEBGL)
+// A WebGL context carries the canvas it presents to, so a surface handle
+// alongside it names a second one this session would ignore. Rejecting it keeps
+// a host from believing it chose the target.
+static void opengl_surface_attach_rejects_a_webgl_surface_handle(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_opengl_surface_descriptor descriptor = opengl_surface_descriptor();
+  descriptor.surface = fake_handle;
+  mln_render_session session = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_opengl_surface_attach(map, &descriptor, &session)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+#endif
 
 // This verifies nested sizes and required raw texture values that typed OpenGL
 // descriptors prevent.
@@ -443,11 +514,16 @@ void run_render_backend_abi_tests(void) {
   RUN_TEST(metal_owned_texture_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(metal_borrowed_texture_rejects_unsafe_raw_descriptors);
   RUN_TEST(opengl_surface_attach_rejects_unsafe_raw_inputs);
+#if defined(MLN_FFI_TEST_OPENGL_WEBGL)
+  RUN_TEST(opengl_surface_attach_rejects_a_webgl_surface_handle);
+#endif
   RUN_TEST(opengl_owned_texture_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(opengl_borrowed_texture_rejects_unsafe_raw_descriptors);
   RUN_TEST(vulkan_surface_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(vulkan_owned_texture_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(vulkan_borrowed_texture_rejects_unsafe_raw_descriptors);
   RUN_TEST(webgpu_owned_texture_attach_rejects_unsafe_raw_inputs);
+  RUN_TEST(webgpu_surface_attach_rejects_unsafe_raw_inputs);
+  RUN_TEST(webgpu_surface_attach_rejects_an_unspecified_format);
   RUN_TEST(webgpu_borrowed_texture_rejects_unsafe_raw_descriptors);
 }

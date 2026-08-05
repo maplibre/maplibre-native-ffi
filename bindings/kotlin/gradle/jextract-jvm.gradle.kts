@@ -95,10 +95,10 @@ abstract class GenerateJvmJextractBindingsTask : DefaultTask() {
 
     val sharedBindings =
       output.resolve("org/maplibre/nativeffi/internal/c/MapLibreNativeC\$shared.java")
-    // jextract lowers size_t, int64_t, and uint64_t through the build host's typedefs. Unix
-    // output therefore uses C_LONG even though every such value in our 64-bit C ABI is 64 bits,
-    // while C_LONG itself becomes 32 bits when the same JVM artifact runs on Windows.
-    // The public API has no plain C long, so every generated C_LONG use is a fixed-width value.
+    // jextract lowers size_t, int64_t, and uint64_t through the build host's typedefs. It may
+    // spell those fixed-width values as C_LONG or C_LONG_LONG, while C_LONG itself becomes 32
+    // bits when the same JVM artifact runs on Windows. The public API uses neither C long type,
+    // so normalize every generated reference to the fixed 64-bit C_LONG layout.
     // TODO: Replace this textual normalization with an AST-based rewrite.
     val hostLongLayout =
       Regex(
@@ -120,7 +120,12 @@ abstract class GenerateJvmJextractBindingsTask : DefaultTask() {
     output
       .walkTopDown()
       .filter { it.isFile && it.extension == "java" }
-      .forEach { it.writeText(it.readText().trimEnd() + "\n") }
+      .forEach {
+        it.writeText(
+          it.readText().replace("MapLibreNativeC.C_LONG_LONG", "MapLibreNativeC.C_LONG").trimEnd() +
+            "\n"
+        )
+      }
   }
 }
 

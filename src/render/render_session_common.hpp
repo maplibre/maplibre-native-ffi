@@ -109,6 +109,14 @@ class SurfaceSessionBackend {
       "session does not render through an OpenGL surface"
     );
   }
+  virtual auto set_webgpu_target(
+    const mln_webgpu_surface_descriptor& descriptor
+  ) -> mln_status {
+    (void)descriptor;
+    return unsupported_retarget(
+      "session does not render through a WebGPU surface"
+    );
+  }
 };
 
 class TextureSessionBackend {
@@ -469,6 +477,8 @@ auto opengl_borrowed_texture_descriptor_default() noexcept
 auto validate_opengl_context(
   const mln_opengl_context_descriptor& context, bool require_supported_provider
 ) -> mln_status;
+auto validate_webgpu_context(const mln_webgpu_context_descriptor& context)
+  -> mln_status;
 
 // Whether two Vulkan context descriptors name the same device and queue, which
 // is what lets a session keep every resource the renderer allocated on it

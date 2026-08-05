@@ -41,6 +41,29 @@ typedef struct mln_vulkan_surface_descriptor {
   void* surface;
 } mln_vulkan_surface_descriptor;
 
+/** WebGPU native surface session attachment options. */
+typedef struct mln_webgpu_surface_descriptor {
+  uint32_t size;
+  /** Logical surface extent. */
+  mln_render_target_extent extent;
+  /** Borrowed WebGPU context. device is required. */
+  mln_webgpu_context_descriptor context;
+  /**
+   * Borrowed WGPUSurface. Required. The host creates it from whatever it
+   * presents to, which in a browser is a canvas, and keeps it alive for the
+   * session. The session configures it for this device and extent, and
+   * unconfigures it when the session ends.
+   */
+  void* surface;
+  /**
+   * WGPUTextureFormat to configure the surface with. Required. The host names
+   * it because a surface reports what it supports through its adapter, which
+   * this descriptor does not carry; a browser host takes it from
+   * navigator.gpu.getPreferredCanvasFormat().
+   */
+  uint32_t format;
+} mln_webgpu_surface_descriptor;
+
 /** OpenGL native surface session attachment options. */
 typedef struct mln_opengl_surface_descriptor {
   uint32_t size;
@@ -49,8 +72,10 @@ typedef struct mln_opengl_surface_descriptor {
   /** Borrowed OpenGL context provider data. */
   mln_opengl_context_descriptor context;
   /**
-   * Borrowed platform surface handle. For WGL this is an HDC. For EGL this is
-   * an EGLSurface. Required.
+   * Borrowed platform surface handle. For WGL this is an HDC, and for EGL an
+   * EGLSurface; both are required, because such a context needs a surface to
+   * become current. A WebGL context is created against its canvas and carries
+   * that binding, so it names the surface already and this is null there.
    */
   void* surface;
 } mln_opengl_surface_descriptor;
@@ -72,6 +97,12 @@ mln_vulkan_surface_descriptor_default(void) MLN_NOEXCEPT;
  */
 MLN_API mln_opengl_surface_descriptor
 mln_opengl_surface_descriptor_default(void) MLN_NOEXCEPT;
+
+/**
+ * Returns WebGPU surface descriptor defaults for this C API version.
+ */
+MLN_API mln_webgpu_surface_descriptor
+mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
  * Attaches a Metal native surface render target to a map.
@@ -162,6 +193,36 @@ MLN_API mln_status mln_opengl_surface_attach(
 ) MLN_NOEXCEPT;
 
 /**
+ * Attaches a WebGPU native surface render target to a map.
+ *
+ * The map may have at most one live render session. The calling thread becomes
+ * the session's owner thread, and every surface-session call is affine to it.
+ * The map need only be live, so a host may attach on the thread that drives its
+ * render loop while the map stays on the runtime loop thread. Attach creates
+ * the session's graphics resources on the calling thread, so the host resources
+ * named by descriptor must be usable there; a WebGPU object belongs to the
+ * agent that created it, so that is the thread the surface and device came
+ * from. The session configures descriptor->surface for this device and extent,
+ * takes its current texture each frame, and presents through it. The surface,
+ * device, and instance are borrowed and must remain valid until detach or
+ * destroy. On success, *out_session receives a handle the caller destroys with
+ * mln_render_session_destroy().
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
+ *   null or invalid, out_session is null, or *out_session is not null.
+ * - MLN_STATUS_INVALID_STATE when the map already has a render session.
+ * - MLN_STATUS_UNSUPPORTED when WebGPU surface sessions are not supported by
+ *   this build.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_webgpu_surface_attach(
+  mln_map map, const mln_webgpu_surface_descriptor* descriptor,
+  mln_render_session* out_session
+) MLN_NOEXCEPT;
+
+/**
  * Presents an attached Metal surface session through a new surface.
  *
  * A host surface can be destroyed and recreated while the map goes on living,
@@ -195,6 +256,8 @@ MLN_API mln_status mln_opengl_surface_attach(
  * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
  *   null or invalid, or descriptor->context names a device other than the
  *   session's.
+ * - MLN_STATUS_UNSUPPORTED when descriptor->format differs from the session's;
+ *   destroy the session and attach again to change it.
  * - MLN_STATUS_INVALID_STATE when the session is detached.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
@@ -294,6 +357,33 @@ MLN_API mln_status mln_vulkan_surface_set_target(
  */
 MLN_API mln_status mln_opengl_surface_set_target(
   mln_render_session session, const mln_opengl_surface_descriptor* descriptor
+) MLN_NOEXCEPT;
+
+/**
+ * Presents an attached WebGPU surface session through a new surface.
+ *
+ * The replacement names the same device as the session attached with, because
+ * every resource the renderer holds was created on it, and the same format,
+ * because the render pipelines were built for it. The session unconfigures the
+ * surface it had and configures the replacement for this extent.
+ *
+ * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
+ * target is touched and leaves the session rendering into the one it had.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
+ *   null or invalid, or descriptor->context names a device other than the
+ *   session's.
+ * - MLN_STATUS_INVALID_STATE when the session is detached.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
+ *   owner thread.
+ * - MLN_STATUS_UNSUPPORTED when the session does not render through a WebGPU
+ *   surface, or when WebGPU surface sessions are not supported by this build.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_webgpu_surface_set_target(
+  mln_render_session session, const mln_webgpu_surface_descriptor* descriptor
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus
