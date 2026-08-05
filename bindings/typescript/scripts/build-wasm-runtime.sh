@@ -61,7 +61,17 @@ mkdir -p "$package"
 # On the pool size below: a browser cannot grow it. Creating a worker needs the
 # event loop, and the thread that would wait for one is the thread that runs it,
 # so an exhausted pool wedges the page rather than failing. Node grows it on
-# demand and so never noticed. The pool is sized for a whole session instead.
+# demand and so never noticed.
+#
+# One runtime with a map takes twelve to sixteen workers, measured by walking
+# the pool size down until the conformance suite stopped passing, so this is
+# roughly four times what a page with a map needs. It is not sized for a whole
+# session: a closed runtime gives its workers back, but only once the thread
+# that closed it yields to the event loop, because the worker returns through a
+# message. Code that opens and closes runtimes without ever reaching a task
+# boundary therefore holds every worker it has taken, and no pool that fits in a
+# browser is large enough for that. `loadBrowser()` says so where a consumer
+# meets it.
 "$emcc" \
   -std=c23 \
   -O2 \
@@ -80,7 +90,7 @@ mkdir -p "$package"
   -sALLOW_MEMORY_GROWTH=1 \
   -sINITIAL_MEMORY=512MB \
   -sSTACK_SIZE=1MB \
-  -sPTHREAD_POOL_SIZE=192 \
+  -sPTHREAD_POOL_SIZE=64 \
   -sFETCH=1 \
   -sUSE_ZLIB=1 \
   -sFULL_ES3=1 \

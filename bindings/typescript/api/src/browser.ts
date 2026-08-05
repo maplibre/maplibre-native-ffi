@@ -38,6 +38,21 @@
  *   payload package, serve them side by side, and pass the `.mjs` URL as
  *   `moduleUrl`. The module finds the `.wasm` beside the URL it was loaded
  *   from.
+ *
+ * ## Closing a runtime needs a turn of the event loop
+ *
+ * The payload runs its threads on a fixed pool of workers, because a browser
+ * cannot grow one: creating a worker needs the event loop, and the thread that
+ * would wait for a new one is the thread that runs it. Closing a runtime ends
+ * its threads, but each worker returns to the pool through a message, and a
+ * message is only delivered once the closing thread yields.
+ *
+ * Awaiting a promise is not a yield: a promise settles on the microtask queue,
+ * which runs to exhaustion before the browser looks at its messages. So code
+ * that opens and closes runtimes in a loop without ever reaching a task
+ * boundary holds every worker it has taken, and empties the pool rather than
+ * reusing it. Ordinary event-driven code yields constantly and never meets
+ * this. A loop that does not should wait on a timer between runtimes.
  */
 
 import { MaplibreError } from "./errors.ts";

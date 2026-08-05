@@ -233,6 +233,16 @@ describe("a browser hosting the WebAssembly payload", () => {
             hostSurface,
             httpOrigin,
           });
+          // A closed runtime's threads exit, but the worker each one ran on
+          // comes back to the pool through a message, and a message is only
+          // delivered when this thread yields to the event loop. Awaiting a
+          // promise does not yield: that resolves on the microtask queue, which
+          // runs before the browser ever looks at its messages. So a run that
+          // never reaches a task boundary keeps taking workers without giving
+          // any back, and a suite this long empties the pool long before it
+          // finishes. A timer is a task, so waiting on one lets the workers a
+          // case finished with go back before the next case asks for more.
+          await new Promise((resolve) => setTimeout(resolve, 0));
         });
       }
     });
