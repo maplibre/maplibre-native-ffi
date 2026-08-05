@@ -216,20 +216,42 @@ final class ResourceErrorReason {
   final String name;
 }
 
-/// Exact URL rewrite rule used by the runtime resource transform.
+/// URL rewrite rule used by the runtime resource transform.
 final class ResourceUrlRewriteRule {
-  /// Creates an exact URL rewrite rule.
+  /// Creates a URL rewrite rule.
   const ResourceUrlRewriteRule({
     this.kind,
     required this.url,
+    this.matchGlob = false,
     required this.replacementUrl,
   });
 
   /// Optional resource kind filter. Null matches any kind.
   final ResourceKind? kind;
 
-  /// Original URL to match exactly.
+  /// Original URL to match, compared case-sensitively with no URL parsing or
+  /// normalization.
   final String url;
+
+  /// Reads [url] as a glob pattern instead of comparing the complete URL byte
+  /// for byte.
+  ///
+  /// A pattern matches the complete URL, so a pattern that describes a suffix
+  /// opens with a wildcard:
+  ///
+  /// - `*` matches a run of any length that contains no `/`, including an empty
+  ///   run.
+  /// - `**` matches a run of any length, including one that contains `/`.
+  /// - `?` matches one character other than `/`.
+  /// - `\` matches the next character literally, and a trailing `\` matches
+  ///   itself.
+  ///
+  /// Confining `*` to one path segment is what makes a host pattern hold:
+  /// `https://*.example.com/**` matches every subdomain of example.com, and a
+  /// request for `https://attacker.example/x.example.com/tile` matches it
+  /// nowhere. Use `**` wherever a pattern spans path segments, as in
+  /// `https://tiles.example.com/**` for one whole host.
+  final bool matchGlob;
 
   /// Replacement URL returned to native code.
   final String replacementUrl;
@@ -246,17 +268,21 @@ final class HttpHeader {
 
 /// Native-owned route supplying headers for matching transformed URLs.
 final class HttpHeaderTransformRule {
-  /// Creates an exact or prefix route.
+  /// Creates a route matching the complete transformed URL or a glob pattern.
   const HttpHeaderTransformRule({
     this.kind,
     required this.url,
-    this.matchPrefix = false,
+    this.matchGlob = false,
     required this.headers,
   });
 
   final ResourceKind? kind;
   final String url;
-  final bool matchPrefix;
+
+  /// Reads [url] as a glob pattern. See [ResourceUrlRewriteRule.matchGlob] for
+  /// the pattern language.
+  final bool matchGlob;
+
   final List<HttpHeader> headers;
 }
 
@@ -323,40 +349,46 @@ final class ResourceProviderRoute {
   const ResourceProviderRoute({
     this.kind,
     required this.url,
-    this.matchPrefix = false,
+    this.matchGlob = false,
     this.useRequestedUrl = false,
   });
 
   /// Optional resource kind filter. Null matches any kind.
   final ResourceKind? kind;
 
-  /// Literal URL comparison value, compared case-sensitively with no glob
-  /// expansion, regular expressions, URL parsing, or normalization.
+  /// URL comparison value, compared case-sensitively with no URL parsing or
+  /// normalization.
   final String url;
 
-  /// Matches [url] against the start of the request URL instead of the whole
-  /// request URL. An empty [url] then matches every request URL.
-  final bool matchPrefix;
+  /// Reads [url] as a glob pattern. See [ResourceUrlRewriteRule.matchGlob] for
+  /// the pattern language.
+  final bool matchGlob;
 
   /// Compares [ResourceRequest.requestedUrl] instead of
   /// [ResourceRequest.resolvedUrl].
   final bool useRequestedUrl;
 }
 
-/// Exact URL provider rule used by the runtime resource provider.
+/// URL provider rule used by the runtime resource provider.
 final class ResourceProviderRule {
-  /// Creates an exact URL provider rule.
+  /// Creates a provider rule.
   const ResourceProviderRule({
     this.kind,
     required this.requestedUrl,
+    this.matchGlob = false,
     required this.response,
   });
 
   /// Optional resource kind filter. Null matches any kind.
   final ResourceKind? kind;
 
-  /// Requested URL to match exactly.
+  /// Requested URL to match, compared case-sensitively with no URL parsing or
+  /// normalization.
   final String requestedUrl;
+
+  /// Reads [requestedUrl] as a glob pattern. See
+  /// [ResourceUrlRewriteRule.matchGlob] for the pattern language.
+  final bool matchGlob;
 
   /// Response to complete for matching requests.
   final ResourceResponse response;

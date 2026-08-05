@@ -317,16 +317,18 @@ void main() {
     runtime.close();
   });
 
-  // BND-156: a prefix route claims a URL family whose members are known only
+  // BND-156: a glob route claims a URL family whose members are known only
   // when they are requested.
-  test('queued resource provider prefix routes claim a URL family', () async {
-    const prefix = 'custom://dart-provider-prefix/';
+  test('queued resource provider glob routes claim a URL family', () async {
+    const origin = 'custom://dart-provider-glob/';
     final runtime = RuntimeHandle.create();
     final claimed = <String>[];
 
     runtime.setResourceProvider(
       ResourceProvider(
-        routes: const [ResourceProviderRoute(url: prefix, matchPrefix: true)],
+        routes: const [
+          ResourceProviderRoute(url: '$origin**', matchGlob: true),
+        ],
         callback: (request, handle) {
           claimed.add(request.resolvedUrl);
           handle.complete(
@@ -341,21 +343,21 @@ void main() {
     );
 
     final map = runtime.createMap();
-    map.setStyleUrl('${prefix}unenumerated/style.json');
+    map.setStyleUrl('${origin}unenumerated/style.json');
     await _pumpUntilEvent(
       runtime,
       (candidate) => candidate.eventType == RuntimeEventType.mapStyleLoaded,
     );
 
-    // The prefix is start-anchored, so a URL that merely contains it stays with
-    // native loading.
-    map.setStyleUrl('custom://elsewhere/${prefix}style.json');
+    // A pattern matches the complete URL, so a URL that merely contains the
+    // route's origin stays with native loading.
+    map.setStyleUrl('custom://elsewhere/${origin}style.json');
     await _pumpUntilEvent(
       runtime,
       (candidate) => candidate.eventType == RuntimeEventType.mapLoadingFailed,
     );
 
-    expect(claimed, ['${prefix}unenumerated/style.json']);
+    expect(claimed, ['${origin}unenumerated/style.json']);
 
     map.close();
     runtime.close();
@@ -959,8 +961,8 @@ void main() {
     );
     runtime.setHttpHeaderTransformRules([
       const HttpHeaderTransformRule(
-        url: 'https://example.com/',
-        matchPrefix: true,
+        url: 'https://example.com/**',
+        matchGlob: true,
         headers: [HttpHeader(name: 'X-Test', value: 'café')],
       ),
     ]);
