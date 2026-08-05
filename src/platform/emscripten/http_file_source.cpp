@@ -262,10 +262,19 @@ class TransportThread {
     if (!started_) {
       return false;
     }
+    return runOn(thread_, std::move(work));
+  }
+
+  // Queues work on a specific transport generation. A fetch belongs to the
+  // pthread that created its browser XHR, which can differ from `thread_` once
+  // the last source releases one generation and another source starts the
+  // next.
+  [[nodiscard]] static auto runOn(pthread_t thread, std::function<void()> work)
+    -> bool {
     auto task = std::make_unique<std::function<void()>>(std::move(work));
     if (
       emscripten_proxy_async(
-        emscripten_proxy_get_system_queue(), thread_, &execute, task.get()
+        emscripten_proxy_get_system_queue(), thread, &execute, task.get()
       ) == 0
     ) {
       return false;
@@ -385,7 +394,9 @@ class FetchRequestState
 
   void start();
 
-  void closeClaimedFetch(emscripten_fetch_t* claimedFetch);
+  void closeClaimedFetch(
+    emscripten_fetch_t* claimedFetch, pthread_t transportThread
+  );
   void completeFetch(emscripten_fetch_t* completedFetch);
   void finish(std::optional<Response> response);
   void deliver();
@@ -405,6 +416,7 @@ class FetchRequestState
   FileSource::Callback callback_;
   Response response_;
   emscripten_fetch_t* fetch_ = nullptr;
+  pthread_t transportThread_{};
   Transport transport_ = Transport::None;
   bool canceled_ = false;
   bool slotHeld_ = false;
@@ -534,12 +546,14 @@ void FetchRequestState::startOnTransport() {
 }
 
 void FetchRequestState::start() {
+  const auto transportThread = pthread_self();
   auto wantsFetch = false;
   {
     std::scoped_lock lock(mutex_);
     wantsFetch = !canceled_ && !finished_;
     if (wantsFetch) {
       transport_ = Transport::Callback;
+      transportThread_ = transportThread;
     }
   }
   if (!wantsFetch) {
@@ -587,6 +601,7 @@ void FetchRequestState::start() {
     {
       std::scoped_lock lock(mutex_);
       transport_ = Transport::None;
+      transportThread_ = pthread_t{};
     }
     auto response = Response{};
     response.error = std::make_unique<Response::Error>(
@@ -614,32 +629,42 @@ void FetchRequestState::start() {
   }
 
   if (fetchToClose != nullptr) {
-    closeClaimedFetch(fetchToClose);
+    closeClaimedFetch(fetchToClose, transportThread);
     finish(std::nullopt);
   }
 }
 
-void FetchRequestState::closeClaimedFetch(emscripten_fetch_t* claimedFetch) {
+void FetchRequestState::closeClaimedFetch(
+  emscripten_fetch_t* claimedFetch, pthread_t transportThread
+) {
   // Aborts the transfer, on the thread that owns the handle. Emscripten reports
   // the abort to onFetchComplete() from inside this call, which finds the
   // handle claimed and leaves it here.
   //
-  // Cancellation reaches this from whichever thread released the request, so
-  // the close is handed to the transport thread the same way the start was.
-  // Closing where the transport cannot reach it is the fallback, because
-  // leaking the handle costs the module a slot for the rest of its life.
-  if (!TransportThread::instance().run([claimedFetch]() {
-        emscripten_fetch_close(claimedFetch);
-      })) {
+  // Cancellation can arrive after the shared transport has started another
+  // pthread. The XHR remains local to the generation that created it, so the
+  // recorded thread remains its target until the close completes.
+  if (pthread_equal(pthread_self(), transportThread)) {
     emscripten_fetch_close(claimedFetch);
+  } else {
+    // The queued stop follows work already sent to this pthread. If proxying
+    // nevertheless fails, leaving the handle allocated is safer than touching
+    // worker-local XHR state from another pthread.
+    static_cast<void>(TransportThread::runOn(transportThread, [claimedFetch]() {
+      emscripten_fetch_close(claimedFetch);
+    }));
   }
-  std::scoped_lock lock(mutex_);
-  transport_ = Transport::None;
+  {
+    std::scoped_lock lock(mutex_);
+    transport_ = Transport::None;
+    transportThread_ = pthread_t{};
+  }
 }
 
 void FetchRequestState::cancel() {
   auto delivery = std::shared_ptr<util::AsyncTask>{};
   auto* fetchToClose = static_cast<emscripten_fetch_t*>(nullptr);
+  auto transportThread = pthread_t{};
   auto closePending = false;
   {
     std::scoped_lock lock(mutex_);
@@ -657,6 +682,7 @@ void FetchRequestState::cancel() {
       if (fetch_ != nullptr) {
         transport_ = Transport::Request;
         fetchToClose = std::exchange(fetch_, nullptr);
+        transportThread = transportThread_;
       } else {
         // start() has not stored the handle yet; it closes and finishes.
         closePending = true;
@@ -665,7 +691,7 @@ void FetchRequestState::cancel() {
   }
 
   if (fetchToClose != nullptr) {
-    closeClaimedFetch(fetchToClose);
+    closeClaimedFetch(fetchToClose, transportThread);
   }
   if (!closePending) {
     finish(std::nullopt);
@@ -707,6 +733,7 @@ void FetchRequestState::completeFetch(emscripten_fetch_t* completedFetch) {
     // this runs cannot free the handle underneath it.
     transport_ = Transport::None;
     fetch_ = nullptr;
+    transportThread_ = pthread_t{};
   }
 
   auto response = makeResponse(resource_, completedFetch);
