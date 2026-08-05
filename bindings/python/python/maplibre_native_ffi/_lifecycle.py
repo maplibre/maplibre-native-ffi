@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import warnings as _warnings
 from collections.abc import Callable
+from contextlib import suppress
 from types import TracebackType
 from typing import Any, Self
-import warnings as _warnings
 
 
 def warn_unclosed(
@@ -16,16 +17,11 @@ def warn_unclosed(
     """Report an unclosed handle without destroying thread-affine native state."""
     if closed:
         return
-    try:
-        _warn(
-            f"{handle_name} was not closed; native state was intentionally leaked",
-            ResourceWarning,
-            stacklevel=2,
-        )
-    except BaseException:
-        # Finalizers may run during interpreter shutdown, with Python globals
-        # half torn down.
-        return
+    _warn(
+        f"{handle_name} was not closed; native state was intentionally leaked",
+        ResourceWarning,
+        stacklevel=2,
+    )
 
 
 class ContextHandleMixin:
@@ -58,10 +54,10 @@ class WarnUnclosedMixin:
         raise NotImplementedError
 
     def __del__(self) -> None:
-        try:
+        # Finalizers cannot report warning-delivery failures, including during
+        # interpreter shutdown when Python globals may be partially torn down.
+        with suppress(BaseException):
             warn_unclosed(self._handle_name, getattr(self, "closed", True))
-        except BaseException:
-            return
 
 
 class NativeHandleMixin(WarnUnclosedMixin, ContextHandleMixin):

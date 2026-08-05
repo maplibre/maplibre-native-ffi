@@ -7,13 +7,12 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
-
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUTPUT_PATH = REPO_ROOT / "docs" / "src" / "generated" / "support-matrix.json"
 SUPPORT_SOURCE = "ci/workflow.toml"
 sys.path.insert(0, str(REPO_ROOT))
 
-from ci.workflow import (  # noqa: E402
+from ci.workflow import (
     architecture,
     backend,
     consumer_commands,
@@ -23,7 +22,6 @@ from ci.workflow import (  # noqa: E402
     preset_sets,
     runtime_tested,
 )
-
 
 PLATFORM_LABELS = {
     "android": "Android",

@@ -1,19 +1,41 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from ctypes.util import find_library
-from importlib import metadata, util
 import os
-from pathlib import Path
-from typing import Any
 import sys
 import types
+from ctypes.util import find_library
+from dataclasses import dataclass
+from importlib import abc, metadata, util
+from pathlib import Path
+from typing import Any, Self
 
 from maplibre_native_ffi import render
 
 
 class VulkanUnavailableError(RuntimeError):
     pass
+
+
+class _PatchedVulkanLoader(abc.SourceLoader):
+    def __init__(self, source_path: Path, library_path: str) -> None:
+        self.source_path = source_path
+        self.library_path = library_path
+
+    def get_filename(self, fullname: str) -> str:
+        return str(self.source_path)
+
+    def get_data(self, path: str) -> bytes:
+        source = self.source_path.read_text(encoding="utf-8")
+        original = "_lib_names = ('libvulkan.so.1', 'vulkan-1.dll', 'libvulkan.dylib')"
+        replacement = (
+            f"_lib_names = ({self.library_path!r}, 'libvulkan.so.1', "
+            "'vulkan-1.dll', 'libvulkan.dylib')"
+        )
+        patched = source.replace(original, replacement)
+        if patched == source:
+            msg = "could not patch the Python Vulkan loader search path"
+            raise VulkanUnavailableError(msg)
+        return patched.encode()
 
 
 def _import_vulkan() -> Any:
@@ -53,23 +75,19 @@ def _import_vulkan() -> Any:
     sys.modules[cache_spec.name] = cache_module
     cache_spec.loader.exec_module(cache_module)
 
-    vulkan_spec = util.spec_from_file_location(
-        "vulkan._vulkan", package_root / "_vulkan.py"
+    vulkan_path = package_root / "_vulkan.py"
+    vulkan_loader = _PatchedVulkanLoader(vulkan_path, str(library_path))
+    vulkan_spec = util.spec_from_loader(
+        "vulkan._vulkan",
+        vulkan_loader,
+        origin=str(vulkan_path),
     )
     if vulkan_spec is None or vulkan_spec.loader is None:
         msg = "could not load vulkan._vulkan"
         raise VulkanUnavailableError(msg)
     vulkan_module = util.module_from_spec(vulkan_spec)
     sys.modules[vulkan_spec.name] = vulkan_module
-    source = (package_root / "_vulkan.py").read_text(encoding="utf-8")
-    source = source.replace(
-        "_lib_names = ('libvulkan.so.1', 'vulkan-1.dll', 'libvulkan.dylib')",
-        f"_lib_names = ({str(library_path)!r}, 'libvulkan.so.1', 'vulkan-1.dll', 'libvulkan.dylib')",
-    )
-    exec(
-        compile(source, str(package_root / "_vulkan.py"), "exec"),
-        vulkan_module.__dict__,
-    )
+    vulkan_spec.loader.exec_module(vulkan_module)
 
     for name, value in vulkan_module.__dict__.items():
         if not name.startswith("_"):
@@ -151,7 +169,7 @@ class VulkanContext:
     _closed: bool = False
 
     @classmethod
-    def create(cls) -> "VulkanContext":
+    def create(cls) -> VulkanContext:
         extensions: list[str] = []
         instance_flags = 0
         if _has_instance_extension("VK_KHR_portability_enumeration"):
@@ -178,6 +196,7 @@ class VulkanContext:
             raise VulkanUnavailableError(msg) from error
 
         device = None
+        device_errors: list[str] = []
         try:
             for physical_device in vk.vkEnumeratePhysicalDevices(instance):
                 queue_family_index = _find_graphics_queue_family(physical_device)
@@ -202,7 +221,8 @@ class VulkanContext:
                 )
                 try:
                     device = vk.vkCreateDevice(physical_device, device_info, None)
-                except Exception:
+                except vk.VkError as error:
+                    device_errors.append(str(error))
                     continue
 
                 graphics_queue = vk.vkGetDeviceQueue(device, queue_family_index, 0)
@@ -220,7 +240,10 @@ class VulkanContext:
             raise
 
         vk.vkDestroyInstance(instance, None)
-        msg = "no Vulkan physical device with a graphics queue was found"
+        details = f": {'; '.join(device_errors)}" if device_errors else ""
+        msg = (
+            f"no usable Vulkan physical device with a graphics queue was found{details}"
+        )
         raise VulkanUnavailableError(msg)
 
     def descriptor(self) -> render.VulkanContextDescriptor:
@@ -256,7 +279,7 @@ class VulkanContext:
         width: int = 64,
         height: int = 64,
         scale_factor: float = 1.0,
-    ) -> "VulkanBorrowedImage":
+    ) -> VulkanBorrowedImage:
         return VulkanBorrowedImage.create(self, width, height, scale_factor)
 
     def close(self) -> None:
@@ -267,7 +290,7 @@ class VulkanContext:
         vk.vkDestroyInstance(self.instance, None)
         self._closed = True
 
-    def __enter__(self) -> "VulkanContext":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args: object) -> None:
@@ -292,7 +315,7 @@ class VulkanBorrowedImage:
         width: int,
         height: int,
         scale_factor: float,
-    ) -> "VulkanBorrowedImage":
+    ) -> VulkanBorrowedImage:
         image = vk.vkCreateImage(
             context.device,
             vk.VkImageCreateInfo(
@@ -381,7 +404,7 @@ class VulkanBorrowedImage:
         vk.vkFreeMemory(self.context.device, self.memory, None)
         self._closed = True
 
-    def __enter__(self) -> "VulkanBorrowedImage":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args: object) -> None:

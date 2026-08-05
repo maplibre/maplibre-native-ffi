@@ -19,7 +19,6 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-
 BACKENDS = {"vulkan", "opengl", "metal"}
 NAME = "maplibre-native-ffi"
 # Wheel filenames and dist-info directories use the escaped distribution name.

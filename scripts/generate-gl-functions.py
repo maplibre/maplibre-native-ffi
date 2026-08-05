@@ -18,7 +18,6 @@ import pathlib
 import re
 import sys
 
-
 # `= ::glFoo;`, which upstream wraps onto its own line for long declarations.
 INITIALIZER = re.compile(r"=\s*::(gl\w+);")
 

@@ -1,7 +1,6 @@
 import contextlib
 import http.server
 import math
-from pathlib import Path
 import subprocess
 import sys
 import textwrap
@@ -9,22 +8,24 @@ import threading
 import time
 import typing
 import warnings
-
-import pytest
+from pathlib import Path
 
 import maplibre_native_ffi as mln
-from maplibre_native_ffi import _native
+import pytest
 from maplibre_native_ffi import (
+    _native,
     camera,
     geo,
     json,
     log,
-    map as map_module,
     offline,
     query,
     render,
     resource,
     style,
+)
+from maplibre_native_ffi import (
+    map as map_module,
 )
 
 _EMPTY_STYLE_JSON = '{"version":8,"sources":{},"layers":[]}'
@@ -56,7 +57,7 @@ def _http_style_server() -> typing.Iterator[tuple[str, threading.Event]]:
     served = threading.Event()
 
     class Handler(http.server.BaseHTTPRequestHandler):
-        def do_GET(self) -> None:  # noqa: N802
+        def do_GET(self) -> None:
             served.set()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -114,7 +115,7 @@ def _wait_for_offline_operation(
     *,
     iterations: int = 5000,
 ) -> mln.RuntimeEvent:
-    operation_id = operation._operation_id  # noqa: SLF001
+    operation_id = operation._operation_id
     for _ in range(iterations):
         runtime.pump()
         while event := runtime.poll_event():
@@ -356,11 +357,12 @@ def test_public_type_hints_are_resolvable() -> None:
 
     layer_hints = typing.get_type_hints(map_module.MapHandle.set_layer_property)
     assert layer_hints["value"] != typing.Any
-    assert "maplibre_native_ffi.json.JsonUInt" in repr(layer_hints["value"])
+    assert layer_hints["value"] is json.JsonValue
+    assert json.JsonUInt in typing.get_args(json.JsonScalar.__value__)
 
     style_hints = typing.get_type_hints(map_module.MapHandle.get_style_layer_json)
     assert style_hints["return"] != typing.Any
-    assert "maplibre_native_ffi.json.JsonObject" in repr(style_hints["return"])
+    assert set(typing.get_args(style_hints["return"])) == {json.JsonValue, type(None)}
 
     map_init_hints = typing.get_type_hints(map_module.MapHandle.__init__)
     assert map_init_hints["runtime"] is mln.RuntimeHandle
@@ -482,24 +484,23 @@ def test_parked_owner_thread_wakes_for_native_work_and_for_a_wake_source() -> No
 
 
 def test_pump_clears_the_wake_flag_it_returns_on() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.wake_source() as source:
-            quiesce(runtime)
+    with mln.RuntimeHandle() as runtime, runtime.wake_source() as source:
+        quiesce(runtime)
 
-            source.signal()
-            signalled_started = time.monotonic()
-            runtime.pump(10.0)
-            assert time.monotonic() - signalled_started < 5.0, (
-                "a pump waited even though the wake flag was set"
-            )
+        source.signal()
+        signalled_started = time.monotonic()
+        runtime.pump(10.0)
+        assert time.monotonic() - signalled_started < 5.0, (
+            "a pump waited even though the wake flag was set"
+        )
 
-            # The pump above cleared the wake flag, so this one waits its
-            # full timeout.
-            idle_started = time.monotonic()
-            runtime.pump(0.2)
-            assert time.monotonic() - idle_started >= 0.1, (
-                "the first pump left the wake flag set"
-            )
+        # The pump above cleared the wake flag, so this one waits its
+        # full timeout.
+        idle_started = time.monotonic()
+        runtime.pump(0.2)
+        assert time.monotonic() - idle_started >= 0.1, (
+            "the first pump left the wake flag set"
+        )
 
 
 def test_closed_handle_finalizers_are_quiet_at_interpreter_shutdown() -> None:
@@ -521,7 +522,7 @@ def test_closed_handle_finalizers_are_quiet_at_interpreter_shutdown() -> None:
         """
     )
 
-    completed = subprocess.run(  # noqa: S603
+    completed = subprocess.run(
         [sys.executable, "-c", script],
         check=False,
         capture_output=True,
@@ -555,7 +556,7 @@ def test_runtime_close_from_wrong_thread_reports_wrong_thread() -> None:
     def close_runtime() -> None:
         try:
             runtime.close()
-        except BaseException as error:
+        except mln.WrongThreadError as error:
             raised_error.append(error)
 
     thread = threading.Thread(target=close_runtime)
@@ -590,7 +591,7 @@ def test_owner_thread_methods_report_wrong_thread_diagnostics() -> None:
         for call in (runtime.pump, runtime.poll_event, map_handle.request_repaint):
             try:
                 call()
-            except BaseException as error:
+            except mln.WrongThreadError as error:
                 raised_errors.append(error)
 
     thread = threading.Thread(target=call_owner_thread_methods)
@@ -620,7 +621,7 @@ def test_resource_transform_registration_reports_wrong_thread_diagnostics() -> N
         ):
             try:
                 call()
-            except BaseException as error:
+            except mln.WrongThreadError as error:
                 raised_errors.append(error)
 
     thread = threading.Thread(target=call_resource_transform_methods)
@@ -814,7 +815,7 @@ def test_render_session_methods_propagate_wrong_thread_errors() -> None:
         for name, call in calls.items():
             try:
                 call()
-            except BaseException as error:
+            except mln.WrongThreadError as error:
                 raised_errors[name] = error
 
     thread = threading.Thread(target=call_render_session_methods)
@@ -848,7 +849,7 @@ def test_render_session_detach_releases_python_map_reference() -> None:
     detached = session.detach()
 
     assert session.detached
-    assert session._map is None  # noqa: SLF001
+    assert session._map is None
     detached.close()
 
 
@@ -867,19 +868,20 @@ def test_map_handle_context_manager_closes_once() -> None:
 
 
 def test_map_options_accept_fast_pfor_decoding() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map(
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map(
             mln.MapOptions(width=64, height=64, fast_pfor_enabled=True)
-        ) as map_handle:
-            assert map_handle.get_size() == (64, 64, 1.0)
+        ) as map_handle,
+    ):
+        assert map_handle.get_size() == (64, 64, 1.0)
 
 
 def test_unset_map_options_take_the_c_creation_defaults() -> None:
     # Unset fields take the C API defaults rather than values this binding
     # repeats, so mln_map_options_default() stays the single source for them.
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            assert map_handle.get_size() == (256, 256, 1.0)
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        assert map_handle.get_size() == (256, 256, 1.0)
 
 
 def test_runtime_rejects_close_while_map_is_live() -> None:
@@ -900,16 +902,18 @@ def test_runtime_rejects_close_while_map_is_live() -> None:
 
 
 def test_still_image_request_uses_map_mode_validation() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map(mln.MapOptions(mode=mln.MapMode.STATIC)) as static_map:
-            static_map.request_still_image()
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map(mln.MapOptions(mode=mln.MapMode.STATIC)) as static_map,
+    ):
+        static_map.request_still_image()
 
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map(
-            mln.MapOptions(mode=mln.MapMode.CONTINUOUS)
-        ) as map_handle:
-            with pytest.raises(mln.InvalidStateError) as raised:
-                map_handle.request_still_image()
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map(mln.MapOptions(mode=mln.MapMode.CONTINUOUS)) as map_handle,
+        pytest.raises(mln.InvalidStateError) as raised,
+    ):
+        map_handle.request_still_image()
 
     assert raised.value.status == mln.MaplibreStatus.INVALID_STATE
 
@@ -928,32 +932,30 @@ def test_map_create_from_closed_runtime_reports_invalid_state() -> None:
 
 
 def test_map_debug_and_status_options_round_trip_public_values() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            debug_options = (
-                map_module.MapDebugOptions.TILE_BORDERS
-                | map_module.MapDebugOptions.PARSE_STATUS
-            )
-            map_handle.set_debug_options(debug_options)
-            map_handle.set_rendering_stats_view_enabled(True)
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        debug_options = (
+            map_module.MapDebugOptions.TILE_BORDERS
+            | map_module.MapDebugOptions.PARSE_STATUS
+        )
+        map_handle.set_debug_options(debug_options)
+        map_handle.set_rendering_stats_view_enabled(True)
 
-            assert map_handle.get_debug_options() == debug_options
-            assert map_handle.get_rendering_stats_view_enabled() is True
-            assert isinstance(map_handle.is_fully_loaded(), bool)
+        assert map_handle.get_debug_options() == debug_options
+        assert map_handle.get_rendering_stats_view_enabled() is True
+        assert isinstance(map_handle.is_fully_loaded(), bool)
 
-            map_handle.set_debug_options(map_module.MapDebugOptions.NONE)
-            map_handle.set_rendering_stats_view_enabled(False)
-            assert map_handle.get_debug_options() == map_module.MapDebugOptions.NONE
-            assert map_handle.get_rendering_stats_view_enabled() is False
+        map_handle.set_debug_options(map_module.MapDebugOptions.NONE)
+        map_handle.set_rendering_stats_view_enabled(False)
+        assert map_handle.get_debug_options() == map_module.MapDebugOptions.NONE
+        assert map_handle.get_rendering_stats_view_enabled() is False
 
 
 def test_style_url_rejects_embedded_nul_before_native_call() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            stale = _native_invalid_network_status_error().diagnostic
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        stale = _native_invalid_network_status_error().diagnostic
 
-            with pytest.raises(mln.InvalidArgumentError) as raised:
-                map_handle.set_style_url("bad\0url")
+        with pytest.raises(mln.InvalidArgumentError) as raised:
+            map_handle.set_style_url("bad\0url")
 
     assert raised.value.status == mln.MaplibreStatus.INVALID_ARGUMENT
     assert raised.value.native_status_code is None
@@ -987,232 +989,229 @@ def test_style_source_metadata_enums_preserve_unknown_values() -> None:
 
 def test_loaded_style_document_and_url_read_back_what_was_loaded() -> None:
     style_json = '{"version":8,"sources":{},"layers":[]}'
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            # Nothing parsed and nothing requested yet.
-            assert map_handle.get_loaded_style_json() == ""
-            assert map_handle.get_style_url() == ""
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        # Nothing parsed and nothing requested yet.
+        assert map_handle.get_loaded_style_json() == ""
+        assert map_handle.get_style_url() == ""
 
-            # The document reads back byte-for-byte, so it can be reloaded
-            # unchanged.
-            map_handle.set_style_json(style_json)
-            assert map_handle.get_loaded_style_json() == style_json
-            # Inline JSON clears the URL.
-            assert map_handle.get_style_url() == ""
+        # The document reads back byte-for-byte, so it can be reloaded
+        # unchanged.
+        map_handle.set_style_json(style_json)
+        assert map_handle.get_loaded_style_json() == style_json
+        # Inline JSON clears the URL.
+        assert map_handle.get_style_url() == ""
 
-            # The URL is request state, recorded before the load can succeed,
-            # while the document still reports the style that last parsed.
-            map_handle.set_style_url("https://example.test/style.json")
-            assert map_handle.get_style_url() == "https://example.test/style.json"
-            assert map_handle.get_loaded_style_json() == style_json
+        # The URL is request state, recorded before the load can succeed,
+        # while the document still reports the style that last parsed.
+        map_handle.set_style_url("https://example.test/style.json")
+        assert map_handle.get_style_url() == "https://example.test/style.json"
+        assert map_handle.get_loaded_style_json() == style_json
 
 
 def test_style_source_url_metadata_and_removal_public_api() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
-            map_handle.add_style_source_json(
-                "style-json-points",
-                _json_object(
-                    {
-                        "type": "geojson",
-                        "data": {
-                            "type": "FeatureCollection",
-                            "features": [],
-                        },
-                    }
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        map_handle.add_style_source_json(
+            "style-json-points",
+            _json_object(
+                {
+                    "type": "geojson",
+                    "data": {
+                        "type": "FeatureCollection",
+                        "features": [],
+                    },
+                }
+            ),
+        )
+        map_handle.add_geojson_source_url(
+            "points",
+            "https://example.test/points.geojson",
+            style.GeoJsonSourceOptions(
+                min_zoom=1.0,
+                max_zoom=14.0,
+                tolerance=0.5,
+                tile_size=256,
+                buffer=64,
+                line_metrics=True,
+            ),
+        )
+        inline_points = geo.FeatureCollection(
+            (
+                geo.Feature(
+                    geometry=geo.Point(geo.LatLng(1.0, 2.0)),
+                    properties=(json.JsonMember("name", "one"),),
+                    identifier=geo.FeatureIdentifierString("point-1"),
                 ),
             )
-            map_handle.add_geojson_source_url(
-                "points",
-                "https://example.test/points.geojson",
-                style.GeoJsonSourceOptions(
-                    min_zoom=1.0,
-                    max_zoom=14.0,
-                    tolerance=0.5,
-                    tile_size=256,
-                    buffer=64,
-                    line_metrics=True,
+        )
+        map_handle.add_geojson_source_data(
+            "inline-points",
+            inline_points,
+            style.GeoJsonSourceOptions(
+                cluster=True,
+                cluster_radius=40,
+                cluster_max_zoom=12.0,
+                cluster_min_points=3,
+                cluster_properties=json.from_python(
+                    {"name_count": ["+", ["case", ["has", "name"], 1, 0]]}
                 ),
-            )
-            inline_points = geo.FeatureCollection(
-                (
-                    geo.Feature(
-                        geometry=geo.Point(geo.LatLng(1.0, 2.0)),
-                        properties=(json.JsonMember("name", "one"),),
-                        identifier=geo.FeatureIdentifierString("point-1"),
-                    ),
-                )
-            )
-            map_handle.add_geojson_source_data(
-                "inline-points",
-                inline_points,
-                style.GeoJsonSourceOptions(
-                    cluster=True,
-                    cluster_radius=40,
-                    cluster_max_zoom=12.0,
-                    cluster_min_points=3,
-                    cluster_properties=json.from_python(
-                        {"name_count": ["+", ["case", ["has", "name"], 1, 0]]}
-                    ),
-                ),
-            )
-            map_handle.set_geojson_source_url(
-                "inline-points",
-                "https://example.test/inline-points.geojson",
-            )
-            map_handle.set_geojson_source_data("inline-points", inline_points)
-            map_handle.add_vector_source_url(
-                "vector-tiles",
-                "https://example.test/vector.json",
-                style.TileSourceOptions(
-                    min_zoom=1.0,
-                    max_zoom=10.0,
-                    vector_encoding=style.VectorTileEncoding.MVT,
-                ),
-            )
-            map_handle.add_raster_source_url(
-                "raster-tiles",
-                "https://example.test/raster.json",
-                style.TileSourceOptions(tile_size=256),
-            )
-            map_handle.add_raster_dem_source_url(
-                "dem-tiles",
-                "https://example.test/dem.json",
-                style.TileSourceOptions(
-                    tile_size=512,
-                    raster_dem_encoding=style.RasterDemEncoding.MAPBOX,
-                ),
-            )
-            map_handle.add_vector_source_tiles(
-                "vector-inline",
-                (
-                    "https://a.example.test/vector/{z}/{x}/{y}.mlt",
-                    "https://b.example.test/vector/{z}/{x}/{y}.mlt",
-                ),
-                style.TileSourceOptions(
-                    min_zoom=2.0,
-                    max_zoom=7.0,
-                    attribution="Example attribution",
-                    scheme=style.TileScheme.TMS,
-                    bounds=geo.LatLngBounds(
-                        geo.LatLng(-5.0, -10.0), geo.LatLng(15.0, 20.0)
-                    ),
-                    vector_encoding=style.VectorTileEncoding.MLT,
-                ),
-            )
-            map_handle.add_raster_source_tiles(
-                "raster-inline",
-                ("https://example.test/raster/{z}/{x}/{y}.png",),
-            )
-            map_handle.add_raster_dem_source_tiles(
-                "dem-inline",
-                ("https://example.test/dem/{z}/{x}/{y}.png",),
-            )
-
-            assert map_handle.style_source_exists("points") is True
-            assert map_handle.style_source_exists("missing") is False
-            assert (
-                map_handle.get_style_source_type("style-json-points")
-                == style.StyleSourceType.GEOJSON
-            )
-            assert (
-                map_handle.get_style_source_type("points")
-                == style.StyleSourceType.GEOJSON
-            )
-            assert (
-                map_handle.get_style_source_type("inline-points")
-                == style.StyleSourceType.GEOJSON
-            )
-            assert (
-                map_handle.get_style_source_type("vector-tiles")
-                == style.StyleSourceType.VECTOR
-            )
-            assert (
-                map_handle.get_style_source_type("raster-tiles")
-                == style.StyleSourceType.RASTER
-            )
-            assert (
-                map_handle.get_style_source_type("dem-tiles")
-                == style.StyleSourceType.RASTER_DEM
-            )
-            assert (
-                map_handle.get_style_source_type("vector-inline")
-                == style.StyleSourceType.VECTOR
-            )
-            assert (
-                map_handle.get_style_source_type("raster-inline")
-                == style.StyleSourceType.RASTER
-            )
-            assert (
-                map_handle.get_style_source_type("dem-inline")
-                == style.StyleSourceType.RASTER_DEM
-            )
-            assert map_handle.get_style_source_type("missing") is None
-            source_ids = map_handle.list_style_source_ids()
-            assert "style-json-points" in source_ids
-            assert "points" in source_ids
-            assert "inline-points" in source_ids
-            assert "vector-tiles" in source_ids
-            assert "raster-tiles" in source_ids
-            assert "dem-tiles" in source_ids
-            assert "vector-inline" in source_ids
-            assert "raster-inline" in source_ids
-            assert "dem-inline" in source_ids
-
-            info = map_handle.get_style_source_info("points")
-            assert info is not None
-            assert info.source_type == style.StyleSourceType.GEOJSON
-            assert info.attribution is None
-            assert info.url == "https://example.test/points.geojson"
-            assert info.tile_json is None
-            assert map_handle.get_style_source_info("missing") is None
-
-            remote_info = map_handle.get_style_source_info("vector-tiles")
-            assert remote_info is not None
-            assert remote_info.url == "https://example.test/vector.json"
-            assert remote_info.tile_json is None
-
-            copied_inline = map_handle.get_style_source_info("vector-inline")
-            assert copied_inline is not None
-            assert copied_inline.url is None
-            assert copied_inline.attribution == "Example attribution"
-            assert copied_inline.tile_size == 512
-            assert copied_inline.vector_encoding == style.VectorTileEncoding.MLT
-            assert copied_inline.tile_json is not None
-            assert copied_inline.tile_json.tiles == (
+            ),
+        )
+        map_handle.set_geojson_source_url(
+            "inline-points",
+            "https://example.test/inline-points.geojson",
+        )
+        map_handle.set_geojson_source_data("inline-points", inline_points)
+        map_handle.add_vector_source_url(
+            "vector-tiles",
+            "https://example.test/vector.json",
+            style.TileSourceOptions(
+                min_zoom=1.0,
+                max_zoom=10.0,
+                vector_encoding=style.VectorTileEncoding.MVT,
+            ),
+        )
+        map_handle.add_raster_source_url(
+            "raster-tiles",
+            "https://example.test/raster.json",
+            style.TileSourceOptions(tile_size=256),
+        )
+        map_handle.add_raster_dem_source_url(
+            "dem-tiles",
+            "https://example.test/dem.json",
+            style.TileSourceOptions(
+                tile_size=512,
+                raster_dem_encoding=style.RasterDemEncoding.MAPBOX,
+            ),
+        )
+        map_handle.add_vector_source_tiles(
+            "vector-inline",
+            (
                 "https://a.example.test/vector/{z}/{x}/{y}.mlt",
                 "https://b.example.test/vector/{z}/{x}/{y}.mlt",
-            )
-            assert copied_inline.tile_json.min_zoom == 2.0
-            assert copied_inline.tile_json.max_zoom == 7.0
-            assert copied_inline.tile_json.scheme == style.TileScheme.TMS
-            assert copied_inline.tile_json.bounds == geo.LatLngBounds(
-                geo.LatLng(-5.0, -10.0), geo.LatLng(15.0, 20.0)
-            )
+            ),
+            style.TileSourceOptions(
+                min_zoom=2.0,
+                max_zoom=7.0,
+                attribution="Example attribution",
+                scheme=style.TileScheme.TMS,
+                bounds=geo.LatLngBounds(
+                    geo.LatLng(-5.0, -10.0), geo.LatLng(15.0, 20.0)
+                ),
+                vector_encoding=style.VectorTileEncoding.MLT,
+            ),
+        )
+        map_handle.add_raster_source_tiles(
+            "raster-inline",
+            ("https://example.test/raster/{z}/{x}/{y}.png",),
+        )
+        map_handle.add_raster_dem_source_tiles(
+            "dem-inline",
+            ("https://example.test/dem/{z}/{x}/{y}.png",),
+        )
 
-            assert map_handle.remove_style_source("style-json-points") is True
-            assert map_handle.remove_style_source("points") is True
-            assert map_handle.remove_style_source("points") is False
-            assert map_handle.remove_style_source("inline-points") is True
-            assert map_handle.remove_style_source("vector-tiles") is True
-            assert map_handle.remove_style_source("raster-tiles") is True
-            assert map_handle.remove_style_source("dem-tiles") is True
-            assert map_handle.remove_style_source("vector-inline") is True
-            assert map_handle.remove_style_source("raster-inline") is True
-            assert map_handle.remove_style_source("dem-inline") is True
-            source_ids = map_handle.list_style_source_ids()
-            assert "style-json-points" not in source_ids
-            assert "points" not in source_ids
-            assert "inline-points" not in source_ids
-            assert "vector-tiles" not in source_ids
-            assert "raster-tiles" not in source_ids
-            assert "dem-tiles" not in source_ids
-            assert "vector-inline" not in source_ids
-            assert "raster-inline" not in source_ids
-            assert "dem-inline" not in source_ids
-            assert copied_inline.tile_json is not None
-            assert len(copied_inline.tile_json.tiles) == 2
+        assert map_handle.style_source_exists("points") is True
+        assert map_handle.style_source_exists("missing") is False
+        assert (
+            map_handle.get_style_source_type("style-json-points")
+            == style.StyleSourceType.GEOJSON
+        )
+        assert (
+            map_handle.get_style_source_type("points") == style.StyleSourceType.GEOJSON
+        )
+        assert (
+            map_handle.get_style_source_type("inline-points")
+            == style.StyleSourceType.GEOJSON
+        )
+        assert (
+            map_handle.get_style_source_type("vector-tiles")
+            == style.StyleSourceType.VECTOR
+        )
+        assert (
+            map_handle.get_style_source_type("raster-tiles")
+            == style.StyleSourceType.RASTER
+        )
+        assert (
+            map_handle.get_style_source_type("dem-tiles")
+            == style.StyleSourceType.RASTER_DEM
+        )
+        assert (
+            map_handle.get_style_source_type("vector-inline")
+            == style.StyleSourceType.VECTOR
+        )
+        assert (
+            map_handle.get_style_source_type("raster-inline")
+            == style.StyleSourceType.RASTER
+        )
+        assert (
+            map_handle.get_style_source_type("dem-inline")
+            == style.StyleSourceType.RASTER_DEM
+        )
+        assert map_handle.get_style_source_type("missing") is None
+        source_ids = map_handle.list_style_source_ids()
+        assert "style-json-points" in source_ids
+        assert "points" in source_ids
+        assert "inline-points" in source_ids
+        assert "vector-tiles" in source_ids
+        assert "raster-tiles" in source_ids
+        assert "dem-tiles" in source_ids
+        assert "vector-inline" in source_ids
+        assert "raster-inline" in source_ids
+        assert "dem-inline" in source_ids
+
+        info = map_handle.get_style_source_info("points")
+        assert info is not None
+        assert info.source_type == style.StyleSourceType.GEOJSON
+        assert info.attribution is None
+        assert info.url == "https://example.test/points.geojson"
+        assert info.tile_json is None
+        assert map_handle.get_style_source_info("missing") is None
+
+        remote_info = map_handle.get_style_source_info("vector-tiles")
+        assert remote_info is not None
+        assert remote_info.url == "https://example.test/vector.json"
+        assert remote_info.tile_json is None
+
+        copied_inline = map_handle.get_style_source_info("vector-inline")
+        assert copied_inline is not None
+        assert copied_inline.url is None
+        assert copied_inline.attribution == "Example attribution"
+        assert copied_inline.tile_size == 512
+        assert copied_inline.vector_encoding == style.VectorTileEncoding.MLT
+        assert copied_inline.tile_json is not None
+        assert copied_inline.tile_json.tiles == (
+            "https://a.example.test/vector/{z}/{x}/{y}.mlt",
+            "https://b.example.test/vector/{z}/{x}/{y}.mlt",
+        )
+        assert copied_inline.tile_json.min_zoom == 2.0
+        assert copied_inline.tile_json.max_zoom == 7.0
+        assert copied_inline.tile_json.scheme == style.TileScheme.TMS
+        assert copied_inline.tile_json.bounds == geo.LatLngBounds(
+            geo.LatLng(-5.0, -10.0), geo.LatLng(15.0, 20.0)
+        )
+
+        assert map_handle.remove_style_source("style-json-points") is True
+        assert map_handle.remove_style_source("points") is True
+        assert map_handle.remove_style_source("points") is False
+        assert map_handle.remove_style_source("inline-points") is True
+        assert map_handle.remove_style_source("vector-tiles") is True
+        assert map_handle.remove_style_source("raster-tiles") is True
+        assert map_handle.remove_style_source("dem-tiles") is True
+        assert map_handle.remove_style_source("vector-inline") is True
+        assert map_handle.remove_style_source("raster-inline") is True
+        assert map_handle.remove_style_source("dem-inline") is True
+        source_ids = map_handle.list_style_source_ids()
+        assert "style-json-points" not in source_ids
+        assert "points" not in source_ids
+        assert "inline-points" not in source_ids
+        assert "vector-tiles" not in source_ids
+        assert "raster-tiles" not in source_ids
+        assert "dem-tiles" not in source_ids
+        assert "vector-inline" not in source_ids
+        assert "raster-inline" not in source_ids
+        assert "dem-inline" not in source_ids
+        assert copied_inline.tile_json is not None
+        assert len(copied_inline.tile_json.tiles) == 2
 
 
 def test_image_source_url_image_and_coordinates_public_api() -> None:
@@ -1233,40 +1232,39 @@ def test_image_source_url_image_and_coordinates_public_api() -> None:
         data=bytes([0, 255, 0, 255]),
     )
 
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
-            map_handle.add_image_source_url(
-                "overlay-url",
-                coordinates,
-                "https://example.test/overlay.png",
-            )
-            map_handle.add_image_source_image("overlay-inline", coordinates, image)
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        map_handle.add_image_source_url(
+            "overlay-url",
+            coordinates,
+            "https://example.test/overlay.png",
+        )
+        map_handle.add_image_source_image("overlay-inline", coordinates, image)
 
-            assert (
-                map_handle.get_style_source_type("overlay-url")
-                == style.StyleSourceType.IMAGE
-            )
-            assert (
-                map_handle.get_style_source_type("overlay-inline")
-                == style.StyleSourceType.IMAGE
-            )
-            assert map_handle.get_image_source_coordinates("overlay-url") == coordinates
-            assert map_handle.get_image_source_coordinates("missing") is None
+        assert (
+            map_handle.get_style_source_type("overlay-url")
+            == style.StyleSourceType.IMAGE
+        )
+        assert (
+            map_handle.get_style_source_type("overlay-inline")
+            == style.StyleSourceType.IMAGE
+        )
+        assert map_handle.get_image_source_coordinates("overlay-url") == coordinates
+        assert map_handle.get_image_source_coordinates("missing") is None
 
-            map_handle.set_image_source_url(
-                "overlay-url",
-                "https://example.test/overlay-2.png",
-            )
-            map_handle.set_image_source_image("overlay-url", image)
-            map_handle.set_image_source_coordinates("overlay-url", updated_coordinates)
-            assert (
-                map_handle.get_image_source_coordinates("overlay-url")
-                == updated_coordinates
-            )
+        map_handle.set_image_source_url(
+            "overlay-url",
+            "https://example.test/overlay-2.png",
+        )
+        map_handle.set_image_source_image("overlay-url", image)
+        map_handle.set_image_source_coordinates("overlay-url", updated_coordinates)
+        assert (
+            map_handle.get_image_source_coordinates("overlay-url")
+            == updated_coordinates
+        )
 
-            assert map_handle.remove_style_source("overlay-url") is True
-            assert map_handle.remove_style_source("overlay-inline") is True
+        assert map_handle.remove_style_source("overlay-url") is True
+        assert map_handle.remove_style_source("overlay-inline") is True
 
 
 def test_style_json_light_layer_property_and_filter_public_api() -> None:
@@ -1274,61 +1272,54 @@ def test_style_json_light_layer_property_and_filter_public_api() -> None:
     circle = _json_object({"id": "json-circle", "type": "circle", "source": "points"})
     raw_filter = ["==", ["get", "kind"], "park"]
     filter_value = _json_value(raw_filter)
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
-            map_handle.add_geojson_source_url(
-                "points",
-                "https://example.test/points.geojson",
-            )
-            with pytest.raises(TypeError, match="unsupported JSON value: dict"):
-                map_handle.add_style_layer_json(
-                    typing.cast(
-                        typing.Any,
-                        {"id": "raw-dict", "type": "background"},
-                    )
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        map_handle.add_geojson_source_url(
+            "points",
+            "https://example.test/points.geojson",
+        )
+        with pytest.raises(TypeError, match="unsupported JSON value: dict"):
+            map_handle.add_style_layer_json(
+                typing.cast(
+                    typing.Any,
+                    {"id": "raw-dict", "type": "background"},
                 )
-            with pytest.raises(TypeError, match="unsupported JSON value: int"):
-                map_handle.set_style_light_property(
-                    "intensity",
-                    typing.cast(typing.Any, 1),
-                )
-            map_handle.add_style_layer_json(background)
-            map_handle.add_style_layer_json(circle)
-            map_handle.set_layer_property(
-                "json-background",
-                "background-color",
-                "#ff0000",
             )
-            map_handle.set_layer_filter("json-circle", filter_value)
-            map_handle.set_style_light_json(_json_object({"anchor": "viewport"}))
-            map_handle.set_style_light_property("intensity", json.JsonDouble(0.5))
+        with pytest.raises(TypeError, match="unsupported JSON value: int"):
+            map_handle.set_style_light_property(
+                "intensity",
+                typing.cast(typing.Any, 1),
+            )
+        map_handle.add_style_layer_json(background)
+        map_handle.add_style_layer_json(circle)
+        map_handle.set_layer_property(
+            "json-background",
+            "background-color",
+            "#ff0000",
+        )
+        map_handle.set_layer_filter("json-circle", filter_value)
+        map_handle.set_style_light_json(_json_object({"anchor": "viewport"}))
+        map_handle.set_style_light_property("intensity", json.JsonDouble(0.5))
 
-            layer_json = map_handle.get_style_layer_json("json-background")
-            assert layer_json is not None
-            assert ("id", "json-background") in json.to_python(layer_json)
-            assert map_handle.get_style_layer_json("missing") is None
-            background_color = map_handle.get_layer_property(
-                "json-background",
-                "background-color",
-            )
-            assert isinstance(background_color, json.JsonArray)
-            assert background_color.values[0] == "rgba"
-            assert (
-                json.to_python(map_handle.get_layer_filter("json-circle")) == raw_filter
-            )
-            assert map_handle.get_style_light_property("anchor") == "viewport"
-            assert map_handle.get_style_light_property("intensity") == json.JsonDouble(
-                0.5
-            )
+        layer_json = map_handle.get_style_layer_json("json-background")
+        assert layer_json is not None
+        assert ("id", "json-background") in json.to_python(layer_json)
+        assert map_handle.get_style_layer_json("missing") is None
+        background_color = map_handle.get_layer_property(
+            "json-background",
+            "background-color",
+        )
+        assert isinstance(background_color, json.JsonArray)
+        assert background_color.values[0] == "rgba"
+        assert json.to_python(map_handle.get_layer_filter("json-circle")) == raw_filter
+        assert map_handle.get_style_light_property("anchor") == "viewport"
+        assert map_handle.get_style_light_property("intensity") == json.JsonDouble(0.5)
 
-            with pytest.raises(ValueError, match="finite"):
-                map_handle.set_style_light_property(
-                    "intensity", json.JsonDouble(math.inf)
-                )
+        with pytest.raises(ValueError, match="finite"):
+            map_handle.set_style_light_property("intensity", json.JsonDouble(math.inf))
 
-            map_handle.set_layer_filter("json-circle", None)
-            assert map_handle.get_layer_filter("json-circle") is None
+        map_handle.set_layer_filter("json-circle", None)
+        assert map_handle.get_layer_filter("json-circle") is None
 
 
 def test_style_image_metadata_copy_and_removal_public_api() -> None:
@@ -1336,116 +1327,113 @@ def test_style_image_metadata_copy_and_removal_public_api() -> None:
         info=render.TextureImageInfo(width=1, height=1, stride=4, byte_length=4),
         data=bytes([255, 0, 0, 255]),
     )
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
-            map_handle.set_style_image(
-                "marker",
-                image,
-                style.StyleImageOptions(pixel_ratio=2.0, sdf=True),
-            )
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        map_handle.set_style_image(
+            "marker",
+            image,
+            style.StyleImageOptions(pixel_ratio=2.0, sdf=True),
+        )
 
-            assert map_handle.style_image_exists("marker") is True
-            assert map_handle.style_image_exists("missing") is False
-            info = map_handle.get_style_image_info("marker")
-            assert info is not None
-            assert info.width == 1
-            assert info.height == 1
-            assert info.stride == 4
-            assert info.byte_length == 4
-            assert info.pixel_ratio == pytest.approx(2.0)
-            assert info.sdf is True
-            assert map_handle.get_style_image_info("missing") is None
+        assert map_handle.style_image_exists("marker") is True
+        assert map_handle.style_image_exists("missing") is False
+        info = map_handle.get_style_image_info("marker")
+        assert info is not None
+        assert info.width == 1
+        assert info.height == 1
+        assert info.stride == 4
+        assert info.byte_length == 4
+        assert info.pixel_ratio == pytest.approx(2.0)
+        assert info.sdf is True
+        assert map_handle.get_style_image_info("missing") is None
 
-            copied = map_handle.copy_style_image_premultiplied_rgba8("marker")
-            assert copied is not None
-            assert copied.image == image
-            assert copied.pixel_ratio == pytest.approx(2.0)
-            assert copied.sdf is True
-            assert map_handle.copy_style_image_premultiplied_rgba8("missing") is None
+        copied = map_handle.copy_style_image_premultiplied_rgba8("marker")
+        assert copied is not None
+        assert copied.image == image
+        assert copied.pixel_ratio == pytest.approx(2.0)
+        assert copied.sdf is True
+        assert map_handle.copy_style_image_premultiplied_rgba8("missing") is None
 
-            assert map_handle.remove_style_image("marker") is True
-            assert map_handle.remove_style_image("marker") is False
+        assert map_handle.remove_style_image("marker") is True
+        assert map_handle.remove_style_image("marker") is False
 
 
 def test_builtin_style_layers_and_location_indicator_public_api() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
-            map_handle.add_raster_dem_source_url(
-                "dem",
-                "https://example.test/dem.json",
-                style.TileSourceOptions(
-                    tile_size=512,
-                    raster_dem_encoding=style.RasterDemEncoding.MAPBOX,
-                ),
-            )
-            map_handle.add_hillshade_layer("hillshade", "dem")
-            map_handle.add_color_relief_layer("relief", "dem")
-            map_handle.add_location_indicator_layer("location")
-            map_handle.set_location_indicator_location(
-                "location",
-                geo.LatLng(1.0, 2.0),
-                3.0,
-            )
-            map_handle.set_location_indicator_bearing("location", 45.0)
-            map_handle.set_location_indicator_accuracy_radius("location", 5.0)
-            map_handle.set_location_indicator_image_name(
-                "location",
-                style.LocationIndicatorImageKind.TOP,
-                "marker",
-            )
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        map_handle.add_raster_dem_source_url(
+            "dem",
+            "https://example.test/dem.json",
+            style.TileSourceOptions(
+                tile_size=512,
+                raster_dem_encoding=style.RasterDemEncoding.MAPBOX,
+            ),
+        )
+        map_handle.add_hillshade_layer("hillshade", "dem")
+        map_handle.add_color_relief_layer("relief", "dem")
+        map_handle.add_location_indicator_layer("location")
+        map_handle.set_location_indicator_location(
+            "location",
+            geo.LatLng(1.0, 2.0),
+            3.0,
+        )
+        map_handle.set_location_indicator_bearing("location", 45.0)
+        map_handle.set_location_indicator_accuracy_radius("location", 5.0)
+        map_handle.set_location_indicator_image_name(
+            "location",
+            style.LocationIndicatorImageKind.TOP,
+            "marker",
+        )
 
-            assert map_handle.get_style_layer_type("hillshade") == "hillshade"
-            assert map_handle.get_style_layer_type("relief") == "color-relief"
-            assert map_handle.get_style_layer_type("location") == "location-indicator"
-            assert map_handle.remove_style_layer("hillshade") is True
-            assert map_handle.remove_style_layer("relief") is True
-            assert map_handle.remove_style_layer("location") is True
+        assert map_handle.get_style_layer_type("hillshade") == "hillshade"
+        assert map_handle.get_style_layer_type("relief") == "color-relief"
+        assert map_handle.get_style_layer_type("location") == "location-indicator"
+        assert map_handle.remove_style_layer("hillshade") is True
+        assert map_handle.remove_style_layer("relief") is True
+        assert map_handle.remove_style_layer("location") is True
 
 
 def test_nine_patch_style_image_round_trips_public_api() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            map_handle.set_style_json(_EMPTY_STYLE_JSON)
-            image = render.PremultipliedRgba8Image(
-                render.TextureImageInfo(width=2, height=2, stride=8, byte_length=16),
-                bytes(16),
-            )
-            options = style.StyleImageOptions(
-                stretch_x=(style.ImageStretch(0.0, 1.0),),
-                stretch_y=(style.ImageStretch(0.0, 1.0), style.ImageStretch(1.0, 2.0)),
-                content=style.ImageContent(0.5, 0.5, 1.5, 1.5),
-                text_fit_height=style.StyleImageTextFit.PROPORTIONAL,
-            )
-            map_handle.set_style_image("patch", image, options)
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json(_EMPTY_STYLE_JSON)
+        image = render.PremultipliedRgba8Image(
+            render.TextureImageInfo(width=2, height=2, stride=8, byte_length=16),
+            bytes(16),
+        )
+        options = style.StyleImageOptions(
+            stretch_x=(style.ImageStretch(0.0, 1.0),),
+            stretch_y=(style.ImageStretch(0.0, 1.0), style.ImageStretch(1.0, 2.0)),
+            content=style.ImageContent(0.5, 0.5, 1.5, 1.5),
+            text_fit_height=style.StyleImageTextFit.PROPORTIONAL,
+        )
+        map_handle.set_style_image("patch", image, options)
 
-            info = map_handle.get_style_image_info("patch")
-            assert info is not None
-            assert info.stretch_x_count == 1
-            assert info.stretch_y_count == 2
-            assert info.content == style.ImageContent(0.5, 0.5, 1.5, 1.5)
-            # An absent text fit stays distinguishable from a present default.
-            assert info.text_fit_width is None
-            assert info.text_fit_height is style.StyleImageTextFit.PROPORTIONAL
+        info = map_handle.get_style_image_info("patch")
+        assert info is not None
+        assert info.stretch_x_count == 1
+        assert info.stretch_y_count == 2
+        assert info.content == style.ImageContent(0.5, 0.5, 1.5, 1.5)
+        # An absent text fit stays distinguishable from a present default.
+        assert info.text_fit_width is None
+        assert info.text_fit_height is style.StyleImageTextFit.PROPORTIONAL
 
-            stretches = map_handle.get_style_image_stretches("patch")
-            assert stretches is not None
-            stretch_x, stretch_y = stretches
-            assert stretch_x == (style.ImageStretch(0.0, 1.0),)
-            assert stretch_y == (
-                style.ImageStretch(0.0, 1.0),
-                style.ImageStretch(1.0, 2.0),
+        stretches = map_handle.get_style_image_stretches("patch")
+        assert stretches is not None
+        stretch_x, stretch_y = stretches
+        assert stretch_x == (style.ImageStretch(0.0, 1.0),)
+        assert stretch_y == (
+            style.ImageStretch(0.0, 1.0),
+            style.ImageStretch(1.0, 2.0),
+        )
+        assert map_handle.get_style_image_stretches("missing") is None
+
+        # A backwards interval is rejected by C.
+        with pytest.raises(mln.InvalidArgumentError):
+            map_handle.set_style_image(
+                "bad",
+                image,
+                style.StyleImageOptions(stretch_x=(style.ImageStretch(2.0, 1.0),)),
             )
-            assert map_handle.get_style_image_stretches("missing") is None
-
-            # A backwards interval is rejected by C.
-            with pytest.raises(mln.InvalidArgumentError):
-                map_handle.set_style_image(
-                    "bad",
-                    image,
-                    style.StyleImageOptions(stretch_x=(style.ImageStretch(2.0, 1.0),)),
-                )
 
 
 def test_style_transition_options_round_trip_public_api() -> None:
@@ -1453,96 +1441,93 @@ def test_style_transition_options_round_trip_public_api() -> None:
         '{"version":8,"transition":{"duration":750,"delay":100},'
         '"sources":{},"layers":[]}'
     )
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            # A map with no style yet reports no duration or delay. The
-            # placement flag always reports, because native always holds one.
-            empty = map_handle.get_style_transition_options()
-            assert empty.duration_ms is None
-            assert empty.delay_ms is None
-            assert empty.enable_placement_transitions is True
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        # A map with no style yet reports no duration or delay. The
+        # placement flag always reports, because native always holds one.
+        empty = map_handle.get_style_transition_options()
+        assert empty.duration_ms is None
+        assert empty.delay_ms is None
+        assert empty.enable_placement_transitions is True
 
-            # The style parser fills in its own 300ms duration for a style that
-            # declares no transition.
-            map_handle.set_style_json(_EMPTY_STYLE_JSON)
-            parsed = map_handle.get_style_transition_options()
-            assert parsed.duration_ms == 300.0
-            assert parsed.delay_ms is None
+        # The style parser fills in its own 300ms duration for a style that
+        # declares no transition.
+        map_handle.set_style_json(_EMPTY_STYLE_JSON)
+        parsed = map_handle.get_style_transition_options()
+        assert parsed.duration_ms == 300.0
+        assert parsed.delay_ms is None
 
-            map_handle.set_style_json(transition_style_json)
-            declared = map_handle.get_style_transition_options()
-            assert declared.duration_ms == 750.0
-            assert declared.delay_ms == 100.0
-            assert declared.enable_placement_transitions is True
+        map_handle.set_style_json(transition_style_json)
+        declared = map_handle.get_style_transition_options()
+        assert declared.duration_ms == 750.0
+        assert declared.delay_ms == 100.0
+        assert declared.enable_placement_transitions is True
 
-            # A present zero stays distinguishable from an absent field, and an
-            # absent field clears what the style declared rather than merging.
-            options = style.StyleTransitionOptions(
-                duration_ms=0.0,
-                enable_placement_transitions=False,
-            )
-            map_handle.set_style_transition_options(options)
-            assert map_handle.get_style_transition_options() == options
+        # A present zero stays distinguishable from an absent field, and an
+        # absent field clears what the style declared rather than merging.
+        options = style.StyleTransitionOptions(
+            duration_ms=0.0,
+            enable_placement_transitions=False,
+        )
+        map_handle.set_style_transition_options(options)
+        assert map_handle.get_style_transition_options() == options
 
-            # Omitting the flag leaves the cross-fade on rather than clearing it.
+        # Omitting the flag leaves the cross-fade on rather than clearing it.
+        map_handle.set_style_transition_options(
+            style.StyleTransitionOptions(duration_ms=250.0)
+        )
+        assert (
+            map_handle.get_style_transition_options().enable_placement_transitions
+            is True
+        )
+
+        # Loading a style replaces the override with what that style declares.
+        map_handle.set_style_json(transition_style_json)
+        assert map_handle.get_style_transition_options() == declared
+
+        with pytest.raises(mln.InvalidArgumentError, match="delay_ms"):
             map_handle.set_style_transition_options(
-                style.StyleTransitionOptions(duration_ms=250.0)
+                style.StyleTransitionOptions(delay_ms=-1.0)
             )
-            assert (
-                map_handle.get_style_transition_options().enable_placement_transitions
-                is True
-            )
-
-            # Loading a style replaces the override with what that style declares.
-            map_handle.set_style_json(transition_style_json)
-            assert map_handle.get_style_transition_options() == declared
-
-            with pytest.raises(mln.InvalidArgumentError, match="delay_ms"):
-                map_handle.set_style_transition_options(
-                    style.StyleTransitionOptions(delay_ms=-1.0)
-                )
 
 
 def test_layer_base_accessors_round_trip_public_api() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            map_handle.set_style_json(
-                '{"version":8,"sources":{"geo":{"type":"geojson","data":'
-                '{"type":"FeatureCollection","features":[]}}},"layers":['
-                '{"id":"bg","type":"background"},'
-                '{"id":"fill","type":"fill","source":"geo"}]}'
-            )
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json(
+            '{"version":8,"sources":{"geo":{"type":"geojson","data":'
+            '{"type":"FeatureCollection","features":[]}}},"layers":['
+            '{"id":"bg","type":"background"},'
+            '{"id":"fill","type":"fill","source":"geo"}]}'
+        )
 
-            assert map_handle.get_layer_source_layer("fill") == ""
-            map_handle.set_layer_source_layer("fill", "roads")
-            assert map_handle.get_layer_source_layer("fill") == "roads"
-            assert map_handle.get_layer_source_id("fill") == "geo"
+        assert map_handle.get_layer_source_layer("fill") == ""
+        map_handle.set_layer_source_layer("fill", "roads")
+        assert map_handle.get_layer_source_layer("fill") == "roads"
+        assert map_handle.get_layer_source_id("fill") == "geo"
 
-            # A layer type that takes no source is rejected, not silently ignored.
-            with pytest.raises(mln.InvalidArgumentError, match="source-layer"):
-                map_handle.set_layer_source_layer("bg", "roads")
-            assert map_handle.get_layer_source_id("bg") == ""
+        # A layer type that takes no source is rejected, not silently ignored.
+        with pytest.raises(mln.InvalidArgumentError, match="source-layer"):
+            map_handle.set_layer_source_layer("bg", "roads")
+        assert map_handle.get_layer_source_id("bg") == ""
 
-            # An unset zoom range crosses the boundary as infinities.
-            assert map_handle.get_layer_min_zoom("fill") == -math.inf
-            assert map_handle.get_layer_max_zoom("fill") == math.inf
-            map_handle.set_layer_min_zoom("fill", 4.0)
-            map_handle.set_layer_max_zoom("fill", 12.5)
-            assert map_handle.get_layer_min_zoom("fill") == 4.0
-            assert map_handle.get_layer_max_zoom("fill") == 12.5
+        # An unset zoom range crosses the boundary as infinities.
+        assert map_handle.get_layer_min_zoom("fill") == -math.inf
+        assert map_handle.get_layer_max_zoom("fill") == math.inf
+        map_handle.set_layer_min_zoom("fill", 4.0)
+        map_handle.set_layer_max_zoom("fill", 12.5)
+        assert map_handle.get_layer_min_zoom("fill") == 4.0
+        assert map_handle.get_layer_max_zoom("fill") == 12.5
 
-            assert (
-                map_handle.get_layer_visibility("fill")
-                is style.StyleLayerVisibility.VISIBLE
-            )
-            map_handle.set_layer_visibility("fill", style.StyleLayerVisibility.NONE)
-            assert (
-                map_handle.get_layer_visibility("fill")
-                is style.StyleLayerVisibility.NONE
-            )
+        assert (
+            map_handle.get_layer_visibility("fill")
+            is style.StyleLayerVisibility.VISIBLE
+        )
+        map_handle.set_layer_visibility("fill", style.StyleLayerVisibility.NONE)
+        assert (
+            map_handle.get_layer_visibility("fill") is style.StyleLayerVisibility.NONE
+        )
 
-            with pytest.raises(mln.InvalidArgumentError):
-                map_handle.get_layer_min_zoom("missing")
+        with pytest.raises(mln.InvalidArgumentError):
+            map_handle.get_layer_min_zoom("missing")
 
 
 def test_style_layer_metadata_move_and_removal_public_api() -> None:
@@ -1556,26 +1541,25 @@ def test_style_layer_metadata_move_and_removal_public_api() -> None:
       ]
     }
     """
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            map_handle.set_style_json(style_json)
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json(style_json)
 
-            layer_ids = map_handle.list_style_layer_ids()
-            assert "background-a" in layer_ids
-            assert "background-b" in layer_ids
-            assert layer_ids.index("background-a") < layer_ids.index("background-b")
-            assert map_handle.style_layer_exists("background-a") is True
-            assert map_handle.style_layer_exists("missing") is False
-            assert map_handle.get_style_layer_type("background-a") == "background"
-            assert map_handle.get_style_layer_type("missing") is None
+        layer_ids = map_handle.list_style_layer_ids()
+        assert "background-a" in layer_ids
+        assert "background-b" in layer_ids
+        assert layer_ids.index("background-a") < layer_ids.index("background-b")
+        assert map_handle.style_layer_exists("background-a") is True
+        assert map_handle.style_layer_exists("missing") is False
+        assert map_handle.get_style_layer_type("background-a") == "background"
+        assert map_handle.get_style_layer_type("missing") is None
 
-            map_handle.move_style_layer("background-b", "background-a")
-            layer_ids = map_handle.list_style_layer_ids()
-            assert layer_ids.index("background-b") < layer_ids.index("background-a")
+        map_handle.move_style_layer("background-b", "background-a")
+        layer_ids = map_handle.list_style_layer_ids()
+        assert layer_ids.index("background-b") < layer_ids.index("background-a")
 
-            assert map_handle.remove_style_layer("background-b") is True
-            assert map_handle.remove_style_layer("background-b") is False
-            assert "background-b" not in map_handle.list_style_layer_ids()
+        assert map_handle.remove_style_layer("background-b") is True
+        assert map_handle.remove_style_layer("background-b") is False
+        assert "background-b" not in map_handle.list_style_layer_ids()
 
 
 def test_map_viewport_and_tile_options_round_trip_public_values() -> None:
@@ -1594,70 +1578,66 @@ def test_map_viewport_and_tile_options_round_trip_public_values() -> None:
         lod_mode=map_module.TileLodMode.DEFAULT,
     )
 
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            map_handle.set_viewport_options(viewport)
-            map_handle.set_tile_options(tile)
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_viewport_options(viewport)
+        map_handle.set_tile_options(tile)
 
-            assert map_handle.get_viewport_options() == viewport
-            assert map_handle.get_tile_options() == tile
+        assert map_handle.get_viewport_options() == viewport
+        assert map_handle.get_tile_options() == tile
 
 
 def test_camera_snapshot_and_jump_round_trip_public_values() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            target = camera.CameraOptions(
-                center=geo.LatLng(10.0, 20.0),
-                zoom=2.0,
-                bearing=15.0,
-                pitch=10.0,
-                padding=camera.EdgeInsets(top=1.0, left=2.0, bottom=3.0, right=4.0),
-                anchor=camera.ScreenPoint(x=16.0, y=8.0),
-            )
-            map_handle.jump_to(target)
-            snapshot = map_handle.get_camera()
-            map_handle.move_by(1.0, 1.0)
-            map_handle.cancel_transitions()
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        target = camera.CameraOptions(
+            center=geo.LatLng(10.0, 20.0),
+            zoom=2.0,
+            bearing=15.0,
+            pitch=10.0,
+            padding=camera.EdgeInsets(top=1.0, left=2.0, bottom=3.0, right=4.0),
+            anchor=camera.ScreenPoint(x=16.0, y=8.0),
+        )
+        map_handle.jump_to(target)
+        snapshot = map_handle.get_camera()
+        map_handle.move_by(1.0, 1.0)
+        map_handle.cancel_transitions()
 
-            assert snapshot.center is not None
-            assert snapshot.center.latitude == pytest.approx(10.0)
-            assert snapshot.center.longitude == pytest.approx(20.0)
-            assert snapshot.zoom == pytest.approx(2.0)
-            assert snapshot.bearing == pytest.approx(15.0)
-            assert snapshot.pitch == pytest.approx(10.0)
-            assert snapshot.padding == target.padding
+        assert snapshot.center is not None
+        assert snapshot.center.latitude == pytest.approx(10.0)
+        assert snapshot.center.longitude == pytest.approx(20.0)
+        assert snapshot.zoom == pytest.approx(2.0)
+        assert snapshot.bearing == pytest.approx(15.0)
+        assert snapshot.pitch == pytest.approx(10.0)
+        assert snapshot.padding == target.padding
 
 
 def test_gesture_in_progress_brackets_host_driven_camera_commands() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            assert map_handle.is_gesture_in_progress() is False
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        assert map_handle.is_gesture_in_progress() is False
 
-            map_handle.set_gesture_in_progress(True)
-            map_handle.move_by(8.0, -4.0)
-            assert map_handle.is_gesture_in_progress() is True
+        map_handle.set_gesture_in_progress(True)
+        map_handle.move_by(8.0, -4.0)
+        assert map_handle.is_gesture_in_progress() is True
 
-            map_handle.set_gesture_in_progress(False)
-            assert map_handle.is_gesture_in_progress() is False
+        map_handle.set_gesture_in_progress(False)
+        assert map_handle.is_gesture_in_progress() is False
 
 
 def test_free_camera_and_projection_mode_round_trip_public_values() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            free_camera = map_handle.get_free_camera_options()
-            assert isinstance(free_camera, camera.FreeCameraOptions)
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        free_camera = map_handle.get_free_camera_options()
+        assert isinstance(free_camera, camera.FreeCameraOptions)
 
-            projection = camera.ProjectionMode(
-                axonometric=True,
-                x_skew=0.1,
-                y_skew=0.2,
-            )
-            map_handle.set_projection_mode(projection)
-            snapshot = map_handle.get_projection_mode()
+        projection = camera.ProjectionMode(
+            axonometric=True,
+            x_skew=0.1,
+            y_skew=0.2,
+        )
+        map_handle.set_projection_mode(projection)
+        snapshot = map_handle.get_projection_mode()
 
-            assert snapshot.axonometric is True
-            assert snapshot.x_skew == pytest.approx(0.1)
-            assert snapshot.y_skew == pytest.approx(0.2)
+        assert snapshot.axonometric is True
+        assert snapshot.x_skew == pytest.approx(0.1)
+        assert snapshot.y_skew == pytest.approx(0.2)
 
 
 def test_camera_fit_bounds_and_constraints_public_api() -> None:
@@ -1672,39 +1652,38 @@ def test_camera_fit_bounds_and_constraints_public_api() -> None:
     )
     target = camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=1.0)
 
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            map_handle.set_bounds(
-                camera.BoundOptions(
-                    bounds=camera.Bounded(bounds),
-                    min_zoom=0.0,
-                    max_zoom=10.0,
-                )
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_bounds(
+            camera.BoundOptions(
+                bounds=camera.Bounded(bounds),
+                min_zoom=0.0,
+                max_zoom=10.0,
             )
-            constraints = map_handle.get_bounds()
-            fit_bounds = map_handle.camera_for_lat_lng_bounds(bounds, fit)
-            fit_coordinates = map_handle.camera_for_lat_lngs(
-                (bounds.southwest, bounds.northeast),
-                fit,
-            )
-            fit_geometry = map_handle.camera_for_geometry(
-                geo.LineString((bounds.southwest, bounds.northeast)),
-                fit,
-            )
-            visible_bounds = map_handle.lat_lng_bounds_for_camera(target)
-            unwrapped_bounds = map_handle.lat_lng_bounds_for_camera(
-                target,
-                unwrapped=True,
-            )
+        )
+        constraints = map_handle.get_bounds()
+        fit_bounds = map_handle.camera_for_lat_lng_bounds(bounds, fit)
+        fit_coordinates = map_handle.camera_for_lat_lngs(
+            (bounds.southwest, bounds.northeast),
+            fit,
+        )
+        fit_geometry = map_handle.camera_for_geometry(
+            geo.LineString((bounds.southwest, bounds.northeast)),
+            fit,
+        )
+        visible_bounds = map_handle.lat_lng_bounds_for_camera(target)
+        unwrapped_bounds = map_handle.lat_lng_bounds_for_camera(
+            target,
+            unwrapped=True,
+        )
 
-            assert constraints.bounds == camera.Bounded(bounds)
-            assert constraints.min_zoom == pytest.approx(0.0)
-            assert constraints.max_zoom == pytest.approx(10.0)
-            assert isinstance(fit_bounds, camera.CameraOptions)
-            assert isinstance(fit_coordinates, camera.CameraOptions)
-            assert isinstance(fit_geometry, camera.CameraOptions)
-            assert isinstance(visible_bounds, geo.LatLngBounds)
-            assert isinstance(unwrapped_bounds, geo.LatLngBounds)
+        assert constraints.bounds == camera.Bounded(bounds)
+        assert constraints.min_zoom == pytest.approx(0.0)
+        assert constraints.max_zoom == pytest.approx(10.0)
+        assert isinstance(fit_bounds, camera.CameraOptions)
+        assert isinstance(fit_coordinates, camera.CameraOptions)
+        assert isinstance(fit_geometry, camera.CameraOptions)
+        assert isinstance(visible_bounds, geo.LatLngBounds)
+        assert isinstance(unwrapped_bounds, geo.LatLngBounds)
 
 
 def _jumped_longitude(map_handle: mln.MapHandle, longitude: float) -> float:
@@ -1722,31 +1701,24 @@ def test_camera_bounds_distinguish_unbounded_from_world() -> None:
         northeast=geo.LatLng(90.0, 180.0),
     )
 
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            assert map_handle.get_bounds().bounds == camera.Unbounded()
-            # An unbounded map wraps across the antimeridian.
-            assert _jumped_longitude(map_handle, 200.0) == pytest.approx(
-                -160.0, abs=1e-6
-            )
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        assert map_handle.get_bounds().bounds == camera.Unbounded()
+        # An unbounded map wraps across the antimeridian.
+        assert _jumped_longitude(map_handle, 200.0) == pytest.approx(-160.0, abs=1e-6)
 
-            map_handle.set_bounds(camera.BoundOptions(bounds=camera.Bounded(world)))
+        map_handle.set_bounds(camera.BoundOptions(bounds=camera.Bounded(world)))
 
-            constrained = map_handle.get_bounds().bounds
-            assert isinstance(constrained, camera.Bounded)
-            assert constrained.bounds.northeast.longitude == pytest.approx(180.0)
-            # World bounds clamp at the antimeridian instead of wrapping.
-            assert _jumped_longitude(map_handle, 200.0) == pytest.approx(
-                180.0, abs=1e-6
-            )
+        constrained = map_handle.get_bounds().bounds
+        assert isinstance(constrained, camera.Bounded)
+        assert constrained.bounds.northeast.longitude == pytest.approx(180.0)
+        # World bounds clamp at the antimeridian instead of wrapping.
+        assert _jumped_longitude(map_handle, 200.0) == pytest.approx(180.0, abs=1e-6)
 
-            map_handle.set_bounds(camera.BoundOptions(bounds=camera.Unbounded()))
+        map_handle.set_bounds(camera.BoundOptions(bounds=camera.Unbounded()))
 
-            assert map_handle.get_bounds().bounds == camera.Unbounded()
-            # Releasing the constraint restores antimeridian wrapping.
-            assert _jumped_longitude(map_handle, 200.0) == pytest.approx(
-                -160.0, abs=1e-6
-            )
+        assert map_handle.get_bounds().bounds == camera.Unbounded()
+        # Releasing the constraint restores antimeridian wrapping.
+        assert _jumped_longitude(map_handle, 200.0) == pytest.approx(-160.0, abs=1e-6)
 
 
 def test_camera_transition_commands_accept_public_values() -> None:
@@ -1760,18 +1732,17 @@ def test_camera_transition_commands_accept_public_values() -> None:
     first = camera.ScreenPoint(0.0, 0.0)
     second = camera.ScreenPoint(1.0, 1.0)
 
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            map_handle.ease_to(target, animation)
-            map_handle.fly_to(target, animation)
-            map_handle.move_by_animated(1.0, 1.0, animation)
-            map_handle.scale_by(1.0, first)
-            map_handle.scale_by_animated(1.0, first, animation)
-            map_handle.rotate_by(first, second)
-            map_handle.rotate_by_animated(first, second, animation)
-            map_handle.pitch_by(0.0)
-            map_handle.pitch_by_animated(0.0, animation)
-            map_handle.cancel_transitions()
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.ease_to(target, animation)
+        map_handle.fly_to(target, animation)
+        map_handle.move_by_animated(1.0, 1.0, animation)
+        map_handle.scale_by(1.0, first)
+        map_handle.scale_by_animated(1.0, first, animation)
+        map_handle.rotate_by(first, second)
+        map_handle.rotate_by_animated(first, second, animation)
+        map_handle.pitch_by(0.0)
+        map_handle.pitch_by_animated(0.0, animation)
+        map_handle.cancel_transitions()
 
 
 def _drain_runtime_events(runtime: mln.RuntimeHandle) -> list[mln.RuntimeEvent]:
@@ -1804,14 +1775,13 @@ def _camera_change_modes(
 def test_zero_duration_ease_reports_transition_finished_once() -> None:
     target = camera.CameraOptions(center=geo.LatLng(12.0, 34.0), zoom=4.0)
 
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            _drain_runtime_events(runtime)
-            map_handle.ease_to(
-                target,
-                camera.AnimationOptions(duration_ms=0.0, transition_id=101),
-            )
-            events = _drain_runtime_events(runtime)
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        _drain_runtime_events(runtime)
+        map_handle.ease_to(
+            target,
+            camera.AnimationOptions(duration_ms=0.0, transition_id=101),
+        )
+        events = _drain_runtime_events(runtime)
 
     assert _finished_transition_ids(events) == [101]
     assert _camera_change_modes(events, mln.RuntimeEventType.MAP_CAMERA_DID_CHANGE) == [
@@ -1820,36 +1790,34 @@ def test_zero_duration_ease_reports_transition_finished_once() -> None:
 
 
 def test_superseded_transition_reports_transition_finished_once() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            _drain_runtime_events(runtime)
-            map_handle.ease_to(
-                camera.CameraOptions(center=geo.LatLng(20.0, 40.0), zoom=6.0),
-                camera.AnimationOptions(duration_ms=5_000.0, transition_id=201),
-            )
-            started = _drain_runtime_events(runtime)
-            map_handle.jump_to(
-                camera.CameraOptions(center=geo.LatLng(-20.0, -40.0), zoom=2.0)
-            )
-            superseded = _drain_runtime_events(runtime)
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        _drain_runtime_events(runtime)
+        map_handle.ease_to(
+            camera.CameraOptions(center=geo.LatLng(20.0, 40.0), zoom=6.0),
+            camera.AnimationOptions(duration_ms=5_000.0, transition_id=201),
+        )
+        started = _drain_runtime_events(runtime)
+        map_handle.jump_to(
+            camera.CameraOptions(center=geo.LatLng(-20.0, -40.0), zoom=2.0)
+        )
+        superseded = _drain_runtime_events(runtime)
 
     assert _finished_transition_ids(started) == []
     assert _finished_transition_ids(superseded) == [201]
 
 
 def test_cancelled_transition_reports_transition_finished_once() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            _drain_runtime_events(runtime)
-            map_handle.fly_to(
-                camera.CameraOptions(center=geo.LatLng(30.0, 60.0), zoom=8.0),
-                camera.AnimationOptions(duration_ms=5_000.0, transition_id=301),
-            )
-            started = _drain_runtime_events(runtime)
-            map_handle.cancel_transitions()
-            cancelled = _drain_runtime_events(runtime)
-            map_handle.cancel_transitions()
-            cancelled_again = _drain_runtime_events(runtime)
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        _drain_runtime_events(runtime)
+        map_handle.fly_to(
+            camera.CameraOptions(center=geo.LatLng(30.0, 60.0), zoom=8.0),
+            camera.AnimationOptions(duration_ms=5_000.0, transition_id=301),
+        )
+        started = _drain_runtime_events(runtime)
+        map_handle.cancel_transitions()
+        cancelled = _drain_runtime_events(runtime)
+        map_handle.cancel_transitions()
+        cancelled_again = _drain_runtime_events(runtime)
 
     assert _finished_transition_ids(started) == []
     assert _finished_transition_ids(cancelled) == [301]
@@ -1861,26 +1829,25 @@ def test_completed_ease_reports_transition_finished_once() -> None:
     deadline = time.monotonic() + 10.0
     events: list[mln.RuntimeEvent] = []
 
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            _drain_runtime_events(runtime)
-            map_handle.ease_to(
-                target,
-                camera.AnimationOptions(duration_ms=20.0, transition_id=401),
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        _drain_runtime_events(runtime)
+        map_handle.ease_to(
+            target,
+            camera.AnimationOptions(duration_ms=20.0, transition_id=401),
+        )
+        while not _finished_transition_ids(events):
+            assert time.monotonic() < deadline, (
+                "ease did not finish while the runtime was pumped"
             )
-            while not _finished_transition_ids(events):
-                assert time.monotonic() < deadline, (
-                    "ease did not finish while the runtime was pumped"
-                )
-                map_handle.request_repaint()
-                runtime.pump()
-                events.extend(_drain_runtime_events(runtime))
+            map_handle.request_repaint()
+            runtime.pump()
+            events.extend(_drain_runtime_events(runtime))
 
-            trailing: list[mln.RuntimeEvent] = []
-            for _ in range(8):
-                map_handle.request_repaint()
-                runtime.pump()
-                trailing.extend(_drain_runtime_events(runtime))
+        trailing: list[mln.RuntimeEvent] = []
+        for _ in range(8):
+            map_handle.request_repaint()
+            runtime.pump()
+            trailing.extend(_drain_runtime_events(runtime))
 
     assert _finished_transition_ids(events) == [401]
     assert _finished_transition_ids(trailing) == []
@@ -1890,20 +1857,17 @@ def test_completed_ease_reports_transition_finished_once() -> None:
 
 
 def test_camera_change_events_report_immediate_and_animated_modes() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            _drain_runtime_events(runtime)
-            map_handle.jump_to(
-                camera.CameraOptions(center=geo.LatLng(1.0, 2.0), zoom=3.0)
-            )
-            jumped = _drain_runtime_events(runtime)
-            map_handle.ease_to(
-                camera.CameraOptions(center=geo.LatLng(-1.0, -2.0), zoom=7.0),
-                camera.AnimationOptions(duration_ms=5_000.0),
-            )
-            eased = _drain_runtime_events(runtime)
-            map_handle.cancel_transitions()
-            eased.extend(_drain_runtime_events(runtime))
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        _drain_runtime_events(runtime)
+        map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(1.0, 2.0), zoom=3.0))
+        jumped = _drain_runtime_events(runtime)
+        map_handle.ease_to(
+            camera.CameraOptions(center=geo.LatLng(-1.0, -2.0), zoom=7.0),
+            camera.AnimationOptions(duration_ms=5_000.0),
+        )
+        eased = _drain_runtime_events(runtime)
+        map_handle.cancel_transitions()
+        eased.extend(_drain_runtime_events(runtime))
 
     will_change = mln.RuntimeEventType.MAP_CAMERA_WILL_CHANGE
     did_change = mln.RuntimeEventType.MAP_CAMERA_DID_CHANGE
@@ -1931,51 +1895,49 @@ def test_poll_event_returns_none_when_queue_is_empty() -> None:
 
 
 def test_poll_event_returns_copied_map_event() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            with pytest.raises((mln.InvalidArgumentError, mln.NativeError)):
-                map_handle.set_style_json("{")
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        with pytest.raises((mln.InvalidArgumentError, mln.NativeError)):
+            map_handle.set_style_json("{")
 
-            loading_failed = None
-            for _ in range(8):
-                event = runtime.poll_event()
-                if event is None:
-                    break
-                if event.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED:
-                    loading_failed = event
-                    break
+        loading_failed = None
+        for _ in range(8):
+            event = runtime.poll_event()
+            if event is None:
+                break
+            if event.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED:
+                loading_failed = event
+                break
 
-            assert loading_failed is not None
-            copied_message = loading_failed.message
-            runtime.poll_event()
+        assert loading_failed is not None
+        copied_message = loading_failed.message
+        runtime.poll_event()
 
-            assert loading_failed.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED
-            assert loading_failed.source.source_type == mln.RuntimeEventSourceType.MAP
-            assert loading_failed.source.map_handle is map_handle
-            assert copied_message == loading_failed.message
-            assert loading_failed.message
+        assert loading_failed.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED
+        assert loading_failed.source.source_type == mln.RuntimeEventSourceType.MAP
+        assert loading_failed.source.map_handle is map_handle
+        assert copied_message == loading_failed.message
+        assert loading_failed.message
 
 
 def test_pump_and_poll_event_return_copied_style_loaded_event() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
 
-            style_loaded = None
-            for _ in range(32):
-                runtime.pump()
-                while event := runtime.poll_event():
-                    if event.event_type == mln.RuntimeEventType.MAP_STYLE_LOADED:
-                        style_loaded = event
-                        break
-                if style_loaded is not None:
-                    break
-
-            assert style_loaded is not None
-            assert style_loaded.source.source_type == mln.RuntimeEventSourceType.MAP
-            assert style_loaded.source.map_handle is map_handle
+        style_loaded = None
+        for _ in range(32):
             runtime.pump()
-            assert runtime.poll_event() is None
+            while event := runtime.poll_event():
+                if event.event_type == mln.RuntimeEventType.MAP_STYLE_LOADED:
+                    style_loaded = event
+                    break
+            if style_loaded is not None:
+                break
+
+        assert style_loaded is not None
+        assert style_loaded.source.source_type == mln.RuntimeEventSourceType.MAP
+        assert style_loaded.source.map_handle is map_handle
+        runtime.pump()
+        assert runtime.poll_event() is None
 
 
 def test_runtime_event_payload_wire_shapes_include_native_fields() -> None:
@@ -2342,54 +2304,49 @@ def test_render_session_feature_state_empty_result_is_empty_object() -> None:
 
 
 def test_invalid_render_target_attach_reports_native_status() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            with pytest.raises(
-                (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
-            ) as raised:
-                map_handle.attach_metal_owned_texture(
-                    render.MetalOwnedTextureDescriptor()
-                )
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        with pytest.raises(
+            (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
+        ) as raised:
+            map_handle.attach_metal_owned_texture(render.MetalOwnedTextureDescriptor())
 
-            assert raised.value.status in {
-                mln.MaplibreStatus.INVALID_ARGUMENT,
-                mln.MaplibreStatus.UNSUPPORTED,
-            }
+        assert raised.value.status in {
+            mln.MaplibreStatus.INVALID_ARGUMENT,
+            mln.MaplibreStatus.UNSUPPORTED,
+        }
 
 
 def test_invalid_opengl_render_target_attach_reports_native_status() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            with pytest.raises(
-                (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
-            ) as raised:
-                map_handle.attach_opengl_owned_texture(
-                    render.OpenGLOwnedTextureDescriptor()
-                )
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        with pytest.raises(
+            (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
+        ) as raised:
+            map_handle.attach_opengl_owned_texture(
+                render.OpenGLOwnedTextureDescriptor()
+            )
 
-            assert raised.value.status in {
-                mln.MaplibreStatus.INVALID_ARGUMENT,
-                mln.MaplibreStatus.UNSUPPORTED,
-            }
+        assert raised.value.status in {
+            mln.MaplibreStatus.INVALID_ARGUMENT,
+            mln.MaplibreStatus.UNSUPPORTED,
+        }
 
 
 def test_map_coordinate_conversions_round_trip_public_values() -> None:
     coordinate = geo.LatLng(0.0, 0.0)
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            map_handle.jump_to(camera.CameraOptions(center=coordinate, zoom=1.0))
-            point = map_handle.pixel_for_lat_lng(coordinate)
-            projected = map_handle.lat_lng_for_pixel(point)
-            points = map_handle.pixels_for_lat_lngs((coordinate, geo.LatLng(1.0, 1.0)))
-            coordinates = map_handle.lat_lngs_for_pixels(points)
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.jump_to(camera.CameraOptions(center=coordinate, zoom=1.0))
+        point = map_handle.pixel_for_lat_lng(coordinate)
+        projected = map_handle.lat_lng_for_pixel(point)
+        points = map_handle.pixels_for_lat_lngs((coordinate, geo.LatLng(1.0, 1.0)))
+        coordinates = map_handle.lat_lngs_for_pixels(points)
 
-            assert isinstance(point, camera.ScreenPoint)
-            assert math.isfinite(projected.latitude)
-            assert math.isfinite(projected.longitude)
-            assert len(points) == 2
-            assert len(coordinates) == 2
-            assert all(isinstance(item, camera.ScreenPoint) for item in points)
-            assert all(isinstance(item, geo.LatLng) for item in coordinates)
+        assert isinstance(point, camera.ScreenPoint)
+        assert math.isfinite(projected.latitude)
+        assert math.isfinite(projected.longitude)
+        assert len(points) == 2
+        assert len(coordinates) == 2
+        assert all(isinstance(item, camera.ScreenPoint) for item in points)
+        assert all(isinstance(item, geo.LatLng) for item in coordinates)
 
 
 def test_map_projection_converts_coordinates_and_closes() -> None:
@@ -2401,29 +2358,28 @@ def test_map_projection_converts_coordinates_and_closes() -> None:
     assert math.isclose(round_tripped.latitude, coordinate.latitude, abs_tol=1e-6)
     assert math.isclose(round_tripped.longitude, coordinate.longitude, abs_tol=1e-6)
 
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            map_handle.jump_to(camera.CameraOptions(center=coordinate, zoom=1.0))
-            with map_handle.create_projection() as projection:
-                point = projection.pixel_for_lat_lng(coordinate)
-                projected = projection.lat_lng_for_pixel(point)
-                projection.set_camera(camera.CameraOptions(center=coordinate, zoom=2.0))
-                projection.set_visible_coordinates(
-                    (geo.LatLng(-1.0, -1.0), geo.LatLng(1.0, 1.0)),
-                    camera.EdgeInsets(),
-                )
-                projection.set_visible_geometry(
-                    geo.LineString((geo.LatLng(-1.0, -1.0), geo.LatLng(1.0, 1.0))),
-                    camera.EdgeInsets(),
-                )
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.jump_to(camera.CameraOptions(center=coordinate, zoom=1.0))
+        with map_handle.create_projection() as projection:
+            point = projection.pixel_for_lat_lng(coordinate)
+            projected = projection.lat_lng_for_pixel(point)
+            projection.set_camera(camera.CameraOptions(center=coordinate, zoom=2.0))
+            projection.set_visible_coordinates(
+                (geo.LatLng(-1.0, -1.0), geo.LatLng(1.0, 1.0)),
+                camera.EdgeInsets(),
+            )
+            projection.set_visible_geometry(
+                geo.LineString((geo.LatLng(-1.0, -1.0), geo.LatLng(1.0, 1.0))),
+                camera.EdgeInsets(),
+            )
 
-                assert not projection.closed
-                assert isinstance(projection.get_camera(), camera.CameraOptions)
-                assert isinstance(point, camera.ScreenPoint)
-                assert math.isfinite(projected.latitude)
-                assert math.isfinite(projected.longitude)
+            assert not projection.closed
+            assert isinstance(projection.get_camera(), camera.CameraOptions)
+            assert isinstance(point, camera.ScreenPoint)
+            assert math.isfinite(projected.latitude)
+            assert math.isfinite(projected.longitude)
 
-            assert projection.closed
+        assert projection.closed
 
 
 def test_offline_region_operation_starts_return_public_handles(tmp_path: Path) -> None:
@@ -2645,7 +2601,7 @@ def test_offline_operation_take_rejects_closed_handles() -> None:
     assert status_handle.take_status().complete is True
     with pytest.raises(mln.InvalidStateError, match="offline operation handle"):
         status_handle.take_status()
-    assert runtime._native.status_takes == 1  # noqa: SLF001
+    assert runtime._native.status_takes == 1
 
     closed_takes = (
         lambda handle: handle.take_region(),
@@ -2661,8 +2617,8 @@ def test_offline_operation_take_rejects_closed_handles() -> None:
         with pytest.raises(mln.InvalidStateError, match="offline operation handle"):
             take(handle)
 
-    assert runtime._native.discarded == list(range(20, 26))  # noqa: SLF001
-    assert runtime._native.status_takes == 1  # noqa: SLF001
+    assert runtime._native.discarded == list(range(20, 26))
+    assert runtime._native.status_takes == 1
     assert runtime.operations == set()
 
 
@@ -2842,11 +2798,10 @@ def test_process_global_logging_receiver_copies_native_records() -> None:
     receiver = log.set_log_callback(max_queued_records=8, consume=True)
     try:
         log.set_async_log_severity_mask(log.LogSeverityMask.DEFAULT)
-        with mln.RuntimeHandle() as runtime:
-            with runtime.create_map() as map_handle:
-                with pytest.raises((mln.InvalidArgumentError, mln.NativeError)):
-                    map_handle.set_style_json("{")
-                map_handle.dump_debug_logs()
+        with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+            with pytest.raises((mln.InvalidArgumentError, mln.NativeError)):
+                map_handle.set_style_json("{")
+            map_handle.dump_debug_logs()
 
         records = []
         while (record := receiver.poll_record()) is not None:
@@ -2864,11 +2819,10 @@ def test_process_global_logging_receiver_copies_native_records() -> None:
 def test_log_receiver_reports_dropped_records() -> None:
     receiver = log.set_log_callback(max_queued_records=1, consume=True)
     try:
-        with mln.RuntimeHandle() as runtime:
-            with runtime.create_map() as map_handle:
-                with pytest.raises((mln.InvalidArgumentError, mln.NativeError)):
-                    map_handle.set_style_json("{")
-                map_handle.dump_debug_logs()
+        with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+            with pytest.raises((mln.InvalidArgumentError, mln.NativeError)):
+                map_handle.set_style_json("{")
+            map_handle.dump_debug_logs()
 
         assert receiver.poll_record() is not None
         assert receiver.dropped_record_count >= 0
@@ -2972,7 +2926,7 @@ def test_resource_provider_adapter_pass_through_closes_temporary_handle() -> Non
         return resource.ResourceProviderDecision.PASS_THROUGH
 
     native = FakeNativeRequest()
-    adapted = resource._adapt_resource_provider_callback(provider)  # noqa: SLF001
+    adapted = resource._adapt_resource_provider_callback(provider)
 
     raw_request = {
         "requested_url": "https://example.test/tile.pbf",
@@ -3037,7 +2991,7 @@ def test_resource_provider_adapter_closes_temporary_handle_on_exception() -> Non
         "prior_data": b"",
     }
     native = FakeNativeRequest()
-    adapted = resource._adapt_resource_provider_callback(provider)  # noqa: SLF001
+    adapted = resource._adapt_resource_provider_callback(provider)
 
     with warnings.catch_warnings(record=True) as captured:
         warnings.simplefilter("always", ResourceWarning)
@@ -3246,12 +3200,15 @@ def test_resource_transform_rewrites_copied_network_style_request() -> None:
             return rewritten_style_url
         return None
 
-    with _online_network(), _http_style_server() as (rewritten_style_url, served):
-        with mln.RuntimeHandle() as runtime:
-            runtime.set_resource_transform(transform, max_pending_callbacks=4)
-            with runtime.create_map() as map_handle:
-                map_handle.set_style_url("http://example.invalid/original-style.json")
-                _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
+    with (
+        _online_network(),
+        _http_style_server() as (rewritten_style_url, served),
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map() as map_handle,
+    ):
+        runtime.set_resource_transform(transform, max_pending_callbacks=4)
+        map_handle.set_style_url("http://example.invalid/original-style.json")
+        _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
 
     assert served.is_set()
     assert transform_requests
@@ -3266,13 +3223,16 @@ def test_resource_transform_can_be_cleared_after_map_creation() -> None:
         calls.append(request)
         return "unsupported://unexpected-rewrite.json"
 
-    with _online_network(), _http_style_server() as (style_url, served):
-        with mln.RuntimeHandle() as runtime:
-            runtime.set_resource_transform(transform, max_pending_callbacks=1)
-            with runtime.create_map() as map_handle:
-                runtime.clear_resource_transform()
-                map_handle.set_style_url(style_url)
-                _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
+    with (
+        _online_network(),
+        _http_style_server() as (style_url, served),
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map() as map_handle,
+    ):
+        runtime.set_resource_transform(transform, max_pending_callbacks=1)
+        runtime.clear_resource_transform()
+        map_handle.set_style_url(style_url)
+        _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
 
     assert served.is_set()
     assert calls == []
@@ -3434,7 +3394,6 @@ def test_resource_provider_deferred_completion_loads_style_with_copied_request()
 
 def test_resource_provider_can_complete_request_from_another_thread() -> None:
     handles: list[resource.ResourceRequestHandle] = []
-    thread_errors: list[BaseException] = []
 
     def provider(
         request: resource.ResourceRequest,
@@ -3445,24 +3404,27 @@ def test_resource_provider_can_complete_request_from_another_thread() -> None:
         handles.append(handle)
         return resource.ResourceProviderDecision.HANDLE
 
-    def complete_on_thread(handle: resource.ResourceRequestHandle) -> None:
-        try:
-            handle.complete(resource.ResourceResponse(bytes=_EMPTY_STYLE_BYTES))
-        except BaseException as error:  # pragma: no cover - re-raised below
-            thread_errors.append(error)
-
     with mln.RuntimeHandle() as runtime:
         runtime.set_resource_provider(provider, max_pending_callbacks=4)
         with runtime.create_map() as map_handle:
             map_handle.set_style_url("custom://cross-thread-style.json")
             handle = _wait_for_provider_handle(runtime, handles)
 
-            thread = threading.Thread(target=complete_on_thread, args=(handle,))
-            thread.start()
-            thread.join(timeout=2)
+            completed = threading.Event()
 
+            def complete() -> None:
+                handle.complete(
+                    resource.ResourceResponse(bytes=_EMPTY_STYLE_BYTES),
+                )
+                completed.set()
+
+            thread = threading.Thread(target=complete, daemon=True)
+            thread.start()
+            assert completed.wait(timeout=2), (
+                "cross-thread resource completion did not return"
+            )
+            thread.join(timeout=2)
             assert not thread.is_alive()
-            assert thread_errors == []
             _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
 
 
@@ -3656,7 +3618,6 @@ def test_resource_request_release_race_with_cancellation_checks_closes_cleanly()
             started = threading.Event()
             stop = threading.Event()
             saw_closed = threading.Event()
-            unexpected_errors: list[BaseException] = []
 
             def probe_cancelled() -> None:
                 while not stop.is_set():
@@ -3666,94 +3627,88 @@ def test_resource_request_release_race_with_cancellation_checks_closes_cleanly()
                     except mln.InvalidArgumentError, mln.InvalidStateError:
                         saw_closed.set()
                         stop.set()
-                    except BaseException as error:  # pragma: no cover - re-raised below
-                        unexpected_errors.append(error)
-                        stop.set()
 
-            thread = threading.Thread(target=probe_cancelled)
-            thread.start()
-            assert started.wait(timeout=2)
-            handle.close()
-            assert saw_closed.wait(timeout=2)
-            stop.set()
-            thread.join(timeout=2)
-
-            assert not thread.is_alive()
-            assert unexpected_errors == []
+            probe = threading.Thread(target=probe_cancelled, daemon=True)
+            probe.start()
+            try:
+                assert started.wait(timeout=2)
+                handle.close()
+                assert saw_closed.wait(timeout=2)
+            finally:
+                stop.set()
+                probe.join(timeout=2)
+            assert not probe.is_alive(), "cancellation probe did not return"
             with pytest.raises(mln.InvalidStateError, match="already closed"):
                 handle.is_cancelled()
 
 
 def test_custom_geometry_source_scaffolding_queues_copied_events() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
-            source = map_handle.add_custom_geometry_source(
-                "custom",
-                style.CustomGeometrySourceOptions(
-                    has_cancel_tile=True,
-                    max_queued_events=1,
-                ),
-            )
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        source = map_handle.add_custom_geometry_source(
+            "custom",
+            style.CustomGeometrySourceOptions(
+                has_cancel_tile=True,
+                max_queued_events=1,
+            ),
+        )
 
-            source._native.push_fetch_for_test(1, 2, 3)
-            source._native.push_cancel_for_test(4, 5, 6)
+        source._native.push_fetch_for_test(1, 2, 3)
+        source._native.push_cancel_for_test(4, 5, 6)
 
-            event = source.poll_event()
-            assert event == style.CustomGeometrySourceEvent(
-                style.CustomGeometrySourceEventType.FETCH_TILE,
-                style.CanonicalTileId(1, 2, 3),
-            )
-            assert source.poll_event() is None
-            assert source.dropped_event_count == 1
+        event = source.poll_event()
+        assert event == style.CustomGeometrySourceEvent(
+            style.CustomGeometrySourceEventType.FETCH_TILE,
+            style.CanonicalTileId(1, 2, 3),
+        )
+        assert source.poll_event() is None
+        assert source.dropped_event_count == 1
 
-            tile = style.CanonicalTileId(0, 0, 0)
-            data = geo.FeatureCollection(
-                (geo.Feature(geometry=geo.Point(geo.LatLng(0.0, 0.0))),)
-            )
-            bounds = geo.LatLngBounds(
-                southwest=geo.LatLng(-1.0, -1.0),
-                northeast=geo.LatLng(1.0, 1.0),
-            )
-            map_handle.set_custom_geometry_source_tile_data("custom", tile, data)
-            map_handle.invalidate_custom_geometry_source_tile("custom", tile)
-            map_handle.invalidate_custom_geometry_source_region("custom", bounds)
-            source.close()
-            assert source.closed
+        tile = style.CanonicalTileId(0, 0, 0)
+        data = geo.FeatureCollection(
+            (geo.Feature(geometry=geo.Point(geo.LatLng(0.0, 0.0))),)
+        )
+        bounds = geo.LatLngBounds(
+            southwest=geo.LatLng(-1.0, -1.0),
+            northeast=geo.LatLng(1.0, 1.0),
+        )
+        map_handle.set_custom_geometry_source_tile_data("custom", tile, data)
+        map_handle.invalidate_custom_geometry_source_tile("custom", tile)
+        map_handle.invalidate_custom_geometry_source_region("custom", bounds)
+        source.close()
+        assert source.closed
 
-            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
-            assert source.closed
+        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        assert source.closed
 
 
 def test_set_style_url_retires_custom_geometry_callback_state() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
-            source = map_handle.add_custom_geometry_source(
-                "custom",
-                style.CustomGeometrySourceOptions(max_queued_events=1),
-            )
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        source = map_handle.add_custom_geometry_source(
+            "custom",
+            style.CustomGeometrySourceOptions(max_queued_events=1),
+        )
 
-            map_handle.set_style_url("https://example.test/style.json")
+        map_handle.set_style_url("https://example.test/style.json")
 
-            assert source.closed
-            source._native.push_fetch_for_test(1, 2, 3)
-            assert source.poll_event() is None
+        assert source.closed
+        source._native.push_fetch_for_test(1, 2, 3)
+        assert source.poll_event() is None
 
 
 def test_remove_style_source_releases_custom_geometry_handle() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
-            source = map_handle.add_custom_geometry_source(
-                "custom-remove",
-                style.CustomGeometrySourceOptions(max_queued_events=1),
-            )
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        source = map_handle.add_custom_geometry_source(
+            "custom-remove",
+            style.CustomGeometrySourceOptions(max_queued_events=1),
+        )
 
-            assert map_handle.remove_style_source("custom-remove") is True
-            assert source.closed
-            source._native.push_fetch_for_test(1, 2, 3)
-            assert source.poll_event() is None
+        assert map_handle.remove_style_source("custom-remove") is True
+        assert source.closed
+        source._native.push_fetch_for_test(1, 2, 3)
+        assert source.poll_event() is None
 
 
 def test_map_close_releases_custom_geometry_handle() -> None:
@@ -3774,14 +3729,13 @@ def test_map_close_releases_custom_geometry_handle() -> None:
 
 
 def test_custom_geometry_source_rejects_empty_queue_capacity() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
-            with pytest.raises(mln.InvalidArgumentError):
-                map_handle.add_custom_geometry_source(
-                    "custom",
-                    style.CustomGeometrySourceOptions(max_queued_events=0),
-                )
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        with pytest.raises(mln.InvalidArgumentError):
+            map_handle.add_custom_geometry_source(
+                "custom",
+                style.CustomGeometrySourceOptions(max_queued_events=0),
+            )
 
 
 def test_set_bounds_rejects_unsupported_constraint() -> None:
@@ -3792,28 +3746,27 @@ def test_set_bounds_rejects_unsupported_constraint() -> None:
         northeast=geo.LatLng(90.0, 180.0),
     )
 
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            with pytest.raises(mln.InvalidArgumentError):
-                map_handle.set_bounds(
-                    camera.BoundOptions(bounds=world)  # type: ignore[arg-type]
-                )
-            assert map_handle.get_bounds().bounds == camera.Unbounded()
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        with pytest.raises(mln.InvalidArgumentError):
+            map_handle.set_bounds(
+                camera.BoundOptions(bounds=world)  # type: ignore[arg-type]
+            )
+        assert map_handle.get_bounds().bounds == camera.Unbounded()
 
 
 @pytest.mark.parametrize("transition_id", [-1, 2**64])
 def test_transition_id_out_of_range_raises_binding_error(transition_id: int) -> None:
     # PyO3 extracts this as Option<u64>, so without a range check the caller
     # would see a bare OverflowError instead of the binding's error shape.
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            with pytest.raises(mln.InvalidArgumentError):
-                map_handle.ease_to(
-                    camera.CameraOptions(zoom=2.0),
-                    camera.AnimationOptions(
-                        duration_ms=0.0, transition_id=transition_id
-                    ),
-                )
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map() as map_handle,
+        pytest.raises(mln.InvalidArgumentError),
+    ):
+        map_handle.ease_to(
+            camera.CameraOptions(zoom=2.0),
+            camera.AnimationOptions(duration_ms=0.0, transition_id=transition_id),
+        )
 
 
 def test_released_map_id_replayed_after_a_new_map_reports_it_stale() -> None:

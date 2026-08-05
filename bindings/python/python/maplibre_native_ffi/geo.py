@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TypeAlias
 
 from .json import JsonMember
 
@@ -78,7 +77,7 @@ class GeometryCollection:
     geometries: tuple[Geometry, ...]
 
 
-Geometry: TypeAlias = (
+type Geometry = (
     EmptyGeometry
     | Point
     | LineString
@@ -123,7 +122,7 @@ class FeatureIdentifierString:
     value: str
 
 
-FeatureIdentifier: TypeAlias = (
+type FeatureIdentifier = (
     None
     | FeatureIdentifierUInt
     | FeatureIdentifierInt
@@ -162,7 +161,7 @@ class FeatureCollection:
     features: tuple[Feature, ...]
 
 
-GeoJson: TypeAlias = GeometryGeoJson | FeatureGeoJson | FeatureCollection
+type GeoJson = GeometryGeoJson | FeatureGeoJson | FeatureCollection
 
 
 __all__ = [

@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
 import threading
 import time
-
-import pytest
+from collections.abc import Callable
+from dataclasses import dataclass
 
 import maplibre_native_ffi as mln
+import pytest
 from maplibre_native_ffi import camera, geo, json, query, render
-
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
     assert_cluster_feature_extensions,
@@ -19,7 +17,7 @@ from render_backend_helpers.runtime import (
 
 try:
     from render_backend_helpers.metal import MetalContext, MetalUnavailableError
-except Exception as error:  # pragma: no cover - host fixture dependency
+except (ImportError, OSError, RuntimeError) as error:  # pragma: no cover
     skip_or_fail_fixture_setup(
         f"Metal Python render fixtures are unavailable: {error}",
         "metal",
@@ -442,16 +440,15 @@ def test_real_metal_render_session_reports_wrong_thread_errors(
         *set_target_calls(metal_owned_session.session),
     )
 
+    def run_call(call: Callable[[], object], observed: list[Exception]) -> None:
+        try:
+            call()
+        except mln.WrongThreadError as error:
+            observed.append(error)
+
     for call in calls:
-        observed: list[BaseException] = []
-
-        def run_call() -> None:
-            try:
-                call()
-            except BaseException as error:
-                observed.append(error)
-
-        thread = threading.Thread(target=run_call)
+        observed: list[Exception] = []
+        thread = threading.Thread(target=run_call, args=(call, observed))
         thread.start()
         thread.join()
 

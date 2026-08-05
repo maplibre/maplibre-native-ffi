@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from . import _native
-from ._lifecycle import NativeHandleMixin
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from enum import IntFlag
 from typing import Any
-from collections.abc import Callable
 
+from . import _native
+from ._lifecycle import NativeHandleMixin
 from .geo import Feature
 from .json import JsonObject, JsonValue
 from .query import (
@@ -66,7 +66,7 @@ class NativePointer:
         self._diagnostic_name = _diagnostic_name
 
     @classmethod
-    def null(cls) -> "NativePointer":
+    def null(cls) -> NativePointer:
         """Return a null native pointer value."""
         return cls(0)
 
@@ -161,39 +161,39 @@ class RenderTargetExtent:
 class MetalContextDescriptor:
     """Borrowed Metal context values shared by Metal render targets."""
 
-    device: NativePointer = NativePointer(0)
+    device: NativePointer = field(default_factory=NativePointer.null)
 
 
 @dataclass(frozen=True, slots=True)
 class VulkanContextDescriptor:
     """Borrowed Vulkan context values shared by Vulkan render targets."""
 
-    instance: NativePointer = NativePointer(0)
-    physical_device: NativePointer = NativePointer(0)
-    device: NativePointer = NativePointer(0)
-    graphics_queue: NativePointer = NativePointer(0)
+    instance: NativePointer = field(default_factory=NativePointer.null)
+    physical_device: NativePointer = field(default_factory=NativePointer.null)
+    device: NativePointer = field(default_factory=NativePointer.null)
+    graphics_queue: NativePointer = field(default_factory=NativePointer.null)
     graphics_queue_family_index: int = 0
-    get_instance_proc_addr: NativePointer = NativePointer(0)
-    get_device_proc_addr: NativePointer = NativePointer(0)
+    get_instance_proc_addr: NativePointer = field(default_factory=NativePointer.null)
+    get_device_proc_addr: NativePointer = field(default_factory=NativePointer.null)
 
 
 @dataclass(frozen=True, slots=True)
 class WglContextDescriptor:
     """Borrowed WGL context values shared by OpenGL render targets."""
 
-    device_context: NativePointer = NativePointer(0)
-    share_context: NativePointer = NativePointer(0)
-    get_proc_address: NativePointer = NativePointer(0)
+    device_context: NativePointer = field(default_factory=NativePointer.null)
+    share_context: NativePointer = field(default_factory=NativePointer.null)
+    get_proc_address: NativePointer = field(default_factory=NativePointer.null)
 
 
 @dataclass(frozen=True, slots=True)
 class EglContextDescriptor:
     """Borrowed EGL context values shared by OpenGL render targets."""
 
-    display: NativePointer = NativePointer(0)
-    config: NativePointer = NativePointer(0)
-    share_context: NativePointer = NativePointer(0)
-    get_proc_address: NativePointer = NativePointer(0)
+    display: NativePointer = field(default_factory=NativePointer.null)
+    config: NativePointer = field(default_factory=NativePointer.null)
+    share_context: NativePointer = field(default_factory=NativePointer.null)
+    get_proc_address: NativePointer = field(default_factory=NativePointer.null)
 
 
 OpenGLContextDescriptor = WglContextDescriptor | EglContextDescriptor
@@ -205,7 +205,7 @@ class MetalSurfaceDescriptor:
 
     extent: RenderTargetExtent = RenderTargetExtent()
     context: MetalContextDescriptor = MetalContextDescriptor()
-    layer: NativePointer = NativePointer(0)
+    layer: NativePointer = field(default_factory=NativePointer.null)
 
 
 @dataclass(frozen=True, slots=True)
@@ -214,7 +214,7 @@ class VulkanSurfaceDescriptor:
 
     extent: RenderTargetExtent = RenderTargetExtent()
     context: VulkanContextDescriptor = VulkanContextDescriptor()
-    surface: NativePointer = NativePointer(0)
+    surface: NativePointer = field(default_factory=NativePointer.null)
 
 
 @dataclass(frozen=True, slots=True)
@@ -223,7 +223,7 @@ class OpenGLSurfaceDescriptor:
 
     extent: RenderTargetExtent = RenderTargetExtent()
     context: OpenGLContextDescriptor = EglContextDescriptor()
-    surface: NativePointer = NativePointer(0)
+    surface: NativePointer = field(default_factory=NativePointer.null)
 
 
 @dataclass(frozen=True, slots=True)
@@ -242,7 +242,7 @@ class MetalBorrowedTextureDescriptor:
     # Sized by its owner, not derived from extent.
     physical_width: int
     physical_height: int
-    texture: NativePointer = NativePointer(0)
+    texture: NativePointer = field(default_factory=NativePointer.null)
 
 
 @dataclass(frozen=True, slots=True)
@@ -262,8 +262,8 @@ class VulkanBorrowedTextureDescriptor:
     physical_width: int
     physical_height: int
     context: VulkanContextDescriptor = VulkanContextDescriptor()
-    image: NativePointer = NativePointer(0)
-    image_view: NativePointer = NativePointer(0)
+    image: NativePointer = field(default_factory=NativePointer.null)
+    image_view: NativePointer = field(default_factory=NativePointer.null)
     format: int = 0
     initial_layout: int = 0
     final_layout: int = 0
@@ -300,7 +300,7 @@ class TextureImageInfo:
     byte_length: int
 
     @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> "TextureImageInfo":
+    def _from_native(cls, raw: dict[str, Any]) -> TextureImageInfo:
         return cls(
             width=raw["width"],
             height=raw["height"],
@@ -317,7 +317,7 @@ class PremultipliedRgba8Image:
     data: bytes
 
     @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> "PremultipliedRgba8Image":
+    def _from_native(cls, raw: dict[str, Any]) -> PremultipliedRgba8Image:
         return cls(info=TextureImageInfo._from_native(raw["info"]), data=raw["data"])
 
 
@@ -333,7 +333,7 @@ class MetalOwnedTextureFrame:
     pixel_format: int
 
     @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> "MetalOwnedTextureFrame":
+    def _from_native(cls, raw: dict[str, Any]) -> MetalOwnedTextureFrame:
         return cls(
             generation=raw["generation"],
             width=raw["width"],
@@ -357,7 +357,7 @@ class VulkanOwnedTextureFrame:
     layout: int
 
     @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> "VulkanOwnedTextureFrame":
+    def _from_native(cls, raw: dict[str, Any]) -> VulkanOwnedTextureFrame:
         return cls(
             generation=raw["generation"],
             width=raw["width"],
@@ -384,7 +384,7 @@ class OpenGLOwnedTextureFrame:
     type: int
 
     @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> "OpenGLOwnedTextureFrame":
+    def _from_native(cls, raw: dict[str, Any]) -> OpenGLOwnedTextureFrame:
         return cls(
             generation=raw["generation"],
             width=raw["width"],
@@ -414,7 +414,7 @@ class DetachedRenderSessionHandle(NativeHandleMixin):
         self._native = native
 
     @classmethod
-    def _from_native(cls, native: Any) -> "DetachedRenderSessionHandle":
+    def _from_native(cls, native: Any) -> DetachedRenderSessionHandle:
         return cls(native, _create_key=_DETACHED_RENDER_SESSION_HANDLE_CREATE_KEY)
 
 
@@ -437,7 +437,7 @@ class RenderSessionHandle(NativeHandleMixin):
         self._map: MapHandle | None = map_handle
 
     @classmethod
-    def _from_native(cls, native: Any, map_handle: MapHandle) -> "RenderSessionHandle":
+    def _from_native(cls, native: Any, map_handle: MapHandle) -> RenderSessionHandle:
         return cls(native, map_handle, _create_key=_RENDER_SESSION_HANDLE_CREATE_KEY)
 
     @property
@@ -623,7 +623,7 @@ class RenderSessionHandle(NativeHandleMixin):
         """
         native = self._native.detach()
         self._map = None
-        return DetachedRenderSessionHandle._from_native(native)  # noqa: SLF001
+        return DetachedRenderSessionHandle._from_native(native)
 
     def reduce_memory_use(self) -> None:
         """Ask the session renderer to release cached resources where possible."""
@@ -647,21 +647,21 @@ class RenderSessionHandle(NativeHandleMixin):
             self._native.read_premultiplied_rgba8_into(buffer)
         )
 
-    def acquire_metal_owned_texture_frame(self) -> "MetalOwnedTextureFrameHandle":
+    def acquire_metal_owned_texture_frame(self) -> MetalOwnedTextureFrameHandle:
         """Acquire a borrowed Metal frame from a session-owned texture target."""
-        return MetalOwnedTextureFrameHandle._from_native(  # noqa: SLF001
+        return MetalOwnedTextureFrameHandle._from_native(
             self._native.acquire_metal_owned_texture_frame()
         )
 
-    def acquire_vulkan_owned_texture_frame(self) -> "VulkanOwnedTextureFrameHandle":
+    def acquire_vulkan_owned_texture_frame(self) -> VulkanOwnedTextureFrameHandle:
         """Acquire a borrowed Vulkan frame from a session-owned texture target."""
-        return VulkanOwnedTextureFrameHandle._from_native(  # noqa: SLF001
+        return VulkanOwnedTextureFrameHandle._from_native(
             self._native.acquire_vulkan_owned_texture_frame()
         )
 
-    def acquire_opengl_owned_texture_frame(self) -> "OpenGLOwnedTextureFrameHandle":
+    def acquire_opengl_owned_texture_frame(self) -> OpenGLOwnedTextureFrameHandle:
         """Acquire a borrowed OpenGL frame from a session-owned texture target."""
-        return OpenGLOwnedTextureFrameHandle._from_native(  # noqa: SLF001
+        return OpenGLOwnedTextureFrameHandle._from_native(
             self._native.acquire_opengl_owned_texture_frame()
         )
 
@@ -771,7 +771,7 @@ class MetalOwnedTextureFrameHandle(NativeHandleMixin):
         self._native = native
 
     @classmethod
-    def _from_native(cls, native: Any) -> "MetalOwnedTextureFrameHandle":
+    def _from_native(cls, native: Any) -> MetalOwnedTextureFrameHandle:
         return cls(native, _create_key=_METAL_FRAME_HANDLE_CREATE_KEY)
 
     @property
@@ -810,7 +810,7 @@ class VulkanOwnedTextureFrameHandle(NativeHandleMixin):
         self._native = native
 
     @classmethod
-    def _from_native(cls, native: Any) -> "VulkanOwnedTextureFrameHandle":
+    def _from_native(cls, native: Any) -> VulkanOwnedTextureFrameHandle:
         return cls(native, _create_key=_VULKAN_FRAME_HANDLE_CREATE_KEY)
 
     @property
@@ -858,7 +858,7 @@ class OpenGLOwnedTextureFrameHandle(NativeHandleMixin):
         self._native = native
 
     @classmethod
-    def _from_native(cls, native: Any) -> "OpenGLOwnedTextureFrameHandle":
+    def _from_native(cls, native: Any) -> OpenGLOwnedTextureFrameHandle:
         return cls(native, _create_key=_OPENGL_FRAME_HANDLE_CREATE_KEY)
 
     @property
@@ -930,4 +930,4 @@ __all__ = [
     "WglContextDescriptor",
 ]
 
-from .map import MapHandle  # noqa: E402
+from .map import MapHandle

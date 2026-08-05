@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
+
 from ._enum import NativeIntEnum, UnknownIntEnum
 from ._lifecycle import ContextHandleMixin, WarnUnclosedMixin
-from dataclasses import dataclass
-from typing import Any, Callable
 
 _REQUEST_HANDLE_CREATE_KEY = object()
 
@@ -87,7 +89,7 @@ class ByteRange:
     end: int
 
     @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> "ByteRange":
+    def _from_native(cls, raw: dict[str, Any]) -> ByteRange:
         return cls(start=raw["start"], end=raw["end"])
 
 
@@ -113,7 +115,7 @@ class ResourceRequest:
     prior_data: bytes
 
     @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> "ResourceRequest":
+    def _from_native(cls, raw: dict[str, Any]) -> ResourceRequest:
         raw_range = raw["range"]
         return cls(
             requested_url=raw["requested_url"],
@@ -139,7 +141,7 @@ class ResourceTransformRequest:
     url: str
 
     @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> "ResourceTransformRequest":
+    def _from_native(cls, raw: dict[str, Any]) -> ResourceTransformRequest:
         return cls(kind=ResourceKind(raw["kind"]), url=raw["url"])
 
 
@@ -151,7 +153,7 @@ class HttpHeaderTransformRequest:
     url: str
 
     @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> "HttpHeaderTransformRequest":
+    def _from_native(cls, raw: dict[str, Any]) -> HttpHeaderTransformRequest:
         return cls(kind=ResourceKind(raw["kind"]), url=raw["url"])
 
 
@@ -204,7 +206,7 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
         self._closed = False
 
     @classmethod
-    def _from_native(cls, native: Any) -> "ResourceRequestHandle":
+    def _from_native(cls, native: Any) -> ResourceRequestHandle:
         return cls(native, _create_key=_REQUEST_HANDLE_CREATE_KEY)
 
     @property
@@ -281,7 +283,7 @@ def _adapt_resource_provider_callback(
     callback: ResourceProviderCallback,
 ) -> Callable[[dict[str, Any], Any], int]:
     def adapted(raw_request: dict[str, Any], native_handle: Any) -> int:
-        handle = ResourceRequestHandle._from_native(native_handle)  # noqa: SLF001
+        handle = ResourceRequestHandle._from_native(native_handle)
         try:
             decision = ResourceProviderDecision(
                 callback(ResourceRequest._from_native(raw_request), handle)

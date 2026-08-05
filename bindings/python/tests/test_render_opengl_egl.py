@@ -1,16 +1,14 @@
 from __future__ import annotations
 
+import threading
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-import threading
-import time
-
-import pytest
 
 import maplibre_native_ffi as mln
+import pytest
 from maplibre_native_ffi import camera, geo, json, query, render
-
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
     RED_BACKGROUND_STYLE_JSON,
@@ -28,7 +26,12 @@ try:
         EglPbufferSurface,
         EglUnavailableError,
     )
-except Exception as error:  # pragma: no cover - host fixture dependency
+except (
+    AttributeError,
+    ImportError,
+    OSError,
+    RuntimeError,
+) as error:  # pragma: no cover
     skip_or_fail_fixture_setup(
         f"EGL Python render fixtures are unavailable: {error}",
         "opengl",
@@ -269,34 +272,35 @@ def _borrowed_descriptor_snapshot(
 
 
 def test_invalid_opengl_surface_attach_reports_native_status() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            with pytest.raises(
-                (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
-            ) as raised:
-                map_handle.attach_opengl_surface(render.OpenGLSurfaceDescriptor())
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        with pytest.raises(
+            (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
+        ) as raised:
+            map_handle.attach_opengl_surface(render.OpenGLSurfaceDescriptor())
 
-            assert raised.value.status in {
-                mln.MaplibreStatus.INVALID_ARGUMENT,
-                mln.MaplibreStatus.UNSUPPORTED,
-            }
+        assert raised.value.status in {
+            mln.MaplibreStatus.INVALID_ARGUMENT,
+            mln.MaplibreStatus.UNSUPPORTED,
+        }
 
 
 def test_egl_pbuffer_surface_attach_reports_public_session_shape() -> None:
-    with _egl_context() as context:
-        with _egl_pbuffer_surface(context) as surface:
-            with mln.RuntimeHandle() as runtime:
-                with runtime.create_map(
-                    mln.MapOptions(width=surface.width, height=surface.height)
-                ) as map_handle:
-                    session = map_handle.attach_opengl_surface(surface.descriptor())
-                    try:
-                        _assert_public_session_shape(session)
+    with (
+        _egl_context() as context,
+        _egl_pbuffer_surface(context) as surface,
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map(
+            mln.MapOptions(width=surface.width, height=surface.height)
+        ) as map_handle,
+    ):
+        session = map_handle.attach_opengl_surface(surface.descriptor())
+        try:
+            _assert_public_session_shape(session)
 
-                        map_handle.set_style_json(EMPTY_STYLE_JSON)
-                        render_until_update(runtime, session)
-                    finally:
-                        session.close()
+            map_handle.set_style_json(EMPTY_STYLE_JSON)
+            render_until_update(runtime, session)
+        finally:
+            session.close()
 
 
 def test_attach_returns_public_render_session_and_rejects_second_session(
@@ -536,16 +540,15 @@ def test_real_opengl_render_session_reports_wrong_thread_errors(
         opengl_owned_session.session.close,
     )
 
+    def run_call(call: Callable[[], object], observed: list[Exception]) -> None:
+        try:
+            call()
+        except mln.WrongThreadError as error:
+            observed.append(error)
+
     for call in calls:
-        observed: list[BaseException] = []
-
-        def run_call() -> None:
-            try:
-                call()
-            except BaseException as error:
-                observed.append(error)
-
-        thread = threading.Thread(target=run_call)
+        observed: list[Exception] = []
+        thread = threading.Thread(target=run_call, args=(call, observed))
         thread.start()
         thread.join()
 
@@ -556,40 +559,41 @@ def test_real_opengl_render_session_reports_wrong_thread_errors(
 
 
 def test_egl_borrowed_texture_session_close_preserves_caller_resources() -> None:
-    with _egl_context() as context:
-        with _egl_borrowed_texture(context) as texture:
-            descriptor = texture.descriptor()
-            before_descriptor = _borrowed_descriptor_snapshot(descriptor)
-            before_texture = texture.texture
+    with _egl_context() as context, _egl_borrowed_texture(context) as texture:
+        descriptor = texture.descriptor()
+        before_descriptor = _borrowed_descriptor_snapshot(descriptor)
+        before_texture = texture.texture
 
-            with mln.RuntimeHandle() as runtime:
-                with runtime.create_map(
-                    mln.MapOptions(
-                        width=descriptor.extent.width,
-                        height=descriptor.extent.height,
-                    )
-                ) as map_handle:
-                    session = map_handle.attach_opengl_borrowed_texture(descriptor)
-                    try:
-                        _assert_public_session_shape(session)
+        with (
+            mln.RuntimeHandle() as runtime,
+            runtime.create_map(
+                mln.MapOptions(
+                    width=descriptor.extent.width,
+                    height=descriptor.extent.height,
+                )
+            ) as map_handle,
+        ):
+            session = map_handle.attach_opengl_borrowed_texture(descriptor)
+            try:
+                _assert_public_session_shape(session)
 
-                        map_handle.set_style_json(EMPTY_STYLE_JSON)
-                        render_until_update(runtime, session)
+                map_handle.set_style_json(EMPTY_STYLE_JSON)
+                render_until_update(runtime, session)
 
-                        with pytest.raises(mln.UnsupportedFeatureError) as raised:
-                            session.acquire_opengl_owned_texture_frame()
-                        assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
-                    finally:
-                        session.close()
+                with pytest.raises(mln.UnsupportedFeatureError) as raised:
+                    session.acquire_opengl_owned_texture_frame()
+                assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
+            finally:
+                session.close()
 
-            assert _borrowed_descriptor_snapshot(descriptor) == before_descriptor
-            assert texture.texture == before_texture
-            assert texture.exists()
+        assert _borrowed_descriptor_snapshot(descriptor) == before_descriptor
+        assert texture.texture == before_texture
+        assert texture.exists()
 
-            replacement_descriptor = texture.descriptor()
-            assert _borrowed_descriptor_snapshot(replacement_descriptor) == (
-                before_descriptor
-            )
+        replacement_descriptor = texture.descriptor()
+        assert _borrowed_descriptor_snapshot(replacement_descriptor) == (
+            before_descriptor
+        )
 
 
 def test_egl_borrowed_texture_set_target_hands_over_a_replacement() -> None:
@@ -599,79 +603,77 @@ def test_egl_borrowed_texture_set_target_hands_over_a_replacement() -> None:
     resize allocates a texture at the new size and hands it over instead of
     resizing this session.
     """
-    with _egl_context() as context:
-        with _egl_borrowed_texture(context) as texture:
-            descriptor = texture.descriptor()
+    with _egl_context() as context, _egl_borrowed_texture(context) as texture:
+        descriptor = texture.descriptor()
 
-            with mln.RuntimeHandle() as runtime:
-                with runtime.create_map(
-                    mln.MapOptions(
-                        width=descriptor.extent.width,
-                        height=descriptor.extent.height,
-                    )
-                ) as map_handle:
-                    session = map_handle.attach_opengl_borrowed_texture(descriptor)
+        with (
+            mln.RuntimeHandle() as runtime,
+            runtime.create_map(
+                mln.MapOptions(
+                    width=descriptor.extent.width,
+                    height=descriptor.extent.height,
+                )
+            ) as map_handle,
+        ):
+            session = map_handle.attach_opengl_borrowed_texture(descriptor)
+            try:
+                map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON)
+                render_until_update(runtime, session)
+
+                with pytest.raises(mln.UnsupportedFeatureError) as raised:
+                    session.resize(48, 24, 1.0)
+                assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
+
+                with _egl_borrowed_texture(context, width=48, height=24) as replacement:
+                    # Freshly allocated, so anything drawn into it
+                    # later came from this session after the handoff.
+                    assert not any(replacement.read_rgba())
+
+                    # The C API replaces the target on the calling
+                    # thread, so the host context is current for it.
+                    context.make_current(replacement.surface)
                     try:
-                        map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON)
-                        render_until_update(runtime, session)
-
-                        with pytest.raises(mln.UnsupportedFeatureError) as raised:
-                            session.resize(48, 24, 1.0)
-                        assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
-
-                        with _egl_borrowed_texture(
-                            context, width=48, height=24
-                        ) as replacement:
-                            # Freshly allocated, so anything drawn into it
-                            # later came from this session after the handoff.
-                            assert not any(replacement.read_rgba())
-
-                            # The C API replaces the target on the calling
-                            # thread, so the host context is current for it.
-                            context.make_current(replacement.surface)
-                            try:
-                                session.set_opengl_borrowed_texture_target(
-                                    replacement.descriptor()
-                                )
-                            finally:
-                                context.clear_current()
-
-                            # The session kept its renderer and paints the
-                            # texture it was handed, at the extent handed with
-                            # it, once the map catches up.
-                            render_until(
-                                runtime,
-                                session,
-                                lambda: (
-                                    map_handle.get_size()
-                                    == (48, 24, pytest.approx(1.0))
-                                    and any(replacement.read_rgba())
-                                ),
-                                "the replacement texture was never rendered into",
-                            )
-                            assert session.render_update()
-
-                            # Both textures belong to their owner: the session
-                            # neither released the outgoing one nor took over
-                            # the replacement's lifetime.
-                            assert texture.exists()
-                            assert replacement.exists()
-
-                            # A surface descriptor names a target this session
-                            # does not have.
-                            with pytest.raises(mln.UnsupportedFeatureError) as raised:
-                                session.set_opengl_surface_target(
-                                    render.OpenGLSurfaceDescriptor(
-                                        extent=replacement.descriptor().extent,
-                                        context=context.descriptor(),
-                                        surface=render.NativePointer(0x1),
-                                    )
-                                )
-                            assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
-                            # The rejection left the session usable.
-                            session.render_update()
+                        session.set_opengl_borrowed_texture_target(
+                            replacement.descriptor()
+                        )
                     finally:
-                        session.close()
+                        context.clear_current()
+
+                    # The session kept its renderer and paints the
+                    # texture it was handed, at the extent handed with
+                    # it, once the map catches up.
+                    render_until(
+                        runtime,
+                        session,
+                        lambda: (
+                            map_handle.get_size() == (48, 24, pytest.approx(1.0))
+                            and any(replacement.read_rgba())
+                        ),
+                        "the replacement texture was never rendered into",
+                    )
+                    assert session.render_update()
+
+                    # Both textures belong to their owner: the session
+                    # neither released the outgoing one nor took over
+                    # the replacement's lifetime.
+                    assert texture.exists()
+                    assert replacement.exists()
+
+                    # A surface descriptor names a target this session
+                    # does not have.
+                    with pytest.raises(mln.UnsupportedFeatureError) as raised:
+                        session.set_opengl_surface_target(
+                            render.OpenGLSurfaceDescriptor(
+                                extent=replacement.descriptor().extent,
+                                context=context.descriptor(),
+                                surface=render.NativePointer(0x1),
+                            )
+                        )
+                    assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
+                    # The rejection left the session usable.
+                    session.render_update()
+            finally:
+                session.close()
 
 
 def test_cluster_feature_extension_queries_resolve_unsigned_cluster_id_and_limit(

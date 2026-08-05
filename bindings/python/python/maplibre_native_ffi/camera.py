@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TypeAlias
 
 from .geo import LatLng, LatLngBounds
 
@@ -74,7 +73,7 @@ class CameraOptions:
     field_of_view: float | None = None
 
     @classmethod
-    def _from_native(cls, raw: dict[str, object]) -> "CameraOptions":
+    def _from_native(cls, raw: dict[str, object]) -> CameraOptions:
         center = raw["center"]
         padding = raw["padding"]
         anchor = raw["anchor"]
@@ -132,7 +131,7 @@ class Unbounded:
     """
 
 
-BoundsConstraint: TypeAlias = Bounded | Unbounded
+type BoundsConstraint = Bounded | Unbounded
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,7 +145,7 @@ class BoundOptions:
     max_pitch: float | None = None
 
     @classmethod
-    def _from_native(cls, raw: dict[str, object]) -> "BoundOptions":
+    def _from_native(cls, raw: dict[str, object]) -> BoundOptions:
         raw_bounds = raw["bounds"]
         bounds: BoundsConstraint | None
         if isinstance(raw_bounds, dict):
@@ -177,7 +176,7 @@ class FreeCameraOptions:
     orientation: Quaternion | None = None
 
     @classmethod
-    def _from_native(cls, raw: dict[str, object]) -> "FreeCameraOptions":
+    def _from_native(cls, raw: dict[str, object]) -> FreeCameraOptions:
         position = raw["position"]
         orientation = raw["orientation"]
         return cls(
@@ -197,7 +196,7 @@ class ProjectionMode:
     y_skew: float | None = None
 
     @classmethod
-    def _from_native(cls, raw: dict[str, object]) -> "ProjectionMode":
+    def _from_native(cls, raw: dict[str, object]) -> ProjectionMode:
         return cls(
             axonometric=raw["axonometric"],
             x_skew=raw["x_skew"],

@@ -9,10 +9,9 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
-import urllib.parse
 import urllib.error
+import urllib.parse
 import urllib.request
-
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MANAGED_PROJECT = (

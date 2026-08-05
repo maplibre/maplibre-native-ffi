@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-from ._enum import NativeIntEnum
-from ._lifecycle import NativeHandleMixin
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
 from enum import IntFlag
+from typing import Any
 
 from . import _native
+from ._enum import NativeIntEnum
+from ._lifecycle import NativeHandleMixin
 from .camera import (
     AnimationOptions,
-    BoundOptions,
     Bounded,
+    BoundOptions,
     CameraFitOptions,
     CameraOptions,
     EdgeInsets,
@@ -44,10 +44,10 @@ from .style import (
     CustomGeometrySourceHandle,
     CustomGeometrySourceOptions,
     GeoJsonSourceOptions,
+    ImageStretch,
     LocationIndicatorImageKind,
     StyleImage,
     StyleImageInfo,
-    ImageStretch,
     StyleImageOptions,
     StyleLayerVisibility,
     StyleSourceInfo,
@@ -137,7 +137,7 @@ class MapViewportOptions:
     frustum_offset: EdgeInsets | None = None
 
     @classmethod
-    def _from_native(cls, raw: dict[str, object]) -> "MapViewportOptions":
+    def _from_native(cls, raw: dict[str, object]) -> MapViewportOptions:
         frustum_offset = raw["frustum_offset"]
         return cls(
             north_orientation=NorthOrientation(raw["north_orientation"])
@@ -167,7 +167,7 @@ class MapTileOptions:
     lod_mode: TileLodMode | None = None
 
     @classmethod
-    def _from_native(cls, raw: dict[str, object]) -> "MapTileOptions":
+    def _from_native(cls, raw: dict[str, object]) -> MapTileOptions:
         return cls(
             prefetch_zoom_delta=raw["prefetch_zoom_delta"],
             lod_min_radius=raw["lod_min_radius"],
@@ -441,7 +441,7 @@ class MapProjectionHandle(NativeHandleMixin):
         self._native = native
 
     @classmethod
-    def _from_native(cls, native: object) -> "MapProjectionHandle":
+    def _from_native(cls, native: object) -> MapProjectionHandle:
         return cls(native, _create_key=_MAP_PROJECTION_HANDLE_CREATE_KEY)
 
     def get_camera(self) -> CameraOptions:
@@ -525,12 +525,12 @@ class MapHandle(NativeHandleMixin):
             options.fast_pfor_enabled,
         )
         self._native_id_value = int(self._native.id())
-        runtime._register_map(self)  # noqa: SLF001
+        runtime._register_map(self)
 
     @classmethod
     def _create(
         cls, runtime: RuntimeHandle, options: MapOptions | None = None
-    ) -> "MapHandle":
+    ) -> MapHandle:
         return cls(runtime, options, _create_key=_MAP_HANDLE_CREATE_KEY)
 
     def _native_id(self) -> int:
@@ -544,7 +544,7 @@ class MapHandle(NativeHandleMixin):
         state you mirror from events before closing.
         """
         self._native.close()
-        self._runtime._unregister_map(self)  # noqa: SLF001
+        self._runtime._unregister_map(self)
 
     def request_repaint(self) -> None:
         """Request a repaint for a continuous map."""
@@ -1158,7 +1158,7 @@ class MapHandle(NativeHandleMixin):
 
     def create_projection(self) -> MapProjectionHandle:
         """Create a standalone projection helper from the current map transform."""
-        return MapProjectionHandle._from_native(self._native.create_projection())  # noqa: SLF001
+        return MapProjectionHandle._from_native(self._native.create_projection())
 
     def get_camera(self) -> CameraOptions:
         """Return the current camera snapshot."""
@@ -1450,7 +1450,7 @@ class MapHandle(NativeHandleMixin):
             options.wrap,
             options.has_cancel_tile,
         )
-        return CustomGeometrySourceHandle._from_native(native)  # noqa: SLF001
+        return CustomGeometrySourceHandle._from_native(native)
 
     def set_custom_geometry_source_tile_data(
         self,
@@ -1506,7 +1506,7 @@ class MapHandle(NativeHandleMixin):
             extent.scale_factor,
             *args,
         )
-        return RenderSessionHandle._from_native(native, self)  # noqa: SLF001
+        return RenderSessionHandle._from_native(native, self)
 
     def attach_metal_surface(
         self, descriptor: MetalSurfaceDescriptor
@@ -1671,4 +1671,4 @@ __all__ = [
     "projected_meters_for_lat_lng",
 ]
 
-from .runtime import RuntimeHandle  # noqa: E402
+from .runtime import RuntimeHandle

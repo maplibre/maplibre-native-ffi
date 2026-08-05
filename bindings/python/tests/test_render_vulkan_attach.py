@@ -3,11 +3,9 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-import pytest
-
 import maplibre_native_ffi as mln
+import pytest
 from maplibre_native_ffi import render
-
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
     render_until,
@@ -21,7 +19,7 @@ try:
         VulkanContext,
         VulkanUnavailableError,
     )
-except Exception as error:  # pragma: no cover - host fixture dependency
+except (ImportError, OSError, RuntimeError) as error:  # pragma: no cover
     skip_or_fail_fixture_setup(
         f"Vulkan Python render fixtures are unavailable: {error}",
         "vulkan",
@@ -108,72 +106,73 @@ def _descriptor_snapshot(
 
 
 def test_invalid_vulkan_surface_attach_reports_native_status() -> None:
-    with mln.RuntimeHandle() as runtime:
-        with runtime.create_map() as map_handle:
-            with pytest.raises(
-                (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
-            ) as raised:
-                map_handle.attach_vulkan_surface(render.VulkanSurfaceDescriptor())
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        with pytest.raises(
+            (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
+        ) as raised:
+            map_handle.attach_vulkan_surface(render.VulkanSurfaceDescriptor())
 
-            assert raised.value.status in {
-                mln.MaplibreStatus.INVALID_ARGUMENT,
-                mln.MaplibreStatus.UNSUPPORTED,
-            }
+        assert raised.value.status in {
+            mln.MaplibreStatus.INVALID_ARGUMENT,
+            mln.MaplibreStatus.UNSUPPORTED,
+        }
 
 
 def test_vulkan_borrowed_texture_attach_reports_public_render_session_shape() -> None:
     _require_native_vulkan_support()
 
-    with _vulkan_context() as context:
-        with _vulkan_borrowed_image(context) as image:
-            descriptor = image.descriptor()
+    with _vulkan_context() as context, _vulkan_borrowed_image(context) as image:
+        descriptor = image.descriptor()
 
-            with mln.RuntimeHandle() as runtime:
-                with runtime.create_map(
-                    mln.MapOptions(
-                        width=descriptor.extent.width,
-                        height=descriptor.extent.height,
-                    )
-                ) as map_handle:
-                    session = map_handle.attach_vulkan_borrowed_texture(descriptor)
-                    try:
-                        _assert_public_session_shape(session)
+        with (
+            mln.RuntimeHandle() as runtime,
+            runtime.create_map(
+                mln.MapOptions(
+                    width=descriptor.extent.width,
+                    height=descriptor.extent.height,
+                )
+            ) as map_handle,
+        ):
+            session = map_handle.attach_vulkan_borrowed_texture(descriptor)
+            try:
+                _assert_public_session_shape(session)
 
-                        map_handle.set_style_json(EMPTY_STYLE_JSON)
-                        render_until_update(runtime, session)
+                map_handle.set_style_json(EMPTY_STYLE_JSON)
+                render_until_update(runtime, session)
 
-                        with pytest.raises(mln.UnsupportedFeatureError) as raised:
-                            session.acquire_vulkan_owned_texture_frame()
-                        assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
-                    finally:
-                        session.close()
+                with pytest.raises(mln.UnsupportedFeatureError) as raised:
+                    session.acquire_vulkan_owned_texture_frame()
+                assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
+            finally:
+                session.close()
 
 
 def test_vulkan_borrowed_texture_session_close_preserves_caller_resources() -> None:
     _require_native_vulkan_support()
 
-    with _vulkan_context() as context:
-        with _vulkan_borrowed_image(context) as image:
-            descriptor = image.descriptor()
-            before_descriptor = _descriptor_snapshot(descriptor)
-            before_resources = (image.image, image.image_view, image.memory)
+    with _vulkan_context() as context, _vulkan_borrowed_image(context) as image:
+        descriptor = image.descriptor()
+        before_descriptor = _descriptor_snapshot(descriptor)
+        before_resources = (image.image, image.image_view, image.memory)
 
-            with mln.RuntimeHandle() as runtime:
-                with runtime.create_map(
-                    mln.MapOptions(
-                        width=descriptor.extent.width,
-                        height=descriptor.extent.height,
-                    )
-                ) as map_handle:
-                    session = map_handle.attach_vulkan_borrowed_texture(descriptor)
-                    _assert_public_session_shape(session)
-                    session.close()
+        with (
+            mln.RuntimeHandle() as runtime,
+            runtime.create_map(
+                mln.MapOptions(
+                    width=descriptor.extent.width,
+                    height=descriptor.extent.height,
+                )
+            ) as map_handle,
+        ):
+            session = map_handle.attach_vulkan_borrowed_texture(descriptor)
+            _assert_public_session_shape(session)
+            session.close()
 
-            assert _descriptor_snapshot(descriptor) == before_descriptor
-            assert (image.image, image.image_view, image.memory) == before_resources
+        assert _descriptor_snapshot(descriptor) == before_descriptor
+        assert (image.image, image.image_view, image.memory) == before_resources
 
-            replacement_descriptor = image.descriptor()
-            assert _descriptor_snapshot(replacement_descriptor) == before_descriptor
+        replacement_descriptor = image.descriptor()
+        assert _descriptor_snapshot(replacement_descriptor) == before_descriptor
 
 
 def test_vulkan_borrowed_texture_set_target_hands_over_a_replacement() -> None:
@@ -187,59 +186,55 @@ def test_vulkan_borrowed_texture_set_target_hands_over_a_replacement() -> None:
     """
     _require_native_vulkan_support()
 
-    with _vulkan_context() as context:
-        with _vulkan_borrowed_image(context) as image:
-            descriptor = image.descriptor()
+    with _vulkan_context() as context, _vulkan_borrowed_image(context) as image:
+        descriptor = image.descriptor()
 
-            with mln.RuntimeHandle() as runtime:
-                with runtime.create_map(
-                    mln.MapOptions(
-                        width=descriptor.extent.width,
-                        height=descriptor.extent.height,
+        with (
+            mln.RuntimeHandle() as runtime,
+            runtime.create_map(
+                mln.MapOptions(
+                    width=descriptor.extent.width,
+                    height=descriptor.extent.height,
+                )
+            ) as map_handle,
+        ):
+            session = map_handle.attach_vulkan_borrowed_texture(descriptor)
+            try:
+                map_handle.set_style_json(EMPTY_STYLE_JSON)
+                render_until_update(runtime, session)
+
+                with pytest.raises(mln.UnsupportedFeatureError) as raised:
+                    session.resize(48, 24, 1.0)
+                assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
+
+                with _vulkan_borrowed_image(
+                    context, width=48, height=24
+                ) as replacement:
+                    replacement_descriptor = replacement.descriptor()
+                    session.set_vulkan_borrowed_texture_target(replacement_descriptor)
+
+                    # The session kept its renderer and renders at the
+                    # extent it was handed, once the map catches up.
+                    render_until(
+                        runtime,
+                        session,
+                        lambda: map_handle.get_size() == (48, 24, pytest.approx(1.0)),
+                        "the map never took the replacement image extent",
                     )
-                ) as map_handle:
-                    session = map_handle.attach_vulkan_borrowed_texture(descriptor)
-                    try:
-                        map_handle.set_style_json(EMPTY_STYLE_JSON)
-                        render_until_update(runtime, session)
+                    assert session.render_update()
 
-                        with pytest.raises(mln.UnsupportedFeatureError) as raised:
-                            session.resize(48, 24, 1.0)
-                        assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
-
-                        with _vulkan_borrowed_image(
-                            context, width=48, height=24
-                        ) as replacement:
-                            replacement_descriptor = replacement.descriptor()
-                            session.set_vulkan_borrowed_texture_target(
-                                replacement_descriptor
+                    # A surface descriptor names a target this session
+                    # does not have.
+                    with pytest.raises(mln.UnsupportedFeatureError) as raised:
+                        session.set_vulkan_surface_target(
+                            render.VulkanSurfaceDescriptor(
+                                extent=replacement_descriptor.extent,
+                                context=context.descriptor(),
+                                surface=render.NativePointer(0x1),
                             )
-
-                            # The session kept its renderer and renders at the
-                            # extent it was handed, once the map catches up.
-                            render_until(
-                                runtime,
-                                session,
-                                lambda: (
-                                    map_handle.get_size()
-                                    == (48, 24, pytest.approx(1.0))
-                                ),
-                                "the map never took the replacement image extent",
-                            )
-                            assert session.render_update()
-
-                            # A surface descriptor names a target this session
-                            # does not have.
-                            with pytest.raises(mln.UnsupportedFeatureError) as raised:
-                                session.set_vulkan_surface_target(
-                                    render.VulkanSurfaceDescriptor(
-                                        extent=replacement_descriptor.extent,
-                                        context=context.descriptor(),
-                                        surface=render.NativePointer(0x1),
-                                    )
-                                )
-                            assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
-                            # The rejection left the session usable.
-                            session.render_update()
-                    finally:
-                        session.close()
+                        )
+                    assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
+                    # The rejection left the session usable.
+                    session.render_update()
+            finally:
+                session.close()

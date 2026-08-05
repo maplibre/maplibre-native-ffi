@@ -18,7 +18,7 @@ dependencies = []
 [dependency-groups]
 dev = [
   "maturin>=1.13,<2 ; sys_platform != 'linux'",
-  "maturin[patchelf]>=1.13,<2 ; sys_platform == 'linux'",
+  "maturin[patchelf]>=1.14.1,<2 ; sys_platform == 'linux'",
   "pyobjc-framework-metal>=12,<13 ; sys_platform == 'darwin'",
   "pyobjc-framework-quartz>=12,<13 ; sys_platform == 'darwin'",
   "pyopengl>=3.1.10,<4",

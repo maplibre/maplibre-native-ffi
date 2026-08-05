@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from ._enum import NativeIntEnum, UnknownIntEnum
-from ._lifecycle import ContextHandleMixin, WarnUnclosedMixin
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from ._enum import NativeIntEnum, UnknownIntEnum
+from ._lifecycle import ContextHandleMixin, WarnUnclosedMixin
 from .geo import Geometry, LatLngBounds
 from .resource import ResourceErrorReason
 
@@ -74,7 +74,7 @@ class OfflineOperationHandle(WarnUnclosedMixin, ContextHandleMixin):
 
     def __init__(
         self,
-        runtime: "RuntimeHandle",
+        runtime: RuntimeHandle,
         operation_id: int,
         *,
         _create_key: object | None = None,
@@ -85,12 +85,12 @@ class OfflineOperationHandle(WarnUnclosedMixin, ContextHandleMixin):
         self._runtime = runtime
         self._operation_id = operation_id
         self._closed = False
-        runtime._register_offline_operation(self)  # noqa: SLF001
+        runtime._register_offline_operation(self)
 
     @classmethod
     def _from_native(
-        cls, runtime: "RuntimeHandle", operation_id: int
-    ) -> "OfflineOperationHandle":
+        cls, runtime: RuntimeHandle, operation_id: int
+    ) -> OfflineOperationHandle:
         return cls(
             runtime,
             operation_id,
@@ -106,14 +106,14 @@ class OfflineOperationHandle(WarnUnclosedMixin, ContextHandleMixin):
         """Discard runtime-owned state for this operation."""
         if self._closed:
             return
-        self._runtime._native.offline_operation_discard(self._operation_id)  # noqa: SLF001
+        self._runtime._native.offline_operation_discard(self._operation_id)
         self._mark_closed()
 
     def _mark_closed(self) -> None:
         if self._closed:
             return
         self._closed = True
-        self._runtime._unregister_offline_operation(self)  # noqa: SLF001
+        self._runtime._unregister_offline_operation(self)
 
     def _mark_runtime_closed(self) -> None:
         self._mark_closed()
@@ -130,44 +130,42 @@ class OfflineOperationHandle(WarnUnclosedMixin, ContextHandleMixin):
         self._mark_closed()
         return raw
 
-    def take_region(self) -> "OfflineRegionInfo":
+    def take_region(self) -> OfflineRegionInfo:
         """Take a completed region snapshot result."""
         return OfflineRegionInfo._from_native(
-            self._take(self._runtime._native.offline_region_create_take_result)  # noqa: SLF001
+            self._take(self._runtime._native.offline_region_create_take_result)
         )
 
-    def take_optional_region(self) -> "OfflineRegionInfo | None":
+    def take_optional_region(self) -> OfflineRegionInfo | None:
         """Take a completed optional region snapshot result."""
-        raw = self._take(self._runtime._native.offline_region_get_take_result)  # noqa: SLF001
+        raw = self._take(self._runtime._native.offline_region_get_take_result)
         return OfflineRegionInfo._from_native(raw) if raw is not None else None
 
     def take_region_list(
         self,
         *,
         merge_result: bool = False,
-    ) -> tuple["OfflineRegionInfo", ...]:
+    ) -> tuple[OfflineRegionInfo, ...]:
         """Take a completed region-list result."""
         take = (
-            self._runtime._native.offline_regions_merge_database_take_result  # noqa: SLF001
+            self._runtime._native.offline_regions_merge_database_take_result
             if merge_result
-            else self._runtime._native.offline_regions_list_take_result  # noqa: SLF001
+            else self._runtime._native.offline_regions_list_take_result
         )
         return tuple(
             OfflineRegionInfo._from_native(region) for region in self._take(take)
         )
 
-    def take_updated_region(self) -> "OfflineRegionInfo":
+    def take_updated_region(self) -> OfflineRegionInfo:
         """Take a completed updated region snapshot result."""
         return OfflineRegionInfo._from_native(
-            self._take(
-                self._runtime._native.offline_region_update_metadata_take_result  # noqa: SLF001
-            )
+            self._take(self._runtime._native.offline_region_update_metadata_take_result)
         )
 
-    def take_status(self) -> "OfflineRegionStatus":
+    def take_status(self) -> OfflineRegionStatus:
         """Take a completed offline region status result."""
         return OfflineRegionStatus._from_native(
-            self._take(self._runtime._native.offline_region_get_status_take_result)  # noqa: SLF001
+            self._take(self._runtime._native.offline_region_get_status_take_result)
         )
 
 
@@ -186,7 +184,7 @@ class OfflineRegionStatus:
     complete: bool
 
     @classmethod
-    def _from_native(cls, raw: dict[str, object]) -> "OfflineRegionStatus":
+    def _from_native(cls, raw: dict[str, object]) -> OfflineRegionStatus:
         return cls(
             download_state=OfflineRegionDownloadState(raw["download_state"]),
             completed_resource_count=raw["completed_resource_count"],
@@ -250,7 +248,7 @@ class OfflineRegionInfo:
     metadata: bytes
 
     @classmethod
-    def _from_native(cls, raw: dict[str, object]) -> "OfflineRegionInfo":
+    def _from_native(cls, raw: dict[str, object]) -> OfflineRegionInfo:
         return cls(
             id=raw["id"],
             definition=_definition_from_native_wire(raw["definition"]),
@@ -268,7 +266,7 @@ class OfflineRegionStatusChanged:
     @classmethod
     def _from_runtime_payload(
         cls, payload: dict[str, object]
-    ) -> "OfflineRegionStatusChanged":
+    ) -> OfflineRegionStatusChanged:
         return cls(
             region_id=_payload_int(payload, "region_id"),
             status=OfflineRegionStatus._from_native(payload["status"]),
@@ -285,7 +283,7 @@ class OfflineRegionResponseError:
     @classmethod
     def _from_runtime_payload(
         cls, payload: dict[str, object]
-    ) -> "OfflineRegionResponseError":
+    ) -> OfflineRegionResponseError:
         from .resource import ResourceErrorReason
 
         return cls(
@@ -304,7 +302,7 @@ class OfflineRegionTileCountLimitExceeded:
     @classmethod
     def _from_runtime_payload(
         cls, payload: dict[str, object]
-    ) -> "OfflineRegionTileCountLimitExceeded":
+    ) -> OfflineRegionTileCountLimitExceeded:
         return cls(
             region_id=_payload_int(payload, "region_id"),
             limit=_payload_int(payload, "limit"),
@@ -324,7 +322,7 @@ class OfflineOperationCompleted:
     @classmethod
     def _from_runtime_payload(
         cls, payload: dict[str, object]
-    ) -> "OfflineOperationCompleted":
+    ) -> OfflineOperationCompleted:
         return cls(
             operation_id=_payload_int(payload, "operation_id"),
             operation_kind=OfflineOperationKind(
@@ -406,4 +404,4 @@ __all__ = [
     "OfflineTilePyramidRegionDefinition",
 ]
 
-from .runtime import RuntimeHandle  # noqa: E402
+from .runtime import RuntimeHandle
