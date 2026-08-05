@@ -10,8 +10,7 @@
 
 import { emptyGeometry, geoJsonGeometry } from "../geojson.ts";
 import { clearForcedStatuses, forceStatus } from "../internal/faults.ts";
-import { jsonBool, jsonFrom, jsonObject, type JsonValue } from "../json.ts";
-import { pointQuery } from "../query.ts";
+import { jsonFrom, type JsonValue } from "../json.ts";
 import { EP } from "../raw/entrypoints.ts";
 import { MLN_STATUS } from "../raw/enums.ts";
 import { nativePointer } from "../render.ts";
