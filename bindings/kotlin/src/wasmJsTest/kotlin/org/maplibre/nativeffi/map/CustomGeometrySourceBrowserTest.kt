@@ -6,13 +6,12 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.PageCanvases
 import org.maplibre.nativeffi.assertPresentedColor
 import org.maplibre.nativeffi.backgroundStyle
 import org.maplibre.nativeffi.browserTest
-import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.FeatureIdentifier
@@ -42,18 +41,21 @@ import org.maplibre.nativeffi.withMap
 /**
  * A custom geometry source whose tiles this page supplies, end to end.
  *
- * This is the one callback family in the binding that native invokes without waiting for an answer,
- * and it is the only one where the request and the answer are separate calls. MapLibre asks for a
- * tile from the worker the source's tile loader runs on; that worker cannot enter the page's
- * WebAssembly instance, so the module copies the tile id and posts it to the page, where the host's
- * callback body is. The host answers later, from a `maplibreScope`, with
- * `setCustomGeometrySourceTileData`.
+ * This is the one callback family in the binding that native invokes without waiting for an answer.
+ * MapLibre asks for a tile from the worker the source's tile loader runs on; that worker cannot
+ * enter the page's WebAssembly instance, so the module copies the tile id and posts it to the page,
+ * where the host's callback body is. Because nothing is blocked while that body runs, the binding
+ * delivers it on a stack that may reach the owner thread — so the host may answer with
+ * `setCustomGeometrySourceTileData` from inside the callback, which is what shared expect/actual
+ * code written for JVM, Android, or Kotlin/Native does, or record the tile and answer from a
+ * `maplibreScope` afterwards.
  *
- * So the proof has to be the whole chain rather than any part of it. A tile the host was asked for
- * and answered has to end up as pixels on a `<canvas>` the page displays — read the way page code
- * would read it — because every intermediate step can be right while the geometry never reaches the
- * screen. A fill layer over the custom source paints one colour over a background of another, so
- * the page changing colour is the source's geometry arriving and nothing else.
+ * So the proof has to be the whole chain rather than any part of it, and it has to be both answers.
+ * A tile the host was asked for and answered has to end up as pixels on a `<canvas>` the page
+ * displays — read the way page code would read it — because every intermediate step can be right
+ * while the geometry never reaches the screen. A fill layer over the custom source paints one
+ * colour over a background of another, so the page changing colour is the source's geometry
+ * arriving and nothing else.
  */
 class CustomGeometrySourceBrowserTest {
   // Spec coverage: BND-124.
@@ -63,25 +65,34 @@ class CustomGeometrySourceBrowserTest {
       withMap(WIDTH, HEIGHT) { runtime, map ->
         val requested = mutableListOf<CanonicalTileId>()
         val cancelled = mutableListOf<CanonicalTileId>()
-        // What a host's first instinct is: answer the request inside the callback that made it.
-        // That call is owner-affine and this stack cannot park on the owner thread's answer, so it
-        // is refused — captured here rather than thrown, because nothing above a callback would
-        // catch it.
-        var answeredInline: Throwable? = null
-        val callback =
+        val deferred =
           object : CustomGeometrySourceCallback {
             override fun fetchTile(tileId: CanonicalTileId) {
               requested.add(tileId)
-              if (answeredInline == null) {
-                answeredInline =
-                  runCatching { map.setCustomGeometrySourceTileData(SOURCE, tileId, worldFill()) }
-                    .exceptionOrNull()
-              }
             }
 
             override fun cancelTile(tileId: CanonicalTileId) {
               cancelled.add(tileId)
             }
+          }
+
+        // The shared-code shape: answer the request inside the callback that made it. Failures are
+        // captured rather than thrown, because nothing above a callback would catch one and the
+        // test would then only see a tile that never arrived.
+        val answeredInline = mutableListOf<CanonicalTileId>()
+        var inlineFailure: Throwable? = null
+        val inline =
+          object : CustomGeometrySourceCallback {
+            override fun fetchTile(tileId: CanonicalTileId) {
+              runCatching {
+                  map.setCustomGeometrySourceTileData(SOURCE, tileId, worldFill())
+                  answeredInline.add(tileId)
+                }
+                .exceptionOrNull()
+                ?.let { if (inlineFailure == null) inlineFailure = it }
+            }
+
+            override fun cancelTile(tileId: CanonicalTileId) {}
           }
 
         val context = WebglContext.createForCanvas(PageCanvases.CUSTOM_GEOMETRY, WIDTH, HEIGHT)
@@ -99,7 +110,7 @@ class CustomGeometrySourceBrowserTest {
             map.setStyleJson(backgroundStyle(BACKGROUND_COLOR))
             waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
 
-            map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(callback))
+            map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(deferred))
             assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceType(SOURCE))
             map.addStyleLayerJson(fillLayer(), "")
 
@@ -112,16 +123,6 @@ class CustomGeometrySourceBrowserTest {
             // The whole world at the zoom the map opens at, which is the tile the fill below
             // covers.
             assertContains(requested, CanonicalTileId(0, 0, 0))
-
-            val failure = assertNotNull(answeredInline, "answering inside the callback succeeded")
-            assertTrue(
-              failure is InvalidStateException,
-              "answering inside the callback failed with $failure",
-            )
-            assertTrue(
-              failure.message.orEmpty().contains("callback"),
-              "the refusal does not say a callback is what refused it: ${failure.message}",
-            )
 
             // The layer has a source and the source has no data, so what the page shows so far is
             // the background alone. Asserted before the answer, so the colour below is provably the
@@ -153,7 +154,8 @@ class CustomGeometrySourceBrowserTest {
 
             // Removing the layer and then the source takes the geometry away again, which is the
             // other half of the claim: the fill was the source's rather than anything the style
-            // held on its own.
+            // held on its own. It is also what puts the page back to one colour, so the second half
+            // of this test starts from a screen that provably holds no custom geometry.
             assertTrue(map.removeStyleLayer(FILL_LAYER))
             assertTrue(map.removeStyleSource(SOURCE))
             assertFalse(map.styleSourceExists(SOURCE))
@@ -164,6 +166,25 @@ class CustomGeometrySourceBrowserTest {
               BACKGROUND_GREEN,
               BACKGROUND_BLUE,
             )
+
+            // The same source again, answered from inside the callback this time. This is the
+            // workflow a multiplatform host writes once and runs everywhere, and the claim is that
+            // it is not merely accepted here but that its geometry reaches the screen: nothing
+            // between this and the assertion below supplies a tile, so the page can only come to
+            // show the fill because the callback's own answer arrived.
+            map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(inline))
+            map.addStyleLayerJson(fillLayer(), "")
+            assertTrue(
+              renderUntil(runtime, session) { answeredInline.isNotEmpty() },
+              "the callback never answered from inside itself: ${inlineFailure?.message}",
+            )
+            assertNull(inlineFailure, "answering inside the callback failed")
+            assertTrue(
+              renderUntil(runtime, session) { map.isFullyLoaded },
+              "the map never finished loading the tiles the callback answered with",
+            )
+            renderUntilSettled(runtime, session)
+            assertPresentedColor(PageCanvases.CUSTOM_GEOMETRY, FILL_RED, FILL_GREEN, FILL_BLUE)
           } finally {
             session.close()
           }

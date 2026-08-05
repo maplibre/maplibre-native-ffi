@@ -12,14 +12,20 @@ import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 
 /**
- * The host callbacks MapLibre invokes synchronously from its own threads.
+ * Registering and clearing the host callbacks MapLibre invokes from its own threads.
  *
- * These are the only calls in the binding that travel the other way. A MapLibre worker cannot enter
- * this module's WebAssembly instance, so the module's compiled-in thunk forwards the call to the
- * page over a proxying queue and blocks the worker until the page answers. Registering one is
- * therefore the first moment the trampoline has to exist in the linked binary, which is what these
- * tests are really covering: the trampolines are reached from JavaScript by name, and a name in a
- * JavaScript string is invisible to dead-code elimination.
+ * Registration is the whole subject here, and specifically the moment a trampoline has to exist in
+ * the linked binary: they are reached from JavaScript by name, and a name inside a JavaScript
+ * string is invisible to dead-code elimination, so a binary that dropped one fails here at the
+ * first `addFunction` rather than at the first callback. That is a real regression this locks, and
+ * it is cheap to run because nothing has to load a style to reach it.
+ *
+ * **It does not cover the proxy.** Nothing here blocks a MapLibre worker inside
+ * `emscripten_proxy_sync` or carries a decision back from the page, so a `sync_callback.c` that
+ * proxied to the wrong queue, tripped the self-proxy assertion, or never wrote the decision back
+ * would leave this file green. That path is covered by `ResourceProviderBrowserTest` and the
+ * transform tests, which drive it end to end against a real style load; read those to know whether
+ * the worker-to-page journey still works.
  */
 class SyncCallbackBrowserTest {
   @Test

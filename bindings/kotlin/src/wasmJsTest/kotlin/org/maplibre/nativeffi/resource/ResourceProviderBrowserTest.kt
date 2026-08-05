@@ -29,9 +29,10 @@ import org.maplibre.nativeffi.withMap
  * A MapLibre worker cannot enter this module's WebAssembly instance, so the module's own thunk
  * forwards the request to the page and blocks the worker until the page answers. The page is not
  * blocked — it is inside a parked pump — so the turn that delivers the request always comes. That
- * makes a provider callback the one place in this binding where host code runs on a stack it may
- * not park on, which is why a request handle's own operations are the only ones that do not
- * dispatch.
+ * makes a provider callback one of the two places in this binding where host code may not reach the
+ * owner thread, which is why a request handle's own operations are the only ones that do not
+ * dispatch. What decides that is the blocked worker rather than the stack: a custom geometry
+ * source's tile callback is delivered on a stack that may park, because nothing is waiting on it.
  */
 class ResourceProviderBrowserTest {
   // Spec coverage: BND-121, BND-141, BND-142, BND-143, BND-144, BND-146, BND-147, BND-148,
@@ -53,6 +54,16 @@ class ResourceProviderBrowserTest {
             calls++
             copiedRequest = request
             assertEquals(ResourceKind.STYLE, request.kind)
+            // The one thing this stack may not do, and the reason is the blocked worker rather
+            // than the stack: a call to the owner thread would park the page while a MapLibre
+            // worker is parked on the page, which is the cycle that would take both sides down.
+            // The refusal names the callback instead. A custom geometry source's tile callback is
+            // in the other position — nothing waits for it — and may call the map freely.
+            val refused = assertFailsWith<InvalidStateException> { map.isFullyLoaded }
+            assertTrue(
+              refused.message.orEmpty().contains("callback"),
+              "the refusal does not say a callback is what refused it: ${refused.message}",
+            )
             handle.complete(
               ResourceResponse(ResourceResponseStatus.OK).apply {
                 bytes = EMPTY_STYLE_JSON.encodeToByteArray()

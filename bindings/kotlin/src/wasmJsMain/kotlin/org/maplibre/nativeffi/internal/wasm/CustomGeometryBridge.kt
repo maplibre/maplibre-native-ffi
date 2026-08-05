@@ -87,17 +87,22 @@ private fun retainTrampolines() {
  * that returns void. What arrives here is therefore a notification on a page task, after the worker
  * that produced it has moved on.
  *
- * The body runs inside a [CallbackScope], which makes a dispatched call from it report an error
- * rather than park this stack. That matters more here than the deadlock it prevents elsewhere: the
- * obvious thing for a host to write is a `fetchTile` that answers immediately with
- * `setCustomGeometrySourceTileData`, and that call is owner-affine, so it is refused. A host
- * answers from its own stack instead — the request and the answer are separate in the C API on
- * every platform, and this target is the one where that separation is enforced.
+ * The body does **not** run inside a [CallbackScope], and this is the one callback family in the
+ * binding that does not. A callback scope exists to refuse a suspension on a stack that cannot take
+ * one, and the stack a notification is delivered on is chosen here rather than inherited:
+ * [AsyncDelivery] queues it and runs it on a promising stack, so the obvious thing for a host to
+ * write — a `fetchTile` that answers immediately with `setCustomGeometrySourceTileData` — is an
+ * ordinary owner-affine call and works exactly as it does on JVM, Android, and Kotlin/Native. That
+ * is only available here because nothing is waiting: the worker returned as soon as it posted, so
+ * parking the page adds no edge to the wait graph the synchronous callbacks live inside.
  *
  * A [CallbackGate] is what makes a late notification safe. The source can be removed, and the map
  * closed, while notifications for it are still in flight on the page; the gate stops delivering as
  * soon as the registration is closed, and the token it was reached by is never issued again, so a
- * notification that arrives afterwards finds nothing and is dropped.
+ * notification that arrives afterwards finds nothing and is dropped. The token is resolved at
+ * delivery rather than at posting for exactly that reason, which is also what
+ * `src/browser/custom_geometry.c` does with the host pointer, and it is what keeps the guarantee
+ * across the extra hop the queue adds.
  */
 internal class CustomGeometryBridge
 private constructor(private val callback: CustomGeometrySourceCallback, private val token: Int) :
@@ -116,9 +121,12 @@ private constructor(private val callback: CustomGeometrySourceCallback, private 
    * notification is a copy of a tile id on a page task, so the worst a late one can do is arrive
    * after this, which is what the gate and the retired token answer.
    *
-   * There is no reentrancy check to make, unlike the synchronous callbacks: everything that ends a
-   * source — removing it, replacing the style, closing the map — reaches the owner thread, and a
-   * dispatched call from inside a callback is already refused.
+   * A host may reach this from inside its own callback, because a delivery can call the owner
+   * thread and removing a source is such a call. That needs no refusal the way the synchronous
+   * callbacks' does: the gate stops admitting as this runs, the delivery already inside it finishes
+   * on its own, and the gate holds nothing native that a still-running body could be left without.
+   * A source that ends itself from `fetchTile` therefore hears nothing further, which is what a
+   * host asked for.
    */
   override fun close() {
     gate.close()
@@ -128,9 +136,7 @@ private constructor(private val callback: CustomGeometrySourceCallback, private 
   private fun invoke(kind: Int, tileId: CanonicalTileId) {
     val lease = gate.enter() ?: return
     try {
-      CallbackScope.inside {
-        if (kind == KIND_FETCH) callback.fetchTile(tileId) else callback.cancelTile(tileId)
-      }
+      if (kind == KIND_FETCH) callback.fetchTile(tileId) else callback.cancelTile(tileId)
     } catch (_: Throwable) {
       // A host failure leaves the tile unanswered, which is a state the source already has a
       // meaning for: MapLibre shows nothing for that tile until the host supplies data or
@@ -166,14 +172,24 @@ private constructor(private val callback: CustomGeometrySourceCallback, private 
     fun cancelThunk(): Int = cancelTileThunk()
 
     /**
-     * Delivers a tile notification to the registration [token] names.
+     * Queues a tile notification for the registration [token] names.
      *
-     * A token with no registration names a source that has already been removed, or a map that has
-     * been closed, so the notification is dropped rather than reaching a callback that has retired.
+     * The tile id is built here, on the frame the module's proxied task called, because the
+     * notification carrying it is freed as that task returns. The registration is *not* looked up
+     * here: it is resolved when the queued body runs, so a source removed between the posting and
+     * the delivery is one whose notification is dropped rather than delivered to a callback that
+     * has retired. A token with no registration names such a source, or a map that has been closed.
+     *
+     * Queued rather than delivered, so that the body runs on a stack that may reach the owner
+     * thread; [AsyncDelivery] says why that is available here and nowhere else in this binding.
      */
     fun dispatch(token: Int, kind: Int, z: Int, x: Long, y: Long) {
-      val bridge = host.find(token) ?: return
-      bridge.invoke(kind, CanonicalTileId(z, x, y))
+      // Rejected here as well, because a token is issued once and never again: one that names
+      // nothing now will never name anything, so queuing it would cost a drain and deliver nothing.
+      // The lookup in the queued body is what carries the guarantee; this only saves the work.
+      if (host.find(token) == null) return
+      val tileId = CanonicalTileId(z, x, y)
+      AsyncDelivery.post { host.find(token)?.invoke(kind, tileId) }
     }
   }
 }

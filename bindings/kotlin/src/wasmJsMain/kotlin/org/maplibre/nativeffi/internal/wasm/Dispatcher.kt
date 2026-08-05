@@ -134,12 +134,12 @@ internal object Dispatcher {
    * is open loses that handle for the life of the page; the count says so at the moment the mistake
    * is made, while the thread is still there to close them on.
    *
-   * A runtime is what is counted, because it is what every other owner-affine handle hangs from: a
-   * map, a projection, a render session, an offline operation and a frame all retain their runtime
-   * as a child, so none of them can be open without the runtime that owns it being open too. A
-   * WebGL context is the one owner-affine handle with no runtime behind it, and it is not counted
-   * here; a context left open at shutdown is caught by [stopped] instead, as a refusal rather than
-   * as a stranded destroy.
+   * A runtime counts for more than itself, because it is what every other owner-affine handle hangs
+   * from: a map, a projection, a render session, an offline operation and a frame all retain their
+   * runtime as a child, so none of them can be open without the runtime that owns it being open
+   * too. A WebGL context is the one owner-affine handle with no runtime behind it, so it counts
+   * itself; without that, a context left open at shutdown would reach the terminal failure rather
+   * than the refusal, which tells a host the same thing far too late to act on it.
    *
    * A plain list, because a page is one thread and every handle is created and released on it.
    */
@@ -324,11 +324,16 @@ internal object Dispatcher {
    * The two below are stacks that cannot park, and both would otherwise trap inside [awaitCall]
    * rather than report anything a host can act on.
    *
-   * A callback frame was entered from native, so it is not a promising stack; it also runs while a
-   * scope may be parked, so dispatching from it would put a second call in flight that the
-   * suspension gate exists to prevent. The binding specification already requires callback code to
-   * hand owner-thread work back rather than calling these APIs, so this reports that rather than
+   * A callback scope is set only for the two families a MapLibre worker waits inside: the resource
+   * provider and the URL transform. That worker is blocked in the module's synchronous proxy until
+   * this page answers, so a call placed on the owner thread from here would be a page waiting for a
+   * thread that is waiting for the page. The binding specification already requires those callbacks
+   * to hand owner-thread work back rather than calling these APIs, so this reports it rather than
    * trying to serve it. It is checked first because it is the more specific of the two.
+   *
+   * A second call in flight is not itself the problem, and is ordinary now: a tile notification is
+   * delivered on a promising stack of its own and may call the owner thread while a host scope is
+   * parked. Only a blocked worker makes it a deadlock.
    *
    * Anything else outside a `maplibreScope` is a host that left the scope out, which is the easy
    * mistake to make: every other target's actuals are ordinary synchronous functions, so nothing in
@@ -507,9 +512,14 @@ internal object Dispatcher {
   // this bounds only what this binding is willing to receive: the module truncates to whatever it
   // is given, on a UTF-8 boundary.
   private const val DIAGNOSTIC_BYTES = 512
-  // Tokens must be unique among outstanding calls. What guarantees that is the module-wide
-  // suspension gate: one scope runs at a time, so one dispatched call is outstanding at a time.
-  // The wrap is only to keep the counter from growing without bound -- it is not what makes a
-  // token unique, and would not be enough on its own if more than one call could be in flight.
+  // Tokens must be unique among outstanding calls, and the counter alone is what makes them so:
+  // every call takes the next value, and no two calls in flight can hold the same one. More than
+  // one can now be in flight -- a tile notification is delivered on a promising stack of its own
+  // and may call the owner thread while a host scope is parked -- so the counter is what this
+  // rests on rather than one call at a time.
+  //
+  // The wrap keeps it from growing without bound. Reaching a token still outstanding would take
+  // this many issuances between one call and its completion, which is not a number a page reaches
+  // with at most a host scope and a delivery in flight.
   private const val TOKEN_WRAP = 1 shl 20
 }

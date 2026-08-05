@@ -3,6 +3,7 @@ package org.maplibre.nativeffi
 import kotlin.js.JsAny
 import kotlin.js.Promise
 import kotlin.wasm.WasmExport
+import org.maplibre.nativeffi.internal.wasm.AsyncDelivery
 import org.maplibre.nativeffi.internal.wasm.Dispatcher
 import org.maplibre.nativeffi.internal.wasm.PromisingStack
 import org.maplibre.nativeffi.internal.wasm.SuspensionGate
@@ -113,5 +114,13 @@ public suspend fun <T> maplibreScope(block: () -> T): T = SuspensionGate.withGat
  *   thread is still open.
  */
 public suspend fun shutdownMaplibre() {
-  SuspensionGate.withGate { Dispatcher.stop() }
+  SuspensionGate.withGate {
+    // A tile notification is delivered on a stack of its own, which this gate does not describe, so
+    // one can be parked on the owner thread at this moment, and stopping underneath it would leave
+    // that stack suspended for the life of the page. Waited for only once every handle has gone,
+    // because until then native can still be asking this page for tiles and there would be no end
+    // to wait for -- and a shutdown with a handle open is refused below in any case.
+    if (Dispatcher.openHandles.isEmpty()) AsyncDelivery.awaitIdle()
+    Dispatcher.stop()
+  }
 }

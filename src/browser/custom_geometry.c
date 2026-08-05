@@ -45,17 +45,25 @@
 // delays only other tile callbacks: a provider's answer is being waited on by a
 // blocked worker, and this one is not.
 //
-// **This adds no edge to the wait graph.** `sync_callback.c` describes a graph
-// whose every wait points from a worker to the page, which is safe only while
-// nothing points back. Nothing here waits at all -- not the worker, which
-// returns as soon as the task is enqueued, and not the page, which runs the
-// task from its event loop. The rule that does still apply is the one on the
-// host callback: it runs on a stack entered from native rather than through
-// `maplibreScope`, so it may not suspend, and the Kotlin end enters its
-// callback scope for exactly that reason. A host that wants to answer the
-// request calls `mln_map_set_custom_geometry_source_tile_data` from its own
-// thread afterwards, which is what the C API's asynchronous shape already asks
-// of every platform.
+// **This adds no edge to the wait graph, and that is what a host may spend.**
+// `sync_callback.c` describes a graph whose every wait points from a worker to
+// the page, which is safe only while nothing points back. Nothing here waits at
+// all -- not the worker, which returns as soon as the task is enqueued, and not
+// the page, which runs the task from its event loop. So a host is free to wait
+// inside one of these callbacks, including on the thread that owns its runtime,
+// which a host inside one of `sync_callback.c`'s is not.
+//
+// The one rule that still applies is where the delivery below lands: it is an
+// ordinary proxied task, so the host function is entered on a stack that a
+// browser will not let suspend. A host that wants to suspend therefore carries
+// the notification onto a stack of its own before running its body -- the
+// Kotlin binding queues it and drains the queue under `WebAssembly.promising`
+// -- which costs an event-loop turn and is invisible here, because this side
+// was told nothing about when the call would happen and receives no answer from
+// it either way. A host that would rather answer later calls
+// `mln_map_set_custom_geometry_source_tile_data` from wherever it likes
+// afterwards, which is what the C API's asynchronous shape already allows on
+// every platform.
 //
 // **What this guarantees, and what it does not.** A notification native emitted
 // is either delivered to the installed host or dropped; it is never delivered

@@ -67,7 +67,6 @@ import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.render.WebglContext
 import org.maplibre.nativeffi.runtime.RuntimeHandle
-import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageStretch
@@ -364,13 +363,14 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
    * `src/browser/custom_geometry.c` states what that guarantees and what it does not. The callback
    * therefore arrives on a page task of its own, after the worker that produced it has moved on.
    *
-   * **The callback may not answer the request from inside itself.**
-   * [setCustomGeometrySourceTileData] is owner-affine, like every other call here, and a callback
-   * runs on a stack that cannot be parked on the owner thread's answer — so calling it from
-   * [CustomGeometrySourceCallback.fetchTile] reports that rather than deadlocking. A host records
-   * the tile the callback was given and supplies its data from a `maplibreScope` afterwards, which
-   * is what the C API's asynchronous shape asks of every platform; this is the target that enforces
-   * it.
+   * **The callback may answer the request from inside itself**, with
+   * [setCustomGeometrySourceTileData], exactly as it may on JVM, Android, and Kotlin/Native, and it
+   * needs no `maplibreScope` of its own to do so. This is the one callback family here that native
+   * does not wait for, so the binding is free to choose the stack it delivers on and picks one that
+   * may reach the owner thread. The other families — the resource provider and the URL transform —
+   * are entered with a MapLibre worker blocked on their answer, so they must still hand
+   * owner-affine work back rather than doing it. Answering later, from a `maplibreScope`, works
+   * here too: the request and the answer are separate calls in the C API on every platform.
    *
    * The callback registration lives as long as the source does. It is released when the source is
    * removed with [removeStyleSource], when a new style drops it, and when this map is closed, and a

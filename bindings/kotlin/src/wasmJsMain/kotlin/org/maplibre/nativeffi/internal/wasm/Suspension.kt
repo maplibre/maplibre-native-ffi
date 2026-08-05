@@ -46,9 +46,13 @@ internal suspend fun Promise<JsAny?>.awaitOrThrow(): JsAny? = suspendCoroutine {
  * This is a queue rather than a lock. A waiter parks its continuation and yields the page, so the
  * event loop keeps running -- which is what lets the suspended holder's promise settle at all.
  *
- * Callbacks deliberately do not take this gate. A callback runs to completion before it returns to
- * native, so any allocator scope it opens is properly nested inside the holder's, which is exactly
- * the nesting the allocator supports.
+ * Callbacks deliberately do not take this gate, and could not: they arrive while the scope that
+ * holds it is parked, so a callback that waited for it would be waiting for the loop that is
+ * waiting for it. A synchronous callback runs to completion before it returns to native, so any
+ * allocator scope it opens is properly nested inside the holder's, which is exactly the nesting the
+ * allocator supports. An [AsyncDelivery] drain may park instead, and is safe for a different
+ * reason: no allocator scope is ever held across a park, so its scopes and a host scope's never
+ * interleave.
  */
 internal object SuspensionGate {
   private var held = false
@@ -84,13 +88,18 @@ internal object SuspensionGate {
 }
 
 /**
- * Tracks whether the calling frame is inside one of this binding's callbacks.
+ * Tracks whether the calling frame is inside one of this binding's *synchronous* callbacks.
  *
- * A callback is entered from native, on a stack that was never wrapped by `WebAssembly.promising`,
- * so nothing in it may park on a promise. It also runs *while a scope may be parked*, which is why
- * the suspension gate cannot describe it: the gate is held by the parked scope, and a callback that
- * waited for it would deadlock, while one that ignored it would dispatch a second call the gate was
- * supposed to prevent.
+ * Such a callback is entered from native on a stack that was never wrapped by
+ * `WebAssembly.promising`, so nothing in it may park on a promise, and it is entered while a
+ * MapLibre worker is blocked waiting for what it returns. Both halves matter. The stack rule alone
+ * could be met by delivering on a promising stack instead, which is what [AsyncDelivery] does for
+ * the callbacks native does not wait for; the blocked worker is what makes that unavailable here,
+ * because a page parked on the owner thread while a worker is parked on the page is the cycle
+ * `src/browser/sync_callback.c` describes.
+ *
+ * The suspension gate cannot describe this either: the gate is held by the parked scope the
+ * callback arrived under, so a callback that waited for it would deadlock.
  *
  * So dispatch asks this instead. It is a plain counter because a Kotlin/Wasm module is one thread.
  */
@@ -125,8 +134,10 @@ internal object CallbackScope {
  * frames read as what they are, by surrendering the count for exactly as long as the suspension
  * lasts.
  *
- * A plain counter because a Kotlin/Wasm module is one thread, and one scope at a time because
- * [SuspensionGate] serializes them, so the count is only ever zero or one.
+ * A plain counter because a Kotlin/Wasm module is one thread. More than one promising stack can
+ * exist at once — a host scope and an [AsyncDelivery] drain that started while it was parked — and
+ * the count is still only ever zero or one, because a page runs one of them at a time and the
+ * parked ones have each given their count back.
  */
 internal object PromisingStack {
   private var depth = 0
