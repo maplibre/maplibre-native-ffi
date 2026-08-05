@@ -70,13 +70,6 @@ function environmentSupport(
   );
 }
 
-function supportStatus(support: EnvironmentSupport): Status {
-  if (support.backends.some((backend) => backend.status === "build-only")) {
-    return "build-only";
-  }
-  return "tested";
-}
-
 function backendSignature(backends: Backend[]): string {
   return backends
     .map((backend) => backend.backendLabel)
@@ -113,10 +106,28 @@ function subprojectSupport(
     if (!support) {
       return [];
     }
+    const statuses = new Set(support.backends.map((backend) => backend.status));
+    if (statuses.size > 1) {
+      return statusBadges.flatMap(({ status }) => {
+        const backends = support.backends.filter(
+          (backend) => backend.status === status,
+        );
+        if (backends.length === 0) {
+          return [];
+        }
+        return [
+          {
+            label: `${subproject.label} (${backends.map((backend) => backend.backendLabel).join(", ")})`,
+            status,
+            url: sourceUrl(subproject.sourceDirectory),
+          },
+        ];
+      });
+    }
     return [
       {
         label: labelFor(subproject, support),
-        status: supportStatus(support),
+        status: support.backends[0].status,
         url: sourceUrl(subproject.sourceDirectory),
       },
     ];
@@ -203,7 +214,8 @@ function subprojectSupport(
   </tbody>
 </table>
 <p>
-  OpenGL uses WGL on Windows and EGL on other platforms. macOS EGL uses ANGLE.
+  OpenGL uses WGL on Windows and EGL on other platforms. macOS EGL uses ANGLE. A
+  binding or example has separate badges when its CI status differs by backend.
 </p>
 
 <style>
