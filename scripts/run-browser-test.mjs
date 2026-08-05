@@ -32,6 +32,11 @@ const CONTENT_TYPES = {
   ".map": "application/json",
 };
 
+// Style document the browser HTTP regression test fetches. Serving it from the
+// runner's real origin exercises emscripten_fetch end to end.
+const HTTP_FIXTURE_PATH = "/__fixture/http-style.json";
+const HTTP_FIXTURE_LAYER_ID = "http-fixture";
+
 function fail(message) {
   console.error(`error: ${message}`);
   process.exit(2);
@@ -116,6 +121,17 @@ const server = createServer((request, response) => {
         settle({ status: 2, output: `malformed result: ${String(error)}` });
       }
     });
+    return;
+  }
+
+  if (url.pathname === HTTP_FIXTURE_PATH) {
+    response.writeHead(200, { "Content-Type": "application/json" }).end(
+      JSON.stringify({
+        version: 8,
+        sources: {},
+        layers: [{ id: HTTP_FIXTURE_LAYER_ID, type: "background" }],
+      }),
+    );
     return;
   }
 

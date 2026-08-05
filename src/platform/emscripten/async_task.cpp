@@ -38,13 +38,16 @@ class AsyncTaskState : public platform::emscripten::RunLoopWake::Runnable,
 
   auto countsForWaitForEmpty() const -> bool override { return true; }
 
+  // Unlists first, whatever this finds: a listed task counts against
+  // RunLoop::waitForEmpty(), so one that ran and stayed listed would keep that
+  // loop going with nothing left to run. Only maySend() lists this, and only
+  // after taking `queued`, so an unqueued task has nothing outstanding to
+  // record.
   void runTask() override {
-    if (!queued.load()) {
+    wake->removeRunnable(shared_from_this());
+    if (!queued.exchange(false)) {
       return;
     }
-
-    wake->removeRunnable(shared_from_this());
-    queued.store(false);
     if (alive) {
       task();
     }

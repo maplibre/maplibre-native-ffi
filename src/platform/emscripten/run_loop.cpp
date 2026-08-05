@@ -240,17 +240,31 @@ void RunLoop::stop() {
 
 void RunLoop::updateTime() {}
 
-// TODO(browser-threading): this spins instead of blocking, so that it is legal
-// on the browser main thread, where a host cannot own a thread of its own (see
-// #37). It only makes progress on work this loop can run itself; work owned by
-// another thread is not awaited, it is polled around. A main-thread host that
-// waits on another thread's queue can therefore spin without converging.
-// Blocking is legal on a worker, so the fix travels with the proxy shim that
-// lets a JS or Kotlin host own a worker-hosted map.
+// Runs this loop until its own work is done.
+//
+// One pass runs everything outstanding: the queues drain, and so does every
+// runnable that counts, because an async task is due the moment it is queued.
+// A pass that leaves work behind found it queued while the pass ran, so each
+// repeat runs what arrived rather than asking again for the same thing. That
+// bound rests on runTask() unlisting whatever it finds; see async_task.cpp.
+//
+// It runs the work directly rather than through runOnce(), which arms a browser
+// timer for the delay it leaves pending. A caller here is draining, so the wake
+// that timer carries has nothing to release, and arming one costs a proxy hop
+// to the main thread per pass.
+//
+// The reach stops at this loop. A caller arriving from ThreadedScheduler, where
+// the tag selects one map's tasks across pool threads, gets this loop's own
+// queues instead: an owner thread runs its own work. RenderSessionScheduler
+// takes the same position; see render/render_session_common.hpp.
 void RunLoop::waitForEmpty(
   [[maybe_unused]] const mbgl::util::SimpleIdentity tag
 ) {
+  MBGL_VERIFY_THREAD(tid);
   while (true) {
+    process();
+    impl->wake.processRunnables();
+
     std::size_t remaining;
     {
       std::scoped_lock lock(mutex);
@@ -260,8 +274,6 @@ void RunLoop::waitForEmpty(
     if (remaining == 0 && impl->wake.emptyForWaitForEmpty()) {
       return;
     }
-
-    runOnce();
   }
 }
 
