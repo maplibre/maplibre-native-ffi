@@ -30,8 +30,8 @@ private external fun destroyRecord(address: Int)
 @JsFun("(address) => globalThis.__maplibreNativeC.UTF8ToString(address)")
 private external fun readString(address: Int): String
 
-@JsFun("(drain) => globalThis.setTimeout(drain, 0)")
-private external fun scheduleDrain(drain: () -> Unit)
+@JsFun("(drain, delay) => globalThis.setTimeout(drain, delay)")
+private external fun scheduleDrain(drain: () -> Unit, delayMillis: Int)
 
 /**
  * One host callback's registration with the browser log queue.
@@ -98,6 +98,36 @@ internal object LogQueueDrain {
   private var installed = false
   private var running = false
 
+  /**
+   * How long the next turn waits, in milliseconds, and so how idle the drain currently is.
+   *
+   * Zero while records are arriving, and stepped up towards [MAX_IDLE_DELAY_MILLIS] by each turn
+   * that finds nothing. This is what stands in for the wake-up the queue does not have. Records are
+   * produced by native threads and a pthread cannot call the page, so the only way a page learns of
+   * one is by asking; the question is not whether to poll but how often, and the answer cannot be
+   * "as fast as the browser will schedule a task" for a page that may be logging nothing at all for
+   * minutes at a time.
+   *
+   * A backoff rather than a stop, which is where this parts company with the dispatcher's
+   * completion drain. That one stops on a count it owns: a completion exists only because the page
+   * submitted a call, so the page knows exactly when one can no longer arrive. Nothing here is that
+   * count. MapLibre logs from whichever thread reaches the condition -- a tile worker answering a
+   * response long after the call that asked for it returned -- so a drain that stopped on an empty
+   * turn would need a page-side event to restart it that no page-side event corresponds to, and the
+   * records would sit in the ring until the host happened to make another call.
+   *
+   * A turn that finds nothing costs two calls into the module, each taking the queue's lock and
+   * finding it empty, so the cap is chosen for the page's task queue rather than for the work: four
+   * wake-ups a second is what an idle page does anyway, where a zero-delay chain is a task every
+   * four milliseconds forever, competing with rendering and input for the whole session.
+   *
+   * Read by the test that says an idle drain stops running a task per turn, which is otherwise
+   * unobservable from a page: a drain that is sleeping and one that is spinning both deliver the
+   * same records.
+   */
+  var nextTurnDelayMillis: Int = 0
+    private set
+
   // Records enqueued before this are not this callback's. Taken when a callback is installed and
   // compared inside the same lock that enqueues, so there is no window in which a record produced
   // while nobody was listening can be delivered to whoever listens next -- which flushing at the
@@ -145,9 +175,15 @@ internal object LogQueueDrain {
     }
     // Everything already queued belongs to a period this callback was not listening for.
     mark = currentMark()
+    // A host that has just installed a callback is about to want records, so the ramp starts over
+    // rather than inheriting whatever the previous era backed off to. A turn already scheduled
+    // keeps its own delay -- there is no cancelling a browser timeout from here, and scheduling a
+    // second turn would run two drains against one queue -- so the first turn of a new era arrives
+    // no later than the last era's delay, and every turn after it is prompt.
+    nextTurnDelayMillis = 0
     if (!running) {
       running = true
-      scheduleDrain(::drainTurn)
+      scheduleDrain(::drainTurn, 0)
     }
     return 0
   }
@@ -189,8 +225,8 @@ internal object LogQueueDrain {
     // log delivery for the life of the page, and `install`'s `if (!running)` would never start it
     // again. Nothing here strands a caller the way a stranded completion drain would -- the cost is
     // that the host stops hearing records -- but it is silent, and a page has no other way back.
+    var delivered = 0
     try {
-      var delivered = 0
       var address = takeRecord(mark)
       while (address != 0) {
         deliver(HeapPointer(address))
@@ -201,9 +237,28 @@ internal object LogQueueDrain {
       val dropped = takeDropped()
       if (dropped > 0L) droppedRecords += dropped
     } finally {
-      scheduleDrain(::drainTurn)
+      // A turn that delivered anything is followed at once, because a queue that had one record has
+      // every chance of having the next; a turn that found nothing steps the wait up. A turn that
+      // threw is counted by whatever it managed to deliver first, so a failure that repeats backs
+      // off with the idle case rather than becoming a task the page runs as fast as it can schedule
+      // one. Either way a successor is scheduled, which is the property this finally exists for.
+      nextTurnDelayMillis = if (delivered > 0) 0 else nextIdleDelay()
+      scheduleDrain(::drainTurn, nextTurnDelayMillis)
     }
   }
+
+  /**
+   * Doubles the idle wait, from one millisecond up to the cap.
+   *
+   * Geometric rather than a single idle constant so that the wait tracks how quiet the queue has
+   * actually been: a gap between two records in a burst is covered by a wait of a few milliseconds,
+   * and only a page that has logged nothing for a quarter of a second reaches the cap. The browser
+   * clamps a nested timeout to about four milliseconds anyway, so the first few steps cost no more
+   * than the zero-delay chain they replace.
+   */
+  private fun nextIdleDelay(): Int =
+    if (nextTurnDelayMillis == 0) FIRST_IDLE_DELAY_MILLIS
+    else minOf(nextTurnDelayMillis * 2, MAX_IDLE_DELAY_MILLIS)
 
   private fun deliver(record: HeapPointer) {
     try {

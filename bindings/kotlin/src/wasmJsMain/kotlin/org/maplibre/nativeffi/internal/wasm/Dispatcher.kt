@@ -310,8 +310,13 @@ internal object Dispatcher {
       fill(NativeCall.Slots(scratch))
       // The test seam for the failures the module will not produce on request, and inert unless a
       // test has armed one. It stands where the submission does so that a faulted call reaches
-      // neither the owner thread nor native, which is what leaves the state behind it real.
-      if (InjectedFaults.injectCallFailure(name, result)) return@withScratch read(result)
+      // neither the owner thread nor native, which is what leaves the state behind it real. Its
+      // diagnostic is published exactly the way a real one is, so the reader below cannot tell the
+      // difference.
+      val injected = InjectedFaults.injectedCallFailure(name, result)
+      if (injected != null) {
+        return@withScratch NativeDiagnostics.forDispatchedCall(injected) { read(result) }
+      }
       val token = nextToken++
       if (nextToken == TOKEN_WRAP) nextToken = 1
       beginWait(token)
@@ -327,16 +332,21 @@ internal object Dispatcher {
           )
         }
         val invoked = park(token)
-        // Taken whatever the outcome, so a message never outlives the call it belongs to, and
-        // published before the status is read: [read] is where the status becomes an exception, and
-        // the diagnostic that exception copies has to be this call's.
-        NativeDiagnostics.setProxiedDiagnostic(diagnostics.remove(token) ?: "")
+        // Taken whatever the outcome, so a message never outlives the call it belongs to. A refused
+        // invocation carries one too -- the module copies the owner thread's slot whether or not it
+        // reached the entry point -- and leaving that behind would strand it in the map for the
+        // life of the page.
+        val diagnostic = diagnostics.remove(token) ?: ""
         if (invoked == 0) {
           throw Status.invalidState(
             "The MapLibre Native browser module could not invoke $name with $slotCount slots."
           )
         }
-        read(result)
+        // Held for the read and no longer: [read] is where the status becomes an exception, and the
+        // diagnostic that exception copies has to be this call's. Anything the page does after this
+        // frame -- including a page-thread call that reaches native and fails -- is answered by the
+        // page's own slot again.
+        NativeDiagnostics.forDispatchedCall(diagnostic) { read(result) }
       } finally {
         outstanding--
       }

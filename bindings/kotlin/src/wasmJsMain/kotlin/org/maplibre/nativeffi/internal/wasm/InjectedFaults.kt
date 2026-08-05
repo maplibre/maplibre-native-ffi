@@ -1,7 +1,6 @@
 package org.maplibre.nativeffi.internal.wasm
 
 import org.maplibre.nativeffi.error.MaplibreStatus
-import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 import org.maplibre.nativeffi.internal.status.Status
 
 /**
@@ -106,18 +105,19 @@ internal object InjectedFaults {
   }
 
   /**
-   * Reports whether [entry] is armed to fail, having written its status into [result].
+   * Reports the diagnostic [entry] is armed to fail with, having written its status into [result],
+   * or null when nothing is armed for it.
    *
    * Called by [Dispatcher.call] where the submission would go. The status lands in the caller's own
-   * result slot, so the reader above turns it into an exception by the ordinary path rather than by
-   * one this knows about.
+   * result slot and the message goes back to the caller rather than being published from here, so
+   * both reach the reader above by the ordinary path rather than by one this knows about -- and so
+   * a faulted call's message is scoped to that call exactly as a real one is.
    */
-  fun injectCallFailure(entry: String, result: HeapPointer): Boolean {
-    if (faultedEntry != entry) return false
+  fun injectedCallFailure(entry: String, result: HeapPointer): String? {
+    if (faultedEntry != entry) return null
     faultedEntry = null
-    NativeDiagnostics.setProxiedDiagnostic(faultedDiagnostic)
     Heap.storeInt(result, faultedStatus)
-    return true
+    return faultedDiagnostic
   }
 
   /** Makes every result-handle copy fail as an allocation failure, until [takeCopiedResults]. */

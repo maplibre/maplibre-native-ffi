@@ -13,8 +13,8 @@ import org.maplibre.nativeffi.internal.wasm.BrowserModule
  * Every other call runs on the pthread that owns its runtime, so its diagnostic belongs to that
  * thread and is gone, or replaced, by the time the page resumes. Reading it here would report an
  * empty or unrelated message for the failure the caller is actually holding. The dispatch path
- * therefore copies the diagnostic on the executing pthread, beside the status, and publishes it
- * through [proxied].
+ * therefore copies the diagnostic on the executing pthread, beside the status, and hands it to
+ * [NativeDiagnostics.forDispatchedCall] for as long as that call's result is being read.
  */
 @JsFun(
   """
@@ -29,27 +29,56 @@ private external fun lastErrorMessage(): String
 
 internal actual object NativeDiagnostics {
   /**
-   * The diagnostic the last dispatched call brought back, or null when the last call this binding
-   * made ran on the page.
+   * The diagnostic belonging to the dispatched call whose result is being read right now, or null
+   * when no such call is being read.
    *
-   * This is the page's stand-in for the owner thread's own slot, and it follows the same rule that
-   * slot does: every dispatched call replaces it, with the empty string when it did not fail. So a
-   * diagnostic is never older than the call whose status is being converted, which is the whole
-   * point -- a message that outlived its call would name an unrelated failure.
+   * Scoped to that read rather than held until something happens to replace it. The two are not the
+   * same rule, and the difference is the whole reason this is a scope: a value that stands until
+   * replaced is authoritative for every call that follows it, so *every* other path to native has
+   * to retire it, and one that forgets reports a message belonging to somebody else's failure --
+   * or, worse, the empty string a call that succeeded left behind. Only the dispatch path knows it
+   * has a proxied diagnostic, so only the dispatch path says so, and it says so for exactly as long
+   * as the statement is true.
    *
-   * Null rather than empty for a page-thread call, because the page has a real slot of its own for
-   * those and it is the authority on them.
+   * Null the rest of the time, and null is the answer for every page-thread call: the page has a
+   * real slot of its own, written by the call being converted, and it is the authority on it. So a
+   * page-thread entry point needs to do nothing at all to be reported correctly, which is what
+   * makes this safe for the ones that reach native without going through [NativeCall] --
+   * `WakeSource.signal` and `RenderTargetExtent.physicalSize`.
+   *
+   * A plain field, saved and restored, because a page is one thread and the scope below spans no
+   * suspension: nothing else on the page can run inside it, so the only nesting possible is a call
+   * this binding makes from inside a result read.
    */
   private var proxied: String? = null
 
-  /** Reports [diagnostic] as the current one until the next call this binding makes. */
-  fun setProxiedDiagnostic(diagnostic: String) {
-    proxied = diagnostic
-  }
+  /**
+   * Reports [diagnostic] as the current one while [read] converts a dispatched call's result.
+   *
+   * The message travelled back in the call's completion because the C API's own slot is
+   * thread-local to the owner thread, where the next call replaces it. This is the window in which
+   * that copy is the answer, and it closes as the read returns however it returns.
+   */
+  fun <T> forDispatchedCall(diagnostic: String, read: () -> T): T = reporting(diagnostic, read)
 
-  /** Hands the page's own slot back the authority, for a call this binding makes on the page. */
-  fun clearProxiedDiagnostic() {
-    proxied = null
+  /**
+   * Gives the page's own slot the authority while [call] runs on the page.
+   *
+   * Redundant at the top level, where nothing has claimed the authority anyway, and not redundant
+   * inside a dispatched call's result read -- a read that copies a native list or snapshot makes
+   * its own page-thread calls, and a failure in one of those is the page's to report rather than
+   * the dispatched call's.
+   */
+  fun <T> forPageCall(call: () -> T): T = reporting(null, call)
+
+  private fun <T> reporting(diagnostic: String?, body: () -> T): T {
+    val enclosing = proxied
+    proxied = diagnostic
+    try {
+      return body()
+    } finally {
+      proxied = enclosing
+    }
   }
 
   actual fun currentDiagnostic(): String {

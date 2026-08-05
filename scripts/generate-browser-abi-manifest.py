@@ -28,7 +28,6 @@ reads `Qb`, `Rb`, and the signatures cannot be attributed to an entry point.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import pathlib
 import re
@@ -500,7 +499,10 @@ def main(argv: list[str]) -> int:
         layout["fields"] = described
     manifest = {
         # 2 added each field's declared and canonical type beside its offset.
-        "version": 2,
+        # 3 dropped a digest of the manifest that the manifest carried, because
+        # a file's own digest, stored in that file, is not something a reader
+        # can rely on: whoever changed the contents rewrites it too.
+        "version": 3,
         "headersDigest": headers_digest(arguments.include),
         "dispatchProtocol": dispatch_protocol(
             arguments.include.parent / "src" / "browser" / "dispatch_table.h"
@@ -509,8 +511,6 @@ def main(argv: list[str]) -> int:
         "structs": structs,
         "enums": dict(sorted(_ENUM_VALUES.items())),
     }
-    text = json.dumps(manifest, indent=2, sort_keys=False) + "\n"
-    manifest["manifestDigest"] = hashlib.sha256(text.encode()).hexdigest()
     text = json.dumps(manifest, indent=2, sort_keys=False) + "\n"
 
     # Rewritten only on change, so an unchanged manifest does not retrigger

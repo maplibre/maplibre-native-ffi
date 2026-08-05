@@ -110,19 +110,22 @@ internal object NativeCall {
       val result = scratch + slotCount * SLOT_BYTES
       fill(Slots(scratch))
       // This one runs on the page, so the page's own diagnostic slot is the authority on what it
-      // says. Handing it back retires whatever the last dispatched call left behind, which belongs
-      // to the owner thread and not to this failure.
-      NativeDiagnostics.clearProxiedDiagnostic()
-      if (!invokeHere(entry, scratch.address, slotCount, result.address)) {
-        // The module rejects a call it cannot place: an index it does not carry,
-        // or a buffer shorter than the entry reads. Both mean this binding and
-        // the module disagree, so neither is worth retrying.
-        throw Status.invalidState(
-          "The MapLibre Native browser module rejected a call to $name with $slotCount " +
-            "slots; it reads ${slotCount(entry)}."
-        )
+      // says, and it is written by the invocation below. Saying so matters only where this call is
+      // nested inside a dispatched call's result read -- a read that copies a native list or
+      // snapshot makes these page-thread calls -- because that read has an owner-thread message
+      // standing, and it is not this failure's.
+      NativeDiagnostics.forPageCall {
+        if (!invokeHere(entry, scratch.address, slotCount, result.address)) {
+          // The module rejects a call it cannot place: an index it does not carry,
+          // or a buffer shorter than the entry reads. Both mean this binding and
+          // the module disagree, so neither is worth retrying.
+          throw Status.invalidState(
+            "The MapLibre Native browser module rejected a call to $name with $slotCount " +
+              "slots; it reads ${slotCount(entry)}."
+          )
+        }
+        read(result)
       }
-      read(result)
     }
   }
 
