@@ -44,7 +44,7 @@ type StyleSourceInfo struct {
 	RasterEncoding  *StyleRasterDEMEncoding
 }
 
-// StyleSourceTileJSON contains the parsed TileJSON fields retained by a tile source.
+// StyleSourceTileJSON contains the retained TileJSON fields of an inline tile source.
 type StyleSourceTileJSON struct {
 	TileURLs []string
 	MinZoom  float64

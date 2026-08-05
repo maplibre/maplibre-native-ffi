@@ -305,7 +305,7 @@ pub fn custom_geometry_source_options_to_native(
     raw
 }
 
-/// Copied fields from a parsed TileJSON source description.
+/// Copied fields from an inline TileJSON source description.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct TileJsonInfo {

@@ -400,7 +400,7 @@ public struct StyleTransitionOptions: Equatable, Sendable {
   }
 }
 
-/// The parsed TileJSON fields that MapLibre Native retains for a tile source.
+/// The retained TileJSON fields of an inline tile source.
 public struct StyleSourceTileJSON: Equatable, Sendable {
   public let tileURLs: [String]
   public let minZoom: Double

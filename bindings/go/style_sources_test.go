@@ -217,7 +217,7 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 		t.Fatalf("StyleSourceInfo(inline-vector) attribution = %v, want %q", info.Attribution, attribution)
 	}
 	if info.TileJSON == nil {
-		t.Fatal("StyleSourceInfo(inline-vector) TileJSON = nil, want parsed TileJSON")
+		t.Fatal("StyleSourceInfo(inline-vector) TileJSON = nil, want inline TileJSON")
 	}
 	if len(info.TileJSON.TileURLs) != len(tileURLs) {
 		t.Fatalf("StyleSourceInfo(inline-vector) tile URLs = %v, want %v", info.TileJSON.TileURLs, tileURLs)

@@ -218,6 +218,14 @@ auto tile_source_from_source(const mbgl::style::Source& source)
   }
 }
 
+auto inline_tileset(const mbgl::style::TileSource& source)
+  -> const mbgl::Tileset* {
+  const auto& url_or_tileset = source.getURLOrTileset();
+  return url_or_tileset.is<mbgl::Tileset>()
+           ? &url_or_tileset.get<mbgl::Tileset>()
+           : nullptr;
+}
+
 auto source_url(const mbgl::style::Source& source)
   -> std::optional<std::string> {
   if (const auto* tile_source = tile_source_from_source(source)) {
@@ -4226,8 +4234,8 @@ auto map_get_style_source_info(
       to_c_vector_encoding(vector_source->getEncoding());
   }
 
-  const auto& tileset = tile_source->getTileset();
-  if (!tileset) {
+  const auto* tileset = inline_tileset(*tile_source);
+  if (tileset == nullptr) {
     return MLN_STATUS_OK;
   }
 
@@ -4381,7 +4389,7 @@ auto map_get_style_source_tile_urls(
 
   auto tile_urls = std::vector<std::string>{};
   if (const auto* tile_source = tile_source_from_source(*source)) {
-    if (const auto& tileset = tile_source->getTileset()) {
+    if (const auto* tileset = inline_tileset(*tile_source)) {
       tile_urls = tileset->tiles;
     }
   }

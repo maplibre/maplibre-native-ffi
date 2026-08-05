@@ -108,7 +108,7 @@ class StyleLayerVisibility(UnknownIntEnum):
 
 @dataclass(frozen=True, slots=True)
 class TileJsonInfo:
-    """Copied fields from a parsed TileJSON source description."""
+    """Copied fields from an inline TileJSON source description."""
 
     tiles: tuple[str, ...]
     min_zoom: float

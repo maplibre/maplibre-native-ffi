@@ -902,39 +902,11 @@ static void style_source_info_rebuilds_an_inline_tile_source(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// URL is retained at construction, while fields sourced from TileJSON appear
-// only after the source description has loaded.
-static void style_source_info_tracks_loaded_tilejson(void) {
+// A URL-backed tile source stays represented by its URL. The resolved remote
+// TileJSON is runtime state rather than part of its reconstructible descriptor.
+static void style_source_info_reports_url_backed_tile_source(void) {
   static const char source_url[] = "https://example.com/source.json";
-  static const uint8_t tilejson[] =
-    "{\"tilejson\":\"3.0.0\",\"tiles\":[\"https://tiles.example/{z}/{x}/"
-    "{y}.pbf\"],"
-    "\"minzoom\":1,\"maxzoom\":9,\"scheme\":\"tms\",\"bounds\":[-30,-20,40,50]"
-    "}";
-  const mln_adapter_resource_provider_rule rule = {
-    .kind = MLN_RESOURCE_KIND_SOURCE,
-    .requested_url = source_url,
-    .response = {
-      .size = sizeof(mln_resource_response),
-      .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
-      .error_reason = MLN_RESOURCE_ERROR_REASON_NONE,
-      .bytes = tilejson,
-      .byte_count = sizeof(tilejson) - 1,
-    },
-  };
-  const mln_adapter_resource_provider_rules rules = {
-    .rules = &rule, .count = 1
-  };
-
   mln_runtime runtime = mln_test_create_runtime();
-  const mln_resource_provider provider = {
-    .size = sizeof(mln_resource_provider),
-    .callback = mln_adapter_resource_provider_rules_callback,
-    .user_data = (void*)&rules,
-  };
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
-  );
   mln_map map = mln_test_create_map(runtime);
   const mln_string_view source_id = MLN_STRING_LITERAL("remote");
   TEST_ASSERT_EQUAL_INT(
@@ -950,6 +922,7 @@ static void style_source_info_tracks_loaded_tilejson(void) {
   );
   TEST_ASSERT_TRUE(found);
   TEST_ASSERT_BITS_HIGH(MLN_STYLE_SOURCE_INFO_URL, info.fields);
+  TEST_ASSERT_BITS_LOW(MLN_STYLE_SOURCE_INFO_TILEJSON, info.fields);
   TEST_ASSERT_EQUAL_size_t(sizeof(source_url) - 1, info.url_size);
 
   size_t copied_size = 0;
@@ -974,27 +947,6 @@ static void style_source_info_tracks_loaded_tilejson(void) {
   );
   TEST_ASSERT_EQUAL_STRING_LEN(source_url, copied_url, copied_size);
 
-  for (unsigned int attempt = 0;
-       attempt < 600 && (info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) == 0;
-       attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
-    info.size = sizeof(mln_style_source_info);
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_map_get_style_source_info(map, source_id, &info, &found)
-    );
-    if ((info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) == 0) {
-      mln_test_sleep_millisecond();
-    }
-  }
-  TEST_ASSERT_BITS_HIGH(
-    MLN_STYLE_SOURCE_INFO_TILEJSON | MLN_STYLE_SOURCE_INFO_BOUNDS, info.fields
-  );
-  TEST_ASSERT_EQUAL_size_t(1, info.tile_count);
-  TEST_ASSERT_EQUAL_DOUBLE(1.0, info.min_zoom);
-  TEST_ASSERT_EQUAL_DOUBLE(9.0, info.max_zoom);
-  TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_TILE_SCHEME_TMS, info.scheme);
-
   mln_style_string_list urls = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
@@ -1004,13 +956,10 @@ static void style_source_info_tracks_loaded_tilejson(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_style_string_list_count(urls, &count)
   );
-  TEST_ASSERT_EQUAL_size_t(1, count);
+  TEST_ASSERT_EQUAL_size_t(0, count);
   mln_style_string_list_destroy(urls);
 
   mln_test_destroy_map(map);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_clear_resource_provider(runtime)
-  );
   mln_test_destroy_runtime(runtime);
 }
 
@@ -1483,7 +1432,7 @@ void run_style_values_abi_tests(void) {
   RUN_TEST(style_image_stretch_descriptors_reject_unsafe_raw_values);
   RUN_TEST(copy_entry_points_answer_a_null_buffer_as_a_size_probe);
   RUN_TEST(style_source_info_rebuilds_an_inline_tile_source);
-  RUN_TEST(style_source_info_tracks_loaded_tilejson);
+  RUN_TEST(style_source_info_reports_url_backed_tile_source);
   RUN_TEST(style_source_info_reports_other_source_shapes);
   RUN_TEST(loaded_style_document_reports_the_parsed_bytes);
   RUN_TEST(style_url_reports_the_requested_url);

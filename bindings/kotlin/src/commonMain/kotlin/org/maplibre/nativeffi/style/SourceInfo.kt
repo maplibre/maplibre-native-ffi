@@ -20,7 +20,7 @@ public data class SourceInfo(
 )
 
 /**
- * Parsed TileJSON fields that MapLibre retains for a tiled style source.
+ * Retained TileJSON fields for an inline tiled style source.
  *
  * This value contains normalized retained fields rather than the original TileJSON document.
  */

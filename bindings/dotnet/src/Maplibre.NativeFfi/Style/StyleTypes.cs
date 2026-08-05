@@ -36,7 +36,7 @@ public enum RasterDemEncoding : uint
     Terrarium = 1,
 }
 
-/// <summary>Parsed TileJSON fields that MapLibre retains for a tile source.</summary>
+/// <summary>Retained TileJSON fields for an inline tile source.</summary>
 /// <remarks>
 /// <see cref="RawScheme" /> preserves a scheme value that has no named <see cref="TileScheme" />
 /// member. The tile URL list is a copied snapshot.
@@ -89,7 +89,7 @@ public enum LocationIndicatorImageKind : uint
 
 /// <summary>Copied metadata that MapLibre currently retains for a style source.</summary>
 /// <remarks>
-/// <see cref="TileJson" /> is present after a tile source has a parsed description. Raw enum
+/// <see cref="TileJson" /> is present for an inline tile source. Raw enum
 /// values preserve native values that have no named managed member.
 /// </remarks>
 public sealed record SourceInfo(

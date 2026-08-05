@@ -180,7 +180,7 @@ final class SourceInfo {
   /// Retained source URL, when the source has one.
   final String? url;
 
-  /// Parsed TileJSON retained by the source.
+  /// Retained TileJSON for an inline tile source.
   final ParsedTileJson? tileJson;
 
   /// Tile size exposed by the source.
@@ -193,9 +193,9 @@ final class SourceInfo {
   final RasterDemEncoding? rasterDemEncoding;
 }
 
-/// Parsed TileJSON fields retained by a tile source.
+/// Retained TileJSON fields for an inline tile source.
 final class ParsedTileJson {
-  /// Creates copied parsed TileJSON metadata.
+  /// Creates copied inline TileJSON metadata.
   ParsedTileJson({
     required List<String> tileUrls,
     required this.minZoom,

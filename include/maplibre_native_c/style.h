@@ -40,9 +40,9 @@ typedef enum mln_style_source_type : uint32_t {
 typedef enum mln_style_source_info_field : uint32_t {
   /** The source retains a URL. Copy it with mln_map_copy_style_source_url(). */
   MLN_STYLE_SOURCE_INFO_URL = 1U << 0U,
-  /** The source has a parsed TileJSON description. */
+  /** The tile source was defined with an inline TileJSON description. */
   MLN_STYLE_SOURCE_INFO_TILEJSON = 1U << 1U,
-  /** The parsed TileJSON description contains geographic bounds. */
+  /** The inline TileJSON description contains geographic bounds. */
   MLN_STYLE_SOURCE_INFO_BOUNDS = 1U << 2U,
   /** The source exposes a tile size. */
   MLN_STYLE_SOURCE_INFO_TILE_SIZE = 1U << 3U,
@@ -188,7 +188,7 @@ typedef struct mln_style_source_info {
   size_t attribution_size;
   /** URL byte length, meaningful when fields contains URL. */
   size_t url_size;
-  /** Tile URL count, meaningful when fields contains TILEJSON. */
+  /** Inline tile URL count, meaningful when fields contains TILEJSON. */
   size_t tile_count;
   /** Minimum zoom, meaningful when fields contains TILEJSON. */
   double min_zoom;
@@ -605,11 +605,11 @@ MLN_API mln_status mln_map_get_style_source_type(
 /**
  * Copies fixed metadata for one style source.
  *
- * The returned struct contains string lengths and fixed parsed TileJSON
+ * The returned struct contains string lengths and fixed inline TileJSON
  * fields, not string contents. Use
  * mln_map_copy_style_source_attribution() and
  * mln_map_copy_style_source_url() to copy individual strings, and
- * mln_map_get_style_source_tile_urls() to copy parsed tile URLs. The source ID
+ * mln_map_get_style_source_tile_urls() to copy inline tile URLs. The source ID
  * is the lookup key and is also available through style source ID lists.
  *
  * Returns:
@@ -683,11 +683,13 @@ MLN_API mln_status mln_map_copy_style_source_url(
 ) MLN_NOEXCEPT;
 
 /**
- * Copies one style source's parsed TileJSON tile URLs into an owned list.
+ * Copies one style source's inline TileJSON tile URLs into an owned list.
  *
  * On success, out_found reports whether source_id exists. When found,
- * *out_tile_urls receives an owned list. A source without parsed TileJSON
- * returns an empty list. Destroy the list with mln_style_string_list_destroy().
+ * *out_tile_urls receives an owned list. A URL-backed tile source and every
+ * source without inline TileJSON return an empty list. Loading a URL-backed
+ * source does not change this result. Destroy the list with
+ * mln_style_string_list_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK on success.

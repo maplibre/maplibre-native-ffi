@@ -631,7 +631,7 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     }
   }
 
-  // BND-109: source inspection copies reconstructible URL and parsed TileJSON state.
+  // BND-109: source inspection copies reconstructible URL and inline TileJSON state.
 
   @Test
   fun styleSourceInfoCopiesUrlAndInlineTileMetadataPastNativeLifetime() {
