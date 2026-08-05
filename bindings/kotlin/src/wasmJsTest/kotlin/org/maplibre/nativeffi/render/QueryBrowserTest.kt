@@ -4,11 +4,15 @@ import kotlin.js.JsAny
 import kotlin.js.Promise
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import org.maplibre.nativeffi.assertResultHandleDestroyed
 import org.maplibre.nativeffi.browserTest
 import org.maplibre.nativeffi.camera.CameraOptions
+import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.FeatureIdentifier
 import org.maplibre.nativeffi.geo.GeoJson
@@ -16,6 +20,7 @@ import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.internal.wasm.InjectedFaults
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.maplibreScope
@@ -246,6 +251,61 @@ class QueryBrowserTest {
           val shiftedLeaves = assertIs<FeatureExtensionResult.FeatureCollection>(shifted).features
           assertEquals(2, shiftedLeaves.size)
           assertEquals(boundedLeaves[1], shiftedLeaves[0])
+        }
+      }
+    }
+  }
+
+  /**
+   * A query result belongs to the call that made it, so a copy that fails still has to end it.
+   *
+   * The failure injected is the one the copy really has: everything a result is read through goes
+   * via a block the page allocates first, and the module's allocator can refuse it. What matters is
+   * not the error — a caller sees an allocation failure either way — but whether the result handle
+   * native had already produced went with it. A leaked one is silent, so it is replayed against
+   * native, which is the only party that can say whether it is still there.
+   */
+  // Spec coverage: BND-066.
+  @Test
+  fun aFailedResultCopyDestroysTheNativeResultRatherThanLeakingIt(): Promise<JsAny?> = browserTest {
+    maplibreScope {
+      withMap(WIDTH, HEIGHT) { runtime, map ->
+        withSession(map) { session ->
+          map.setStyleJson(POINTS_STYLE_JSON)
+          map.jumpTo(
+            CameraOptions().apply {
+              center = LatLng(0.0, 0.0)
+              zoom = 3.0
+            }
+          )
+          render(runtime, session)
+          // The same query first, so what the injected failure changes is this call rather than a
+          // query that was never going to answer.
+          assertTrue(querySourceUntilFound(runtime, session, "points", null).isNotEmpty())
+
+          val acquired: Long
+          try {
+            InjectedFaults.failResultCopies()
+            val error =
+              assertFailsWith<InvalidStateException> { session.querySourceFeatures("points", null) }
+            assertEquals(MaplibreStatus.INVALID_STATE, error.status)
+            assertTrue(error.diagnostic.contains("could not allocate"), error.diagnostic)
+            acquired =
+              assertNotNull(
+                InjectedFaults.takeCopiedResults().singleOrNull(),
+                "the query did not reach the copy, so nothing proves what it did with the result",
+              )
+          } finally {
+            InjectedFaults.reset()
+          }
+          assertResultHandleDestroyed(
+            acquired,
+            "mln_feature_query_result_count",
+            "mln_feature_query_result",
+          )
+
+          // And the session is unharmed: the next query answers as the first one did.
+          assertTrue(querySourceUntilFound(runtime, session, "points", null).isNotEmpty())
         }
       }
     }

@@ -5,6 +5,7 @@ import kotlin.js.Promise
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -12,6 +13,7 @@ import org.maplibre.nativeffi.PageCanvases
 import org.maplibre.nativeffi.assertPresentedColor
 import org.maplibre.nativeffi.backgroundStyle
 import org.maplibre.nativeffi.browserTest
+import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.FeatureIdentifier
@@ -571,6 +573,88 @@ class CustomGeometrySourceBrowserTest {
 
     override fun cancelTile(tileId: CanonicalTileId) {
       if (retired) afterEra++
+    }
+  }
+
+  /**
+   * A source native refuses leaves the callback already registered under that id serving tiles.
+   *
+   * This family needs nothing injected. A style holds one source per id, so adding a second under
+   * an id it already carries is refused by native itself — which is precisely a replacement
+   * failing, and it fails at the point that matters: the binding has already installed the
+   * replacement's host registration, because the module reaches a tile callback through the pointer
+   * that installation places and a source added first could ask for a tile with nowhere to send it.
+   *
+   * So the refusal has to give that registration back and leave the previous one alone, and both
+   * halves are asserted: the registry count says the replacement's state went, and the tiles the
+   * page is still asked for say whose callback native reaches.
+   *
+   * Rendered into a texture of its own rather than onto the page, for the reason the teardown test
+   * above gives.
+   */
+  // Spec coverage: BND-122.
+  @Test
+  fun aSourceReplacementNativeRefusesKeepsThePreviousCallback(): Promise<JsAny?> = browserTest {
+    maplibreScope {
+      withMap(WIDTH, HEIGHT) { runtime, map ->
+        val installed = RecordingCallback()
+        val refused = RecordingCallback()
+        val registrationsBefore = CustomGeometryBridge.liveRegistrations
+        val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
+        try {
+          val session =
+            map.attachOpenGLOwnedTexture(
+              OpenGLOwnedTextureDescriptor(
+                RenderTargetExtent(WIDTH, HEIGHT, 1.0),
+                context.descriptor(),
+              )
+            )
+          try {
+            map.setStyleJson(backgroundStyle(BACKGROUND_COLOR))
+            waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
+            map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(installed))
+            map.addStyleLayerJson(fillLayer(), "")
+            assertTrue(
+              renderUntil(runtime, session) { installed.tiles.isNotEmpty() },
+              "the source never asked the page for a tile",
+            )
+            assertEquals(registrationsBefore + 1, CustomGeometryBridge.liveRegistrations)
+
+            // The same id again. Native holds one source per id and says so.
+            val error =
+              assertFailsWith<InvalidArgumentException> {
+                map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(refused))
+              }
+            assertContains(error.diagnostic, "already exists")
+
+            // The refused source's registration went back rather than holding the module's
+            // trampoline open for a source that does not exist.
+            assertEquals(
+              registrationsBefore + 1,
+              CustomGeometryBridge.liveRegistrations,
+              "the refused source left its registration behind",
+            )
+
+            // And native still asks the callback that was already there, which is the half the
+            // count cannot show.
+            val askedBefore = installed.tiles.size
+            map.invalidateCustomGeometrySourceTile(SOURCE, installed.tiles.first())
+            assertTrue(
+              renderUntil(runtime, session) { installed.tiles.size > askedBefore },
+              "the source stopped asking the callback it was added with",
+            )
+            assertTrue(refused.tiles.isEmpty(), "the refused source's callback was called anyway")
+
+            assertTrue(map.removeStyleLayer(FILL_LAYER))
+            assertTrue(map.removeStyleSource(SOURCE))
+            assertEquals(registrationsBefore, CustomGeometryBridge.liveRegistrations)
+          } finally {
+            session.close()
+          }
+        } finally {
+          context.close()
+        }
+      }
     }
   }
 

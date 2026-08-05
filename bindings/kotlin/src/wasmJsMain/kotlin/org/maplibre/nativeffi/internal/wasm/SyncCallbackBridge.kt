@@ -180,6 +180,16 @@ private constructor(private val callback: ResourceProviderCallback, private val 
       ResourceProviderBridge(callback, token)
     }
 
+    /**
+     * How many runtimes still hold a registration, for the tests that assert a release.
+     *
+     * A registration that outlived the call it was made for and one that did not both do nothing
+     * until native invokes them, and a refused installation is exactly the case where native never
+     * will — so this is the only way a page can tell a released replacement from a leaked one.
+     */
+    val liveRegistrations: Int
+      get() = host.registrationCount
+
     /** The callback to register in the descriptor, which is compiled into the browser module. */
     fun thunk(): Int = providerThunk()
 
@@ -293,6 +303,10 @@ private constructor(private val callback: ResourceTransformCallback, private val
     fun install(callback: ResourceTransformCallback): ResourceTransformBridge = host.add { token ->
       ResourceTransformBridge(callback, token)
     }
+
+    /** How many runtimes still hold a registration, read by the tests for the same reason above. */
+    val liveRegistrations: Int
+      get() = host.registrationCount
 
     fun thunk(): Int = transformThunk()
 

@@ -15,6 +15,7 @@ import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.UnsupportedFeatureException
+import org.maplibre.nativeffi.internal.wasm.InjectedFaults
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.maplibreScope
 import org.maplibre.nativeffi.runtime.RuntimeHandle
@@ -30,7 +31,7 @@ import org.maplibre.nativeffi.withMap
  */
 class RenderSessionBrowserTest {
   // Spec coverage: BND-161, BND-162, BND-163, BND-164, BND-165, BND-166, BND-167, BND-168,
-  // BND-170, BND-173, BND-175, BND-176.
+  // BND-169, BND-170, BND-173, BND-175, BND-176.
 
   @Test
   fun aDescriptorMaterializesAnExtentAndABorrowedContextItDoesNotOwn(): Promise<JsAny?> =
@@ -313,6 +314,62 @@ class RenderSessionBrowserTest {
             } finally {
               next.close()
             }
+          }
+        }
+      }
+    }
+
+  /**
+   * A release native refuses leaves the frame exactly as it was, so the caller can ask again.
+   *
+   * The alternative is worse than the failure: a frame marked closed by a release that did not
+   * happen is one native still holds, and the session it was borrowed from refuses to render,
+   * resize, detach, or close for as long as that borrow stands — with nothing left that could give
+   * it back. So the assertions here are about the state rather than the error. The frame is still
+   * open, its backend handles still read, the session still refuses to render, and the retry both
+   * succeeds and gives the session back.
+   *
+   * The refusal is injected, and injected in place of the call rather than after it: native still
+   * holds the frame afterwards, which is what makes the retry below a real release rather than a
+   * second attempt at one that already happened.
+   */
+  // Spec coverage: BND-169.
+  @Test
+  fun aFrameReleaseNativeRefusesLeavesTheFrameOpenForAnotherAttempt(): Promise<JsAny?> =
+    browserTest {
+      maplibreScope {
+        withMap(WIDTH, HEIGHT) { runtime, map ->
+          withSession(map) { _, session ->
+            map.setStyleJson(BACKGROUND_STYLE_JSON)
+            assertTrue(renderOneFrame(runtime, session))
+
+            val frame = session.acquireOpenGLOwnedTextureFrame()
+            val texture = frame.frame().texture()
+            try {
+              InjectedFaults.failNextCall(
+                "mln_opengl_owned_texture_release_frame",
+                MaplibreStatus.INVALID_STATE,
+                "render session has no frame acquired",
+              )
+              val error = assertFailsWith<InvalidStateException> { frame.close() }
+              assertEquals(MaplibreStatus.INVALID_STATE, error.status)
+              assertEquals("render session has no frame acquired", error.diagnostic)
+            } finally {
+              InjectedFaults.reset()
+            }
+
+            // Nothing was retired: the handle is open, its frame still reads through a scope that
+            // was not closed, and the session still counts the borrow the release did not end.
+            assertFalse(frame.isClosed, "the frame was retired by a release that did not happen")
+            assertEquals(texture, frame.frame().texture())
+            assertFailsWith<InvalidStateException> { session.renderUpdate() }
+
+            // The retry is the release that never happened, so it closes the frame and hands the
+            // session back.
+            frame.close()
+            assertTrue(frame.isClosed)
+            assertFailsWith<InvalidStateException> { frame.frame() }
+            assertTrue(renderOneFrame(runtime, session))
           }
         }
       }

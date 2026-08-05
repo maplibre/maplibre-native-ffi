@@ -13,6 +13,7 @@ import org.maplibre.nativeffi.internal.wasm.Dispatcher
 import org.maplibre.nativeffi.internal.wasm.Heap
 import org.maplibre.nativeffi.internal.wasm.HeapArena
 import org.maplibre.nativeffi.internal.wasm.HeapPointer
+import org.maplibre.nativeffi.internal.wasm.InjectedFaults
 import org.maplibre.nativeffi.internal.wasm.NativeCall
 import org.maplibre.nativeffi.internal.wasm.OfflineMarshal
 import org.maplibre.nativeffi.internal.wasm.ResourceProviderBridge
@@ -827,6 +828,7 @@ public actual class RuntimeHandle private constructor(private val handle: Native
    */
   private fun readSnapshot(snapshot: NativeOfflineRegionSnapshot): OfflineRegionInfo =
     try {
+      InjectedFaults.beginResultCopy(snapshot.raw, MlnOfflineRegionInfo.SIZEOF)
       Heap.withScratch(MlnOfflineRegionInfo.SIZEOF) { info ->
         OfflineMarshal.writeRegionInfoHeader(info)
         NativeCall.call(
@@ -854,6 +856,7 @@ public actual class RuntimeHandle private constructor(private val handle: Native
   /** Copies every region out of a list and destroys it, on the page for the reason above. */
   private fun readList(list: NativeOfflineRegionList): List<OfflineRegionInfo> =
     try {
+      InjectedFaults.beginResultCopy(list.raw, MlnOfflineRegionInfo.SIZEOF + SIZE_BYTES)
       // The info descriptor goes first, and the count after it. A descriptor holds 64-bit fields,
       // and the heap views these reads go through index by width rather than by byte, so one
       // placed at an address the allocator did not align would be read at the wrong offsets

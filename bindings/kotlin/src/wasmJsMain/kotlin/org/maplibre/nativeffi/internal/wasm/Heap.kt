@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.internal.wasm
 
 import kotlin.wasm.unsafe.withScopedMemoryAllocator
+import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.internal.status.Status
 
 /**
@@ -156,9 +157,7 @@ internal object Heap {
     // happened. The check is a global read, which is nothing beside the allocation it guards.
     BrowserModule.require()
     val address = heapAllocate(size)
-    if (address == 0) {
-      throw Status.invalidState("The MapLibre Native browser module could not allocate $size bytes")
-    }
+    if (address == 0) throw allocationFailure(size)
     heapClear(address, size)
     try {
       return body(HeapPointer(address))
@@ -166,6 +165,16 @@ internal object Heap {
       heapFree(address)
     }
   }
+
+  /**
+   * The failure a scratch acquisition of [size] bytes reports when the module's allocator refuses.
+   *
+   * Named rather than thrown inline because [InjectedFaults] raises the same one: a test that
+   * simulates an allocation failure has to produce the error a real one would, and two spellings of
+   * it would drift apart the first time this message changed.
+   */
+  fun allocationFailure(size: Int): MaplibreException =
+    Status.invalidState("The MapLibre Native browser module could not allocate $size bytes")
 
   /**
    * Sizes an array of [count] elements, refusing one this target could not address.

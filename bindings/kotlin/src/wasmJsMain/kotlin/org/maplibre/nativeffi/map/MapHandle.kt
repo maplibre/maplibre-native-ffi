@@ -28,6 +28,7 @@ import org.maplibre.nativeffi.internal.wasm.GeometryMarshal
 import org.maplibre.nativeffi.internal.wasm.Heap
 import org.maplibre.nativeffi.internal.wasm.HeapArena
 import org.maplibre.nativeffi.internal.wasm.HeapPointer
+import org.maplibre.nativeffi.internal.wasm.InjectedFaults
 import org.maplibre.nativeffi.internal.wasm.JsonMarshal
 import org.maplibre.nativeffi.internal.wasm.MapOptionsMarshal
 import org.maplibre.nativeffi.internal.wasm.NativeCall
@@ -2048,6 +2049,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   private fun readStyleIdList(list: Long): List<String> {
     if (list == 0L) return emptyList()
     try {
+      InjectedFaults.beginResultCopy(list, SIZE_BYTES + MlnStringView.SIZEOF)
       return Heap.withScratch(SIZE_BYTES + MlnStringView.SIZEOF) { count ->
         val id = count + SIZE_BYTES
         NativeCall.call(
@@ -2085,6 +2087,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     // The C API reports an absent value as the null snapshot rather than as a failure.
     if (snapshot == 0L) return null
     try {
+      InjectedFaults.beginResultCopy(snapshot, POINTER_BYTES)
       return Heap.withScratch(POINTER_BYTES) { out ->
         NativeCall.call(
           "mln_json_snapshot_get",

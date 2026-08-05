@@ -9,9 +9,12 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.maplibre.nativeffi.BACKGROUND_STYLE_JSON
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
+import org.maplibre.nativeffi.assertResultHandleDestroyed
 import org.maplibre.nativeffi.browserTest
 import org.maplibre.nativeffi.error.InvalidArgumentException
+import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.FeatureIdentifier
@@ -20,6 +23,7 @@ import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.internal.wasm.Heap
 import org.maplibre.nativeffi.internal.wasm.HeapArena
+import org.maplibre.nativeffi.internal.wasm.InjectedFaults
 import org.maplibre.nativeffi.internal.wasm.JsonMarshal
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.maplibreScope
@@ -537,6 +541,60 @@ class StyleBrowserTest {
       }
     }
   }
+
+  /**
+   * A list and a snapshot both belong to the call that made them, so a failed copy still ends them.
+   *
+   * These two are the other kinds of native result handle the style API produces, and both are read
+   * the same way a query result is: through a block the page allocates before it can touch native
+   * storage at all. So the failure injected is that allocation being refused, and the question is
+   * whether the handle native had already produced went with it. It cannot be seen from the page —
+   * a leaked handle sits in the module's table doing nothing — so each one is replayed against
+   * native afterwards, which is the only party that can say.
+   */
+  // Spec coverage: BND-066.
+  @Test
+  fun aFailedListOrSnapshotCopyDestroysTheNativeHandleRatherThanLeakingIt(): Promise<JsAny?> =
+    browserTest {
+      maplibreScope {
+        withMap { _, map ->
+          map.setStyleJson(BACKGROUND_STYLE_JSON)
+          // Both calls first, so what the injected failure changes is the copy rather than a style
+          // that had nothing to answer with.
+          assertTrue(map.styleLayerIds().contains("background"))
+          assertNotNull(map.styleLayerJson("background"))
+
+          val list: Long
+          val snapshot: Long
+          try {
+            InjectedFaults.failResultCopies()
+            val listError = assertFailsWith<InvalidStateException> { map.styleLayerIds() }
+            assertTrue(listError.diagnostic.contains("could not allocate"), listError.diagnostic)
+            list =
+              assertNotNull(
+                InjectedFaults.takeCopiedResults().singleOrNull(),
+                "listing the layer ids did not reach the copy",
+              )
+
+            InjectedFaults.failResultCopies()
+            assertFailsWith<InvalidStateException> { map.styleLayerJson("background") }
+            snapshot =
+              assertNotNull(
+                InjectedFaults.takeCopiedResults().singleOrNull(),
+                "reading the layer JSON did not reach the copy",
+              )
+          } finally {
+            InjectedFaults.reset()
+          }
+          assertResultHandleDestroyed(list, "mln_style_id_list_count", "mln_style_id_list")
+          assertResultHandleDestroyed(snapshot, "mln_json_snapshot_get", "mln_json_snapshot")
+
+          // And the style is unharmed: both calls answer as they did before.
+          assertTrue(map.styleLayerIds().contains("background"))
+          assertNotNull(map.styleLayerJson("background"))
+        }
+      }
+    }
 
   private companion object {
     const val FILL_STYLE_JSON =

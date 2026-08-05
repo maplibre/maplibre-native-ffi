@@ -11,6 +11,7 @@ import org.maplibre.nativeffi.internal.wasm.GeoJsonMarshal
 import org.maplibre.nativeffi.internal.wasm.Heap
 import org.maplibre.nativeffi.internal.wasm.HeapArena
 import org.maplibre.nativeffi.internal.wasm.HeapPointer
+import org.maplibre.nativeffi.internal.wasm.InjectedFaults
 import org.maplibre.nativeffi.internal.wasm.JsonMarshal
 import org.maplibre.nativeffi.internal.wasm.NativeCall
 import org.maplibre.nativeffi.internal.wasm.RenderMarshal
@@ -550,6 +551,7 @@ internal constructor(
    */
   private fun readFeatureQueryResult(result: Long): List<QueriedFeature> {
     try {
+      InjectedFaults.beginResultCopy(result, SIZE_BYTES)
       val count =
         Heap.withScratch(SIZE_BYTES) { out ->
           callResult("mln_feature_query_result_count", result, out)
@@ -591,6 +593,7 @@ internal constructor(
 
   private fun readFeatureExtensionResult(result: Long): FeatureExtensionResult {
     try {
+      InjectedFaults.beginResultCopy(result, RenderMarshal.FEATURE_EXTENSION_RESULT_INFO_SIZEOF)
       return Heap.withScratch(RenderMarshal.FEATURE_EXTENSION_RESULT_INFO_SIZEOF) { out ->
         RenderMarshal.writeFeatureExtensionResultInfoHeader(out)
         callResult("mln_feature_extension_result_get", result, out)
@@ -605,6 +608,7 @@ internal constructor(
     // The C API reports an absent value as the null snapshot rather than as a failure.
     if (snapshot == 0L) return null
     try {
+      InjectedFaults.beginResultCopy(snapshot, POINTER_BYTES)
       return Heap.withScratch(POINTER_BYTES) { out ->
         callResult("mln_json_snapshot_get", snapshot, out)
         RenderMarshal.readJsonPointer(HeapPointer(Heap.loadInt(out)))

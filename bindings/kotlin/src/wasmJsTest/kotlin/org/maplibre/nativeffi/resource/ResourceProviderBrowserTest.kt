@@ -12,8 +12,12 @@ import kotlin.test.assertTrue
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.browserTest
 import org.maplibre.nativeffi.drain
+import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.internal.wasm.InjectedFaults
+import org.maplibre.nativeffi.internal.wasm.ResourceProviderBridge
+import org.maplibre.nativeffi.internal.wasm.ResourceTransformBridge
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.maplibreScope
 import org.maplibre.nativeffi.pageOrigin
@@ -35,8 +39,8 @@ import org.maplibre.nativeffi.withMap
  * source's tile callback is delivered on a stack that may park, because nothing is waiting on it.
  */
 class ResourceProviderBrowserTest {
-  // Spec coverage: BND-121, BND-141, BND-142, BND-143, BND-144, BND-146, BND-147, BND-148,
-  // BND-140, BND-149, BND-150, BND-151, BND-152, BND-154, BND-155.
+  // Spec coverage: BND-121, BND-122, BND-141, BND-142, BND-143, BND-144, BND-146, BND-147,
+  // BND-148, BND-140, BND-149, BND-150, BND-151, BND-152, BND-154, BND-155.
 
   @Test
   fun aHandledRequestCompletedInsideTheCallbackLoadsTheStyle(): Promise<JsAny?> = browserTest {
@@ -316,6 +320,135 @@ class ResourceProviderBrowserTest {
         }
       }
     }
+
+  /**
+   * A replacement native refuses leaves the provider that was already there serving requests.
+   *
+   * The order the binding installs in is what this rests on. The replacement's host trampoline goes
+   * in before native is told about it, because the module's thunk reaches the page through a
+   * pointer it reads on every request — so at the moment native refuses, the binding is holding a
+   * registration for a provider native has never heard of. It has to give that one back and keep
+   * the previous one, and the two halves are separately observable: the registry count says the
+   * replacement's state went, and a real request says whose callback native still reaches.
+   *
+   * Native has no refusal of its own to offer here — setting a provider validates the runtime and
+   * the descriptor, both of which the binding has already made valid — so the refusal is injected.
+   */
+  // Spec coverage: BND-122.
+  @Test
+  fun aProviderReplacementNativeRefusesKeepsThePreviousProvider(): Promise<JsAny?> = browserTest {
+    maplibreScope {
+      withMap { runtime, map ->
+        var previous = 0
+        var replacement = 0
+        runtime.setResourceProvider { _, _ ->
+          previous++
+          ResourceProviderDecision.PASS_THROUGH
+        }
+        loadUnservedStyle(runtime, map, UNSERVED_URL + "?installed")
+        assertTrue(previous > 0, "the provider that was installed was never consulted")
+
+        val registered = ResourceProviderBridge.liveRegistrations
+        try {
+          InjectedFaults.failNextCall(
+            "mln_runtime_set_resource_provider",
+            MaplibreStatus.INVALID_ARGUMENT,
+            "provider callback must not be null",
+          )
+          val error =
+            assertFailsWith<InvalidArgumentException> {
+              runtime.setResourceProvider { _, _ ->
+                replacement++
+                ResourceProviderDecision.PASS_THROUGH
+              }
+            }
+          assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status)
+          assertEquals("provider callback must not be null", error.diagnostic)
+        } finally {
+          InjectedFaults.reset()
+        }
+
+        // The replacement's registration went back, so the module's trampoline is not held open for
+        // a provider native was never given.
+        assertEquals(
+          registered,
+          ResourceProviderBridge.liveRegistrations,
+          "the refusal did not leave exactly the previous registration standing",
+        )
+
+        // And native still reaches the provider it already had, which is the half the count cannot
+        // show: a registration that stayed and one that is still wired to native look the same.
+        val beforeLoad = previous
+        loadUnservedStyle(runtime, map, UNSERVED_URL + "?refused")
+        assertTrue(previous > beforeLoad, "the previous provider stopped being consulted")
+        assertEquals(0, replacement, "the provider native refused was consulted anyway")
+
+        // A later replacement is accepted, so the refusal left the runtime able to take one.
+        runtime.setResourceProvider { _, _ ->
+          replacement++
+          ResourceProviderDecision.PASS_THROUGH
+        }
+        loadUnservedStyle(runtime, map, UNSERVED_URL + "?accepted")
+        assertTrue(replacement > 0)
+        runtime.clearResourceProvider()
+      }
+    }
+  }
+
+  /** The URL transform is the other family installed this way, and it is refused the same way. */
+  // Spec coverage: BND-122.
+  @Test
+  fun aTransformReplacementNativeRefusesKeepsThePreviousTransform(): Promise<JsAny?> = browserTest {
+    maplibreScope {
+      withMap { runtime, map ->
+        var previous = 0
+        var replacement = 0
+        runtime.setResourceTransform { _ ->
+          previous++
+          null
+        }
+        // A real HTTP request, which is where MapLibre consults a transform; the URL is not served
+        // and does not need to be, because what is asserted is the consultation.
+        map.setStyleUrl(pageOrigin() + "/maplibre/transform-installed.json")
+        assertTrue(
+          pumpUntil(runtime) { previous > 0 },
+          "the transform that was installed was never consulted",
+        )
+
+        val registered = ResourceTransformBridge.liveRegistrations
+        try {
+          InjectedFaults.failNextCall(
+            "mln_runtime_set_resource_transform",
+            MaplibreStatus.INVALID_ARGUMENT,
+            "transform callback must not be null",
+          )
+          assertFailsWith<InvalidArgumentException> {
+            runtime.setResourceTransform { _ ->
+              replacement++
+              null
+            }
+          }
+        } finally {
+          InjectedFaults.reset()
+        }
+
+        assertEquals(
+          registered,
+          ResourceTransformBridge.liveRegistrations,
+          "the refusal did not leave exactly the previous registration standing",
+        )
+
+        val consultedBefore = previous
+        map.setStyleUrl(pageOrigin() + "/maplibre/transform-refused.json")
+        assertTrue(
+          pumpUntil(runtime) { previous > consultedBefore },
+          "the previous transform stopped being consulted",
+        )
+        assertEquals(0, replacement, "the transform native refused was consulted anyway")
+        runtime.clearResourceTransform()
+      }
+    }
+  }
 
   @Test
   fun aSchemeAliasReachesTheProviderAsBothItsUrls(): Promise<JsAny?> = browserTest {

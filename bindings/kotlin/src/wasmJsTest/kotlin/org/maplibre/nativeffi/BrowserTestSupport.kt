@@ -6,8 +6,12 @@ import kotlin.coroutines.startCoroutine
 import kotlin.js.JsAny
 import kotlin.js.Promise
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import org.maplibre.nativeffi.error.InvalidArgumentException
+import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.wasm.Heap
+import org.maplibre.nativeffi.internal.wasm.NativeCall
 import org.maplibre.nativeffi.internal.wasm.awaitOrThrow
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapOptions
@@ -49,15 +53,28 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
 // - BND-160's Metal and Vulkan halves — the browser module is built with OpenGL only. The
 //   unsupported-backend errors those attach paths report are covered.
 //
-// **No seam for the injected failure.** The C API cannot be made to produce these here, and this
-// binding has no internal hook that would:
-// - BND-066's copy-failure half — an allocation failure after a native result handle is acquired.
-//   The success half, which releases the same handles, is covered.
-// - BND-122's failed-replacement half — a callback install that native refuses. The half that
-//   preserves the previous callback is covered.
-// - BND-169 — a native frame release that fails. Every reachable release succeeds.
-// - BND-172 — fallible owned-frame wrapper construction. Nothing between this binding's native
-//   frame acquire and the handle it returns can fail.
+// **Injected through an internal seam.** The module will not produce these on request, so
+// `InjectedFaults` produces them instead, which the binding specification's test-seam rules allow
+// for exactly this set. Each of these tests asserts the state the failure left behind rather than
+// only the error it reported:
+// - BND-066's copy-failure half — `StyleBrowserTest` and `QueryBrowserTest` fail the copy after a
+//   native list, snapshot, or result handle is acquired, and replay the handle to prove native
+//   destroyed it.
+// - BND-122's failed-replacement half — `ResourceProviderBrowserTest` has native refuse the
+//   provider and transform installs. The custom geometry family needs no seam: native refuses a
+//   duplicate source id by itself, which `CustomGeometrySourceBrowserTest` uses.
+// - BND-169 — `RenderSessionBrowserTest` has native refuse a frame release, and the frame stays
+//   retryable.
+//
+// **The C API has no such call to refuse.**
+// - BND-122's log family. The module's log queue is registered with native once and never
+//   withdrawn -- the adapter's listener takes no user data, so a withdrawal could not be
+//   attributed to the registration retiring -- so replacing a log callback swaps a Kotlin
+//   reference and makes no native install call at all. `LogQueueBridge` states why. There is
+//   nothing for native to refuse, and the replacement holds no native state to release.
+// - BND-172 — fallible owned-frame wrapper construction. This is a conditional requirement, and
+//   the condition does not hold here: `OpenGLOwnedTextureFrameHandle`'s constructor takes values
+//   already copied out of the acquire, and nothing between the acquire and the return can fail.
 //
 // ---------------------------------------------------------------------------------------------
 
@@ -130,6 +147,43 @@ internal external fun runOnNextPageTask(task: () -> Unit)
 internal suspend fun nextPageTask() {
   Promise<JsAny?> { resolve, _ -> runOnNextPageTask { resolve(null) } }.awaitOrThrow()
 }
+
+/**
+ * Asserts that native no longer holds the snapshot, list, or result handle [handle] named.
+ *
+ * Asking native is the only way a page can tell a destroyed result handle from a leaked one. A
+ * leaked one sits in the module's handle table doing nothing until the page is gone. A destroyed
+ * one names a retired generation of its slot, and native answers that with an invalid argument
+ * saying so. So the handle is replayed through [entry], which is any entry point that takes a
+ * handle of this [kind] and one output pointer, and the diagnostic is what carries the proof.
+ *
+ * The replay is what a released handle costs a caller anyway, and the binding's own wrappers cannot
+ * express it: a result handle never leaves the call that reads it.
+ */
+internal fun assertResultHandleDestroyed(handle: Long, entry: String, kind: String) {
+  assertTrue(handle != 0L, "no native $kind was acquired, so nothing was there to destroy")
+  val error =
+    assertFailsWith<InvalidArgumentException>(
+      "native still holds $kind $handle, so the failed copy leaked it"
+    ) {
+      Heap.withScratch(RESULT_HANDLE_OUT_BYTES) { out ->
+        NativeCall.call(
+          entry,
+          2,
+          { slots ->
+            slots.setLong(0, handle)
+            slots.setPointer(1, out)
+          },
+          { Status.check(Heap.loadInt(it)) },
+        )
+      }
+    }
+  assertTrue(error.diagnostic.contains(kind), error.diagnostic)
+  assertTrue(error.diagnostic.contains("stale"), error.diagnostic)
+}
+
+/** Room for the widest output any of the replayed entry points above writes. */
+private const val RESULT_HANDLE_OUT_BYTES = 8
 
 // ---------------------------------------------------------------------------------------------
 // Presenting to the page, and looking at what arrived there.

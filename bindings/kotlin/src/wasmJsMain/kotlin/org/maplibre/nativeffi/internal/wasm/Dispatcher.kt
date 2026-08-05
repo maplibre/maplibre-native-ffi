@@ -286,6 +286,10 @@ internal object Dispatcher {
     return Heap.withScratch(bytes) { scratch ->
       val result = scratch + slotCount * SLOT_BYTES
       fill(NativeCall.Slots(scratch))
+      // The test seam for the failures the module will not produce on request, and inert unless a
+      // test has armed one. It stands where the submission does so that a faulted call reaches
+      // neither the owner thread nor native, which is what leaves the state behind it real.
+      if (InjectedFaults.injectCallFailure(name, result)) return@withScratch read(result)
       val token = nextToken++
       if (nextToken == TOKEN_WRAP) nextToken = 1
       beginWait(token)
