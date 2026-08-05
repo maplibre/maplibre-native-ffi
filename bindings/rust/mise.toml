@@ -122,11 +122,16 @@ cargo clippy \
 
 [tasks."test:android-emulator"]
 description = "Run the Rust binding tests in the Android emulator."
-depends = [{ task = "//:build", args = ["android-x64-egl"] }]
+usage = '''
+arg "[preset]" default="android-x64-egl" {
+  choices "android-x64-egl" "android-x64-vulkan"
+}
+'''
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = '''
 set -euo pipefail
-native_install_dir="$MISE_MONOREPO_ROOT/build/android-x64-egl/install"
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
 cargo_target=x86_64-linux-android
 compiler_prefix=x86_64-linux-android

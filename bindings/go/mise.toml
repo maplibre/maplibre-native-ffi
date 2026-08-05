@@ -115,11 +115,16 @@ go vet ./...
 
 [tasks."test:android-emulator"]
 description = "Run the Go binding tests in the Android emulator."
-depends = [{ task = "//:build", args = ["android-x64-egl"] }]
+usage = '''
+arg "[preset]" default="android-x64-egl" {
+  choices "android-x64-egl" "android-x64-vulkan"
+}
+'''
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 set -euo pipefail
-native_install_dir="$MISE_MONOREPO_ROOT/build/android-x64-egl/install"
-test_dir="$MISE_MONOREPO_ROOT/build/android-emulator/go"
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+test_dir="$MISE_MONOREPO_ROOT/build/android-emulator/$usage_preset/go"
 mkdir -p "$test_dir"
 find "$test_dir" -maxdepth 1 -type f -name '*.test' -delete
 

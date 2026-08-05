@@ -71,42 +71,15 @@ function environmentSupport(
 }
 
 function supportStatus(support: EnvironmentSupport): Status {
-  if (support.backends.some((backend) => backend.status === "build-only")) {
-    return "build-only";
+  if (support.backends.some((backend) => backend.status === "tested")) {
+    return "tested";
   }
-  return "tested";
-}
-
-function backendSignature(backends: Backend[]): string {
-  return backends
-    .map((backend) => backend.backendLabel)
-    .sort()
-    .join("|");
-}
-
-function supportLabel(
-  label: string,
-  environment: EnvironmentColumn & {
-    backends: Backend[];
-  },
-  support: EnvironmentSupport,
-): string {
-  if (
-    backendSignature(support.backends) ===
-    backendSignature(environment.backends)
-  ) {
-    return label;
-  }
-  return `${label} (${support.backends.map((backend) => backend.backendLabel).join(", ")})`;
+  return "build-only";
 }
 
 function subprojectSupport(
   subprojects: SubprojectSupport[],
-  environment: EnvironmentColumn & { backends: Backend[] },
-  labelFor: (
-    subproject: SubprojectSupport,
-    support: EnvironmentSupport,
-  ) => string,
+  environment: EnvironmentColumn,
 ): { label: string; status: Status; url: string }[] {
   return subprojects.flatMap((subproject) => {
     const support = environmentSupport(subproject, environment.environment);
@@ -115,7 +88,7 @@ function subprojectSupport(
     }
     return [
       {
-        label: labelFor(subproject, support),
+        label: subproject.label,
         status: supportStatus(support),
         url: sourceUrl(subproject.sourceDirectory),
       },
@@ -147,16 +120,8 @@ function subprojectSupport(
   </thead>
   <tbody>
     {environmentRows.map((environment) => {
-      const bindings = subprojectSupport(
-        supportMatrix.bindings,
-        environment,
-        (binding, support) => supportLabel(binding.label, environment, support),
-      );
-      const examples = subprojectSupport(
-        supportMatrix.examples,
-        environment,
-        (example) => example.label,
-      );
+      const bindings = subprojectSupport(supportMatrix.bindings, environment);
+      const examples = subprojectSupport(supportMatrix.examples, environment);
       return (
         <tr>
           <th scope="row">{environment.label}</th>

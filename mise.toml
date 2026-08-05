@@ -62,7 +62,7 @@ android_cmdline_tools_version = "22.0"
 android_cmake_version = "4.1.2"
 android_ndk_version = "28.2.13676358"
 # The system image the emulator tasks boot. It is gigabytes on its own and only
-# the x64 EGL suite runs on it, so `//:android-emulator:boot` installs it rather
+# the x64 suites run on it, so `//:android-emulator:boot` installs it rather
 # than .mise/bin/sync-android-packages. The AOSP image carries no Google APIs,
 # which nothing here calls, and is the smallest one that still ships a full
 # graphics stack.
@@ -277,7 +277,7 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 if [[ "$usage_preset" == ios-simulator-* ]]; then
   mise run //:ios-simulator:boot
-elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-x64-egl ]]; then
+elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-x64-* ]]; then
   # An emulator target runs the suite through a device shell rather than ctest,
   # so the tile fixtures ctest would name by absolute source path are staged
   # into a directory the runner pushes to the device.
@@ -390,9 +390,9 @@ if [[ -f "$pid_file" ]]; then
 fi
 
 if [[ ! -f "$pid_file" ]]; then
-  # SwiftShader draws the GLES surfaces in software, which is what a runner
-  # without a GPU has. The suite renders offscreen, so no window is needed and
-  # no snapshot is written: a run always starts from the image as installed.
+  # SwiftShader draws the GLES and Vulkan targets in software, which is what a
+  # runner without a GPU has. The suite renders offscreen, so no window is
+  # needed and no snapshot is written: a run starts from the installed image.
   launcher=(
     "$sdk_root/emulator/emulator"
     -avd "$avd_name"
@@ -401,7 +401,7 @@ if [[ ! -f "$pid_file" ]]; then
     -no-boot-anim
     -no-snapshot
     -no-metrics
-    -gpu swiftshader_indirect
+    -gpu swiftshader
     -memory 4096
     -camera-back none
     -camera-front none
