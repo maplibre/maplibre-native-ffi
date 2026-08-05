@@ -244,11 +244,32 @@ static void mln_browser_custom_geometry_cancel_callback(
 MLN_API bool mln_browser_custom_geometry_install(
   mln_browser_custom_geometry_host host
 ) MLN_NOEXCEPT {
-  if (host != NULL && mln_browser_custom_geometry_queue() == NULL) {
+  if (host == NULL) {
+    atomic_store_explicit(&tile_host, NULL, memory_order_release);
+    return true;
+  }
+  if (mln_browser_custom_geometry_queue() == NULL) {
     return false;
   }
-  atomic_store_explicit(&tile_host, host, memory_order_release);
-  return true;
+  // Claimed rather than assigned, for the reason
+  // mln_browser_sync_provider_install is: this slot is module-global, so a
+  // second host arriving would silently take every notification the first one
+  // was registered for, and the first would go on believing it was installed.
+  // Refusing here is what a second binding on the page meets when the loader
+  // has not already turned it away, and it is the only layer that can turn away
+  // a host that is not this binding at all.
+  mln_browser_custom_geometry_host installed = NULL;
+  if (
+    atomic_compare_exchange_strong_explicit(
+      &tile_host, &installed, host, memory_order_acq_rel, memory_order_acquire
+    )
+  ) {
+    return true;
+  }
+  // The exchange wrote whatever was already there into `installed`, so this
+  // distinguishes a host reinstalling itself -- a no-op that succeeds -- from a
+  // second host arriving, which is what this refuses.
+  return installed == host;
 }
 
 /**

@@ -157,6 +157,22 @@ run = '''
   :bindings:kotlin:wasmJsBrowserTest
 '''
 
+[tasks.wasmJsFinalShutdownTest]
+description = "Run the browser binding's final-shutdown test on a page of its own."
+depends = [{ task = "//:build", args = ["emscripten-wasm32-webgl"] }]
+dir = "../.."
+# A shutdown stops the thread every runtime lived on and takes the page's canvases with it, so the
+# test that performs one cannot share a Karma page with anything. It runs the same test task as
+# wasmJsTest, which excludes it, against the one test this selects. Both are needed: neither run
+# covers what the other does.
+run = '''
+./gradlew \
+  -Pkotlin.js.yarn=false \
+  -Pmaplibre.browser.moduleDir=build/emscripten-wasm32-webgl/install/lib/browser \
+  -Pmaplibre.browser.finalShutdown=true \
+  :bindings:kotlin:wasmJsBrowserTest
+'''
+
 [tasks.iosBuild]
 description = "Build the Kotlin binding and embedded Metal runtime for an iOS target."
 usage = '''

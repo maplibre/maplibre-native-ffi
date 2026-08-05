@@ -72,6 +72,20 @@
 // has released the provider will silently pass requests through, so the order
 // that keeps behavior exact is: install, register, clear the registration, then
 // clear the host pointer.
+//
+// **One host at a time, and the module says so rather than assuming it.** The
+// pointer below is a module global, while the user_data that reaches it is an
+// index into whatever registry the installing host keeps. A second host that
+// replaced the first would therefore not merely take over: the first host's
+// registrations are still registered with native, so its requests would arrive
+// at the second host carrying tokens that mean something else there, and the
+// second host would answer them out of its own registry. Installing is a
+// compare-exchange for that reason. The first host to install owns the slot
+// until it clears, a second is refused, and installing what is already
+// installed changes nothing and is accepted. Clearing is unconditional, because
+// the argument that clears is a null pointer and so cannot say who is clearing;
+// a host that clears a slot it never owned is outside the order above, and this
+// module has nothing to check that against.
 
 #include <emscripten/proxying.h>
 #include <emscripten/threading.h>
@@ -226,8 +240,13 @@ static mln_status mln_browser_sync_transform_callback(
  * can serve several registrations.
  *
  * Passing null clears it, after which every request passes through to native
- * loading. Returns false when the proxying queue could not be created, in which
- * case nothing is installed.
+ * loading. Returns false when the proxying queue could not be created and when
+ * a different host is already installed, in which case nothing is installed.
+ * Installing the host that is already installed succeeds and changes nothing.
+ *
+ * **One host serves the whole module.** The slot is a module global and the
+ * user_data that reaches it is the installing host's own, so a second host is
+ * refused rather than allowed to take over a registration it cannot read.
  *
  * **Call this from the main runtime thread**, before registering the provider
  * with a runtime, and clear it only after the registration has been cleared.
@@ -235,11 +254,26 @@ static mln_status mln_browser_sync_transform_callback(
 MLN_API bool mln_browser_sync_provider_install(
   mln_resource_provider_callback host
 ) MLN_NOEXCEPT {
-  if (host != NULL && mln_browser_sync_queue() == NULL) {
+  if (host == NULL) {
+    atomic_store_explicit(&provider_host, NULL, memory_order_release);
+    return true;
+  }
+  if (mln_browser_sync_queue() == NULL) {
     return false;
   }
-  atomic_store_explicit(&provider_host, host, memory_order_release);
-  return true;
+  mln_resource_provider_callback installed = NULL;
+  if (
+    atomic_compare_exchange_strong_explicit(
+      &provider_host, &installed, host, memory_order_acq_rel,
+      memory_order_acquire
+    )
+  ) {
+    return true;
+  }
+  // The exchange wrote whatever was already there into `installed`, so this
+  // distinguishes a host reinstalling itself -- which is a no-op -- from a
+  // second host arriving, which is the case this refuses.
+  return installed == host;
 }
 
 /**
@@ -257,17 +291,30 @@ mln_browser_sync_provider_thunk(void) MLN_NOEXCEPT {
 /**
  * Installs the host function that answers resource transform callbacks.
  *
- * The rules are mln_browser_sync_provider_install()'s. Passing null clears it,
- * after which every URL is used unchanged.
+ * The rules are mln_browser_sync_provider_install()'s, including the one host
+ * this module serves. Passing null clears it, after which every URL is used
+ * unchanged.
  */
 MLN_API bool mln_browser_sync_transform_install(
   mln_resource_transform_callback host
 ) MLN_NOEXCEPT {
-  if (host != NULL && mln_browser_sync_queue() == NULL) {
+  if (host == NULL) {
+    atomic_store_explicit(&transform_host, NULL, memory_order_release);
+    return true;
+  }
+  if (mln_browser_sync_queue() == NULL) {
     return false;
   }
-  atomic_store_explicit(&transform_host, host, memory_order_release);
-  return true;
+  mln_resource_transform_callback installed = NULL;
+  if (
+    atomic_compare_exchange_strong_explicit(
+      &transform_host, &installed, host, memory_order_acq_rel,
+      memory_order_acquire
+    )
+  ) {
+    return true;
+  }
+  return installed == host;
 }
 
 /**

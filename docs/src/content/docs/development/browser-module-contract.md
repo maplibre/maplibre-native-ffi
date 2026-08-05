@@ -166,6 +166,25 @@ the wake that failed was the only thing that could have reached it. The worker
 then survives for the document's lifetime. That is the lesser harm: the
 alternative leaks the dispatcher beside it and leaves the same worker running.
 
+**Stopping the thread is not releasing the module.** The worker pool and the
+heap belong to the instance rather than to a dispatcher, so they outlive every
+stop and stay reachable for as long as the document does. A host that is
+finished releases them by terminating the pool with
+`PThread.terminateAllThreads()` and dropping its reference to the instance — in
+one step, because neither half is safe alone. A stop is fire-and-forget, so the
+owner thread frees the dispatcher after the stop has returned, and a terminate
+can kill it inside that `free` and leave the module's allocator lock held in
+shared memory. Dropping the reference is what guarantees nothing allocates
+against a held lock afterwards, and it has to be the same step for that
+guarantee to hold.
+
+Releasing is final. A page instantiates one module, so loading again builds a
+second pool and a second heap beside the one just given back rather than
+recovering it, and a host that wants a map again reloads the document. Nothing
+on a page task may still be reaching the module when this happens: a repeating
+drain — the log queue's, for one — calls the instance directly and has to have
+stopped first.
+
 `mln_browser_dispatcher_submit_task` places work the module itself owns on that
 thread. It takes no index and no slots, because its caller is another
 translation unit in this module rather than a host packing a buffer; everything
@@ -315,6 +334,40 @@ host stops receiving records by dropping its own callback. This module owns the
 process-global log callback: anything registering through `mln_log_set_callback`
 or `mln_adapter_log_set_callback` afterwards retires it permanently.
 
+## One host per module
+
+A page loads this module once, and some of what a host installs into it is a
+module global rather than a per-host registration: the log queue's registration,
+and the synchronous resource provider and resource transform callbacks. A second
+host installing over the first would not take over cleanly. The first host's
+registrations are still registered with native, so its requests keep arriving at
+the slot, now carrying `user_data` tokens that mean something else in the second
+host's registry.
+
+The module therefore refuses rather than replaces.
+`mln_browser_sync_provider_install` and `mln_browser_sync_transform_install`
+name the host function that answers on the main runtime thread. Each takes an
+empty slot and reports false for a second, different host; installing the host
+that is already installed changes nothing and succeeds, and passing null clears
+the slot. What a host registers with a runtime is the module's own callback,
+returned by `mln_browser_sync_provider_thunk` and
+`mln_browser_sync_transform_thunk`: those are compiled into the module and so
+callable from every MapLibre thread, where a trampoline the page added is not.
+
+**Install, register, clear the registration, then clear the host.** Passing null
+clears a slot unconditionally, because a null argument cannot say who is
+clearing, so the module has nothing to check a stray clear against. A host that
+clears before the runtime has released the provider silently passes requests
+through instead of failing.
+
+A binding enforces the rest, because a binding keeps state the module cannot
+see: its own call tokens, its own dispatcher handle, its own callback registry.
+Two separately bundled copies of one binding on a page share the module and
+duplicate that state, which is worse than sharing or duplicating both — both
+copies issue call token 1, and a completion resolves whichever copy registered
+that token last. A binding therefore detects a second instance of itself and
+refuses to load, rather than corrupting at the first call.
+
 ## Checking compatibility
 
 The documented ABI version cannot tell a host that its generated offsets no
@@ -331,6 +384,15 @@ The ABI manifest records the same digest and protocol. A host checks the
 manifest before instantiating and the module's own values afterwards. The first
 check refuses a mismatched module before its worker pool starts. The manifest
 describes whatever file sits beside the module; the module describes itself.
+
+**A host checks a module it finds as well as one it builds.** The page carries
+one module, and the host that loads it is not always the host that uses it, so
+finding `globalThis` already holding an instance is not a reason to skip the
+comparison — it is the case where it matters most, because that instance was
+verified against whoever loaded it. Joining a load already in flight is the same
+situation a moment earlier: the load in flight carries its starter's digest, its
+starter's protocol, and its starter's URL, so a host that joins one has checked
+nothing until it compares the module the load published against its own.
 
 A host that refuses an instance it has already built terminates that instance's
 worker pool with `PThread.terminateAllThreads()`, which the link exports for

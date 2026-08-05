@@ -127,9 +127,16 @@ private constructor(private val callback: CustomGeometrySourceCallback, private 
    * on its own, and the gate holds nothing native that a still-running body could be left without.
    * A source that ends itself from `fetchTile` therefore hears nothing further, which is what a
    * host asked for.
+   *
+   * Closed without draining, and it is the only gate in the binding that is. A delivery reaching
+   * the owner thread parks its stack, and the host's stack -- parked on a call it made earlier --
+   * is resumed first, so the ordinary case is a close arriving from a stack that is not the
+   * delivery's while the delivery is suspended partway through a host body. Draining there is not
+   * slow but impossible: the suspended frame resumes from the event loop, which a close spinning on
+   * a count is never going to reach. [CallbackGate.closeWithoutDraining] says the rest.
    */
   override fun close() {
-    gate.close()
+    gate.closeWithoutDraining()
     host.remove(token)
   }
 

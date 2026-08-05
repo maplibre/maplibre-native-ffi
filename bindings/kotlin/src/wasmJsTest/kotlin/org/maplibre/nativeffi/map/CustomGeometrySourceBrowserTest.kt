@@ -398,6 +398,137 @@ class CustomGeometrySourceBrowserTest {
     }
   }
 
+  /**
+   * A registration closed while the callback holding it is parked partway through its answer.
+   *
+   * This is the interleaving the asynchronous delivery made reachable, and it is the one no other
+   * test here drives. A tile notification runs on a promising stack of its own, so a `fetchTile`
+   * that answers inline parks that stack on the owner thread — and the host's own stack, parked on
+   * a pump that was submitted earlier, is resumed first. The host is therefore running, with a full
+   * callback body suspended beside it, and whatever it does next to end the source closes that
+   * body's registration from a stack that is not the body's.
+   *
+   * The claim is that such a close returns rather than waiting. Waiting cannot work: the body that
+   * holds the registration is a suspended stack, only the event loop can resume it, and a close
+   * running on the host's stack never reaches one. A close that drained would spin until
+   * `yieldWhileClosing` gave up, and the source would still be registered afterwards.
+   *
+   * The window is held open deliberately rather than caught by luck. The callback goes on making
+   * owner-affine calls for as long as the test asks it to, so the window is open when the host
+   * looks, and the flag is read on the same stack the close ran on, where nothing can have resumed
+   * in between. A true read there is therefore an answer that really was suspended at that moment.
+   * A style reload is the close path because it is the shortest — the sources go the instant the
+   * call returns, without a layer to remove first — and every path ends in the same
+   * `CustomGeometryBridge.close`.
+   *
+   * Rendered into a texture of its own, for the reason the teardown test above gives.
+   */
+  // Spec coverage: BND-124.
+  @Test
+  fun releasesASourceClosedWhileItsCallbackWasParkedInsideItsAnswer(): Promise<JsAny?> =
+    browserTest {
+      maplibreScope {
+        withMap(WIDTH, HEIGHT) { runtime, map ->
+          val registrationsBefore = CustomGeometryBridge.liveRegistrations
+          // Whether a callback body is between its first line and its last, which on this target
+          // means it is either running or suspended -- and the host stack can only read it while
+          // the host stack runs, so a true read there is a suspended body.
+          var answering = false
+          // Released by the host once it has closed the registration. Until then the body below
+          // goes on parking, which is what keeps the window open for as long as the test needs it
+          // rather than for as long as one owner-thread call happens to take.
+          var holdAnswer = true
+          var retired = false
+          var afterClose = 0
+          val callback =
+            object : CustomGeometrySourceCallback {
+              override fun fetchTile(tileId: CanonicalTileId) {
+                if (retired) {
+                  afterClose++
+                  return
+                }
+                answering = true
+                try {
+                  // The inline answer a shared host writes, and the first park of this stack.
+                  runCatching { map.setCustomGeometrySourceTileData(SOURCE, tileId, worldFill()) }
+                  // Each of these parks again. Bounded so that a test that failed to release this
+                  // fails rather than hanging the page, and failures are swallowed because the
+                  // style this asks about is replaced underneath it by the close being tested.
+                  var parks = 0
+                  while (holdAnswer && parks < ANSWER_PARK_LIMIT) {
+                    parks++
+                    runCatching { map.isFullyLoaded }
+                  }
+                } finally {
+                  answering = false
+                }
+              }
+
+              override fun cancelTile(tileId: CanonicalTileId) {
+                if (retired) afterClose++
+              }
+            }
+          val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
+          try {
+            val session =
+              map.attachOpenGLOwnedTexture(
+                OpenGLOwnedTextureDescriptor(
+                  RenderTargetExtent(WIDTH, HEIGHT, 1.0),
+                  context.descriptor(),
+                )
+              )
+            try {
+              map.setStyleJson(backgroundStyle(BACKGROUND_COLOR))
+              waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
+              map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(callback))
+              map.addStyleLayerJson(fillLayer(), "")
+
+              var closedMidAnswer = false
+              var attempts = 0
+              while (!closedMidAnswer && attempts < ATTEMPTS) {
+                attempts++
+                session.renderUpdate()
+                // The park that hands the page back, so a notification the module posted is
+                // delivered and its body reaches its own first park while this stack is away.
+                runtime.pump(PUMP_MILLIS)
+                while (runtime.pollEvent() != null) {}
+                if (!answering) continue
+                // The style reload takes the source, and with it the registration the suspended
+                // body belongs to. This parks once itself, which the body outlasts because it goes
+                // on parking until released below.
+                map.setStyleJson(backgroundStyle(FILL_COLOR))
+                closedMidAnswer = answering
+                retired = true
+                holdAnswer = false
+              }
+              assertTrue(
+                closedMidAnswer,
+                "the source was never closed while its callback was parked inside an answer",
+              )
+              assertEquals(
+                registrationsBefore,
+                CustomGeometryBridge.liveRegistrations,
+                "closing a source while its callback was parked left its registration behind",
+              )
+
+              // The body must still be allowed to finish: closing the registration stops further
+              // deliveries, and says nothing about the one already inside.
+              assertTrue(
+                renderUntil(runtime, session) { !answering },
+                "the callback that was parked when its source closed never finished",
+              )
+              renderTurns(runtime, session, TEARDOWN_ATTEMPTS)
+              assertEquals(0, afterClose, "a source closed mid-answer went on being called")
+            } finally {
+              session.close()
+            }
+          } finally {
+            context.close()
+          }
+        }
+      }
+    }
+
   /** Records what it was asked for, and whether anything arrived after its source was retired. */
   private class RecordingCallback : CustomGeometrySourceCallback {
     val tiles = mutableListOf<CanonicalTileId>()
@@ -551,5 +682,10 @@ class CustomGeometrySourceBrowserTest {
     const val ATTEMPTS = 200
     const val TEARDOWN_ATTEMPTS = 32
     const val PUMP_MILLIS = 2L
+
+    // How many times a held answer may park before it gives up on being released. Reached only if
+    // the test that is holding it never gets far enough to let go, which is a failure rather than a
+    // reason to keep the page busy forever.
+    const val ANSWER_PARK_LIMIT = 1_000
   }
 }

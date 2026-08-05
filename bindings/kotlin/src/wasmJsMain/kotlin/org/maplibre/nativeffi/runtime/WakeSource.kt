@@ -37,10 +37,20 @@ public actual class WakeSource private constructor(private val source: NativeWak
     core.withLive { Status.check(signalWakeSource(source.raw)) }
   }
 
+  /**
+   * Releases the wake source, or retires the handle when the module has already gone.
+   *
+   * A wake source is not owner-affine, so it is deliberately not one of the handles a shutdown
+   * refuses to leave open — a host may hold one past the end of every runtime and close it whenever
+   * it likes, which is the behaviour every other target has. A shutdown that released the module
+   * took this source's storage with the heap it lived in, so there is nothing left to destroy and
+   * the handle simply retires. Calling native there would reach a null module and fail a close that
+   * has nothing to fail at.
+   */
   public actual override fun close() {
     core.closeOnce(
       destroy = {
-        destroyWakeSource(source.raw)
+        if (BrowserModule.isLoaded()) destroyWakeSource(source.raw)
         MaplibreStatus.OK.nativeCode
       }
     )

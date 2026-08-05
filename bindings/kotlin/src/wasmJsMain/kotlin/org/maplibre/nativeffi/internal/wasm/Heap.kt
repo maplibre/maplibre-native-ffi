@@ -149,6 +149,12 @@ internal object Heap {
    */
   fun <T> withScratch(size: Int, body: (HeapPointer) -> T): T {
     Status.requireArgument(size > 0) { "scratch size must be positive" }
+    // Asked before the allocator is, because this is the first thing most calls into the binding
+    // touch. A final shutdown releases the module, and every accessor here reaches it through a
+    // page global that is then null -- so without this, a call after a shutdown reports a
+    // JavaScript type error naming `_malloc` rather than the binding failure that says what
+    // happened. The check is a global read, which is nothing beside the allocation it guards.
+    BrowserModule.require()
     val address = heapAllocate(size)
     if (address == 0) {
       throw Status.invalidState("The MapLibre Native browser module could not allocate $size bytes")

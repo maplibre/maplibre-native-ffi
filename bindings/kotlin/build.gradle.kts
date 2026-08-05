@@ -62,6 +62,16 @@ val packagedBrowserModule = layout.buildDirectory.dir("wasmJsBrowserModule")
 val browserNoticeDir = browserModuleSourceDir.map {
   it.parentFile.parentFile.resolve("share/maplibre-native-c/licenses")
 }
+// The one browser test that stops the module's owner thread, and the property that selects it.
+//
+// Stopping is final: the thread every runtime lived on is gone, the canvases that went with it
+// cannot come back, and every later call is refused. So it cannot share a Karma page with any other
+// test, and the same test task runs either everything else or it alone. Two runs rather than one
+// task each, because a browser test task is created by the Kotlin plugin's target DSL and there is
+// no second one to configure.
+val browserFinalShutdownTests = "*ShutdownMaplibreFinalBrowserTest*"
+val browserFinalShutdownRun =
+  providers.gradleProperty("maplibre.browser.finalShutdown").map(String::toBoolean).orElse(false)
 val testBrowserPath =
   providers
     .environmentVariable("MLN_FFI_TEST_BROWSER")
@@ -94,6 +104,15 @@ kotlin {
         // what puts karma-chrome-launcher on the harness; karma.config.d then selects a launcher of
         // its own that carries the flags a container needs.
         useKarma { useChromeHeadless() }
+        // Selected here rather than left to the caller's `--tests`, so neither run can be spelled
+        // wrongly: the ordinary run is everything but the final shutdown, and the final-shutdown
+        // run is that test on a page of its own. Gradle fails a run whose include pattern matches
+        // nothing, so a renamed test breaks the task rather than quietly testing nothing.
+        if (browserFinalShutdownRun.get()) {
+          filter.includeTestsMatching(browserFinalShutdownTests)
+        } else {
+          filter.excludeTestsMatching(browserFinalShutdownTests)
+        }
       }
     }
     compilerOptions {

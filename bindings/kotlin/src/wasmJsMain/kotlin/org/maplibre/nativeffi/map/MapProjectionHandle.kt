@@ -28,7 +28,16 @@ import org.maplibre.nativeffi.internal.wasm.generated.MlnScreenPoint
  */
 public actual class MapProjectionHandle
 internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
-  private val core = HandleStateCore("MapProjectionHandle", handle.raw)
+  private val core = HandleStateCore(TYPE_NAME, handle.raw)
+
+  init {
+    // Counted with the module, because a projection is the one owner-affine handle that retains
+    // nothing: it is a snapshot of a map's transform and outlives both that map and the runtime
+    // behind it. So there is no other handle whose refusal to close could stand in for this one,
+    // and a shutdown that could not see it would be accepted while the only thread that may
+    // destroy this is stopped.
+    Dispatcher.retainHandle(TYPE_NAME)
+  }
 
   /**
    * Checks this handle is live and then runs [body], without holding a use count across it.
@@ -144,7 +153,11 @@ internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
           { slots -> slots.setLong(0, handle.raw) },
           { Heap.loadInt(it) },
         )
-      }
+      },
+      // Only a destroy that happened stops the count. A destroy the C API refuses leaves the
+      // native projection there and this wrapper open for a retry, and releasing here would let a
+      // shutdown be accepted while it still exists.
+      afterSuccess = { Dispatcher.releaseHandle(TYPE_NAME) },
     )
   }
 
@@ -176,6 +189,8 @@ internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
   }
 
   internal companion object {
+    private const val TYPE_NAME = "MapProjectionHandle"
+
     fun fromNative(handle: NativeMapProjection): MapProjectionHandle = MapProjectionHandle(handle)
   }
 }

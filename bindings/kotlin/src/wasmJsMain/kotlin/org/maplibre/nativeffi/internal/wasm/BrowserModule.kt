@@ -25,6 +25,139 @@ import org.maplibre.nativeffi.internal.wasm.generated.StructLayouts
 private external fun instance(): MaplibreNativeCModule?
 
 /**
+ * Checks the module already on this page against what this binding was generated for.
+ *
+ * The module is a page global, so it can be one this binding never loaded: another separately
+ * bundled copy of the binding may have loaded it, and so may a host written against the module
+ * directly. The C ABI version cannot settle whether such a module is the right one -- it stays 0
+ * for the whole prerelease -- so the digest, the call protocol, and the entry points are what say
+ * so, and they are the same three the load path checks on a module it built itself.
+ *
+ * Nothing here fetches or instantiates anything: it reads properties off a module that already
+ * exists and calls two of its entry points. That is what makes it safe to run before the preflight
+ * that keeps a doomed module from starting a worker pool, because there is no pool left to start.
+ *
+ * Returns null when the page carries no module, an empty string when it carries an acceptable one,
+ * and otherwise the reason it is refused. Reported rather than thrown, so the failure reaches a
+ * host as this binding's own exception instead of as a JavaScript error the Kotlin end cannot
+ * classify.
+ */
+@OptIn(ExperimentalWasmJsInterop::class)
+@JsFun(
+  """
+  (expectedDigest, expectedProtocol, requiredNames, runtimeNames) => {
+    const module = globalThis.__maplibreNativeC
+    if (!module) return null
+    const here = 'The MapLibre Native browser module already loaded on this page '
+    // Checked before anything is called out of the module, because the digest below is read through
+    // two of the names this loop is what vouches for.
+    for (const name of requiredNames.split(',')) {
+      if (typeof module[name] !== 'function') {
+        return here + 'is missing ' + name + ', so it was not built as a browser module this ' +
+          'binding can drive.'
+      }
+    }
+    for (const name of runtimeNames.split(',')) {
+      if (module[name] === undefined) {
+        return here + 'is missing the ' + name + ' runtime helper, so it was not built as a ' +
+          'browser module this binding can drive.'
+      }
+    }
+    const digest = module.UTF8ToString(module._mln_browser_headers_digest())
+    if (digest !== expectedDigest) {
+      return here + 'was built from different headers than this binding was generated from ' +
+        '(module ' + digest + ', binding ' + expectedDigest + '). One module serves the whole ' +
+        'page, so a binding generated against another set of headers would write descriptors at ' +
+        'offsets that are not this module\'s.'
+    }
+    const protocol = module._mln_browser_dispatch_protocol()
+    if (protocol !== expectedProtocol) {
+      return here + 'packs calls for protocol ' + protocol + ', but this binding packs for ' +
+        expectedProtocol + '.'
+    }
+    return ''
+  }
+"""
+)
+private external fun verifyIncumbent(
+  expectedDigest: String,
+  expectedProtocol: Int,
+  requiredNames: String,
+  runtimeNames: String,
+): String?
+
+/**
+ * Takes the next binding-instance number from the page.
+ *
+ * The counter is a page global and every instance reads it through this, so two separately bundled
+ * copies of the binding cannot mint the same number however they interleave. A number rather than
+ * an object, because it survives the boundary as a value and needs no identity to be preserved.
+ */
+@OptIn(ExperimentalWasmJsInterop::class)
+@JsFun(
+  "() => (globalThis.__maplibreNativeCInstances = (globalThis.__maplibreNativeCInstances ?? 0) + 1)"
+)
+private external fun nextInstanceId(): Int
+
+/**
+ * Claims the page for [id], and reports which instance holds it.
+ *
+ * Returns zero when [id] has just taken an unclaimed page, and otherwise the id of whichever
+ * instance holds it -- which is [id] itself for the instance that claimed it earlier. Zero is never
+ * a minted id, because [nextInstanceId] counts from one.
+ */
+@OptIn(ExperimentalWasmJsInterop::class)
+@JsFun(
+  """
+  (id) => {
+    const owner = globalThis.__maplibreNativeCOwner
+    if (owner === undefined) {
+      globalThis.__maplibreNativeCOwner = id
+      return 0
+    }
+    return owner
+  }
+"""
+)
+private external fun claimPage(id: Int): Int
+
+/**
+ * Terminates the module's worker pool and drops the page's last reference to it, as one step.
+ *
+ * One step because neither half is safe alone. Terminating kills each worker wherever it happens to
+ * be, which for the dispatcher's own thread can be inside the `free` that releases the dispatcher
+ * after a stop -- `mln_browser_dispatcher_stop` posts a wake and returns, so that free happens
+ * later and nothing on the page can wait for it. A worker killed there leaves the module's
+ * allocator lock held in shared memory, and the next allocation on the page would block forever on
+ * a thread that may not block. Dropping the reference is what guarantees there is no next
+ * allocation.
+ *
+ * The reference goes first, and the memo with it, so a terminate that throws still leaves nothing
+ * reachable. The flag is what every entry point reads afterwards: it separates a page that has
+ * released its module from one that never loaded, which are the same absence and need opposite
+ * answers.
+ */
+@OptIn(ExperimentalWasmJsInterop::class)
+@JsFun(
+  """
+  () => {
+    const module = globalThis.__maplibreNativeC
+    globalThis.__maplibreNativeC = null
+    globalThis.__maplibreNativeCLoading = null
+    globalThis.__maplibreNativeCReleased = true
+    // Optional throughout, because this also runs on a page that never finished loading a module,
+    // and a module being refused is exactly one that may not carry the helper.
+    module?.PThread?.terminateAllThreads?.()
+  }
+"""
+)
+private external fun releaseInstance()
+
+@OptIn(ExperimentalWasmJsInterop::class)
+@JsFun("() => globalThis.__maplibreNativeCReleased === true")
+private external fun isReleased(): Boolean
+
+/**
  * Verifies and instantiates the module as one memoized operation.
  *
  * Memoizing here rather than in Kotlin is what makes concurrent loads safe. The whole operation --
@@ -58,6 +191,10 @@ private external fun instance(): MaplibreNativeCModule?
       throw new Error('cannot resolve ' + url + ' against this context')
     }
     url = resolved
+    // Joined rather than repeated, and joining is not the same as accepting: the load in flight was
+    // started by whoever arrived first, with that caller's digest, protocol, and URL. So a caller
+    // that joins one has checked nothing yet, and BrowserModule.load checks the module this
+    // resolves against its own expectations before it returns.
     if (globalThis.__maplibreNativeCLoading) return globalThis.__maplibreNativeCLoading
     // The manifest beside the module is a preflight, not the authority: rejecting a mismatch here
     // means a module that is about to be refused never starts a 16-worker pthread pool at all,
@@ -200,29 +337,174 @@ private external fun supportsSharedMemory(): Boolean
 
 internal object BrowserModule {
   /**
+   * This binding instance's number on the page, taken once.
+   *
+   * Read on the first use of this object, which for any binding instance is far ahead of anything
+   * that could matter, so which instance holds the page is settled by which one starts using the
+   * binding rather than by which bundle the page evaluated first.
+   */
+  private val instanceId: Int = mintInstanceId()
+
+  /**
    * Returns the loaded module, or reports that the host never loaded it.
    *
    * Every entry point that reaches native goes through this, so a host that forgot to await the
-   * loader gets one clear failure rather than a null dereference inside interop.
+   * loader gets one clear failure rather than a null dereference inside interop. It is also where a
+   * second binding instance is caught whatever route it took: an instance that never called the
+   * loader still has to come through here before its first call reaches native, because it resolves
+   * every entry point for the first time itself.
+   *
+   * Ownership is asked about before the module is, because a second instance is wrong whether or
+   * not a module is loaded, and telling it to await a loader it must not call would send it after
+   * the wrong problem.
    */
-  fun require(): MaplibreNativeCModule =
-    instance()
+  fun require(): MaplibreNativeCModule {
+    checkSoleBinding()
+    checkNotReleased()
+    return instance()
       ?: throw Status.invalidState(
         "The MapLibre Native browser module is not loaded. Await " +
           "Maplibre.loadNativeLibraryAsync() before calling this binding."
       )
+  }
 
-  /** Reports whether [require] would succeed. */
+  /** Reports whether the module is on the page, which a release makes false again. */
   fun isLoaded(): Boolean = instance() != null
+
+  /**
+   * Terminates the module's worker pool and drops this page's reference to it.
+   *
+   * A shutdown stops the thread this binding's runtimes ran on; this is what releases the module
+   * they ran inside. Sixteen workers and a heap that starts at half a gigabyte stay reachable
+   * otherwise, for as long as the document lives, which on a single-page host is the whole session.
+   *
+   * **Final, and the last thing that may touch the module.** Terminating a worker inside the
+   * module's allocator would leave its lock held, so this drops the page's reference in the same
+   * step and every entry point refuses afterwards -- including the loader, which would otherwise
+   * instantiate a second sixteen-worker module beside the one just released.
+   *
+   * **Nothing on a page task may still be reaching the module.** A stack parked on the owner thread
+   * is already excluded, because a shutdown takes the gate a scope holds. A repeating page task is
+   * not: the log drain reschedules itself for as long as a callback is installed, and it calls the
+   * module directly, so it has to have stopped before this runs.
+   */
+  internal fun discardAfterShutdown() {
+    releaseInstance()
+  }
+
+  /**
+   * Refuses a page whose module has been released.
+   *
+   * Separated from "never loaded" because the remedy is opposite. A page that never loaded is told
+   * to await the loader; a page that released is told that awaiting it again is the one thing that
+   * would make this worse, since a page instantiates one module and a second is another pool and
+   * another heap beside the one just given back.
+   */
+  private fun checkNotReleased() {
+    if (!isReleased()) return
+    throw Status.invalidState(
+      "The MapLibre Native browser module has been released. Shutting down terminated its worker " +
+        "pool and dropped this page's last reference to it, which cannot be undone: loading again " +
+        "would instantiate a second module beside the one just released rather than recover it. A " +
+        "host that wants a map again reloads the document."
+    )
+  }
+
+  /**
+   * Mints the number a binding instance identifies itself by.
+   *
+   * Called once by this instance, for [instanceId]. It is also the seam the test that refuses a
+   * second instance uses: minting another number is exactly what a second instance does, and it is
+   * the only part of being one that a suite running in a single WebAssembly instance can reproduce.
+   * Minting alone claims nothing, so a caller that only mints leaves the page as it found it.
+   */
+  internal fun mintInstanceId(): Int = nextInstanceId()
+
+  /**
+   * Refuses a page that another binding instance already owns.
+   *
+   * The module and the map of calls parked on it are page globals, while everything that indexes
+   * into them -- the dispatcher handle, the call tokens, the callback registrations -- belongs to
+   * one WebAssembly instance. Two separately bundled instances therefore share half their state and
+   * duplicate the other half: both start issuing call tokens at one, the second overwrites the
+   * first's resolver in the shared map, and a completion then resumes the wrong caller with the
+   * wrong output while the right one parks forever.
+   *
+   * Refused rather than isolated. A second instance on one page is a deployment mistake -- the same
+   * binding bundled twice, or two versions of it -- and a host can fix it by loading the binding
+   * once and sharing it. Isolating would mean giving each instance its own module, and a page
+   * cannot have two: a canvas is transferred to a thread once, the log callback is process-global
+   * to the module, and the synchronous callback hosts are module globals as well.
+   *
+   * [candidate] is this instance's number. The test that says a second instance is refused passes
+   * one of its own, which is what a second instance would arrive with.
+   */
+  internal fun checkSoleBinding(candidate: Int = instanceId) {
+    val owner = claimPage(candidate)
+    if (owner == 0 || owner == candidate) return
+    throw Status.invalidState(
+      "Another instance of the MapLibre Native browser binding already owns this page. The module " +
+        "and the calls parked on it are shared by the whole page, while the tokens and handles " +
+        "that index into them belong to one WebAssembly instance, so a second instance would " +
+        "resolve the first's calls with its own results. Load this binding once and share it " +
+        "across the page."
+    )
+  }
+
+  /**
+   * Checks the module on this page against what this binding was generated for, if there is one.
+   *
+   * Returns whether a module was there, and throws when one was there and does not match. Every
+   * path that hands a caller a module goes through this: the one that instantiates it, the one that
+   * finds it already loaded, and the one that joins a load another caller started.
+   *
+   * The two expectations are parameters, here and in [load], so that the guard can be exercised
+   * against values no loadable module reports, the way
+   * [org.maplibre.nativeffi.Maplibre.checkCompatibleCAbi] is. This page serves one module, and it
+   * is the matching one, so a mismatch has no other way to be reached from a test.
+   */
+  internal fun checkLoadedModule(
+    expectedDigest: String = StructLayouts.HEADERS_DIGEST,
+    expectedProtocol: Int = NativeCall.EXPECTED_PROTOCOL,
+  ): Boolean {
+    val problem =
+      verifyIncumbent(
+        expectedDigest,
+        expectedProtocol,
+        REQUIRED_EXPORTS.joinToString(","),
+        REQUIRED_RUNTIME.joinToString(","),
+      ) ?: return false
+    if (problem.isNotEmpty()) throw Status.invalidState(problem)
+    return true
+  }
 
   /**
    * Instantiates the module from [url], which names the ES module beside its wasm and manifest.
    *
    * Loading twice is not an error: the module is process-global, and every caller that arrives
-   * while a load is in flight joins that one rather than starting another.
+   * while a load is in flight joins that one rather than starting another. What a caller gets that
+   * way is still checked against this binding's own digest and call protocol, because the module it
+   * joins was loaded for somebody else's.
+   *
+   * [expectedDigest] and [expectedProtocol] are what this binding was generated for. They are
+   * parameters for the reason [checkLoadedModule]'s are, and they are what makes the *placement* of
+   * that check testable rather than only the check itself: a test that loads with a digest no
+   * module carries reaches this with the suite's module already on the page, which is exactly the
+   * path that used to return without looking.
    */
-  suspend fun load(url: String) {
-    if (isLoaded()) return
+  suspend fun load(
+    url: String,
+    expectedDigest: String = StructLayouts.HEADERS_DIGEST,
+    expectedProtocol: Int = NativeCall.EXPECTED_PROTOCOL,
+  ) {
+    // First, because it is the one refusal that has nothing to do with the browser, the page, or
+    // the module: a second binding instance is a deployment mistake whatever else is true, and it
+    // is this binding's own state that makes it one.
+    checkSoleBinding()
+    // Before the preflights, because a released page fails them or passes them irrelevantly: what a
+    // load would do here is build a second module beside the one this page just gave back, and no
+    // browser capability changes that.
+    checkNotReleased()
     // Both preflights are a property read, and both come before the fetch that starts the load,
     // because the factory spawns a sixteen-worker pool before it resolves and neither of these
     // failures is one those workers could recover from. The browser is asked about first: a browser
@@ -243,14 +525,29 @@ internal object BrowserModule {
           "so that those headers allow it."
       )
     }
+    // A module already here is checked rather than accepted on sight. It may be one this binding
+    // never loaded -- another copy of the binding, or a host driving the module directly -- and the
+    // C ABI version cannot tell them apart, because it stays 0 for the whole prerelease. This costs
+    // nothing on the path that matters: an unloaded page reads one undefined property and goes on.
+    if (checkLoadedModule(expectedDigest, expectedProtocol)) return
     verifyAndInstantiate(
         url,
-        StructLayouts.HEADERS_DIGEST,
-        NativeCall.EXPECTED_PROTOCOL,
+        expectedDigest,
+        expectedProtocol,
         REQUIRED_EXPORTS.joinToString(","),
         REQUIRED_RUNTIME.joinToString(","),
       )
       .awaitOrThrow()
+    // Checked again, because the load above may have been somebody else's. A caller that arrives
+    // while a load is in flight joins it, and that load compared the module against the digest and
+    // protocol of whoever started it. This is that same comparison against this binding's own, and
+    // the only one covering a module this call did not build.
+    if (!checkLoadedModule(expectedDigest, expectedProtocol)) {
+      throw Status.invalidState(
+        "The MapLibre Native browser module finished loading but is no longer on this page. " +
+          "Something on the page removed it between the load resolving and this check."
+      )
+    }
   }
 
   /**

@@ -134,12 +134,16 @@ internal object Dispatcher {
    * is open loses that handle for the life of the page; the count says so at the moment the mistake
    * is made, while the thread is still there to close them on.
    *
-   * A runtime counts for more than itself, because it is what every other owner-affine handle hangs
-   * from: a map, a projection, a render session, an offline operation and a frame all retain their
-   * runtime as a child, so none of them can be open without the runtime that owns it being open
-   * too. A WebGL context is the one owner-affine handle with no runtime behind it, so it counts
-   * itself; without that, a context left open at shutdown would reach the terminal failure rather
-   * than the refusal, which tells a host the same thing far too late to act on it.
+   * A wrapper counts itself unless something already counted is *refused* while it lives. A map and
+   * an offline operation retain their runtime as a child, and a runtime with a live child refuses
+   * its own destroy, so the runtime's entry covers them for as long as they exist; an owned texture
+   * frame is covered the same way by the session that acquired it, which refuses to close while a
+   * frame is out. Nothing covers the other three. A projection is a standalone snapshot of a map's
+   * transform and retains nothing, a render session gives up both its retentions at detach while
+   * staying live and still needing destruction, and a WebGL context has no runtime behind it. Each
+   * of those counts itself, from construction until native has destroyed it. Without that, a
+   * shutdown that should have been refused is accepted, and the handle it stranded reaches the
+   * terminal failure instead -- which tells a host the same thing far too late to act on it.
    *
    * A plain list, because a page is one thread and every handle is created and released on it.
    */
@@ -148,9 +152,10 @@ internal object Dispatcher {
   /**
    * What a shutdown would refuse to stop for.
    *
-   * Read by the test that says a closed handle stops holding the module open. The other way to
-   * observe that is to shut down and see it accepted, which a suite cannot do: the shutdown is
-   * final, and the page it happened on has no map in it again.
+   * Read by the tests that say a closed handle stops holding the module open. Those run in the
+   * shared suite, where the other way to observe it -- shutting down and seeing it accepted -- is
+   * unavailable: a shutdown is final, and the page it happened on has no map in it again. The
+   * accepted shutdown is covered by a run of its own instead; see the browser final-shutdown task.
    */
   val openHandles: List<String>
     get() = liveHandles.toList()

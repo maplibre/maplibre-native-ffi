@@ -74,6 +74,11 @@ commands = [{ task = "//bindings/python:test" }]
 platforms = ["emscripten"]
 commands = [
   { task = "//bindings/kotlin:wasmJsTest", include = ["emscripten-wasm32-webgl"], preset = false },
+  # A run of its own, because a successful shutdown is final: it ends the owner thread and gives
+  # away the canvases it was handed, so the page it happened on can never host a map again. The
+  # suite above therefore only ever asserts the refusals, and this is the one place the accepted
+  # path -- the final wake, the keepalive release, and freeing from the worker -- runs at all.
+  { task = "//bindings/kotlin:wasmJsFinalShutdownTest", include = ["emscripten-wasm32-webgl"], preset = false },
 ]
 
 # TODO(#412): Re-enable //bindings/dart:test once thread-affine ownership is

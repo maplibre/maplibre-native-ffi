@@ -65,8 +65,9 @@ class WebglContextBrowserTest {
               context.destroyTexture(texture)
 
               // Detaching is what releases the backend, so the context becomes closeable there
-              // rather than only at close — which is what a host that keeps the session handle to
-              // attach a new target with depends on.
+              // rather than only at close. That is the order a host tearing a map down takes: the
+              // detached session is live for its own destroy and nothing else, so releasing the
+              // context it no longer touches must not wait for that destroy.
               session.detach()
               context.close()
               assertTrue(context.isClosed)

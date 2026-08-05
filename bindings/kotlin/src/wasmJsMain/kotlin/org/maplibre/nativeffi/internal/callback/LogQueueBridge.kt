@@ -167,6 +167,14 @@ internal object LogQueueDrain {
   }
 
   private fun drainTurn() {
+    // A final shutdown discards the module, and this turn was already scheduled by then. Every call
+    // below reaches the module, so a turn that ran afterwards would fail on a reference that is
+    // gone -- in a page task, where there is no caller to report it to. The backlog goes with the
+    // heap it lived in, so there is nothing left to drain either.
+    if (!BrowserModule.isLoaded()) {
+      running = false
+      return
+    }
     if (registry?.invoke() == null) {
       // Nothing is listening, so the task parks however busy native happens to be -- a condition
       // that also counted records would keep waking the page forever under a steady log rate. The

@@ -4,6 +4,7 @@ import kotlin.js.JsAny
 import kotlin.js.Promise
 import kotlin.wasm.WasmExport
 import org.maplibre.nativeffi.internal.wasm.AsyncDelivery
+import org.maplibre.nativeffi.internal.wasm.BrowserModule
 import org.maplibre.nativeffi.internal.wasm.Dispatcher
 import org.maplibre.nativeffi.internal.wasm.PromisingStack
 import org.maplibre.nativeffi.internal.wasm.SuspensionGate
@@ -110,6 +111,14 @@ public suspend fun <T> maplibreScope(block: () -> T): T = SuspensionGate.withGat
  * thread cannot be given to a second one. A host that has shut down and wants a map again reloads
  * the page.
  *
+ * **This releases the module too.** Stopping the owner thread alone would leave the Emscripten
+ * module's worker pool and its heap reachable for the life of the document, which is most of what a
+ * single-page host wanted back. So the pool is terminated and this page's reference to the instance
+ * is dropped, in that order and as one step: a worker terminated while it holds the module's
+ * allocator lock leaves that lock held, and dropping the reference is what guarantees nothing on
+ * the page allocates afterwards. Every later call reports the release rather than loading a second
+ * sixteen-worker module.
+ *
  * @throws org.maplibre.nativeffi.error.InvalidStateException if a handle created on the owner
  *   thread is still open.
  */
@@ -122,5 +131,10 @@ public suspend fun shutdownMaplibre() {
     // to wait for -- and a shutdown with a handle open is refused below in any case.
     if (Dispatcher.openHandles.isEmpty()) AsyncDelivery.awaitIdle()
     Dispatcher.stop()
+    // Last, and only once the stop was accepted: a refused stop throws above, which is what leaves
+    // the module intact for the host to close what was named and try again. Nothing between the two
+    // reaches the module -- stopping allocates nothing after it posts its wake, and a drain turn
+    // returns immediately once the dispatcher handle is gone.
+    BrowserModule.discardAfterShutdown()
   }
 }

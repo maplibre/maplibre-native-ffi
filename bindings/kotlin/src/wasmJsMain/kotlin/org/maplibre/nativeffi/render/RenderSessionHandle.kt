@@ -58,9 +58,18 @@ internal constructor(
   // Held so the map reports a live session rather than letting native refuse the destroy. Passing
   // the map to HandleStateCore only names the parent; this is what makes closing the map while a
   // session is attached the binding's own INVALID_STATE, which is what the common KDoc promises.
-  private val mapRetention = map.retainChild("RenderSessionHandle")
-  private val core = HandleStateCore("RenderSessionHandle", handle.raw, map)
+  private val mapRetention = map.retainChild(TYPE_NAME)
+  private val core = HandleStateCore(TYPE_NAME, handle.raw, map)
   private val activeFrame = ActiveFrameState()
+
+  init {
+    // Counted with the module as well as with the map, because [detach] gives the map back while
+    // this session stays live and still has to be destroyed on the owner thread. From then on no
+    // other handle is holding the module open on this one's account, so a shutdown that read only
+    // the retentions would be accepted and strand a session nothing could ever destroy. Last of
+    // the initializers, so a retention this constructor failed to take leaves no count behind.
+    Dispatcher.retainHandle(TYPE_NAME)
+  }
 
   /**
    * Checks this handle is live and then runs [body], without holding a use count across it.
@@ -166,7 +175,10 @@ internal constructor(
     activeFrame.ensureInactive("detach")
     live { callWithSession("mln_render_session_detach") }
     // A detached session no longer holds the map, so the map becomes closeable again even though
-    // this handle is still live and can be attached to a new target.
+    // this handle is still live. Live for destruction and nothing else: the C API answers every
+    // target, render, readback and maintenance call on a detached session with an invalid-state
+    // status, and has no way to attach one again. A host that wants to render after this destroys
+    // the session and attaches a new one.
     mapRetention.close()
     // The backend released its GL objects during the detach, so nothing here names the WebGL
     // context any more and the host may close it.
@@ -472,6 +484,9 @@ internal constructor(
       afterSuccess = {
         mapRetention.close()
         contextRetention?.close()
+        // Native has destroyed it, so the owner thread no longer owns anything on this session's
+        // account and a shutdown is no longer refused for it.
+        Dispatcher.releaseHandle(TYPE_NAME)
       },
     )
   }
@@ -625,6 +640,7 @@ internal constructor(
     )
 
   internal companion object {
+    private const val TYPE_NAME = "RenderSessionHandle"
     private const val BOOL_BYTES = 1
     private const val POINTER_BYTES = 4
     private const val SIZE_BYTES = 4
