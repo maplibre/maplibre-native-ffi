@@ -43,8 +43,8 @@ class LogCallbackStateTest : org.maplibre.nativeffi.NativeTestBase() {
       Maplibre.setLogCallback(
         LogCallback { record ->
           records += record
-          true
-        }
+        },
+        consume = true,
       )
       initialState = LogCallbackState.currentForTesting()
       memScoped {
@@ -60,8 +60,8 @@ class LogCallbackStateTest : org.maplibre.nativeffi.NativeTestBase() {
       Maplibre.setLogCallback(
         LogCallback { record ->
           replacementRecords += record
-          false
-        }
+        },
+        consume = false,
       )
       replacementState = LogCallbackState.currentForTesting()
       assertEquals(0U, initialState?.invoke(1U, 3U, 8L, null))
@@ -89,8 +89,8 @@ class LogCallbackStateTest : org.maplibre.nativeffi.NativeTestBase() {
       Maplibre.setLogCallback(
         LogCallback {
           record = it
-          true
-        }
+        },
+        consume = true,
       )
       val state = requireNotNull(LogCallbackState.currentForTesting())
 
@@ -114,7 +114,8 @@ class LogCallbackStateTest : org.maplibre.nativeffi.NativeTestBase() {
     val error =
       assertFailsWith<MaplibreException> {
         LogCallbackState.setForTesting(
-          LogCallback { true },
+          LogCallback {},
+          consume = true,
           install = { MaplibreStatus.NATIVE_ERROR.nativeCode },
           captureReplacement = { replacementState = it },
         )
@@ -134,8 +135,8 @@ class LogCallbackStateTest : org.maplibre.nativeffi.NativeTestBase() {
         LogCallback {
           state.close()
           accepted += 1
-          true
-        }
+        },
+        consume = true,
       )
       state = requireNotNull(LogCallbackState.currentForTesting())
 
@@ -155,8 +156,8 @@ class LogCallbackStateTest : org.maplibre.nativeffi.NativeTestBase() {
       Maplibre.setLogCallback(
         LogCallback {
           clearError = assertFailsWith<InvalidStateException> { Maplibre.clearLogCallback() }
-          true
-        }
+        },
+        consume = true,
       )
       state = requireNotNull(LogCallbackState.currentForTesting())
 
@@ -176,9 +177,9 @@ class LogCallbackStateTest : org.maplibre.nativeffi.NativeTestBase() {
       Maplibre.setLogCallback(
         LogCallback {
           setError =
-            assertFailsWith<InvalidStateException> { Maplibre.setLogCallback(LogCallback { true }) }
-          true
-        }
+            assertFailsWith<InvalidStateException> { Maplibre.setLogCallback(LogCallback {}, consume = true) }
+        },
+        consume = true,
       )
       state = requireNotNull(LogCallbackState.currentForTesting())
 
@@ -204,8 +205,8 @@ class LogCallbackStateTest : org.maplibre.nativeffi.NativeTestBase() {
           accepted.addAndFetch(1)
           phase.store(LOG_PHASE_ENTERED)
           waitForLogPhase(phase, LOG_PHASE_RELEASE)
-          true
-        }
+        },
+        consume = true,
       )
       state = requireNotNull(LogCallbackState.currentForTesting())
 

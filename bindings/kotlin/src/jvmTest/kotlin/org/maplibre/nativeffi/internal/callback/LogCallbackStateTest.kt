@@ -19,8 +19,8 @@ class LogCallbackStateTest {
       LogCallbackState.set(
         LogCallback { record ->
           copiedRecord = record
-          true
-        }
+        },
+        consume = true,
       )
       val state = assertNotNull(LogCallbackState.currentForTesting())
 

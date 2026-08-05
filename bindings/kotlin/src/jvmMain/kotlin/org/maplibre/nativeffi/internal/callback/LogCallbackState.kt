@@ -19,7 +19,10 @@ import org.maplibre.nativeffi.log.LogSeverity
 
 /** Owns process-global JVM FFM logging callback state. */
 @OptIn(ExperimentalAtomicApi::class)
-internal class LogCallbackState private constructor(private val callback: LogCallback) :
+internal class LogCallbackState private constructor(
+  private val callback: LogCallback,
+  private val consume: Boolean,
+) :
   AutoCloseable {
   private val arena = Arena.ofShared()
   private val gate = CallbackGate("log callbacks") { arena.close() }
@@ -61,7 +64,8 @@ internal class LogCallbackState private constructor(private val callback: LogCal
           code,
           copyCString(message),
         )
-      if (callback.log(record)) 1 else 0
+      callback.log(record)
+      if (consume) 1 else 0
     } catch (_: Throwable) {
       0
     } finally {
@@ -88,9 +92,9 @@ internal class LogCallbackState private constructor(private val callback: LogCal
     private val updateLock = AtomicInt(0)
     private val current = AtomicReference<LogCallbackState?>(null)
 
-    fun set(callback: LogCallback) {
+    fun set(callback: LogCallback, consume: Boolean) {
       NativeAccess.ensureLoaded()
-      val replacement = LogCallbackState(callback)
+      val replacement = LogCallbackState(callback, consume)
       var previous: LogCallbackState? = null
       try {
         withUpdateLock {

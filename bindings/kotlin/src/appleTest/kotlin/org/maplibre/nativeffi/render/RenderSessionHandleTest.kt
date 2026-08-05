@@ -118,7 +118,7 @@ class RenderSessionHandleTest {
     if (!metalSupportedOrInapplicable()) return
     val device =
       MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
-    Maplibre.setLogCallback(LogCallback { true })
+    Maplibre.setLogCallback(LogCallback {}, consume = true)
     Maplibre.setAsyncLogSeverities(emptySet())
     try {
       val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
@@ -369,7 +369,7 @@ class RenderSessionHandleTest {
     if (!metalSupportedOrInapplicable()) return
     val device =
       MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
-    Maplibre.setLogCallback(LogCallback { true })
+    Maplibre.setLogCallback(LogCallback {}, consume = true)
     Maplibre.setAsyncLogSeverities(emptySet())
     try {
       val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
@@ -460,7 +460,7 @@ class RenderSessionHandleTest {
     if (!metalSupportedOrInapplicable()) return
     val device =
       MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
-    Maplibre.setLogCallback(LogCallback { true })
+    Maplibre.setLogCallback(LogCallback {}, consume = true)
     Maplibre.setAsyncLogSeverities(emptySet())
     try {
       val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
@@ -676,7 +676,7 @@ class RenderSessionHandleTest {
     if (!metalSupportedOrInapplicable()) return
     val device =
       MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
-    Maplibre.setLogCallback(LogCallback { true })
+    Maplibre.setLogCallback(LogCallback {}, consume = true)
     Maplibre.setAsyncLogSeverities(emptySet())
     try {
       val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
