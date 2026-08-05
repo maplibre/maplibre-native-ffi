@@ -23,7 +23,11 @@ import org.maplibre.nativeffi.gradle.canonicalizeKmpRootMetadata
 import org.maplibre.nativeffi.gradle.embedMaplibreLicenseBundle
 import org.maplibre.nativeffi.gradle.requiredEnvironmentVariable
 
-data class NativeTargetConfiguration(val definitionFileName: String, val targetPlatform: String)
+data class NativeTargetConfiguration(
+  val definitionFileName: String,
+  val targetPlatform: String,
+  val staticLibraries: List<String> = listOf("libmaplibre-native-c.a"),
+)
 
 data class JvmRuntimeInstall(
   val classifier: String,
@@ -57,7 +61,14 @@ fun nativeTargets(
       require(backend != MaplibreRuntimeBackend.METAL) {
         "Metal does not support the Linux runtime target family"
       }
-      mapOf("linuxX64" to NativeTargetConfiguration("linux-${backend.id}.def", "linux-x64"))
+      mapOf(
+        "linuxX64" to
+          NativeTargetConfiguration(
+            "linux-${backend.id}.def",
+            "linux-x64",
+            listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
+          )
+      )
     }
     MaplibreRuntimeTargetFamily.APPLE -> {
       require(backend == MaplibreRuntimeBackend.METAL) {
@@ -352,6 +363,10 @@ extensions.configure<KotlinMultiplatformExtension> {
     val configuredInstall = providers.gradleProperty(installPropertyName)
     val runtimeInstallDir =
       configuredInstall.map(rootProject::file).getOrElse(maplibreNativeC.installDir)
+    val runtimeArchives =
+      targetConfiguration.staticLibraries.map { runtimeInstallDir.resolve("lib/$it") }
+    val staticLibraryOptions =
+      targetConfiguration.staticLibraries.flatMap { listOf("-staticLibrary", it) }.toTypedArray()
 
     val runtimeInterop =
       compilations.getByName("main").cinterops.create("maplibreNativeRuntime") {
@@ -361,19 +376,14 @@ extensions.configure<KotlinMultiplatformExtension> {
         extraOpts(
           "-libraryPath",
           runtimeInstallDir.resolve("lib").absolutePath,
-          "-staticLibrary",
-          "libmaplibre-native-c.a",
+          *staticLibraryOptions,
         )
       }
 
-    val runtimeArchive = runtimeInstallDir.resolve("lib/libmaplibre-native-c.a")
     val runtimeLicenseDirectory = runtimeInstallDir.resolve("share/maplibre-native-c/licenses")
     tasks.named<CInteropProcess>(runtimeInterop.interopProcessingTaskName) {
-      // cinterop takes the archive through -staticLibrary, which Gradle cannot
-      // see, so the task would otherwise stay up to date across a rebuild of the
-      // archive and embed a stale copy in the published KLIB. A file collection
-      // tolerates the archive being absent on a host that does not build it.
-      inputs.files(runtimeArchive).withPropertyName("maplibreNativeCArchive")
+      // Track archives that cinterop receives through -staticLibrary.
+      inputs.files(runtimeArchives).withPropertyName("maplibreNativeCArchives")
       embedMaplibreLicenseBundle(runtimeLicenseDirectory)
     }
 

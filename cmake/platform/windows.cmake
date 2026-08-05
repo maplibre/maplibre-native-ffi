@@ -46,7 +46,7 @@ function(mln_ffi_configure_platform_dependencies target)
       MLN_FFI_STATIC_BASE_OUTPUT_NAME
       maplibre-native-c-static-base
       MLN_FFI_STATIC_ARCHIVES
-      "mbgl-vendor-icu;mln_ffi_platform_rust;zlibstatic;uv_a"
+      "mbgl-vendor-icu;zlibstatic;uv_a"
       MLN_FFI_TEST_SUPPORTED
       TRUE
       MLN_FFI_TEST_LIBRARY_PATH_VARIABLE

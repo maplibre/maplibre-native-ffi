@@ -1,27 +1,33 @@
 function(mln_ffi_configure_platform_dependencies target)
-  # The browser file source is built on emscripten_fetch, whose implementation
-  # is a link-time option rather than a library. It propagates to consumers
-  # because they are the ones who link the module.
-  target_link_options(${target} INTERFACE "-sFETCH=1")
-  # The shared default storage sources include zlib's headers and the module
-  # links its implementation, so this belongs to the platform rather than to
-  # whichever render backend happens to be built with it.
-  target_compile_options(${target} INTERFACE "-sUSE_ZLIB=1")
-  target_link_options(${target} INTERFACE "-sUSE_ZLIB=1")
+  # Consumers link the final module, so they need these options.
+  target_compile_options(
+    ${target}
+    INTERFACE -pthread -fwasm-exceptions "-sUSE_ZLIB=1")
+  target_link_options(
+    ${target}
+    INTERFACE
+      -pthread
+      "-sPTHREAD_POOL_SIZE=${MLN_FFI_EMSCRIPTEN_PTHREAD_POOL_SIZE}"
+      "-sINITIAL_MEMORY=${MLN_FFI_EMSCRIPTEN_INITIAL_MEMORY}"
+      "-sSTACK_SIZE=${MLN_FFI_EMSCRIPTEN_STACK_SIZE}"
+      "-sDEFAULT_TO_CXX=1"
+      -fwasm-exceptions
+      "-sFETCH=1"
+      "-sUSE_ZLIB=1")
+  # TODO: Use SIDE_MODULE when pthread dynamic linking is stable.
   set_target_properties(
     ${target}
     PROPERTIES
       MLN_FFI_DEFAULT_LOGGING_STDERR
       TRUE
       MLN_FFI_DEFAULT_THREAD_LOCAL
-      TRUE # A wasm module is linked by emcc from archives; there is no shared
-      # library form to produce.
+      TRUE
       MLN_FFI_SHARED_SUPPORTED
       FALSE
       MLN_FFI_ARCHIVE_FORMAT
-      none
+      wasm
       MLN_FFI_STATIC_ARCHIVES
-      "mbgl-vendor-icu;maplibre_native_platform_rust"
+      "mbgl-vendor-icu"
       MLN_FFI_TARGET_PLATFORM
       emscripten-wasm32
       MLN_FFI_ZIG_TARGET

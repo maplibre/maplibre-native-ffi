@@ -197,6 +197,16 @@ function(mln_ffi_link_rust_platform target)
   add_dependencies(mln_ffi_platform_rust mln_ffi_platform_rust_build)
 
   target_link_libraries(${target} PRIVATE mln_ffi_platform_rust)
+  # A separate archive avoids embedding a second Rust runtime in static hosts.
+  set_property(
+    TARGET mln_ffi_platform_dependencies
+    APPEND
+    PROPERTY
+      MLN_FFI_INSTALL_LIBRARY_FILES "$<TARGET_FILE:mln_ffi_platform_rust>")
+  set_property(
+    TARGET mln_ffi_platform_dependencies
+    APPEND_STRING
+    PROPERTY MLN_FFI_PKG_CONFIG_ARCHIVES " -lmln_ffi_platform")
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(${target} PRIVATE dl m)
   endif()

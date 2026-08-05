@@ -129,7 +129,7 @@ function(mln_ffi_configure_platform_dependencies target)
       MLN_FFI_ARCHIVE_FORMAT
       elf
       MLN_FFI_STATIC_ARCHIVES
-      "mbgl-vendor-icu;mln_ffi_platform_rust;zlibstatic;uv_a"
+      "mbgl-vendor-icu;zlibstatic;uv_a"
       MLN_FFI_PKG_CONFIG_LIBS
       -ldl
       MLN_FFI_TEST_SUPPORTED
