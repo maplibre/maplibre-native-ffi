@@ -77,12 +77,14 @@ internal class LogQueueBridge(private val callback: LogCallback) : AutoCloseable
  * a `maplibreScope` is parked: the parked stack cannot resume until this task returns, which makes
  * any allocator scope opened here properly nested inside it.
  *
- * **Stated limitation.** [LogCallback.log] returns whether the callback consumed the record, but a
+ * **Stated divergence.** [LogCallback.log] returns whether the callback consumed the record, but a
  * browser host cannot answer that: MapLibre needs the decision on the logging thread, before the
  * record has reached the page. The registration reports a fixed "not consumed", so native logging
  * behaves exactly as it would with no callback installed, and a Kotlin callback observes records
- * without being able to suppress them. Its return value is ignored. That is the browser's choice,
- * not the API's, and whether the common contract should change is open.
+ * without being able to suppress them. Its return value is ignored. The fixed policy is stated on
+ * [LogCallback.log] and on
+ * [Maplibre.setLogCallback][org.maplibre.nativeffi.Maplibre.setLogCallback], so a host reads it
+ * where it installs one, and it is recorded in the binding specification's browser divergences.
  */
 internal object LogQueueDrain {
   // The native registration is made once and never withdrawn, because the adapter's listener takes

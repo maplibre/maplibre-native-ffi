@@ -56,6 +56,7 @@ import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
 import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
+import org.maplibre.nativeffi.render.OpenGLContextDescriptor
 import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
@@ -63,6 +64,7 @@ import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
+import org.maplibre.nativeffi.render.WebglContext
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
@@ -105,8 +107,10 @@ private const val NUL = '\u0000'
  * or destroying one, so those run on the page rather than costing an event-loop round trip per ID
  * or per node.
  *
- * The browser build compiles one render backend, OpenGL against WebGL, and only its texture
- * sessions; see the Metal, Vulkan, and surface members below for what that leaves unreachable.
+ * The browser build compiles one render backend, OpenGL against WebGL, and every render target that
+ * backend has: a native surface, which here is the canvas the context is bound to, and both the
+ * owned and the borrowed texture target. See the Metal and Vulkan members below for what compiling
+ * one backend leaves unreachable.
  */
 public actual class MapHandle
 private constructor(private val runtime: RuntimeHandle, private val handle: NativeMap) :
@@ -1480,31 +1484,36 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   public actual fun attachOpenGLOwnedTexture(
     descriptor: OpenGLOwnedTextureDescriptor
   ): RenderSessionHandle = live {
-    // The out-handle goes first because it is the only member here that needs eight-byte alignment.
-    Heap.withScratch(HANDLE_BYTES + MlnOpenglOwnedTextureDescriptor.SIZEOF) { out ->
-      val block = out + HANDLE_BYTES
-      // The render marshaller owns the descriptors a session sets on itself, and an owned texture
-      // is only ever attached, so its two nested descriptors are placed here.
-      MlnOpenglOwnedTextureDescriptor.setSize(block, MlnOpenglOwnedTextureDescriptor.SIZEOF)
-      RenderMarshal.writeExtent(
-        block + MlnOpenglOwnedTextureDescriptor.OFFSET_EXTENT,
-        descriptor.extent,
-      )
-      RenderMarshal.writeOpenGLContext(
-        block + MlnOpenglOwnedTextureDescriptor.OFFSET_CONTEXT,
-        descriptor.context,
-      )
-      attach("mln_opengl_owned_texture_attach", block, out)
+    withWebglContext(descriptor.context) { retention ->
+      // The out-handle goes first because it is the only member here that needs eight-byte
+      // alignment.
+      Heap.withScratch(HANDLE_BYTES + MlnOpenglOwnedTextureDescriptor.SIZEOF) { out ->
+        val block = out + HANDLE_BYTES
+        // The render marshaller owns the descriptors a session sets on itself, and an owned texture
+        // is only ever attached, so its two nested descriptors are placed here.
+        MlnOpenglOwnedTextureDescriptor.setSize(block, MlnOpenglOwnedTextureDescriptor.SIZEOF)
+        RenderMarshal.writeExtent(
+          block + MlnOpenglOwnedTextureDescriptor.OFFSET_EXTENT,
+          descriptor.extent,
+        )
+        RenderMarshal.writeOpenGLContext(
+          block + MlnOpenglOwnedTextureDescriptor.OFFSET_CONTEXT,
+          descriptor.context,
+        )
+        attach("mln_opengl_owned_texture_attach", block, out, retention)
+      }
     }
   }
 
   public actual fun attachOpenGLBorrowedTexture(
     descriptor: OpenGLBorrowedTextureDescriptor
   ): RenderSessionHandle = live {
-    Heap.withScratch(HANDLE_BYTES + RenderMarshal.OPENGL_BORROWED_TEXTURE_SIZEOF) { out ->
-      val block = out + HANDLE_BYTES
-      RenderMarshal.writeOpenGLBorrowedTexture(block, descriptor)
-      attach("mln_opengl_borrowed_texture_attach", block, out)
+    withWebglContext(descriptor.context) { retention ->
+      Heap.withScratch(HANDLE_BYTES + RenderMarshal.OPENGL_BORROWED_TEXTURE_SIZEOF) { out ->
+        val block = out + HANDLE_BYTES
+        RenderMarshal.writeOpenGLBorrowedTexture(block, descriptor)
+        attach("mln_opengl_borrowed_texture_attach", block, out, retention)
+      }
     }
   }
 
@@ -1528,12 +1537,14 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
    */
   public actual fun attachOpenGLSurface(descriptor: OpenGLSurfaceDescriptor): RenderSessionHandle =
     live {
-      // The out-handle goes first because it is the only member here that needs eight-byte
-      // alignment.
-      Heap.withScratch(HANDLE_BYTES + RenderMarshal.OPENGL_SURFACE_SIZEOF) { out ->
-        val block = out + HANDLE_BYTES
-        RenderMarshal.writeOpenGLSurface(block, descriptor)
-        attach("mln_opengl_surface_attach", block, out)
+      withWebglContext(descriptor.context) { retention ->
+        // The out-handle goes first because it is the only member here that needs eight-byte
+        // alignment.
+        Heap.withScratch(HANDLE_BYTES + RenderMarshal.OPENGL_SURFACE_SIZEOF) { out ->
+          val block = out + HANDLE_BYTES
+          RenderMarshal.writeOpenGLSurface(block, descriptor)
+          attach("mln_opengl_surface_attach", block, out, retention)
+        }
       }
     }
 
@@ -1748,13 +1759,44 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     }
   }
 
-  private fun attach(name: String, descriptor: HeapPointer, out: HeapPointer): RenderSessionHandle {
+  /**
+   * Holds the WebGL context an OpenGL target names open for as long as [body] and its session need
+   * it.
+   *
+   * Taken before anything is written or dispatched, because an attach parks this stack on the owner
+   * thread and a page task that ran meanwhile could otherwise close the context between the two.
+   * Released again when the attach fails, so a refused target leaves nothing holding the context.
+   * The retention is idempotent, so releasing it here and in the session is the same release.
+   */
+  private fun <T> withWebglContext(
+    context: OpenGLContextDescriptor,
+    body: (HandleStateCore.ChildRetention?) -> T,
+  ): T {
+    val retention = WebglContext.retainForTarget(context)
+    try {
+      return body(retention)
+    } catch (error: Throwable) {
+      retention?.close()
+      throw error
+    }
+  }
+
+  private fun attach(
+    name: String,
+    descriptor: HeapPointer,
+    out: HeapPointer,
+    contextRetention: HandleStateCore.ChildRetention?,
+  ): RenderSessionHandle {
     call(name, 3) { slots ->
       slots.setLong(0, handle.raw)
       slots.setPointer(1, descriptor)
       slots.setPointer(2, out)
     }
-    return RenderSessionHandle.fromNative(this, NativeRenderSession(Heap.loadLong(out)))
+    return RenderSessionHandle.fromNative(
+      this,
+      NativeRenderSession(Heap.loadLong(out)),
+      contextRetention,
+    )
   }
 
   private fun addTileSourceUrl(

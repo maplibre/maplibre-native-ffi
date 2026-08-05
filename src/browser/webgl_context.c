@@ -306,6 +306,21 @@ MLN_API int32_t mln_browser_webgl_context_create_here(
   // linked with -sOFFSCREEN_FRAMEBUFFER, which this module is not.
   attributes.proxyContextToMainThread = EMSCRIPTEN_WEBGL_CONTEXT_PROXY_DISALLOW;
 
+  // A registry key with Emscripten's prefix on it, and deliberately *not* a CSS
+  // selector, which is why nothing is escaped here and escaping would be a bug.
+  // `findCanvasEventTarget()` -- the resolver under `-sOFFSCREENCANVAS_SUPPORT`
+  // -- drops one leading character and looks the remainder up in
+  // `GL.offscreenCanvases` as a property name, so what arrives is the id
+  // exactly. Its `document.querySelector` fallback is what a selector would be
+  // for, and it is unreachable from here: the entry is registered above for a
+  // private canvas, and checked for by mln_browser_webgl_has_canvas() for a
+  // transferred one, whose key Emscripten's transfer sets from the element's
+  // `id` rather than from the selector that found it.
+  //
+  // So the two places this module names a canvas spell it differently and agree
+  // on the element. dispatcher.c escapes, because `pthread_create` really does
+  // resolve a selector; this does not, because a key that was escaped would
+  // match nothing in the registry the transfer just filled.
   char target[sizeof(entry->id) + 1];
   (void)snprintf(target, sizeof(target), "#%s", entry->id);
   entry->context = emscripten_webgl_create_context(target, &attributes);

@@ -78,6 +78,12 @@ Serve every response cross-origin isolated, with
 threads of its own, which need `SharedArrayBuffer`, and the workers those
 threads run in are documents that lose the isolation without the headers.
 
+Calling the binding then differs from the other Kotlin targets in three ways.
+[Render a map in a
+browser](/maplibre-native-ffi/guides/render-a-map-in-a-browser/) covers loading
+the module, the scope that owner-affine calls run inside, and the canvas that a
+host claims before the first native call.
+
 ## Rust
 
 Depend on the `maplibre-native-ffi` crate from Git and enable one backend feature.

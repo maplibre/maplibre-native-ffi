@@ -21,13 +21,17 @@ import org.maplibre.nativeffi.withMap
  *
  * Logging has no runtime to pump, so this binding drains the module's log queue onto its own
  * macrotask rather than inside a pump: a host most wants logging during startup and during teardown
- * after the last pump. That is the one visible difference from the other platforms — a record is
- * delivered on a later turn of the page's event loop rather than on the thread that produced it —
- * so a test has to yield the page before it can assert on what arrived.
+ * after the last pump. Two things follow from that, and both are differences from the other
+ * platforms rather than details of this suite.
  *
- * A callback's return value cannot be honoured here, and that is stated rather than worked around:
- * MapLibre needs the consumed/not-consumed decision on the logging thread, before the record has
- * reached the page at all.
+ * A record is delivered on a later turn of the page's event loop rather than on the thread that
+ * produced it, so a test yields the page before it asserts on what arrived.
+ *
+ * A callback's return value is ignored and native is always told the record was not consumed,
+ * because MapLibre needs that decision on the logging thread and the record has not reached the
+ * page by then. So these tests assert on what a callback received and never on what native did with
+ * a record afterwards; the policy is stated on `LogCallback.log`, on `Maplibre.setLogCallback`, and
+ * in the binding specification's browser divergences.
  */
 class LogCallbackBrowserTest {
   // Spec coverage: BND-120, BND-121, BND-122, BND-123.

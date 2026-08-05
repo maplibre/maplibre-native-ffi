@@ -74,6 +74,13 @@ another attached to the same canvas. It returns null for the same reasons
 `mln_browser_dispatcher_create` does, and additionally when a named canvas is
 not in the document or control of it has already been transferred.
 
+These are element ids rather than selectors. Any id an HTML document accepts
+works, including one a CSS identifier cannot spell — a leading digit, a colon, a
+dot, a bracket — because the module escapes each id before it reaches the
+selector Emscripten resolves. A comma is the exception: it separates the list,
+so it cannot appear inside an entry. Surrounding whitespace is trimmed, and an
+id may not contain any.
+
 A canvas given away this way is no longer drawable from the page. The `<canvas>`
 element becomes a placeholder that displays what the owner thread renders, with
 no copy.

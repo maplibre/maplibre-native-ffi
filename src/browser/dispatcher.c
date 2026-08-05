@@ -393,14 +393,88 @@ static bool mln_browser_dispatcher_enqueue(
   return false;
 }
 
+// Writes the id `[at, end)` of `canvas_ids` into `out` as a CSS identifier,
+// returning how many bytes it wrote.
+//
+// An HTML id may be any non-empty string with no ASCII whitespace in it, and a
+// CSS identifier is a far smaller set. So `#` and the id concatenated is a
+// correct selector only for the ids that already happen to be identifiers:
+// `map:canvas` would travel as `#map:canvas`, where `:canvas` parses as a
+// pseudo-class and matches no element at all, and an id beginning with a digit
+// or containing a dot or a bracket goes wrong the same way -- selecting nothing
+// or, worse, selecting some other element. Every one of those is a valid id,
+// and a host that used one would see `pthread_create` refuse the whole transfer
+// with its canvas reported as missing.
+//
+// This is `CSS.escape` -- the CSS Object Model's "serialize an identifier" --
+// written here rather than called through `EM_JS`, because `CSS` is a `Window`
+// interface and a host may create its dispatcher from a worker, where the name
+// is not defined at all. The algorithm is specified over code points, but every
+// rule below concerns ASCII and UTF-8 spells every other code point as bytes
+// >= 0x80, which the "emit unchanged" branch covers as they are; so a byte at a
+// time gives the same answer as a code point at a time.
+//
+// The one rule not implemented is the first: a U+0000 becomes U+FFFD. An id
+// arrives here inside a C string and so cannot contain one.
+static size_t mln_browser_dispatcher_escape(
+  const char* canvas_ids, size_t at, size_t end, char* out
+) {
+  static const char digits[] = "0123456789abcdef";
+  const size_t length = end - at;
+  size_t written = 0;
+  for (size_t index = 0; index < length; index++) {
+    const unsigned char byte = (unsigned char)canvas_ids[at + index];
+    const bool numeric = byte >= '0' && byte <= '9';
+    // A control character can never appear literally, and a leading digit -- or
+    // a digit after a leading '-' -- would be read as the start of a number
+    // rather than of a name. All three travel as a hexadecimal escape, which a
+    // space terminates.
+    if (
+      byte <= 0x1FU || byte == 0x7FU || (index == 0 && numeric) ||
+      (index == 1 && numeric && canvas_ids[at] == '-')
+    ) {
+      out[written++] = '\\';
+      if (byte >= 0x10U) {
+        out[written++] = digits[byte >> 4U];
+      }
+      out[written++] = digits[byte & 0x0FU];
+      out[written++] = ' ';
+      continue;
+    }
+    // A lone '-' is a valid id and not a valid identifier, because an
+    // identifier may not be just a hyphen.
+    if (byte == '-' && length == 1) {
+      out[written++] = '\\';
+      out[written++] = '-';
+      continue;
+    }
+    if (
+      byte >= 0x80U || byte == '-' || byte == '_' || numeric ||
+      (byte >= 'a' && byte <= 'z') || (byte >= 'A' && byte <= 'Z')
+    ) {
+      out[written++] = (char)byte;
+      continue;
+    }
+    out[written++] = '\\';
+    out[written++] = (char)byte;
+  }
+  return written;
+}
+
 // Rewrites a comma-separated list of canvas element ids into the selector list
 // Emscripten's transfer attribute expects, or returns null when the list names
 // nothing.
 //
 // Emscripten resolves each entry with `document.querySelector`, so `map` has to
-// travel as `#map`. Making the host write the selector instead would put a
-// piece of Emscripten's implementation in every host's API; an element id is
-// what a host already has.
+// travel as `#map` and anything an identifier cannot spell literally has to be
+// escaped on the way -- see mln_browser_dispatcher_escape(). Making the host
+// write the selector instead would put a piece of Emscripten's implementation
+// in every host's API; an element id is what a host already has.
+//
+// The comma stays a separator rather than becoming an escapable character.
+// Emscripten splits the string it is given before any of this is visible to it,
+// so an id containing a comma cannot reach a transfer however it is spelled
+// here, and a host is told so at its own boundary.
 //
 // Surrounding whitespace is dropped so that a host may write the list the way
 // it reads, and an empty entry is skipped rather than passed on, because
@@ -414,9 +488,11 @@ static char* mln_browser_dispatcher_selector(const char* canvas_ids) {
   if (length == 0) {
     return NULL;
   }
-  // One '#' per entry, and there are at most as many entries as characters, so
-  // twice the input plus a terminator covers every list.
-  char* selector = calloc(length * 2 + 2, 1);
+  // An escape is at most four bytes for one -- a backslash, two hexadecimal
+  // digits, and the space closing them -- and an entry adds its '#' and the
+  // comma before it, of which there are fewer than there are characters. Six
+  // times the input plus a terminator covers every list.
+  char* selector = calloc(length * 6 + 2, 1);
   if (selector == NULL) {
     return NULL;
   }
@@ -439,8 +515,9 @@ static char* mln_browser_dispatcher_selector(const char* canvas_ids) {
         selector[written++] = ',';
       }
       selector[written++] = '#';
-      memcpy(selector + written, canvas_ids + at, trimmed - at);
-      written += trimmed - at;
+      written += mln_browser_dispatcher_escape(
+        canvas_ids, at, trimmed, selector + written
+      );
     }
     at = end + 1;
   }
@@ -460,6 +537,13 @@ static char* mln_browser_dispatcher_selector(const char* canvas_ids) {
  * mln_browser_webgl_context_create() then names one of them to render onto, and
  * what that context draws reaches the page with no copy, because the canvas the
  * page displays *is* the canvas the owner thread renders into.
+ *
+ * These are element ids, not selectors. Any id an HTML document accepts works,
+ * including one a CSS identifier cannot spell literally, because each is
+ * escaped before it reaches the selector Emscripten resolves. The one exception
+ * is a comma, which separates this list and so cannot appear inside an entry;
+ * surrounding whitespace is trimmed, so an id cannot begin or end with a space
+ * either.
  *
  * **This is the only moment a canvas can be transferred.** Emscripten performs
  * the transfer inside `pthread_create`, so every canvas a host will ever render

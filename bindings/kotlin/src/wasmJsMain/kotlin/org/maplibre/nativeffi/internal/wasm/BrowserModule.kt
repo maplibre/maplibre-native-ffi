@@ -182,6 +182,22 @@ private external fun verifyAndInstantiate(
 )
 private external fun supportsSuspension(): Boolean
 
+/**
+ * Reports whether this page may use the shared memory the module's threads are built on.
+ *
+ * The module owns a pthread, and Emscripten builds one out of a worker and a `SharedArrayBuffer`
+ * heap. A browser exposes that buffer only to a cross-origin isolated document, so a deployment
+ * that serves the page without `Cross-Origin-Opener-Policy` and `Cross-Origin-Embedder-Policy` is
+ * one where the module can be fetched and instantiated and can then never start a thread.
+ *
+ * Both halves are asked for because they fail at different moments: without the buffer the factory
+ * itself throws while it allocates the heap, and without isolation a worker that receives the heap
+ * is refused it. The remedy is the same one, which is why they share a message.
+ */
+@OptIn(ExperimentalWasmJsInterop::class)
+@JsFun("() => typeof SharedArrayBuffer === 'function' && globalThis.crossOriginIsolated === true")
+private external fun supportsSharedMemory(): Boolean
+
 internal object BrowserModule {
   /**
    * Returns the loaded module, or reports that the host never loaded it.
@@ -207,10 +223,24 @@ internal object BrowserModule {
    */
   suspend fun load(url: String) {
     if (isLoaded()) return
+    // Both preflights are a property read, and both come before the fetch that starts the load,
+    // because the factory spawns a sixteen-worker pool before it resolves and neither of these
+    // failures is one those workers could recover from. The browser is asked about first: a browser
+    // too old for suspension cannot run this binding whatever the page's headers say, so telling
+    // such a host to change its headers would send it after the wrong problem.
     if (!supportsSuspension()) {
       throw Status.invalidState(
         "This browser does not support the WebAssembly JavaScript Promise Integration this " +
           "binding requires. Chrome 137, Firefox 139, or a newer browser is needed."
+      )
+    }
+    if (!supportsSharedMemory()) {
+      throw Status.invalidState(
+        "This page is not cross-origin isolated, so the MapLibre Native browser module cannot " +
+          "start the threads it runs on. Serve the document with the headers " +
+          "\"Cross-Origin-Opener-Policy: same-origin\" and " +
+          "\"Cross-Origin-Embedder-Policy: require-corp\", and serve every resource it embeds " +
+          "so that those headers allow it."
       )
     }
     verifyAndInstantiate(

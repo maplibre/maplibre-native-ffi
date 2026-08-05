@@ -240,6 +240,17 @@ internal object PageCanvases {
   const val BORROWED_TEXTURE: String = "mln-test-borrowed-texture"
 
   /**
+   * A valid HTML id that a CSS identifier cannot spell literally, for [HostileCanvasIdBrowserTest].
+   *
+   * An id may be anything without ASCII whitespace, and the module reaches a page canvas through
+   * `document.querySelector`, so every character here is one that has to be escaped on the way or
+   * the transfer selects the wrong element or none: a leading digit, a colon, a dot, and brackets.
+   * Reserved alongside the others because a canvas reaches the owner thread only as that thread is
+   * created.
+   */
+  const val HOSTILE: String = "9mln:test.hostile[canvas]"
+
+  /**
    * The size every one of them is created at.
    *
    * Small, because a software rasteriser draws every pixel of every frame these tests render, and
@@ -257,7 +268,7 @@ internal object PageCanvases {
    * consumer of the same canvas makes destroying the runtime fail.
    */
   fun reserveAll() {
-    for (id in listOf(SURFACE, OWNED_TEXTURE, BORROWED_TEXTURE)) {
+    for (id in listOf(SURFACE, OWNED_TEXTURE, BORROWED_TEXTURE, HOSTILE)) {
       ensureCanvasElement(id, WIDTH, HEIGHT)
       WebglContext.reserveCanvas(id)
     }

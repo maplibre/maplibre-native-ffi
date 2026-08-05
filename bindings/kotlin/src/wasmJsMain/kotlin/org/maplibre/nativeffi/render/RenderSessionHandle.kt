@@ -37,12 +37,24 @@ import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
  * event-loop round trip, and a query that dispatched its count, every getter, and its destroy would
  * cost one per feature.
  *
- * The browser build compiles one render backend, OpenGL against WebGL, and only its texture
- * sessions; see the Metal and Vulkan members below for what that leaves unreachable.
+ * The browser build compiles one render backend, OpenGL against WebGL, and every render target that
+ * backend has: a native surface, which here is the canvas the context is bound to, and both the
+ * owned and the borrowed texture target. See the Metal and Vulkan members below for what compiling
+ * one backend leaves unreachable.
+ *
+ * A session holds its WebGL context open for as long as it borrows it. The backend makes that
+ * context current on every frame and again while it releases its GL objects, so closing the context
+ * first returns an invalid-state status naming this session rather than leaving native to work in a
+ * context that is gone. [detach] and [close] release it.
  */
 public actual class RenderSessionHandle
-internal constructor(private val map: MapHandle, private val handle: NativeRenderSession) :
-  AutoCloseable {
+internal constructor(
+  private val map: MapHandle,
+  private val handle: NativeRenderSession,
+  // Null only for the WGL and EGL arms of an OpenGL context descriptor, which name a graphics API
+  // this module was not built against and which native refuses at attach.
+  private val contextRetention: HandleStateCore.ChildRetention?,
+) : AutoCloseable {
   // Held so the map reports a live session rather than letting native refuse the destroy. Passing
   // the map to HandleStateCore only names the parent; this is what makes closing the map while a
   // session is attached the binding's own INVALID_STATE, which is what the common KDoc promises.
@@ -156,6 +168,9 @@ internal constructor(private val map: MapHandle, private val handle: NativeRende
     // A detached session no longer holds the map, so the map becomes closeable again even though
     // this handle is still live and can be attached to a new target.
     mapRetention.close()
+    // The backend released its GL objects during the detach, so nothing here names the WebGL
+    // context any more and the host may close it.
+    contextRetention?.close()
   }
 
   public actual fun reduceMemoryUse() {
@@ -451,9 +466,13 @@ internal constructor(private val map: MapHandle, private val handle: NativeRende
           { Heap.loadInt(it) },
         )
       },
-      // Closing twice is what a detach followed by a close would otherwise do; the retention is
-      // idempotent for that reason, so this needs no flag of its own.
-      afterSuccess = { mapRetention.close() },
+      // Closing twice is what a detach followed by a close would otherwise do; both retentions are
+      // idempotent for that reason, so this needs no flag of its own. Released only after native
+      // has destroyed the session, because destroying is itself GL work in the context this holds.
+      afterSuccess = {
+        mapRetention.close()
+        contextRetention?.close()
+      },
     )
   }
 
@@ -610,7 +629,10 @@ internal constructor(private val map: MapHandle, private val handle: NativeRende
     private const val POINTER_BYTES = 4
     private const val SIZE_BYTES = 4
 
-    fun fromNative(map: MapHandle, handle: NativeRenderSession): RenderSessionHandle =
-      RenderSessionHandle(map, handle)
+    fun fromNative(
+      map: MapHandle,
+      handle: NativeRenderSession,
+      contextRetention: HandleStateCore.ChildRetention?,
+    ): RenderSessionHandle = RenderSessionHandle(map, handle, contextRetention)
   }
 }

@@ -511,6 +511,21 @@ cleanup reports the leak and keeps callback memory reachable from native alive.
 Style-scoped callback retention follows current native source ownership, not
 stale event timing or source ID reuse alone.
 
+#### Log record consumption in the browser
+
+A log callback reports whether it consumed the record it received, and native
+logging handles every record that a callback did not consume.
+
+The browser binding delivers log records asynchronously, because MapLibre
+produces them on threads that cannot enter the page's WebAssembly instance where
+a host's callback body lives. Native needs the consumption answer on the thread
+that produced the record, so the binding MUST answer in advance with a fixed
+not-consumed result and MUST ignore what the host callback returns. Every record
+therefore reaches both the host callback and MapLibre's platform logger, and a
+host that wants a single sink filters at its own or narrows the async severity
+mask. The binding MUST state this policy on the public callback type and on the
+entry point that installs one.
+
 ### Resource transforms
 
 Resource transform callbacks are synchronous.

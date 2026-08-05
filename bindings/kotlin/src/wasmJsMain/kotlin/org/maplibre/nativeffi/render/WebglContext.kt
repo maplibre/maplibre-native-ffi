@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.render
 
-import org.maplibre.nativeffi.internal.lifecycle.BorrowedResourceCore
+import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.wasm.Dispatcher
 import org.maplibre.nativeffi.internal.wasm.Heap
@@ -124,17 +125,21 @@ private external fun submitReadPixels(
  * [reserveCanvas] is the exception, because it runs before that thread exists.
  *
  * Closing is what releases the context, and there is no finalizer behind it: a browser host cannot
- * recover leaked resources by restarting a process. Close it only after every render target that
- * borrowed it has been detached or destroyed, because the C API borrows the handle for a target's
- * lifetime.
+ * recover leaked resources by restarting a process. A render target borrows the handle for its
+ * whole life, so this context stays open while one is attached: closing it then returns an
+ * invalid-state status naming the render session that holds it, and the host detaches or closes
+ * that session first. A close that native refuses leaves this context open for a retry.
  */
 public class WebglContext private constructor(private val handle: Int) : AutoCloseable {
-  private val core =
-    BorrowedResourceCore("WebglContext") {
-      Dispatcher.submitTask("mln_browser_webgl_context_destroy") { dispatcher, token ->
-        submitDestroy(dispatcher, handle, token)
-      }
-    }
+  // The same release bookkeeping every owned handle in this binding uses, for the two properties it
+  // brings. A render target retains this as a child, so the context outlives every target naming
+  // it; and a destroy the module refuses restores the open state, so the wrapper is retryable
+  // rather than spent while the native context is still there.
+  private val core = HandleStateCore("WebglContext", handle.toLong())
+
+  /** Reports whether this context has been released. */
+  public val isClosed: Boolean
+    get() = core.isReleased()
 
   /**
    * Returns a descriptor naming this context, for a render target to be attached with.
@@ -142,19 +147,20 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
    * A fresh descriptor each call, because a descriptor is mutable: a shared one that a caller
    * changed would point every later target at whatever it was changed to.
    */
-  public fun descriptor(): WebglContextDescriptor = core.withOpenResource {
-    WebglContextDescriptor(handle)
+  public fun descriptor(): WebglContextDescriptor {
+    requireOpen()
+    return WebglContextDescriptor(handle)
   }
 
   /**
-   * Reports that this context is still open, without holding a borrow while native works.
+   * Reports that this context is still open, without holding a use count while native works.
    *
-   * Every call below parks its stack on the owner thread, and a borrow held across that park would
-   * be a borrow held for as long as native takes. Closing is the caller's own next statement, on
-   * the same single-threaded page, so the check is what is wanted here and the borrow is not.
+   * Every call below parks its stack on the owner thread, and a use count held across that park
+   * would be a count held for as long as native takes. Closing is the caller's own next statement,
+   * on the same single-threaded page, so the check is what is wanted here and the count is not.
    */
   private fun requireOpen() {
-    core.withOpenResource {}
+    core.requireLive()
   }
 
   /**
@@ -303,7 +309,22 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
     }
   }
 
-  override fun close(): Unit = core.close()
+  override fun close() {
+    core.closeOnce(
+      destroy = {
+        // The module reports a refused submission by throwing rather than by a status, and that
+        // throw is what closeOnce turns back into an open context. A task that was accepted always
+        // completes, so there is no destroy status to check here.
+        Dispatcher.submitTask("mln_browser_webgl_context_destroy") { dispatcher, token ->
+          submitDestroy(dispatcher, handle, token)
+        }
+        MaplibreStatus.OK.nativeCode
+      },
+      // Removed only once native has really destroyed it, so a close that failed leaves the context
+      // findable and a descriptor naming it still attachable.
+      afterSuccess = { openContexts.remove(handle) },
+    )
+  }
 
   public companion object {
     /**
@@ -376,7 +397,49 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
             "canvas may not have been reserved before the owner thread started."
         )
       }
-      return WebglContext(handle)
+      val context = WebglContext(handle)
+      openContexts[handle] = context
+      return context
+    }
+
+    /**
+     * The contexts this module has made and not yet destroyed, by the handle that names each.
+     *
+     * A [WebglContextDescriptor] carries the Emscripten handle and nothing else, because that is
+     * what the C API's descriptor carries. So the wrapper a descriptor came from is found here
+     * rather than travelling with it, which is what lets an attach retain the context it is about
+     * to borrow.
+     *
+     * A plain map with no synchronization, because a page is one agent and every context is created
+     * and released on it.
+     */
+    private val openContexts = mutableMapOf<Int, WebglContext>()
+
+    /**
+     * Retains the context a render target is about to borrow, for as long as that target lives.
+     *
+     * A render target names its context by handle for its whole life, and the backend makes that
+     * handle current on every frame and again while it tears its GL objects down. Destroying the
+     * context underneath it would leave a live target naming a context that is gone, so the target
+     * holds the context open the way a render session holds its map open, and closing the context
+     * first reports the live child instead.
+     *
+     * Returns null for the WGL and EGL arms, which name a context from a graphics API this module
+     * was not built against. Nothing here can retain one, and native is where a build's capability
+     * is known, so those are passed down and refused there.
+     */
+    internal fun retainForTarget(
+      context: OpenGLContextDescriptor
+    ): HandleStateCore.ChildRetention? {
+      if (context !is WebglContextDescriptor) return null
+      val owner =
+        openContexts[context.context]
+          ?: throw Status.invalidArgument(
+            "A WebGL context descriptor names the handle ${context.context}, which no open " +
+              "WebglContext has. A render target's context comes from WebglContext.descriptor() " +
+              "and stays open until every target that borrowed it is detached or closed."
+          )
+      return owner.core.retainChild("RenderSessionHandle")
     }
 
     /** One four-byte output: a context handle, a texture name, or a success flag. */

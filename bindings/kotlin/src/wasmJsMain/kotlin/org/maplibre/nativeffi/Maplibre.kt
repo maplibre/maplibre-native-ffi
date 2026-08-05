@@ -117,8 +117,15 @@ public actual object Maplibre {
    * Installs or replaces the process-global native log callback.
    *
    * Records reach [callback] on a browser task of this binding's own, because logging has no
-   * runtime to pump. See [LogQueueBridge] for why the callback's return value cannot be honoured
-   * here.
+   * runtime to pump. They therefore arrive on a later turn of the page's event loop than the one
+   * that produced them, rather than on the thread that produced them.
+   *
+   * **The callback's result is ignored, and native is told the record was not consumed.** MapLibre
+   * needs that answer on the logging thread, which cannot enter the page's WebAssembly instance
+   * where a host's callback body lives, so this binding answers in advance and always answers the
+   * same way. Every record therefore reaches MapLibre's platform logger as well as [callback], and
+   * a host that wants one sink filters at its own or narrows the severity mask with
+   * [setAsyncLogSeverities].
    */
   public actual fun setLogCallback(callback: LogCallback) {
     BrowserModule.require()
