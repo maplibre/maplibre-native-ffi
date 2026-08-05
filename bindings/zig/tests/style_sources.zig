@@ -44,10 +44,13 @@ test "style source JSON descriptors expose type info and copied attribution" {
 
     try testing.expect(try map.styleSourceExists(testing.allocator, "empty-json"));
     try testing.expectEqual(maplibre.StyleSourceType.geojson, (try map.getStyleSourceType(testing.allocator, "empty-json")).?);
-    const info = (try map.getStyleSourceInfo(testing.allocator, "empty-json")).?;
+    var info = (try map.getStyleSourceInfo(testing.allocator, "empty-json")).?;
+    defer info.deinit();
     try testing.expectEqual(maplibre.StyleSourceType.geojson, info.source_type);
     try testing.expectEqual(@as(usize, "empty-json".len), info.id_size);
-    try testing.expect(!info.has_attribution);
+    try testing.expect(info.attribution == null);
+    try testing.expect(info.url == null);
+    try testing.expect(info.tile_json == null);
 
     const tile_values = [_]maplibre.JsonValue{.{ .string = "https://example.com/{z}/{x}/{y}.pbf" }};
     const vector_members = [_]maplibre.JsonMember{
@@ -57,10 +60,10 @@ test "style source JSON descriptors expose type info and copied attribution" {
     };
     try map.addStyleSourceJson(testing.allocator, "vector-meta", .{ .object = vector_members[0..] });
 
-    const vector_info = (try map.getStyleSourceInfo(testing.allocator, "vector-meta")).?;
+    var vector_info = (try map.getStyleSourceInfo(testing.allocator, "vector-meta")).?;
+    defer vector_info.deinit();
     try testing.expectEqual(maplibre.StyleSourceType.vector, vector_info.source_type);
-    try testing.expect(vector_info.has_attribution);
-    try testing.expectEqual(@as(usize, "Example attribution".len), vector_info.attribution_size);
+    try testing.expectEqualStrings("Example attribution", vector_info.attribution.?);
 
     var attribution = (try map.copyStyleSourceAttribution(testing.allocator, "vector-meta")).?;
     defer attribution.deinit();
@@ -81,15 +84,19 @@ test "style source removal reports state and copies missing results" {
     try testing.expect(!try map.removeStyleSource(testing.allocator, "remove-me"));
     try testing.expect((try map.getStyleSourceInfo(testing.allocator, "remove-me")) == null);
     try testing.expect((try map.copyStyleSourceAttribution(testing.allocator, "remove-me")) == null);
+    try testing.expect((try map.copyStyleSourceUrl(testing.allocator, "remove-me")) == null);
 }
 
-test "tile source helpers add vector raster and raster DEM sources" {
+test "tile source helpers expose copied reconstructible source information" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
-    const vector_tiles = [_][]const u8{"https://example.com/vector/{z}/{x}/{y}.mvt"};
+    const vector_tiles = [_][]const u8{
+        "https://a.example.com/vector/{z}/{x}/{y}.mvt",
+        "https://b.example.com/vector/{z}/{x}/{y}.mvt",
+    };
     try map.addVectorSourceTiles(testing.allocator, "vector-helper", vector_tiles[0..], .{
         .min_zoom = 1.0,
         .max_zoom = 14.0,
@@ -102,16 +109,41 @@ test "tile source helpers add vector raster and raster DEM sources" {
         .vector_encoding = .mlt,
     });
     try testing.expectEqual(maplibre.StyleSourceType.vector, (try map.getStyleSourceType(testing.allocator, "vector-helper")).?);
-    const vector_info = (try map.getStyleSourceInfo(testing.allocator, "vector-helper")).?;
-    try testing.expect(vector_info.has_attribution);
-    try testing.expectEqual(@as(usize, "Helper attribution".len), vector_info.attribution_size);
+    var vector_info = (try map.getStyleSourceInfo(testing.allocator, "vector-helper")).?;
+    defer vector_info.deinit();
+    try testing.expectEqualStrings("Helper attribution", vector_info.attribution.?);
+    try testing.expect(vector_info.url == null);
+    try testing.expectEqual(@as(?u32, 512), vector_info.tile_size);
+    try testing.expectEqual(maplibre.StyleVectorTileEncoding.mlt, vector_info.vector_encoding.?);
+    const vector_tile_json = vector_info.tile_json.?;
+    try testing.expectEqual(@as(usize, 2), vector_tile_json.tile_urls.len);
+    try testing.expectEqualStrings(vector_tiles[0], vector_tile_json.tile_urls[0]);
+    try testing.expectEqualStrings(vector_tiles[1], vector_tile_json.tile_urls[1]);
+    try testing.expectEqual(@as(f64, 1.0), vector_tile_json.min_zoom);
+    try testing.expectEqual(@as(f64, 14.0), vector_tile_json.max_zoom);
+    try testing.expectEqual(maplibre.StyleTileScheme.tms, vector_tile_json.scheme);
+    try testing.expectEqual(@as(f64, -45.0), vector_tile_json.bounds.?.southwest.latitude);
+    try testing.expectEqual(@as(f64, 120.0), vector_tile_json.bounds.?.northeast.longitude);
 
     try map.addVectorSourceUrl(testing.allocator, "vector-url-helper", "https://example.com/vector.json", null);
     try testing.expectEqual(maplibre.StyleSourceType.vector, (try map.getStyleSourceType(testing.allocator, "vector-url-helper")).?);
+    var vector_url_info = (try map.getStyleSourceInfo(testing.allocator, "vector-url-helper")).?;
+    defer vector_url_info.deinit();
+    try testing.expectEqualStrings("https://example.com/vector.json", vector_url_info.url.?);
+    try testing.expect(vector_url_info.tile_json == null);
+
+    var copied_url = (try map.copyStyleSourceUrl(testing.allocator, "vector-url-helper")).?;
+    defer copied_url.deinit();
+    try testing.expectEqualStrings("https://example.com/vector.json", copied_url.value);
 
     const raster_tiles = [_][]const u8{"https://example.com/raster/{z}/{x}/{y}.png"};
     try map.addRasterSourceTiles(testing.allocator, "raster-helper", raster_tiles[0..], .{ .tile_size = 256 });
     try testing.expectEqual(maplibre.StyleSourceType.raster, (try map.getStyleSourceType(testing.allocator, "raster-helper")).?);
+    var raster_info = (try map.getStyleSourceInfo(testing.allocator, "raster-helper")).?;
+    defer raster_info.deinit();
+    try testing.expectEqual(@as(?u32, 256), raster_info.tile_size);
+    try testing.expect(raster_info.vector_encoding == null);
+    try testing.expect(raster_info.raster_encoding == null);
     try map.addRasterSourceUrl(testing.allocator, "raster-url-helper", "https://example.com/raster.json", .{ .tile_size = 256 });
 
     const dem_tiles = [_][]const u8{"https://example.com/dem/{z}/{x}/{y}.png"};
@@ -123,6 +155,10 @@ test "tile source helpers add vector raster and raster DEM sources" {
     });
     try map.addRasterDemSourceUrl(testing.allocator, "dem-url", "https://example.com/dem.json", .{ .tile_size = 256, .raster_encoding = .mapbox });
     try testing.expectEqual(maplibre.StyleSourceType.raster_dem, (try map.getStyleSourceType(testing.allocator, "dem")).?);
+    var dem_info = (try map.getStyleSourceInfo(testing.allocator, "dem")).?;
+    defer dem_info.deinit();
+    try testing.expectEqual(@as(?u32, 256), dem_info.tile_size);
+    try testing.expectEqual(maplibre.StyleRasterDemEncoding.terrarium, dem_info.raster_encoding.?);
 
     try map.addHillshadeLayer(testing.allocator, "dem-hillshade", "dem", "point-circle");
     try map.addColorReliefLayer(testing.allocator, "dem-relief", "dem", "");
@@ -158,6 +194,11 @@ test "tile source helpers add vector raster and raster DEM sources" {
 
     try testing.expectError(error.InvalidArgument, map.addHillshadeLayer(testing.allocator, "bad-hillshade", "point", ""));
     try testing.expectError(error.InvalidArgument, map.addRasterSourceTiles(testing.allocator, "bad-raster", raster_tiles[0..], .{ .raster_encoding = .mapbox }));
+
+    try testing.expect(try map.removeStyleSource(testing.allocator, "vector-helper"));
+    try map.close();
+    try testing.expectEqualStrings(vector_tiles[0], vector_info.tile_json.?.tile_urls[0]);
+    try testing.expectEqualStrings("https://example.com/vector.json", vector_url_info.url.?);
 }
 
 test "image source helpers add update and copy coordinates" {
@@ -235,7 +276,8 @@ test "style source JSON descriptors reject invalid source data and pass explicit
     };
     try map.addStyleSourceJson(testing.allocator, "nul\x00source", .{ .object = valid_source_members[0..] });
     try testing.expect(try map.styleSourceExists(testing.allocator, "nul\x00source"));
-    const info = (try map.getStyleSourceInfo(testing.allocator, "nul\x00source")).?;
+    var info = (try map.getStyleSourceInfo(testing.allocator, "nul\x00source")).?;
+    defer info.deinit();
     try testing.expectEqual(@as(usize, "nul\x00source".len), info.id_size);
 }
 

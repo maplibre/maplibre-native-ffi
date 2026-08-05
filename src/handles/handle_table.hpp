@@ -35,6 +35,7 @@ enum class HandleKind : std::uint8_t {
   FeatureExtensionResult = 10,
   WakeSource = 11,
   ResourceRequest = 12,
+  StyleStringList = 13,
 };
 
 inline constexpr auto handle_generation_bits = std::uint32_t{36};

@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -46,6 +47,7 @@ import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.RasterDemEncoding
+import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleLayerVisibility
@@ -250,6 +252,66 @@ class MapHandleTest {
     }
   }
 
+  // BND-109: source inspection copies reconstructible URL and inline TileJSON state.
+
+  @Test
+  fun styleSourceInfoCopiesUrlAndInlineTileMetadataPastNativeLifetime() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+          mapMode = MapMode.STATIC
+        },
+      )
+    lateinit var retainedInfo: SourceInfo
+    val tileUrls =
+      listOf("https://a.example.com/{z}/{x}/{y}.pbf", "https://b.example.com/{z}/{x}/{y}.pbf")
+    val bounds = LatLngBounds(LatLng(-5.0, -10.0), LatLng(15.0, 20.0))
+    try {
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
+      map.addVectorSourceUrl("remote", "https://example.com/vector.json", null)
+      val remote = assertNotNull(map.styleSourceInfo("remote"))
+      assertEquals("https://example.com/vector.json", remote.url)
+      assertNull(remote.tileJson)
+
+      map.addVectorSourceTiles(
+        "inline",
+        tileUrls,
+        TileSourceOptions().apply {
+          minZoom = 0.0
+          maxZoom = 12.0
+          attribution = "inline attribution"
+          scheme = TileScheme.TMS
+          this.bounds = bounds
+          tileSize = 256
+          vectorEncoding = VectorTileEncoding.MLT
+        },
+      )
+
+      retainedInfo = assertNotNull(map.styleSourceInfo("inline"))
+      assertNull(retainedInfo.url)
+      assertEquals("inline attribution", retainedInfo.attribution)
+      assertEquals(tileUrls, retainedInfo.tileJson?.tileUrls)
+      assertEquals(0.0, retainedInfo.tileJson?.minZoom)
+      assertEquals(12.0, retainedInfo.tileJson?.maxZoom)
+      assertEquals(TileScheme.TMS, retainedInfo.tileJson?.scheme)
+      assertEquals(bounds, retainedInfo.tileJson?.bounds)
+      assertEquals(512, retainedInfo.tileSize)
+      assertEquals(VectorTileEncoding.MLT, retainedInfo.vectorEncoding)
+      assertNull(retainedInfo.rasterDemEncoding)
+      assertTrue(map.removeStyleSource("inline"))
+    } finally {
+      map.close()
+      runtime.close()
+    }
+
+    assertEquals(tileUrls, retainedInfo.tileJson?.tileUrls)
+    assertEquals(bounds, retainedInfo.tileJson?.bounds)
+  }
+
   @Test
   fun geoJsonSourcesCanBeAddedAndUpdated() {
     val runtime = RuntimeHandle.create(RuntimeOptions())
@@ -410,8 +472,11 @@ class MapHandleTest {
       )
 
       assertEquals(SourceType.VECTOR, map.styleSourceType("roads"))
-      assertEquals(SourceType.RASTER, map.styleSourceInfo("satellite")?.type)
+      val rasterInfo = assertNotNull(map.styleSourceInfo("satellite"))
+      assertEquals(SourceType.RASTER, rasterInfo.type)
+      assertEquals(256, rasterInfo.tileSize)
       assertEquals(SourceType.RASTER_DEM, map.styleSourceType("terrain"))
+      assertEquals(RasterDemEncoding.TERRARIUM, map.styleSourceInfo("terrain")?.rasterDemEncoding)
       assertTrue(map.styleSourceIds().containsAll(listOf("roads", "satellite", "terrain")))
     } finally {
       map.close()

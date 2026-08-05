@@ -8,8 +8,8 @@ pub(crate) use maplibre_core::style::{
 pub use maplibre_core::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind,
     RasterDemEncoding, SourceInfo, SourceType, StyleImage, StyleImageInfo, StyleImageOptions,
-    StyleImageTextFit, StyleLayerVisibility, StyleTransitionOptions, TileScheme, TileSourceOptions,
-    VectorTileEncoding,
+    StyleImageTextFit, StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo, TileScheme,
+    TileSourceOptions, VectorTileEncoding,
 };
 use maplibre_native_ffi_core as maplibre_core;
 use maplibre_native_ffi_core::ptr::const_ptr_or_null;
@@ -679,7 +679,7 @@ impl super::MapHandle {
         Ok(found.then(|| SourceType::from_raw(raw_source_type)))
     }
 
-    /// Copies fixed metadata and attribution for one style source.
+    /// Copies retained metadata for one style source.
     pub fn style_source_info(&self, source_id: &str) -> Result<Option<SourceInfo>> {
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
@@ -704,9 +704,29 @@ impl super::MapHandle {
             None
         };
 
+        let url = if info.fields & sys::MLN_STYLE_SOURCE_INFO_URL != 0 {
+            match self.copy_style_source_url(map, source_id.raw(), info.url_size)? {
+                Some(url) => Some(url),
+                None => return Ok(None),
+            }
+        } else {
+            None
+        };
+
+        let tiles = if info.fields & sys::MLN_STYLE_SOURCE_INFO_TILEJSON != 0 {
+            match self.copy_style_source_tile_urls(map, source_id.raw())? {
+                Some(tiles) => tiles,
+                None => return Ok(None),
+            }
+        } else {
+            Vec::new()
+        };
+
         Ok(Some(maplibre_core::style::style_source_info_from_native(
             &info,
             attribution,
+            url,
+            tiles,
         )))
     }
 
@@ -767,6 +787,73 @@ impl super::MapHandle {
                 "native style source attribution was not valid UTF-8: {error}"
             ))
         })
+    }
+
+    fn copy_style_source_url(
+        &self,
+        map: sys::mln_map,
+        source_id: sys::mln_string_view,
+        url_size: usize,
+    ) -> Result<Option<String>> {
+        let mut buffer = vec![0u8; url_size];
+        let mut copied_size = 0;
+        let mut found = false;
+        // SAFETY: map and source_id remain live for this call, the buffer is
+        // writable for url_size bytes or null-equivalent when empty, and the
+        // output pointers refer to writable storage.
+        maplibre_core::check(unsafe {
+            sys::mln_map_copy_style_source_url(
+                map,
+                source_id,
+                if buffer.is_empty() {
+                    ptr::null_mut()
+                } else {
+                    buffer.as_mut_ptr().cast()
+                },
+                buffer.len(),
+                &mut copied_size,
+                &mut found,
+            )
+        })?;
+        if !found {
+            return Ok(None);
+        }
+        if copied_size > buffer.len() {
+            return Err(Error::new(
+                ErrorKind::NativeError,
+                None,
+                "native style source URL size exceeded caller buffer",
+            ));
+        }
+        buffer.truncate(copied_size);
+        String::from_utf8(buffer).map(Some).map_err(|error| {
+            Error::invalid_argument(format!(
+                "native style source URL was not valid UTF-8: {error}"
+            ))
+        })
+    }
+
+    fn copy_style_source_tile_urls(
+        &self,
+        map: sys::mln_map,
+        source_id: sys::mln_string_view,
+    ) -> Result<Option<Vec<String>>> {
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_style_string_list>::new();
+        let mut found = false;
+        // SAFETY: map and source_id remain live for this call, out is a
+        // null-initialized output handle, and found points to writable storage.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_style_source_tile_urls(map, source_id, out.as_mut_ptr(), &mut found)
+        })?;
+        if !found {
+            return Ok(None);
+        }
+        // SAFETY: A found source returns an owned style string list; core
+        // copies every borrowed view and releases the list on all paths.
+        unsafe {
+            maplibre_core::style::copy_style_string_list(out.into_live("mln_style_string_list")?)
+                .map(Some)
+        }
     }
 
     /// Adds a GeoJSON source that loads data from a URL.

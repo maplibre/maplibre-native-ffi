@@ -62,6 +62,13 @@ final class SourceType {
 final class TileScheme {
   const TileScheme._(this.rawValue, this.name);
 
+  /// Creates a tile scheme from a native raw value.
+  factory TileScheme.fromRaw(int rawValue) => switch (rawValue) {
+    0 => xyz,
+    1 => tms,
+    _ => TileScheme._(rawValue, 'unknown($rawValue)'),
+  };
+
   /// XYZ tile scheme.
   static const xyz = TileScheme._(0, 'xyz');
 
@@ -79,6 +86,13 @@ final class TileScheme {
 final class VectorTileEncoding {
   const VectorTileEncoding._(this.rawValue, this.name);
 
+  /// Creates a vector tile encoding from a native raw value.
+  factory VectorTileEncoding.fromRaw(int rawValue) => switch (rawValue) {
+    0 => mvt,
+    1 => mlt,
+    _ => VectorTileEncoding._(rawValue, 'unknown($rawValue)'),
+  };
+
   /// Mapbox Vector Tile encoding.
   static const mvt = VectorTileEncoding._(0, 'mvt');
 
@@ -95,6 +109,13 @@ final class VectorTileEncoding {
 /// DEM raster encoding.
 final class RasterDemEncoding {
   const RasterDemEncoding._(this.rawValue, this.name);
+
+  /// Creates a DEM raster encoding from a native raw value.
+  factory RasterDemEncoding.fromRaw(int rawValue) => switch (rawValue) {
+    0 => mapbox,
+    1 => terrarium,
+    _ => RasterDemEncoding._(rawValue, 'unknown($rawValue)'),
+  };
 
   /// Mapbox DEM encoding.
   static const mapbox = RasterDemEncoding._(0, 'mapbox');
@@ -129,7 +150,7 @@ final class LocationIndicatorImageKind {
   final String name;
 }
 
-/// Fixed source metadata copied from native style state.
+/// Source metadata copied from retained native style state.
 final class SourceInfo {
   /// Creates source metadata.
   const SourceInfo({
@@ -137,6 +158,11 @@ final class SourceInfo {
     required this.id,
     required this.isVolatile,
     this.attribution,
+    this.url,
+    this.tileJson,
+    this.tileSize,
+    this.vectorEncoding,
+    this.rasterDemEncoding,
   });
 
   /// Source type.
@@ -150,6 +176,48 @@ final class SourceInfo {
 
   /// Optional attribution.
   final String? attribution;
+
+  /// Retained source URL, when the source has one.
+  final String? url;
+
+  /// Retained TileJSON for an inline tile source.
+  final ParsedTileJson? tileJson;
+
+  /// Tile size exposed by the source.
+  final int? tileSize;
+
+  /// Vector tile encoding exposed by the source.
+  final VectorTileEncoding? vectorEncoding;
+
+  /// DEM raster encoding exposed by the source.
+  final RasterDemEncoding? rasterDemEncoding;
+}
+
+/// Retained TileJSON fields for an inline tile source.
+final class ParsedTileJson {
+  /// Creates copied inline TileJSON metadata.
+  ParsedTileJson({
+    required List<String> tileUrls,
+    required this.minZoom,
+    required this.maxZoom,
+    required this.scheme,
+    this.bounds,
+  }) : tileUrls = List.unmodifiable(tileUrls);
+
+  /// Complete tile URL template list.
+  final List<String> tileUrls;
+
+  /// Minimum zoom.
+  final double minZoom;
+
+  /// Maximum zoom.
+  final double maxZoom;
+
+  /// Tile coordinate scheme.
+  final TileScheme scheme;
+
+  /// Optional geographic bounds.
+  final LatLngBounds? bounds;
 }
 
 /// Options for vector, raster, and raster DEM tile sources.

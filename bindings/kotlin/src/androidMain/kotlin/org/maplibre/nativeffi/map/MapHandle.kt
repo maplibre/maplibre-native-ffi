@@ -48,6 +48,7 @@ import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageContent
 import org.maplibre.nativeffi.style.ImageStretch
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
+import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
@@ -56,7 +57,10 @@ import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleImageTextFit
 import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
+import org.maplibre.nativeffi.style.TileJson
+import org.maplibre.nativeffi.style.TileScheme
 import org.maplibre.nativeffi.style.TileSourceOptions
+import org.maplibre.nativeffi.style.VectorTileEncoding
 
 /** Owned Android JNI map handle. */
 public actual class MapHandle
@@ -187,7 +191,37 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
           if (outInfo.has_attribution())
             copyStyleSourceAttribution(requireLiveHandle(), nativeSourceId, outInfo)
           else null
-        return SourceInfo(SourceType.fromNative(outInfo.type()), outInfo.is_volatile(), attribution)
+        val fields = outInfo.fields()
+        val url =
+          if (fields and STYLE_SOURCE_INFO_URL != 0)
+            copyStyleSourceUrl(requireLiveHandle(), nativeSourceId, outInfo.url_size())
+          else null
+        val tileJson =
+          if (fields and STYLE_SOURCE_INFO_TILEJSON != 0)
+            TileJson(
+              copyStyleSourceTileUrls(requireLiveHandle(), nativeSourceId),
+              outInfo.min_zoom(),
+              outInfo.max_zoom(),
+              TileScheme.fromNative(outInfo.scheme()),
+              if (fields and STYLE_SOURCE_INFO_BOUNDS != 0) latLngBounds(outInfo.bounds()) else null,
+            )
+          else null
+        return SourceInfo(
+          SourceType.fromNative(outInfo.type()),
+          outInfo.is_volatile(),
+          attribution,
+          url,
+          tileJson,
+          if (fields and STYLE_SOURCE_INFO_TILE_SIZE != 0)
+            Math.toIntExact(Integer.toUnsignedLong(outInfo.tile_size()))
+          else null,
+          if (fields and STYLE_SOURCE_INFO_VECTOR_ENCODING != 0)
+            VectorTileEncoding.fromNative(outInfo.vector_encoding())
+          else null,
+          if (fields and STYLE_SOURCE_INFO_RASTER_ENCODING != 0)
+            RasterDemEncoding.fromNative(outInfo.raster_encoding())
+          else null,
+        )
       }
     }
   }
@@ -1816,6 +1850,21 @@ private fun styleIdList(list: Long): List<String> =
     MaplibreNativeC.mln_style_id_list_destroy(list)
   }
 
+private fun styleStringList(list: Long): List<String> =
+  try {
+    SizeTPointer(1).use { outCount ->
+      Status.check(MaplibreNativeC.mln_style_string_list_count(list, outCount))
+      List(Math.toIntExact(outCount.get())) { index ->
+        MaplibreNativeC.mln_string_view().use { outValue ->
+          Status.check(MaplibreNativeC.mln_style_string_list_get(list, index.toLong(), outValue))
+          stringView(outValue)
+        }
+      }
+    }
+  } finally {
+    MaplibreNativeC.mln_style_string_list_destroy(list)
+  }
+
 /**
  * Probes the required length, then copies. A null buffer with zero capacity is a size probe the C
  * API answers with OK.
@@ -1888,6 +1937,50 @@ private fun copyStyleSourceAttribution(
     }
   }
 }
+
+private fun copyStyleSourceUrl(mapId: Long, sourceId: StringViewScope, urlSize: Long): String {
+  if (urlSize == 0L) return ""
+  BytePointer(urlSize).use { outUrl ->
+    SizeTPointer(1).use { outSize ->
+      val outFound = booleanArrayOf(false)
+      Status.check(
+        MaplibreNativeC.mln_map_copy_style_source_url(
+          mapId,
+          sourceId.view,
+          outUrl,
+          urlSize,
+          outSize,
+          outFound,
+        )
+      )
+      check(outFound[0]) { "style source disappeared while its metadata was copied" }
+      val bytes = ByteArray(Math.toIntExact(outSize.get()))
+      outUrl.get(bytes, 0, bytes.size)
+      return String(bytes, java.nio.charset.StandardCharsets.UTF_8)
+    }
+  }
+}
+
+private fun copyStyleSourceTileUrls(mapId: Long, sourceId: StringViewScope): List<String> {
+  LongPointer(1).use { outList ->
+    outList.put(0, 0L)
+    val outFound = booleanArrayOf(false)
+    Status.check(
+      MaplibreNativeC.mln_map_get_style_source_tile_urls(mapId, sourceId.view, outList, outFound)
+    )
+    check(outFound[0]) { "style source disappeared while its metadata was copied" }
+    val list = outList.get()
+    require(list != 0L) { "mln_map_get_style_source_tile_urls returned the null handle" }
+    return styleStringList(list)
+  }
+}
+
+private const val STYLE_SOURCE_INFO_URL: Int = 1 shl 0
+private const val STYLE_SOURCE_INFO_TILEJSON: Int = 1 shl 1
+private const val STYLE_SOURCE_INFO_BOUNDS: Int = 1 shl 2
+private const val STYLE_SOURCE_INFO_TILE_SIZE: Int = 1 shl 3
+private const val STYLE_SOURCE_INFO_VECTOR_ENCODING: Int = 1 shl 4
+private const val STYLE_SOURCE_INFO_RASTER_ENCODING: Int = 1 shl 5
 
 private fun jsonSnapshot(outSnapshot: LongPointer): JsonValue? {
   // A null snapshot means the value is absent, which the C API reports as success.

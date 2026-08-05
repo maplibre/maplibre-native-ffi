@@ -1160,6 +1160,38 @@ String? _copyStyleSourceAttribution(
   return buffer.cast<Utf8>().toDartString(length: outSize.value);
 }
 
+String? _copyStyleSourceUrl(
+  NativeMap map,
+  raw.mln_string_view sourceId,
+  bool hasUrl,
+  int urlSize,
+  Allocator allocator,
+) {
+  if (!hasUrl) {
+    return null;
+  }
+  final buffer = urlSize == 0 ? nullptr.cast<Char>() : allocator<Char>(urlSize);
+  final outSize = allocator<Size>();
+  final outFound = allocator<Bool>();
+  _check(
+    raw.mln_map_copy_style_source_url(
+      map.raw,
+      sourceId,
+      buffer,
+      urlSize,
+      outSize,
+      outFound,
+    ),
+  );
+  if (!outFound.value) {
+    return null;
+  }
+  if (outSize.value == 0) {
+    return '';
+  }
+  return buffer.cast<Utf8>().toDartString(length: outSize.value);
+}
+
 JsonValue? _copyJsonSnapshot(NativeJsonSnapshot snapshot) {
   // A null snapshot means the value is absent, which the C API reports as
   // success.
@@ -1196,6 +1228,24 @@ List<String> _copyStyleIdList(NativeStyleIdList list) {
     });
   } finally {
     raw.mln_style_id_list_destroy(list.raw);
+  }
+}
+
+List<String> _copyStyleStringList(NativeStyleStringList list) {
+  try {
+    return withNativeArena((arena) {
+      final outCount = arena<Size>();
+      _check(raw.mln_style_string_list_count(list.raw, outCount));
+      final values = <String>[];
+      for (var index = 0; index < outCount.value; index += 1) {
+        final outValue = arena<raw.mln_string_view>();
+        _check(raw.mln_style_string_list_get(list.raw, index, outValue));
+        values.add(_copyStringView(outValue.ref) ?? '');
+      }
+      return values;
+    });
+  } finally {
+    raw.mln_style_string_list_destroy(list.raw);
   }
 }
 

@@ -1668,6 +1668,86 @@ void main() {
     expect(NativePointer.nullPointer.isNull, isTrue);
   });
 
+  test('BND-109 source inspection returns independent copied metadata', () {
+    final runtime = RuntimeHandle.create();
+    final map = runtime.createMap();
+    map.setStyleJson(_emptyStyleJson);
+
+    const tileUrls = [
+      'https://a.example.com/{z}/{x}/{y}.mvt',
+      'https://b.example.com/{z}/{x}/{y}.mvt',
+    ];
+    const bounds = LatLngBounds(
+      southwest: LatLng(-12, -34),
+      northeast: LatLng(56, 78),
+    );
+    map.addVectorSourceTiles(
+      'inline-vector',
+      tileUrls,
+      options: const TileSourceOptions(
+        minZoom: 0,
+        maxZoom: 12,
+        attribution: 'Inline attribution',
+        scheme: TileScheme.tms,
+        bounds: bounds,
+        tileSize: 512,
+        vectorEncoding: VectorTileEncoding.mlt,
+      ),
+    );
+
+    final inline = map.getStyleSourceInfo('inline-vector')!;
+    expect(inline.type, SourceType.vector);
+    expect(inline.url, isNull);
+    expect(inline.attribution, 'Inline attribution');
+    expect(inline.tileSize, 512);
+    expect(inline.vectorEncoding, VectorTileEncoding.mlt);
+    expect(inline.rasterDemEncoding, isNull);
+    expect(inline.tileJson, isNotNull);
+    expect(inline.tileJson!.tileUrls, tileUrls);
+    expect(inline.tileJson!.minZoom, 0);
+    expect(inline.tileJson!.maxZoom, 12);
+    expect(inline.tileJson!.scheme, TileScheme.tms);
+    expect(inline.tileJson!.bounds, bounds);
+    expect(
+      () => inline.tileJson!.tileUrls.add('https://example.com/extra'),
+      throwsUnsupportedError,
+    );
+
+    map.addVectorSourceUrl(
+      'url-vector',
+      'https://example.com/vector-tilejson.json',
+    );
+    final urlBacked = map.getStyleSourceInfo('url-vector')!;
+    expect(urlBacked.url, 'https://example.com/vector-tilejson.json');
+    expect(urlBacked.tileJson, isNull);
+
+    map.addRasterDemSourceTiles(
+      'inline-dem',
+      const ['https://example.com/{z}/{x}/{y}.png'],
+      options: const TileSourceOptions(
+        tileSize: 256,
+        rasterDemEncoding: RasterDemEncoding.terrarium,
+      ),
+    );
+    final rasterDem = map.getStyleSourceInfo('inline-dem')!;
+    expect(rasterDem.tileSize, 256);
+    expect(rasterDem.rasterDemEncoding, RasterDemEncoding.terrarium);
+    expect(rasterDem.vectorEncoding, isNull);
+
+    expect(map.removeStyleSource('inline-vector'), isTrue);
+    expect(map.removeStyleSource('url-vector'), isTrue);
+    expect(map.removeStyleSource('inline-dem'), isTrue);
+    map.close();
+    runtime.close();
+
+    expect(inline.id, 'inline-vector');
+    expect(inline.tileJson!.tileUrls, tileUrls);
+    expect(urlBacked.url, 'https://example.com/vector-tilejson.json');
+    expect(TileScheme.fromRaw(91).rawValue, 91);
+    expect(VectorTileEncoding.fromRaw(92).rawValue, 92);
+    expect(RasterDemEncoding.fromRaw(93).rawValue, 93);
+  });
+
   test('scoped native values validate before exposing borrowed values', () {
     var live = true;
     void checkLive() {

@@ -235,13 +235,23 @@ impl SourceType {
 pub enum TileScheme {
     Xyz,
     Tms,
+    Other(u32),
 }
 
 impl TileScheme {
+    pub fn from_raw(raw: u32) -> Self {
+        match raw {
+            sys::MLN_STYLE_TILE_SCHEME_XYZ => Self::Xyz,
+            sys::MLN_STYLE_TILE_SCHEME_TMS => Self::Tms,
+            _ => Self::Other(raw),
+        }
+    }
+
     pub fn raw_value(self) -> u32 {
         match self {
             Self::Xyz => sys::MLN_STYLE_TILE_SCHEME_XYZ,
             Self::Tms => sys::MLN_STYLE_TILE_SCHEME_TMS,
+            Self::Other(raw) => raw,
         }
     }
 }
@@ -309,13 +319,23 @@ impl StyleLayerVisibility {
 pub enum VectorTileEncoding {
     Mvt,
     Mlt,
+    Other(u32),
 }
 
 impl VectorTileEncoding {
+    pub fn from_raw(raw: u32) -> Self {
+        match raw {
+            sys::MLN_STYLE_VECTOR_TILE_ENCODING_MVT => Self::Mvt,
+            sys::MLN_STYLE_VECTOR_TILE_ENCODING_MLT => Self::Mlt,
+            _ => Self::Other(raw),
+        }
+    }
+
     pub fn raw_value(self) -> u32 {
         match self {
             Self::Mvt => sys::MLN_STYLE_VECTOR_TILE_ENCODING_MVT,
             Self::Mlt => sys::MLN_STYLE_VECTOR_TILE_ENCODING_MLT,
+            Self::Other(raw) => raw,
         }
     }
 }
@@ -326,13 +346,23 @@ impl VectorTileEncoding {
 pub enum RasterDemEncoding {
     Mapbox,
     Terrarium,
+    Other(u32),
 }
 
 impl RasterDemEncoding {
+    pub fn from_raw(raw: u32) -> Self {
+        match raw {
+            sys::MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX => Self::Mapbox,
+            sys::MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM => Self::Terrarium,
+            _ => Self::Other(raw),
+        }
+    }
+
     pub fn raw_value(self) -> u32 {
         match self {
             Self::Mapbox => sys::MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX,
             Self::Terrarium => sys::MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM,
+            Self::Other(raw) => raw,
         }
     }
 }
@@ -1109,13 +1139,22 @@ mod tests {
         assert_eq!(SourceType::Other(999_040).raw_value(), 999_040);
 
         assert_eq!(TileScheme::Tms.raw_value(), sys::MLN_STYLE_TILE_SCHEME_TMS);
+        assert_eq!(TileScheme::from_raw(999_041), TileScheme::Other(999_041));
         assert_eq!(
             VectorTileEncoding::Mlt.raw_value(),
             sys::MLN_STYLE_VECTOR_TILE_ENCODING_MLT
         );
         assert_eq!(
+            VectorTileEncoding::from_raw(999_042),
+            VectorTileEncoding::Other(999_042)
+        );
+        assert_eq!(
             RasterDemEncoding::Terrarium.raw_value(),
             sys::MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM
+        );
+        assert_eq!(
+            RasterDemEncoding::from_raw(999_043),
+            RasterDemEncoding::Other(999_043)
         );
         assert_eq!(
             LocationIndicatorImageKind::Bearing.raw_value(),

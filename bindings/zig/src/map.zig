@@ -595,28 +595,82 @@ pub const MapHandle = enum(c.mln_map) {
         return values.styleSourceTypeFromNative(raw_type);
     }
 
+    /// Copies one source's retained metadata into a value that remains valid independently of the map.
     pub fn getStyleSourceInfo(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         source_id: []const u8,
     ) status.Error!?values.StyleSourceInfo {
-        var temp = native_temp.TempStorage.init(allocator);
-        defer temp.deinit();
-        var raw_info: c.mln_style_source_info = .{
-            .size = @sizeOf(c.mln_style_source_info),
-            .type = c.MLN_STYLE_SOURCE_TYPE_UNKNOWN,
-            .id_size = 0,
-            .is_volatile = false,
-            .has_attribution = false,
-            .attribution_size = 0,
+        const raw_info = (try self.getNativeStyleSourceInfo(allocator, source_id)) orelse return null;
+
+        var attribution: ?[]const u8 = null;
+        errdefer if (attribution) |value| allocator.free(value);
+        if (raw_info.has_attribution) {
+            const copied = (try self.copyStyleSourceText(
+                allocator,
+                source_id,
+                c.mln_map_copy_style_source_attribution,
+            )) orelse return error.UnknownStatus;
+            attribution = copied.value;
+        }
+
+        var url: ?[]const u8 = null;
+        errdefer if (url) |value| allocator.free(value);
+        if ((raw_info.fields & c.MLN_STYLE_SOURCE_INFO_URL) != 0) {
+            const copied = (try self.copyStyleSourceText(
+                allocator,
+                source_id,
+                c.mln_map_copy_style_source_url,
+            )) orelse return error.UnknownStatus;
+            url = copied.value;
+        }
+
+        var tile_urls: ?values.StringList = null;
+        errdefer if (tile_urls) |*list| list.deinit();
+        if ((raw_info.fields & c.MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
+            var raw_list: c.mln_style_string_list = 0;
+            var found = false;
+            try status.checkStatus(
+                c.mln_map_get_style_source_tile_urls(
+                    try native(self),
+                    stringView(source_id),
+                    &raw_list,
+                    &found,
+                ),
+                diagnosticStore(self),
+            );
+            defer c.mln_style_string_list_destroy(raw_list);
+            if (!found) return error.UnknownStatus;
+            tile_urls = try copyStyleStringList(allocator, raw_list, diagnosticStore(self));
+        }
+
+        return .{
+            .allocator = allocator,
+            .source_type = values.styleSourceTypeFromNative(raw_info.type),
+            .id_size = raw_info.id_size,
+            .is_volatile = raw_info.is_volatile,
+            .attribution = attribution,
+            .url = url,
+            .tile_json = if (tile_urls) |list| .{
+                .tile_urls = list.items,
+                .min_zoom = raw_info.min_zoom,
+                .max_zoom = raw_info.max_zoom,
+                .scheme = values.StyleTileScheme.fromRaw(raw_info.scheme),
+                .bounds = if ((raw_info.fields & c.MLN_STYLE_SOURCE_INFO_BOUNDS) != 0)
+                    values.latLngBoundsFromNative(raw_info.bounds)
+                else
+                    null,
+            } else null,
+            .tile_size = if ((raw_info.fields & c.MLN_STYLE_SOURCE_INFO_TILE_SIZE) != 0) raw_info.tile_size else null,
+            .vector_encoding = if ((raw_info.fields & c.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING) != 0)
+                values.StyleVectorTileEncoding.fromRaw(raw_info.vector_encoding)
+            else
+                null,
+            .raster_encoding = if ((raw_info.fields & c.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING) != 0)
+                values.StyleRasterDemEncoding.fromRaw(raw_info.raster_encoding)
+            else
+                null,
         };
-        var found = false;
-        try status.checkStatus(
-            c.mln_map_get_style_source_info(try native(self), try temp.stringView(source_id), &raw_info, &found),
-            diagnosticStore(self),
-        );
-        if (!found) return null;
-        return values.styleSourceInfoFromNative(raw_info);
     }
 
     pub fn copyStyleSourceAttribution(
@@ -624,19 +678,69 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         source_id: []const u8,
     ) status.Error!?values.OwnedString {
-        const info = (try self.getStyleSourceInfo(allocator, source_id)) orelse return null;
+        const info = (try self.getNativeStyleSourceInfo(allocator, source_id)) orelse return null;
         if (!info.has_attribution) return null;
+        return self.copyStyleSourceText(
+            allocator,
+            source_id,
+            c.mln_map_copy_style_source_attribution,
+        );
+    }
 
+    /// Copies one source's retained URL. A source without a URL returns null.
+    pub fn copyStyleSourceUrl(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+    ) status.Error!?values.OwnedString {
+        const info = (try self.getNativeStyleSourceInfo(allocator, source_id)) orelse return null;
+        if ((info.fields & c.MLN_STYLE_SOURCE_INFO_URL) == 0) return null;
+        return self.copyStyleSourceText(allocator, source_id, c.mln_map_copy_style_source_url);
+    }
+
+    fn getNativeStyleSourceInfo(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+    ) status.Error!?c.mln_style_source_info {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        const buffer = try allocator.alloc(u8, info.attribution_size);
-        errdefer allocator.free(buffer);
-        var copied_size: usize = 0;
+        var raw_info = std.mem.zeroes(c.mln_style_source_info);
+        raw_info.size = @sizeOf(c.mln_style_source_info);
         var found = false;
         try status.checkStatus(
-            c.mln_map_copy_style_source_attribution(
+            c.mln_map_get_style_source_info(
                 try native(self),
                 try temp.stringView(source_id),
+                &raw_info,
+                &found,
+            ),
+            diagnosticStore(self),
+        );
+        return if (found) raw_info else null;
+    }
+
+    fn copyStyleSourceText(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        copy: *const fn (c.mln_map, c.mln_string_view, ?[*]u8, usize, *usize, *bool) callconv(.c) c.mln_status,
+    ) status.Error!?values.OwnedString {
+        var required: usize = 0;
+        var found = false;
+        try status.checkStatus(
+            copy(try native(self), stringView(source_id), null, 0, &required, &found),
+            diagnosticStore(self),
+        );
+        if (!found) return null;
+
+        const buffer = try allocator.alloc(u8, required);
+        errdefer allocator.free(buffer);
+        var copied_size: usize = 0;
+        try status.checkStatus(
+            copy(
+                try native(self),
+                stringView(source_id),
                 if (buffer.len == 0) null else buffer.ptr,
                 buffer.len,
                 &copied_size,
@@ -2207,6 +2311,28 @@ fn copyStyleIdList(
     for (items, 0..) |*item, index| {
         var view = c.mln_string_view{ .data = null, .size = 0 };
         try status.checkStatus(c.mln_style_id_list_get(list, index, &view), diagnostic_store);
+        item.* = if (view.size == 0) try allocator.dupe(u8, "") else try allocator.dupe(u8, view.data[0..view.size]);
+        initialized += 1;
+    }
+    return .{ .allocator = allocator, .items = items };
+}
+
+fn copyStyleStringList(
+    allocator: std.mem.Allocator,
+    list: c.mln_style_string_list,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+) status.Error!values.StringList {
+    var count: usize = 0;
+    try status.checkStatus(c.mln_style_string_list_count(list, &count), diagnostic_store);
+    const items = try allocator.alloc([]const u8, count);
+    var initialized: usize = 0;
+    errdefer {
+        for (items[0..initialized]) |item| allocator.free(item);
+        allocator.free(items);
+    }
+    for (items, 0..) |*item, index| {
+        var view = c.mln_string_view{ .data = null, .size = 0 };
+        try status.checkStatus(c.mln_style_string_list_get(list, index, &view), diagnostic_store);
         item.* = if (view.size == 0) try allocator.dupe(u8, "") else try allocator.dupe(u8, view.data[0..view.size]);
         initialized += 1;
     }

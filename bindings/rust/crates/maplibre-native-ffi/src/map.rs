@@ -43,8 +43,8 @@ mod style;
 pub use style::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind,
     RasterDemEncoding, SourceInfo, SourceType, StyleImage, StyleImageInfo, StyleImageOptions,
-    StyleImageTextFit, StyleLayerVisibility, StyleTransitionOptions, TileScheme, TileSourceOptions,
-    VectorTileEncoding,
+    StyleImageTextFit, StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo, TileScheme,
+    TileSourceOptions, VectorTileEncoding,
 };
 
 #[derive(Debug)]

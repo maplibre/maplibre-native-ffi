@@ -31,6 +31,8 @@ import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_TILEJSON
+import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_URL
 import org.maplibre.nativeffi.internal.c.mln_bound_options_default
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_free_camera_options_default
@@ -63,6 +65,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_copy_loaded_style_json
 import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_premultiplied_rgba8
 import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_stretches
 import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_attribution
+import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_copy_style_url
 import org.maplibre.nativeffi.internal.c.mln_map_create
 import org.maplibre.nativeffi.internal.c.mln_map_destroy
@@ -87,6 +90,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_json
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_type
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_light_property
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_info
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_tile_urls
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_type
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_transition_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_tile_options
@@ -172,6 +176,7 @@ import org.maplibre.nativeffi.internal.lifecycle.mapHandle
 import org.maplibre.nativeffi.internal.lifecycle.mapProjectionHandle
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.lifecycle.styleIdListHandle
+import org.maplibre.nativeffi.internal.lifecycle.styleStringListHandle
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.CoreStructs
@@ -297,7 +302,9 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     )
     if (!outFound.value) return@memScoped null
     val attribution = copyStyleSourceAttribution(sourceId, outInfo)
-    StyleStructs.sourceInfo(outInfo, attribution)
+    val url = copyStyleSourceUrl(sourceId, outInfo)
+    val tileUrls = copyStyleSourceTileUrls(sourceId, outInfo)
+    StyleStructs.sourceInfo(outInfo, attribution, url, tileUrls)
   }
 
   public actual fun styleSourceIds(): List<String> = memScoped {
@@ -810,6 +817,55 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           .readBytes(checkedInt(outAttributionSize.value, "style source copied attribution size"))
           .decodeToString()
       else null
+    }
+  }
+
+  private fun copyStyleSourceUrl(sourceId: String, info: mln_style_source_info): String? {
+    if (info.fields and MLN_STYLE_SOURCE_INFO_URL == 0u) return null
+    if (info.url_size == 0UL) return ""
+    return memScoped {
+      val outUrl = allocArray<ByteVar>(checkedInt(info.url_size, "style source URL size"))
+      val outUrlSize = alloc<ULongVar>()
+      val outFound = alloc<BooleanVar>()
+      Status.check(
+        mln_map_copy_style_source_url(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          outUrl,
+          info.url_size,
+          outUrlSize.ptr,
+          outFound.ptr,
+        )
+      )
+      if (outFound.value)
+        outUrl
+          .readBytes(checkedInt(outUrlSize.value, "style source copied URL size"))
+          .decodeToString()
+      else null
+    }
+  }
+
+  private fun copyStyleSourceTileUrls(
+    sourceId: String,
+    info: mln_style_source_info,
+  ): List<String>? {
+    if (info.fields and MLN_STYLE_SOURCE_INFO_TILEJSON == 0u) return null
+    return memScoped {
+      val outList = alloc<ULongVar>()
+      outList.value = 0uL
+      val outFound = alloc<BooleanVar>()
+      Status.check(
+        mln_map_get_style_source_tile_urls(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          outList.ptr,
+          outFound.ptr,
+        )
+      )
+      check(outFound.value) { "style source disappeared while its metadata was copied" }
+      StyleStructs.styleStringList(
+        outList.value.asHandle("mln_map_get_style_source_tile_urls", ::styleStringListHandle)
+      )
     }
   }
 

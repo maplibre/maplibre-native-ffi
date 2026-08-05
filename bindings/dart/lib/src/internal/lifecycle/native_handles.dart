@@ -38,6 +38,9 @@ extension type const NativeJsonSnapshot(int raw) implements NativeHandle {}
 /// Style id list handle id.
 extension type const NativeStyleIdList(int raw) implements NativeHandle {}
 
+/// Style string list handle id.
+extension type const NativeStyleStringList(int raw) implements NativeHandle {}
+
 /// Feature query result handle id.
 extension type const NativeFeatureQueryResult(int raw)
     implements NativeHandle {}

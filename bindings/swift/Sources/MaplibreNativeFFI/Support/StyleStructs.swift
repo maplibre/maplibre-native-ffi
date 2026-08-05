@@ -596,18 +596,21 @@ struct NativeStyleImageInfo: Equatable {
   }
 }
 
+struct NativeStyleSourceTileJSON: Equatable {
+  let tileURLs: [String]
+  let minZoom: Double
+  let maxZoom: Double
+  let scheme: UInt32
+  let bounds: NativeLatLngBounds?
+}
+
 struct NativeStyleSourceInfo: Equatable {
   let type: UInt32
-  let idSize: Int
   let isVolatile: Bool
-  let hasAttribution: Bool
-  let attributionSize: Int
-
-  init(_ raw: mln_style_source_info) {
-    type = raw.type
-    idSize = raw.id_size
-    isVolatile = raw.is_volatile
-    hasAttribution = raw.has_attribution
-    attributionSize = raw.attribution_size
-  }
+  let attribution: String?
+  let url: String?
+  let tileJSON: NativeStyleSourceTileJSON?
+  let tileSize: UInt32?
+  let vectorEncoding: UInt32?
+  let rasterEncoding: UInt32?
 }

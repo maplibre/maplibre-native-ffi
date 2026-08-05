@@ -34,7 +34,7 @@ public struct MapOptions: Equatable, Sendable {
   /// encodings, fixed for the lifetime of the map.
   ///
   /// Enable this on maps that read vector sources created with
-  /// ``VectorTileEncoding/mlt`` from a tile set that uses FastPFOR. A map
+  /// ``StyleVectorTileEncoding/mlt`` from a tile set that uses FastPFOR. A map
   /// created with this `false` decodes every other MLT encoding and logs a tile
   /// parse warning for the FastPFOR ones.
   public var fastPFOREnabled: Bool

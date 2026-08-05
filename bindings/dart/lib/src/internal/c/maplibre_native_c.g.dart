@@ -651,6 +651,25 @@ external int mln_map_copy_style_source_attribution(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
+    mln_string_view,
+    ffi.Pointer<ffi.Char>,
+    ffi.Size,
+    ffi.Pointer<ffi.Size>,
+    ffi.Pointer<ffi.Bool>,
+  )
+>()
+external int mln_map_copy_style_source_url(
+  int map,
+  mln_string_view source_id,
+  ffi.Pointer<ffi.Char> out_url,
+  int url_capacity,
+  ffi.Pointer<ffi.Size> out_url_size,
+  ffi.Pointer<ffi.Bool> out_found,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
     ffi.Pointer<ffi.Char>,
     ffi.Size,
     ffi.Pointer<ffi.Size>,
@@ -895,6 +914,21 @@ external int mln_map_get_style_source_info(
   int map,
   mln_string_view source_id,
   ffi.Pointer<mln_style_source_info> out_info,
+  ffi.Pointer<ffi.Bool> out_found,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_string_view,
+    ffi.Pointer<mln_style_string_list>,
+    ffi.Pointer<ffi.Bool>,
+  )
+>()
+external int mln_map_get_style_source_tile_urls(
+  int map,
+  mln_string_view source_id,
+  ffi.Pointer<mln_style_string_list> out_tile_urls,
   ffi.Pointer<ffi.Bool> out_found,
 );
 
@@ -2307,6 +2341,28 @@ external mln_style_image_info mln_style_image_info_default();
 
 @ffi.Native<mln_style_image_options Function()>()
 external mln_style_image_options mln_style_image_options_default();
+
+@ffi.Native<ffi.Int32 Function(mln_style_string_list, ffi.Pointer<ffi.Size>)>()
+external int mln_style_string_list_count(
+  int list,
+  ffi.Pointer<ffi.Size> out_count,
+);
+
+@ffi.Native<ffi.Void Function(mln_style_string_list)>()
+external void mln_style_string_list_destroy(int list);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_style_string_list,
+    ffi.Size,
+    ffi.Pointer<mln_string_view>,
+  )
+>()
+external int mln_style_string_list_get(
+  int list,
+  int index,
+  ffi.Pointer<mln_string_view> out_value,
+);
 
 @ffi.Native<mln_style_tile_source_options Function()>()
 external mln_style_tile_source_options mln_style_tile_source_options_default();
@@ -6176,6 +6232,9 @@ final class mln_style_source_info extends ffi.Struct {
   @ffi.Uint32()
   external int type;
 
+  @ffi.Uint32()
+  external int fields;
+
   @ffi.Size()
   external int id_size;
 
@@ -6188,21 +6247,55 @@ final class mln_style_source_info extends ffi.Struct {
   @ffi.Size()
   external int attribution_size;
 
-  static ffi.Pointer<mln_style_source_info> $allocate(
-    ffi.Allocator $allocator, {
-    required int size,
-    required int type,
-    required int id_size,
-    required bool is_volatile,
-    required bool has_attribution,
-    required int attribution_size,
-  }) => $allocator<mln_style_source_info>()
-    ..ref.size = size
-    ..ref.type = type
-    ..ref.id_size = id_size
-    ..ref.is_volatile = is_volatile
-    ..ref.has_attribution = has_attribution
-    ..ref.attribution_size = attribution_size;
+  @ffi.Size()
+  external int url_size;
+
+  @ffi.Size()
+  external int tile_count;
+
+  @ffi.Double()
+  external double min_zoom;
+
+  @ffi.Double()
+  external double max_zoom;
+
+  @ffi.Uint32()
+  external int scheme;
+
+  external mln_lat_lng_bounds bounds;
+
+  @ffi.Uint32()
+  external int tile_size;
+
+  @ffi.Uint32()
+  external int vector_encoding;
+
+  @ffi.Uint32()
+  external int raster_encoding;
+}
+
+enum mln_style_source_info_field {
+  MLN_STYLE_SOURCE_INFO_URL(1),
+  MLN_STYLE_SOURCE_INFO_TILEJSON(2),
+  MLN_STYLE_SOURCE_INFO_BOUNDS(4),
+  MLN_STYLE_SOURCE_INFO_TILE_SIZE(8),
+  MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING(16),
+  MLN_STYLE_SOURCE_INFO_RASTER_ENCODING(32);
+
+  final int value;
+  const mln_style_source_info_field(this.value);
+
+  static mln_style_source_info_field fromValue(int value) => switch (value) {
+    1 => MLN_STYLE_SOURCE_INFO_URL,
+    2 => MLN_STYLE_SOURCE_INFO_TILEJSON,
+    4 => MLN_STYLE_SOURCE_INFO_BOUNDS,
+    8 => MLN_STYLE_SOURCE_INFO_TILE_SIZE,
+    16 => MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING,
+    32 => MLN_STYLE_SOURCE_INFO_RASTER_ENCODING,
+    _ => throw ArgumentError(
+      'Unknown value for mln_style_source_info_field: $value',
+    ),
+  };
 }
 
 enum mln_style_source_type {
@@ -6232,6 +6325,9 @@ enum mln_style_source_type {
     _ => throw ArgumentError('Unknown value for mln_style_source_type: $value'),
   };
 }
+
+typedef mln_style_string_list = ffi.Uint64;
+typedef Dartmln_style_string_list = int;
 
 enum mln_style_tile_scheme {
   MLN_STYLE_TILE_SCHEME_XYZ(0),

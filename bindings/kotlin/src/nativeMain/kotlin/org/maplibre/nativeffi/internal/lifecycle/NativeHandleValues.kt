@@ -29,6 +29,9 @@ internal fun jsonSnapshotHandle(value: ULong): NativeJsonSnapshot =
 
 internal fun styleIdListHandle(value: ULong): NativeStyleIdList = NativeStyleIdList(value.toLong())
 
+internal fun styleStringListHandle(value: ULong): NativeStyleStringList =
+  NativeStyleStringList(value.toLong())
+
 internal fun featureQueryResultHandle(value: ULong): NativeFeatureQueryResult =
   NativeFeatureQueryResult(value.toLong())
 

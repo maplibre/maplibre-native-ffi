@@ -36,6 +36,50 @@ public enum RasterDemEncoding : uint
     Terrarium = 1,
 }
 
+/// <summary>Retained TileJSON fields for an inline tile source.</summary>
+/// <remarks>
+/// <see cref="RawScheme" /> preserves a scheme value that has no named <see cref="TileScheme" />
+/// member. The tile URL list is a copied snapshot.
+/// </remarks>
+public sealed record TileJson(
+    IReadOnlyList<string> TileUrls,
+    double MinimumZoom,
+    double MaximumZoom,
+    TileScheme Scheme,
+    uint RawScheme,
+    LatLngBounds? Bounds
+)
+{
+    private readonly IReadOnlyList<string> tileUrls = ValueEquality.Snapshot(TileUrls);
+
+    public IReadOnlyList<string> TileUrls
+    {
+        get => tileUrls;
+        init => tileUrls = ValueEquality.Snapshot(value);
+    }
+
+    public bool Equals(TileJson? other) =>
+        other is not null
+        && ValueEquality.SequenceEquals(TileUrls, other.TileUrls)
+        && MinimumZoom == other.MinimumZoom
+        && MaximumZoom == other.MaximumZoom
+        && Scheme == other.Scheme
+        && RawScheme == other.RawScheme
+        && Bounds == other.Bounds;
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(ValueEquality.SequenceHashCode(TileUrls));
+        hash.Add(MinimumZoom);
+        hash.Add(MaximumZoom);
+        hash.Add(Scheme);
+        hash.Add(RawScheme);
+        hash.Add(Bounds);
+        return hash.ToHashCode();
+    }
+}
+
 public enum LocationIndicatorImageKind : uint
 {
     Top = 0,
@@ -43,12 +87,24 @@ public enum LocationIndicatorImageKind : uint
     Shadow = 2,
 }
 
+/// <summary>Copied metadata that MapLibre currently retains for a style source.</summary>
+/// <remarks>
+/// <see cref="TileJson" /> is present for an inline tile source. Raw enum
+/// values preserve native values that have no named managed member.
+/// </remarks>
 public sealed record SourceInfo(
     string Id,
     SourceType Type,
     uint RawType,
     bool IsVolatile,
-    string? Attribution
+    string? Attribution,
+    string? Url,
+    TileJson? TileJson,
+    uint? TileSize,
+    VectorTileEncoding? VectorEncoding,
+    uint? RawVectorEncoding,
+    RasterDemEncoding? RasterDemEncoding,
+    uint? RawRasterDemEncoding
 );
 
 /// <remarks>

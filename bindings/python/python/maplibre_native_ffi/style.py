@@ -7,7 +7,7 @@ from ._lifecycle import NativeHandleMixin
 from dataclasses import dataclass
 from typing import Any
 
-from .geo import LatLngBounds
+from .geo import LatLng, LatLngBounds
 from .errors import InvalidArgumentError
 from .json import JsonValue
 from .render import PremultipliedRgba8Image, TextureImageInfo
@@ -15,21 +15,21 @@ from .render import PremultipliedRgba8Image, TextureImageInfo
 _CUSTOM_GEOMETRY_SOURCE_HANDLE_CREATE_KEY = object()
 
 
-class TileScheme(NativeIntEnum):
+class TileScheme(UnknownIntEnum):
     """Tile URL coordinate scheme values."""
 
     XYZ = 0
     TMS = 1
 
 
-class VectorTileEncoding(NativeIntEnum):
+class VectorTileEncoding(UnknownIntEnum):
     """Vector tile encoding values."""
 
     MVT = 0
     MLT = 1
 
 
-class RasterDemEncoding(NativeIntEnum):
+class RasterDemEncoding(UnknownIntEnum):
     """DEM raster encoding values."""
 
     MAPBOX = 0
@@ -107,12 +107,44 @@ class StyleLayerVisibility(UnknownIntEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class TileJsonInfo:
+    """Copied fields from an inline TileJSON source description."""
+
+    tiles: tuple[str, ...]
+    min_zoom: float
+    max_zoom: float
+    scheme: TileScheme
+    bounds: LatLngBounds | None = None
+
+    @classmethod
+    def _from_native(cls, raw: dict[str, Any]) -> "TileJsonInfo":
+        bounds = raw["bounds"]
+        return cls(
+            tiles=tuple(raw["tiles"]),
+            min_zoom=raw["min_zoom"],
+            max_zoom=raw["max_zoom"],
+            scheme=TileScheme(raw["scheme"]),
+            bounds=None
+            if bounds is None
+            else LatLngBounds(
+                southwest=LatLng(**bounds["southwest"]),
+                northeast=LatLng(**bounds["northeast"]),
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class StyleSourceInfo:
-    """Copied fixed metadata for one style source."""
+    """Copied retained metadata for one style source."""
 
     source_type: StyleSourceType
     is_volatile: bool
     attribution: str | None = None
+    url: str | None = None
+    tile_json: TileJsonInfo | None = None
+    tile_size: int | None = None
+    vector_encoding: VectorTileEncoding | None = None
+    raster_dem_encoding: RasterDemEncoding | None = None
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> "StyleSourceInfo":
@@ -121,6 +153,17 @@ class StyleSourceInfo:
             source_type=StyleSourceType(raw["source_type"]),
             is_volatile=raw["is_volatile"],
             attribution=raw["attribution"],
+            url=raw["url"],
+            tile_json=None
+            if raw["tile_json"] is None
+            else TileJsonInfo._from_native(raw["tile_json"]),
+            tile_size=raw["tile_size"],
+            vector_encoding=None
+            if raw["vector_encoding"] is None
+            else VectorTileEncoding(raw["vector_encoding"]),
+            raster_dem_encoding=None
+            if raw["raster_dem_encoding"] is None
+            else RasterDemEncoding(raw["raster_dem_encoding"]),
         )
 
 
@@ -371,6 +414,7 @@ __all__ = [
     "StyleSourceType",
     "StyleTransitionOptions",
     "TileScheme",
+    "TileJsonInfo",
     "TileSourceOptions",
     "VectorTileEncoding",
 ]

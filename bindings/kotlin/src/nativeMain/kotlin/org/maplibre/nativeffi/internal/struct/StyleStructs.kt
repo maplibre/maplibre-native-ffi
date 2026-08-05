@@ -33,6 +33,12 @@ import org.maplibre.nativeffi.internal.c.MLN_STYLE_IMAGE_OPTION_STRETCH_X
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_IMAGE_OPTION_STRETCH_Y
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH
+import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_BOUNDS
+import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING
+import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_TILEJSON
+import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_TILE_SIZE
+import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_URL
+import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM
@@ -58,24 +64,32 @@ import org.maplibre.nativeffi.internal.c.mln_style_image_info
 import org.maplibre.nativeffi.internal.c.mln_style_image_options
 import org.maplibre.nativeffi.internal.c.mln_style_image_options_default
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
+import org.maplibre.nativeffi.internal.c.mln_style_string_list_count
+import org.maplibre.nativeffi.internal.c.mln_style_string_list_destroy
+import org.maplibre.nativeffi.internal.c.mln_style_string_list_get
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options_default
 import org.maplibre.nativeffi.internal.c.mln_style_transition_options
 import org.maplibre.nativeffi.internal.c.mln_style_transition_options_default
 import org.maplibre.nativeffi.internal.lifecycle.NativeStyleIdList
+import org.maplibre.nativeffi.internal.lifecycle.NativeStyleStringList
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageContent
 import org.maplibre.nativeffi.style.ImageStretch
+import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleImageTextFit
 import org.maplibre.nativeffi.style.StyleTransitionOptions
+import org.maplibre.nativeffi.style.TileJson
+import org.maplibre.nativeffi.style.TileScheme
 import org.maplibre.nativeffi.style.TileSourceOptions
+import org.maplibre.nativeffi.style.VectorTileEncoding
 
 /** Copies style-owned list and metadata handles into Kotlin values. */
 @OptIn(ExperimentalForeignApi::class, ExperimentalUnsignedTypes::class)
@@ -369,6 +383,52 @@ internal object StyleStructs {
       destroyer(list)
     }
 
-  fun sourceInfo(value: mln_style_source_info, attribution: String?): SourceInfo =
-    SourceInfo(SourceType.fromNative(value.type), value.is_volatile, attribution)
+  fun styleStringList(list: NativeStyleStringList): List<String> =
+    styleStringList(
+      list.rawHandleValue,
+      counter = ::mln_style_string_list_count,
+      getter = ::mln_style_string_list_get,
+      destroyer = ::mln_style_string_list_destroy,
+    )
+
+  fun styleStringList(
+    list: ULong,
+    counter: (ULong, CPointer<ULongVar>) -> Int,
+    getter: (ULong, ULong, CPointer<mln_string_view>) -> Int,
+    destroyer: (ULong) -> Unit,
+  ): List<String> = styleIdList(list, counter, getter, destroyer)
+
+  fun sourceInfo(
+    value: mln_style_source_info,
+    attribution: String?,
+    url: String? = null,
+    tileUrls: List<String>? = null,
+  ): SourceInfo {
+    val fields = value.fields
+    return SourceInfo(
+      SourceType.fromNative(value.type),
+      value.is_volatile,
+      attribution,
+      if (fields and MLN_STYLE_SOURCE_INFO_URL != 0u) url else null,
+      if (fields and MLN_STYLE_SOURCE_INFO_TILEJSON != 0u)
+        TileJson(
+          tileUrls.orEmpty(),
+          value.min_zoom,
+          value.max_zoom,
+          TileScheme.fromNative(value.scheme),
+          if (fields and MLN_STYLE_SOURCE_INFO_BOUNDS != 0u) CoreStructs.latLngBounds(value.bounds)
+          else null,
+        )
+      else null,
+      if (fields and MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0u)
+        checkedInt(value.tile_size, "style source tile size")
+      else null,
+      if (fields and MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING != 0u)
+        VectorTileEncoding.fromNative(value.vector_encoding)
+      else null,
+      if (fields and MLN_STYLE_SOURCE_INFO_RASTER_ENCODING != 0u)
+        RasterDemEncoding.fromNative(value.raster_encoding)
+      else null,
+    )
+  }
 }

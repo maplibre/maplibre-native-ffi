@@ -129,6 +129,7 @@ import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
 import org.maplibre.nativeffi.internal.lifecycle.NativeResourceRequest
 import org.maplibre.nativeffi.internal.lifecycle.NativeRuntime
 import org.maplibre.nativeffi.internal.lifecycle.NativeStyleIdList
+import org.maplibre.nativeffi.internal.lifecycle.NativeStyleStringList
 import org.maplibre.nativeffi.internal.lifecycle.NativeWakeSource
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.json.JsonValue
@@ -195,6 +196,7 @@ import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageContent
 import org.maplibre.nativeffi.style.ImageStretch
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
+import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
@@ -202,7 +204,10 @@ import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleImageTextFit
 import org.maplibre.nativeffi.style.StyleTransitionOptions
+import org.maplibre.nativeffi.style.TileJson
+import org.maplibre.nativeffi.style.TileScheme
 import org.maplibre.nativeffi.style.TileSourceOptions
+import org.maplibre.nativeffi.style.VectorTileEncoding
 
 /** Ensures the native library is loaded before JVM FFM downcalls run. */
 internal object NativeAccess {
@@ -640,10 +645,53 @@ internal object NativeAccess {
             arena,
           ) ?: return@use null
         } else null
+      val fields = outInfo.get(ValueLayout.JAVA_INT, STYLE_SOURCE_INFO_FIELDS_OFFSET)
+      val url =
+        if (fields and STYLE_SOURCE_INFO_URL != 0) {
+          copyStyleSourceUrl(
+            map,
+            sourceIdView,
+            outInfo.get(ValueLayout.JAVA_LONG, STYLE_SOURCE_INFO_URL_SIZE_OFFSET),
+            arena,
+          )
+        } else null
+      val tileJson =
+        if (fields and STYLE_SOURCE_INFO_TILEJSON != 0) {
+          TileJson(
+            styleSourceTileUrls(map, sourceIdView, arena),
+            outInfo.get(ValueLayout.JAVA_DOUBLE, STYLE_SOURCE_INFO_MIN_ZOOM_OFFSET),
+            outInfo.get(ValueLayout.JAVA_DOUBLE, STYLE_SOURCE_INFO_MAX_ZOOM_OFFSET),
+            TileScheme.fromNative(
+              outInfo.get(ValueLayout.JAVA_INT, STYLE_SOURCE_INFO_SCHEME_OFFSET)
+            ),
+            if (fields and STYLE_SOURCE_INFO_BOUNDS != 0)
+              latLngBounds(outInfo.asSlice(STYLE_SOURCE_INFO_BOUNDS_OFFSET, LAT_LNG_BOUNDS_SIZE))
+            else null,
+          )
+        } else null
       SourceInfo(
         SourceType.fromNative(outInfo.get(ValueLayout.JAVA_INT, STYLE_SOURCE_INFO_TYPE_OFFSET)),
         outInfo.get(ValueLayout.JAVA_BOOLEAN, STYLE_SOURCE_INFO_IS_VOLATILE_OFFSET),
         attribution,
+        url,
+        tileJson,
+        if (fields and STYLE_SOURCE_INFO_TILE_SIZE != 0)
+          Math.toIntExact(
+            Integer.toUnsignedLong(
+              outInfo.get(ValueLayout.JAVA_INT, STYLE_SOURCE_INFO_TILE_SIZE_OFFSET)
+            )
+          )
+        else null,
+        if (fields and STYLE_SOURCE_INFO_VECTOR_ENCODING != 0)
+          VectorTileEncoding.fromNative(
+            outInfo.get(ValueLayout.JAVA_INT, STYLE_SOURCE_INFO_VECTOR_ENCODING_OFFSET)
+          )
+        else null,
+        if (fields and STYLE_SOURCE_INFO_RASTER_ENCODING != 0)
+          RasterDemEncoding.fromNative(
+            outInfo.get(ValueLayout.JAVA_INT, STYLE_SOURCE_INFO_RASTER_ENCODING_OFFSET)
+          )
+        else null,
       )
     }
 
@@ -3270,8 +3318,20 @@ internal object NativeAccess {
 
   private fun styleIdListDestroyFunction(): MethodHandle = downcall("mln_style_id_list_destroy")
 
+  private fun mapGetStyleSourceTileUrlsFunction(): MethodHandle =
+    downcall("mln_map_get_style_source_tile_urls")
+
+  private fun styleStringListCountFunction(): MethodHandle = downcall("mln_style_string_list_count")
+
+  private fun styleStringListGetFunction(): MethodHandle = downcall("mln_style_string_list_get")
+
+  private fun styleStringListDestroyFunction(): MethodHandle =
+    downcall("mln_style_string_list_destroy")
+
   private fun copyStyleSourceAttributionFunction(): MethodHandle =
     downcall("mln_map_copy_style_source_attribution")
+
+  private fun copyStyleSourceUrlFunction(): MethodHandle = downcall("mln_map_copy_style_source_url")
 
   private fun jsonSnapshotGetFunction(): MethodHandle = downcall("mln_json_snapshot_get")
 
@@ -5326,6 +5386,43 @@ internal object NativeAccess {
       styleIdListDestroyFunction().invokeNative(list)
     }
 
+  private fun styleSourceTileUrls(
+    map: NativeMap,
+    sourceId: MemorySegment,
+    arena: Arena,
+  ): List<String> {
+    val outList = arena.allocate(ValueLayout.JAVA_LONG)
+    outList.set(ValueLayout.JAVA_LONG, 0, 0L)
+    val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+    Status.check(
+      mapGetStyleSourceTileUrlsFunction().invokeNative(map, sourceId, outList, outFound) as Int
+    )
+    check(outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
+      "style source disappeared while its metadata was copied"
+    }
+    val list = NativeStyleStringList(outList.get(ValueLayout.JAVA_LONG, 0))
+    check(!list.isNull) { "mln_map_get_style_source_tile_urls returned the null handle" }
+    return styleStringList(list)
+  }
+
+  private fun styleStringList(list: NativeStyleStringList): List<String> =
+    try {
+      Arena.ofConfined().use { arena ->
+        val outCount = arena.allocate(ValueLayout.JAVA_LONG)
+        Status.check(styleStringListCountFunction().invokeNative(list, outCount) as Int)
+        val count = Math.toIntExact(outCount.get(ValueLayout.JAVA_LONG, 0))
+        List(count) { index ->
+          val outValue = arena.allocate(STRING_VIEW_SIZE)
+          Status.check(
+            styleStringListGetFunction().invokeNative(list, index.toLong(), outValue) as Int
+          )
+          stringView(outValue)
+        }
+      }
+    } finally {
+      styleStringListDestroyFunction().invokeNative(list)
+    }
+
   private fun copyStyleSourceAttribution(
     map: NativeMap,
     sourceId: MemorySegment,
@@ -5347,6 +5444,23 @@ internal object NativeAccess {
       return null
     }
     return copyString(outAttribution, outAttributionSize.get(ValueLayout.JAVA_LONG, 0))
+  }
+
+  private fun copyStyleSourceUrl(
+    map: NativeMap,
+    sourceId: MemorySegment,
+    urlSize: Long,
+    arena: Arena,
+  ): String? {
+    val outUrl = if (urlSize == 0L) MemorySegment.NULL else arena.allocate(urlSize)
+    val outUrlSize = arena.allocate(ValueLayout.JAVA_LONG)
+    val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+    Status.check(
+      copyStyleSourceUrlFunction()
+        .invokeNative(map, sourceId, outUrl, urlSize, outUrlSize, outFound) as Int
+    )
+    if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) return null
+    return if (urlSize == 0L) "" else copyString(outUrl, outUrlSize.get(ValueLayout.JAVA_LONG, 0))
   }
 
   private fun takeOfflineRegionSnapshot(
@@ -5877,12 +5991,30 @@ internal object NativeAccess {
   private val STYLE_SOURCE_INFO_SIZE: Long = mln_style_source_info.sizeof()
   private val STYLE_SOURCE_INFO_SIZE_OFFSET: Long = mln_style_source_info.`size$offset`()
   private val STYLE_SOURCE_INFO_TYPE_OFFSET: Long = mln_style_source_info.`type$offset`()
+  private val STYLE_SOURCE_INFO_FIELDS_OFFSET: Long = mln_style_source_info.`fields$offset`()
   private val STYLE_SOURCE_INFO_IS_VOLATILE_OFFSET: Long =
     mln_style_source_info.`is_volatile$offset`()
   private val STYLE_SOURCE_INFO_HAS_ATTRIBUTION_OFFSET: Long =
     mln_style_source_info.`has_attribution$offset`()
   private val STYLE_SOURCE_INFO_ATTRIBUTION_SIZE_OFFSET: Long =
     mln_style_source_info.`attribution_size$offset`()
+  private val STYLE_SOURCE_INFO_URL_SIZE_OFFSET: Long = mln_style_source_info.`url_size$offset`()
+  private val STYLE_SOURCE_INFO_MIN_ZOOM_OFFSET: Long = mln_style_source_info.`min_zoom$offset`()
+  private val STYLE_SOURCE_INFO_MAX_ZOOM_OFFSET: Long = mln_style_source_info.`max_zoom$offset`()
+  private val STYLE_SOURCE_INFO_SCHEME_OFFSET: Long = mln_style_source_info.`scheme$offset`()
+  private val STYLE_SOURCE_INFO_BOUNDS_OFFSET: Long = mln_style_source_info.`bounds$offset`()
+  private val STYLE_SOURCE_INFO_TILE_SIZE_OFFSET: Long = mln_style_source_info.`tile_size$offset`()
+  private val STYLE_SOURCE_INFO_VECTOR_ENCODING_OFFSET: Long =
+    mln_style_source_info.`vector_encoding$offset`()
+  private val STYLE_SOURCE_INFO_RASTER_ENCODING_OFFSET: Long =
+    mln_style_source_info.`raster_encoding$offset`()
+
+  private const val STYLE_SOURCE_INFO_URL: Int = 1 shl 0
+  private const val STYLE_SOURCE_INFO_TILEJSON: Int = 1 shl 1
+  private const val STYLE_SOURCE_INFO_BOUNDS: Int = 1 shl 2
+  private const val STYLE_SOURCE_INFO_TILE_SIZE: Int = 1 shl 3
+  private const val STYLE_SOURCE_INFO_VECTOR_ENCODING: Int = 1 shl 4
+  private const val STYLE_SOURCE_INFO_RASTER_ENCODING: Int = 1 shl 5
 
   private const val IMAGE_SOURCE_COORDINATE_COUNT: Int = 4
 

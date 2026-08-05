@@ -2861,6 +2861,65 @@ final class MapHandle {
         return null;
       }
       final info = outInfo.ref;
+      final hasUrl =
+          info.fields &
+              raw.mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_URL.value !=
+          0;
+      final hasTileJson =
+          info.fields &
+              raw
+                  .mln_style_source_info_field
+                  .MLN_STYLE_SOURCE_INFO_TILEJSON
+                  .value !=
+          0;
+      final hasBounds =
+          info.fields &
+              raw
+                  .mln_style_source_info_field
+                  .MLN_STYLE_SOURCE_INFO_BOUNDS
+                  .value !=
+          0;
+      final hasTileSize =
+          info.fields &
+              raw
+                  .mln_style_source_info_field
+                  .MLN_STYLE_SOURCE_INFO_TILE_SIZE
+                  .value !=
+          0;
+      final hasVectorEncoding =
+          info.fields &
+              raw
+                  .mln_style_source_info_field
+                  .MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING
+                  .value !=
+          0;
+      final hasRasterEncoding =
+          info.fields &
+              raw
+                  .mln_style_source_info_field
+                  .MLN_STYLE_SOURCE_INFO_RASTER_ENCODING
+                  .value !=
+          0;
+      List<String>? tileUrls;
+      if (hasTileJson) {
+        final outTileUrls = arena<Uint64>();
+        outTileUrls.value = 0;
+        final outTileUrlsFound = arena<Bool>();
+        _check(
+          raw.mln_map_get_style_source_tile_urls(
+            _handle.raw,
+            nativeId.value,
+            outTileUrls,
+            outTileUrlsFound,
+          ),
+        );
+        if (!outTileUrlsFound.value) {
+          return null;
+        }
+        tileUrls = _copyStyleStringList(
+          NativeStyleStringList(outTileUrls.value),
+        );
+      }
       return SourceInfo(
         type: SourceType.fromRaw(info.type),
         id: sourceId,
@@ -2872,6 +2931,31 @@ final class MapHandle {
           info.attribution_size,
           arena,
         ),
+        url: _copyStyleSourceUrl(
+          _handle,
+          nativeId.value,
+          hasUrl,
+          info.url_size,
+          arena,
+        ),
+        tileJson: hasTileJson
+            ? ParsedTileJson(
+                tileUrls: tileUrls!,
+                minZoom: info.min_zoom,
+                maxZoom: info.max_zoom,
+                scheme: TileScheme.fromRaw(info.scheme),
+                bounds: hasBounds
+                    ? native_struct.latLngBoundsFromNative(info.bounds)
+                    : null,
+              )
+            : null,
+        tileSize: hasTileSize ? info.tile_size : null,
+        vectorEncoding: hasVectorEncoding
+            ? VectorTileEncoding.fromRaw(info.vector_encoding)
+            : null,
+        rasterDemEncoding: hasRasterEncoding
+            ? RasterDemEncoding.fromRaw(info.raster_encoding)
+            : null,
       );
     });
   }

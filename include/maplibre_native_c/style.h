@@ -21,6 +21,7 @@ extern "C" {
 #endif
 
 typedef uint64_t mln_style_id_list;
+typedef uint64_t mln_style_string_list;
 
 /** Style source type values returned by mln_map_get_style_source_type(). */
 typedef enum mln_style_source_type : uint32_t {
@@ -34,6 +35,22 @@ typedef enum mln_style_source_type : uint32_t {
   MLN_STYLE_SOURCE_TYPE_ANNOTATIONS = 7,
   MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR = 8,
 } mln_style_source_type;
+
+/** Fields available in mln_style_source_info. */
+typedef enum mln_style_source_info_field : uint32_t {
+  /** The source retains a URL. Copy it with mln_map_copy_style_source_url(). */
+  MLN_STYLE_SOURCE_INFO_URL = 1U << 0U,
+  /** The tile source was defined with an inline TileJSON description. */
+  MLN_STYLE_SOURCE_INFO_TILEJSON = 1U << 1U,
+  /** The inline TileJSON description contains geographic bounds. */
+  MLN_STYLE_SOURCE_INFO_BOUNDS = 1U << 2U,
+  /** The source exposes a tile size. */
+  MLN_STYLE_SOURCE_INFO_TILE_SIZE = 1U << 3U,
+  /** The source exposes a vector tile encoding. */
+  MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 1U << 4U,
+  /** The source exposes a DEM raster encoding. */
+  MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 1U << 5U,
+} mln_style_source_info_field;
 
 /** Field mask values for mln_style_tile_source_options. */
 typedef enum mln_style_tile_source_option_field : uint32_t {
@@ -161,12 +178,32 @@ typedef struct mln_style_source_info {
   uint32_t size;
   /** One of mln_style_source_type. */
   uint32_t type;
+  /** Bitwise combination of mln_style_source_info_field values. */
+  uint32_t fields;
   /** Source ID byte length, excluding any null terminator. */
   size_t id_size;
   bool is_volatile;
   bool has_attribution;
   /** Attribution byte length, excluding any null terminator. */
   size_t attribution_size;
+  /** URL byte length, meaningful when fields contains URL. */
+  size_t url_size;
+  /** Inline tile URL count, meaningful when fields contains TILEJSON. */
+  size_t tile_count;
+  /** Minimum zoom, meaningful when fields contains TILEJSON. */
+  double min_zoom;
+  /** Maximum zoom, meaningful when fields contains TILEJSON. */
+  double max_zoom;
+  /** One of mln_style_tile_scheme, meaningful when fields contains TILEJSON. */
+  uint32_t scheme;
+  /** Geographic bounds, meaningful when fields contains BOUNDS. */
+  mln_lat_lng_bounds bounds;
+  /** Tile size in pixels, meaningful when fields contains TILE_SIZE. */
+  uint32_t tile_size;
+  /** Vector encoding, meaningful when fields contains VECTOR_ENCODING. */
+  uint32_t vector_encoding;
+  /** DEM encoding, meaningful when fields contains RASTER_ENCODING. */
+  uint32_t raster_encoding;
 } mln_style_source_info;
 
 /** Options for vector and raster tile sources. */
@@ -458,6 +495,40 @@ MLN_API mln_status mln_style_id_list_get(
 MLN_API void mln_style_id_list_destroy(mln_style_id_list list) MLN_NOEXCEPT;
 
 /**
+ * Gets the number of strings in a style string list handle.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when list is null or not live, or out_count is
+ *   null.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_style_string_list_count(
+  mln_style_string_list list, size_t* out_count
+) MLN_NOEXCEPT;
+
+/**
+ * Borrows one string from a style string list handle.
+ *
+ * On success, out_value receives a view into list-owned storage. The view
+ * remains valid until the list is destroyed.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when list is null or not live, index is out of
+ *   range, or out_value is null.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_style_string_list_get(
+  mln_style_string_list list, size_t index, mln_string_view* out_value
+) MLN_NOEXCEPT;
+
+/** Destroys a style string list handle. Null is accepted as a no-op. */
+MLN_API void mln_style_string_list_destroy(
+  mln_style_string_list list
+) MLN_NOEXCEPT;
+
+/**
  * Adds one style source from a style-spec source JSON object.
  *
  * source_id and source_json are borrowed for the call. source_json is the
@@ -534,10 +605,12 @@ MLN_API mln_status mln_map_get_style_source_type(
 /**
  * Copies fixed metadata for one style source.
  *
- * The returned struct contains string lengths, not string contents. Use
- * mln_map_copy_style_source_attribution() to copy attribution bytes when
- * has_attribution is true. The source ID is the lookup key and is also
- * available through style source ID lists.
+ * The returned struct contains string lengths and fixed inline TileJSON
+ * fields, not string contents. Use
+ * mln_map_copy_style_source_attribution() and
+ * mln_map_copy_style_source_url() to copy individual strings, and
+ * mln_map_get_style_source_tile_urls() to copy inline tile URLs. The source ID
+ * is the lookup key and is also available through style source ID lists.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -580,6 +653,56 @@ MLN_API mln_status mln_map_get_style_source_info(
 MLN_API mln_status mln_map_copy_style_source_attribution(
   mln_map map, mln_string_view source_id, char* out_attribution,
   size_t attribution_capacity, size_t* out_attribution_size, bool* out_found
+) MLN_NOEXCEPT;
+
+/**
+ * Copies one style source URL into caller-owned memory.
+ *
+ * source_id is borrowed for the call. On success, out_url_size receives the URL
+ * byte length, excluding any null terminator. When out_found is false or the
+ * source has no URL, out_url_size receives 0.
+ *
+ * Passing null for out_url with a capacity of 0 is a size probe. It reports the
+ * required byte length and succeeds. With a non-null out_url, a capacity
+ * smaller than the required length still reports that length and returns
+ * MLN_STATUS_INVALID_ARGUMENT.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success, including a size probe.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ *   invalid or empty, out_url is null with non-zero capacity, url_capacity is
+ *   too small for a non-null buffer, out_url_size is null, or out_found is
+ *   null.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_copy_style_source_url(
+  mln_map map, mln_string_view source_id, char* out_url, size_t url_capacity,
+  size_t* out_url_size, bool* out_found
+) MLN_NOEXCEPT;
+
+/**
+ * Copies one style source's inline TileJSON tile URLs into an owned list.
+ *
+ * On success, out_found reports whether source_id exists. When found,
+ * *out_tile_urls receives an owned list. A URL-backed tile source and every
+ * source without inline TileJSON return an empty list. Loading a URL-backed
+ * source does not change this result. Destroy the list with
+ * mln_style_string_list_destroy().
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ *   invalid or empty, out_tile_urls is null, *out_tile_urls is not null, or
+ *   out_found is null.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_get_style_source_tile_urls(
+  mln_map map, mln_string_view source_id, mln_style_string_list* out_tile_urls,
+  bool* out_found
 ) MLN_NOEXCEPT;
 
 /**

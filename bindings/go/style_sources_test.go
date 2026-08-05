@@ -152,6 +152,136 @@ func TestStyleSourceURLAndTileBindings(t *testing.T) {
 	}
 }
 
+func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+		t.Fatalf("SetStyleJSON(empty style): %v", err)
+	}
+	minZoom := 0.0
+	maxZoom := 14.0
+	attribution := "copied attribution"
+	scheme := StyleTileSchemeTMS
+	bounds := LatLngBounds{
+		Southwest: LatLng{Latitude: -5, Longitude: -10},
+		Northeast: LatLng{Latitude: 15, Longitude: 20},
+	}
+	tileSize := uint32(512)
+	vectorEncoding := StyleVectorTileEncodingMLT
+	options := StyleTileSourceOptions{
+		MinZoom:        &minZoom,
+		MaxZoom:        &maxZoom,
+		Attribution:    &attribution,
+		Scheme:         &scheme,
+		Bounds:         &bounds,
+		TileSize:       &tileSize,
+		VectorEncoding: &vectorEncoding,
+	}
+	tileURLs := []string{
+		"https://example.com/first/{z}/{x}/{y}.mlt",
+		"https://example.com/second/{z}/{x}/{y}.mlt",
+	}
+	if err := m.AddVectorSourceTiles("inline-vector", tileURLs, &options); err != nil {
+		t.Fatalf("AddVectorSourceTiles(): %v", err)
+	}
+
+	info, found, err := m.StyleSourceInfo("inline-vector")
+	if err != nil {
+		t.Fatalf("StyleSourceInfo(inline-vector): %v", err)
+	}
+	if !found {
+		t.Fatal("StyleSourceInfo(inline-vector) found = false, want true")
+	}
+	if info.Type != StyleSourceTypeVector || info.URL != nil {
+		t.Fatalf("StyleSourceInfo(inline-vector) type/URL = (%v, %v), want vector and absent URL", info.Type, info.URL)
+	}
+	if info.Attribution == nil || *info.Attribution != attribution {
+		t.Fatalf("StyleSourceInfo(inline-vector) attribution = %v, want %q", info.Attribution, attribution)
+	}
+	if info.TileJSON == nil {
+		t.Fatal("StyleSourceInfo(inline-vector) TileJSON = nil, want inline TileJSON")
+	}
+	if len(info.TileJSON.TileURLs) != len(tileURLs) {
+		t.Fatalf("StyleSourceInfo(inline-vector) tile URLs = %v, want %v", info.TileJSON.TileURLs, tileURLs)
+	}
+	for i := range tileURLs {
+		if info.TileJSON.TileURLs[i] != tileURLs[i] {
+			t.Fatalf("StyleSourceInfo(inline-vector) tile URL %d = %q, want %q", i, info.TileJSON.TileURLs[i], tileURLs[i])
+		}
+	}
+	if info.TileJSON.MinZoom != minZoom || info.TileJSON.MaxZoom != maxZoom || info.TileJSON.Scheme != scheme {
+		t.Fatalf("StyleSourceInfo(inline-vector) TileJSON = %#v, want zooms %v/%v and scheme %v", info.TileJSON, minZoom, maxZoom, scheme)
+	}
+	if info.TileJSON.Bounds == nil || *info.TileJSON.Bounds != bounds {
+		t.Fatalf("StyleSourceInfo(inline-vector) bounds = %v, want %v", info.TileJSON.Bounds, bounds)
+	}
+	if info.TileSize == nil || *info.TileSize != tileSize {
+		t.Fatalf("StyleSourceInfo(inline-vector) tile size = %v, want %d", info.TileSize, tileSize)
+	}
+	if info.VectorEncoding == nil || *info.VectorEncoding != vectorEncoding {
+		t.Fatalf("StyleSourceInfo(inline-vector) vector encoding = %v, want %v", info.VectorEncoding, vectorEncoding)
+	}
+	if info.RasterEncoding != nil {
+		t.Fatalf("StyleSourceInfo(inline-vector) raster encoding = %v, want absent", info.RasterEncoding)
+	}
+
+	removed, err := m.RemoveStyleSource("inline-vector")
+	if err != nil || !removed {
+		t.Fatalf("RemoveStyleSource(inline-vector) = (%v, %v), want true and nil", removed, err)
+	}
+	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+		t.Fatalf("SetStyleJSON(replacement): %v", err)
+	}
+	if *info.Attribution != attribution || info.TileJSON.TileURLs[1] != tileURLs[1] || *info.TileJSON.Bounds != bounds {
+		t.Fatalf("copied source info changed after removal and style replacement: %#v", info)
+	}
+
+	url := "https://example.invalid/vector-tilejson.json"
+	if err := m.AddVectorSourceURL("url-vector", url, nil); err != nil {
+		t.Fatalf("AddVectorSourceURL(): %v", err)
+	}
+	urlInfo, found, err := m.StyleSourceInfo("url-vector")
+	if err != nil {
+		t.Fatalf("StyleSourceInfo(url-vector): %v", err)
+	}
+	if !found || urlInfo.URL == nil || *urlInfo.URL != url {
+		t.Fatalf("StyleSourceInfo(url-vector) URL = (%v, %v), want %q and true", urlInfo.URL, found, url)
+	}
+	if urlInfo.TileJSON != nil || urlInfo.Attribution != nil {
+		t.Fatalf("StyleSourceInfo(url-vector) optional loaded fields = (%v, %v), want absent", urlInfo.TileJSON, urlInfo.Attribution)
+	}
+
+	data := GeoJSONFeatureCollection(nil)
+	if err := m.AddGeoJSONSourceData("inline-geojson", data, nil); err != nil {
+		t.Fatalf("AddGeoJSONSourceData(): %v", err)
+	}
+	geoJSONInfo, found, err := m.StyleSourceInfo("inline-geojson")
+	if err != nil {
+		t.Fatalf("StyleSourceInfo(inline-geojson): %v", err)
+	}
+	if !found || geoJSONInfo.URL != nil || geoJSONInfo.TileJSON != nil {
+		t.Fatalf("StyleSourceInfo(inline-geojson) = (%#v, %v), want absent URL and TileJSON", geoJSONInfo, found)
+	}
+}
+
 func TestGeoJSONSourceDataDescriptors(t *testing.T) {
 	lockOSThreadForTest(t)
 

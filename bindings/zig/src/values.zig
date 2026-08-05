@@ -167,19 +167,70 @@ pub const TileOptions = struct {
     lod_mode: ?TileLodMode = null,
 };
 
-pub const StyleTileScheme = enum {
+pub const StyleTileScheme = union(enum) {
     xyz,
     tms,
+    unknown: u32,
+
+    pub fn fromRaw(raw: u32) StyleTileScheme {
+        return switch (raw) {
+            c.MLN_STYLE_TILE_SCHEME_XYZ => .xyz,
+            c.MLN_STYLE_TILE_SCHEME_TMS => .tms,
+            else => .{ .unknown = raw },
+        };
+    }
+
+    pub fn toRaw(self: StyleTileScheme) u32 {
+        return switch (self) {
+            .xyz => c.MLN_STYLE_TILE_SCHEME_XYZ,
+            .tms => c.MLN_STYLE_TILE_SCHEME_TMS,
+            .unknown => |raw| raw,
+        };
+    }
 };
 
-pub const StyleVectorTileEncoding = enum {
+pub const StyleVectorTileEncoding = union(enum) {
     mvt,
     mlt,
+    unknown: u32,
+
+    pub fn fromRaw(raw: u32) StyleVectorTileEncoding {
+        return switch (raw) {
+            c.MLN_STYLE_VECTOR_TILE_ENCODING_MVT => .mvt,
+            c.MLN_STYLE_VECTOR_TILE_ENCODING_MLT => .mlt,
+            else => .{ .unknown = raw },
+        };
+    }
+
+    pub fn toRaw(self: StyleVectorTileEncoding) u32 {
+        return switch (self) {
+            .mvt => c.MLN_STYLE_VECTOR_TILE_ENCODING_MVT,
+            .mlt => c.MLN_STYLE_VECTOR_TILE_ENCODING_MLT,
+            .unknown => |raw| raw,
+        };
+    }
 };
 
-pub const StyleRasterDemEncoding = enum {
+pub const StyleRasterDemEncoding = union(enum) {
     mapbox,
     terrarium,
+    unknown: u32,
+
+    pub fn fromRaw(raw: u32) StyleRasterDemEncoding {
+        return switch (raw) {
+            c.MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX => .mapbox,
+            c.MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM => .terrarium,
+            else => .{ .unknown = raw },
+        };
+    }
+
+    pub fn toRaw(self: StyleRasterDemEncoding) u32 {
+        return switch (self) {
+            .mapbox => c.MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX,
+            .terrarium => c.MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM,
+            .unknown => |raw| raw,
+        };
+    }
 };
 
 /// Whether a style layer draws.
@@ -733,12 +784,37 @@ pub const StyleSourceType = union(enum) {
     raw: u32,
 };
 
+pub const StyleTileJsonInfo = struct {
+    tile_urls: []const []const u8,
+    min_zoom: f64,
+    max_zoom: f64,
+    scheme: StyleTileScheme,
+    bounds: ?LatLngBounds,
+};
+
 pub const StyleSourceInfo = struct {
+    allocator: std.mem.Allocator,
     source_type: StyleSourceType,
     id_size: usize,
     is_volatile: bool,
-    has_attribution: bool,
-    attribution_size: usize,
+    attribution: ?[]const u8,
+    url: ?[]const u8,
+    tile_json: ?StyleTileJsonInfo,
+    tile_size: ?u32,
+    vector_encoding: ?StyleVectorTileEncoding,
+    raster_encoding: ?StyleRasterDemEncoding,
+
+    pub fn deinit(self: *StyleSourceInfo) void {
+        if (self.attribution) |attribution| self.allocator.free(attribution);
+        if (self.url) |url| self.allocator.free(url);
+        if (self.tile_json) |tile_json| {
+            for (tile_json.tile_urls) |tile_url| self.allocator.free(tile_url);
+            self.allocator.free(tile_json.tile_urls);
+        }
+        self.attribution = null;
+        self.url = null;
+        self.tile_json = null;
+    }
 };
 
 pub const OwnedString = struct {
@@ -768,16 +844,6 @@ pub fn styleSourceTypeFromNative(raw: u32) StyleSourceType {
         c.MLN_STYLE_SOURCE_TYPE_ANNOTATIONS => .annotations,
         c.MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR => .custom_vector,
         else => .{ .raw = raw },
-    };
-}
-
-pub fn styleSourceInfoFromNative(raw: c.mln_style_source_info) StyleSourceInfo {
-    return .{
-        .source_type = styleSourceTypeFromNative(raw.type),
-        .id_size = raw.id_size,
-        .is_volatile = raw.is_volatile,
-        .has_attribution = raw.has_attribution,
-        .attribution_size = raw.attribution_size,
     };
 }
 
@@ -1166,24 +1232,15 @@ pub fn tileOptionsFromNative(raw: c.mln_map_tile_options) error{UnknownStatus}!T
 }
 
 pub fn styleTileSchemeToNative(value: StyleTileScheme) u32 {
-    return switch (value) {
-        .xyz => c.MLN_STYLE_TILE_SCHEME_XYZ,
-        .tms => c.MLN_STYLE_TILE_SCHEME_TMS,
-    };
+    return value.toRaw();
 }
 
 pub fn styleVectorTileEncodingToNative(value: StyleVectorTileEncoding) u32 {
-    return switch (value) {
-        .mvt => c.MLN_STYLE_VECTOR_TILE_ENCODING_MVT,
-        .mlt => c.MLN_STYLE_VECTOR_TILE_ENCODING_MLT,
-    };
+    return value.toRaw();
 }
 
 pub fn styleRasterDemEncodingToNative(value: StyleRasterDemEncoding) u32 {
-    return switch (value) {
-        .mapbox => c.MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX,
-        .terrarium => c.MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM,
-    };
+    return value.toRaw();
 }
 
 pub fn premultipliedRgba8ImageToNative(value: PremultipliedRgba8Image) c.mln_premultiplied_rgba8_image {
@@ -1319,6 +1376,15 @@ test "owned JSON copy rejects unknown native tags" {
 
 test "growable style source type preserves unknown raw values" {
     try std.testing.expect(std.meta.eql(styleSourceTypeFromNative(0xbeef), StyleSourceType{ .raw = 0xbeef }));
+}
+
+test "style source metadata enums preserve unknown raw values" {
+    const scheme = StyleTileScheme.fromRaw(81);
+    try std.testing.expectEqual(@as(u32, 81), scheme.toRaw());
+    const vector_encoding = StyleVectorTileEncoding.fromRaw(82);
+    try std.testing.expectEqual(@as(u32, 82), vector_encoding.toRaw());
+    const raster_encoding = StyleRasterDemEncoding.fromRaw(83);
+    try std.testing.expectEqual(@as(u32, 83), raster_encoding.toRaw());
 }
 
 test "owned JSON copy handles empty native arrays and objects" {

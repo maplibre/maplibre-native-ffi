@@ -188,6 +188,41 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   }
 
   @Test
+  fun styleStringListCopiesValuesAndDestroysOnSuccessAndFailure() {
+    memScoped {
+      var destroys = 0
+      val values =
+        StyleStructs.styleStringList(
+          123UL,
+          counter = { _, outCount ->
+            outCount[0] = 1UL
+            MaplibreStatus.OK.nativeCode
+          },
+          getter = { _, _, outValue ->
+            CoreStructs.setStringView(outValue.pointed, "tile", this)
+            MaplibreStatus.OK.nativeCode
+          },
+          destroyer = { destroys++ },
+        )
+      assertEquals(listOf("tile"), values)
+      assertEquals(1, destroys)
+
+      assertFailsWith<IllegalArgumentException> {
+        StyleStructs.styleStringList(
+          456UL,
+          counter = { _, outCount ->
+            outCount[0] = Int.MAX_VALUE.toULong() + 1UL
+            MaplibreStatus.OK.nativeCode
+          },
+          getter = { _, _, _ -> MaplibreStatus.OK.nativeCode },
+          destroyer = { destroys++ },
+        )
+      }
+      assertEquals(2, destroys)
+    }
+  }
+
+  @Test
   fun sourceInfoPreservesUnknownTypeAndStableFields() {
     memScoped {
       val native = alloc<mln_style_source_info>()
