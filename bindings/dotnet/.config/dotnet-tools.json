@@ -4,12 +4,16 @@
   "tools": {
     "sleet": {
       "version": "7.2.0+git.7247be6",
-      "commands": ["sleet"],
+      "commands": [
+        "sleet"
+      ],
       "rollForward": false
     },
     "clangsharppinvokegenerator": {
-      "version": "21.1.8.3",
-      "commands": ["ClangSharpPInvokeGenerator"],
+      "version": "21.1.8.4",
+      "commands": [
+        "ClangSharpPInvokeGenerator"
+      ],
       "rollForward": false
     }
   }
