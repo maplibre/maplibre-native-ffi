@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from ._enum import NativeIntEnum
 from dataclasses import dataclass
 from typing import Any
 
+from ._enum import NativeIntEnum
 from .camera import ScreenPoint
 from .geo import Feature
 from .json import JsonValue
@@ -41,12 +41,12 @@ class RenderedQueryGeometry:
     line_string: tuple[ScreenPoint, ...] | None = None
 
     @classmethod
-    def point_geometry(cls, point: ScreenPoint) -> "RenderedQueryGeometry":
+    def point_geometry(cls, point: ScreenPoint) -> RenderedQueryGeometry:
         """Create a point query geometry."""
         return cls(RenderedQueryGeometryType.POINT, point=point)
 
     @classmethod
-    def box_geometry(cls, box_: ScreenBox) -> "RenderedQueryGeometry":
+    def box_geometry(cls, box_: ScreenBox) -> RenderedQueryGeometry:
         """Create a box query geometry."""
         return cls(RenderedQueryGeometryType.BOX, box=box_)
 
@@ -54,7 +54,7 @@ class RenderedQueryGeometry:
     def line_string_geometry(
         cls,
         points: list[ScreenPoint] | tuple[ScreenPoint, ...],
-    ) -> "RenderedQueryGeometry":
+    ) -> RenderedQueryGeometry:
         """Create a line-string query geometry."""
         return cls(RenderedQueryGeometryType.LINE_STRING, line_string=tuple(points))
 
@@ -120,7 +120,7 @@ class QueriedFeature:
     state: JsonValue | None = None
 
     @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> "QueriedFeature":
+    def _from_native(cls, raw: dict[str, Any]) -> QueriedFeature:
         return cls(
             feature=raw["feature"],
             source_id=raw.get("source_id"),
@@ -147,7 +147,7 @@ class FeatureExtensionResult:
     raw_type: int | None = None
 
     @classmethod
-    def value_result(cls, value: JsonValue) -> "FeatureExtensionResult":
+    def value_result(cls, value: JsonValue) -> FeatureExtensionResult:
         """Create a JSON value result."""
         return cls(FeatureExtensionResultType.VALUE, value=value)
 
@@ -155,7 +155,7 @@ class FeatureExtensionResult:
     def feature_collection_result(
         cls,
         features: list[Feature] | tuple[Feature, ...],
-    ) -> "FeatureExtensionResult":
+    ) -> FeatureExtensionResult:
         """Create a feature collection result."""
         return cls(
             FeatureExtensionResultType.FEATURE_COLLECTION,
@@ -163,12 +163,12 @@ class FeatureExtensionResult:
         )
 
     @classmethod
-    def unknown_result(cls, raw_type: int) -> "FeatureExtensionResult":
+    def unknown_result(cls, raw_type: int) -> FeatureExtensionResult:
         """Create a result that preserves an unknown native result type."""
         return cls(FeatureExtensionResultType.UNKNOWN, raw_type=raw_type)
 
     @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> "FeatureExtensionResult":
+    def _from_native(cls, raw: dict[str, Any]) -> FeatureExtensionResult:
         raw_type = int(raw["type"])
         if raw_type == FeatureExtensionResultType.VALUE:
             return cls.value_result(raw["value"])

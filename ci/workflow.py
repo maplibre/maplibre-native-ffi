@@ -4,7 +4,6 @@ import json
 import pathlib
 import tomllib
 
-
 DESKTOP = {"linux", "macos", "windows"}
 
 # Targets whose suite runs on an emulator instead of through ctest, so CMake

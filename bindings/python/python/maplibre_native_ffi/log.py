@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from ._enum import UnknownIntEnum
 from dataclasses import dataclass
 from enum import IntFlag
 from typing import Any
 
 from . import _native
+from ._enum import UnknownIntEnum
 
 _LOG_RECEIVER_CREATE_KEY = object()
 
@@ -62,7 +62,7 @@ class LogRecord:
     message: str
 
     @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> "LogRecord":
+    def _from_native(cls, raw: dict[str, Any]) -> LogRecord:
         return cls(
             severity=LogSeverity(raw["severity"]),
             event=LogEvent(raw["event"]),
@@ -81,7 +81,7 @@ class LogReceiver:
         self._native = native
 
     @classmethod
-    def _from_native(cls, native: Any) -> "LogReceiver":
+    def _from_native(cls, native: Any) -> LogReceiver:
         return cls(native, _create_key=_LOG_RECEIVER_CREATE_KEY)
 
     @property

@@ -21,7 +21,6 @@ import subprocess
 import tomllib
 from typing import NamedTuple
 
-
 CONFIG = pathlib.Path("ci/snapshots.toml")
 
 # Each component's last publish is a floating tag on the commit it published
@@ -173,6 +172,7 @@ def state_tag(component: str) -> str:
 def _git(root: pathlib.Path, *arguments: str) -> str:
     completed = subprocess.run(
         ("git", "-C", str(root), *arguments),
+        check=False,
         capture_output=True,
         text=True,
     )

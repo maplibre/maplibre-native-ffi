@@ -6,7 +6,6 @@ import pathlib
 import re
 from typing import NamedTuple
 
-
 CATALOG = pathlib.Path(".github/workflows/action-pins.yml")
 
 # `uses: owner/repo@<40-hex-sha> # vX.Y.Z`, the only form this repository allows.

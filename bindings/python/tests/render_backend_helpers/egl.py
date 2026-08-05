@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
 import ctypes
 import os
 import sys
-
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Self
 
 if sys.platform != "darwin":
     # These fixtures render into pbuffers and never present, so they need the
@@ -40,10 +39,9 @@ if sys.platform == "darwin":
     ctypes.CDLL = _MacAngleCDLL  # type: ignore[assignment]
     ctypes.cdll._dlltype = _MacAngleCDLL  # type: ignore[attr-defined]
 
+from maplibre_native_ffi import render
 from OpenGL import EGL
 from OpenGL import GLES3 as GL
-
-from maplibre_native_ffi import render
 
 
 class EglUnavailableError(RuntimeError):
@@ -87,7 +85,7 @@ class EglContext:
     _closed: bool = False
 
     @classmethod
-    def create(cls) -> "EglContext":
+    def create(cls) -> EglContext:
         display = _display()
         if _addr(display) == 0:
             msg = "EGL display creation returned EGL_NO_DISPLAY"
@@ -184,7 +182,7 @@ class EglContext:
         width: int = 64,
         height: int = 64,
         scale_factor: float = 1.0,
-    ) -> "EglPbufferSurface":
+    ) -> EglPbufferSurface:
         return EglPbufferSurface.create(self, width, height, scale_factor)
 
     def borrowed_texture(
@@ -192,10 +190,10 @@ class EglContext:
         width: int = 64,
         height: int = 64,
         scale_factor: float = 1.0,
-    ) -> "EglBorrowedTexture":
+    ) -> EglBorrowedTexture:
         return EglBorrowedTexture.create(self, width, height, scale_factor)
 
-    def make_current(self, surface: "EglPbufferSurface") -> None:
+    def make_current(self, surface: EglPbufferSurface) -> None:
         if not EGL.eglMakeCurrent(
             self.display,
             surface.surface,
@@ -221,7 +219,7 @@ class EglContext:
         EGL.eglTerminate(self.display)
         self._closed = True
 
-    def __enter__(self) -> "EglContext":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args: object) -> None:
@@ -245,7 +243,7 @@ class EglBorrowedTexture:
         width: int,
         height: int,
         scale_factor: float,
-    ) -> "EglBorrowedTexture":
+    ) -> EglBorrowedTexture:
         surface = context.pbuffer_surface(width, height, scale_factor)
         try:
             context.make_current(surface)
@@ -361,7 +359,7 @@ class EglBorrowedTexture:
             self.surface.close()
             self._closed = True
 
-    def __enter__(self) -> "EglBorrowedTexture":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args: object) -> None:
@@ -384,7 +382,7 @@ class EglPbufferSurface:
         width: int,
         height: int,
         scale_factor: float,
-    ) -> "EglPbufferSurface":
+    ) -> EglPbufferSurface:
         surface = EGL.eglCreatePbufferSurface(
             context.display,
             context.config,
@@ -418,7 +416,7 @@ class EglPbufferSurface:
         EGL.eglDestroySurface(self.context.display, self.surface)
         self._closed = True
 
-    def __enter__(self) -> "EglPbufferSurface":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args: object) -> None:

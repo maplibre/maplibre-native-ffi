@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from ._enum import UnknownIntEnum
-from ._lifecycle import NativeHandleMixin
+import weakref
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
-import weakref
 
 from . import _native
+from ._enum import UnknownIntEnum
+from ._lifecycle import NativeHandleMixin
 from .errors import InvalidArgumentError
 from .resource import (
     HttpHeaderTransformCallback,
@@ -103,7 +103,7 @@ class RenderingStats:
     total_draw_call_count: int
 
     @classmethod
-    def _from_native(cls, raw: dict[str, object]) -> "RenderingStats":
+    def _from_native(cls, raw: dict[str, object]) -> RenderingStats:
         return cls(
             encoding_time=raw["encoding_time"],
             rendering_time=raw["rendering_time"],
@@ -123,7 +123,7 @@ class RenderFramePayload:
     stats: RenderingStats
 
     @classmethod
-    def _from_runtime_payload(cls, payload: dict[str, object]) -> "RenderFramePayload":
+    def _from_runtime_payload(cls, payload: dict[str, object]) -> RenderFramePayload:
         return cls(
             mode=RenderMode(payload["mode"]),
             needs_repaint=payload["needs_repaint"],
@@ -139,7 +139,7 @@ class RenderMapPayload:
     mode: RenderMode
 
     @classmethod
-    def _from_runtime_payload(cls, payload: dict[str, object]) -> "RenderMapPayload":
+    def _from_runtime_payload(cls, payload: dict[str, object]) -> RenderMapPayload:
         return cls(mode=RenderMode(payload["mode"]))
 
 
@@ -152,7 +152,7 @@ class StyleImageMissingPayload:
     @classmethod
     def _from_runtime_payload(
         cls, payload: dict[str, object]
-    ) -> "StyleImageMissingPayload":
+    ) -> StyleImageMissingPayload:
         return cls(image_id=payload["image_id"])
 
 
@@ -167,7 +167,7 @@ class TileId:
     canonical_y: int
 
     @classmethod
-    def _from_native(cls, raw: dict[str, object]) -> "TileId":
+    def _from_native(cls, raw: dict[str, object]) -> TileId:
         return cls(
             overscaled_z=raw["overscaled_z"],
             wrap=raw["wrap"],
@@ -186,7 +186,7 @@ class TileActionPayload:
     source_id: str
 
     @classmethod
-    def _from_runtime_payload(cls, payload: dict[str, object]) -> "TileActionPayload":
+    def _from_runtime_payload(cls, payload: dict[str, object]) -> TileActionPayload:
         return cls(
             operation=TileOperation(payload["operation"]),
             tile_id=TileId._from_native(payload["tile_id"]),
@@ -207,7 +207,7 @@ class CameraTransitionFinishedPayload:
     @classmethod
     def _from_runtime_payload(
         cls, payload: dict[str, object]
-    ) -> "CameraTransitionFinishedPayload":
+    ) -> CameraTransitionFinishedPayload:
         return cls(transition_id=payload["transition_id"])
 
 
@@ -221,7 +221,7 @@ class UnknownRuntimeEventPayload:
     @classmethod
     def _from_runtime_payload(
         cls, payload: dict[str, object]
-    ) -> "UnknownRuntimeEventPayload":
+    ) -> UnknownRuntimeEventPayload:
         return cls(raw_type=payload["raw_type"], data=payload["bytes"])
 
 
@@ -258,7 +258,7 @@ class RuntimeEvent:
         cls,
         raw: dict[str, Any],
         runtime: RuntimeHandle | None = None,
-    ) -> "RuntimeEvent":
+    ) -> RuntimeEvent:
         source_type = RuntimeEventSourceType(raw["source_type"])
         source_id = raw["source_id"]
         return cls(
@@ -266,7 +266,7 @@ class RuntimeEvent:
             source=RuntimeEventSource(
                 source_type=source_type,
                 map_handle=(
-                    runtime._map_for_source_id(source_id)  # noqa: SLF001
+                    runtime._map_for_source_id(source_id)
                     if runtime is not None and source_type == RuntimeEventSourceType.MAP
                     else None
                 ),
@@ -347,10 +347,10 @@ class RuntimeHandle(NativeHandleMixin):
         self._offline_operations.discard(operation)
 
     def _register_map(self, map_handle: MapHandle) -> None:
-        self._maps[map_handle._native_id()] = weakref.ref(map_handle)  # noqa: SLF001
+        self._maps[map_handle._native_id()] = weakref.ref(map_handle)
 
     def _unregister_map(self, map_handle: MapHandle) -> None:
-        self._maps.pop(map_handle._native_id(), None)  # noqa: SLF001
+        self._maps.pop(map_handle._native_id(), None)
 
     def _map_for_source_id(self, source_id: int) -> MapHandle | None:
         source = self._maps.get(source_id)
@@ -385,14 +385,14 @@ class RuntimeHandle(NativeHandleMixin):
 
     def wake_source(self) -> WakeSource:
         """Acquire a wake source for this runtime, usable from any thread."""
-        return WakeSource._from_native(self._native.wake_source())  # noqa: SLF001
+        return WakeSource._from_native(self._native.wake_source())
 
     def _offline_operation(
         self, start: Callable[..., int], *args: object
     ) -> OfflineOperationHandle:
         from .offline import OfflineOperationHandle
 
-        return OfflineOperationHandle._from_native(self, start(*args))  # noqa: SLF001
+        return OfflineOperationHandle._from_native(self, start(*args))
 
     def run_ambient_cache_operation(
         self, operation: AmbientCacheOperation
@@ -582,7 +582,7 @@ class RuntimeHandle(NativeHandleMixin):
         """Create a map owned by this runtime."""
         from .map import MapHandle
 
-        return MapHandle._create(self, options)  # noqa: SLF001
+        return MapHandle._create(self, options)
 
 
 def _runtime_payload_from_native(payload: dict[str, object]) -> RuntimeEventPayload:
@@ -632,8 +632,8 @@ __all__ = [
     "UnknownRuntimeEventPayload",
 ]
 
-from .map import MapHandle, MapOptions  # noqa: E402
-from .offline import (  # noqa: E402
+from .map import MapHandle, MapOptions
+from .offline import (
     AmbientCacheOperation,
     OfflineOperationCompleted,
     OfflineOperationHandle,

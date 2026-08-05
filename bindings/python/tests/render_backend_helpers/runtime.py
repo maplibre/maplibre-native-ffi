@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 import time
-
-import pytest
+from collections.abc import Callable
 
 import maplibre_native_ffi as mln
+import pytest
 from maplibre_native_ffi import camera, geo, json, query, render, style
 
 EMPTY_STYLE_JSON = '{"version":8,"sources":{},"layers":[]}'

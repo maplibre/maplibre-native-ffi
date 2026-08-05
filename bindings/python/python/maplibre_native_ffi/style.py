@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from ._enum import NativeIntEnum, UnknownIntEnum
-from ._lifecycle import NativeHandleMixin
 from dataclasses import dataclass
 from typing import Any
 
-from .geo import LatLng, LatLngBounds
+from ._enum import NativeIntEnum, UnknownIntEnum
+from ._lifecycle import NativeHandleMixin
 from .errors import InvalidArgumentError
+from .geo import LatLng, LatLngBounds
 from .json import JsonValue
 from .render import PremultipliedRgba8Image, TextureImageInfo
 
@@ -116,7 +116,7 @@ class TileJsonInfo:
     bounds: LatLngBounds | None = None
 
     @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> "TileJsonInfo":
+    def _from_native(cls, raw: dict[str, Any]) -> TileJsonInfo:
         bounds = raw["bounds"]
         return cls(
             tiles=tuple(raw["tiles"]),
@@ -146,7 +146,7 @@ class StyleSourceInfo:
     raster_dem_encoding: RasterDemEncoding | None = None
 
     @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> "StyleSourceInfo":
+    def _from_native(cls, raw: dict[str, Any]) -> StyleSourceInfo:
         return cls(
             source_type=StyleSourceType(raw["source_type"]),
             is_volatile=raw["is_volatile"],
@@ -226,7 +226,7 @@ class StyleImageInfo:
     text_fit_height: StyleImageTextFit | None = None
 
     @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> "StyleImageInfo":
+    def _from_native(cls, raw: dict[str, Any]) -> StyleImageInfo:
         content = raw["content"]
         text_fit_width = raw["text_fit_width"]
         text_fit_height = raw["text_fit_height"]
@@ -270,7 +270,7 @@ class StyleTransitionOptions:
     frame. Reading the options always reports a value."""
 
     @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> "StyleTransitionOptions":
+    def _from_native(cls, raw: dict[str, Any]) -> StyleTransitionOptions:
         return cls(
             duration_ms=raw["duration_ms"],
             delay_ms=raw["delay_ms"],
@@ -287,7 +287,7 @@ class StyleImage:
     sdf: bool
 
     @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> "StyleImage":
+    def _from_native(cls, raw: dict[str, Any]) -> StyleImage:
         info = StyleImageInfo._from_native(raw["info"])
         return cls(
             image=PremultipliedRgba8Image(
@@ -336,7 +336,7 @@ class CustomGeometrySourceEvent:
     tile_id: CanonicalTileId
 
     @classmethod
-    def _from_native(cls, raw: dict[str, Any]) -> "CustomGeometrySourceEvent":
+    def _from_native(cls, raw: dict[str, Any]) -> CustomGeometrySourceEvent:
         return cls(
             event_type=CustomGeometrySourceEventType(raw["kind"]),
             tile_id=CanonicalTileId(z=raw["z"], x=raw["x"], y=raw["y"]),
@@ -370,7 +370,7 @@ class CustomGeometrySourceHandle(NativeHandleMixin):
         self._native = native
 
     @classmethod
-    def _from_native(cls, native: Any) -> "CustomGeometrySourceHandle":
+    def _from_native(cls, native: Any) -> CustomGeometrySourceHandle:
         return cls(native, _create_key=_CUSTOM_GEOMETRY_SOURCE_HANDLE_CREATE_KEY)
 
     @property
@@ -401,8 +401,8 @@ __all__ = [
     "StyleSourceInfo",
     "StyleSourceType",
     "StyleTransitionOptions",
-    "TileScheme",
     "TileJsonInfo",
+    "TileScheme",
     "TileSourceOptions",
     "VectorTileEncoding",
 ]

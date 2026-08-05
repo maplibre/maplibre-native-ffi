@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
-from typing import Any, TypeAlias
+from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,8 +60,8 @@ class JsonObject:
     members: tuple[JsonMember, ...]
 
 
-JsonScalar: TypeAlias = None | bool | str | JsonUInt | JsonInt | JsonDouble
-JsonValue: TypeAlias = JsonScalar | JsonArray | JsonObject
+type JsonScalar = None | bool | str | JsonUInt | JsonInt | JsonDouble
+type JsonValue = JsonScalar | JsonArray | JsonObject
 
 
 def from_python(value: Any) -> JsonValue:

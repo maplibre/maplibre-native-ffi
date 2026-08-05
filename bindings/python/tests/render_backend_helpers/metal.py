@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Self
 
 import Metal
 import Quartz
-
 from maplibre_native_ffi import render
 
 
@@ -31,7 +30,7 @@ class MetalContext:
     _closed: bool = False
 
     @classmethod
-    def create(cls) -> "MetalContext":
+    def create(cls) -> MetalContext:
         device = Metal.MTLCreateSystemDefaultDevice()
         if device is None:
             msg = "MTLCreateSystemDefaultDevice returned nil"
@@ -57,7 +56,7 @@ class MetalContext:
         width: int = 64,
         height: int = 64,
         scale_factor: float = 1.0,
-    ) -> "MetalSurface":
+    ) -> MetalSurface:
         return MetalSurface.create(self, width, height, scale_factor)
 
     def borrowed_texture(
@@ -65,13 +64,13 @@ class MetalContext:
         width: int = 64,
         height: int = 64,
         scale_factor: float = 1.0,
-    ) -> "MetalBorrowedTexture":
+    ) -> MetalBorrowedTexture:
         return MetalBorrowedTexture.create(self, width, height, scale_factor)
 
     def close(self) -> None:
         self._closed = True
 
-    def __enter__(self) -> "MetalContext":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args: object) -> None:
@@ -94,7 +93,7 @@ class MetalSurface:
         width: int,
         height: int,
         scale_factor: float,
-    ) -> "MetalSurface":
+    ) -> MetalSurface:
         layer = Quartz.CAMetalLayer.layer()
         if layer is None:
             msg = "CAMetalLayer.layer returned nil"
@@ -119,7 +118,7 @@ class MetalSurface:
     def close(self) -> None:
         self._closed = True
 
-    def __enter__(self) -> "MetalSurface":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args: object) -> None:
@@ -142,7 +141,7 @@ class MetalBorrowedTexture:
         width: int,
         height: int,
         scale_factor: float,
-    ) -> "MetalBorrowedTexture":
+    ) -> MetalBorrowedTexture:
         descriptor = Metal.MTLTextureDescriptor.texture2DDescriptorWithPixelFormat_width_height_mipmapped_(
             Metal.MTLPixelFormatRGBA8Unorm,
             width,
@@ -207,7 +206,7 @@ class MetalBorrowedTexture:
     def close(self) -> None:
         self._closed = True
 
-    def __enter__(self) -> "MetalBorrowedTexture":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *args: object) -> None:
