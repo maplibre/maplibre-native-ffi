@@ -1,9 +1,16 @@
 // clang-format off
+#include <atomic>
 #include <cstdint>
+#include <cstring>
 #include <exception>
 #include <memory>
 #include <optional>
 #include <stdexcept>
+
+// The WebGPU backend is a browser backend: it is built only against the
+// emdawnwebgpu port, which is what supplies webgpu.h. See
+// cmake/render/webgpu.cmake.
+#include <emscripten/emscripten.h>
 
 // Include WebGPU headers first to define WEBGPU_H_ before MapLibre WebGPU
 // headers.
@@ -26,6 +33,15 @@
 namespace {
 
 constexpr auto webgpu_owned_color_format = WGPUTextureFormat_RGBA8Unorm;
+
+// WebGPU pads every row of a texture-to-buffer copy to this many bytes, so a
+// readback stages the padded rows and unpacks them.
+constexpr uint32_t readback_row_alignment = 256;
+constexpr uint32_t readback_bytes_per_pixel = 4;
+// Five seconds of yielding, which a map that is going to complete beats by
+// orders of magnitude.
+constexpr uint32_t readback_yield_milliseconds = 1;
+constexpr uint32_t readback_yield_attempts = 5000;
 
 auto validate_webgpu_texture(
   const mln_webgpu_borrowed_texture_descriptor& descriptor,
@@ -161,21 +177,54 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
     return *this;
   }
 
-  // Empty rather than implemented, which supports_readback() reports so the C
-  // API answers UNSUPPORTED instead of treating an empty image as a failure.
+  // Copies the rendered texture into a mappable buffer and waits for the map,
+  // which is how WebGPU reads a texture back.
   //
-  // WebGPU can read a texture back -- upstream does it in
-  // mbgl/webgpu/offscreen_texture.cpp by copying into a mappable buffer and
-  // blocking on wgpuBufferMapAsync through wgpuInstanceWaitAny. That path is
-  // not available to a session, because this backend renders into a texture the
-  // caller supplied or owns rather than into upstream's offscreen texture, and
-  // because a non-zero WaitAny timeout is only legal on an instance created
-  // with timedWaitAnyEnable. The instance here belongs to the host, so the C
-  // API cannot require that capability of it.
+  // Only a session-owned texture arrives here: the C API offers readback for
+  // owned sessions alone, and a caller's texture need not carry CopySrc usage
+  // at all. ensureColorTexture() gives the owned one that usage.
   //
-  // TODO(browser-webgpu): implement the copy and map on the session's own
-  // texture, waiting with a zero timeout so the host's instance needs nothing.
-  mbgl::PremultipliedImage readStillImage() override { return {}; }
+  // Upstream blocks the same map on wgpuInstanceWaitAny
+  // (mbgl/webgpu/offscreen_texture.cpp), which a session cannot: a non-zero
+  // WaitAny timeout is legal only on an instance created with
+  // timedWaitAnyEnable, and this instance belongs to the host and is optional
+  // besides. A spontaneous callback needs no instance, and yielding to the
+  // browser's job queue is what lets it arrive.
+  mbgl::PremultipliedImage readStillImage() override {
+    const auto size = getSize();
+    if (
+      device_ == nullptr || queue_ == nullptr || texture_ == nullptr ||
+      size.width == 0 || size.height == 0
+    ) {
+      return {};
+    }
+
+    const auto row_stride = size.width * readback_bytes_per_pixel;
+    const auto aligned_row_stride =
+      ((row_stride + readback_row_alignment - 1) / readback_row_alignment) *
+      readback_row_alignment;
+    const auto mapped_size =
+      static_cast<uint64_t>(aligned_row_stride) * size.height;
+
+    WGPUBufferDescriptor buffer_desc{};
+    buffer_desc.size = mapped_size;
+    buffer_desc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_MapRead;
+    auto* const staging = wgpuDeviceCreateBuffer(device_, &buffer_desc);
+    if (staging == nullptr) {
+      return {};
+    }
+
+    if (!copy_texture_into(staging, aligned_row_stride, size)) {
+      wgpuBufferRelease(staging);
+      return {};
+    }
+
+    auto image = map_buffer_into_image(
+      staging, mapped_size, size, row_stride, aligned_row_stride
+    );
+    wgpuBufferRelease(staging);
+    return image;
+  }
 
   mbgl::gfx::RendererBackend* getRendererBackend() override { return this; }
 
@@ -261,6 +310,119 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
   void deactivate() override {}
 
  private:
+  // Submits the texture-to-buffer copy on the session's queue. Ordered behind
+  // the render commands already submitted there, so it reads the drawn frame
+  // without a fence of its own.
+  auto copy_texture_into(
+    WGPUBuffer destination, uint32_t aligned_row_stride, mbgl::Size size
+  ) -> bool {
+    auto* const encoder = wgpuDeviceCreateCommandEncoder(device_, nullptr);
+    if (encoder == nullptr) {
+      return false;
+    }
+
+    WGPUTexelCopyTextureInfo source{};
+    source.texture = texture_;
+    source.mipLevel = 0;
+    source.origin = {0, 0, 0};
+    source.aspect = WGPUTextureAspect_All;
+
+    WGPUTexelCopyBufferInfo target{};
+    target.buffer = destination;
+    target.layout.offset = 0;
+    target.layout.bytesPerRow = aligned_row_stride;
+    target.layout.rowsPerImage = size.height;
+
+    const WGPUExtent3D copy_size{size.width, size.height, 1};
+    wgpuCommandEncoderCopyTextureToBuffer(
+      encoder, &source, &target, &copy_size
+    );
+
+    auto* const commands = wgpuCommandEncoderFinish(encoder, nullptr);
+    wgpuCommandEncoderRelease(encoder);
+    if (commands == nullptr) {
+      return false;
+    }
+    wgpuQueueSubmit(queue_, 1, &commands);
+    wgpuCommandBufferRelease(commands);
+    return true;
+  }
+
+  // The map callback's own state, held by shared_ptr because a wait that gives
+  // up outlives neither. WebGPU still delivers the callback afterwards -- with
+  // Aborted, once releasing the buffer cancels the map -- so a state on this
+  // stack would be written through after the frame is gone.
+  struct MapState {
+    std::atomic<WGPUMapAsyncStatus> status{WGPUMapAsyncStatus_Error};
+    std::atomic_bool completed{false};
+  };
+
+  // Maps the staged copy and unpacks its padded rows into an image.
+  //
+  // The map resolves on the browser's job queue, so this thread yields rather
+  // than spins: emscripten_sleep suspends through JSPI and lets that queue run,
+  // which is also what delivers the spontaneous callback. Bounded, so a device
+  // that never answers fails the read instead of hanging the caller.
+  auto map_buffer_into_image(
+    WGPUBuffer staging, uint64_t mapped_size, mbgl::Size size,
+    uint32_t row_stride, uint32_t aligned_row_stride
+  ) -> mbgl::PremultipliedImage {
+    auto const state = std::make_shared<MapState>();
+    WGPUBufferMapCallbackInfo callback_info{};
+    callback_info.mode = WGPUCallbackMode_AllowSpontaneous;
+    callback_info.callback = [](
+                               WGPUMapAsyncStatus status,
+                               WGPUStringView /*message*/, void* user_data,
+                               void* /*reserved*/
+                             ) {
+      // Takes back the reference handed to the callback, so the state lives
+      // exactly until the one delivery WebGPU promises.
+      const std::unique_ptr<std::shared_ptr<MapState>> owner(
+        static_cast<std::shared_ptr<MapState>*>(user_data)
+      );
+      (*owner)->status.store(status, std::memory_order_relaxed);
+      (*owner)->completed.store(true, std::memory_order_release);
+    };
+    callback_info.userdata1 = new std::shared_ptr<MapState>(state);
+    wgpuBufferMapAsync(
+      staging, WGPUMapMode_Read, 0, mapped_size, callback_info
+    );
+
+    for (uint32_t attempt = 0; attempt < readback_yield_attempts; ++attempt) {
+      if (state->completed.load(std::memory_order_acquire)) {
+        break;
+      }
+      emscripten_sleep(readback_yield_milliseconds);
+    }
+    if (
+      !state->completed.load(std::memory_order_acquire) ||
+      state->status.load(std::memory_order_relaxed) !=
+        WGPUMapAsyncStatus_Success
+    ) {
+      return {};
+    }
+
+    const auto* const mapped = static_cast<const uint8_t*>(
+      wgpuBufferGetConstMappedRange(staging, 0, mapped_size)
+    );
+    if (mapped == nullptr) {
+      wgpuBufferUnmap(staging);
+      return {};
+    }
+
+    auto data = std::make_unique<uint8_t[]>(
+      static_cast<size_t>(row_stride) * size.height
+    );
+    for (uint32_t row = 0; row < size.height; ++row) {
+      std::memcpy(
+        data.get() + static_cast<size_t>(row) * row_stride,
+        mapped + static_cast<size_t>(row) * aligned_row_stride, row_stride
+      );
+    }
+    wgpuBufferUnmap(staging);
+    return {size, std::move(data)};
+  }
+
   void initializeContext(const mln_webgpu_context_descriptor& context) {
     if (context.instance != nullptr) {
       instance_ = static_cast<WGPUInstance>(context.instance);
@@ -449,8 +611,6 @@ class WebGPUTextureSessionBackend final
   auto headless_backend() -> mbgl::gfx::HeadlessBackend& override {
     return backend_;
   }
-
-  auto supports_readback() const -> bool override { return false; }
 
   auto set_webgpu_borrowed_target(
     const mln_webgpu_borrowed_texture_descriptor& descriptor

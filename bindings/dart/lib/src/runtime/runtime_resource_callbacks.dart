@@ -1,5 +1,9 @@
 part of 'runtime.dart';
 
+int _urlMatchFlags(bool matchGlob) => matchGlob
+    ? raw.mln_adapter_url_match_flags.MLN_ADAPTER_URL_MATCH_GLOB.value
+    : raw.mln_adapter_url_match_flags.MLN_ADAPTER_URL_MATCH_FLAGS_NONE.value;
+
 final class _ResourceTransformState {
   _ResourceTransformState(List<ResourceUrlRewriteRule> rules) {
     for (final rule in rules) {
@@ -15,6 +19,7 @@ final class _ResourceTransformState {
       final rule = rules[index];
       pointer.ref.rules[index].kind =
           rule.kind?.rawValue ?? _resourceKindWildcard;
+      pointer.ref.rules[index].flags = _urlMatchFlags(rule.matchGlob);
       pointer.ref.rules[index].url = _nativeOwnedCString(rule.url);
       pointer.ref.rules[index].replacement_url = _nativeOwnedCString(
         rule.replacementUrl,
@@ -61,15 +66,7 @@ final class _HttpHeaderTransformState {
       final rule = rules[ruleIndex];
       final nativeRule = pointer.ref.rules[ruleIndex];
       nativeRule.kind = rule.kind?.rawValue ?? _resourceKindWildcard;
-      nativeRule.flags = rule.matchPrefix
-          ? raw
-                .mln_adapter_http_header_route_flags
-                .MLN_ADAPTER_HTTP_HEADER_ROUTE_MATCH_PREFIX
-                .value
-          : raw
-                .mln_adapter_http_header_route_flags
-                .MLN_ADAPTER_HTTP_HEADER_ROUTE_FLAGS_NONE
-                .value;
+      nativeRule.flags = _urlMatchFlags(rule.matchGlob);
       nativeRule.url = _nativeOwnedCString(rule.url);
       nativeRule.header_count = rule.headers.length;
       nativeRule.headers = rule.headers.isEmpty
@@ -145,6 +142,7 @@ final class _ResourceProviderRulesState {
       final rule = rules[index];
       pointer.ref.rules[index].kind =
           rule.kind?.rawValue ?? _resourceKindWildcard;
+      pointer.ref.rules[index].flags = _urlMatchFlags(rule.matchGlob);
       pointer.ref.rules[index].requested_url = _nativeOwnedCString(
         rule.requestedUrl,
       );
@@ -175,10 +173,10 @@ int _resourceRouteFlags(ResourceProviderRoute route) {
       .mln_adapter_resource_route_flags
       .MLN_ADAPTER_RESOURCE_ROUTE_FLAGS_NONE
       .value;
-  if (route.matchPrefix) {
+  if (route.matchGlob) {
     flags |= raw
         .mln_adapter_resource_route_flags
-        .MLN_ADAPTER_RESOURCE_ROUTE_MATCH_PREFIX
+        .MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB
         .value;
   }
   if (route.useRequestedUrl) {

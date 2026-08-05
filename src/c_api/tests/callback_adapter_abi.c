@@ -1,7 +1,8 @@
 // Raw C ABI coverage for queued provider route matching: route descriptors a
-// binding's own route type cannot express, and a request that carries no
-// requested URL. Which URL each flag combination compares is semantic, so it
-// belongs to the binding suites that register these routes.
+// binding's own route type cannot express, a request that carries no requested
+// URL, and the glob language every binding shares. Which URL each flag
+// combination compares is semantic, so it belongs to the binding suites that
+// register these routes.
 //
 // The adapter decides a route before it reads the handle, so these drive the
 // callback directly with a synthesized request rather than through a loader.
@@ -93,7 +94,7 @@ static void assert_passes_through(
 // This verifies the two route descriptors a binding route type cannot express:
 // a null comparison URL and a flag bit this C API version does not define.
 // Neither names a URL family the adapter can compare, so each matches nothing
-// rather than claiming every request the way an empty prefix does.
+// rather than claiming every request the way `**` does.
 static void queued_provider_routes_reject_raw_invalid_route_descriptors(void) {
   const mln_resource_request request = style_request();
 
@@ -108,7 +109,7 @@ static void queued_provider_routes_reject_raw_invalid_route_descriptors(void) {
   assert_passes_through(
     (mln_adapter_queued_resource_provider_route){
       .kind = MLN_ADAPTER_RESOURCE_KIND_ANY,
-      .flags = MLN_ADAPTER_RESOURCE_ROUTE_MATCH_PREFIX,
+      .flags = MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB,
       .url = NULL,
     },
     &request
@@ -116,18 +117,18 @@ static void queued_provider_routes_reject_raw_invalid_route_descriptors(void) {
   assert_passes_through(
     (mln_adapter_queued_resource_provider_route){
       .kind = MLN_ADAPTER_RESOURCE_KIND_ANY,
-      .flags = MLN_ADAPTER_RESOURCE_ROUTE_MATCH_PREFIX | (1U << 31U),
-      .url = "",
+      .flags = MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB | (1U << 31U),
+      .url = "**",
     },
     &request
   );
 }
 
 // This verifies a request whose requested URL is absent, which the loader does
-// not produce and a binding cannot synthesize. An empty prefix over the URL
-// that is present still claims the request, while the same prefix over the
-// absent URL matches nothing. A claimed record reports the absent URL as the
-// empty string, so a listener reads it without a null check.
+// not produce and a binding cannot synthesize. A `**` route over the URL that
+// is present still claims the request, while the same route over the absent URL
+// matches nothing. A claimed record reports the absent URL as the empty string,
+// so a listener reads it without a null check.
 static void queued_provider_routes_tolerate_raw_absent_request_urls(void) {
   mln_resource_request request = style_request();
   request.requested_url = NULL;
@@ -135,8 +136,8 @@ static void queued_provider_routes_tolerate_raw_absent_request_urls(void) {
   assert_claims(
     (mln_adapter_queued_resource_provider_route){
       .kind = MLN_ADAPTER_RESOURCE_KIND_ANY,
-      .flags = MLN_ADAPTER_RESOURCE_ROUTE_MATCH_PREFIX,
-      .url = "",
+      .flags = MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB,
+      .url = "**",
     },
     &request
   );
@@ -145,11 +146,86 @@ static void queued_provider_routes_tolerate_raw_absent_request_urls(void) {
   assert_passes_through(
     (mln_adapter_queued_resource_provider_route){
       .kind = MLN_ADAPTER_RESOURCE_KIND_ANY,
-      .flags = MLN_ADAPTER_RESOURCE_ROUTE_MATCH_PREFIX |
+      .flags = MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB |
                MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL,
-      .url = "",
+      .url = "**",
     },
     &request
+  );
+}
+
+// Reports whether one glob pattern claims one resolved URL. Every binding
+// shares this matcher, so the language itself is covered here rather than once
+// per binding suite.
+static bool glob_claims(const char* pattern, const char* resolved_url) {
+  mln_resource_request request = style_request();
+  request.resolved_url = resolved_url;
+  return route_decision(
+           (mln_adapter_queued_resource_provider_route){
+             .kind = MLN_ADAPTER_RESOURCE_KIND_ANY,
+             .flags = MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB,
+             .url = pattern,
+           },
+           &request
+         ) == MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+}
+
+static void glob_routes_confine_a_star_to_one_path_segment(void) {
+  static const char host_pattern[] = "https://*.maplibre.org/**";
+
+  TEST_ASSERT_TRUE(glob_claims(host_pattern, normalized_url));
+  TEST_ASSERT_TRUE(
+    glob_claims(host_pattern, "https://tiles.maplibre.org/1/2/3.pbf")
+  );
+  // A path segment carrying the host name reaches the same rule under a
+  // separator-crossing wildcard, which is what confining `*` prevents.
+  TEST_ASSERT_FALSE(
+    glob_claims(host_pattern, "https://attacker.test/x.maplibre.org/style.json")
+  );
+  // A single `*` spans one segment, and `**` spans the rest of the URL.
+  TEST_ASSERT_TRUE(glob_claims("https://*/style.json", normalized_url));
+  TEST_ASSERT_TRUE(glob_claims("https://*.maplibre.org/*", normalized_url));
+  TEST_ASSERT_FALSE(glob_claims("https://*.maplibre.org/*/*", normalized_url));
+  TEST_ASSERT_TRUE(glob_claims("**", normalized_url));
+  TEST_ASSERT_FALSE(glob_claims("*", normalized_url));
+}
+
+static void glob_routes_anchor_match_wildcards_and_escapes(void) {
+  // A pattern matches the complete URL, so a bare suffix or infix claims
+  // nothing without a leading wildcard.
+  TEST_ASSERT_TRUE(glob_claims("**.json", normalized_url));
+  TEST_ASSERT_FALSE(glob_claims(".json", normalized_url));
+  TEST_ASSERT_FALSE(glob_claims("**.pbf", normalized_url));
+  TEST_ASSERT_TRUE(glob_claims("https://demotiles**", normalized_url));
+
+  // A pattern with no metacharacters compares byte for byte.
+  TEST_ASSERT_TRUE(glob_claims(normalized_url, normalized_url));
+  TEST_ASSERT_FALSE(glob_claims("", normalized_url));
+  TEST_ASSERT_TRUE(glob_claims("", ""));
+
+  // `?` spans one character other than a separator, and `\` makes the next
+  // character literal.
+  TEST_ASSERT_TRUE(
+    glob_claims("?ttps://demotiles.maplibre.org/style.json", normalized_url)
+  );
+  TEST_ASSERT_TRUE(
+    glob_claims("https://demotiles.maplibre.org/style?json", normalized_url)
+  );
+  TEST_ASSERT_FALSE(
+    glob_claims("https://demotiles.maplibre.org/style\\?json", normalized_url)
+  );
+  TEST_ASSERT_FALSE(glob_claims("https:?**", normalized_url));
+  TEST_ASSERT_TRUE(
+    glob_claims("https://star\\*.test/x", "https://star*.test/x")
+  );
+  TEST_ASSERT_FALSE(
+    glob_claims("https://star\\*.test/x", "https://starry.test/x")
+  );
+}
+
+static void glob_routes_backtrack_across_wildcard_runs(void) {
+  TEST_ASSERT_TRUE(
+    glob_claims("https://**/tiles/*", "https://host/tiles/a/b/tiles/x")
   );
 }
 
@@ -169,20 +245,20 @@ static mln_status header_route_status(
   );
 }
 
-static void http_header_routes_match_exact_prefix_kind_and_order(void) {
+static void http_header_routes_match_exact_glob_kind_and_order(void) {
   const mln_adapter_http_header invalid[] = {{.name = "Host", .value = "bad"}};
   const mln_adapter_http_header_transform_rule rules[] = {
     {
       .kind = MLN_RESOURCE_KIND_TILE,
-      .flags = MLN_ADAPTER_HTTP_HEADER_ROUTE_FLAGS_NONE,
+      .flags = MLN_ADAPTER_URL_MATCH_FLAGS_NONE,
       .url = "https://tiles.test/exact",
       .headers = invalid,
       .header_count = 1,
     },
     {
       .kind = MLN_ADAPTER_RESOURCE_KIND_ANY,
-      .flags = MLN_ADAPTER_HTTP_HEADER_ROUTE_MATCH_PREFIX,
-      .url = "https://tiles.test/",
+      .flags = MLN_ADAPTER_URL_MATCH_GLOB,
+      .url = "https://tiles.test/**",
       .headers = NULL,
       .header_count = 0,
     },
@@ -239,6 +315,9 @@ void run_callback_adapter_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(queued_provider_routes_reject_raw_invalid_route_descriptors);
   RUN_TEST(queued_provider_routes_tolerate_raw_absent_request_urls);
-  RUN_TEST(http_header_routes_match_exact_prefix_kind_and_order);
+  RUN_TEST(glob_routes_confine_a_star_to_one_path_segment);
+  RUN_TEST(glob_routes_anchor_match_wildcards_and_escapes);
+  RUN_TEST(glob_routes_backtrack_across_wildcard_runs);
+  RUN_TEST(http_header_routes_match_exact_glob_kind_and_order);
   RUN_TEST(http_header_validation_uses_the_native_policy);
 }

@@ -112,12 +112,18 @@ String _clangExecutable() {
       continue;
     }
     final normalized = candidate.absolute.path.replaceAll('\\', '/');
-    if (normalized.contains('/mise/shims/')) {
+    final normalizedLower = normalized.toLowerCase();
+    if (normalizedLower.contains('/mise/shims/') ||
+        normalizedLower.contains('/emsdk/')) {
       continue;
     }
     // Resource-directory discovery needs the compiler itself: an inactive
-    // mise shim or ccache wrapper resolves another command through PATH.
+    // mise shim resolves another command through PATH. Emscripten's resource
+    // headers can also conflict with the host libclang that ffigen loads.
     final resolved = candidate.resolveSymbolicLinksSync().replaceAll('\\', '/');
+    if (resolved.toLowerCase().contains('/emsdk/')) {
+      continue;
+    }
     final resolvedName = resolved.substring(resolved.lastIndexOf('/') + 1);
     if (!resolvedName.toLowerCase().startsWith('clang')) {
       continue;

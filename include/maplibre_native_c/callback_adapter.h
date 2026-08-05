@@ -51,15 +51,49 @@ extern "C" {
 /** Rule kind that matches every resource kind. */
 #define MLN_ADAPTER_RESOURCE_KIND_ANY UINT32_MAX
 
+// This block uses line comments because its examples contain URL patterns that
+// a block comment cannot carry.
+
+/// How a rule compares its url against a request URL.
+///
+/// With no flags, a rule compares the complete URL byte for byte.
+/// MLN_ADAPTER_URL_MATCH_GLOB reads the url as a glob pattern instead:
+///
+/// - `*` matches a run of any length that contains no `/`, including an empty
+///   run.
+/// - `**` matches a run of any length, including one that contains `/`.
+/// - `?` matches one character other than `/`.
+/// - `\` matches the next character literally, and a trailing `\` matches
+///   itself.
+///
+/// Every other byte compares literally. A pattern matches the complete URL, so
+/// a pattern that describes a suffix opens with a wildcard. Comparison is
+/// case-sensitive either way, and applies no URL parsing or normalization.
+///
+/// Confining `*` to one path segment is what makes a host pattern hold:
+/// `https://*.example.com/**` matches every subdomain of example.com, and a
+/// request for `https://attacker.example/x.example.com/tile` matches it
+/// nowhere. Use `**` wherever a pattern spans path segments, as in
+/// `https://tiles.example.com/**` for one whole host.
+typedef enum mln_adapter_url_match_flags : uint32_t {
+  MLN_ADAPTER_URL_MATCH_FLAGS_NONE = 0U,
+  MLN_ADAPTER_URL_MATCH_GLOB = 1U << 0U,
+} mln_adapter_url_match_flags;
+
 /**
- * One exact-URL resource rewrite rule.
+ * One resource rewrite rule.
  *
  * The kind field matches mln_resource_kind values, or
- * MLN_ADAPTER_RESOURCE_KIND_ANY for every kind. A null replacement_url leaves
- * the URL unchanged. Both strings are borrowed and must outlive the rule table.
+ * MLN_ADAPTER_RESOURCE_KIND_ANY for every kind. The flags field is a bitwise OR
+ * of mln_adapter_url_match_flags values choosing how url compares against the
+ * request URL. A null url or an unknown flag bit makes the rule match nothing.
+ *
+ * A null replacement_url leaves the URL unchanged. Both strings are borrowed
+ * and must outlive the rule table.
  */
 typedef struct mln_adapter_resource_rewrite_rule {
   uint32_t kind;
+  uint32_t flags;
   const char* url;
   const char* replacement_url;
 } mln_adapter_resource_rewrite_rule;
@@ -75,12 +109,6 @@ typedef struct mln_adapter_resource_rewrite_rules {
   size_t count;
 } mln_adapter_resource_rewrite_rules;
 
-/** How an HTTP header transform rule compares its URL. */
-typedef enum mln_adapter_http_header_route_flags : uint32_t {
-  MLN_ADAPTER_HTTP_HEADER_ROUTE_FLAGS_NONE = 0U,
-  MLN_ADAPTER_HTTP_HEADER_ROUTE_MATCH_PREFIX = 1U << 0U,
-} mln_adapter_http_header_route_flags;
-
 /** One borrowed header supplied by an HTTP header transform rule. */
 typedef struct mln_adapter_http_header {
   const char* name;
@@ -90,11 +118,13 @@ typedef struct mln_adapter_http_header {
 /**
  * One native-owned matching rule for an HTTP header transform.
  *
- * kind is one mln_resource_kind value or MLN_ADAPTER_RESOURCE_KIND_ANY. With
- * no flags, url matches the complete transformed URL. MATCH_PREFIX selects a
- * literal, case-sensitive prefix comparison. Unknown flags and a null url make
- * the rule non-matching. The first matching rule supplies its complete header
- * list. Every pointer is borrowed and must outlive the registration.
+ * kind is one mln_resource_kind value or MLN_ADAPTER_RESOURCE_KIND_ANY. The
+ * flags field is a bitwise OR of mln_adapter_url_match_flags values choosing
+ * how url compares against the complete transformed URL. A null url or an
+ * unknown flag bit makes the rule match nothing.
+ *
+ * The first matching rule supplies its complete header list. Every pointer is
+ * borrowed and must outlive the registration.
  */
 typedef struct mln_adapter_http_header_transform_rule {
   uint32_t kind;
@@ -111,14 +141,21 @@ typedef struct mln_adapter_http_header_transform_rules {
 } mln_adapter_http_header_transform_rules;
 
 /**
- * One exact-URL resource provider rule.
+ * One resource provider rule.
  *
- * A rule matches mln_resource_request.requested_url. A matching request is
- * completed with the rule's response without reaching the host. The response
- * and its buffers are borrowed and must outlive the rule table.
+ * The kind field matches mln_resource_kind values, or
+ * MLN_ADAPTER_RESOURCE_KIND_ANY for every kind. The flags field is a bitwise OR
+ * of mln_adapter_url_match_flags values choosing how requested_url compares
+ * against mln_resource_request.requested_url. A null requested_url or an
+ * unknown flag bit makes the rule match nothing.
+ *
+ * A matching request is completed with the rule's response without reaching the
+ * host. The response and its buffers are borrowed and must outlive the rule
+ * table.
  */
 typedef struct mln_adapter_resource_provider_rule {
   uint32_t kind;
+  uint32_t flags;
   const char* requested_url;
   mln_resource_response response;
 } mln_adapter_resource_provider_rule;
@@ -137,16 +174,15 @@ typedef struct mln_adapter_resource_provider_rules {
 /**
  * How a queued provider route compares its url against a request.
  *
- * MLN_ADAPTER_RESOURCE_ROUTE_MATCH_PREFIX compares the url against the start of
- * the request URL instead of the whole request URL.
+ * MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB reads the url as a glob pattern, in the
+ * language mln_adapter_url_match_flags describes.
  * MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL selects
  * mln_resource_request.requested_url as the compared URL instead of
- * mln_resource_request.resolved_url. Setting both matches a requested-URL
- * prefix.
+ * mln_resource_request.resolved_url. Setting both matches a requested-URL glob.
  */
 typedef enum mln_adapter_resource_route_flags : uint32_t {
   MLN_ADAPTER_RESOURCE_ROUTE_FLAGS_NONE = 0U,
-  MLN_ADAPTER_RESOURCE_ROUTE_MATCH_PREFIX = 1U << 0U,
+  MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB = 1U << 0U,
   MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL = 1U << 1U,
 } mln_adapter_resource_route_flags;
 
@@ -156,14 +192,12 @@ typedef enum mln_adapter_resource_route_flags : uint32_t {
  * The kind field matches mln_resource_kind values, or
  * MLN_ADAPTER_RESOURCE_KIND_ANY for every kind. The flags field is a bitwise OR
  * of mln_adapter_resource_route_flags values choosing which URL the route
- * compares and whether it compares a prefix; with no flags the route matches
+ * compares and how; with no flags the route matches
  * mln_resource_request.resolved_url exactly.
  *
- * The url field is a literal comparison value. Comparison is case-sensitive and
- * applies no glob expansion, regular expressions, URL parsing, or
- * normalization, so an empty prefix matches every URL. A null url or an unknown
- * flag bit makes the route match nothing. The url pointer is borrowed and must
- * outlive the provider.
+ * The url field is a comparison value, read literally or as a glob pattern
+ * according to flags. A null url or an unknown flag bit makes the route match
+ * nothing. The url pointer is borrowed and must outlive the provider.
  */
 typedef struct mln_adapter_queued_resource_provider_route {
   uint32_t kind;
