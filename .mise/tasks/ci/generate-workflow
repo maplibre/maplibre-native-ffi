@@ -42,12 +42,13 @@ SCCACHE_ENVIRONMENT = (
 # Tall stacks put many pull requests in flight at once, so CI runs for pushes,
 # for pull requests that target `main`, and for pull requests that are ready for
 # review. A draft deeper in a stack waits until it retargets `main` or leaves
-# draft. `changes.base` is present only when an `edited` event retargeted the
-# pull request, which keeps title, body, and label edits from starting a run.
+# draft. Every event that reaches a gated-off job publishes a skipped
+# `ci-required` check, which counts as a satisfied required check, so the
+# trigger lists only events that create a pull request or move its head commit.
 GATE_CLAUSES = [
     "github.event_name != 'pull_request'",
-    "|| ((github.base_ref == 'main' || github.event.pull_request.draft == false)",
-    "&& (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))",
+    "|| github.base_ref == 'main'",
+    "|| github.event.pull_request.draft == false",
 ]
 
 
@@ -198,15 +199,14 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         # No branch filter: a pull request stacked on another one bases on that
         # branch rather than main, and a stack cannot be verified if only its
         # first link runs CI. The job-level gate decides which of those links
-        # actually build; `ready_for_review` and `edited` are the events that
-        # let a gated-off link start once it qualifies.
+        # actually build, and `ready_for_review` lets a gated-off link start
+        # once it qualifies.
         "  pull_request:",
         "    types:",
         "      - opened",
         "      - synchronize",
         "      - reopened",
         "      - ready_for_review",
-        "      - edited",
         "",
         "permissions:",
         "  contents: read",
