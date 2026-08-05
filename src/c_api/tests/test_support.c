@@ -31,12 +31,18 @@
 // The registry is GL.offscreenCanvases rather than specialHTMLTargets:
 // findCanvasEventTarget(), which is what resolves the selector under
 // -sOFFSCREENCANVAS_SUPPORT, searches the former and never consults the latter.
+//
+// An entry carries the OffscreenCanvas under both names its consumers unwrap:
+// emscripten's WebGL path and emdawnwebgpu's surface creation each look for
+// `offscreenCanvas`, while emscripten's own transfer path stores `canvas`.
 EM_JS(
   void, mln_test_register_offscreen_canvas,
   (const char* name, int width, int height), {
     const id = UTF8ToString(name);
+    const canvas = new OffscreenCanvas(width, height);
     Module["GL"].offscreenCanvases[id] = {
-      canvas : new OffscreenCanvas(width, height),
+      canvas : canvas,
+      offscreenCanvas : canvas,
       id : id,
     };
   }

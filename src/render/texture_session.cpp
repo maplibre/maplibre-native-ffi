@@ -150,26 +150,6 @@ auto webgpu_borrowed_texture_descriptor_default() noexcept
   };
 }
 
-namespace {
-
-// A host owns its WebGPU device, so a session needs one handed to it. The
-// instance and queue are optional: a texture session needs no surface, and a
-// null queue means the device's default queue.
-auto validate_webgpu_context(const mln_webgpu_context_descriptor& context)
-  -> mln_status {
-  if (context.size < sizeof(mln_webgpu_context_descriptor)) {
-    set_thread_error("mln_webgpu_context_descriptor.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (context.device == nullptr) {
-    set_thread_error("WebGPU device must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-}  // namespace
-
 auto validate_webgpu_owned_texture_descriptor(
   const mln_webgpu_owned_texture_descriptor* descriptor
 ) -> mln_status {

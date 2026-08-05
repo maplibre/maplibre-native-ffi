@@ -27,6 +27,7 @@
 #include "map/map.hpp"
 #include "maplibre_native_c/texture.h"
 #include "render/render_session_common.hpp"
+#include "render/surface_session.hpp"
 #include "render/texture_session.hpp"
 // clang-format on
 
@@ -595,6 +596,415 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
   mbgl::Size depth_stencil_size_{0, 0};
 };
 
+// Renders into a surface the host presents, which in a browser is a canvas.
+//
+// The depth and stencil attachment, the context handling, and the renderable
+// resource are the texture session's; what differs is the colour target. A
+// surface hands out one texture per frame and takes it back at present, so this
+// acquires at frame start and releases at swap rather than holding one.
+class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
+                                   public mbgl::gfx::Renderable {
+ public:
+  class RenderableResource final : public mbgl::webgpu::RenderableResource {
+   public:
+    explicit RenderableResource(WebGPUSurfaceBackend& backend_)
+        : backend(backend_) {}
+
+    void bind() override { backend.ensureDepthStencilTexture(); }
+
+    void swap() override { backend.present(); }
+
+    const mbgl::webgpu::RendererBackend& getBackend() const override {
+      return backend;
+    }
+
+    const WGPUCommandEncoder& getCommandEncoder() const override {
+      static WGPUCommandEncoder dummy = nullptr;
+      return dummy;
+    }
+
+    WGPURenderPassEncoder getRenderPassEncoder() const override {
+      return nullptr;
+    }
+
+    WGPUTextureView getColorTextureView() override {
+      return backend.color_view();
+    }
+
+    std::optional<wgpu::TextureFormat> getColorTextureFormat() const override {
+      return backend.color_format();
+    }
+
+    WGPUTextureView getDepthStencilTextureView() override {
+      return static_cast<WGPUTextureView>(backend.getDepthStencilView());
+    }
+
+    std::optional<wgpu::TextureFormat>
+    getDepthStencilTextureFormat() const override {
+      return backend.getDepthStencilFormat();
+    }
+
+   private:
+    WebGPUSurfaceBackend& backend;
+  };
+
+  WebGPUSurfaceBackend(
+    const mln_webgpu_surface_descriptor& descriptor, mbgl::Size size
+  )
+      : mbgl::webgpu::RendererBackend(mbgl::gfx::ContextMode::Shared),
+        mbgl::gfx::Renderable(
+          size, std::make_unique<RenderableResource>(*this)
+        ),
+        surface_(static_cast<WGPUSurface>(descriptor.surface)),
+        color_format_(static_cast<WGPUTextureFormat>(descriptor.format)) {
+    wgpuSurfaceAddRef(surface_);
+    try {
+      initializeContext(descriptor.context);
+      setColorFormat(static_cast<wgpu::TextureFormat>(color_format_));
+      setDepthStencilFormat(wgpu::TextureFormat::Depth24PlusStencil8);
+      configureSurface();
+    } catch (...) {
+      shutdown();
+      throw;
+    }
+  }
+
+  WebGPUSurfaceBackend(const WebGPUSurfaceBackend&) = delete;
+  auto operator=(const WebGPUSurfaceBackend&) -> WebGPUSurfaceBackend& = delete;
+  WebGPUSurfaceBackend(WebGPUSurfaceBackend&&) = delete;
+  auto operator=(WebGPUSurfaceBackend&&) -> WebGPUSurfaceBackend& = delete;
+
+  ~WebGPUSurfaceBackend() override { shutdown(); }
+
+  mbgl::gfx::Renderable& getDefaultRenderable() override { return *this; }
+
+  void* getCurrentTextureView() override { return color_view(); }
+
+  void* getDepthStencilView() override {
+    ensureDepthStencilTexture();
+    return depth_stencil_view_;
+  }
+
+  mbgl::Size getFramebufferSize() const override { return getSize(); }
+
+  auto color_format() const -> wgpu::TextureFormat {
+    return static_cast<wgpu::TextureFormat>(color_format_);
+  }
+
+  // Takes the frame's texture from the surface, which is what the renderable
+  // draws into. A surface with nothing to give reports that instead of
+  // failing: a canvas the browser is not compositing right now is a frame to
+  // skip, the way an occluded window is for the other backends.
+  auto acquire_frame(bool& out_ready) -> bool {
+    out_ready = false;
+    if (color_view_ != nullptr) {
+      out_ready = true;
+      return true;
+    }
+    WGPUSurfaceTexture frame{};
+    wgpuSurfaceGetCurrentTexture(surface_, &frame);
+    if (
+      frame.status != WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal &&
+      frame.status != WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal
+    ) {
+      if (frame.texture != nullptr) {
+        wgpuTextureRelease(frame.texture);
+      }
+      // Outdated is what a surface reports when its configuration no longer
+      // matches the thing it presents to, which a browser does when the canvas
+      // it belongs to changes size. Configuring again is the answer, and the
+      // frame it would have given is the next one: reporting a failure here
+      // would leave every later render failing the same way, because nothing
+      // else reconfigures until the host happens to resize or retarget.
+      if (frame.status == WGPUSurfaceGetCurrentTextureStatus_Outdated) {
+        configureSurface();
+        return true;
+      }
+      // Timeout is this frame arriving late, so the next render tries again.
+      // Lost and Error are the surface itself, which only the host can replace.
+      return frame.status == WGPUSurfaceGetCurrentTextureStatus_Timeout;
+    }
+
+    WGPUTextureViewDescriptor view_desc{};
+    view_desc.format = color_format_;
+    view_desc.dimension = WGPUTextureViewDimension_2D;
+    view_desc.baseMipLevel = 0;
+    view_desc.mipLevelCount = 1;
+    view_desc.baseArrayLayer = 0;
+    view_desc.arrayLayerCount = 1;
+    view_desc.aspect = WGPUTextureAspect_All;
+    auto* const view = wgpuTextureCreateView(frame.texture, &view_desc);
+    if (view == nullptr) {
+      wgpuTextureRelease(frame.texture);
+      return false;
+    }
+    color_texture_ = frame.texture;
+    color_view_ = view;
+    out_ready = true;
+    return true;
+  }
+
+  auto color_view() -> WGPUTextureView {
+    bool ready = false;
+    if (!acquire_frame(ready) || !ready) {
+      return nullptr;
+    }
+    return color_view_;
+  }
+
+  // Ends the frame by letting its texture go.
+  //
+  // The browser composites the canvas itself, the way it does for WebGL, so
+  // there is no present call to make: wgpuSurfacePresent() aborts here with
+  // "unsupported (use requestAnimationFrame via html5.h instead)". Releasing
+  // the texture is what returns the frame to the surface.
+  void present() {
+    if (color_view_ == nullptr) {
+      return;
+    }
+    releaseFrame();
+  }
+
+  void resize(mbgl::Size size_) {
+    if (size_ == getSize()) {
+      return;
+    }
+    size = size_;
+    releaseFrame();
+    configureSurface();
+  }
+
+  auto matches_context(const mln_webgpu_context_descriptor& context) const
+    -> bool {
+    return static_cast<WGPUDevice>(context.device) == device_;
+  }
+
+  auto matches_format(const mln_webgpu_surface_descriptor& descriptor) const
+    -> bool {
+    return static_cast<WGPUTextureFormat>(descriptor.format) == color_format_;
+  }
+
+  // Presents through a different host surface from here on. The caller has
+  // already established that it matches this session's device and format.
+  void set_surface(const mln_webgpu_surface_descriptor& descriptor) {
+    auto* const replacement = static_cast<WGPUSurface>(descriptor.surface);
+    // Referenced before the outgoing one is let go, so a descriptor handing
+    // back the surface this session already holds cannot drop its last
+    // reference partway through.
+    wgpuSurfaceAddRef(replacement);
+    releaseFrame();
+    if (surface_ != nullptr) {
+      wgpuSurfaceUnconfigure(surface_);
+      wgpuSurfaceRelease(surface_);
+    }
+    surface_ = replacement;
+    size = mbgl::Size{
+      mln::core::physical_dimension(
+        descriptor.extent.width, descriptor.extent.scale_factor
+      ),
+      mln::core::physical_dimension(
+        descriptor.extent.height, descriptor.extent.scale_factor
+      )
+    };
+    configureSurface();
+  }
+
+ protected:
+  void activate() override { ensureDepthStencilTexture(); }
+
+  void deactivate() override {}
+
+ private:
+  void initializeContext(const mln_webgpu_context_descriptor& context) {
+    if (context.instance != nullptr) {
+      instance_ = static_cast<WGPUInstance>(context.instance);
+      wgpuInstanceAddRef(instance_);
+    }
+
+    device_ = static_cast<WGPUDevice>(context.device);
+    wgpuDeviceAddRef(device_);
+
+    if (context.queue != nullptr) {
+      queue_ = static_cast<WGPUQueue>(context.queue);
+      wgpuQueueAddRef(queue_);
+    } else {
+      queue_ = wgpuDeviceGetQueue(device_);
+    }
+
+    setInstance(instance_);
+    setDevice(device_);
+    setQueue(queue_);
+  }
+
+  void configureSurface() {
+    const auto size = getSize();
+    if (surface_ == nullptr || size.width == 0 || size.height == 0) {
+      return;
+    }
+    WGPUSurfaceConfiguration configuration{};
+    configuration.device = device_;
+    configuration.format = color_format_;
+    configuration.usage = WGPUTextureUsage_RenderAttachment;
+    configuration.width = size.width;
+    configuration.height = size.height;
+    configuration.alphaMode = WGPUCompositeAlphaMode_Auto;
+    configuration.presentMode = WGPUPresentMode_Fifo;
+    wgpuSurfaceConfigure(surface_, &configuration);
+  }
+
+  void ensureDepthStencilTexture() {
+    const auto size = getSize();
+    if (device_ == nullptr || size.width == 0 || size.height == 0) {
+      return;
+    }
+    if (
+      depth_stencil_texture_ != nullptr &&
+      depth_stencil_size_.width == size.width &&
+      depth_stencil_size_.height == size.height
+    ) {
+      return;
+    }
+
+    releaseDepthStencilTexture();
+
+    const auto depth_format =
+      static_cast<WGPUTextureFormat>(getDepthStencilFormat());
+    WGPUTextureDescriptor depth_desc{};
+    depth_desc.usage = WGPUTextureUsage_RenderAttachment;
+    depth_desc.dimension = WGPUTextureDimension_2D;
+    depth_desc.size = {size.width, size.height, 1};
+    depth_desc.format = depth_format;
+    depth_desc.mipLevelCount = 1;
+    depth_desc.sampleCount = 1;
+    depth_stencil_texture_ = wgpuDeviceCreateTexture(device_, &depth_desc);
+    if (depth_stencil_texture_ == nullptr) {
+      throw std::runtime_error("Failed to create WebGPU depth texture");
+    }
+
+    WGPUTextureViewDescriptor view_desc{};
+    view_desc.format = depth_format;
+    view_desc.dimension = WGPUTextureViewDimension_2D;
+    view_desc.baseMipLevel = 0;
+    view_desc.mipLevelCount = 1;
+    view_desc.baseArrayLayer = 0;
+    view_desc.arrayLayerCount = 1;
+    view_desc.aspect = WGPUTextureAspect_All;
+    depth_stencil_view_ =
+      wgpuTextureCreateView(depth_stencil_texture_, &view_desc);
+    if (depth_stencil_view_ == nullptr) {
+      releaseDepthStencilTexture();
+      throw std::runtime_error("Failed to create WebGPU depth texture view");
+    }
+    depth_stencil_size_ = size;
+  }
+
+  void releaseDepthStencilTexture() {
+    if (depth_stencil_view_ != nullptr) {
+      wgpuTextureViewRelease(depth_stencil_view_);
+      depth_stencil_view_ = nullptr;
+    }
+    if (depth_stencil_texture_ != nullptr) {
+      wgpuTextureDestroy(depth_stencil_texture_);
+      wgpuTextureRelease(depth_stencil_texture_);
+      depth_stencil_texture_ = nullptr;
+    }
+    depth_stencil_size_ = {0, 0};
+  }
+
+  // Lets the frame's texture go without presenting it, which is what a resize,
+  // a retarget, and teardown each need.
+  void releaseFrame() {
+    if (color_view_ != nullptr) {
+      wgpuTextureViewRelease(color_view_);
+      color_view_ = nullptr;
+    }
+    if (color_texture_ != nullptr) {
+      wgpuTextureRelease(color_texture_);
+      color_texture_ = nullptr;
+    }
+  }
+
+  void shutdown() {
+    releaseDepthStencilTexture();
+    releaseFrame();
+    if (surface_ != nullptr) {
+      wgpuSurfaceUnconfigure(surface_);
+      wgpuSurfaceRelease(surface_);
+      surface_ = nullptr;
+    }
+    if (queue_ != nullptr) {
+      wgpuQueueRelease(queue_);
+      queue_ = nullptr;
+    }
+    if (device_ != nullptr) {
+      wgpuDeviceRelease(device_);
+      device_ = nullptr;
+    }
+    if (instance_ != nullptr) {
+      wgpuInstanceRelease(instance_);
+      instance_ = nullptr;
+    }
+  }
+
+  WGPUSurface surface_ = nullptr;
+  WGPUTexture color_texture_ = nullptr;
+  WGPUTextureView color_view_ = nullptr;
+  WGPUTextureFormat color_format_ = WGPUTextureFormat_Undefined;
+  WGPUInstance instance_ = nullptr;
+  WGPUDevice device_ = nullptr;
+  WGPUQueue queue_ = nullptr;
+  WGPUTexture depth_stencil_texture_ = nullptr;
+  WGPUTextureView depth_stencil_view_ = nullptr;
+  mbgl::Size depth_stencil_size_{0, 0};
+};
+
+class WebGPUSurfaceSessionBackend final
+    : public mln::core::SurfaceSessionBackend {
+ public:
+  WebGPUSurfaceSessionBackend(
+    const mln_webgpu_surface_descriptor& descriptor, mbgl::Size size
+  )
+      : backend_(descriptor, size) {}
+
+  auto renderer_backend() -> mbgl::gfx::RendererBackend& override {
+    return backend_;
+  }
+
+  void resize(uint32_t physical_width, uint32_t physical_height) override {
+    backend_.resize(mbgl::Size{physical_width, physical_height});
+  }
+
+  auto prepare_frame(bool& out_ready) -> mln_status override {
+    if (!backend_.acquire_frame(out_ready)) {
+      mln::core::set_thread_error("WebGPU surface produced no frame texture");
+      return MLN_STATUS_NATIVE_ERROR;
+    }
+    return MLN_STATUS_OK;
+  }
+
+  auto set_webgpu_target(const mln_webgpu_surface_descriptor& descriptor)
+    -> mln_status override {
+    if (!backend_.matches_context(descriptor.context)) {
+      mln::core::set_thread_error(
+        "WebGPU surface target must name the device this session attached with"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (!backend_.matches_format(descriptor)) {
+      return mln::core::unsupported_retarget(
+        "WebGPU surface target must have the format this session's render "
+        "pipelines were built for; destroy the session and attach again to "
+        "change it"
+      );
+    }
+    backend_.set_surface(descriptor);
+    return MLN_STATUS_OK;
+  }
+
+ private:
+  WebGPUSurfaceBackend backend_;
+};
+
 class WebGPUTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
@@ -839,6 +1249,82 @@ auto webgpu_borrowed_texture_set_target(
       return target_session.texture.backend->set_webgpu_borrowed_target(
         *descriptor
       );
+    }
+  );
+}
+
+auto webgpu_surface_attach(
+  mln_map map, const mln_webgpu_surface_descriptor* descriptor,
+  mln_render_session* out_session
+) -> mln_status {
+#if !defined(MLN_RENDER_BACKEND_WEBGPU)
+  set_thread_error("WebGPU surface sessions are not supported by this build");
+  return MLN_STATUS_UNSUPPORTED;
+#else
+  MapObject* live_map = nullptr;
+  const auto map_status = validate_map_live(map, live_map);
+  if (map_status != MLN_STATUS_OK) {
+    return map_status;
+  }
+  const auto descriptor_status = validate_webgpu_surface_descriptor(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  const auto output_status = validate_attach_output(
+    out_session, "out_session must not be null",
+    "out_session must point to a null handle"
+  );
+  if (output_status != MLN_STATUS_OK) {
+    return output_status;
+  }
+  const auto physical_status = validate_physical_size(
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled surface dimensions are too large"
+  );
+  if (physical_status != MLN_STATUS_OK) {
+    return physical_status;
+  }
+
+  try {
+    auto session = std::make_shared<mln_render_session_object>();
+    session->map = map;
+    set_session_extent(*session, descriptor->extent);
+    session->surface.backend = std::make_unique<WebGPUSurfaceSessionBackend>(
+      *descriptor, mbgl::Size{session->physical_width, session->physical_height}
+    );
+    return attach_render_session(
+      std::move(session), out_session, RenderSessionKind::Surface,
+      RenderSessionAttachMessages{
+        .null_session = "surface session must not be null",
+        .null_output = "out_session must not be null",
+        .non_null_output = "out_session must point to a null handle",
+      }
+    );
+  } catch (const std::exception& exception) {
+    set_thread_error(exception.what());
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+#endif
+}
+
+auto webgpu_surface_set_target(
+  mln_render_session session, const mln_webgpu_surface_descriptor* descriptor
+) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto session_status = validate_render_session_retarget(
+    session, RetargetTargetKind::Surface, live
+  );
+  if (session_status != MLN_STATUS_OK) {
+    return session_status;
+  }
+  const auto descriptor_status = validate_webgpu_surface_descriptor(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  return surface_session_set_target(
+    session, descriptor->extent,
+    [descriptor](mln_render_session_object& target_session) -> mln_status {
+      return target_session.surface.backend->set_webgpu_target(*descriptor);
     }
   );
 }

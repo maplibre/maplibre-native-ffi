@@ -2564,6 +2564,33 @@ external int mln_webgpu_owned_texture_release_frame(
   ffi.Pointer<mln_webgpu_owned_texture_frame> frame,
 );
 
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_webgpu_surface_descriptor>,
+    ffi.Pointer<mln_render_session>,
+  )
+>()
+external int mln_webgpu_surface_attach(
+  int map,
+  ffi.Pointer<mln_webgpu_surface_descriptor> descriptor,
+  ffi.Pointer<mln_render_session> out_session,
+);
+
+@ffi.Native<mln_webgpu_surface_descriptor Function()>()
+external mln_webgpu_surface_descriptor mln_webgpu_surface_descriptor_default();
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_webgpu_surface_descriptor>,
+  )
+>()
+external int mln_webgpu_surface_set_target(
+  int session,
+  ffi.Pointer<mln_webgpu_surface_descriptor> descriptor,
+);
+
 const int MLN_ADAPTER_RESOURCE_KIND_ANY = 4294967295;
 
 const int MLN_HANDLE_NULL = 0;
@@ -6903,6 +6930,20 @@ final class mln_webgpu_owned_texture_frame extends ffi.Struct {
     ..ref.texture_view = texture_view
     ..ref.device = device
     ..ref.format = format;
+}
+
+final class mln_webgpu_surface_descriptor extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  external mln_render_target_extent extent;
+
+  external mln_webgpu_context_descriptor context;
+
+  external ffi.Pointer<ffi.Void> surface;
+
+  @ffi.Uint32()
+  external int format;
 }
 
 final class mln_wgl_context_descriptor extends ffi.Struct {
