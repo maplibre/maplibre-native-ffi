@@ -25,6 +25,15 @@ pub struct VulkanContextDescriptorFields {
     pub get_device_proc_addr: *mut c_void,
 }
 
+/// A browser host owns its WebGPU device, so a session borrows these rather than
+/// creating any of them.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WebGpuContextDescriptorFields {
+    pub instance: *mut c_void,
+    pub device: *mut c_void,
+    pub queue: *mut c_void,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WglContextDescriptorFields {
     pub device_context: *mut c_void,
@@ -40,10 +49,18 @@ pub struct EglContextDescriptorFields {
     pub get_proc_address: *mut c_void,
 }
 
+/// A browser host owns its WebGL context and hands the session its Emscripten
+/// handle, so there is nothing else for a descriptor to carry.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WebGlContextDescriptorFields {
+    pub context: i32,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum OpenGLContextDescriptorFields {
     Wgl(WglContextDescriptorFields),
     Egl(EglContextDescriptorFields),
+    WebGl(WebGlContextDescriptorFields),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -58,6 +75,14 @@ pub struct VulkanSurfaceDescriptorFields {
     pub extent: RenderTargetExtentFields,
     pub context: VulkanContextDescriptorFields,
     pub surface: *mut c_void,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WebGpuSurfaceDescriptorFields {
+    pub extent: RenderTargetExtentFields,
+    pub context: WebGpuContextDescriptorFields,
+    pub surface: *mut c_void,
+    pub format: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -98,6 +123,23 @@ pub struct VulkanBorrowedTextureDescriptorFields {
     pub format: u32,
     pub initial_layout: u32,
     pub final_layout: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WebGpuOwnedTextureDescriptorFields {
+    pub extent: RenderTargetExtentFields,
+    pub context: WebGpuContextDescriptorFields,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WebGpuBorrowedTextureDescriptorFields {
+    pub extent: RenderTargetExtentFields,
+    pub physical_width: u32,
+    pub physical_height: u32,
+    pub context: WebGpuContextDescriptorFields,
+    pub texture: *mut c_void,
+    pub texture_view: *mut c_void,
+    pub format: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -192,6 +234,22 @@ fn opengl_context_descriptor_to_native(
                 egl: egl_context_descriptor_to_native(egl),
             },
         },
+        OpenGLContextDescriptorFields::WebGl(webgl) => sys::mln_opengl_context_descriptor {
+            size: std::mem::size_of::<sys::mln_opengl_context_descriptor>() as u32,
+            platform: sys::MLN_OPENGL_CONTEXT_PLATFORM_WEBGL,
+            data: sys::mln_opengl_context_descriptor__bindgen_ty_1 {
+                webgl: webgl_context_descriptor_to_native(webgl),
+            },
+        },
+    }
+}
+
+fn webgl_context_descriptor_to_native(
+    fields: WebGlContextDescriptorFields,
+) -> sys::mln_webgl_context_descriptor {
+    sys::mln_webgl_context_descriptor {
+        size: std::mem::size_of::<sys::mln_webgl_context_descriptor>() as u32,
+        context: fields.context,
     }
 }
 
@@ -214,6 +272,18 @@ pub fn vulkan_surface_descriptor_to_native(
     raw.extent = render_target_extent_to_native(fields.extent);
     raw.context = vulkan_context_descriptor_to_native(fields.context);
     raw.surface = fields.surface;
+    raw
+}
+
+pub fn webgpu_surface_descriptor_to_native(
+    fields: WebGpuSurfaceDescriptorFields,
+) -> sys::mln_webgpu_surface_descriptor {
+    // SAFETY: Default constructor takes no arguments and initializes size fields.
+    let mut raw = unsafe { sys::mln_webgpu_surface_descriptor_default() };
+    raw.extent = render_target_extent_to_native(fields.extent);
+    raw.context = webgpu_context_descriptor_to_native(fields.context);
+    raw.surface = fields.surface;
+    raw.format = fields.format;
     raw
 }
 
@@ -274,6 +344,42 @@ pub fn vulkan_borrowed_texture_descriptor_to_native(
     raw.format = fields.format;
     raw.initial_layout = fields.initial_layout;
     raw.final_layout = fields.final_layout;
+    raw
+}
+
+fn webgpu_context_descriptor_to_native(
+    fields: WebGpuContextDescriptorFields,
+) -> sys::mln_webgpu_context_descriptor {
+    sys::mln_webgpu_context_descriptor {
+        size: std::mem::size_of::<sys::mln_webgpu_context_descriptor>() as u32,
+        instance: fields.instance,
+        device: fields.device,
+        queue: fields.queue,
+    }
+}
+
+pub fn webgpu_owned_texture_descriptor_to_native(
+    fields: WebGpuOwnedTextureDescriptorFields,
+) -> sys::mln_webgpu_owned_texture_descriptor {
+    // SAFETY: Default constructor takes no arguments and initializes size fields.
+    let mut raw = unsafe { sys::mln_webgpu_owned_texture_descriptor_default() };
+    raw.extent = render_target_extent_to_native(fields.extent);
+    raw.context = webgpu_context_descriptor_to_native(fields.context);
+    raw
+}
+
+pub fn webgpu_borrowed_texture_descriptor_to_native(
+    fields: WebGpuBorrowedTextureDescriptorFields,
+) -> sys::mln_webgpu_borrowed_texture_descriptor {
+    // SAFETY: Default constructor takes no arguments and initializes size fields.
+    let mut raw = unsafe { sys::mln_webgpu_borrowed_texture_descriptor_default() };
+    raw.extent = render_target_extent_to_native(fields.extent);
+    raw.physical_width = fields.physical_width;
+    raw.physical_height = fields.physical_height;
+    raw.context = webgpu_context_descriptor_to_native(fields.context);
+    raw.texture = fields.texture;
+    raw.texture_view = fields.texture_view;
+    raw.format = fields.format;
     raw
 }
 
@@ -510,6 +616,26 @@ mod tests {
         assert_eq!(
             (borrowed.physical_width, borrowed.physical_height),
             (65, 33)
+        );
+
+        // A browser context carries a handle rather than pointers, so it is the
+        // one provider whose union member is not pointer-shaped.
+        let browser =
+            opengl_owned_texture_descriptor_to_native(OpenGLOwnedTextureDescriptorFields {
+                extent: extent(),
+                context: OpenGLContextDescriptorFields::WebGl(WebGlContextDescriptorFields {
+                    context: 13,
+                }),
+            });
+        assert_eq!(
+            browser.context.platform,
+            sys::MLN_OPENGL_CONTEXT_PLATFORM_WEBGL
+        );
+        // SAFETY: platform selects the webgl union field initialized above.
+        assert_eq!(unsafe { browser.context.data.webgl.context }, 13);
+        assert_eq!(
+            unsafe { browser.context.data.webgl.size },
+            std::mem::size_of::<sys::mln_webgl_context_descriptor>() as u32
         );
     }
 }

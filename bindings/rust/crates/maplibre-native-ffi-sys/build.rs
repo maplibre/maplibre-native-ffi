@@ -181,7 +181,7 @@ mod download {
     const RELEASE_BASE_URL: &str =
         "https://github.com/maplibre/maplibre-native-ffi/releases/download";
     const SNAPSHOT_TAG: &str = "unstable-native-snapshot";
-    const BACKENDS: [&str; 3] = ["metal", "opengl", "vulkan"];
+    const BACKENDS: [&str; 4] = ["metal", "opengl", "vulkan", "webgpu"];
 
     /// A published `<os>-<arch>-<backend>` artifact.
     struct Preset {

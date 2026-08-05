@@ -16,10 +16,14 @@ maplibre-native-ffi-sys = { path = "../maplibre-native-ffi-sys" }
 metal = ["maplibre-native-ffi-sys/metal"]
 opengl = ["maplibre-native-ffi-sys/opengl"]
 vulkan = ["maplibre-native-ffi-sys/vulkan"]
+webgpu = ["maplibre-native-ffi-sys/webgpu"]
 
 [dev-dependencies]
+static_assertions = "1.1.0"
+
+# Native graphics fixtures.
+[target.'cfg(not(target_os = "emscripten"))'.dev-dependencies]
 ash = "0.38.0"
 glow = "0.16.0"
 glutin_egl_sys = "0.7.1"
 libloading = "0.8.9"
-static_assertions = "1.1.0"
