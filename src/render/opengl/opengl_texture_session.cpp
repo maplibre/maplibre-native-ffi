@@ -98,10 +98,9 @@ class OpenGLTextureRenderableResource final
     }
   }
 
-  // A caller-owned texture is handed back to its owner as soon as the render
-  // update returns, so it completes every frame. A session-owned texture is
-  // handed over at acquire-frame, which completes the rendering itself, and
-  // CPU readback fences on glReadPixels in this context.
+  // A caller-owned texture returns to its owner as soon as the render update
+  // returns, so it completes every frame. A session-owned texture is handed
+  // over at acquire-frame, which completes the rendering itself.
   void swap() override {
     if (borrowed_texture_ != 0) {
       context.finish();
@@ -191,10 +190,9 @@ class OpenGLTextureRenderableResource final
   std::optional<mbgl::gl::Framebuffer> framebuffer_;
 };
 
-// A browser session renders into the host's own context, whichever kind of
-// texture it draws into, so MapLibre has to treat its cached GL state as stale
-// each frame. Every other provider gets a session context of its own inside the
-// host's share group and so keeps exclusive ownership of it.
+// A browser session renders into the host's own context, so MapLibre must treat
+// its cached GL state as stale each frame. Every other provider gets a session
+// context of its own inside the host's share group.
 #if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
 constexpr auto session_context_mode = mbgl::gfx::ContextMode::Shared;
 #else
@@ -284,17 +282,14 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
 
   void finish_rendering() { getContext<mbgl::gl::Context>().finish(); }
 
-  // Renders into a different caller-owned texture from here on. The session's
-  // context is untouched, so every object the renderer built in it survives;
-  // only the framebuffer that named the outgoing texture is rebuilt, which
-  // getDefaultRenderable() does once the resource is gone.
+  // Renders into a different caller-owned texture from here on, keeping the
+  // session's context and everything the renderer built in it.
   void set_borrowed_texture(uint32_t texture, mbgl::Size new_size) {
     borrowed_texture_ = texture;
-    // setSize() drops the renderable unconditionally, which is what rebuilds
-    // the framebuffer against the new texture even when the size is unchanged.
-    // No context is made current for it: the framebuffer and renderbuffer names
-    // it owns go to the context's abandoned lists and are deleted on the next
-    // render, the same way an owned-texture resize releases them.
+    // setSize() drops the renderable unconditionally, rebuilding the
+    // framebuffer against the new texture even when the size is unchanged. No
+    // context is made current: the framebuffer and renderbuffer names go to the
+    // context's abandoned lists and are deleted on the next render.
     setSize(new_size);
   }
 
@@ -671,10 +666,8 @@ auto opengl_borrowed_texture_set_target(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  // The same check attach makes: the shared validator accepts any nonzero
-  // target, and the backend attaches whatever name it is given as
-  // GL_TEXTURE_2D. Without this a cube-map target is taken here and only fails
-  // on the next render, with the old target already discarded.
+  // The same check attach makes. Without it a cube-map target fails only on the
+  // next render, once the outgoing target is already discarded.
   if (descriptor->target != opengl_texture_target) {
     set_thread_error("OpenGL texture target must be GL_TEXTURE_2D");
     return MLN_STATUS_INVALID_ARGUMENT;

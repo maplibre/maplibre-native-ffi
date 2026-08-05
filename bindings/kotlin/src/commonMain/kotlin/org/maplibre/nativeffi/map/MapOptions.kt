@@ -30,11 +30,8 @@ public class MapOptions {
     }
 
   /**
-   * UI-to-device pixel scale, fixed for the lifetime of the map.
-   *
-   * This selects sprites, glyphs, and raster tiles for every frame. Render targets carry their own
-   * scale factor for geometry, so attaching or resizing a session with a different one logs a
-   * warning and renders styled imagery chosen for this density.
+   * UI-to-device pixel scale, fixed for the lifetime of the map. It selects sprites, glyphs, and
+   * raster tiles; render targets carry their own scale factor for geometry.
    */
   public var scaleFactor: Double? = null
 
@@ -42,12 +39,7 @@ public class MapOptions {
 
   /**
    * Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR encodings, fixed for the
-   * lifetime of the map.
-   *
-   * Enable this on maps that read vector sources created with
-   * [org.maplibre.nativeffi.style.VectorTileEncoding.MLT] from a tile set that uses FastPFOR. A map
-   * created with this `false` decodes every other MLT encoding and logs a tile parse warning for
-   * the FastPFOR ones.
+   * lifetime of the map. A map created with this `false` logs a tile parse warning for such tiles.
    */
   public var fastPforEnabled: Boolean? = null
 

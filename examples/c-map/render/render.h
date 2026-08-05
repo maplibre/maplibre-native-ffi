@@ -1,7 +1,5 @@
-// The uniform render-target interface. Exactly one backend translation unit
-// is compiled per build, selected by the CMake render-backend probe, so these
-// are free functions rather than a dispatch table: the linker does the
-// dispatch.
+// The uniform render-target interface. Exactly one backend translation unit is
+// compiled per build, so the linker does the dispatch.
 
 #ifndef C_MAP_RENDER_RENDER_H
 #define C_MAP_RENDER_RENDER_H
@@ -55,8 +53,8 @@ void render_target_deinit(render_target* target);
   render_target* target, viewport current_viewport
 );
 
-/// Runs once per render loop iteration, before the render request is
-/// consumed: fences, pacing, and deferred presentation cleanup live here.
+/// Runs once per render loop iteration, before the render request is consumed:
+/// fences, pacing, and deferred presentation cleanup.
 [[nodiscard]] app_error render_target_finish_frame(render_target* target);
 
 /// Consumes one render request: renders, composites when the mode needs it,

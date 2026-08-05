@@ -861,7 +861,7 @@ fn countingProvider(
 }
 
 // Requests a style whose scheme no file source serves, so the failure event
-// that follows proves the request reached the network file source.
+// proves the request reached the network file source.
 fn loadProbeStyle(runtime: *maplibre.RuntimeHandle, map: *maplibre.MapHandle, style_url: []const u8) !void {
     try map.setStyleUrl(testing.allocator, style_url);
     var event = try waitForOwnedEvent(runtime, .map_loading_failed);

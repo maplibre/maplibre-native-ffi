@@ -80,10 +80,9 @@ public enum RuntimeEventType : uint
 /// <param name="RuntimeSource">The runtime that produced a runtime-sourced event.</param>
 /// <param name="MapSource">
 /// The map that raised this event, resolved from the runtime's weak map registry.
-/// Hold your own strong reference to a <see cref="MapHandle" /> for as long as you
-/// want to attribute its events: once the only remaining reference is the runtime's
-/// weak one, the map can be collected and this member is <see langword="null" />
-/// even though <see cref="SourceType" /> still reports a map source.
+/// Hold a strong reference to the <see cref="MapHandle" /> for as long as you want to
+/// attribute its events: a collected map leaves this <see langword="null" /> even
+/// though <see cref="SourceType" /> still reports a map source.
 /// </param>
 /// <param name="Code">
 /// Secondary event detail whose meaning <paramref name="Type" /> selects:
@@ -105,7 +104,7 @@ public enum RuntimeEventType : uint
 /// <item>
 /// <description>
 /// <see cref="RuntimeEventType.OfflineOperationCompleted" />: the operation result as a
-/// <c>MaplibreStatus</c> value, the same value the payload reports in its result status.
+/// <c>MaplibreStatus</c> value.
 /// </description>
 /// </item>
 /// <item><description>Every other event kind: 0.</description></item>

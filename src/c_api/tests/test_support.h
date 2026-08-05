@@ -34,11 +34,9 @@ void mln_test_destroy_runtime(mln_runtime runtime);
 void mln_test_destroy_map(mln_map map);
 void mln_test_sleep_millisecond(void);
 
-// Reads a file under the directory named by the MLN_FFI_TEST_FIXTURE_DIR
-// environment variable, which ctest sets, for tests that replay recorded tile
-// or style bytes through a resource provider. relative_path is joined onto that
-// directory. Returns malloc'd bytes the caller frees, or null when the file
-// cannot be read, with *out_size set to the byte count on success.
+// Reads relative_path under the directory named by MLN_FFI_TEST_FIXTURE_DIR,
+// which ctest sets. Returns malloc'd bytes the caller frees and sets *out_size,
+// or null when the file cannot be read.
 uint8_t* mln_test_read_fixture(const char* relative_path, size_t* out_size);
 
 bool mln_test_render_fixture_create(
@@ -47,20 +45,18 @@ bool mln_test_render_fixture_create(
 void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture);
 
 // Pumps the runtime until `flag` is set or the deadline passes. Returns whether
-// the flag was observed. Use for waiting on work another thread reports.
+// the flag was observed.
 bool mln_test_pump_until(mln_runtime runtime, atomic_bool* flag);
 
 // Destroys everything this thread still has tracked, render session first, then
-// map, then runtime, and reports whether it reclaimed anything. Safe to call
-// after an aborted test: it reports through its return value rather than
-// through assertions, which would longjmp out of teardown.
+// map, then runtime, and reports whether it reclaimed anything. Reports through
+// its return value rather than assertions, which would longjmp out of teardown.
 bool mln_test_reclaim_thread_resources(void);
 
-// Releases the graphics device this thread cached, which a thread has to do
-// before its entry function returns. On the browser WebGPU target a live
-// GPUDevice pins an Emscripten runtime keepalive, and a thread that still holds
-// one is never reported as exited, so pthread_join on it blocks forever. A
-// no-op wherever the backend caches nothing per thread.
+// Releases the graphics device this thread cached. Every thread must call this
+// before its entry function returns: on browser WebGPU a live GPUDevice pins an
+// Emscripten keepalive and pthread_join on that thread blocks forever. A no-op
+// where the backend caches nothing per thread.
 void mln_test_release_thread_gpu_resources(void);
 
 #endif

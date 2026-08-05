@@ -4,10 +4,8 @@ import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.json.JsonValue
 
 /**
- * Mutable descriptor for GeoJSON style sources.
- *
- * MapLibre Native fixes these options when the source is created, so the update APIs keep the
- * options the source was added with.
+ * Mutable descriptor for GeoJSON style sources. These options are fixed when the source is created;
+ * the data update APIs keep the options the source was added with.
  *
  * Compares and hashes by field value; [copy] returns an independent instance. Keep an instance
  * unmodified while it is a key in a hash-based collection.
@@ -55,10 +53,7 @@ public class GeoJsonSourceOptions {
 
   public var cluster: Boolean? = null
 
-  /**
-   * Applies data updates synchronously, so data set through the GeoJSON data update API reaches the
-   * next rendered frame instead of being tiled on a worker and shown in a later one.
-   */
+  /** Tiles data updates inline, so a data update reaches the next rendered frame. */
   public var synchronousUpdate: Boolean? = null
 
   /** Returns an independent copy of this descriptor with [block] applied to the copy. */

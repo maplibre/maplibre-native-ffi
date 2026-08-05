@@ -36,9 +36,8 @@ public readonly record struct RenderTargetExtent(uint Width, uint Height, double
 {
     /// <summary>
     /// Returns the physical device-pixel size as ceil(logical * <see cref="ScaleFactor"/>) per
-    /// dimension. Session-owned texture targets and surface targets are sized this way. Borrowed
-    /// texture targets state their physical size instead, because not every physical size is
-    /// reachable from a logical extent.
+    /// dimension, which is how surface and session-owned texture targets are sized. Borrowed
+    /// texture targets state their physical size instead.
     /// </summary>
     public unsafe (uint Width, uint Height) PhysicalSize()
     {

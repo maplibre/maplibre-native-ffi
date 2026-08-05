@@ -1,7 +1,6 @@
-// The Vulkan render target: a shared instance/device/queue bridged to the C
-// API through the Vulkan context descriptor, a fullscreen-triangle texture
-// compositor over a window swapchain, and the three render-target modes
-// behind the uniform interface in render.h.
+// The Vulkan render target: a shared instance/device/queue bridged to the C API
+// through the Vulkan context descriptor, plus a fullscreen-triangle compositor
+// over a window swapchain.
 
 #include <SDL3/SDL.h>
 #include <maplibre_native_c.h>
@@ -94,14 +93,9 @@ static app_error vulkan_compositor_init(
   return error;
 }
 
-/// Notes a resized window without touching the swapchain.
-///
-/// The swapchain the window displays stays live until the present that
-/// replaces its content: destroying it here would blank the window for as
-/// long as the map takes to render at the new extent, because the compositor
-/// only presents when a map frame is ready. Presenting through the stale
-/// swapchain scales the old content in the meantime, which is what a resized
-/// native surface shows too.
+/// Notes a resized window without touching the swapchain. The compositor only
+/// presents when a map frame is ready, so destroying the swapchain here would
+/// blank the window until the map renders at the new extent.
 static void vulkan_compositor_resize(
   vulkan_compositor* compositor, viewport current_viewport
 ) {
@@ -113,10 +107,9 @@ static app_error vulkan_compositor_recreate_swapchain(
   vulkan_compositor* compositor
 ) {
   vulkan_context_wait_idle(&compositor->context);
-  // The replacement is created before the retired swapchain is destroyed and
-  // names it as oldSwapchain, so the presentation engine hands the surface
-  // over directly. Destroying it first leaves a gap that MoltenVK fills with
-  // presents that succeed but reach no drawable the window still shows.
+  // Create the replacement naming the retired swapchain as oldSwapchain before
+  // destroying it: on MoltenVK, destroying first leaves presents that succeed
+  // but reach no drawable the window shows.
   vulkan_swapchain previous = compositor->swapchain;
   const VkFormat previous_format = previous.format;
   const app_error error = vulkan_swapchain_init(
@@ -162,16 +155,13 @@ static app_error vulkan_compositor_present_image_view(
   *out_presented = false;
   MAP_TRY(vulkan_compositor_wait_for_frame(compositor));
 
-  // The frame about to present is the first content the resized swapchain
-  // could show, so this is the moment the stale one is replaced.
   if (compositor->swapchain_stale) {
     MAP_TRY(vulkan_compositor_recreate_swapchain(compositor));
     compositor->swapchain_stale = false;
   }
 
-  // After the fence wait, so no in-flight commands read the descriptor set,
-  // and after the replacement, whose format change rebuilds the pipeline
-  // around an unwritten descriptor set that this check then populates.
+  // Must follow the fence wait, so no in-flight command reads the descriptor
+  // set, and the swapchain replacement, which can rebuild the pipeline.
   if (image_view != compositor->pipeline.descriptor_image_view) {
     vulkan_pipeline_update_descriptor(
       &compositor->pipeline, compositor->context.device, image_view
@@ -188,8 +178,7 @@ static app_error vulkan_compositor_present_image_view(
     return APP_OK;
   }
   if (acquire == VK_SUBOPTIMAL_KHR) {
-    // Still presentable, but the surface has moved on; replace the swapchain
-    // before the next frame.
+    // Still presentable, but the surface has moved on.
     compositor->swapchain_stale = true;
   }
   MAP_TRY(expect_vk_or_suboptimal(acquire));
@@ -216,9 +205,8 @@ static app_error vulkan_compositor_present_image_view(
   const VkResult present =
     vkQueuePresentKHR(compositor->context.queue, &present_info);
   if (present == VK_ERROR_OUT_OF_DATE_KHR) {
-    // Nothing reached the screen. The sampling pass was submitted, so wait it
-    // out before the caller releases its frame, and report no present so the
-    // render request is set again.
+    // Nothing reached the screen, but the sampling pass was submitted; wait it
+    // out before the caller releases its frame.
     compositor->swapchain_stale = true;
     (void)vulkan_compositor_wait_for_frame(compositor);
     return APP_OK;
@@ -530,12 +518,8 @@ void render_target_deinit(render_target* target) {
   free(target);
 }
 
-/// Follows a resized window in borrowed-texture mode.
-///
-/// This example sizes the borrowed image, not the session, so following a
-/// resize means allocating one at the new size and handing it to the live
-/// session. The session stays live, which is what keeps the map from going
-/// cold on every resize.
+/// Follows a resized window in borrowed-texture mode: allocates an image at
+/// the new size and hands it to the live session, which stays attached.
 static app_error resize_borrowed(
   render_target* target, viewport current_viewport
 ) {
@@ -556,9 +540,8 @@ static app_error resize_borrowed(
   const mln_status status =
     mln_vulkan_borrowed_texture_set_target(target->session.handle, &descriptor);
   if (status != MLN_STATUS_OK) {
-    // A native error may mean the session took the replacement before
-    // failing, and nothing here can tell that apart from a rejection that
-    // came first, so detach before either target is released.
+    // The session may have taken the replacement before failing, so detach
+    // before either image is released.
     mln_render_session_detach(target->session.handle);
     diagnostics_log_status("Vulkan borrowed texture set target failed", status);
     target->as.borrowed.image = previous;
@@ -567,8 +550,7 @@ static app_error resize_borrowed(
     );
     return APP_ERROR_TEXTURE_RESIZE_FAILED;
   }
-  // Only once the session has taken the replacement, so a rejected one leaves
-  // this target on the image it already had.
+  // Released only once the session has taken the replacement.
   borrowed_image_deinit(
     &previous, target->as.borrowed.compositor.context.device
   );
@@ -643,7 +625,7 @@ static app_error render_update_owned(
   }
 
   // The frame stays acquired until the compositor's fence proves the sampling
-  // pass finished; finish_frame releases it on a later iteration.
+  // pass finished; finish_frame releases it.
   target->as.owned.pending_frame = frame;
   target->as.owned.has_pending_frame = true;
   *out_rendered = true;

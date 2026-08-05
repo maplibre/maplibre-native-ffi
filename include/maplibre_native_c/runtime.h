@@ -577,11 +577,10 @@ typedef struct mln_resource_request {
    * It matches requested_url when no configured alias applies. Providers that
    * replace the built-in network stack fetch this URL.
    *
-   * It also matches requested_url when normalization rejects the URL, which a
-   * tile server that requires an API key does for a canonical URL when no key
-   * is configured. Native loading fails such a request outright, so keeping the
-   * request reachable lets a provider serve it instead. A provider that only
-   * fetches over HTTP checks the scheme before it does.
+   * It also matches requested_url when normalization rejects the URL, as a tile
+   * server requiring an API key does when no key is configured. Native loading
+   * fails such a request, so a provider that only fetches over HTTP checks the
+   * scheme before serving it.
    */
   const char* resolved_url;
   uint32_t kind;
@@ -695,11 +694,9 @@ MLN_API mln_status mln_runtime_create(
  * or the runtime is destroyed. When this call returns, no in-flight request can
  * still invoke the previous provider. Requests the previous provider already
  * took a handle for keep that handle: complete and release each one as usual.
- * Native OnlineFileSource claims every remaining scheme, so a URL with a
- * scheme MapLibre does not recognize, such as jar:file:, is treated as a
- * network request, reaches this callback, and completes as an HTTP error when
- * the provider passes it through. Hosts use this extension point to serve
- * those schemes from host storage.
+ * Native OnlineFileSource claims every remaining scheme, so a URL with a scheme
+ * MapLibre does not recognize, such as jar:file:, reaches this callback and
+ * completes as an HTTP error when the provider passes it through.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -788,8 +785,7 @@ MLN_API void mln_resource_request_release(
  * Blocks until a resource request is completed or released.
  *
  * Hosts that hand a request to another execution context use this to drain
- * outstanding requests during teardown, because a handled request keeps host
- * state reachable until it is retired. Call it from a context that is not
+ * outstanding requests during teardown. Call it from a context that is not
  * responsible for retiring the request.
  *
  * Returns:
@@ -948,29 +944,14 @@ MLN_API mln_status mln_runtime_offline_operation_discard(
  *
  * The runtime must no longer own live maps.
  *
- * When a resource transform is registered, this call waits for in-flight
- * transform callbacks before returning, the same way
- * mln_runtime_set_resource_transform() and
- * mln_runtime_clear_resource_transform() do. The callback contract documented
- * on mln_resource_transform_callback keeps that wait short: the callback
- * returns quickly and calls no C API function other than
- * mln_resource_transform_response_set_url().
- * Registered HTTP header transforms have the same retirement guarantee and
- * remain valid until every in-flight mln_http_header_transform_callback
- * returns.
+ * This call waits for in-flight resource transform, HTTP header transform, and
+ * resource provider callbacks before returning, the same way the corresponding
+ * set and clear functions do. Each callback and its user_data stay valid until
+ * that point and are unreferenced once this call returns, so a host frees
+ * callback-owned state only after it does.
  *
- * A registered resource provider is waited on the same way: this call blocks
- * until every in-flight mln_resource_provider_callback invocation returns,
- * matching mln_runtime_set_resource_provider() and
- * mln_runtime_clear_resource_provider(). The callback and its user_data stay
- * valid until that point and are unreferenced once this call returns, so a
- * host frees provider-owned state only after it does.
- *
- * Both waits run with no runtime-internal lock that other runtimes need, so a
- * slow callback delays only this runtime. Do not call this while holding a
- * host lock that a provider, URL transform, or HTTP header transform callback
- * also acquires; the callback
- * cannot finish, and this call cannot return.
+ * Do not call this while holding a host lock that one of those callbacks also
+ * acquires; the callback cannot finish, and this call cannot return.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -992,18 +973,15 @@ MLN_API mln_status mln_runtime_destroy(mln_runtime runtime) MLN_NOEXCEPT;
  *
  * timeout_ms sets the park bound:
  *
- * - Zero drains and returns. Hosts pumping from a frame callback pass zero and
- *   take their cadence from that callback.
- * - A positive value parks for up to that many milliseconds, then drains. Hosts
- *   that own their pump thread pass a positive value and take their cadence
- *   from the runtime's own work.
+ * - Zero drains and returns. Hosts pumping from a frame callback pass zero.
+ * - A positive value parks for up to that many milliseconds, then drains.
  * - A negative value parks until a wake arrives, then drains.
  *
  * The drain runs every task queued when it begins plus every task those tasks
  * enqueue, and services expired timers and ready file descriptors for the
  * runtime's own network and database work. Its duration follows the work it
- * finds and can span a full style parse, so treat it as work that runs to
- * completion rather than as a fixed-cost per-frame slice.
+ * finds and can span a full style parse, so it is not a fixed-cost per-frame
+ * slice.
  *
  * The runtime holds a wake flag. These set it:
  *
@@ -1062,8 +1040,7 @@ MLN_API mln_status mln_runtime_wake_source_acquire(
 /**
  * Sets the runtime's wake flag and releases the parked owner thread.
  *
- * This function may be called from any thread. It takes one small lock and
- * returns, so a host calls it from its task submission path.
+ * This function may be called from any thread.
  *
  * A signal raised while the owner thread is running sets the wake flag, so the
  * next mln_runtime_pump() call returns without parking. Signalling a wake

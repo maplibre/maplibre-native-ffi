@@ -2,10 +2,9 @@
 // API.
 //
 // Runtime, map, projection, render-session, acquired-frame, and offline
-// operation handles follow the C API owner-thread model. Until the Go
-// owner-thread helper lands, callers should use runtime.LockOSThread before
-// creating a RuntimeHandle and keep that runtime's lifecycle on the locked
-// goroutine.
+// operation handles follow the C API owner-thread model. Call
+// runtime.LockOSThread before creating a RuntimeHandle and keep that runtime's
+// lifecycle on the locked goroutine.
 package maplibre
 
 /*

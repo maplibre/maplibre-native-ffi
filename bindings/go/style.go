@@ -89,8 +89,7 @@ type StyleTileSourceOptions struct {
 	RasterEncoding *StyleRasterDEMEncoding
 }
 
-// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
-// compares the optional fields by pointer identity.
+// Equal reports whether two descriptors hold the same field values.
 func (options StyleTileSourceOptions) Equal(other StyleTileSourceOptions) bool {
 	return equalPointer(options.MinZoom, other.MinZoom) &&
 		equalPointer(options.MaxZoom, other.MaxZoom) &&
@@ -180,16 +179,16 @@ func (options cStyleTileSourceOptions) free() {
 	options.attribution.free()
 }
 
-// StyleGeoJSONSourceOptions configures GeoJSON sources. MapLibre Native fixes these options when
-// the source is created, so SetGeoJSONSourceURL and SetGeoJSONSourceData keep the options the
-// source was added with.
+// StyleGeoJSONSourceOptions configures GeoJSON sources. These options are fixed
+// when the source is created, so SetGeoJSONSourceURL and SetGeoJSONSourceData
+// keep the options the source was added with.
 type StyleGeoJSONSourceOptions struct {
 	MinZoom        *float64
 	MaxZoom        *float64
 	Tolerance      *float64
 	ClusterMaxZoom *float64
-	// ClusterProperties holds cluster aggregation expressions keyed by property name, as a JSON
-	// object whose members follow the MapLibre Style Spec clusterProperties form.
+	// ClusterProperties holds cluster aggregation expressions as a JSON object
+	// in the MapLibre Style Spec clusterProperties form.
 	ClusterProperties *JSONValue
 	TileSize          *uint32
 	Buffer            *uint32
@@ -198,13 +197,12 @@ type StyleGeoJSONSourceOptions struct {
 	LineMetrics       *bool
 	Cluster           *bool
 	// SynchronousUpdate applies data updates synchronously, so data set through
-	// SetGeoJSONSourceData reaches the next rendered frame instead of being tiled on a worker
-	// and shown in a later one.
+	// SetGeoJSONSourceData reaches the next rendered frame rather than a later
+	// one.
 	SynchronousUpdate *bool
 }
 
-// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
-// does not compile for structs holding JSON values.
+// Equal reports whether two descriptors hold the same field values.
 func (options StyleGeoJSONSourceOptions) Equal(other StyleGeoJSONSourceOptions) bool {
 	return equalPointer(options.MinZoom, other.MinZoom) &&
 		equalPointer(options.MaxZoom, other.MaxZoom) &&
@@ -337,8 +335,8 @@ func (options StyleGeoJSONSourceOptions) WithSynchronousUpdate(synchronousUpdate
 	return options
 }
 
-// cStyleGeoJSONSourceOptions keeps the native options struct in C storage because the descriptor
-// carries the cluster property tree owned by a Go-side materializer.
+// cStyleGeoJSONSourceOptions keeps the native options struct in C storage
+// because it points at a cluster property tree a Go-side materializer owns.
 type cStyleGeoJSONSourceOptions struct {
 	raw          *C.mln_geojson_source_options
 	materializer *cJSONMaterializer
@@ -428,11 +426,11 @@ func (options *cStyleGeoJSONSourceOptions) free() {
 	}
 }
 
-// CustomGeometryTileCallback receives custom geometry tile requests. Native
-// code may invoke it on worker threads and may race it with owner-thread map
-// calls. The callback must be thread-safe, must not call MapLibre map APIs
-// directly, and should queue SetCustomGeometrySourceTileData or invalidation
-// work back to the map owner thread. Panics are recovered and ignored.
+// CustomGeometryTileCallback receives custom geometry tile requests. Native code
+// may invoke it on worker threads, racing owner-thread map calls, so it must be
+// thread-safe, must not call MapLibre map APIs, and should queue
+// SetCustomGeometrySourceTileData or invalidation work back to the map owner
+// thread. Panics are recovered and ignored.
 type CustomGeometryTileCallback func(CanonicalTileID)
 
 // CustomGeometrySourceOptions configures a custom geometry source. CancelTile is
@@ -530,8 +528,8 @@ const (
 type StyleImageOptions struct {
 	PixelRatio *float32
 	SDF        *bool
-	// StretchX and StretchY are the stretchable intervals along each axis. A present empty
-	// slice stays distinguishable from an absent one.
+	// StretchX and StretchY are the stretchable intervals along each axis. A
+	// present empty slice stays distinguishable from an absent one.
 	StretchX []ImageStretch
 	StretchY []ImageStretch
 	// Content is the content box used when icon-text-fit applies.
@@ -540,8 +538,7 @@ type StyleImageOptions struct {
 	TextFitHeight *StyleImageTextFit
 }
 
-// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
-// does not compile for structs holding slices.
+// Equal reports whether two descriptors hold the same field values.
 func (options StyleImageOptions) Equal(other StyleImageOptions) bool {
 	return equalPointer(options.PixelRatio, other.PixelRatio) &&
 		equalPointer(options.SDF, other.SDF) &&
@@ -552,8 +549,8 @@ func (options StyleImageOptions) Equal(other StyleImageOptions) bool {
 		equalPointer(options.TextFitHeight, other.TextFitHeight)
 }
 
-// equalStretches compares stretch slices by content, keeping a present empty slice distinct
-// from an absent one.
+// equalStretches compares stretch slices by content, keeping a present empty
+// slice distinct from an absent one.
 func equalStretches(left, right []ImageStretch) bool {
 	if (left == nil) != (right == nil) || len(left) != len(right) {
 		return false
@@ -579,7 +576,7 @@ func (options StyleImageOptions) Clone() StyleImageOptions {
 	return cloned
 }
 
-// cloneStretches copies a stretch slice, keeping a present empty slice distinguishable
+// cloneStretches copies a stretch slice, keeping a present empty slice distinct
 // from an absent one.
 func cloneStretches(stretches []ImageStretch) []ImageStretch {
 	if stretches == nil {
@@ -590,8 +587,8 @@ func cloneStretches(stretches []ImageStretch) []ImageStretch {
 	return cloned
 }
 
-// cStyleImageOptions keeps the stretch arrays in C storage because the native options struct
-// borrows them for the duration of the call.
+// cStyleImageOptionsScope keeps the stretch arrays in C storage, which the
+// native options struct borrows for the duration of the call.
 type cStyleImageOptionsScope struct {
 	raw      C.mln_style_image_options
 	stretchX unsafe.Pointer
@@ -651,8 +648,7 @@ func (scope *cStyleImageOptionsScope) free() {
 
 func allocCStretches(stretches []ImageStretch) unsafe.Pointer {
 	if len(stretches) == 0 {
-		// A present empty array still needs a non-null pointer only when the count is
-		// non-zero, so an empty slice keeps a null pointer with a zero count.
+		// A zero count needs no pointer, so an empty slice stays null.
 		return nil
 	}
 	size := C.size_t(len(stretches)) * C.size_t(unsafe.Sizeof(C.mln_image_stretch{}))
@@ -665,30 +661,25 @@ func allocCStretches(stretches []ImageStretch) unsafe.Pointer {
 	return allocation
 }
 
-// StyleTransitionOptions configures the style's global transitions.
-//
-// These control how the style animates paint property changes and whether symbol placement
-// changes cross-fade. They are distinct from camera animation options and from the per-property
-// transitions a style declares.
+// StyleTransitionOptions configures how the style animates paint property
+// changes and whether symbol placement changes cross-fade. These are distinct
+// from camera animation options and from the per-property transitions a style
+// declares.
 type StyleTransitionOptions struct {
-	// DurationMS is the transition duration in milliseconds. An absent value falls back to the
-	// duration the style declares for each transitioning property.
+	// DurationMS is the transition duration in milliseconds. An absent value
+	// falls back to the duration the style declares per property.
 	DurationMS *float64
-	// DelayMS is the transition delay in milliseconds. An absent value falls back to the delay
-	// the style declares for each transitioning property.
+	// DelayMS is the transition delay in milliseconds. An absent value falls
+	// back to the delay the style declares per property.
 	DelayMS *float64
-	// EnablePlacementTransitions reports whether symbol placement changes cross-fade. An
-	// absent value leaves the cross-fade on, which is MapLibre Native's own default.
-	//
-	// Clearing it makes symbol placement changes apply to the next rendered frame. Hosts that
-	// move symbol-backed features at pointer frequency clear it for the duration of the
-	// interaction so the rendered symbol keeps up. Reading the options always reports it,
-	// because MapLibre Native always holds a value for it.
+	// EnablePlacementTransitions reports whether symbol placement changes
+	// cross-fade, which an absent value leaves on. Clearing it makes symbol
+	// placement changes apply to the next rendered frame. Reading the options
+	// always reports a value.
 	EnablePlacementTransitions *bool
 }
 
-// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
-// compares pointer fields by identity.
+// Equal reports whether two descriptors hold the same field values.
 func (options StyleTransitionOptions) Equal(other StyleTransitionOptions) bool {
 	return equalPointer(options.DurationMS, other.DurationMS) &&
 		equalPointer(options.DelayMS, other.DelayMS) &&
@@ -746,8 +737,8 @@ type StyleImageInfo struct {
 	ByteLength uint64
 	PixelRatio float32
 	SDF        bool
-	// StretchXCount and StretchYCount report the interval counts. Read the intervals
-	// themselves with StyleImageStretches.
+	// StretchXCount and StretchYCount report the interval counts. Read the
+	// intervals themselves with StyleImageStretches.
 	StretchXCount uint64
 	StretchYCount uint64
 	// Content is the content box, absent when the image carries none.
@@ -809,8 +800,8 @@ func styleImageInfoFromC(info C.mln_style_image_info) StyleImageInfo {
 	return result
 }
 
-// StyleImageStretches returns one runtime style image's stretchable intervals, and whether the
-// image exists. It probes the required counts, then copies.
+// StyleImageStretches returns one runtime style image's stretchable intervals
+// and whether the image exists.
 func (m *MapHandle) StyleImageStretches(imageID string) (stretchX, stretchY []ImageStretch, found bool, err error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -906,9 +897,9 @@ func styleSourceInfoFromC(info C.mln_style_source_info) StyleSourceInfo {
 	return result
 }
 
-// AddGeoJSONSourceURL adds a GeoJSON source that loads from a URL. MapLibre Native fixes options
-// when the source is created, so later SetGeoJSONSourceURL and SetGeoJSONSourceData calls keep the
-// options passed here.
+// AddGeoJSONSourceURL adds a GeoJSON source that loads from a URL. Later
+// SetGeoJSONSourceURL and SetGeoJSONSourceData calls keep the options passed
+// here.
 func (m *MapHandle) AddGeoJSONSourceURL(sourceID string, url string, options *StyleGeoJSONSourceOptions) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -948,9 +939,9 @@ func (m *MapHandle) SetGeoJSONSourceURL(sourceID string, url string) error {
 }
 
 // AddGeoJSONSourceData adds a GeoJSON source with inline data. Accepted data is
-// copied into MapLibre Native before the call returns. MapLibre Native fixes options when the
-// source is created, so later SetGeoJSONSourceData and SetGeoJSONSourceURL calls keep the options
-// passed here.
+// copied into MapLibre Native before the call returns, and later
+// SetGeoJSONSourceData and SetGeoJSONSourceURL calls keep the options passed
+// here.
 func (m *MapHandle) AddGeoJSONSourceData(sourceID string, data GeoJSON, options *StyleGeoJSONSourceOptions) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -1000,9 +991,8 @@ func (m *MapHandle) SetGeoJSONSourceData(sourceID string, data GeoJSON) error {
 
 // AddCustomGeometrySource adds a custom geometry source to the current style.
 // Callback state remains valid until source removal, style replacement, or map
-// close. URL style replacement completes asynchronously; after SetStyleURL,
-// detached custom geometry callback state is released when RuntimeHandle.PollEvent
-// observes RuntimeEventMapStyleLoaded for this map.
+// close. After SetStyleURL, detached callback state is released when
+// RuntimeHandle.PollEvent observes RuntimeEventMapStyleLoaded for this map.
 func (m *MapHandle) AddCustomGeometrySource(sourceID string, options CustomGeometrySourceOptions) error {
 	if options.FetchTile == nil {
 		return newBindingError(ErrInvalidArgument, "CustomGeometrySourceOptions.FetchTile is nil")
@@ -1211,9 +1201,8 @@ func (m *MapHandle) StyleImagePremultipliedRGBA8Into(imageID string, buffer []by
 		return uint64(byteLength), bool(found), err
 	}
 	runtime.KeepAlive(buffer)
-	// An empty destination reaches native code as the null pointer and zero
-	// capacity that mean a size probe, which succeeds without copying. Report the
-	// buffer as too small unless the image really carries no bytes.
+	// An empty destination reaches native code as a size probe, which succeeds
+	// without copying, so report it as too small unless the image is empty.
 	if len(buffer) == 0 && byteLength > 0 {
 		return uint64(byteLength), bool(found), newBindingError(ErrInvalidArgument,
 			fmt.Sprintf("buffer length 0 is smaller than the required %d bytes", uint64(byteLength)))
@@ -2043,11 +2032,10 @@ func (m *MapHandle) StyleLightProperty(propertyName string) (JSONValue, error) {
 	return cJSONSnapshotValue(snapshot)
 }
 
-// SetStyleTransitionOptions sets the style's global transition options.
-//
-// Absent duration and delay clear the style-wide override, so this call replaces the whole
-// transition configuration rather than merging into it. Loading a style replaces these options
-// with the ones that style declares, so apply an override after the style loads.
+// SetStyleTransitionOptions replaces the style's global transition options
+// rather than merging into them, so absent duration and delay clear the
+// style-wide override. Loading a style replaces these options with the ones
+// that style declares, so apply an override after the style loads.
 func (m *MapHandle) SetStyleTransitionOptions(options StyleTransitionOptions) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -2246,7 +2234,7 @@ func (m *MapHandle) setLayerText(layerID string, text string, set func(C.mln_map
 	})
 }
 
-// copyLayerText probes the required length, then copies. A null buffer with zero
+// copyMapText probes the required length, then copies. A null buffer with zero
 // capacity is a size probe the C API answers with OK.
 func (m *MapHandle) copyMapText(copy func(C.mln_map, *C.char, C.size_t, *C.size_t) int32) (string, error) {
 	ptr, release, err := m.ptr()

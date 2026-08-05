@@ -11,9 +11,8 @@ import org.gradle.api.publish.tasks.GenerateModuleMetadata
 /**
  * Replaces fallback coordinates for targets disabled on the current host.
  *
- * Kotlin assigns those variants the Gradle project name and `unspecified` because it creates no
- * target publication delegate on that host. Split-host cinterop publishing still needs one
- * canonical root that references every target publication.
+ * Kotlin assigns those variants the Gradle project name and `unspecified`, but split-host cinterop
+ * publishing needs one canonical root that references every target publication.
  */
 fun Project.canonicalizeKmpRootMetadata(
   group: String,

@@ -80,9 +80,6 @@ typedef uint32_t (*mln_log_callback)(
  * - MapLibre may invoke it while holding internal logging locks.
  * - The callback must be thread-safe, return quickly, and must not call this C
  *   API or MapLibre Native APIs.
- * - Language adapters for runtimes that restrict native-thread callbacks can
- *   marshal records into host-managed logging facilities before invoking user
- *   code.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -93,9 +90,6 @@ mln_log_set_callback(mln_log_callback callback, void* user_data) MLN_NOEXCEPT;
 
 /**
  * Clears the process-global log callback.
- *
- * After this call succeeds, future log dispatches no longer use the callback
- * that was previously registered through mln_log_set_callback().
  *
  * Returns:
  * - MLN_STATUS_OK on success.

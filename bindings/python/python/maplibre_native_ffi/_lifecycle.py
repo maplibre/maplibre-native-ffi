@@ -23,8 +23,8 @@ def warn_unclosed(
             stacklevel=2,
         )
     except BaseException:
-        # Finalizers may run during interpreter shutdown. Leak reporting must not
-        # raise noisy unraisable exceptions when Python globals are half torn down.
+        # Finalizers may run during interpreter shutdown, with Python globals
+        # half torn down.
         return
 
 

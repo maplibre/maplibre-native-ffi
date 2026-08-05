@@ -31,8 +31,6 @@ pub(crate) use maplibre_core::runtime::{
 #[derive(Debug)]
 pub(crate) struct RuntimeState {
     handle: ThreadAffineNativeHandle<sys::mln_runtime>,
-    // Resolves a map id to the state this binding owns on top of it, which
-    // drives style-loaded custom geometry cleanup.
     map_states: RefCell<HashMap<MapId, Weak<MapState>>>,
     resource_transform: RefCell<Option<Box<ResourceTransformState>>>,
     http_header_transform: RefCell<Option<Box<HttpHeaderTransformState>>>,
@@ -85,9 +83,8 @@ impl RuntimeState {
         self.install_resource_provider(replacement, descriptor)
     }
 
-    /// Installs a provider descriptor whose callback is null so tests can
-    /// exercise the native install-failure rollback path, which real public
-    /// callers never reach because the wrapper always supplies a trampoline.
+    /// Installs a provider descriptor whose callback is null, exercising the
+    /// native install-failure rollback path that public callers cannot reach.
     #[cfg(test)]
     fn set_resource_provider_with_rejected_descriptor_for_testing<F>(
         &self,
@@ -112,12 +109,9 @@ impl RuntimeState {
     ) -> Result<()> {
         let runtime = self.native()?;
 
-        // SAFETY: runtime is live. descriptor contains a C trampoline and a
-        // user_data pointer to the boxed replacement, which remains alive on
-        // success. Native retires the previous provider before returning, so
-        // the previous state dropped below is unreachable from native. On
-        // failure, native preserves the previous provider and replacement is
-        // dropped below.
+        // SAFETY: runtime is live and descriptor's user_data points to the boxed
+        // replacement, kept alive on success. Native retires the previous
+        // provider before returning, so the state dropped below is unreachable.
         maplibre_core::check(unsafe {
             sys::mln_runtime_set_resource_provider(runtime, &descriptor)
         })?;
@@ -143,10 +137,9 @@ impl RuntimeState {
         let replacement = ResourceTransformState::new(callback);
         let descriptor = replacement.descriptor();
 
-        // SAFETY: runtime is live. descriptor contains a C trampoline and a
-        // user_data pointer to replacement, which remains alive on success. On
-        // failure, native preserves the previous transform and replacement is
-        // dropped below.
+        // SAFETY: runtime is live and descriptor's user_data points to
+        // replacement, kept alive on success. On failure native preserves the
+        // previous transform and replacement is dropped below.
         maplibre_core::check(unsafe {
             sys::mln_runtime_set_resource_transform(runtime, &descriptor)
         })?;
@@ -230,9 +223,8 @@ impl RuntimeState {
     fn source_for_event(&self, raw: &sys::mln_runtime_event) -> RuntimeEventSource {
         match raw.source_type {
             sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME => RuntimeEventSource::Runtime,
-            // The id is copied out of the event, names one map for the life of
-            // the process, and grants nothing on its own, so it is reported
-            // whether or not this runtime still holds a wrapper for that map.
+            // The copied id grants nothing, so it is reported whether or not
+            // this runtime still holds a wrapper for that map.
             sys::MLN_RUNTIME_EVENT_SOURCE_MAP if raw.source != 0 => {
                 RuntimeEventSource::Map(MapId::new(raw.source))
             }
@@ -533,21 +525,14 @@ impl RuntimeHandle {
 
     /// Installs or replaces the runtime-scoped network resource provider.
     ///
-    /// The provider may be installed or replaced before or after creating maps
-    /// from this runtime. Native code may invoke it from worker or network
-    /// threads, so the closure must be thread-safe and `'static`. Keep the
-    /// closure quick, and do not call map or runtime APIs from it. Return
-    /// `PassThrough` to let native networking handle the request. Return
-    /// `Handle` to complete or release the provided `ResourceRequestHandle`
-    /// inline or later. If the callback completes the handle inline, the
-    /// wrapper returns native `Handle` even when the closure returns
-    /// `PassThrough`, preventing native double handling.
+    /// Native may invoke the closure from worker or network threads, so keep it
+    /// quick and call no map or runtime APIs from it. Return `PassThrough` to
+    /// let native networking handle the request, or `Handle` to complete or
+    /// release the provided `ResourceRequestHandle` inline or later.
     ///
-    /// A successful replacement retires the previous provider before returning,
-    /// so this method releases the previous closure's Rust state once native
-    /// can no longer invoke it. Requests the previous provider already took a
-    /// `ResourceRequestHandle` for keep that handle; complete and release each
-    /// one as usual.
+    /// A successful replacement retires the previous provider before returning
+    /// and then releases its Rust state. Handles the previous provider already
+    /// took stay valid; complete and release each one as usual.
     pub fn set_resource_provider<F>(&self, callback: F) -> Result<()>
     where
         F: Fn(crate::ResourceRequest, crate::ResourceRequestHandle) -> ResourceProviderDecision
@@ -558,28 +543,19 @@ impl RuntimeHandle {
         self.inner.set_resource_provider(callback)
     }
 
-    /// Clears the runtime-scoped network resource provider.
-    ///
-    /// Clearing may happen before or after creating maps from this runtime.
-    /// Requests that reach the C API network file source then go to MapLibre's
-    /// online file source. Native clear waits for in-flight provider callbacks
-    /// before returning, so this method releases Rust callback state after a
-    /// successful clear. Requests the provider already took a
-    /// `ResourceRequestHandle` for keep that handle; complete and release each
-    /// one as usual.
+    /// Clears the runtime-scoped network resource provider, sending later
+    /// requests to MapLibre's online file source. The clear waits for in-flight
+    /// provider callbacks before returning and then releases the Rust callback
+    /// state. Handles the provider already took stay valid.
     pub fn clear_resource_provider(&self) -> Result<()> {
         self.inner.clear_resource_provider()
     }
 
     /// Installs or replaces the runtime-scoped network URL transform.
     ///
-    /// The transform may be installed before or after creating maps from this
-    /// runtime. Native code may invoke it from worker or network threads, so
-    /// the closure must be thread-safe and `'static`. Keep the closure quick,
-    /// and do not call MapLibre Native APIs from it. Returning `Some(url)`
-    /// replaces the request URL; returning `None` or an empty string keeps the
-    /// original URL. Panics are contained and treated by native code as no
-    /// rewrite.
+    /// Native may invoke the closure from worker or network threads, so keep it
+    /// quick and call no MapLibre Native APIs from it. `Some(url)` replaces the
+    /// request URL; `None`, an empty string, or a panic keeps the original.
     pub fn set_resource_transform<F>(&self, callback: F) -> Result<()>
     where
         F: Fn(crate::ResourceTransformRequest) -> Option<String> + Send + Sync + 'static,
@@ -587,11 +563,9 @@ impl RuntimeHandle {
         self.inner.set_resource_transform(callback)
     }
 
-    /// Clears the runtime-scoped network URL transform.
-    ///
-    /// Clearing may happen before or after creating maps from this runtime.
-    /// Native clear waits for in-flight transform callbacks before returning,
-    /// so this method can release Rust callback state after a successful clear.
+    /// Clears the runtime-scoped network URL transform. The clear waits for
+    /// in-flight transform callbacks before returning and then releases the
+    /// Rust callback state.
     pub fn clear_resource_transform(&self) -> Result<()> {
         self.inner.clear_resource_transform()
     }
@@ -879,29 +853,20 @@ impl RuntimeHandle {
         )
     }
 
-    /// Advances this runtime.
+    /// Advances this runtime: parks the owner thread when `timeout` allows it,
+    /// then drains the owner-thread task queues. Drain the queued runtime
+    /// events with [`Self::poll_event`] afterwards.
     ///
-    /// The call parks the owner thread when `timeout` allows it, then drains
-    /// the owner-thread task queues. Drain the queued runtime events with
-    /// [`Self::poll_event`] afterwards.
+    /// `Some(Duration::ZERO)` drains and returns, a longer `Some` parks for up
+    /// to that long, and `None` parks until a wake arrives. The drain runs
+    /// every task queued when it begins plus every task those enqueue, so a
+    /// single call can span a full style parse.
     ///
-    /// `timeout` sets the park bound. `Some(Duration::ZERO)` drains and
-    /// returns; hosts pumping from a frame callback pass it. A longer `Some`
-    /// parks for up to that long; hosts that own their pump thread pass one and
-    /// take their cadence from the runtime's own work. `None` parks until a
-    /// wake arrives.
-    ///
-    /// The drain runs every task queued when it begins plus every task those
-    /// enqueue, so a single call can span a full style parse.
-    ///
-    /// The runtime holds a wake flag. Style, tile, offline, and resource
-    /// responses set it, as do queued runtime events and
-    /// [`WakeSource::signal`]. A parking call returns as soon as the flag is
-    /// set and clears it before returning, and work arriving during the drain
-    /// sets it again. A call also returns without parking while unread runtime
-    /// events are queued. Timers and ready file descriptors set the flag only
-    /// when they queue owner-thread work, so pass a bounded timeout to cap how
-    /// long a call waits.
+    /// A parking call returns as soon as the runtime's wake flag is set, and
+    /// returns without parking while unread runtime events are queued. Timers
+    /// and ready file descriptors set the flag only when they queue
+    /// owner-thread work, so pass a bounded timeout to cap how long a call
+    /// waits.
     ///
     /// A non-zero timeout blocks the calling thread. Call it outside any lock
     /// that a thread signalling a [`WakeSource`] takes, and outside native
@@ -932,11 +897,10 @@ impl RuntimeHandle {
 
     /// Polls one queued runtime event and copies it into an owned Rust value.
     ///
-    /// Polling also advances binding-owned state that the event reports. A
-    /// polled [`crate::RuntimeEventType::MapStyleLoaded`] event releases the
-    /// upcall state of custom geometry sources the newly loaded style dropped,
-    /// so keep polling to completion to let that state be reclaimed; a map
-    /// whose events go unpolled keeps those sources' callback state alive.
+    /// Polling also advances binding-owned state: a
+    /// [`crate::RuntimeEventType::MapStyleLoaded`] event releases the callback
+    /// state of custom geometry sources the new style dropped. A map whose
+    /// events go unpolled keeps that state alive.
     pub fn poll_event(&self) -> Result<Option<RuntimeEvent>> {
         let runtime = self.inner.native()?;
         let mut event = empty_runtime_event();
@@ -958,11 +922,8 @@ impl RuntimeHandle {
         Ok(Some(event))
     }
 
-    /// Explicitly destroys the runtime.
-    ///
-    /// Native destruction errors are returned. When destruction fails, the
-    /// underlying native handle remains live in the shared state so child
-    /// handles that retain the runtime can still close safely.
+    /// Explicitly destroys the runtime. A failed destroy leaves the native
+    /// handle live so child handles can still close safely.
     pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
         if self.inner.is_closed() {
             return Ok(());
@@ -985,15 +946,9 @@ impl RuntimeHandle {
 
 /// Releases a runtime owner thread parked in [`RuntimeHandle::pump`].
 ///
-/// A wake source is usable from any thread, which a host's task submission and
-/// shutdown paths rely on. Each source holds its own reference to the runtime's
-/// wake state, so it stays usable after the runtime closes and signalling it
-/// then does nothing.
-///
-/// This is a copied handle value, so `Send` and `Sync` are derived rather than
-/// asserted: the C API documents signalling and destruction as callable from
-/// any thread, synchronizes concurrent signals itself, and rejects a released
-/// handle instead of reaching freed state.
+/// Signalling and destruction are callable from any thread. Each source holds
+/// its own reference to the runtime's wake state, so it stays usable after the
+/// runtime closes, where signalling does nothing.
 #[derive(Debug)]
 pub struct WakeSource {
     handle: sys::mln_wake_source,
@@ -1832,8 +1787,7 @@ mod tests {
     }
 
     #[test]
-    // Spec coverage: BND-122. The rejected descriptor is an internal seam for
-    // native callback-install failure, which public callers cannot produce.
+    // Spec coverage: BND-122.
     fn resource_provider_replacement_rolls_back_when_native_install_fails() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let first = Arc::new(());
@@ -1866,8 +1820,7 @@ mod tests {
 
     // Requests a style no file source serves, so the loading-failure event that
     // follows proves the request reached the network file source where the
-    // runtime-scoped provider sits. This keeps provider consultation observable
-    // without network access.
+    // runtime-scoped provider sits.
     fn load_probe_style(runtime: &RuntimeHandle, map: &MapHandle, style_url: &str) {
         map.set_style_url(style_url).unwrap();
         let event = wait_for_map_loading_failure(runtime);

@@ -25,10 +25,8 @@ void main(List<String> args) {
     output: Output(
       dartFile: _outputFile(args, packageRoot),
       commentType: const CommentType.none(),
-      // The native library arrives as a code asset from `hook/build.dart`,
-      // which the Dart runtime resolves by asset id. That is only reachable
-      // through `@Native`, so the declarations are static rather than a wrapper
-      // class over a DynamicLibrary.
+      // A code asset is resolved by asset id, which only `@Native` reaches, so
+      // the declarations are static rather than a DynamicLibrary wrapper.
       style: const NativeExternalBindings(assetId: nativeAssetId),
       preamble: '''
 // ignore_for_file: always_specify_types
@@ -57,11 +55,9 @@ void main(List<String> args) {
     enums: Enums(
       include: Declarations.includeAll,
       silenceWarning: true,
-      // Status is an integer in the C API, and every binding's raw layer
-      // mirrors it as one: `i32` in Rust, `c.mln_status` in Zig. A Dart enum
-      // here would also force ffigen to wrap each status-returning function in
-      // a converting call, which hides the `@Native` declaration behind a
-      // private name and puts the function's address out of reach.
+      // Status stays an integer: a Dart enum makes ffigen wrap every
+      // status-returning function in a converting call, which hides the
+      // `@Native` declaration and puts the function's address out of reach.
       style: (declaration, suggested) =>
           declaration.originalName == 'mln_status'
           ? EnumStyle.intConstants

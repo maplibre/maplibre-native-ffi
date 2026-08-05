@@ -46,9 +46,8 @@ internal sealed class MetalTextureCompositor : ITextureCompositor
     }
 
     /// <summary>
-    /// Samples the texture into the layer's next drawable. Reports false without presenting when
-    /// the layer has no drawable to hand out, which a minimized or occluded window legitimately has
-    /// not; the caller's redraw stays pending and the draw retries once one is available.
+    /// Samples the texture into the layer's next drawable. Returns false without presenting while
+    /// the layer has no drawable, as a minimized or occluded window does.
     /// </summary>
     public bool DrawTexture(nint texture)
     {

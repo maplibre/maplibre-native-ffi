@@ -38,9 +38,8 @@ static mln_animation_options animation(double duration_ms) {
   return options;
 }
 
-/// Applies one decoded camera command. Runs on the map's owner thread, which
-/// is why the read-modify-write commands read the current camera here rather
-/// than on the render loop that produced them.
+/// Applies one decoded camera command. Runs on the map's owner thread, so the
+/// read-modify-write commands read the current camera here.
 static app_error apply_camera_command(mln_map map, camera_command command) {
   switch (command.kind) {
     case CAMERA_COMMAND_CANCEL_TRANSITIONS:
@@ -212,7 +211,7 @@ app_error map_state_init(map_state* out_state, viewport initial_viewport) {
 }
 
 void map_state_deinit(map_state* state) {
-  // Children first: a runtime refuses to close while its maps are live.
+  // Children first: a runtime cannot be destroyed while its maps are live.
   if (state->map != MLN_HANDLE_NULL) {
     mln_map_destroy(state->map);
     state->map = MLN_HANDLE_NULL;

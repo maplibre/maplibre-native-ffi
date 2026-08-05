@@ -63,7 +63,6 @@ class LogRecord:
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> "LogRecord":
-        """Build a copied log record from private native values."""
         return cls(
             severity=LogSeverity(raw["severity"]),
             event=LogEvent(raw["event"]),

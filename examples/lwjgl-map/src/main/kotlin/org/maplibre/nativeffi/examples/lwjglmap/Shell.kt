@@ -32,8 +32,6 @@ internal object Shell {
       val commands = CommandQueue()
       val renderRequest = RenderRequest()
       val channel = MapChannel()
-      // The runtime loop sizes the map from this snapshot; every later viewport change reaches
-      // native through the render session, which this thread owns.
       val runtimeThread =
         Thread(
           { runtimeLoop(initialViewport, commands, renderRequest, channel) },
@@ -44,8 +42,8 @@ internal object Shell {
       try {
         renderLoop(graphics, mode, viewport, commands, renderRequest, channel)
       } finally {
-        // The render loop has closed its session by now; a map with an attached session cannot be
-        // destroyed, so only then may the runtime loop tear down.
+        // A map with an attached session cannot be destroyed, so the runtime loop tears down only
+        // after the render loop has closed its session.
         channel.requestShutdown()
         runtimeThread.join()
       }
@@ -55,8 +53,7 @@ internal object Shell {
 
   /**
    * Owns the runtime and the map for their whole lifetime, on a thread that is not the one
-   * presenting. It never touches the render session: the render loop attaches its own against the
-   * map published here.
+   * presenting. The render loop attaches its own session against the map published here.
    */
   private fun runtimeLoop(
     viewport: Viewport,
@@ -74,12 +71,12 @@ internal object Shell {
               state.step(commands, renderRequest)
             }
           } catch (error: Throwable) {
-            // Publish before the wait below, so the render loop sees the failure, closes its
-            // session, and releases us rather than stalling until the bound expires.
+            // Publish before the wait below, so the render loop sees the failure and closes its
+            // session rather than stalling until the bound expires.
             channel.fail(error)
           }
-          // The render loop still holds a session attached to the map, and native refuses to
-          // destroy a map that has one, so wait for it to close before `use` tears this down.
+          // A map with an attached session cannot be destroyed, so wait for the render loop to
+          // close its session before `use` tears this down.
           channel.awaitShutdown()
         }
       }
@@ -97,8 +94,6 @@ internal object Shell {
     renderRequest: RenderRequest,
     channel: MapChannel,
   ) {
-    // The runtime loop creates the map; this loop attaches its own session against it and owns that
-    // session for the rest of the run.
     val map = awaitMap(channel) ?: return
     val target = RenderTarget.attach(graphics, map, viewport.value, mode)
     try {
@@ -116,8 +111,6 @@ internal object Shell {
               viewport.value.log("resized viewport")
               if (!viewport.value.empty()) {
                 graphics.resize(viewport.value)
-                // Every mode follows a resize with its session still attached, so the map stays
-                // warm across the change.
                 target.resize(viewport.value)
                 renderRequest.set()
               }
@@ -126,9 +119,8 @@ internal object Shell {
               glfwWaitEventsTimeout(IDLE_WAIT_SECONDS)
               continue
             }
-            // Consume before rendering, so a request the runtime loop publishes during the render
-            // call is not discarded. The map applies a new logical size on the runtime loop's next
-            // pump, so no update until then is expected rather than a failure.
+            // The map applies a new logical size on the runtime loop's next pump, so a resize is
+            // followed by frames with nothing to render.
             var rendered = false
             if (renderRequest.consume()) {
               rendered = render(target)

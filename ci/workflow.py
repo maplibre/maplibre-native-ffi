@@ -7,9 +7,8 @@ import tomllib
 
 DESKTOP = {"linux", "macos", "windows"}
 
-# Targets whose suite runs on an emulator instead of through ctest. CMake
-# registers no test preset for them, because the `test` mise task boots the
-# emulator and drives the device shell itself.
+# Targets whose suite runs on an emulator instead of through ctest, so CMake
+# registers no test preset for them.
 EMULATOR_TESTED = {
     "android-x64-egl",
     "android-x64-vulkan",
@@ -56,9 +55,8 @@ def runner(preset: str) -> str:
     target_platform = platform(preset)
     target_architecture = architecture(preset)
     if target_platform == "linux":
-        # The zig toolchain sets the glibc floor, so the runner image no longer
-        # decides it. These stay pinned for reproducibility; the graphics
-        # loaders and drivers the tests use still come from the image.
+        # The zig toolchain sets the glibc floor. These images stay pinned so
+        # the graphics loaders and drivers the tests use stay reproducible.
         return "ubuntu-24.04-arm" if target_architecture == "arm64" else "ubuntu-24.04"
     if target_platform in {"macos", "ios", "ios-simulator"}:
         return "macos-26"
@@ -100,8 +98,8 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
     arguments = f"{render_backend} {abi}"
     commands = [f"mise run //bindings/kotlin:androidBuild {arguments} --prebuilt"]
     if preset in EMULATOR_TESTED:
-        # Each emulator task cross-compiles the same artifact the build task
-        # would before it runs anything, so it stands in for that command.
+        # Each emulator task cross-compiles the artifact the build task would,
+        # so it stands in for that command.
         commands.extend(
             [
                 f"mise run //bindings/go:test:android-emulator {preset}",
@@ -185,11 +183,9 @@ ZIG_PROJECTS = (
 def uses_zig(commands: list[str]) -> bool:
     """Whether a row fetches every Zig project the package cache key covers.
 
-    The key hashes every `build.zig.zon` in the repository and is shared by all
-    rows on the same runner OS and architecture. Cache keys are immutable, so a
-    row that runs only some of those projects would win the key with a cache
-    that is missing the rest, and Zig's fetcher has no retry: the rows that do
-    run the examples would then fail whenever an upstream host is unavailable.
+    The key hashes every `build.zig.zon` and is shared by all rows on the same
+    runner. Cache keys are immutable, so a row that fetches only some projects
+    would claim the key with an incomplete cache.
     """
     return all(
         any(command.startswith(project) for command in commands)
@@ -209,10 +205,9 @@ GRADLE_PROJECTS = (
 def uses_gradle(commands: list[str]) -> bool:
     """Whether a row runs any Gradle build.
 
-    `setup-gradle` restores a Gradle user home, and stops the daemons in its
-    post-action so Windows file locks do not outlive the job. A row that runs no
-    Gradle build has neither to manage, and pays the action's setup and teardown
-    for an empty cache entry.
+    `setup-gradle` restores a Gradle user home and stops the daemons in its
+    post-action, so Windows file locks do not outlive the job. A row with no
+    Gradle build pays that setup and teardown for an empty cache entry.
     """
     return any(
         command.startswith(project)
@@ -225,8 +220,8 @@ def preset_sets(
     presets: dict[str, object],
 ) -> tuple[list[str], set[str], set[str], set[str]]:
     def names(kind: str) -> list[str]:
-        # Hidden presets carry shared settings for other presets to inherit and
-        # name no target of their own, so they take part in no preset pairing.
+        # Hidden presets carry settings for others to inherit and name no
+        # target, so they take part in no preset pairing.
         return [
             preset["name"]
             for preset in presets.get(kind, [])

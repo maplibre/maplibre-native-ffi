@@ -57,8 +57,8 @@ android {
   }
 }
 
-// The runtime AAR carries the native library and the TLS component that every
-// Android host needs, and the binding adds the Kotlin API over it.
+// The runtime AAR carries the native library and the TLS component; the binding
+// adds the Kotlin API over it.
 dependencies {
   if (usePublishedKotlin) {
     implementation("org.maplibre.nativeffi:maplibre-native-ffi:$maplibrePublicationVersion")

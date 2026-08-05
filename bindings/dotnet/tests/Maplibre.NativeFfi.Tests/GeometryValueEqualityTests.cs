@@ -6,8 +6,8 @@ using Xunit;
 namespace Maplibre.NativeFfi.Tests;
 
 /// <summary>
-/// BND-070: public value trees compare element by element rather than by list identity. Each case
-/// builds two trees from distinct list instances holding equal contents.
+/// Public value trees compare element by element rather than by list identity. Each case builds
+/// two trees from distinct list instances holding equal contents.
 /// </summary>
 public sealed class GeometryValueEqualityTests
 {

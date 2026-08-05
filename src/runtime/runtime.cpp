@@ -80,7 +80,7 @@ struct HandleTraits<OfflineRegionListObject> {
 namespace mln::core {
 
 // Holds its own reference to the wake state, so the state stays readable for a
-// signal that races runtime teardown and hosts destroy the two in either order.
+// signal that races runtime teardown. Hosts destroy the two in either order.
 struct WakeSourceObject {
   explicit WakeSourceObject(std::shared_ptr<WakeState> state_)
       : state(std::move(state_)) {}
@@ -88,11 +88,8 @@ struct WakeSourceObject {
   std::shared_ptr<WakeState> state;
 };
 
-// Signalling is documented as any-thread, so a signal can race a destroy on
-// another thread. Leasing hands the signalling thread a strong reference under
-// the table lock, which keeps the wake state readable for the call even when
-// the destroy wins the race. The object is a lone shared_ptr, so a lease that
-// outlives the destroy retires it on the signalling thread at no cost.
+// Signalling is an any-thread call that can race a destroy, so a lease keeps
+// the wake state readable for the duration of the call.
 template <>
 struct HandleTraits<WakeSourceObject> {
   static constexpr auto kind = HandleKind::WakeSource;
@@ -126,18 +123,11 @@ struct OfflineOperationEventState {
 
 namespace {
 
-// mbgl carries an opaque platform context through ResourceOptions and hands it
-// back on worker and network threads, where it has to name the runtime that
-// registered it. A runtime handle is 64 bits and void* is not that wide on
-// every target, so the context carries a pointer-width token and this registry
-// maps the token back to the handle.
-//
-// Tokens are never reused. Recycling one -- an address, say -- would let a
-// context that outlived its runtime name whichever runtime landed in the slot
-// next, turning a callback that should be dropped into one delivered to the
-// wrong runtime. Liveness itself stays the handle table's to prove: a token
-// whose runtime has been removed from that table names a stale handle and
-// fails the lookup there.
+// Maps the pointer-width token mbgl carries as its opaque platform context back
+// to a runtime handle, which is 64 bits and does not fit in a void* on every
+// target. Tokens are never reused: a recycled token would let a context that
+// outlived its runtime name a later runtime. Liveness stays the handle table's
+// to prove.
 auto platform_context_registry_mutex() -> std::mutex& {
   static std::mutex value;
   return value;
@@ -149,10 +139,9 @@ auto platform_context_registry()
   return value;
 }
 
-// Reserves a token for a runtime that is not published yet. Splitting the
-// reservation from the binding keeps the allocation that can fail on the near
-// side of the handle table insert, so a caller never sees a handle it owns
-// reported as a failure.
+// Reserves a token for a runtime that is not published yet. This allocation can
+// fail, so it runs before the handle table insert and a caller never sees a
+// handle it owns reported as a failure.
 auto reserve_platform_context() -> void* {
   static auto next_token = std::uintptr_t{1};
   const std::scoped_lock lock(platform_context_registry_mutex());
@@ -194,9 +183,8 @@ auto live_runtime_threads_mutex() -> std::mutex& {
   return value;
 }
 
-// Mirrors the owner thread of every live runtime. The handle table does not
-// iterate by design, and runtime creation has to reject a thread that already
-// owns one.
+// Mirrors the owner thread of every live runtime, so runtime creation can
+// reject a thread that already owns one. The handle table does not iterate.
 auto live_runtime_threads() -> std::unordered_set<std::thread::id>& {
   static std::unordered_set<std::thread::id> value;
   return value;
@@ -207,13 +195,10 @@ auto owner_thread_has_live_runtime(std::thread::id owner_thread) -> bool {
   return live_runtime_threads().contains(owner_thread);
 }
 
-// Leases the resource transform registration for a MapLibre-owned thread.
-//
-// The handle table's lock proves the platform context names a live runtime, and
-// the work done under it is a reference count increment that completes without
-// waiting on any per-runtime lock. Callers take the returned state's lock
-// afterwards, so a writer waiting on that lock delays this runtime alone
-// rather than every `mln_*` call in the process.
+// Leases the resource transform registration for a MapLibre-owned thread. Only
+// a reference count increment happens under the handle table lock; the caller
+// takes the returned state's lock after this returns, so a writer waiting on
+// that lock delays this runtime alone.
 auto lease_resource_transform_state(void* platform_context) noexcept
   -> std::shared_ptr<mln::core::ResourceTransformState> {
   if (platform_context == nullptr) {
@@ -248,9 +233,8 @@ auto lease_http_header_transform_state(void* platform_context) noexcept
   return runtime->http_header_transform_state;
 }
 
-// Leases the resource provider registration, matching the transform lookup:
-// the registry lock covers only a reference count increment, and the caller
-// takes the state's lock after it is released.
+// Leases the resource provider registration under the same locking rule as
+// `lease_resource_transform_state()`.
 auto lease_resource_provider_state(void* platform_context) noexcept
   -> std::shared_ptr<mln::core::ResourceProviderState> {
   if (platform_context == nullptr) {
@@ -630,7 +614,7 @@ auto push_offline_region_event(
     runtime->events.push_back(std::move(event));
   }
   // The offline region observer runs off the owner-thread run loop, so this
-  // signal is what tells a parked owner thread the event arrived.
+  // signal releases a parked owner thread.
   mln::core::signal_wake(runtime->wake_state);
 }
 
@@ -701,9 +685,8 @@ auto set_offline_region_observed_flag(
   }
 }
 
-// Fills the object before it is published, so a throwing fill leaves no
-// handle behind. Generational ids cannot collide, so there is no
-// already-registered case to guard against.
+// Fills the object before it is published, so a throwing fill leaves no handle
+// behind.
 template <typename Fill>
 auto register_offline_region_snapshot_from_result(Fill&& fill)
   -> mln_offline_region_snapshot {
@@ -977,9 +960,8 @@ auto database_source_for_runtime(RuntimeObject* runtime)
     mbgl::FileSourceType::Database, resource_options_for_runtime(runtime->self),
     mbgl::ClientOptions()
   );
-  // The Database FileSourceManager factory is registered by the C API layer and
-  // always returns DatabaseFileSource for FileSourceType::Database. MapLibre is
-  // built without RTTI, so keep this path non-RTTI as well.
+  // MapLibre is built without RTTI. The registered FileSourceType::Database
+  // factory always returns a DatabaseFileSource.
   auto database = std::static_pointer_cast<mbgl::DatabaseFileSource>(source);
   runtime->database_source = database;
   return runtime->database_source;
@@ -1082,9 +1064,8 @@ auto create_runtime(
   owned_runtime->wake_state = std::make_shared<WakeState>();
   owned_runtime->run_loop =
     std::make_unique<mbgl::util::RunLoop>(mbgl::util::RunLoop::Type::New);
-  // `setPlatformCallback` is an unlocked assignment, so it is set here while
-  // the run loop is reachable only from this thread. MapLibre calls it from
-  // every thread that queues owner-thread work.
+  // `setPlatformCallback` is an unlocked assignment, so it happens while the
+  // run loop is reachable only from this thread.
   owned_runtime->run_loop->setPlatformCallback(
     [state = owned_runtime->wake_state]() -> void { signal_wake(state); }
   );
@@ -1112,9 +1093,9 @@ auto create_runtime(
     std::make_shared<ResourceProviderState>();
   auto* published = owned_runtime.get();
   // Reserving the token allocates, so it happens before this thread is marked
-  // as owning a runtime. The local is what the failure path below reads: the
-  // insert takes the shared_ptr by value, so a throw there destroys the runtime
-  // while unwinding and the token can no longer be read back off it.
+  // as owning a runtime. The failure path below reads the local, not the
+  // object: the insert takes the shared_ptr by value, so a throw there destroys
+  // the runtime while unwinding.
   auto* const platform_context = reserve_platform_context();
   published->platform_context = platform_context;
   {
@@ -1125,9 +1106,9 @@ auto create_runtime(
     *out_runtime =
       handle_table<RuntimeObject>().insert(std::move(owned_runtime));
   } catch (...) {
-    // The caller receives no handle, so it has nothing to destroy and no way to
-    // give the owner thread back. Releasing it here is what keeps a failed
-    // creation from rejecting every later one on the same thread.
+    // The caller receives no handle, so it has no way to give the owner thread
+    // back. Releasing it here keeps a failed creation from rejecting every
+    // later one on the same thread.
     {
       const std::scoped_lock lock(live_runtime_threads_mutex());
       live_runtime_threads().erase(owner_thread);
@@ -1248,12 +1229,8 @@ auto set_http_header_transform(
   );
   return MLN_STATUS_UNSUPPORTED;
 #elif defined(__EMSCRIPTEN__)
-  // emscripten_fetch is XHR-backed and follows redirects itself, so a
-  // transformed header has no point at which it can be dropped when the origin
-  // changes. Reaching for fetch() with redirect: "manual" does not help either,
-  // because a cross-origin manual redirect is an opaque response whose Location
-  // cannot be read. A resource provider serves these requests instead, and the
-  // host that owns the credential then owns the redirect policy.
+  // fetch() with redirect: "manual" is no help either: a cross-origin manual
+  // redirect is an opaque response whose Location cannot be read.
   set_thread_error(
     "HTTP header transforms are unsupported in the browser because "
     "emscripten_fetch follows redirects itself and cannot drop transformed "
@@ -2682,8 +2659,8 @@ auto offline_region_get_status_take_result(
 auto offline_region_snapshot_get(
   mln_offline_region_snapshot snapshot, mln_offline_region_info* out_info
 ) -> mln_status {
-  // Offline snapshots and lists carry no thread affinity, so another thread
-  // may destroy one mid-read. The lock spans the read for that reason.
+  // Offline snapshots and lists carry no thread affinity, so the lock spans the
+  // read to keep another thread from destroying one mid-read.
   auto& table = handle_table<OfflineRegionSnapshotObject>();
   const std::scoped_lock lock(table.mutex());
   const auto* live_snapshot = table.resolve_locked(snapshot);
@@ -2759,10 +2736,9 @@ auto set_resource_provider(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  // Waiting for the exclusive provider lock waits for every provider callback
-  // that already leased the previous provider, so the previous callback and its
-  // `user_data` are unreferenced once this returns. The registry lock is not
-  // held across that wait, so one runtime's callback cannot stall others.
+  // The exclusive provider lock waits for every callback that leased the
+  // previous provider, so that callback and its `user_data` are unreferenced
+  // once this returns.
   auto& state = *live->resource_provider_state;
   const std::unique_lock lock(state.mutex);
   state.registered = true;
@@ -2790,9 +2766,7 @@ auto clear_resource_provider(mln_runtime runtime) -> mln_status {
 auto destroy_runtime(mln_runtime runtime) -> mln_status {
   // Take ownership of the runtime out of the table, then release the
   // process-global table lock before any teardown step that can block on a
-  // native callback. Removing the entry under the table lock makes the handle
-  // unreachable to every later lookup, so the waits below stall this runtime
-  // alone while calls on unrelated runtimes keep running.
+  // native callback. The waits below then stall this runtime alone.
   std::shared_ptr<RuntimeObject> owned_runtime;
   auto owner_thread = std::thread::id{};
   {
@@ -2820,16 +2794,12 @@ auto destroy_runtime(mln_runtime runtime) -> mln_status {
     const std::scoped_lock lock(live_runtime_threads_mutex());
     live_runtime_threads().erase(owner_thread);
   }
-  // Retiring the handle above already makes every later platform context lookup
-  // fail, so this only reclaims the entry.
   unregister_platform_context(owned_runtime->platform_context);
 
   // A resource transform callback that entered `invoke_resource_transform()`
   // before the erase above holds a shared transform lock, so this wait covers
-  // every callback that can still observe the runtime. A lookup that leased
-  // the state before the erase and reaches the shared lock after this block
-  // reads the cleared registration and calls nothing. The lease keeps the
-  // state object alive on its own, so it stays readable past the runtime.
+  // every callback that can still observe the runtime. A lease that reaches the
+  // shared lock afterwards reads the cleared registration and calls nothing.
   {
     auto& transform_state = *owned_runtime->resource_transform_state;
     const std::unique_lock transform_lock(transform_state.mutex);
@@ -2844,9 +2814,8 @@ auto destroy_runtime(mln_runtime runtime) -> mln_status {
     transform_state.user_data = nullptr;
   }
 
-  // A resource provider callback that leased the provider before the erase
-  // above holds a shared provider lock, so this wait covers every callback that
-  // can still observe the runtime.
+  // Same wait for a resource provider callback that leased the provider before
+  // the erase above.
   {
     auto& provider_state = *owned_runtime->resource_provider_state;
     const std::unique_lock provider_lock(provider_state.mutex);
@@ -2882,7 +2851,6 @@ auto destroy_runtime(mln_runtime runtime) -> mln_status {
 
   // Retiring the wake state before the run loop is released covers a late
   // `mln_wake_source_signal()` and the run loop teardown's final iteration.
-  // Wake sources the host still holds keep the state readable.
   {
     const std::scoped_lock wake_lock(owned_runtime->wake_state->mutex);
     owned_runtime->wake_state->alive = false;
@@ -2890,7 +2858,7 @@ auto destroy_runtime(mln_runtime runtime) -> mln_status {
   }
 
   // Releasing the run loop and the database file source can join native
-  // threads, and that happens here with the registry lock released.
+  // threads, so it happens with the registry lock released.
   owned_runtime.reset();
   return MLN_STATUS_OK;
 }
@@ -2906,9 +2874,8 @@ auto signal_wake(const std::shared_ptr<WakeState>& state) noexcept -> void {
     }
     state->signaled = true;
   }
-  // MapLibre calls this while it holds the `RunLoop` mutex, which every thread
-  // that queues owner-thread work needs, so the notify happens outside the wake
-  // lock to keep the path short.
+  // MapLibre calls this while holding the `RunLoop` mutex, so the notify
+  // happens outside the wake lock to keep that path short.
   state->condition.notify_all();
 }
 
@@ -3097,11 +3064,10 @@ auto acquire_resource_provider_for_platform_context(
     return std::nullopt;
   }
 
-  // The lease keeps this state readable on its own, so the shared lock is
-  // taken with the registry lock released. `destroy_runtime()` erases the
-  // registry entry and then clears the registration under the exclusive lock,
-  // so a callback that reaches the shared lock first holds teardown until it
-  // returns, and one that arrives later finds an empty registration.
+  // The lease keeps this state readable, so the shared lock is taken with the
+  // registry lock released. A callback that reaches the shared lock before
+  // `destroy_runtime()` holds teardown until it returns; one that arrives later
+  // finds an empty registration.
   std::shared_lock provider_lock(state->mutex);
   if (!state->registered) {
     return std::nullopt;
@@ -3132,11 +3098,7 @@ auto invoke_resource_transform(
     return MLN_STATUS_OK;
   }
 
-  // The lease keeps this state readable on its own, so the shared lock is
-  // taken with the registry lock released. `destroy_runtime()` erases the
-  // registry entry and then clears the registration under the exclusive lock,
-  // so a callback that reaches the shared lock first holds teardown until it
-  // returns, and one that arrives later finds an empty registration.
+  // Same locking rule as `acquire_resource_provider_for_platform_context()`.
   const std::shared_lock transform_lock(state->mutex);
   const auto callback = state->callback;
   if (callback == nullptr) {
@@ -3233,17 +3195,13 @@ auto push_runtime_map_event_payload(
       live->map_loading_failures[map] = event.message;
     }
     // A render draws the latest update, so one unread render-update event
-    // covers every invalidation queued behind it. This matches the
-    // `uv_async_send` coalescing MapLibre's own headless frontend relies on.
-    // Comparing against the tail alone preserves the order of every other
-    // event.
+    // covers every invalidation queued behind it. Comparing against the tail
+    // alone preserves the order of every other event.
     if (
       type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE &&
       map != MLN_HANDLE_NULL && !live->events.empty() &&
       live->events.back().type == type && live->events.back().source == map
     ) {
-      // The unread event already asks the host to render and already returns
-      // the next pump without parking.
       return;
     }
     live->events.push_back(std::move(event));

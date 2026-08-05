@@ -5,9 +5,6 @@
 /// names one object for the life of the process, carries no ownership, and is
 /// safe to copy, compare, hash, and send between isolates. Zero is the null
 /// handle.
-///
-/// These are distinct from [NativePointer], which borrows a backend-native
-/// address such as a Metal texture or a Vulkan device.
 extension type const NativeHandle(int raw) implements Object {
   /// Whether this is the null handle.
   bool get isNull => raw == 0;

@@ -133,8 +133,6 @@ public sealed unsafe class OfflineStructTests
         Assert.Equal([1, 2, 3], info.Metadata);
     }
 
-    // Support invariant for copied offline output: malformed native definition
-    // discriminants fail deterministically instead of fabricating public values.
     [Fact]
     public void UnknownOfflineRegionDefinitionTypeThrows()
     {

@@ -203,11 +203,8 @@ public sealed interface NativeSurfaceTarget {
 }
 
 /**
- * A Metal texture and the device it belongs to.
- *
- * [device] is the Skiko device the texture was allocated on. A consumer draws from the texture
- * alone, while a producer that keeps state per device compares this across frames: Skiko allocates
- * a new texture on every resize, and only a device change means it is a new device's texture.
+ * A Metal texture and the Skiko device it was allocated on. Skiko allocates a new texture on every
+ * resize, so a producer keeping per-device state compares [device] rather than the texture.
  */
 public data class MetalTextureTarget(
   public val texture: NativeHandle,

@@ -17,10 +17,6 @@ import 'package:maplibre_native_ffi/src/internal/lifecycle/native_handles.dart';
 
 /// A handle of a distinct kind for tests that exercise binding-owned
 /// bookkeeping without a live native object.
-///
-/// The kind byte matches the C API's map kind, so a value reaching a
-/// diagnostic reads as an obviously synthetic map handle rather than a
-/// plausible one.
 extension type const _FakeNativeHandle(int raw) implements NativeHandle {}
 
 const _fakeHandle = _FakeNativeHandle(0x0200000000001234);
@@ -223,11 +219,8 @@ void main() {
     });
 
     test('owner native thread mismatch reports the isolate moved', () {
-      // The C API keys owner-thread checks on the native thread while this
-      // binding keys them on the isolate. When the VM moves an isolate off its
-      // original thread the isolate check still passes, so this one has to
-      // catch it and say why, rather than letting a bare wrong-thread status
-      // surface from an unrelated-looking call.
+      // The isolate check still passes when the VM moves an isolate off its
+      // original native thread, so the thread check has to catch it.
       final state = NativeHandleState<_FakeNativeHandle>(
         _fakeHandle,
         'fake_handle',

@@ -2,9 +2,7 @@ namespace Maplibre.NativeFfi.Internal;
 
 /// <summary>
 /// Structural comparison and snapshot helpers for public value types that hold list-valued
-/// members. Record synthesis compares such members by reference and stores the caller's list, so
-/// types holding them supply their own <c>Equals</c>, <c>GetHashCode</c>, and <c>init</c>
-/// accessors built on these helpers.
+/// members, which record synthesis would otherwise compare by reference.
 /// </summary>
 internal static class ValueEquality
 {

@@ -32,8 +32,7 @@ final class _LogCallbackState extends RetainedCallbackState {
               try {
                 callback(_copyLogRecord(copied));
               } catch (_) {
-                // Log callbacks are notification boundaries; user exceptions are
-                // contained so they never surface from native callback delivery.
+                // An exception must not escape into native callback delivery.
               }
             } finally {
               Maplibre._c.adapterLogRecordDestroy(record);
@@ -71,10 +70,8 @@ LogRecord _copyLogRecord(raw.mln_adapter_log_record record) {
 }
 
 /// Returns the log callback state native code currently dispatches through, or
-/// `nullptr` when no callback is registered.
-///
-/// Lifecycle tests use this to drive native log dispatch directly, the way
-/// MapLibre's logging threads do.
+/// `nullptr` when no callback is registered. Lifecycle tests use this to drive
+/// native log dispatch directly.
 Pointer<raw.mln_adapter_log_callback_state> logCallbackStateForTesting() =>
     Maplibre._logCallbackState?.pointer ?? nullptr;
 
@@ -124,9 +121,8 @@ final class Maplibre {
 
   /// Sets the process-global native log callback.
   static void setLogCallback(LogCallback callback, {bool consume = false}) {
-    // Before the registration, not after: a native callback that is already
-    // installed cannot be taken back by throwing, and the failure path frees
-    // the state native still points at.
+    // Before the registration: the failure path frees state that an installed
+    // native callback would still point at.
     ensureAbiVersion();
     final state = _LogCallbackState(callback, consume: consume);
     try {

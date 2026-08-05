@@ -51,6 +51,5 @@ void add_cities_layer(mln_map map, const char* geojson_url) {
 }
 
 void refresh_cities(mln_map map, const char* new_url) {
-  // The source already exists, so this is a set, not an add.
   mln_map_set_geojson_source_url(map, sv("cities"), sv(new_url));
 }

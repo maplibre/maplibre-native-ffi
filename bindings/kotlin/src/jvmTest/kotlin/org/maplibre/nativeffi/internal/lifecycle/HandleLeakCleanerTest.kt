@@ -11,8 +11,7 @@ import org.maplibre.nativeffi.runtime.OfflineOperationLeakReport
 import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
 
 class HandleLeakCleanerTest {
-  // BND-044: non-deterministic cleanup hooks report leaked thread-affine handles rather than
-  // destroying them. Destruction stays owner-thread-bound, so the cleaner thread only reports.
+  // BND-044. Destruction is owner-thread-bound, so the cleaner thread only reports.
 
   @Test
   fun unreachableHandleReportsLeakWithoutExplicitRelease() {
@@ -33,8 +32,8 @@ class HandleLeakCleanerTest {
     val liveReports = CopyOnWriteArrayList<String>()
 
     registerReleasedHandle(reports)
-    // A second unreleased registration proves the cleaner ran, so silence above is a real result
-    // rather than a collection that never happened.
+    // A second unreleased registration proves the cleaner ran, so the silence above is a
+    // real result.
     registerUnreachableHandle(liveReports)
 
     assertTrue(awaitReport(liveReports), "expected the cleaner to run")

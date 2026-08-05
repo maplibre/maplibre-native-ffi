@@ -6,24 +6,20 @@
 #include "test_support.h"
 #include "unity.h"
 
-// Reports whether the thread-local diagnostic mentions `fragment`, so a test
-// can tell a stale handle from a mismatched or never-issued one without
-// depending on the exact wording.
+// Matches a substring so tests do not depend on the exact diagnostic wording.
 static bool last_error_mentions(const char* fragment) {
   const char* message = mln_thread_last_error_message();
   return message != NULL && strstr(message, fragment) != NULL;
 }
 
-// A released handle stays distinguishable from every later map, so replaying
-// one after another map exists gives the same outcome every run.
 static void a_released_map_handle_never_names_a_later_map(void) {
   mln_runtime runtime = mln_test_create_runtime();
 
   mln_map first = mln_test_create_map(runtime);
   mln_test_destroy_map(first);
 
-  // Creating again reuses the slot the destroy just freed, which is what makes
-  // this prove the generation rather than the slot merely being empty.
+  // Creating again reuses the slot the destroy freed, so the rejection below
+  // comes from the generation rather than from an empty slot.
   mln_map second = mln_test_create_map(runtime);
   TEST_ASSERT_NOT_EQUAL_UINT64(first, second);
 
@@ -36,15 +32,12 @@ static void a_released_map_handle_never_names_a_later_map(void) {
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_ARGUMENT, mln_map_destroy(first));
 
-  // The live map is unaffected by the stale handle's rejection.
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_request_repaint(second));
 
   mln_test_destroy_map(second);
   mln_test_destroy_runtime(runtime);
 }
 
-// Every handle is the same C type, so the kind tag is what keeps one kind from
-// being accepted where another is expected.
 static void a_handle_of_another_kind_is_rejected_by_kind(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_wake_source source = MLN_HANDLE_NULL;
@@ -68,8 +61,6 @@ static void a_handle_of_another_kind_is_rejected_by_kind(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A value this library never issued is rejected, whether it is the null handle
-// or an arbitrary integer.
 static void a_handle_this_process_never_issued_is_rejected(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_map_request_repaint(MLN_HANDLE_NULL)
@@ -91,8 +82,6 @@ static void a_handle_this_process_never_issued_is_rejected(void) {
   );
 }
 
-// Releasing a scoped handle twice is a defined no-op, which is what makes
-// non-deterministic host cleanup hooks safe.
 static void releasing_a_scoped_handle_twice_is_a_no_op(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -116,8 +105,6 @@ static void releasing_a_scoped_handle_twice_is_a_no_op(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A runtime-sourced event names its runtime by handle, so a host can correlate
-// an event against the handle it holds.
 static void a_runtime_sourced_event_names_its_runtime_handle(void) {
   mln_runtime runtime = mln_test_create_runtime();
 

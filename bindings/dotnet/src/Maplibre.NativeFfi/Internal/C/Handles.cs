@@ -1,12 +1,8 @@
 namespace Maplibre.NativeFfi.Internal.C;
 
-// The C API spells every handle as the same uint64_t, so a generated `ulong`
-// would let a map be passed where a runtime is expected. One readonly struct per
-// handle type keeps the kinds distinct at compile time. Each is a single ulong
-// field, so it passes in a register exactly as the bare integer would.
-//
-// The value is the handle the C API issued. It names one object for the life of
-// the process, carries no ownership, and is safe to copy, compare, and hash.
+// The C API spells every handle as uint64_t. One single-field readonly struct per
+// handle type keeps the kinds distinct at compile time and marshals identically to
+// the bare integer. A handle value carries no ownership and is safe to copy.
 
 /// <summary>A handle the C API issued.</summary>
 internal interface IMlnHandle

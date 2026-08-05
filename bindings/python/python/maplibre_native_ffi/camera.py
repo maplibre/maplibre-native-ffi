@@ -67,18 +67,14 @@ class CameraOptions:
     padding: EdgeInsets | None = None
 
     anchor: ScreenPoint | None = None
-    """Screen-space anchor for jump, ease, and fly commands.
-
-    This field is input-only: MapLibre Native applies it to camera commands and
-    never reports it back, so it is always None on a camera read.
-    """
+    """Screen-space anchor for jump, ease, and fly commands. Input-only: a
+    camera read always reports None."""
 
     roll: float | None = None
     field_of_view: float | None = None
 
     @classmethod
     def _from_native(cls, raw: dict[str, object]) -> "CameraOptions":
-        """Build camera options from private native bridge values."""
         center = raw["center"]
         padding = raw["padding"]
         anchor = raw["anchor"]
@@ -99,12 +95,9 @@ class CameraOptions:
 class AnimationOptions:
     """Optional animation controls for camera transitions.
 
-    ``transition_id`` is a caller-chosen identity for the transition these
-    options start. When it is set, the transition reports its end once through
-    a ``MAP_CAMERA_TRANSITION_FINISHED`` runtime event carrying that value in a
-    ``CameraTransitionFinishedPayload``. The C API passes the value through
-    without interpreting it, so callers pick their own scheme, such as a
-    monotonically increasing counter. Leaving it unset reports no such event.
+    ``transition_id`` is a caller-chosen identity passed through uninterpreted.
+    When set, the transition reports its end once through a
+    ``MAP_CAMERA_TRANSITION_FINISHED`` runtime event carrying that value.
     """
 
     duration_ms: float | None = None
@@ -154,7 +147,6 @@ class BoundOptions:
 
     @classmethod
     def _from_native(cls, raw: dict[str, object]) -> "BoundOptions":
-        """Build bound options from private native bridge values."""
         raw_bounds = raw["bounds"]
         bounds: BoundsConstraint | None
         if isinstance(raw_bounds, dict):
@@ -186,7 +178,6 @@ class FreeCameraOptions:
 
     @classmethod
     def _from_native(cls, raw: dict[str, object]) -> "FreeCameraOptions":
-        """Build free camera options from private native bridge values."""
         position = raw["position"]
         orientation = raw["orientation"]
         return cls(
@@ -207,7 +198,6 @@ class ProjectionMode:
 
     @classmethod
     def _from_native(cls, raw: dict[str, object]) -> "ProjectionMode":
-        """Build projection mode options from private native bridge values."""
         return cls(
             axonometric=raw["axonometric"],
             x_skew=raw["x_skew"],

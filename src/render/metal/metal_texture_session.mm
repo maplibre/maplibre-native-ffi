@@ -44,11 +44,9 @@ auto validate_borrowed_texture(
     mln::core::set_thread_error("Metal texture must allow render target usage");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  // The session builds the depth and stencil attachments that go alongside this
-  // texture, and builds them single-sample. Metal wants one sample count across
-  // a render pass, and mbgl leaves rasterSampleCount at its default of one for
-  // every pipeline it creates, so a multisample texture has no way to work
-  // here. Rejecting it now beats reporting it as a render failure later.
+  // Metal requires one sample count across a render pass, and both the depth
+  // and stencil attachments the session builds and every pipeline mbgl creates
+  // are single-sample.
   if (metal_texture->sampleCount() != 1) {
     mln::core::set_thread_error("Metal texture must be single-sample");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -321,10 +319,9 @@ auto metal_borrowed_texture_set_target(
   if (session_status != MLN_STATUS_OK) {
     return session_status;
   }
-  // The same validator attach uses. The shape-only shared one would let a
-  // texture through that attachment rejects — mismatched dimensions, no render
-  // target usage, multisampled — and the old target is discarded by then, so
-  // the next render is where it would surface.
+  // The same validator attach uses. The shape-only shared one would admit a
+  // texture that fails only on the next render, once the outgoing target is
+  // already discarded.
   const auto descriptor_status = validate_borrowed_texture(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;

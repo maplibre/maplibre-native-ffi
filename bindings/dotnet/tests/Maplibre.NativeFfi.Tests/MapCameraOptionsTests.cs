@@ -144,9 +144,6 @@ public sealed class MapCameraOptionsTests
         Assert.True(unwrappedBounds.Southwest.Latitude <= unwrappedBounds.Northeast.Latitude);
     }
 
-    // This verifies that the geographic constraint reports and applies the
-    // unbounded state distinctly from world bounds, which the southwest/northeast
-    // pair alone cannot express.
     [BindingSpecTest("BND-102")]
     [Fact]
     public void CameraBoundsDistinguishUnboundedFromWorldBounds()

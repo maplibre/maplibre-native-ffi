@@ -86,9 +86,9 @@ struct ResourceRequestHandle {
     state: Arc<maplibre_core::resource::ResourceRequestHandleState>,
 }
 
-// The C API accepts signals and destruction from any thread, and a handle is a
-// plain value, so this pyclass is `Send + Sync` without an unsafe assertion.
-// The mutex is what makes close once-only against a concurrent signal.
+// The C API accepts signals and destruction from any thread, so this pyclass is
+// `Send + Sync` without an unsafe assertion. The mutex makes close once-only
+// against a concurrent signal.
 #[pyclass(name = "_WakeSource")]
 struct WakeSource {
     handle: Mutex<Option<sys::mln_wake_source>>,
@@ -855,9 +855,8 @@ impl RuntimeHandle {
             runtime_handle
         };
         // SAFETY: state owns an mln_runtime handle created by mln_runtime_create
-        // and pairs it with the matching status-returning destroy function. The
-        // C API can wait for in-flight callbacks, so release the GIL while it runs
-        // without holding the Rust handle-state mutex.
+        // and pairs it with the matching destroy function. Destroy can wait for
+        // in-flight callbacks, so it runs without the GIL or the state mutex.
         let status = py.detach(move || unsafe { sys::mln_runtime_destroy(runtime_handle) });
         if let Err(error) = maplibre_core::check(status) {
             self.state().restore_handle_for_retry(runtime_handle);
@@ -889,13 +888,10 @@ impl RuntimeHandle {
             };
             runtime_handle
         };
-        // SAFETY: runtime_handle came from a runtime pointer that passed the
-        // binding lifecycle gate, and the C API validates that it is live and
-        // called on the owner thread. A non-zero timeout parks until native
-        // work, a wake source, or the timeout releases it, so the GIL is
-        // released for the call and the Rust handle-state mutex is not held
-        // across it: another Python thread signalling a wake source is what
-        // ends the park.
+        // SAFETY: runtime_handle passed the binding lifecycle gate, and the C
+        // API validates that it is live and on the owner thread. The call parks,
+        // so it runs without the GIL or the state mutex: another Python thread
+        // signalling a wake source is what ends the park.
         let status = py.detach(|| unsafe { sys::mln_runtime_pump(runtime_handle, timeout_ms) });
         maplibre_core::check(status).map_err(map_error)
     }
@@ -1224,12 +1220,11 @@ impl RuntimeHandle {
         let callback = descriptor.callback;
         let user_data_address = descriptor.user_data as usize;
         let size = descriptor.size;
-        // SAFETY: runtime_handle came from a runtime pointer that passed the
-        // binding lifecycle gate. The C API validates that it is live.
-        // descriptor points to replacement state, which is retained after a
-        // successful native registration. Replacement can wait for in-flight
-        // callbacks that need the GIL, so release the GIL while it runs without
-        // holding the Rust handle-state mutex.
+        // SAFETY: runtime_handle passed the binding lifecycle gate and the C API
+        // validates that it is live. descriptor points to replacement state,
+        // retained after a successful registration. Replacement can wait for
+        // in-flight callbacks that need the GIL, so it runs without the GIL or
+        // the state mutex.
         let status = py.detach(move || {
             let descriptor = sys::mln_resource_provider {
                 size,
@@ -1257,10 +1252,9 @@ impl RuntimeHandle {
             };
             runtime_handle
         };
-        // SAFETY: runtime_handle came from a runtime pointer that passed the
-        // binding lifecycle gate. The C API validates that it is live and waits
-        // for in-flight callbacks that need the GIL before returning, so release
-        // the GIL while it runs without holding the Rust handle-state mutex.
+        // SAFETY: runtime_handle passed the binding lifecycle gate and the C API
+        // validates that it is live. The call waits for in-flight callbacks that
+        // need the GIL, so it runs without the GIL or the state mutex.
         let status =
             py.detach(move || unsafe { sys::mln_runtime_clear_resource_provider(runtime_handle) });
         maplibre_core::check(status).map_err(map_error)?;
@@ -1299,12 +1293,10 @@ impl RuntimeHandle {
         let callback = descriptor.callback;
         let user_data_address = descriptor.user_data as usize;
         let size = descriptor.size;
-        // SAFETY: runtime_handle came from a runtime pointer that passed the
-        // binding lifecycle gate. The C API validates that it is live.
-        // descriptor points to replacement state, which is retained after a
-        // successful native registration. Replacement can wait for in-flight
-        // callbacks, so release the GIL while it runs without holding the Rust
-        // handle-state mutex.
+        // SAFETY: runtime_handle passed the binding lifecycle gate and the C API
+        // validates that it is live. descriptor points to replacement state,
+        // retained after a successful registration. Replacement can wait for
+        // in-flight callbacks, so it runs without the GIL or the state mutex.
         let status = py.detach(move || {
             let descriptor = sys::mln_resource_transform {
                 size,
@@ -1330,10 +1322,9 @@ impl RuntimeHandle {
             };
             runtime_handle
         };
-        // SAFETY: runtime_handle came from a runtime pointer that passed the
-        // binding lifecycle gate. The C API validates that it is live and waits
-        // for in-flight callbacks before returning success, so release the GIL
-        // while it runs without holding the Rust handle-state mutex.
+        // SAFETY: runtime_handle passed the binding lifecycle gate and the C API
+        // validates that it is live. The call waits for in-flight callbacks, so
+        // it runs without the GIL or the state mutex.
         let status =
             py.detach(move || unsafe { sys::mln_runtime_clear_resource_transform(runtime_handle) });
         maplibre_core::check(status).map_err(map_error)?;
@@ -1418,9 +1409,8 @@ impl RuntimeHandle {
             return Ok(None);
         }
 
-        // SAFETY: event and its payload/text pointers remain valid until the
-        // next poll for this runtime. This call copies before another poll can
-        // occur because the runtime state mutex is still held.
+        // SAFETY: event and its payload/text pointers stay valid until the next
+        // poll, which the still-held state mutex prevents.
         let copied = unsafe { maplibre_core::events::runtime_event_from_native(&event) }
             .map_err(map_error)?;
         event_to_py(py, copied).map(Some)
@@ -1629,9 +1619,9 @@ impl MapHandle {
         // url is a null-terminated C string whose storage lives for this call.
         maplibre_core::check(unsafe { sys::mln_map_set_style_url(state.handle(), url.as_ptr()) })
             .map_err(map_error)?;
-        // URL style replacement completes asynchronously when the new style loads.
-        // Keep custom geometry callback state alive until map teardown, while
-        // closing public queues so Python handles stop accepting events.
+        // URL style replacement completes asynchronously, so keep custom
+        // geometry callback state alive until map teardown and only close the
+        // public queues.
         self.retire_custom_geometry_sources();
         Ok(())
     }
@@ -3794,10 +3784,8 @@ impl MapProjectionHandle {
 }
 
 impl RenderSessionHandle {
-    /// Shared body for the `set_*_target` methods.
-    ///
-    /// The native descriptor is materialized by the caller and lives for the
-    /// duration of this call, which is all the C API borrows it for.
+    /// Shared body for the `set_*_target` methods. The caller materializes the
+    /// native descriptor, which the C API borrows only for this call.
     fn set_target<D>(
         &self,
         raw: D,
@@ -4416,9 +4404,9 @@ impl RenderSessionHandle {
         // SAFETY: data points to the writable contiguous Python buffer borrowed
         // above for cells.len() u8 elements, or is null when the buffer is empty.
         let info = read_texture_image_raw(state.native(), data, cells.len())?;
-        // An empty destination reaches native code as the null pointer and zero
-        // capacity that mean a size probe, which succeeds without copying. Report
-        // the buffer as too small unless the frame really carries no bytes.
+        // An empty destination reaches native as the null pointer and zero
+        // capacity of a size probe, which succeeds without copying, so report
+        // the buffer as too small unless the frame carries no bytes.
         if cells.is_empty() && info.byte_length > 0 {
             return Err(invalid_argument_error(format!(
                 "buffer length 0 is smaller than the required {} bytes",
@@ -4871,9 +4859,8 @@ impl PyResourceTransformState {
             return sys::MLN_STATUS_OK;
         }
         // SAFETY: out_response was initialized above and is non-null. The helper
-        // copies the temporary Rust string into C API-managed callback scratch
-        // storage that remains live while native copies it after this
-        // trampoline returns.
+        // copies the string into C API-managed scratch storage that stays live
+        // after this trampoline returns.
         unsafe {
             sys::mln_resource_transform_response_set_url(
                 out_response,
@@ -6800,8 +6787,8 @@ fn premultiplied_rgba8_image_from_parts(
     image
 }
 
-/// Materializes style image options plus the stretch storage native borrows for
-/// the duration of the call. The caller keeps both alive until the C call returns.
+/// Materializes style image options plus the stretch storage native borrows.
+/// The caller keeps both alive until the C call returns.
 #[allow(clippy::too_many_arguments)]
 fn style_image_options_from_parts(
     pixel_ratio: Option<f32>,
@@ -7318,8 +7305,8 @@ impl MetalOwnedTextureFrameHandle {
 
 impl Drop for MetalOwnedTextureFrameHandle {
     fn drop(&mut self) {
-        // Python finalization may run off the owner thread, so native frame
-        // release is explicit through close(). The public wrapper reports leaks.
+        // Python finalization may run off the owner thread, so frame release is
+        // explicit through close().
     }
 }
 
@@ -7423,8 +7410,8 @@ impl VulkanOwnedTextureFrameHandle {
 
 impl Drop for VulkanOwnedTextureFrameHandle {
     fn drop(&mut self) {
-        // Python finalization may run off the owner thread, so native frame
-        // release is explicit through close(). The public wrapper reports leaks.
+        // Python finalization may run off the owner thread, so frame release is
+        // explicit through close().
     }
 }
 
@@ -7502,8 +7489,8 @@ impl OpenGLOwnedTextureFrameHandle {
 
 impl Drop for OpenGLOwnedTextureFrameHandle {
     fn drop(&mut self) {
-        // Python finalization may run off the owner thread, so native frame
-        // release is explicit through close(). The public wrapper reports leaks.
+        // Python finalization may run off the owner thread, so frame release is
+        // explicit through close().
     }
 }
 
@@ -7722,9 +7709,9 @@ fn set_network_status_raw(raw_status: u32) -> PyResult<()> {
     maplibre_core::set_network_status(NetworkStatus::from_raw(raw_status)).map_err(map_error)
 }
 
-/// Test helper that calls the C size accessor with a raw map id, so a test can
-/// replay a released id or use one from another thread. The safe API has no way
-/// to express either.
+/// Test helper that calls the C size accessor with a raw map id, which the safe
+/// API cannot express: a test can replay a released id or one from another
+/// thread.
 #[pyfunction]
 fn map_size_by_id_for_test(py: Python<'_>, id: u64) -> PyResult<(u32, u32, f64)> {
     py.detach(|| {
@@ -7912,11 +7899,9 @@ fn runtime_event_payload_wire_shapes_for_test(py: Python<'_>) -> PyResult<Py<PyA
 }
 
 /// Copies a camera transition-finished event whose native payload reports
-/// `missing_payload_bytes` fewer bytes than the payload struct holds.
-///
-/// Live transitions always report the full payload size, so this seam is the
-/// only way to reach the payload-size validation that guards reading typed
-/// payload fields.
+/// `missing_payload_bytes` fewer bytes than the payload struct holds. Live
+/// transitions always report the full size, so this is the only way to reach
+/// the payload-size validation.
 #[pyfunction]
 fn camera_transition_finished_event_for_test(
     py: Python<'_>,
@@ -7993,9 +7978,9 @@ fn create_runtime(
         maplibre_core::runtime::runtime_options_to_native(&options).map_err(map_error)?;
     let raw_options = native_options.to_raw();
     let mut out = maplibre_core::ptr::OutHandle::<sys::mln_runtime>::new();
-    // SAFETY: raw_options points to a materialized mln_runtime_options value
-    // whose backing strings live for this call. out is a valid
-    // null-initialized out-pointer owned by this call.
+    // SAFETY: raw_options points to a materialized mln_runtime_options whose
+    // backing strings live for this call, and out is a null-initialized
+    // out-pointer owned by this call.
     maplibre_core::check(unsafe { sys::mln_runtime_create(&raw_options, out.as_mut_ptr()) })
         .map_err(map_error)?;
     let native = out.into_live("mln_runtime").map_err(map_error)?;
@@ -8023,8 +8008,8 @@ fn create_map(
     map_mode: Option<u32>,
     fast_pfor_enabled: Option<bool>,
 ) -> PyResult<MapHandle> {
-    // Default() reads mln_map_options_default(), so an argument left unset keeps
-    // the C creation default instead of one this binding repeats.
+    // Default() reads mln_map_options_default(), so an unset argument keeps the
+    // C creation default.
     let mut options = maplibre_core::MapOptions::default();
     if let Some(width) = width {
         options.width = width;
@@ -8045,9 +8030,8 @@ fn create_map(
     let runtime_state = runtime.state_for_operation()?;
     let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map>::new();
     // SAFETY: runtime_state owns a runtime pointer that passed the binding
-    // lifecycle gate. The C API validates that it is live. raw_options is a
-    // fully initialized value, and out is a valid null-initialized out-pointer
-    // owned by this call.
+    // lifecycle gate and the C API validates that it is live. raw_options is
+    // fully initialized, and out is a null-initialized out-pointer.
     maplibre_core::check(unsafe {
         sys::mln_map_create(runtime_state.handle(), &raw_options, out.as_mut_ptr())
     })

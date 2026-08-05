@@ -206,9 +206,8 @@ func TestResourceRequestHandleCancelledAfterCloseFailsBeforeNative(t *testing.T)
 	}
 }
 
-// Clearing or replacing a provider retires its state once native code can no
-// longer invoke it, so a later inbound call must stop at the trampoline instead
-// of reaching freed Go callback state.
+// A call that arrives after the provider state is released must stop at the
+// trampoline rather than reach freed Go callback state.
 func TestResourceProviderReleasedStateStopsReachingCallback(t *testing.T) {
 	var calls int
 	state := newResourceProviderState(func(ResourceRequest, *ResourceRequestHandle) uint32 {

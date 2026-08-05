@@ -21,8 +21,7 @@
 namespace {
 
 // The shared descriptor defaults and validator are built without the Vulkan
-// headers, so they spell these as plain zeros. This is the tripwire if either
-// enumerator ever stops being zero.
+// headers, so they spell these as plain zeros.
 static_assert(VK_FORMAT_UNDEFINED == 0);
 static_assert(VK_IMAGE_LAYOUT_UNDEFINED == 0);
 

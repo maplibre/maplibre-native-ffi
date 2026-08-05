@@ -153,18 +153,15 @@ internal object SkikoHost {
 
   /**
    * Drops the presenter for [textureName] without deleting the OpenGL objects it built, for when
-   * the context that issued them is gone. Its framebuffer name belongs to that context and names
-   * something else in the replacement.
+   * the context that issued them is gone and its names now belong to the replacement.
    */
   fun abandonOpenGlTexture(textureName: Int) {
     openGlPresenters.remove(textureName)?.abandon()
   }
 
   /**
-   * The OpenGL context Skiko's Linux redrawer currently owns.
-   *
-   * Skiko destroys this context along with the redrawer and builds a new one for the replacement,
-   * so anything holding a GL name has to record which context issued it.
+   * The OpenGL context Skiko's Linux redrawer currently owns. Skiko destroys it along with the
+   * redrawer, so anything holding a GL name has to record which context issued it.
    */
   fun requireLinuxOpenGlContext(): SkikoOpenGlContext = onEdt {
     val layer =
@@ -266,9 +263,8 @@ internal object SkikoHost {
     return redrawer
   }
 
-  // Resolves both contexts from one redrawer lookup: the drawing path needs the
-  // Skia context to render and the GL context to tell whether the names it is
-  // about to use still belong to the context that issued them.
+  // Both contexts come from one redrawer lookup, so the drawing path cannot pair a Skia context
+  // with a GL context from a later redrawer.
   private fun findLinuxOpenGlContexts(): LinuxOpenGlContexts? = onEdt {
     val layer =
       findSkiaLayer()
@@ -308,10 +304,8 @@ internal object SkikoHost {
     return redrawer
   }
 
-  // Walking every window's component tree is far too expensive to repeat per
-  // frame, so the layer is remembered until AWT takes its peer away. A layer
-  // that loses its peer is the one case that hands the work to a different
-  // layer, and it is also what drops the redrawer that owns the GL context.
+  // Walking every window's component tree is too expensive to repeat per frame, so the layer is
+  // remembered until AWT takes its peer away.
   private fun findSkiaLayer(): Any? {
     cachedSkiaLayer?.let { cached ->
       if (cached.isDisplayable) {
@@ -639,7 +633,6 @@ internal object SkikoHost {
 
   private class OpenGlTexturePresenter(private val textureName: Int) : AutoCloseable {
     private var contextIdentity = 0
-    // The GL context that issued [framebuffer].
     private var issuingGlContext: SkikoOpenGlContext? = null
     private var extent = SurfaceExtent.Empty
     private var origin = TextureOrigin.TOP_LEFT
@@ -747,12 +740,9 @@ internal object SkikoHost {
     }
 
     /**
-     * Gives up what belongs to a destroyed OpenGL context instead of releasing it.
-     *
-     * The framebuffer name is the replacement context's to hand out, so deleting it there takes out
-     * whatever now answers to it. The Skia objects are the same hazard one level up: freeing them
-     * runs Skia's GPU teardown for a context that is gone, and Skia issues that against the
-     * replacement. Both are handed to [strandedSkiaObjects] to hold rather than released.
+     * Gives up what belongs to a destroyed OpenGL context instead of releasing it. The framebuffer
+     * name and the Skia objects would both be released against the replacement context, deleting
+     * names that now answer to it, so they go to [strandedSkiaObjects] instead.
      */
     private fun strandGpuResources() {
       framebuffer = 0
@@ -819,12 +809,9 @@ internal object SkikoHost {
 }
 
 /**
- * Identity of an OpenGL context owned by a Skiko Linux redrawer.
- *
- * Skiko creates the context with the redrawer and destroys it with the redrawer, so the redrawer is
- * what a context is known by. The redrawer is held weakly: a caller comparing against a context
- * Skiko has dropped is asking about one that no longer exists, and the answer it needs is that the
- * context is gone, not a reference that keeps the layer and its window alive.
+ * Identity of an OpenGL context owned by a Skiko Linux redrawer. Skiko creates and destroys the
+ * context with its redrawer, so the redrawer identifies the context; it is held weakly so a
+ * comparison against a dropped context reports it gone rather than keeping the window alive.
  */
 internal class SkikoOpenGlContext(redrawer: Any, private val handle: Long) {
   private val redrawer = WeakReference(redrawer)
@@ -859,16 +846,11 @@ private fun TextureOrigin.toSkiaOrigin(): SurfaceOrigin =
   }
 
 /**
- * Skia objects whose OpenGL context Skiko has destroyed.
- *
- * Releasing one runs its GPU teardown through a context that no longer exists, and Skia issues that
- * teardown against whatever context is current instead — deleting names that belong to Skiko's
- * replacement. Skija frees a Managed object from a cleaner keyed on reachability, so holding the
- * reference is what keeps that teardown from ever running; closing them is the thing to avoid, and
- * dropping them only defers it to a garbage collection.
- *
- * The GPU memory went with the context the driver tore down. What accumulates here is host-side
- * bookkeeping, bounded by how often Skiko replaces its context over a run.
+ * Skia objects whose OpenGL context Skiko has destroyed. Releasing one runs its GPU teardown
+ * against whatever context is current, deleting names that belong to Skiko's replacement. Skija
+ * frees a Managed object from a reachability cleaner, so holding the reference is what keeps that
+ * teardown from running. The GPU memory went with the destroyed context; this is host-side
+ * bookkeeping, bounded by how often Skiko replaces its context.
  */
 private val strandedSkiaObjects = mutableListOf<AutoCloseable>()
 

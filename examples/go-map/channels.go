@@ -7,9 +7,9 @@ import (
 	maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
 )
 
-// cameraCommand is decoded on the render loop and applied on the runtime
-// loop. Commands that depend on the current camera carry deltas so the read and
-// write stay together on the map's owner thread.
+// cameraCommand is decoded on the render loop and applied on the runtime loop.
+// Commands that depend on the current camera carry deltas so the read and write
+// stay together on the map's owner thread.
 type cameraCommand struct {
 	kind       cameraCommandKind
 	deltaX     float64
@@ -37,14 +37,8 @@ const (
 )
 
 // commandQueue holds the camera commands the render loop has decoded and the
-// runtime loop has not applied yet.
-//
-// The queue grows rather than dropping, which is why it is not a buffered
-// channel: a buffered channel is bounded, and sending on a full one either
-// blocks the render loop or discards a command. Its commands are deltas and a
-// gesture bracket, and neither survives being discarded: a dropped delta is
-// motion the drag never gets back, and a dropped bracket leaves every delta
-// after it attributed to no gesture. Only a stalled runtime loop grows it.
+// runtime loop has not applied yet. It grows rather than dropping, because
+// deltas and gesture brackets are not recoverable once discarded.
 type commandQueue struct {
 	mu      sync.Mutex
 	pending []cameraCommand
@@ -57,10 +51,8 @@ func (queue *commandQueue) push(command cameraCommand) {
 	queue.mu.Unlock()
 }
 
-// drain is called on the runtime loop. It hands the pending slice over and
-// takes the caller's buffer in exchange, so the two ping-pong and the locked
-// section stays O(1): a render loop pushing during a drain waits on the swap,
-// not on the size of the backlog.
+// drain is called on the runtime loop. It swaps the caller's buffer in for the
+// pending slice, keeping the locked section O(1).
 func (queue *commandQueue) drain(out []cameraCommand) []cameraCommand {
 	queue.mu.Lock()
 	defer queue.mu.Unlock()
@@ -69,9 +61,8 @@ func (queue *commandQueue) drain(out []cameraCommand) []cameraCommand {
 	return pending
 }
 
-// sharedState is the small cross-thread state surface between the render and
-// runtime loops. The camera queue and one-time map publication use channels;
-// this carries the render request, shutdown, and first failure.
+// sharedState carries the render request, shutdown, and first failure between
+// the render and runtime loops.
 type sharedState struct {
 	renderRequested atomic.Bool
 	shutdown        atomic.Bool

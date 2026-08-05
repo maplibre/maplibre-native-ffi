@@ -119,8 +119,7 @@ class RuntimeHandleTest {
     }
   }
 
-  // BND-155: a configured URI-scheme alias reaches the provider as the alias,
-  // alongside the URL the built-in network path would have fetched.
+  // BND-155.
   @Test
   fun resourceProviderSeesSchemeAliasAndItsResolvedUrl() {
     RuntimeHandle.create(RuntimeOptions()).use { runtime ->
@@ -201,8 +200,7 @@ class RuntimeHandleTest {
     }
   }
 
-  // BND-154: an installed provider is consulted, a replacement takes over while a
-  // map is live, and a cleared provider leaves requests to the network file source.
+  // BND-154.
   @Test
   fun resourceProviderIsConsultedUntilClearedWhileMapIsLive() {
     RuntimeHandle.create(RuntimeOptions()).use { runtime ->
@@ -226,7 +224,6 @@ class RuntimeHandleTest {
         loadUnservedStyle(runtime, map, "jar:file:/packaged/first.json")
         assertTrue(firstCalls.get() > 0)
 
-        // Replacing the provider while a map is live is part of the C API contract.
         runtime.setResourceProvider(
           ResourceProviderCallback { _, _ ->
             secondCalls.incrementAndGet()
@@ -360,8 +357,8 @@ class RuntimeHandleTest {
   }
 
   /**
-   * Loads a style URL whose scheme no file source serves, so the loading failure that names the
-   * scheme and the URL proves the request reached the network file source.
+   * Loads a style URL whose scheme no file source serves; the failure names the scheme and URL,
+   * proving the request reached the network file source.
    */
   private fun loadUnservedStyle(runtime: RuntimeHandle, map: MapHandle, styleUrl: String) {
     map.setStyleUrl(styleUrl)

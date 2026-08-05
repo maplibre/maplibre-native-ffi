@@ -180,8 +180,8 @@ pub const Context = struct {
             .pQueuePriorities = &priority,
         };
         // A device that exposes the portability subset requires enabling it.
-        // The name is spelled out because its declaration lives behind the
-        // provisional vulkan_beta.h header.
+        // The name is spelled out because its constant lives behind
+        // vulkan_beta.h.
         const extensions = [_][*:0]const u8{
             c.VK_KHR_SWAPCHAIN_EXTENSION_NAME,
             "VK_KHR_portability_subset",

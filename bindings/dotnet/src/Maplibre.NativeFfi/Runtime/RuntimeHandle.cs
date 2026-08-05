@@ -673,24 +673,10 @@ public sealed unsafe class RuntimeHandle : IDisposable
     /// then drains the owner-thread task queues. Drain the queued runtime events
     /// with <see cref="PollEvent" /> afterwards.
     /// <para>
-    /// <paramref name="timeout" /> sets the park bound. <see cref="TimeSpan.Zero" />
-    /// drains and returns; hosts pumping from a frame callback pass it. A positive
-    /// value parks for up to that long; hosts that own their pump thread pass one
-    /// and take their cadence from the runtime's own work. A negative value parks
-    /// until a wake arrives.
-    /// </para>
-    /// <para>
-    /// The drain runs every task queued when it begins plus every task those
-    /// enqueue, so a single call can span a full style parse.
-    /// </para>
-    /// <para>
-    /// The runtime holds a wake flag. Style, tile, offline, and resource responses
-    /// set it, as do queued runtime events and <see cref="WakeSource.Signal" />. A
-    /// parking call returns as soon as the flag is set and clears it before
-    /// returning, and work arriving during the drain sets it again. A call also
-    /// returns without parking while unread runtime events are queued. Timers and
-    /// ready file descriptors set the flag only when they queue owner-thread work,
-    /// so pass a bounded timeout to cap how long a call waits.
+    /// <see cref="TimeSpan.Zero" /> drains and returns, a positive value parks for
+    /// up to that long, and a negative value parks until a wake arrives. Timers and
+    /// ready file descriptors wake the runtime only when they queue owner-thread
+    /// work, so pass a bounded timeout to cap how long a call waits.
     /// </para>
     /// <para>
     /// A non-zero timeout blocks the calling thread. Call it outside any lock that a
@@ -719,13 +705,11 @@ public sealed unsafe class RuntimeHandle : IDisposable
     /// <see langword="null" /> when the queue is empty.
     /// </summary>
     /// <remarks>
-    /// Polling also advances binding-owned state: on a
-    /// <see cref="RuntimeEventType.MapStyleLoaded" /> event this binding releases
-    /// the map's detached custom geometry sources, closing the upcall stubs for
-    /// sources the new style dropped. That release happens when the event is
-    /// polled, so drain the queue to keep dropped sources from lingering. It also
-    /// needs a resolvable <see cref="RuntimeEvent.MapSource" />; see that member
-    /// for the reference caveat.
+    /// Polling also advances binding-owned state: a
+    /// <see cref="RuntimeEventType.MapStyleLoaded" /> event with a resolvable
+    /// <see cref="RuntimeEvent.MapSource" /> closes the upcall stubs for custom
+    /// geometry sources the new style dropped. Drain the queue to keep dropped
+    /// sources from lingering.
     /// </remarks>
     public RuntimeEvent? PollEvent()
     {

@@ -5,19 +5,13 @@ import java.lang.ref.Cleaner
 /**
  * Runs registered actions once their referents become unreachable.
  *
- * A registered action holds cleanup state only. An action that captures its referent keeps the
- * referent strongly reachable from this registry, so the registration stays pending and the action
- * never runs.
- *
- * The Android source set mirrors this contract with `PhantomReference` and `ReferenceQueue`,
- * because `java.lang.ref.Cleaner` arrives at API 33 while the binding supports API 24.
+ * A registered action must hold cleanup state only. An action that captures its referent keeps the
+ * referent strongly reachable from this registry, so the action never runs.
  */
 internal class UnreachableActions private constructor(threadName: String) {
-  // These workers live for the process, so they are constructed without
-  // inheriting thread locals and are pinned to the binding's own class loader.
-  // Otherwise the thread that happens to trigger the first registration leaks
-  // its context — a host class loader or request-scoped `InheritableThreadLocal`
-  // — into a thread that never exits.
+  // The worker lives for the process, so it drops inherited thread locals and pins
+  // the binding's class loader instead of retaining the context of whichever thread
+  // registered first.
   private val cleaner: Cleaner = Cleaner.create { action ->
     Thread(null, action, threadName, 0, false).apply {
       isDaemon = true

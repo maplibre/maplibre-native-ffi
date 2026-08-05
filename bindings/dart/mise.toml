@@ -105,9 +105,8 @@ case "$usage_preset" in
 esac
 '''
 
-# Build hooks run in a semi-hermetic environment that strips arbitrary
-# environment variables, so hook/build.dart takes the install prefix from a file
-# rather than from MLN_FFI_NATIVE_LIBRARY like the other bindings do.
+# Build hooks run with a stripped environment, so hook/build.dart takes the
+# install prefix from a file rather than from MLN_FFI_NATIVE_LIBRARY.
 [tasks._native-prefix]
 description = "Point the Dart build hook at a locally built native library."
 hide = true
@@ -134,10 +133,9 @@ dart test
 
 [tasks."test:download"]
 description = "Test the build hook against a downloaded native snapshot archive."
-# Runs one file rather than the suite: the rest holds native handles across
-# isolate boundaries, which is what keeps `test` out of CI until #412 is fixed.
-# Removing the pointer is what forces the download; it goes back afterwards so a
-# developer who had one keeps building against their local prefix.
+# Runs one file rather than the suite, because the rest holds native handles
+# across isolate boundaries. Removing the pointer forces the download; it goes
+# back afterwards so a local prefix survives this task.
 run = '''
 pointer=.dart_tool/maplibre_native_install_dir
 saved="$(mktemp)"

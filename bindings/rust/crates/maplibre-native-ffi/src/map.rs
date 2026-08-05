@@ -82,9 +82,6 @@ impl MapState {
 
     fn close(&self) -> Result<()> {
         let native = self.handle.handle();
-        // No guard is needed around the destroy: the C API rejects a released
-        // handle, so an attach that races this close reports invalid argument
-        // rather than binding a later map.
         self.handle.close()?;
         if let Some(runtime) = self.runtime.borrow_mut().take() {
             runtime.unregister_map(native);
@@ -143,9 +140,8 @@ impl Drop for MapState {
         if let Some(runtime) = self.runtime.borrow_mut().take() {
             runtime.unregister_map(self.handle.handle());
         }
-        // A failed destroy, which is what happens while a render session is
-        // still attached, leaves the native map live and is reported through the
-        // leak channel by the handle's own `Drop`.
+        // A failed destroy, such as one with a render session still attached,
+        // is reported through the leak channel by the handle's own `Drop`.
         let _ = self.handle.close();
     }
 }
@@ -196,17 +192,12 @@ impl MapHandle {
         self.inner.custom_geometry_sources.borrow().len()
     }
 
-    /// Explicitly destroys the map.
-    ///
-    /// Native destruction errors are returned. When destruction fails, the
-    /// underlying native handle remains live in the shared state so future child
-    /// handles can continue to retain and close the map safely.
+    /// Explicitly destroys the map. A failed destroy leaves the native handle
+    /// live so child handles can keep retaining and closing the map.
     ///
     /// Closing discards this map's queued runtime events and its recorded
-    /// loading failure. There is no flush and no terminal event, so read any
-    /// state you mirror from events before closing, and treat close as the end
-    /// of this map's event stream rather than awaiting an event during
-    /// teardown. Dropping the handle ends the stream the same way.
+    /// loading failure, with no flush and no terminal event. Dropping the
+    /// handle ends the event stream the same way.
     pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
         if self.inner.is_closed() {
             return Ok(());
@@ -291,11 +282,8 @@ impl MapHandle {
     }
 
     /// Reads the map's logical viewport size in UI pixels and its pixel ratio.
-    ///
-    /// The size starts at the creation width and height, and follows the attach
-    /// and resize rules documented on [`MapOptions`]. The scale factor is fixed
-    /// for the lifetime of the map and is independent of any render target's
-    /// scale factor.
+    /// The scale factor is fixed for the lifetime of the map and independent of
+    /// any render target's scale factor.
     pub fn size(&self) -> Result<(u32, u32, f64)> {
         let map = self.inner.native()?;
         let mut width = 0u32;
@@ -366,11 +354,8 @@ impl MapHandle {
         maplibre_core::check(unsafe { sys::mln_map_jump_to(map, &raw) })
     }
 
-    /// Applies a camera ease transition command.
-    ///
-    /// An absent `animation`, or an animation with no duration, eases over zero
-    /// duration: the camera reaches the target before this call returns, with
-    /// no runtime pump in between. Set a duration to animate over time.
+    /// Applies a camera ease transition command. An absent `animation`, or one
+    /// with no duration, reaches the target before this call returns.
     pub fn ease_to(
         &self,
         camera: &CameraOptions,
@@ -386,13 +371,9 @@ impl MapHandle {
         })
     }
 
-    /// Applies a camera fly transition command.
-    ///
-    /// Fly is the one camera command that animates by default. When duration is
-    /// absent, native derives it from `AnimationOptions::velocity`; when
-    /// velocity is absent too, native defaults to 1.2 screenfuls per second.
-    /// The camera is therefore still en route when this call returns and
-    /// advances as the runtime is pumped.
+    /// Applies a camera fly transition command. Fly animates by default, so the
+    /// camera is still en route when this call returns and advances as the
+    /// runtime is pumped.
     pub fn fly_to(
         &self,
         camera: &CameraOptions,
@@ -416,10 +397,8 @@ impl MapHandle {
     }
 
     /// Applies an animated screen-space pan command.
-    ///
-    /// Native routes this delta through the ease transition, so an absent
-    /// `animation`, or an animation with no duration, applies the pan instantly
-    /// like [`Self::ease_to`]. Set a duration to animate over time.
+    /// An absent `animation`, or one with no duration, applies the pan
+    /// instantly.
     pub fn move_by_animated(
         &self,
         delta_x: f64,
@@ -447,10 +426,8 @@ impl MapHandle {
     }
 
     /// Applies an animated screen-space zoom command.
-    ///
-    /// Native routes this delta through the ease transition, so an absent
-    /// `animation`, or an animation with no duration, applies the zoom
-    /// instantly like [`Self::ease_to`]. Set a duration to animate over time.
+    /// An absent `animation`, or one with no duration, applies the zoom
+    /// instantly.
     pub fn scale_by_animated(
         &self,
         scale: f64,
@@ -482,10 +459,8 @@ impl MapHandle {
     }
 
     /// Applies an animated screen-space rotate command.
-    ///
-    /// Native routes this delta through the ease transition, so an absent
-    /// `animation`, or an animation with no duration, applies the rotation
-    /// instantly like [`Self::ease_to`]. Set a duration to animate over time.
+    /// An absent `animation`, or one with no duration, applies the rotation
+    /// instantly.
     pub fn rotate_by_animated(
         &self,
         first: ScreenPoint,
@@ -514,10 +489,8 @@ impl MapHandle {
     }
 
     /// Applies an animated pitch delta command.
-    ///
-    /// Native routes this delta through the ease transition, so an absent
-    /// `animation`, or an animation with no duration, applies the pitch
-    /// instantly like [`Self::ease_to`]. Set a duration to animate over time.
+    /// An absent `animation`, or one with no duration, applies the pitch
+    /// instantly.
     pub fn pitch_by_animated(
         &self,
         pitch: f64,
@@ -539,12 +512,8 @@ impl MapHandle {
         maplibre_core::check(unsafe { sys::mln_map_cancel_transitions(map) })
     }
 
-    /// Marks whether a host-driven gesture is in progress.
-    ///
-    /// A host that decodes its own pointer gestures sets this to `true` when a
-    /// gesture starts and back to `false` when it ends, so the camera commands
-    /// issued in between belong to one live gesture. The flag stays set until
-    /// the host clears it, so pair every `true` with a `false`.
+    /// Marks whether a host-driven gesture is in progress. The flag stays set
+    /// until the host clears it, so pair every `true` with a `false`.
     pub fn set_gesture_in_progress(&self, in_progress: bool) -> Result<()> {
         let map = self.inner.native()?;
         // SAFETY: map is live and in_progress is passed by value.
@@ -796,11 +765,8 @@ impl MapHandle {
     }
 
     /// Produces a [`Send`] reference to this map for attaching a render session.
-    ///
     /// A render session is owned by the thread that attaches it, which need not
-    /// be the map's owner thread. [`MapHandle`] is `!Send`, so this is how the
-    /// thread that drives a render loop names the map it renders while the map
-    /// itself stays on the runtime owner thread.
+    /// be the map's owner thread.
     pub fn attach_ref(&self) -> Result<MapAttachRef> {
         Ok(MapAttachRef {
             map: self.inner.native()?,
@@ -808,28 +774,18 @@ impl MapHandle {
     }
 }
 
-/// A reference to a map for the sole purpose of attaching a render session.
-///
-/// Produced by [`MapHandle::attach_ref`]. Every attach function lives here
-/// rather than on [`MapHandle`], because attaching is the one map operation
+/// A reference to a map for the sole purpose of attaching a render session,
+/// produced by [`MapHandle::attach_ref`]. Attaching is the one map operation
 /// that runs on the render session's thread instead of the map's.
 ///
-/// This carries no Rust retention of the map, because [`MapHandle`] is `!Send`.
-/// Native keeps the map alive instead: destroying a map fails while a render
-/// session is attached to it. A reference that outlives its map names a
-/// released handle, which the C API rejects rather than binding to a later map.
+/// This is a copied handle value and carries no Rust retention of the map.
+/// Native destroys a map only once no session is attached, and rejects a
+/// reference that outlives its map rather than binding to a later one.
 ///
-/// Dropping a [`MapHandle`] instead of closing it, while a session is still
-/// attached, leaks the native map: the destroy fails and an infallible `Drop`
-/// cannot return the error. It reports the handle through
-/// [`set_leak_reporter`](crate::set_leak_reporter) instead, and the runtime
-/// stays undestroyable until that map is destroyed. Close the session first,
-/// then the map.
-///
-/// This is a copied handle value, so it derives `Send` and `Sync` without an
-/// unsafe assertion. The attach it performs reaches no thread-affine map state:
-/// the C API claims the map's render-session slot under its own lock and posts
-/// the new size to the map's owner thread.
+/// Close the session before the map: dropping a [`MapHandle`] with a session
+/// still attached leaks the native map, reports it through
+/// [`set_leak_reporter`](crate::set_leak_reporter), and leaves the runtime
+/// undestroyable.
 #[derive(Clone, Copy)]
 pub struct MapAttachRef {
     map: sys::mln_map,

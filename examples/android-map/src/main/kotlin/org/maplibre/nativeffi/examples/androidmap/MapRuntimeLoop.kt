@@ -22,9 +22,8 @@ import org.maplibre.nativeffi.runtime.WakeSource
  * Owns the runtime and the map for their whole lifetime, off the UI thread.
  *
  * Native owner-thread checks are keyed on the OS thread, so this is a [HandlerThread] rather than a
- * coroutine dispatcher or a pooled executor. The loop never touches the render session: the render
- * loop attaches its own session against the map published here, and closes it before [close] lets
- * this loop destroy the map.
+ * coroutine dispatcher or a pooled executor. The render loop attaches its own session against the
+ * map published here, and closes it before [close] destroys the map.
  *
  * The loop keeps pumping while the view is off screen or the app is backgrounded, so style and tile
  * loading continue.
@@ -47,10 +46,7 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
   var map: MapHandle? = null
     private set
 
-  /**
-   * Set when setup failed, so the view stops scheduling frames instead of reposting every vsync
-   * against a loop that will never publish a map.
-   */
+  /** Set when setup failed, so the view stops scheduling frames against a loop with no map. */
   @Volatile
   var setupFailure: Throwable? = null
     private set
@@ -69,16 +65,12 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
             while (true) {
               apply(currentMap, commands.poll() ?: break)
             }
-            // This thread has no display to pace it, so it takes its cadence from the runtime's
-            // own work and parks in between. The render loop signals the wake source on enqueue,
-            // and close() signals it too, so the bound is a backstop rather than the cadence.
+            // This thread has no display to pace it, so the pump's park is the cadence.
             currentRuntime.pump(PARK_TIMEOUT_MS)
             if (drainEvents(currentRuntime, currentMap)) {
               renderRequest.set()
             }
           } catch (error: RuntimeException) {
-            // Reposting after a failing pump spins the handler thread forever with nothing to
-            // show for it. Record it so the view stops scheduling frames and stops reposting.
             // The handles stay live: the UI thread may still hold an attached session, and a map
             // cannot be destroyed until that session closes. close() tears down in that order.
             Log.e(TAG, "runtime loop iteration failed", error)
@@ -86,8 +78,6 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
             return
           }
         }
-        // The pump above provides the pacing, so requeue immediately rather than adding a delay
-        // on top of the park.
         handler.post(this)
       }
     }
@@ -111,7 +101,6 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
   override fun close() {
     handler.removeCallbacks(pump)
     handler.post { closeHandles() }
-    // Release the parked pump so the close above runs now rather than after its bound.
     wake?.signal()
     thread.quitSafely()
     thread.join()
@@ -172,9 +161,8 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
   }
 
   /**
-   * Applies one decoded camera command on the map's owner thread, which is why the
-   * read-modify-write commands read the current camera here rather than on the render loop that
-   * produced them.
+   * Applies one decoded camera command on the map's owner thread, so read-modify-write commands
+   * read the current camera here rather than on the render loop that produced them.
    */
   private fun apply(map: MapHandle, command: CameraCommand) {
     when (command) {
@@ -227,10 +215,7 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
   private companion object {
     private const val TAG = "MapLibreRuntimeLoop"
     private const val STYLE_URL = "https://tiles.openfreemap.org/styles/bright"
-    /**
-     * Backstop for the runtime loop's park. The wake source is what normally releases it, so this
-     * only bounds a pump that nothing signals.
-     */
+    /** Backstop bound for a parked pump that nothing signals. */
     private const val PARK_TIMEOUT_MS = 100L
     private const val MIN_PITCH = 0.0
     private const val MAX_PITCH = 60.0

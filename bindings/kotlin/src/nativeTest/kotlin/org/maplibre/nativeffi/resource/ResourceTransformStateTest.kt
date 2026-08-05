@@ -67,7 +67,7 @@ class ResourceTransformStateTest : org.maplibre.nativeffi.NativeTestBase() {
       assertNull(nullOut.url)
       nullState.close()
 
-      // BND-121: host-language failures do not escape the C callback boundary.
+      // BND-121.
       val throwingState =
         ResourceTransformState(
           ResourceTransformCallback { throw IllegalStateException("contained") }

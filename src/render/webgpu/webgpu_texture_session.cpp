@@ -7,9 +7,8 @@
 #include <optional>
 #include <stdexcept>
 
-// The WebGPU backend is a browser backend: it is built only against the
-// emdawnwebgpu port, which is what supplies webgpu.h. See
-// cmake/render/webgpu.cmake.
+// The WebGPU backend builds only against the emdawnwebgpu port, which supplies
+// webgpu.h.
 #include <emscripten/emscripten.h>
 
 // Include WebGPU headers first to define WEBGPU_H_ before MapLibre WebGPU
@@ -39,8 +38,8 @@ constexpr auto webgpu_owned_color_format = WGPUTextureFormat_RGBA8Unorm;
 // readback stages the padded rows and unpacks them.
 constexpr uint32_t readback_row_alignment = 256;
 constexpr uint32_t readback_bytes_per_pixel = 4;
-// Five seconds of yielding, which a map that is going to complete beats by
-// orders of magnitude.
+// Five seconds of yielding, orders of magnitude more than a map that is going
+// to complete needs.
 constexpr uint32_t readback_yield_milliseconds = 1;
 constexpr uint32_t readback_yield_attempts = 5000;
 
@@ -178,18 +177,13 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
     return *this;
   }
 
-  // Copies the rendered texture into a mappable buffer and waits for the map,
-  // which is how WebGPU reads a texture back.
+  // Copies the rendered texture into a mappable buffer and waits for the map.
+  // Only a session-owned texture reaches here; a caller's texture need not
+  // carry CopySrc usage.
   //
-  // Only a session-owned texture arrives here: the C API offers readback for
-  // owned sessions alone, and a caller's texture need not carry CopySrc usage
-  // at all. ensureColorTexture() gives the owned one that usage.
-  //
-  // Upstream blocks the same map on wgpuInstanceWaitAny
-  // (mbgl/webgpu/offscreen_texture.cpp), which a session cannot: a non-zero
-  // WaitAny timeout is legal only on an instance created with
-  // timedWaitAnyEnable, and this instance belongs to the host and is optional
-  // besides. A spontaneous callback needs no instance, and yielding to the
+  // wgpuInstanceWaitAny is unusable: a non-zero timeout is legal only on an
+  // instance created with timedWaitAnyEnable, and the host's instance is
+  // optional. A spontaneous callback needs no instance, and yielding to the
   // browser's job queue is what lets it arrive.
   mbgl::PremultipliedImage readStillImage() override {
     const auto size = getSize();
@@ -249,14 +243,8 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
   }
 
   // Whether a replacement target names the context this session attached with.
-  //
-  // The device is what the renderer allocated its resources on, so it has to be
-  // the same one. The queue matters because a replacement is taken without
-  // re-reading it, so one naming another queue would be silently ignored. A
-  // null queue names the device's default queue here exactly as it does at
-  // attach, which makes the two spellings of that queue the same context. The
-  // instance is left out: a texture session never uses it, which is why the
-  // descriptor documents it as optional.
+  // A null queue names the device's default queue, as it does at attach. The
+  // instance is excluded: a texture session never uses it.
   auto matches_context(const mln_webgpu_context_descriptor& context) const
     -> bool {
     if (static_cast<WGPUDevice>(context.device) != device_) {
@@ -288,17 +276,14 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
   ) {
     auto* const texture = static_cast<WGPUTexture>(descriptor.texture);
     auto* const view = static_cast<WGPUTextureView>(descriptor.texture_view);
-    // The replacement is referenced before the outgoing pair is let go, so a
-    // descriptor that hands back the texture this session already holds cannot
-    // drop its last reference partway through.
+    // Reference the replacement before releasing the outgoing pair, so a
+    // descriptor naming the texture this session already holds cannot drop its
+    // last reference partway through.
     wgpuTextureAddRef(texture);
     wgpuTextureViewAddRef(view);
     releaseColorTexture();
     texture_ = texture;
     color_view_ = view;
-    // Drops the renderable resource, which this backend rebuilds lazily, and
-    // leaves the depth and stencil attachments to follow the new size the next
-    // time the renderable binds.
     setSize(mbgl::Size{descriptor.physical_width, descriptor.physical_height});
   }
 
@@ -311,9 +296,8 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
   void deactivate() override {}
 
  private:
-  // Submits the texture-to-buffer copy on the session's queue. Ordered behind
-  // the render commands already submitted there, so it reads the drawn frame
-  // without a fence of its own.
+  // Submits the texture-to-buffer copy on the session's queue, ordered behind
+  // the render commands already there, so it needs no fence of its own.
   auto copy_texture_into(
     WGPUBuffer destination, uint32_t aligned_row_stride, mbgl::Size size
   ) -> bool {
@@ -349,21 +333,17 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
     return true;
   }
 
-  // The map callback's own state, held by shared_ptr because a wait that gives
-  // up outlives neither. WebGPU still delivers the callback afterwards -- with
-  // Aborted, once releasing the buffer cancels the map -- so a state on this
-  // stack would be written through after the frame is gone.
+  // Shared because WebGPU still delivers the callback after a wait gives up, so
+  // state on the waiting frame's stack would be written after it is gone.
   struct MapState {
     std::atomic<WGPUMapAsyncStatus> status{WGPUMapAsyncStatus_Error};
     std::atomic_bool completed{false};
   };
 
-  // Maps the staged copy and unpacks its padded rows into an image.
-  //
-  // The map resolves on the browser's job queue, so this thread yields rather
-  // than spins: emscripten_sleep suspends through JSPI and lets that queue run,
-  // which is also what delivers the spontaneous callback. Bounded, so a device
-  // that never answers fails the read instead of hanging the caller.
+  // Maps the staged copy and unpacks its padded rows into an image. The map
+  // resolves on the browser's job queue, so this thread yields rather than
+  // spins: emscripten_sleep suspends through JSPI and lets that queue run. The
+  // wait is bounded so a device that never answers fails the read.
   auto map_buffer_into_image(
     WGPUBuffer staging, uint64_t mapped_size, mbgl::Size size,
     uint32_t row_stride, uint32_t aligned_row_stride
@@ -376,8 +356,8 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
                                WGPUStringView /*message*/, void* user_data,
                                void* /*reserved*/
                              ) {
-      // Takes back the reference handed to the callback, so the state lives
-      // exactly until the one delivery WebGPU promises.
+      // Takes back the reference handed to the callback; WebGPU promises
+      // exactly one delivery.
       const std::unique_ptr<std::shared_ptr<MapState>> owner(
         static_cast<std::shared_ptr<MapState>*>(user_data)
       );
@@ -596,10 +576,7 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
   mbgl::Size depth_stencil_size_{0, 0};
 };
 
-// Renders into a surface the host presents, which in a browser is a canvas.
-//
-// The depth and stencil attachment, the context handling, and the renderable
-// resource are the texture session's; what differs is the colour target. A
+// Renders into a surface the host presents, which in a browser is a canvas. A
 // surface hands out one texture per frame and takes it back at present, so this
 // acquires at frame start and releases at swap rather than holding one.
 class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
@@ -691,10 +668,9 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
     return static_cast<wgpu::TextureFormat>(color_format_);
   }
 
-  // Takes the frame's texture from the surface, which is what the renderable
-  // draws into. A surface with nothing to give reports that instead of
-  // failing: a canvas the browser is not compositing right now is a frame to
-  // skip, the way an occluded window is for the other backends.
+  // Takes the frame's texture from the surface. A surface with nothing to give
+  // reports not-ready rather than failing: a canvas the browser is not
+  // compositing is a frame to skip.
   auto acquire_frame(bool& out_ready) -> bool {
     out_ready = false;
     if (color_view_ != nullptr) {
@@ -710,12 +686,10 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
       if (frame.texture != nullptr) {
         wgpuTextureRelease(frame.texture);
       }
-      // Outdated is what a surface reports when its configuration no longer
-      // matches the thing it presents to, which a browser does when the canvas
-      // it belongs to changes size. Configuring again is the answer, and the
-      // frame it would have given is the next one: reporting a failure here
-      // would leave every later render failing the same way, because nothing
-      // else reconfigures until the host happens to resize or retarget.
+      // Outdated means the surface configuration no longer matches what it
+      // presents to, which happens when the canvas changes size. Nothing else
+      // reconfigures until the host resizes or retargets, so do it here and
+      // take the next frame.
       if (frame.status == WGPUSurfaceGetCurrentTextureStatus_Outdated) {
         configureSurface();
         return true;
@@ -752,12 +726,9 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
     return color_view_;
   }
 
-  // Ends the frame by letting its texture go.
-  //
-  // The browser composites the canvas itself, the way it does for WebGL, so
-  // there is no present call to make: wgpuSurfacePresent() aborts here with
-  // "unsupported (use requestAnimationFrame via html5.h instead)". Releasing
-  // the texture is what returns the frame to the surface.
+  // Ends the frame by releasing its texture. The browser composites the canvas
+  // itself, and wgpuSurfacePresent() aborts here with "unsupported (use
+  // requestAnimationFrame via html5.h instead)".
   void present() {
     if (color_view_ == nullptr) {
       return;
@@ -788,9 +759,9 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
   // already established that it matches this session's device and format.
   void set_surface(const mln_webgpu_surface_descriptor& descriptor) {
     auto* const replacement = static_cast<WGPUSurface>(descriptor.surface);
-    // Referenced before the outgoing one is let go, so a descriptor handing
-    // back the surface this session already holds cannot drop its last
-    // reference partway through.
+    // Reference the replacement before releasing the outgoing one, so a
+    // descriptor naming the surface this session already holds cannot drop its
+    // last reference partway through.
     wgpuSurfaceAddRef(replacement);
     releaseFrame();
     if (surface_ != nullptr) {
@@ -911,8 +882,7 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
     depth_stencil_size_ = {0, 0};
   }
 
-  // Lets the frame's texture go without presenting it, which is what a resize,
-  // a retarget, and teardown each need.
+  // Releases the frame's texture without presenting it.
   void releaseFrame() {
     if (color_view_ != nullptr) {
       wgpuTextureViewRelease(color_view_);
@@ -1233,8 +1203,8 @@ auto webgpu_borrowed_texture_set_target(
     return physical_status;
   }
   // The same probe attach makes. Without it a texture of the wrong shape, size,
-  // format, or usage is taken here and only fails on the next render, with the
-  // outgoing target already let go.
+  // format, or usage fails only on the next render, once the outgoing target is
+  // already released.
   const auto texture_status = validate_webgpu_texture(
     *descriptor,
     mbgl::Size{descriptor->physical_width, descriptor->physical_height}

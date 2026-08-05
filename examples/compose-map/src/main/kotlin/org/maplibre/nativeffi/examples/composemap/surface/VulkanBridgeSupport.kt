@@ -32,8 +32,8 @@ internal fun vulkanFunctionAddress(name: String): Long {
   return VK.getFunctionProvider().getFunctionAddress(name)
 }
 
-// Enumeration helpers that return heap values push their own frame so callers can invoke them once
-// per physical device without the intermediate buffers piling up on a single stack frame.
+// Enumeration helpers that return heap values push their own stack frame, so calling them once per
+// physical device does not pile intermediate buffers onto one frame.
 
 internal fun vulkanInstanceExtensions(): Set<String> {
   MemoryStack.stackPush().use { stack ->

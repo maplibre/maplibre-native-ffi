@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class FrameScopeTest {
-  // BND-168, BND-173: acquired frame metadata and backend handles reject stale access.
+  // BND-168, BND-173.
 
   @Test
   fun metalFrameRejectsAccessAfterScopeCloses() {

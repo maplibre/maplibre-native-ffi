@@ -2,9 +2,8 @@
 
 struct mach_header;
 
-// Zig's test runtime references this dyld helper, but the iOS SDK link
-// environment used here does not provide it. The tests do not depend on
-// image-header lookup behavior, so a null fallback is sufficient.
+// Zig's test runtime references this dyld helper, which the iOS SDK link
+// environment does not provide. The tests never inspect image headers.
 const struct mach_header* _dyld_get_image_header_containing_address(
   const void* address
 ) {

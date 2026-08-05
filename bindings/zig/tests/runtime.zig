@@ -196,8 +196,8 @@ test "a parked owner thread wakes for native work and for a wake source" {
     defer if (map_open) map.close() catch @panic("map close failed");
     try quiesce(&runtime);
 
-    // The style is malformed, so native reports the failure from its own threads
-    // and the failure reaches the parked owner thread.
+    // A malformed style is reported from native's own threads, so the failure
+    // reaches the parked owner thread.
     try map.setStyleUrl(testing.allocator, "unsupported://style.json");
     var loading_failed = false;
     const load_started = std.Io.Clock.awake.now(testing.io);
@@ -215,8 +215,7 @@ test "a parked owner thread wakes for native work and for a wake source" {
     }
     try testing.expect(loading_failed);
 
-    // A source signalled from another thread matches a host's submission path,
-    // and the park it releases has no other work to end it.
+    // The park this signal releases has no other work to end it.
     const source = try runtime.wakeSource();
     try quiesce(&runtime);
     var thread_error: ?anyerror = error.Unexpected;
@@ -227,8 +226,7 @@ test "a parked owner thread wakes for native work and for a wake source" {
     thread.join();
     try testing.expect(thread_error == null);
 
-    // A wake source stays usable after its runtime closes, so hosts tear the two
-    // down in either order.
+    // A wake source stays usable after its runtime closes.
     try map.close();
     map_open = false;
     try runtime.close();

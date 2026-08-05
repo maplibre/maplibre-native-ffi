@@ -14,11 +14,9 @@ use crate::map::MapAttachRef;
 use crate::{Feature, JsonValue};
 use crate::{HandleOperationError, Result};
 
-/// Borrowed opaque native address used for backend interop handles.
-///
-/// The value does not own, retain, dereference, or validate the pointed-to
-/// object. Passing it to MapLibre Native transfers no ownership and grants the
-/// Rust binding no memory access.
+/// Borrowed opaque native address used for backend interop handles. It does not
+/// own, retain, dereference, or validate the pointed-to object, and passing it
+/// to MapLibre Native transfers no ownership.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NativePointer {
     address: usize,
@@ -36,10 +34,9 @@ impl NativePointer {
     ///
     /// # Safety
     ///
-    /// The caller must ensure the address has the correct backend-native type
-    /// for every API it is passed to, and that the native object stays valid for
-    /// the complete borrow required by that API. This wrapper does not validate
-    /// provenance, alignment, lifetime, thread ownership, or backend type.
+    /// The address must have the correct backend-native type for every API it
+    /// is passed to, and the native object must stay valid for the whole borrow
+    /// that API requires. This wrapper validates nothing.
     pub unsafe fn from_address(address: usize) -> Self {
         if address == 0 {
             Self::NULL
@@ -95,12 +92,9 @@ impl fmt::Debug for NativePointer {
     }
 }
 
-/// Borrowed opaque native address whose validity is tied to an active texture frame.
-///
-/// The value does not own, retain, dereference, or validate the pointed-to
-/// object. It exists so backend pointers returned from acquired frame handles
-/// carry the frame borrow in their Rust type instead of escaping as plain
-/// [`NativePointer`] values.
+/// Borrowed opaque native address whose validity is tied to an active texture
+/// frame. It does not own, retain, dereference, or validate the pointed-to
+/// object.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FrameNativePointer<'frame> {
     address: usize,
@@ -223,11 +217,9 @@ impl RenderTargetExtent {
     }
 
     /// Returns this extent's physical device-pixel size as
-    /// `ceil(logical * scale_factor)` per dimension.
-    ///
-    /// Session-owned texture targets and surface targets are sized this way.
-    /// Borrowed texture targets state their physical size instead, because not
-    /// every physical size is reachable from a logical extent.
+    /// `ceil(logical * scale_factor)` per dimension. Surface and session-owned
+    /// texture targets are sized this way; borrowed texture targets state their
+    /// physical size instead.
     pub fn physical_size(&self) -> Result<(u32, u32)> {
         let native = maplibre_core::render::render_target_extent_to_native(self.to_core());
         let mut width = 0u32;
@@ -1226,8 +1218,8 @@ impl RenderSessionHandle {
         F: FnOnce(sys::mln_map, *mut sys::mln_render_session) -> sys::mln_status,
     {
         let mut out = maplibre_core::ptr::OutHandle::<sys::mln_render_session>::new();
-        // A close racing this attach on the map's owner thread makes the handle
-        // stale, which the C API rejects.
+        // A close racing this attach makes the handle stale, which the C API
+        // rejects.
         let status = attach(map.map(), out.as_mut_ptr());
         maplibre_core::check(status)?;
         let ptr = out_handle(out, "mln_render_session")?;
@@ -1251,17 +1243,11 @@ impl RenderSessionHandle {
     }
     /// Resizes this attached render session.
     ///
-    /// Surface and owned-texture sessions resize in place. Borrowed texture
-    /// targets are sized by their owner and report an unsupported-feature
-    /// error: allocate a texture at the new size and hand it over with the
-    /// `set_*_borrowed_texture_target` method for the backend, which keeps this
-    /// session.
-    ///
-    /// The session keeps its renderer across a resize, so renderer-held state
-    /// such as feature state carries over. A scale factor change is the
-    /// exception: a renderer compiles its shaders for one pixel ratio, so that
-    /// resize starts a new one with renderer-held state empty. Map state such as
-    /// camera, style, and sources lives on the map and survives either way.
+    /// Surface and owned-texture sessions resize in place, keeping the
+    /// renderer and its state. A scale factor change starts a new renderer with
+    /// renderer-held state empty. Borrowed texture targets report an
+    /// unsupported-feature error; hand over a new texture with the backend's
+    /// `set_*_borrowed_texture_target` method instead.
     pub fn resize(&self, width: u32, height: u32, scale_factor: f64) -> Result<()> {
         self.inner.ensure_no_frame_acquired()?;
         let session = self.inner.native()?;
@@ -1271,21 +1257,12 @@ impl RenderSessionHandle {
         })
     }
 
-    /// Presents this attached surface session through a new surface.
+    /// Presents this attached surface session through a new surface, keeping
+    /// this session's renderer and its state.
     ///
-    /// A host surface can be destroyed and recreated while the map goes on
-    /// living, which is what Android rotation, a Flutter `SurfaceProducer`
-    /// lifecycle change, and a window resize that reallocates all look like
-    /// from here. Replacing the surface in place keeps this session's renderer,
-    /// and with it the tile pyramid, glyph and image atlases, symbol placement,
-    /// and feature state.
-    ///
-    /// The descriptor names the same graphics context this session attached
-    /// with, and its extent applies as a resize does. A descriptor whose
-    /// `context.device` is neither null nor this session's device reports an
-    /// invalid-argument error and leaves this session rendering into the
-    /// surface it has. The session assigns the layer its own device and pixel
-    /// format, so the layer itself carries nothing that has to match.
+    /// The descriptor's extent applies as a resize does. A `context.device`
+    /// that is neither null nor this session's device reports an
+    /// invalid-argument error and leaves the current surface in place.
     pub fn set_metal_surface_target(&self, descriptor: &MetalSurfaceDescriptor) -> Result<()> {
         self.set_target(descriptor.to_native(), |session, raw| {
             // SAFETY: session is a live render session handle owned by this
@@ -1323,23 +1300,15 @@ impl RenderSessionHandle {
         })
     }
 
-    /// Renders this attached texture session into a new caller-owned texture.
+    /// Renders this attached texture session into a new caller-owned texture,
+    /// keeping this session's renderer. A scale factor change starts a new
+    /// renderer, as [`RenderSessionHandle::resize`] does.
     ///
-    /// A caller-owned texture is sized by its owner, so a host that follows a
-    /// resize reallocates rather than resizing and [`RenderSessionHandle::resize`]
-    /// reports an unsupported-feature error. Handing the replacement over here
-    /// keeps this session's renderer instead, so the map does not go cold on
-    /// every resize — unless the scale factor changes, which starts a new
-    /// renderer for the new pixel ratio, as [`RenderSessionHandle::resize`]
-    /// does.
-    ///
-    /// The replacement belongs to the device this session attached with, which
-    /// reports an invalid-argument error otherwise, and carries the pixel
-    /// format it attached with, which reports an unsupported-feature error
-    /// otherwise. Both leave this session rendering into the texture it has. The caller owns the replacement and keeps it valid until
-    /// the next replacement, detach, or close. This session never retained the
-    /// outgoing texture, never releases it, and never reads it here, so a host
-    /// that already released it hands over the replacement all the same.
+    /// The replacement must belong to the device this session attached with and
+    /// carry the pixel format it attached with; otherwise this reports an error
+    /// and leaves the current texture in place. The caller owns the replacement
+    /// and keeps it valid until the next replacement, detach, or close. The
+    /// outgoing texture is neither retained nor read here.
     pub fn set_metal_borrowed_texture_target(
         &self,
         descriptor: &MetalBorrowedTextureDescriptor,
@@ -1385,10 +1354,9 @@ impl RenderSessionHandle {
         })
     }
 
-    /// Shared body for the `set_*_target` methods.
-    ///
-    /// The native descriptor is materialized by the caller and lives for the
-    /// duration of `set_target`, which is all the C API borrows it for.
+    /// Shared body for the `set_*_target` methods. The caller-materialized
+    /// descriptor lives for the whole call, which is all the C API borrows it
+    /// for.
     fn set_target<D>(
         &self,
         raw: D,
@@ -1402,11 +1370,9 @@ impl RenderSessionHandle {
     /// Processes the latest map render update for this render target.
     ///
     /// The map retains its latest update, so repeated calls re-render it and
-    /// return `true` again; use this to redraw on demand after resize or
-    /// surface expose, and gate frame loops on render-update-available events
-    /// instead of the return value. Returns `false` when no frame was
-    /// rendered. That is a normal transient: call again on the next frame
-    /// rather than wait for another render-update event.
+    /// return `true` again. Returns `false` when no frame was rendered, which
+    /// is a normal transient: call again on the next frame. Gate frame loops on
+    /// render-update-available events rather than on the return value.
     pub fn render_update(&self) -> Result<bool> {
         self.inner.ensure_no_frame_acquired()?;
         let session = self.inner.native()?;
@@ -1419,15 +1385,11 @@ impl RenderSessionHandle {
         Ok(rendered)
     }
 
-    /// Detaches backend-bound render resources from the map.
+    /// Detaches backend-bound render resources from the map, consuming this
+    /// handle and returning a close-only handle.
     ///
-    /// The native session remains live only for destruction, so successful
-    /// detach consumes this handle and returns a detached close-only handle.
-    ///
-    /// Detach also releases this session's retention of the parent map, so a
-    /// detached session leaves the map free to close. Close the detached
-    /// session whenever it suits the host; it stays destroyable after the map
-    /// closes because a detached session no longer reaches its map.
+    /// A detached session no longer reaches its map, so the map is free to
+    /// close and the detached session stays destroyable afterwards.
     pub fn detach(
         self,
     ) -> std::result::Result<DetachedRenderSessionHandle, HandleOperationError<Self>> {
@@ -1504,9 +1466,8 @@ impl RenderSessionHandle {
         maplibre_core::check(unsafe {
             sys::mln_texture_read_premultiplied_rgba8(session, data_ptr, data.len(), &mut info)
         })?;
-        // An empty destination reaches native code as the null pointer and zero
-        // capacity that mean a size probe, which succeeds without copying. Report
-        // the buffer as too small unless the frame really carries no bytes.
+        // An empty destination reaches native code as the size probe, which
+        // succeeds without copying, so report it as too small here.
         if data.is_empty() && info.byte_length > 0 {
             return Err(crate::Error::invalid_argument(format!(
                 "buffer length 0 is smaller than the required {} bytes",

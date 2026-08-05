@@ -1,10 +1,6 @@
-//! Shared ABI adaptation for MapLibre Native bridge bindings.
-//!
-//! This crate sits above `maplibre-native-ffi-sys` and below public language
-//! bindings. It owns reusable C ABI facts such as status mapping,
-//! diagnostics, pointer checks, native string helpers, and short-lived native
-//! result guards. Public bindings layer their handle, lifetime, callback,
-//! threading, and host-runtime policies above these building blocks.
+//! Shared ABI adaptation for MapLibre Native bridge bindings: status mapping,
+//! diagnostics, pointer checks, native string helpers, and native result
+//! guards.
 //!
 //! This is an internal workspace crate, not the supported safe Rust binding.
 //! Rust applications should use the `maplibre-native-ffi` crate.

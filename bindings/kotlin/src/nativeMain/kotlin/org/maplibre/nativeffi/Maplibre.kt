@@ -38,7 +38,6 @@ public actual object Maplibre {
 
   /** Native libraries are linked by the host binary for Kotlin/Native. */
   public actual fun loadNativeLibrary() {
-    // Direct cinterop calls bind against the native library at link/load time.
     checkCompatibleCAbi()
   }
 

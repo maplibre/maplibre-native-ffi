@@ -151,7 +151,7 @@ public class mln_geojson {
             MapLibreNativeC.C_POINTER.withName("geometry"),
             MapLibreNativeC.C_POINTER.withName("feature"),
             mln_feature_collection.layout().withName("feature_collection")
-        ).withName("$anon$548:3");
+        ).withName("$anon$545:3");
 
         /**
          * The layout of this union

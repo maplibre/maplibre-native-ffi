@@ -25,19 +25,16 @@ extern "C" {
  *
  * Surface and session-owned texture sessions resize in place. Caller-owned
  * borrowed texture targets return MLN_STATUS_UNSUPPORTED because the texture is
- * sized by its owner; a host that reallocates one hands the replacement over
- * with the mln_*_borrowed_texture_set_target() function for its backend, which
- * keeps the session alive and, under the conditions stated there, its renderer.
- * See texture.h.
+ * sized by its owner; hand a replacement over with the
+ * mln_*_borrowed_texture_set_target() function for the backend. See texture.h.
  *
  * The session renderer survives a resize, carrying the tile pyramid, glyph and
  * image atlases, symbol placement, and feature state set through
  * mln_render_session_set_feature_state() across to the new size. A scale_factor
- * that differs from the session's current value is the exception: a renderer
- * compiles its shaders for a fixed pixel ratio, so that resize retires the
- * renderer, the next mln_render_session_render_update() builds a replacement,
- * and renderer-held state starts empty. Map state such as camera, style, and
- * sources lives on the map and survives either way.
+ * that differs from the session's current value retires the renderer instead,
+ * because its shaders are compiled for a fixed pixel ratio, and renderer-held
+ * state starts empty on the next mln_render_session_render_update(). Map state
+ * such as camera, style, and sources survives either way.
  *
  * Passing a scale_factor that differs from the map's mln_map_options
  * scale_factor logs a warning; see mln_map_options.
@@ -69,8 +66,7 @@ MLN_API mln_status mln_render_session_resize(
  * *out_rendered reports whether this call rendered a frame. The map retains its
  * latest update, so a host redraws on demand after a resize or a surface expose
  * and gates a frame loop on MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE. A
- * false report is a normal transient: call again on the next frame rather than
- * wait for another update event.
+ * false report is a normal transient: call again on the next frame.
  *
  * In MLN_MAP_MODE_STATIC, pump a resize through the map before requesting the
  * still image. The session applies its extent on the map's owner thread, and a

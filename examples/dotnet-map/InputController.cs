@@ -6,9 +6,8 @@ namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 /// <summary>Decodes host input into camera commands.</summary>
 /// <remarks>
-/// This runs on the render loop, which does not own the map, so it only produces commands; the
-/// runtime loop applies them on the map's owner thread. GLFW reports pointer positions in window
-/// coordinates, which are already the map's logical coordinates.
+/// This runs on the render loop, which does not own the map, so it only queues commands for the
+/// runtime loop. GLFW reports pointer positions in the map's logical coordinates already.
 /// </remarks>
 internal sealed unsafe class InputController : IDisposable
 {
@@ -142,8 +141,6 @@ internal sealed unsafe class InputController : IDisposable
             commands.Push(new CancelTransitionsCommand());
         }
 
-        // The deltas in between belong to one live gesture, so the map hears about the gesture
-        // rather than a stream of unrelated camera commands.
         if (Dragging != wasDragging)
         {
             commands.Push(new SetGestureInProgressCommand(Dragging));

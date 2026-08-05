@@ -108,8 +108,8 @@ public sealed record SourceInfo(
 );
 
 /// <remarks>
-/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
-/// instance unmodified while it is a key in a hash-based collection.
+/// Compares and hashes by property value; keep an instance unmodified while it is a key in a
+/// hash-based collection.
 /// </remarks>
 public sealed record TileSourceOptions
 {
@@ -123,13 +123,6 @@ public sealed record TileSourceOptions
     public LatLngBounds? Bounds { get; set; }
 }
 
-/// <remarks>
-/// MapLibre Native fixes these options when the source is created, so
-/// <see cref="Map.MapHandle.SetGeoJsonSourceUrl" /> and
-/// <see cref="Map.MapHandle.SetGeoJsonSourceData" /> keep the options the source was added with.
-/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
-/// instance unmodified while it is a key in a hash-based collection.
-/// </remarks>
 /// <summary>Whether a style layer draws.</summary>
 /// <remarks>
 /// This is an open domain: MapLibre Native may report a value with no named member here, so a
@@ -141,6 +134,10 @@ public enum StyleLayerVisibility : uint
     None = 1,
 }
 
+/// <remarks>
+/// These options are fixed when the source is created; later data updates keep them. Compares
+/// and hashes by property value.
+/// </remarks>
 public sealed record GeoJsonSourceOptions
 {
     public double? MinimumZoom { get; set; }
@@ -155,9 +152,8 @@ public sealed record GeoJsonSourceOptions
     public uint? ClusterMinimumPoints { get; set; }
 
     /// <summary>
-    /// Applies data updates synchronously, so data set through the GeoJSON data update API
-    /// reaches the next rendered frame instead of being tiled on a worker and shown in a later
-    /// one.
+    /// Applies data updates synchronously, so updated data reaches the next rendered frame
+    /// instead of being tiled on a worker and shown in a later one.
     /// </summary>
     public bool? SynchronousUpdate { get; set; }
 
@@ -216,8 +212,8 @@ public enum StyleImageTextFit : uint
 }
 
 /// <remarks>
-/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
-/// instance unmodified while it is a key in a hash-based collection.
+/// Compares and hashes by property value; keep an instance unmodified while it is a key in a
+/// hash-based collection.
 /// </remarks>
 public sealed record StyleImageOptions
 {
@@ -304,15 +300,10 @@ public sealed record StyleImageOptions
 
 /// <summary>The style's global transition options.</summary>
 /// <remarks>
-/// <para>
 /// These control how the style animates paint property changes and whether symbol placement
-/// changes cross-fade. They are distinct from camera animation options and from the per-property
-/// transitions a style declares.
-/// </para>
-/// <para>
-/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
-/// instance unmodified while it is a key in a hash-based collection.
-/// </para>
+/// changes cross-fade; they are distinct from camera animation options and from the per-property
+/// transitions a style declares. Compares and hashes by property value; keep an instance
+/// unmodified while it is a key in a hash-based collection.
 /// </remarks>
 public sealed record StyleTransitionOptions
 {
@@ -333,10 +324,8 @@ public sealed record StyleTransitionOptions
     /// MapLibre Native's own default.
     /// </summary>
     /// <remarks>
-    /// Clearing it makes symbol placement changes apply to the next rendered frame. Hosts that
-    /// move symbol-backed features at pointer frequency clear it for the duration of the
-    /// interaction so the rendered symbol keeps up. Reading the options always reports it, because
-    /// MapLibre Native always holds a value for it.
+    /// Clearing it makes symbol placement changes apply to the next rendered frame. Reading the
+    /// options always reports a value here.
     /// </remarks>
     public bool? EnablePlacementTransitions { get; set; }
 }

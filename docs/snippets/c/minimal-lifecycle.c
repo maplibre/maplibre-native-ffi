@@ -26,8 +26,7 @@ int main(void) {
     return 1;
   }
 
-  // Accepting the request is not loading the style. The outcome arrives later,
-  // as an event.
+  // This call only accepts the request; the outcome arrives later as an event.
   const mln_status requested =
     mln_map_set_style_url(map, "https://tiles.openfreemap.org/styles/bright");
   bool loaded = false;
@@ -35,8 +34,7 @@ int main(void) {
 
   const time_t deadline = time(NULL) + 30;
   while (!settled && time(NULL) < deadline) {
-    // A positive timeout parks the thread until work arrives or the timeout
-    // expires, so this loop waits without spinning.
+    // A positive timeout parks the thread until work arrives or it expires.
     mln_runtime_pump(runtime, 100);
 
     mln_runtime_event event = {.size = sizeof(event)};
@@ -58,10 +56,9 @@ int main(void) {
         settled = true;
       }
     }
-    // A host with its own event loop waits in it here.
   }
 
-  // Children first: a runtime refuses to close while its maps are live.
+  // mln_runtime_destroy returns MLN_STATUS_INVALID_STATE while a map is live.
   mln_map_destroy(map);
   mln_runtime_destroy(runtime);
   return loaded ? 0 : 1;

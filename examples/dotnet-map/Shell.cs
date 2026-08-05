@@ -13,8 +13,7 @@ internal static class Shell
     private static readonly TimeSpan RenderLoopInterval = TimeSpan.FromMilliseconds(8);
 
     /// <summary>
-    /// Backstop for the runtime loop's park. The render loop's wake source is what normally
-    /// releases it, so this only bounds a pump that nothing signals.
+    /// Backstop for the runtime loop's park; the render loop's wake source normally releases it.
     /// </summary>
     private static readonly TimeSpan ParkTimeout = TimeSpan.FromMilliseconds(100);
 
@@ -33,8 +32,8 @@ internal static class Shell
         var renderRequest = new RenderRequest();
         var initialViewport = graphics.ReadViewport();
 
-        // A dedicated thread, because the native owner-thread checks are keyed on the OS thread.
-        // Thread pools and async continuations do not guarantee that affinity.
+        // A dedicated thread, because the native owner-thread checks are keyed on the OS thread;
+        // thread pools and async continuations do not guarantee that affinity.
         var runtimeThread = new Thread(() =>
             RuntimeLoop(initialViewport, commands, renderRequest, channel)
         )
@@ -50,8 +49,8 @@ internal static class Shell
         }
         finally
         {
-            // The render loop has closed its session by the time it returns, and a map with an
-            // attached session cannot be destroyed, so shutdown is only requested from here.
+            // Only here: the render loop has closed its session by the time it returns, and a map
+            // with an attached session cannot be destroyed.
             channel.RequestShutdown();
             runtimeThread.Join();
         }
@@ -60,9 +59,8 @@ internal static class Shell
     }
 
     /// <summary>
-    /// Owns the runtime and the map for their whole lifetime, on a thread that is not the one
-    /// presenting. It never touches the render session: the render loop attaches its own against
-    /// the map published here.
+    /// Owns the runtime and the map for their whole lifetime. It never touches the render session:
+    /// the render loop attaches its own against the map published here.
     /// </summary>
     private static void RuntimeLoop(
         Viewport initialViewport,
@@ -95,11 +93,11 @@ internal static class Shell
         }
         finally
         {
-            // Wait for the shutdown signal even after a failure: the render loop closes its
-            // session before it sends that signal, and the map cannot be destroyed until then.
+            // Wait even after a failure: the render loop closes its session before signalling
+            // shutdown, and the map cannot be destroyed until then.
             channel.WaitForShutdown();
-            // Stop handing the render loop this source before disposing it. Disposing first would
-            // leave the channel signalling a closed handle, which throws over the original failure.
+            // Stop handing out the wake source before disposing it, or the channel signals a closed
+            // handle and throws over the original failure.
             commands.OnEnqueue = null;
             channel.ClearWake();
             wake?.Dispose();
@@ -108,8 +106,7 @@ internal static class Shell
     }
 
     /// <summary>
-    /// The display-paced render loop. Owns the window, input decoding, the graphics context, and
-    /// the render session it attaches.
+    /// Owns the window, input decoding, the graphics context, and the render session it attaches.
     /// </summary>
     private static void RenderLoop(
         IGraphicsContext graphics,
@@ -119,8 +116,6 @@ internal static class Shell
         MapChannel channel
     )
     {
-        // The runtime loop creates the map; this loop attaches its own session against it and owns
-        // that session for the rest of the run.
         var map = channel.WaitForMap();
         var viewport = graphics.ReadViewport();
         IRenderTarget? target = null;
@@ -144,10 +139,7 @@ internal static class Shell
                     if (!viewport.IsEmpty)
                     {
                         graphics.Resize(viewport);
-                        // Every mode follows a resize without losing its session: the ones the
-                        // session sizes resize in place, and a caller-owned texture hands the
-                        // session a replacement. Closing and attaching again is reserved for a
-                        // target the live session cannot take at all.
+                        // Every mode resizes against the live session; none needs a re-attach.
                         target.Resize(viewport);
                         renderRequest.Set();
                     }
@@ -157,9 +149,7 @@ internal static class Shell
                 // render call is not discarded.
                 if (graphics.CanRenderFrame && renderRequest.Consume() && !Render(graphics, target))
                 {
-                    // Nothing reached the screen. The map applies its logical size on the runtime
-                    // loop's next Pump, and a presentation target hands out no drawable while the
-                    // window is minimized. Ask again rather than dropping the frame.
+                    // Nothing reached the screen; ask again rather than dropping the frame.
                     renderRequest.Set();
                 }
 

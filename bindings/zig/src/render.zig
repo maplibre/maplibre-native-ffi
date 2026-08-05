@@ -25,15 +25,10 @@ const RenderSessionFrameState = struct {
 };
 
 const RenderSessionState = struct {
-    /// The map this session is registered against, cleared once the
-    /// registration is released by a successful detach or close.
+    /// Cleared once a successful detach or close releases the registration.
     map_handle: ?map_module.MapHandle,
-    /// The session's own store, not the map's.
-    ///
-    /// A session is owned by the thread that attached it, which need not be the
-    /// map's, so sharing the map's store would let both threads write it at
-    /// once. `DiagnosticStore` is unsynchronized and frees the previous message
-    /// on every set, so that would race the allocator, not just the message.
+    /// The session's own store, never the map's: a session's owner thread need
+    /// not be the map's, and `DiagnosticStore` is unsynchronized.
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     frame_state: ?*RenderSessionFrameState,
     active_leases: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
@@ -91,10 +86,8 @@ const OwnedTextureFrameLease = struct {
     }
 };
 
-// The C API issues each session a generational handle and rejects a released
-// one, so this holds only the state this binding owns on top of it. The owned
-// texture frame tables below keep their own generations: a frame is a binding
-// concept with no C handle behind it.
+// An owned texture frame is a binding concept with no C handle behind it, so
+// the frame tables below carry their own generations.
 var render_session_registry_lock = std.atomic.Value(bool).init(false);
 var render_session_registry: std.AutoHashMapUnmanaged(c.mln_render_session, *RenderSessionState) = .empty;
 
@@ -110,19 +103,16 @@ var feature_query_result_destroy_count_for_testing = std.atomic.Value(usize).ini
 pub const NativePointer = enum(usize) {
     _,
 
-    /// Creates a borrowed backend-native pointer.
-    ///
-    /// The caller keeps the backend object valid and synchronized for the full
-    /// C API borrow window documented by the descriptor that receives it.
+    /// Creates a borrowed backend-native pointer. The caller keeps the backend
+    /// object valid and synchronized for the borrow window documented by the
+    /// descriptor that receives it.
     pub fn fromPtr(ptr: *anyopaque) NativePointer {
         return @enumFromInt(@intFromPtr(ptr));
     }
 
-    /// Returns the borrowed backend-native address.
-    ///
-    /// The returned pointer grants no ownership and is valid only for the
-    /// backend lifetime and synchronization scope documented by the operation
-    /// that produced or accepts this value.
+    /// Returns the borrowed backend-native address. The pointer grants no
+    /// ownership and is valid only for the borrow window documented by the
+    /// operation that produced or accepts this value.
     pub fn toPtr(self: NativePointer) *anyopaque {
         return @ptrFromInt(@intFromEnum(self));
     }
@@ -166,11 +156,8 @@ pub const RenderTargetExtent = struct {
     scale_factor: f64 = 1.0,
 
     /// Returns the physical device-pixel size as `ceil(logical * scale_factor)`
-    /// per dimension.
-    ///
-    /// Session-owned texture targets and surface targets are sized this way.
-    /// Borrowed texture targets state their physical size instead, because not
-    /// every physical size is reachable from a logical extent.
+    /// per dimension. Session-owned texture targets and surface targets are
+    /// sized this way; borrowed texture targets state their physical size.
     pub fn physicalSize(
         self: RenderTargetExtent,
         diagnostic_store: ?*diagnostics.DiagnosticStore,
@@ -225,8 +212,7 @@ pub const MetalOwnedTextureDescriptor = struct {
 
 pub const MetalBorrowedTextureDescriptor = struct {
     extent: RenderTargetExtent = .{},
-    /// Physical texture size in device pixels. The texture is sized by its
-    /// owner, so this is stated rather than derived from `extent`.
+    /// Physical texture size in device pixels, set by the texture's owner.
     physical_width: u32,
     physical_height: u32,
     texture: NativePointer,
@@ -239,8 +225,7 @@ pub const VulkanOwnedTextureDescriptor = struct {
 
 pub const VulkanBorrowedTextureDescriptor = struct {
     extent: RenderTargetExtent = .{},
-    /// Physical image size in device pixels. The image is sized by its owner,
-    /// so this is stated rather than derived from `extent`.
+    /// Physical image size in device pixels, set by the image's owner.
     physical_width: u32,
     physical_height: u32,
     context: VulkanContextDescriptor,
@@ -258,8 +243,7 @@ pub const OpenGLOwnedTextureDescriptor = struct {
 
 pub const OpenGLBorrowedTextureDescriptor = struct {
     extent: RenderTargetExtent = .{},
-    /// Physical texture size in device pixels. The texture is sized by its
-    /// owner, so this is stated rather than derived from `extent`.
+    /// Physical texture size in device pixels, set by the texture's owner.
     physical_width: u32,
     physical_height: u32,
     context: OpenGLContextDescriptor,
@@ -299,11 +283,8 @@ pub const FeatureStateSelector = struct {
     state_key: ?[]const u8 = null,
 };
 
-/// Screen-space box in logical map pixels.
-///
-/// Corners may be given in any order, and may extend past the viewport.
-/// Rendered queries normalize the corners and clip the box to the viewport, so
-/// a box that over-covers the viewport queries everything visible.
+/// Screen-space box in logical map pixels. Corners may be given in any order
+/// and may extend past the viewport; rendered queries normalize and clip them.
 pub const ScreenBox = struct {
     min: values.ScreenPoint,
     max: values.ScreenPoint,
@@ -434,19 +415,13 @@ pub const OpenGLOwnedTextureFrameInfo = struct {
 pub const RenderSessionHandle = enum(c.mln_render_session) {
     _,
 
-    /// Resizes this attached render session.
+    /// Resizes this attached render session. Borrowed texture targets are sized
+    /// by their owner and return `error.Unsupported`; hand over a new texture
+    /// with the backend's `set*BorrowedTextureTarget` method instead.
     ///
-    /// Surface and owned-texture sessions resize in place. Borrowed texture
-    /// targets are sized by their owner and return `error.Unsupported`:
-    /// allocate a texture at the new size and hand it over with the
-    /// `set*BorrowedTextureTarget` method for the backend, which keeps this
-    /// session.
-    ///
-    /// The session keeps its renderer across a resize, so renderer-held state
-    /// such as feature state carries over. A scale factor change is the
-    /// exception: a renderer compiles its shaders for one pixel ratio, so that
-    /// resize starts a new one with renderer-held state empty. Map state such as
-    /// camera, style, and sources lives on the map and survives either way.
+    /// The session keeps its renderer, and with it renderer-held state such as
+    /// feature state. A scale factor change is the exception: shaders are
+    /// compiled for one pixel ratio, so it starts a new renderer.
     pub fn resize(self: *RenderSessionHandle, extent: RenderTargetExtent) status.Error!void {
         const lease = try renderSessionLease(self.*);
         defer lease.release();
@@ -457,104 +432,73 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
         );
     }
 
-    /// Presents this attached surface session through a new Metal surface.
-    ///
-    /// A host surface can be destroyed and recreated while the map goes on
-    /// living, which is what Android rotation, a Flutter `SurfaceProducer`
-    /// lifecycle change, and a window resize that reallocates all look like
-    /// from here. Replacing the surface in place keeps this session's renderer,
-    /// and with it the tile pyramid, glyph and image atlases, symbol placement,
-    /// and feature state.
-    ///
-    /// The descriptor names the graphics context this session attached with,
-    /// and its extent applies exactly as `resize` applies one, so the map
-    /// publishes an update matching the new size only once pumped. A descriptor
-    /// whose `context.device` is neither null nor this session's device returns
-    /// `error.InvalidArgument` and leaves the session rendering into the surface
-    /// it has. The session assigns the layer its own device and pixel format, so
-    /// the layer itself carries nothing that has to match.
+    /// Presents this attached surface session through a new Metal surface,
+    /// keeping this session's renderer. The descriptor's extent applies as
+    /// `resize` applies one. A `context.device` that is neither null nor this
+    /// session's device returns `error.InvalidArgument` and leaves the session
+    /// on its current surface; the session assigns the layer its own device and
+    /// pixel format.
     pub fn setMetalSurfaceTarget(self: *RenderSessionHandle, descriptor: MetalSurfaceDescriptor) status.Error!void {
         var raw = metalSurfaceDescriptorToNative(descriptor);
         return try setTarget(self.*, c.mln_metal_surface_set_target, &raw);
     }
 
-    /// Presents this attached surface session through a new Vulkan surface.
-    ///
-    /// See `setMetalSurfaceTarget` for what replacing a surface preserves. The
-    /// outgoing `VkSurfaceKHR` must still be valid: this session holds a
-    /// swapchain built from it, and Vulkan destroys every swapchain before its
-    /// surface. A host that has to release its surface first closes this
-    /// session and attaches again instead.
+    /// Presents this attached surface session through a new Vulkan surface,
+    /// keeping this session's renderer. The outgoing `VkSurfaceKHR` must still
+    /// be valid, since this session destroys the swapchain built from it. A
+    /// host that must release its surface first closes this session instead.
     pub fn setVulkanSurfaceTarget(self: *RenderSessionHandle, descriptor: VulkanSurfaceDescriptor) status.Error!void {
         var raw = vulkanSurfaceDescriptorToNative(descriptor);
         return try setTarget(self.*, c.mln_vulkan_surface_set_target, &raw);
     }
 
-    /// Presents this attached surface session through a new OpenGL surface.
-    ///
-    /// See `setMetalSurfaceTarget` for what replacing a surface preserves. The
-    /// new surface is made current on the next render, so a host may hand over
-    /// a replacement for one it has already destroyed. A surface accepted here
-    /// can still prove unusable, which the next `renderUpdate` reports as
-    /// `error.NativeError` rather than this call.
+    /// Presents this attached surface session through a new OpenGL surface,
+    /// keeping this session's renderer. The new surface is made current on the
+    /// next render, so the outgoing surface may already be destroyed, and an
+    /// unusable replacement surfaces as `error.NativeError` from the next
+    /// `renderUpdate` rather than from this call.
     pub fn setOpenGLSurfaceTarget(self: *RenderSessionHandle, descriptor: OpenGLSurfaceDescriptor) status.Error!void {
         var raw = openglSurfaceDescriptorToNative(descriptor);
         return try setTarget(self.*, c.mln_opengl_surface_set_target, &raw);
     }
 
     /// Renders this attached texture session into a new caller-owned Metal
-    /// texture.
+    /// texture, keeping this session's renderer. The new extent applies as
+    /// `resize` applies one.
     ///
-    /// A caller-owned texture is sized by its owner, so a host that follows a
-    /// resize reallocates rather than resizing and `resize` returns
-    /// `error.Unsupported`. Handing the replacement over here keeps this
-    /// session's renderer instead, so the map does not go cold on every resize,
-    /// and the new extent applies exactly as `resize` applies one — including a
-    /// scale factor change starting a new renderer for the new pixel ratio.
-    ///
-    /// The replacement belongs to the device this session attached with, which
-    /// returns `error.InvalidArgument` otherwise, and carries the pixel format
-    /// it attached with, which returns `error.Unsupported` otherwise. Both
-    /// leave this session rendering into the texture it has. The caller owns the replacement and
-    /// keeps it valid until the next replacement, detach, or close. This
-    /// session never retained the outgoing texture and never releases it, but
-    /// never reads it here, so a host that already released it hands over the
-    /// replacement all the same.
+    /// The replacement must belong to the device this session attached with
+    /// (`error.InvalidArgument` otherwise) and carry the pixel format it
+    /// attached with (`error.Unsupported` otherwise); either leaves the session
+    /// on its current texture. The caller keeps the replacement valid until the
+    /// next replacement, detach, or close. The outgoing texture is neither read
+    /// nor released here.
     pub fn setMetalBorrowedTextureTarget(self: *RenderSessionHandle, descriptor: MetalBorrowedTextureDescriptor) status.Error!void {
         var raw = metalBorrowedTextureDescriptorToNative(descriptor);
         return try setTarget(self.*, c.mln_metal_borrowed_texture_set_target, &raw);
     }
 
     /// Renders this attached texture session into a new caller-owned Vulkan
-    /// image.
-    ///
-    /// See `setMetalBorrowedTextureTarget` for what replacing a target
-    /// preserves. The replacement carries the format and both layouts this
-    /// session attached with, since its render pass was built around them.
+    /// image. See `setMetalBorrowedTextureTarget`. The replacement must carry
+    /// the format and both layouts this session attached with.
     pub fn setVulkanBorrowedTextureTarget(self: *RenderSessionHandle, descriptor: VulkanBorrowedTextureDescriptor) status.Error!void {
         var raw = vulkanBorrowedTextureDescriptorToNative(descriptor);
         return try setTarget(self.*, c.mln_vulkan_borrowed_texture_set_target, &raw);
     }
 
     /// Renders this attached texture session into a new caller-owned OpenGL
-    /// texture.
-    ///
-    /// See `setMetalBorrowedTextureTarget` for what replacing a target
-    /// preserves. The replacement belongs to the context this session attached
-    /// with, or one in its share group, and that context must be current on
-    /// this thread.
+    /// texture. See `setMetalBorrowedTextureTarget`. The replacement must
+    /// belong to the context this session attached with or one in its share
+    /// group, and that context must be current on this thread.
     pub fn setOpenGLBorrowedTextureTarget(self: *RenderSessionHandle, descriptor: OpenGLBorrowedTextureDescriptor) status.Error!void {
         var raw = openglBorrowedTextureDescriptorToNative(descriptor);
         return try setTarget(self.*, c.mln_opengl_borrowed_texture_set_target, &raw);
     }
 
     /// Renders the latest available map render update. The map retains its
-    /// latest update, so repeated calls re-render it and return true again;
-    /// use this to redraw on demand after resize or surface expose, and gate
-    /// frame loops on render-update-available events instead of the return
-    /// value. Returns false when no frame was rendered. That is a normal
-    /// transient: call again on the next frame rather than wait for another
-    /// render-update event.
+    /// latest update, so repeated calls re-render it and return true again.
+    /// Returns false when no frame was rendered, which is a normal transient:
+    /// call again on the next frame rather than wait for another render-update
+    /// event.
     pub fn renderUpdate(self: *RenderSessionHandle) status.Error!bool {
         const lease = try renderSessionLease(self.*);
         defer lease.release();
@@ -568,11 +512,9 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
     }
 
     /// Detaches the render target from this session. The session stays live and
-    /// still needs `close`, but it no longer holds its map: after a successful
-    /// detach the map can be closed while this session is still open, and every
-    /// session operation that needs an attached target returns a native error.
-    ///
-    /// A detached session stays detached. Attach a new session on the map to
+    /// still needs `close`, but releases its map, so the map may be closed while
+    /// this session is open and every operation needing an attached target
+    /// returns a native error. Detaching is permanent; attach a new session to
     /// render again.
     pub fn detach(self: *RenderSessionHandle) status.Error!void {
         const lease = try renderSessionLease(self.*);
@@ -701,13 +643,10 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
 
     /// Queries a feature extension from the latest render session state.
     ///
-    /// The `supercluster` extension reads the `cluster_id` feature property and
-    /// the `limit` and `offset` arguments as `.uint`. Other numeric types are
-    /// treated as absent: a `cluster_id` that is not `.uint` returns a `.value`
-    /// result holding `.null` instead of a `.feature_collection`, and a `limit`
-    /// or `offset` that is not `.uint` leaves `leaves` at the native defaults of
-    /// ten leaves at offset zero. Queried feature properties keep their JSON
-    /// value type, so a queried cluster feature can be passed back unmodified.
+    /// The `supercluster` extension reads `cluster_id`, `limit`, and `offset`
+    /// as `.uint` and treats other numeric types as absent: a non-`.uint`
+    /// `cluster_id` yields a `.value` result holding `.null`, and a non-`.uint`
+    /// `limit` or `offset` falls back to ten leaves at offset zero.
     pub fn queryFeatureExtension(
         self: *RenderSessionHandle,
         allocator: std.mem.Allocator,
@@ -879,9 +818,8 @@ pub const MetalOwnedTextureFrameHandle = enum(u128) {
 
     /// Returns native Metal objects for this acquired frame.
     ///
-    /// Safety: returned backend pointers stay valid only until this frame handle
-    /// is released. Callers must follow the backend synchronization rules from
-    /// the C API while using them.
+    /// Safety: the returned pointers stay valid only until this frame handle is
+    /// released, under the C API's backend synchronization rules.
     pub fn info(self: *const MetalOwnedTextureFrameHandle) status.BindingError!MetalOwnedTextureFrameInfo {
         const lease = try ownedTextureFrameLease(self.*, .metal);
         defer lease.release();
@@ -925,9 +863,8 @@ pub const VulkanOwnedTextureFrameHandle = enum(u128) {
 
     /// Returns native Vulkan objects for this acquired frame.
     ///
-    /// Safety: returned backend pointers stay valid only until this frame handle
-    /// is released. Callers must follow the backend synchronization rules from
-    /// the C API while using them.
+    /// Safety: the returned pointers stay valid only until this frame handle is
+    /// released, under the C API's backend synchronization rules.
     pub fn info(self: *const VulkanOwnedTextureFrameHandle) status.BindingError!VulkanOwnedTextureFrameInfo {
         const lease = try ownedTextureFrameLease(self.*, .vulkan);
         defer lease.release();
@@ -973,9 +910,8 @@ pub const OpenGLOwnedTextureFrameHandle = enum(u128) {
 
     /// Returns native OpenGL object names for this acquired frame.
     ///
-    /// Safety: returned texture names stay valid only until this frame handle is
-    /// released. Callers must follow the C API context-sharing and
-    /// synchronization rules while using them.
+    /// Safety: the returned names stay valid only until this frame handle is
+    /// released, under the C API's context-sharing and synchronization rules.
     pub fn info(self: *const OpenGLOwnedTextureFrameHandle) status.BindingError!OpenGLOwnedTextureFrameInfo {
         const lease = try ownedTextureFrameLease(self.*, .opengl);
         defer lease.release();
@@ -1083,10 +1019,8 @@ fn attach(
     return try newRenderSession(session, map.*, registration.diagnostic_store);
 }
 
-/// Shared body for the `set*Target` methods.
-///
-/// The native descriptor is materialized by the caller and lives for the
-/// duration of this call, which is all the C API borrows it for.
+/// Shared body for the `set*Target` methods. The C API borrows the caller's
+/// native descriptor only for the duration of this call.
 fn setTarget(
     handle: RenderSessionHandle,
     comptime setTargetFn: anytype,
@@ -1107,8 +1041,8 @@ fn newRenderSession(
     session_frame_state.* = .{};
     errdefer std.heap.smp_allocator.destroy(session_frame_state);
 
-    // Its own store, allocated from the same allocator the map's uses so the
-    // host's memory still accounts for it.
+    // Allocated from the map store's allocator so host memory still accounts
+    // for it.
     const session_store: ?*diagnostics.DiagnosticStore = if (diagnostic_store) |map_store| store: {
         const store = try std.heap.smp_allocator.create(diagnostics.DiagnosticStore);
         store.* = diagnostics.DiagnosticStore.init(map_store.allocator);

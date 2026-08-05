@@ -1,12 +1,8 @@
 @testable import MaplibreNativeFFI
 
 /// Handle values for tests that exercise binding-owned bookkeeping without a
-/// live native object.
-///
-/// Each value carries the kind byte the C API assigns to the type it stands in
-/// for, so a synthetic handle that reaches a diagnostic reads as an obviously
-/// fabricated handle of the right kind rather than a plausible one. Passing one
-/// to the C API is rejected as a handle this process never created.
+/// live native object. Each value carries the kind byte the C API assigns to
+/// the type it stands in for. The C API rejects one as never created.
 enum SyntheticHandles {
   static func runtime(_ ordinal: UInt64 = 1) -> NativeRuntimeHandle {
     NativeRuntimeHandle(raw: kind(0x01) | ordinal)

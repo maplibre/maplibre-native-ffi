@@ -19,16 +19,11 @@ pub const Result = struct {
     camera_changed: bool = false,
 };
 
-/// Decodes host input into camera commands.
-///
-/// This runs on the render loop, which does not own the map, so it only
-/// produces commands; the runtime loop applies them on the map's owner thread.
-/// Anything needing the current viewport is converted to logical map
-/// coordinates here, where the viewport lives.
+/// Decodes host input into camera commands. Runs on the render loop, which does
+/// not own the map, so it only queues commands for the runtime loop to apply.
 pub const Controller = struct {
     drag_mode: DragMode = .none,
-    /// The button that started the live drag. A drag belongs to one button, so
-    /// a second button pressed during it neither restarts it nor ends it early.
+    /// The button that started the live drag; only its release ends the drag.
     drag_button: u8 = 0,
     last_x: f64 = 0,
     last_y: f64 = 0,
@@ -55,10 +50,8 @@ pub const Controller = struct {
         commands: *channel.CommandQueue,
         current_viewport: types.Viewport,
     ) Result {
-        // A drag already owns the pointer, so a second button joins it rather
-        // than starting a drag of its own. Its position leaves the live drag's
-        // baseline alone, so the next delta still measures from where the
-        // owning button last was.
+        // A second button joins the live drag rather than starting one, leaving
+        // the drag's baseline position alone.
         if (self.drag_mode != .none) return .{ .handled = true };
 
         const mode = dragModeForButton(button.button);
@@ -68,11 +61,8 @@ pub const Controller = struct {
         self.last_x = cursor.x;
         self.last_y = cursor.y;
 
-        // Queued ahead of the drag's own commands, so the transition stops
-        // before the first delta lands.
+        // Queued first, so any transition stops before the first delta lands.
         commands.push(.cancel_transitions);
-        // The deltas that follow belong to one live gesture, so the map hears
-        // about the gesture rather than a stream of unrelated camera commands.
         commands.push(.{ .set_gesture_in_progress = .{ .in_progress = true } });
         self.drag_mode = mode;
         self.drag_button = button.button;
@@ -87,8 +77,7 @@ pub const Controller = struct {
         if (button.button != c.SDL_BUTTON_LEFT and button.button != c.SDL_BUTTON_RIGHT) {
             return .{};
         }
-        // Releasing a button that joined the drag leaves the drag running, so
-        // the drag ends once, when the button that started it comes up.
+        // The drag ends once, when the button that started it comes up.
         if (button.button != self.drag_button) return .{ .handled = true };
         self.endDrag(commands);
         self.last_x = button.x;
@@ -96,8 +85,8 @@ pub const Controller = struct {
         return .{ .handled = true };
     }
 
-    /// Every path that ends a drag runs through here, so the gesture mark the
-    /// drag set is always paired with a clear.
+    /// Every path that ends a drag runs through here, so the gesture bracket the
+    /// drag opened is always closed.
     fn endDrag(self: *Controller, commands: *channel.CommandQueue) void {
         if (self.drag_mode == .none) return;
         self.drag_mode = .none;

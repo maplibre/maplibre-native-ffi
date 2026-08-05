@@ -59,9 +59,8 @@ func runRuntimeLoop(v viewport, commands *commandQueue, published chan<- runtime
 			shared.requestRender()
 		}
 	}
-	// An operational failure makes the render loop close its session first.
-	// Keep the map alive until that shutdown signal arrives, because destroying
-	// a map with an attached session is invalid.
+	// Destroying a map with an attached session is invalid, so keep the map
+	// alive until the render loop signals shutdown.
 	for !shared.shutdownRequested() {
 		time.Sleep(time.Millisecond)
 	}
@@ -71,8 +70,7 @@ type runtimeMapState struct {
 	runtime *maplibre.RuntimeHandle
 	mapRef  *maplibre.MapHandle
 	mapID   maplibre.MapID
-	// batch is reused across drains so applying commands allocates nothing.
-	batch []cameraCommand
+	batch   []cameraCommand
 }
 
 func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
@@ -227,8 +225,7 @@ func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapID maplibre.MapID) (b
 	}
 }
 
-// renderMapState owns the render target on the SDL render loop thread. It uses
-// the published map only to attach that target.
+// renderMapState owns the render target on the SDL render loop thread.
 type renderMapState struct {
 	target renderTarget
 }
@@ -250,8 +247,6 @@ func (state *renderMapState) closeTarget() error {
 	return err
 }
 
-// resize follows the resized host without losing the session: the render target
-// either resizes in place or hands the live session a replacement of its own.
 func (state *renderMapState) resize(v viewport) error {
 	if state.target == nil {
 		return errors.New("render target is not attached")

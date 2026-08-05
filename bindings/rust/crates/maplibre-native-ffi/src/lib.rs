@@ -218,8 +218,8 @@ pub fn c_version() -> u32 {
 
 /// Returns the render backends compiled into the linked native library.
 pub fn supported_render_backends() -> RenderBackendMask {
-    // SAFETY: mln_supported_render_backend_mask takes no arguments and returns a
-    // value mask. Unknown future bits are preserved by from_bits_retain.
+    // SAFETY: mln_supported_render_backend_mask takes no arguments and returns
+    // a value mask.
     let mask = unsafe { sys::mln_supported_render_backend_mask() };
     RenderBackendMask::from_bits_retain(mask)
 }
@@ -227,7 +227,7 @@ pub fn supported_render_backends() -> RenderBackendMask {
 /// Returns the OpenGL context providers compiled into the linked native library.
 pub fn supported_opengl_context_providers() -> OpenGLContextProviderMask {
     // SAFETY: mln_opengl_supported_context_provider_mask takes no arguments and
-    // returns a value mask. Unknown future bits are preserved by from_bits_retain.
+    // returns a value mask.
     let mask = unsafe { sys::mln_opengl_supported_context_provider_mask() };
     OpenGLContextProviderMask::from_bits_retain(mask)
 }
@@ -288,11 +288,8 @@ mod tests {
     assert_not_impl_any!(FrameNativePointer<'static>: Send, Sync);
     assert_not_impl_any!(RenderSessionHandle: Send, Sync);
     assert_not_impl_any!(DetachedRenderSessionHandle: Send, Sync);
-    // The one map value that crosses threads. A render session is owned by the
-    // thread that attaches it, so the thread driving a render loop needs a way
-    // to name a map owned elsewhere. It is a copied handle id, so both come
-    // from the ordinary derive rather than an unsafe assertion; the C API
-    // accepts one session per map and rejects a released handle.
+    // The one map value that crosses threads: a copied handle id that lets a
+    // render thread name a map owned elsewhere.
     assert_impl_all!(MapAttachRef: Send, Sync);
 
     #[test]

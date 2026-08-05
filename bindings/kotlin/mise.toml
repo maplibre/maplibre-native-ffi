@@ -13,7 +13,6 @@ description = "Generate Dokka HTML API reference for the Kotlin binding."
 dir = "../.."
 run = '''
 # Dokka configures every KMP target, including Android, so the SDK must exist.
-# AGP downloads build-tools on demand once platforms/android-<compileSdk> is present.
 compile_sdk="$(
   sed -n 's/^android-compileSdk = "\([0-9][0-9]*\)"/\1/p' gradle/libs.versions.toml | head -n1
 )"
@@ -144,8 +143,6 @@ esac
 
 [tasks.androidBuild]
 description = "Build the Kotlin Android binding."
-# The floor check runs as a dependency of the Gradle androidBuild task, so it
-# covers direct Gradle invocations too and needs no wiring here.
 usage = '''
 arg "[backend]" default="opengl" {
   choices "opengl" "vulkan"
@@ -170,9 +167,6 @@ fi
 [tasks.compileAndroid]
 description = "Type-check the Android binding without a native cross-compile."
 dir = "../.."
-# androidBuild is the full Android path and needs native artifacts per ABI. This
-# compiles androidMain alone, which the JVM and native test tasks never reach,
-# so a broken androidMain shows up before CI runs androidBuild.
 run = "./gradlew :bindings:kotlin:compileAndroidMain"
 
 [tasks.check-android-api-floor]

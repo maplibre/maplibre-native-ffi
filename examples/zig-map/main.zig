@@ -15,8 +15,8 @@ const viewport = @import("viewport.zig");
 
 const RenderTarget = render.RenderTarget;
 
-/// Backstop for the runtime loop's park. The render loop's wake source is what
-/// normally releases it, so this only bounds a pump that nothing signals.
+/// Backstop for a parked pump that nothing signals; the wake source is what
+/// normally releases it.
 const park_timeout_milliseconds = 100;
 const uses_egl = build_options.supports_opengl and (builtin.os.tag == .linux or builtin.os.tag == .macos);
 
@@ -30,18 +30,14 @@ const RuntimeLoopArgs = struct {
 };
 
 /// Owns the runtime and the map for their whole lifetime, on a thread that is
-/// not the one presenting. It never touches the render session: the render loop
-/// attaches its own against the map published here.
+/// not the one presenting.
 fn runtimeLoop(args: RuntimeLoopArgs) void {
     var state = map_state.MapState.init(args.allocator, args.initial_viewport) catch |err| {
         args.map_channel.fail(err);
         return;
     };
-    // However this loop exits, the render loop still owns the session, and a map
-    // with an attached session cannot be destroyed. The body publishes any
-    // failure before these run, so the render loop stops, closes its session,
-    // and requests shutdown; only then is the map destroyed. Defers run in
-    // reverse, so the wait happens first.
+    // A map with an attached session cannot be destroyed, so wait for the render
+    // loop to close its session first; defers run in reverse.
     defer state.deinit();
     defer args.map_channel.awaitShutdown(args.io);
 
@@ -49,12 +45,10 @@ fn runtimeLoop(args: RuntimeLoopArgs) void {
 }
 
 fn runtimeLoopBody(args: RuntimeLoopArgs, state: *map_state.MapState) !void {
-    // The render loop signals this to release the parked pump, so a camera
-    // command or a shutdown request lands without waiting out the bound below.
+    // The render loop signals this to release the parked pump.
     const wake = try state.runtime.wakeSource();
     defer wake.release();
 
-    // Reused across drains, so applying a batch allocates nothing.
     var batch: std.ArrayList(channel.CameraCommand) = .empty;
     defer batch.deinit(args.allocator);
 
@@ -62,9 +56,6 @@ fn runtimeLoopBody(args: RuntimeLoopArgs, state: *map_state.MapState) !void {
 
     while (!args.map_channel.shutdownRequested() and args.map_channel.failureValue() == null) {
         try state.applyCommands(args.commands, &batch);
-        // This thread has no display to pace it, so it takes its cadence from
-        // the runtime's own work and parks in between. The bound is a backstop
-        // for work that queues nothing on the owner thread, not the cadence.
         try state.runtime.pump(park_timeout_milliseconds);
         if (try map_state.drainEvents(args.allocator, &state.runtime, &state.map)) {
             args.render_request.set();
@@ -124,7 +115,7 @@ pub fn main(init_args: std.process.Init) !void {
     const allocator = gpa.allocator();
 
     // The graphics context, the render session, and every presentation resource
-    // belong to this thread, which owns the window and its display callbacks.
+    // belong to this thread, which owns the window.
     var target = try RenderTarget.init(allocator, window_handle, current_viewport, target_mode);
 
     var commands = channel.CommandQueue.init(allocator);
@@ -174,8 +165,6 @@ fn renderLoop(
     render_request: *channel.RenderRequest,
     map_channel: *channel.MapChannel,
 ) !void {
-    // The runtime loop creates the map; this loop attaches its own session
-    // against it and owns that session for the rest of the run.
     var map = while (true) {
         if (map_channel.failureValue()) |err| return err;
         if (map_channel.mapHandle()) |handle| break handle;
@@ -205,14 +194,9 @@ fn renderLoop(
                 => {
                     current_viewport.* = viewport.get(window_handle);
                     viewport.log("resized viewport", current_viewport.*);
-                    // Every mode follows a resize without losing its session:
-                    // the ones the session sizes resize in place, and a
-                    // caller-owned target allocates a replacement and hands it
-                    // over.
                     try target.resize(current_viewport.*);
-                    // The session resize enqueued the new extent to the map's
-                    // owner thread, so release its parked pump the way an
-                    // input command does.
+                    // The resize is queued to the map's owner thread; release
+                    // its pump.
                     map_channel.wakeRuntimeLoop();
                     render_request.set();
                 },
@@ -223,9 +207,6 @@ fn renderLoop(
                         current_viewport.*,
                     );
                     if (input_result.handled) {
-                        // Release the runtime loop's parked pump so the command
-                        // just queued is applied on this frame rather than after
-                        // the parking bound.
                         map_channel.wakeRuntimeLoop();
                     }
                     if (input_result.camera_changed) render_request.set();
@@ -235,16 +216,15 @@ fn renderLoop(
 
         try target.finishFrame();
 
-        // Consume before rendering, so a request the runtime loop publishes
-        // during the render call is not discarded.
+        // Consume before rendering, so a request published during the render
+        // call is not discarded.
         if (render_request.consume()) {
             if (!try target.renderUpdate(null, current_viewport.*)) {
                 render_request.set();
             }
         }
 
-        // Stand-in for a display-refresh subscription until the host loop is
-        // display-paced; see the frame loop section of the example spec.
+        // Stand-in for a display-refresh subscription.
         try io.sleep(.fromMilliseconds(8), .awake);
     }
 }

@@ -746,12 +746,8 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
   return MLN_STATUS_OK;
 }
 
-/**
- * Converts validated options into mbgl form.
- *
- * Cluster properties are handed to Converter<GeoJSONOptions> as a one-member
- * object so MapLibre Native parses the aggregation expressions.
- */
+// Cluster properties reach Converter<GeoJSONOptions> as a one-member object,
+// which is what parses the aggregation expressions.
 auto to_native_geojson_source_options(const mln_geojson_source_options& options)
   -> std::optional<mbgl::Immutable<mbgl::style::GeoJSONOptions>> {
   auto native = mbgl::style::GeoJSONOptions{};
@@ -831,21 +827,9 @@ auto geojson_alternative_name(const mbgl::GeoJSON& geojson)
   );
 }
 
-/**
- * Reports whether clustered data satisfies supercluster's input requirements.
- *
- * MapLibre Native engages clustering for feature collections only, and it reads
- * each feature's geometry as a point. A bare geometry or a single feature tiles
- * without clustering, and a feature carrying other geometry raises a variant
- * access error inside supercluster while mln_map_add_geojson_source_data() or
- * mln_map_set_geojson_source_data() builds the index. Checking here names the
- * source and the constraint instead of clustering silently or failing deep
- * inside MapLibre Native.
- *
- * An empty feature collection stays accepted: it carries nothing to cluster,
- * and a later mln_map_set_geojson_source_data() clusters the features it
- * supplies.
- */
+// Clustering requires a feature collection whose every feature has point
+// geometry; anything else raises a variant access error inside supercluster
+// while the index is built. An empty collection is accepted.
 auto validate_clustered_geojson(
   const std::string& source_id, const mbgl::GeoJSON& geojson
 ) -> bool {
@@ -1751,26 +1735,11 @@ class HeadlessObserver final : public mbgl::MapObserver {
 };
 
 // Delivers mbgl::RendererObserver callbacks on the map's run loop instead of on
-// whichever thread rendered.
-//
-// mbgl::Map::Impl is itself the RendererObserver, and its handlers reach deep
-// into map-thread state: onInvalidate() calls onUpdate(), and
-// onDidFinishRenderingFrame() reads the transform's transition state, publishes
-// the next update, and completes still-image requests. Handing that pointer
-// straight to a renderer on another thread would be a data race, so every
-// callback becomes a message on a mailbox bound to the runtime's run loop and
-// runs during the host's next mln_runtime_pump().
-//
-// This forwards unconditionally, including when the render session shares the
-// map's owner thread, so there is one delivery order rather than two.
-//
-// onRegisterShaders is deliberately absent. mbgl calls it synchronously during
-// renderer setup with a gfx::ShaderRegistry reference that is only valid for
-// that call, and the type is not copyable, so it cannot become a message. The
-// inherited no-op matches both Android's forwarder and this repo's behavior
-// today, because HeadlessObserver does not implement the corresponding
-// MapObserver hook. A future shader-registry hook (issue #101) has to be a
-// synchronous render-thread callback rather than an observer event.
+// whichever thread rendered. The delegate is mbgl::Map::Impl, whose handlers
+// touch map-thread state, so every callback becomes a mailbox message that runs
+// during the host's next mln_runtime_pump(). Forwarding is unconditional, so
+// delivery order is the same whether or not the session shares the map's owner
+// thread.
 class ForwardingRendererObserver final : public mbgl::RendererObserver {
  public:
   ForwardingRendererObserver(
@@ -1788,9 +1757,8 @@ class ForwardingRendererObserver final : public mbgl::RendererObserver {
 
   ~ForwardingRendererObserver() override { mailbox_->close(); }
 
-  // Stops delivery ahead of destruction. Mailbox::close() waits for an
-  // in-flight receive and drops anything queued, so the delegate can be torn
-  // down after this returns. Idempotent, so the destructor keeps its own call.
+  // Waits out an in-flight receive and drops anything queued, so the delegate
+  // can be torn down once this returns. Idempotent.
   auto close() -> void { mailbox_->close(); }
 
   void onInvalidate() override {
@@ -1813,8 +1781,8 @@ class ForwardingRendererObserver final : public mbgl::RendererObserver {
     RenderMode mode, bool repaint_needed, bool placement_changed,
     const mbgl::gfx::RenderingStats& stats
   ) override {
-    // Disambiguate: the name carries three overloads and only this one is
-    // implemented by mbgl::Map::Impl.
+    // The name carries three overloads; mbgl::Map::Impl implements only this
+    // one.
     void (mbgl::RendererObserver::*method)(
       RenderMode, bool, bool, const mbgl::gfx::RenderingStats&
     ) = &mbgl::RendererObserver::onDidFinishRenderingFrame;
@@ -1901,9 +1869,9 @@ class ForwardingRendererObserver final : public mbgl::RendererObserver {
   mbgl::ActorRef<mbgl::RendererObserver> delegate_;
 };
 
-// Map mutations a render session reaches for from its own owner thread. Posting
-// them through a mailbox on the map's run loop keeps mbgl::Map single-threaded,
-// and Mailbox::close() during map teardown turns late messages into no-ops.
+// Map mutations a render session reaches for from its own owner thread. The
+// mailbox on the map's run loop keeps mbgl::Map single-threaded, and closing it
+// during map teardown turns late messages into no-ops.
 class MapCommands {
  public:
   explicit MapCommands(mbgl::Map& map) : map_(map) {}
@@ -1920,15 +1888,11 @@ class MapCommands {
 
 class HeadlessFrontend final : public mbgl::RendererFrontend {
  public:
-  // The thread pool tag buckets this map's background work in the
-  // process-global scheduler. A default-constructed identity is unique per map;
-  // SimpleIdentity::Empty is the id-0 sentinel, which pools every map's work
-  // into one bucket and, worse, makes waitForEmpty() unable to wait on it at
-  // all, because ThreadedSchedulerBase::waitForEmpty remaps the empty tag to
-  // the pool's own identity. Matches Android's MapRenderer.
-  // Takes the run loop by reference rather than resolving the runtime handle
-  // later: mbgl calls setObserver() from the map constructor, and the run loop
-  // outlives the map by the runtime's own teardown rule.
+  // The thread pool tag must be a default-constructed identity, unique per map.
+  // SimpleIdentity::Empty pools every map's work into one bucket that
+  // waitForEmpty() cannot wait on, because it remaps the empty tag to the
+  // pool's own identity. The run loop comes in by reference because mbgl calls
+  // setObserver() from the map constructor; it outlives the map.
   HeadlessFrontend(
     mln_runtime runtime, mln_map map, mbgl::util::RunLoop& run_loop
   )
@@ -1945,9 +1909,6 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
   }
 
   // mbgl::Map calls this once, from its constructor, on the map owner thread.
-  // The forwarder it builds is what render sessions hand to their renderer, so
-  // observer callbacks land on the map's run loop no matter which thread
-  // rendered.
   void setObserver(mbgl::RendererObserver& observer) override {
     observer_ =
       std::make_unique<ForwardingRendererObserver>(run_loop_, observer);
@@ -1969,10 +1930,9 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
 
   auto run_render_jobs() -> void { thread_pool_.runRenderJobs(); }
 
-  // Drains and retires this map's buckets in the process-global scheduler.
-  // The unique tag above means the task bucket is created on first use and only
-  // waitForEmpty() erases it, so without this every map that ever scheduled
-  // background work would leave a bucket behind for the worker loop to walk.
+  // Every map must call this: only waitForEmpty() erases the map's bucket in
+  // the process-global scheduler, which the worker loop otherwise keeps
+  // walking.
   auto shutdown_thread_pool() -> void {
     thread_pool_.runRenderJobs(/*closeQueue=*/true);
     thread_pool_.waitForEmpty();
@@ -1982,8 +1942,7 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
     return observer_.get();
   }
 
-  // Stops observer delivery before the map that backs the delegate is torn
-  // down. Called from destroy_map() once the map is unreachable.
+  // Must run before the map that backs the delegate is torn down.
   auto close_renderer_observer() -> void {
     if (observer_ != nullptr) {
       observer_->close();
@@ -2154,18 +2113,10 @@ auto milliseconds_from_duration(mbgl::Duration duration) -> double {
   return std::chrono::duration_cast<DoubleMilliseconds>(duration).count();
 }
 
-// The bound is exclusive because mbgl::Duration::max() has no exact double
-// representation. In nanoseconds it converts to 9223372036854.775391 ms, whose
-// reverse conversion computes 2^63 ticks: one past the largest representable
-// count, which makes the conversion to the tick type undefined and in practice
-// yields the most negative duration. The next double below it computes
-// 9223372036854773760 ticks, so stopping short of the rounded maximum keeps
-// every accepted value convertible.
-//
-// That margin follows from this representation rather than from anything
-// std::chrono guarantees, because duration_cast picks its own common
-// representation and ratio order. Pin the representation instead of assuming
-// the margin survives another one.
+// The accepted bound is exclusive because mbgl::Duration::max() has no exact
+// double representation: the nearest double converts back to 2^63 ticks, one
+// past the largest representable count. The margin holds for a nanosecond
+// duration only, so pin the representation.
 static_assert(
   std::is_same_v<mbgl::Duration, std::chrono::nanoseconds>,
   "the accepted duration bound is derived from a nanosecond mbgl::Duration"
@@ -2804,10 +2755,9 @@ auto camera_transition_finished_payload(uint64_t transition_id)
 }
 
 // MapLibre Native owns the returned AnimationOptions for the lifetime of the
-// transition it starts, and Transform invokes transitionFinishFn on the map
-// owner thread. Enqueuing the finish event therefore uses the same push path as
-// the map observer. Events for a destroyed map are discarded by the push, so a
-// transition still holding this callback during map teardown enqueues nothing.
+// transition, and invokes transitionFinishFn on the map owner thread. The push
+// discards events for a destroyed map, so a transition outliving the map
+// enqueues nothing.
 auto to_native_animation(
   mln_runtime runtime, mln_map map, const mln_animation_options* animation
 ) -> mbgl::AnimationOptions {
@@ -3060,10 +3010,9 @@ auto from_native_lat_lng_bounds(const mbgl::LatLngBounds& bounds)
   };
 }
 
-// mbgl keeps the unbounded flag private, so compare against a
-// default-constructed value. mbgl::LatLngBounds::operator== treats any two
-// unbounded values as equal and an unbounded value as distinct from every
-// bounded one, which makes this an exact test for the flag.
+// mbgl keeps the unbounded flag private. Its operator== treats unbounded values
+// as equal to each other and distinct from every bounded one, so comparing
+// against a default-constructed value tests the flag exactly.
 auto is_unbounded_lat_lng_bounds(const mbgl::LatLngBounds& bounds) -> bool {
   return bounds == mbgl::LatLngBounds{};
 }
@@ -3114,8 +3063,7 @@ auto to_native_bound_options(const mln_bound_options& options)
     result.withLatLngBounds(to_native_lat_lng_bounds(options.bounds));
   }
   if ((options.fields & MLN_BOUND_OPTION_UNBOUNDED) != 0U) {
-    // A default-constructed LatLngBounds is the mbgl unbounded constraint:
-    // constrain() returns its input unchanged.
+    // A default-constructed LatLngBounds is the mbgl unbounded constraint.
     result.withLatLngBounds(mbgl::LatLngBounds{});
   }
   if ((options.fields & MLN_BOUND_OPTION_MIN_ZOOM) != 0U) {
@@ -3231,9 +3179,7 @@ struct MapObject {
   std::shared_ptr<mbgl::Mailbox> command_mailbox;
   std::optional<mbgl::ActorRef<MapCommands>> command_ref;
   // Guarded by the map handle table's mutex; a render session on another thread
-  // clears it from map_detach_render_target_session(). This stays an internal
-  // object address, because it is only ever compared against the session the
-  // caller is currently inside.
+  // clears it from map_detach_render_target_session().
   void* render_target_session = nullptr;
 };
 
@@ -3279,10 +3225,10 @@ class RuntimeMapRetainGuard final {
   mln_runtime runtime_ = MLN_HANDLE_NULL;
 };
 
-// Runs later, from mbgl's still-image continuation on the map thread. It takes
-// the handle rather than the object, because the map can be destroyed between
-// the request and the callback. try_resolve keeps this off the thread-local
-// diagnostic: the pump this fires under owns that slot.
+// Runs on the map thread from mbgl's still-image continuation. It takes the
+// handle rather than the object because the map can be destroyed between the
+// request and the callback, and try_resolve leaves the thread-local diagnostic
+// to the pump this fires under.
 auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
   auto* live = handle_table<MapObject>().try_resolve(map);
   if (live == nullptr) {
@@ -3303,16 +3249,14 @@ auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
   );
 }
 
-// Checks a map handle is non-null and live. The caller holds the map handle
-// table's mutex, so it can act on the result without the handle being retired
-// in between. Callers that only need the answer use validate_map_live().
+// The caller holds the map handle table's mutex, so it can act on the result
+// without the handle being retired in between.
 auto validate_map_live_locked(mln_map map, MapObject*& out_map) -> mln_status {
   out_map = handle_table<MapObject>().resolve_locked(map);
   return out_map == nullptr ? MLN_STATUS_INVALID_ARGUMENT : MLN_STATUS_OK;
 }
 
-// Adds the owner-thread check to validate_map_live_locked(). Same locking
-// contract.
+// Same locking contract as validate_map_live_locked().
 auto validate_map_locked(mln_map map, MapObject*& out_map) -> mln_status {
   const auto status = validate_map_live_locked(map, out_map);
   if (status != MLN_STATUS_OK) {
@@ -3325,7 +3269,6 @@ auto validate_map_locked(mln_map map, MapObject*& out_map) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-// Shared body for the copy-out entry points that hand back native text.
 auto copy_text(
   const std::string& text, char* out_text, size_t text_capacity,
   size_t* out_text_size, const char* capacity_name
@@ -3342,9 +3285,8 @@ auto copy_text(
   }
 
   *out_text_size = text.size();
-  // A null buffer with zero capacity is a size probe. It succeeds so a caller
-  // can distinguish the required size from the invalid-argument statuses this
-  // family also uses for a missing object.
+  // A null buffer with zero capacity is a size probe, so it succeeds rather
+  // than sharing a status with a missing object.
   if (out_text == nullptr) {
     return MLN_STATUS_OK;
   }
@@ -3595,9 +3537,8 @@ auto validate_map(mln_map map, MapObject*& out_map) -> mln_status {
   return validate_map_locked(map, out_map);
 }
 
-// Resolves a projection handle and checks its owner thread. Only the owner
-// thread destroys a projection, so the borrowed object stays alive for as long
-// as the calling thread can use it.
+// Only the owner thread destroys a projection, so the borrowed object stays
+// alive for as long as the calling thread can use it.
 auto validate_map_projection(
   mln_map_projection handle, MapProjectionObject*& out_projection
 ) -> mln_status {
@@ -3642,8 +3583,8 @@ auto create_map(
 
   const auto effective = options == nullptr ? map_options_default() : *options;
   auto owned_map = std::make_shared<MapObject>();
-  // Publish the handle before wiring the map up, so the observer and frontend
-  // capture an id that already resolves.
+  // Publish the handle first, so the observer and frontend capture an id that
+  // already resolves.
   const auto handle = handle_table<MapObject>().insert(owned_map);
   register_runtime_map_events(runtime, handle);
   owned_map->runtime = runtime;
@@ -3688,9 +3629,8 @@ auto destroy_map(mln_map map) -> mln_status {
   auto owned_map = std::shared_ptr<MapObject>{};
   {
     // One critical section covers validation, the render-session check, and
-    // taking ownership. A render session on another thread can only detach by
-    // taking this same lock, so it either wins and clears the slot before we
-    // read it, or loses and finds the map already retired.
+    // taking ownership, because a render session on another thread detaches
+    // under this same lock.
     auto& table = handle_table<MapObject>();
     const std::scoped_lock lock(table.mutex());
     MapObject* live = nullptr;
@@ -3705,14 +3645,10 @@ auto destroy_map(mln_map map) -> mln_status {
     runtime = live->runtime;
     owned_map = table.remove_locked(map);
   }
-  // Stop both cross-thread channels before tearing the map down. Nothing can
-  // produce new messages by now: the map is unreachable, and it only got here
-  // with no render session attached. Closing waits out anything in flight and
-  // drops the rest.
+  // Both cross-thread channels close before the map is torn down.
   owned_map->frontend->close_renderer_observer();
   owned_map->command_mailbox->close();
-  // Retire this map's scheduler buckets. This can block on in-flight background
-  // work, which is why it runs outside the registry lock.
+  // Runs outside the registry lock: it can block on in-flight background work.
   owned_map->frontend->shutdown_thread_pool();
   discard_runtime_map_events(runtime, map);
   owned_map.reset();
@@ -3761,17 +3697,16 @@ auto map_request_still_image(mln_map map) -> mln_status {
 }
 
 // The render-facing helpers below run on the session's thread while the map
-// lives on its own. The map cannot be retired underneath them, because
-// destroy_map() refuses a map that still has a session attached and these are
-// only reachable through an attached session. Resolving under the table lock
-// adds identity checking to that existing lifetime guarantee.
+// lives on its own. They are reachable only through an attached session, and
+// destroy_map() returns MLN_STATUS_INVALID_STATE while a session is attached,
+// so the map cannot be retired underneath them.
 auto map_scale_factor(mln_map map) -> double {
   const auto* live = handle_table<MapObject>().try_resolve(map);
   return live == nullptr ? default_scale_factor : live->scale_factor;
 }
 
-// Map-thread only. The render path must not reach this; it posts through
-// map_post_set_size() / map_post_trigger_repaint() instead.
+// Map-thread only. The render path posts through map_post_set_size() and
+// map_post_trigger_repaint() instead.
 auto map_native(MapObject* map) -> mbgl::Map* { return map->map.get(); }
 
 // Both posting helpers hold the map table's mutex across the liveness check and
@@ -3818,12 +3753,9 @@ auto map_run_render_jobs(mln_map map) -> void {
   }
 }
 
-// Attaching claims the map's single render-session slot. It runs on the render
-// session's own thread, which may differ from the map owner thread, so this
-// validates liveness only. Holding the map handle table's mutex across the
-// check and the claim is what makes it race-free against a destroy_map() on
-// the map owner thread: either the slot is claimed first and destroy_map()
-// refuses, or the map is retired first and this returns an invalid handle.
+// Claims the map's single render-session slot. Runs on the render session's own
+// thread, so it validates liveness only, and holds the map handle table's mutex
+// across the check and the claim to stay race-free against destroy_map().
 auto map_attach_render_target_session(mln_map map, void* session)
   -> mln_status {
   const std::scoped_lock lock(handle_table<MapObject>().mutex());
@@ -3844,10 +3776,9 @@ auto map_attach_render_target_session(mln_map map, void* session)
   return MLN_STATUS_OK;
 }
 
-// Detaching runs on the render session's owner thread, which may differ from
-// the map owner thread, so this validates liveness only. Holding the map
-// handle table's mutex across the check and the clear is what makes it
-// race-free against a concurrent destroy_map() on the map owner thread.
+// Runs on the render session's owner thread, so it validates liveness only, and
+// holds the map handle table's mutex across the check and the clear to stay
+// race-free against destroy_map().
 auto map_detach_render_target_session(mln_map map, void* session)
   -> mln_status {
   const std::scoped_lock lock(handle_table<MapObject>().mutex());
@@ -3919,9 +3850,8 @@ auto map_set_style_json(mln_map map, const char* json) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-// MapLibre keeps the document the style loader last parsed rather than
-// re-serializing the live style, so this reports load-time state. Runtime style
-// mutations never reach it.
+// Reports the document the style loader last parsed, not the live style, so
+// runtime style mutations never reach it.
 auto map_copy_loaded_style_json(
   mln_map map, char* out_json, size_t json_capacity, size_t* out_json_size
 ) -> mln_status {
@@ -3936,9 +3866,8 @@ auto map_copy_loaded_style_json(
   );
 }
 
-// MapLibre records the style URL when the request is made and clears it when a
-// JSON style replaces it, so this reports live state rather than the load-time
-// state map_copy_loaded_style_json() reports.
+// Reports live state: MapLibre records the style URL when the request is made
+// and clears it when a JSON style replaces it.
 auto map_copy_style_url(
   mln_map map, char* out_url, size_t url_capacity, size_t* out_url_size
 ) -> mln_status {
@@ -3961,7 +3890,7 @@ auto style_id_list_count(mln_style_id_list list, size_t* out_count)
   }
 
   // A style ID list carries no thread affinity, so another thread may destroy
-  // it mid-read. The lock spans the read for that reason.
+  // it mid-read; the lock spans the read.
   auto& table = handle_table<StyleIdListObject>();
   const std::scoped_lock lock(table.mutex());
   const auto* live_list = table.resolve_locked(list);
@@ -6407,8 +6336,6 @@ auto map_get_layer_filter(
 
 namespace {
 
-// Resolves a live map and one of its layers, sharing the validation every typed
-// layer accessor performs before touching MapLibre state.
 auto resolve_layer_for_access(
   mln_map map, mln_string_view layer_id, mbgl::style::Layer*& out_layer
 ) -> mln_status {
@@ -6434,8 +6361,8 @@ auto resolve_layer_for_access(
   return MLN_STATUS_OK;
 }
 
-// MapLibre's own setProperty path logs a warning and does nothing when a layer
-// type takes no source, so the typed setters reject that case instead.
+// MapLibre's setProperty path logs a warning and does nothing when a layer type
+// takes no source, so the typed setters reject that case instead.
 auto require_layer_takes_source(
   const mbgl::style::Layer& layer, const char* field
 ) -> bool {

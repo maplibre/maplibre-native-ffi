@@ -7,9 +7,8 @@ using Xunit;
 namespace Maplibre.NativeFfi.Tests;
 
 /// <summary>
-/// BND-069: public value trees snapshot caller-owned lists, so later caller mutation leaves the
-/// stored value, its equality, and its hash code unchanged. Matches the Kotlin binding, whose
-/// container constructors copy at every level.
+/// Public value trees snapshot caller-owned lists, so later caller mutation leaves the stored
+/// value, its equality, and its hash code unchanged.
 /// </summary>
 public sealed class ValueSnapshotTests
 {

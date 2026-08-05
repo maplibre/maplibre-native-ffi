@@ -274,9 +274,8 @@ typedef struct mln_geojson_source_options {
    *
    * MapLibre Native normally tiles updated GeoJSON data on a worker and shows
    * it in a later frame. When this is set, tiling runs inline during the update
-   * pass instead, so data set through mln_map_set_geojson_source_data() reaches
-   * the next rendered frame at the cost of that work happening on the thread
-   * driving the update.
+   * pass, so data set through mln_map_set_geojson_source_data() reaches the
+   * next rendered frame at the cost of that work running on the update thread.
    */
   bool synchronous_update;
 } mln_geojson_source_options;
@@ -421,17 +420,12 @@ typedef struct mln_style_transition_options {
    * Whether symbol placement changes cross-fade.
    *
    * Clearing this makes symbol placement changes apply to the next rendered
-   * frame. Hosts that move symbol-backed features at pointer frequency clear it
-   * for the duration of the interaction so the rendered symbol keeps up. It
-   * applies in every map mode.
+   * frame, in every map mode. Hosts that move symbol-backed features at pointer
+   * frequency clear it for the duration of the interaction.
    *
    * When this field is omitted, the cross-fade stays on, which is MapLibre
-   * Native's own default. The field carries a mask bit even though MapLibre
-   * Native has no unset state for it, because false is a meaningful value that
-   * differs from that default, so a caller that omits the field has to stay
-   * distinguishable from one that clears it.
-   *
-   * A style carries no equivalent, so loading a style leaves the cross-fade on.
+   * Native's own default. A style carries no equivalent, so loading a style
+   * leaves the cross-fade on.
    */
   bool enable_placement_transitions;
 } mln_style_transition_options;
@@ -751,10 +745,8 @@ MLN_API mln_status mln_map_add_geojson_source_url(
  * for defaults, and the options are fixed for the lifetime of the source.
  *
  * When options enable clustering, the data must be a feature collection whose
- * every feature carries point geometry. This call checks that before handing
- * the data to MapLibre Native and names the source and the constraint in the
- * thread-local diagnostic, so data MapLibre Native would tile without
- * clustering is reported rather than accepted.
+ * every feature carries point geometry. Data that does not is rejected, and the
+ * thread-local diagnostic names the source and the constraint.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -798,10 +790,9 @@ MLN_API mln_status mln_map_set_geojson_source_url(
  * mln_geojson_source_options it was added with.
  *
  * When the source was added with clustering enabled, the data must be a feature
- * collection whose every feature carries point geometry. This call checks that
- * before handing the data to MapLibre Native and names the source and the
- * constraint in the thread-local diagnostic, so data MapLibre Native would tile
- * without clustering is reported rather than accepted.
+ * collection whose every feature carries point geometry. Data that does not is
+ * rejected, and the thread-local diagnostic names the source and the
+ * constraint.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -1438,14 +1429,11 @@ MLN_API mln_status mln_map_set_location_indicator_image_name(
 /**
  * Adds one style layer from a full style-spec layer JSON object.
  *
- * This is the primary insertion path for every style-spec layer type, and it
- * stays in step with the style specification without new C API surface. The
- * typed adders above cover the three cases that need a dedicated surface for
- * reasons beyond construction: mln_map_add_hillshade_layer() and
- * mln_map_add_color_relief_layer() validate that the source is a raster DEM
- * source, and mln_map_add_location_indicator_layer() pairs with typed
- * per-frame setters that take coordinates in C API order. Use this function for
- * the remaining layer types.
+ * This is the insertion path for every style-spec layer type. The typed adders
+ * above exist for reasons beyond construction: mln_map_add_hillshade_layer()
+ * and mln_map_add_color_relief_layer() validate that the source is a raster DEM
+ * source, and mln_map_add_location_indicator_layer() pairs with typed per-frame
+ * setters that take coordinates in C API order.
  *
  * layer_json and before_layer_id are borrowed for the call. layer_json must
  * contain id and type members. Passing an empty before_layer_id appends the
@@ -1663,17 +1651,14 @@ MLN_API mln_status mln_map_set_style_transition_options(
  * Duration and delay report through their field-mask bits, because MapLibre
  * Native leaves either one unset until a style or a host sets it.
  *
- * A map that has loaded no style yet reports duration and delay unset. Once a
- * style loads, what it declares decides: MapLibre Native's style parser fills
- * in a 300 millisecond duration for a style carrying no "transition" member at
- * all, but a style carrying one reports only the members that object names, so
- * a style whose transition declares a delay alone reports no duration. Read the
+ * A map that has loaded no style yet reports duration and delay unset. A style
+ * carrying no "transition" member reports a 300 millisecond duration, while a
+ * style carrying one reports only the members that object names, so a style
+ * whose transition declares a delay alone reports no duration. Read the
  * field-mask bits rather than assuming a loaded style sets either.
  *
  * MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS is always set on
- * return, because MapLibre Native always holds a value for that field. Its mask
- * bit distinguishes omitted from cleared on the way in, and reports nothing on
- * the way out.
+ * return and reports nothing about the field.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -1780,8 +1765,8 @@ MLN_API mln_status mln_map_get_layer_filter(
  * Native's layer storage before return. Passing an empty source_layer clears
  * it.
  *
- * Only layer types that require a source carry a source-layer, so this rejects
- * layer types such as background and custom rather than silently doing nothing.
+ * Only layer types that require a source carry a source-layer; this rejects the
+ * others, such as background and custom.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -1831,8 +1816,8 @@ MLN_API mln_status mln_map_copy_layer_source_layer(
  * Native's layer storage before return. This does not require the named source
  * to exist yet; MapLibre reports an unresolved source through style events.
  *
- * Only layer types that require a source carry a source ID, so this rejects
- * layer types such as background and custom rather than silently doing nothing.
+ * Only layer types that require a source carry a source ID; this rejects the
+ * others, such as background and custom.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

@@ -10,11 +10,9 @@ pub const Commands = struct {
     command_pool: c.VkCommandPool,
     command_buffer: c.VkCommandBuffer,
     image_available: c.VkSemaphore,
-    /// One present-wait semaphore per swapchain image, indexed by the
-    /// acquired image. The frame fence proves a submit finished, but only the
-    /// next acquire of the same image proves its present consumed the
-    /// semaphore, so a single reused semaphore is a race the presentation
-    /// engine may lose.
+    /// One present-wait semaphore per swapchain image, indexed by the acquired
+    /// image. Only the next acquire of the same image proves its present
+    /// consumed the semaphore, so a single reused semaphore races.
     render_finished: []c.VkSemaphore,
     in_flight: c.VkFence,
 

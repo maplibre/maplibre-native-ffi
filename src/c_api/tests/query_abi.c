@@ -7,8 +7,6 @@
 #include "test_support.h"
 #include "unity.h"
 
-// This verifies undersized query geometry, unknown masks, and invalid string
-// views hidden by binding values.
 static void feature_query_validation_rejects_raw_descriptor_shapes(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

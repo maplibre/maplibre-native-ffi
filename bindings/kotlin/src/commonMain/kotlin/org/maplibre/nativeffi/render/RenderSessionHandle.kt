@@ -20,32 +20,24 @@ public expect class RenderSessionHandle : AutoCloseable {
    * Resizes this attached render session.
    *
    * Surface and owned-texture sessions resize in place. Borrowed texture targets are sized by their
-   * owner and throw `UnsupportedFeatureException`: allocate a texture at the new size and hand it
-   * over with the backend's set-target method, such as [setMetalBorrowedTextureTarget], which keeps
-   * this session.
+   * owner and throw `UnsupportedFeatureException`; hand over a new texture with the backend's
+   * set-target method, such as [setMetalBorrowedTextureTarget].
    *
    * The session keeps its renderer across a resize, so renderer-held state such as feature state
-   * carries over. A scale factor change is the exception: a renderer compiles its shaders for one
-   * pixel ratio, so that resize starts a new one with renderer-held state empty. Map state such as
-   * camera, style, and sources lives on the map and survives either way.
+   * carries over. A scale factor change starts a new renderer with that state empty, since shaders
+   * are compiled for one pixel ratio. Map state such as camera, style, and sources survives either
+   * way.
    */
   public fun resize(width: Int, height: Int, scaleFactor: Double)
 
   /**
-   * Presents this attached surface session through a new surface.
-   *
-   * A host surface can be destroyed and recreated while the map goes on living, which is what
-   * Android rotation, a Flutter `SurfaceProducer` lifecycle change, and a window resize that
-   * reallocates all look like from here. Replacing the surface in place keeps this session's
-   * renderer, and with it the tile pyramid, glyph and image atlases, symbol placement, and feature
-   * state.
+   * Presents this attached surface session through a new surface, keeping this session's renderer
+   * and the state it holds.
    *
    * [descriptor] names the graphics context this session attached with, and its extent applies as
    * [resize] applies one, including a scale factor change starting a new renderer. A descriptor
    * whose `context.device` is neither null nor this session's device throws
-   * `InvalidArgumentException` and leaves this session rendering into the surface it has. The
-   * session assigns the layer its own device and pixel format, so the layer itself carries nothing
-   * that has to match.
+   * `InvalidArgumentException` and leaves this session rendering into the surface it has.
    */
   public fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor)
 
@@ -53,12 +45,12 @@ public expect class RenderSessionHandle : AutoCloseable {
    * Presents this attached surface session through a new surface.
    *
    * See [setMetalSurfaceTarget] for what replacing a surface preserves. The outgoing `VkSurfaceKHR`
-   * must still be valid: this session holds a swapchain built from it, and Vulkan destroys every
-   * swapchain before its surface. A host that has to release its surface first closes this session
-   * and attaches again instead.
+   * must still be valid, since this session holds a swapchain built from it. A host that must
+   * release its surface first closes this session and attaches again instead.
    *
-   * The replacement reports the color format and surface-transform support this session compiled a
-   * render pass and shaders for; one that does not throws `UnsupportedFeatureException`.
+   * The replacement must report the color format and surface-transform support this session
+   * compiled its render pass and shaders for; one that does not throws
+   * `UnsupportedFeatureException`.
    */
   public fun setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor)
 
@@ -67,26 +59,19 @@ public expect class RenderSessionHandle : AutoCloseable {
    *
    * See [setMetalSurfaceTarget] for what replacing a surface preserves. The new surface is made
    * current on the next render, so a host may hand over a replacement for one it has already
-   * destroyed. Nothing is made current here, so a surface this call accepts can still prove
-   * unusable; the next [renderUpdate] reports that rather than this call.
+   * destroyed, and an unusable surface is reported by the next [renderUpdate] rather than here.
    */
   public fun setOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor)
 
   /**
-   * Renders this attached texture session into a new caller-owned texture.
+   * Renders this attached texture session into a new caller-owned texture, keeping this session's
+   * renderer and the state it holds. A scale factor change starts a new renderer, as in [resize].
    *
-   * A caller-owned texture is sized by its owner, so a host that follows a resize reallocates
-   * rather than resizing and [resize] throws `UnsupportedFeatureException`. Handing the replacement
-   * over here keeps this session's renderer instead, and with it the tile pyramid, glyph and image
-   * atlases, symbol placement, and feature state. A scale factor change is the exception, starting
-   * a new renderer for the new pixel ratio just as [resize] does.
-   *
-   * The replacement belongs to the device this session attached with and carries the pixel format
+   * The replacement must belong to the device this session attached with and carry the pixel format
    * it attached with; another device throws `InvalidArgumentException` and another pixel format
    * throws `UnsupportedFeatureException`, both leaving this session rendering into the texture it
    * has. The caller owns the replacement and keeps it valid until the next replacement, [detach],
-   * or [close]. This session never retained the outgoing texture, never releases it, and never
-   * reads it here, so a caller that already released it hands over the replacement all the same.
+   * or [close]. This session never retains or reads the outgoing texture.
    */
   public fun setMetalBorrowedTextureTarget(descriptor: MetalBorrowedTextureDescriptor)
 
@@ -109,13 +94,10 @@ public expect class RenderSessionHandle : AutoCloseable {
   public fun setOpenGLBorrowedTextureTarget(descriptor: OpenGLBorrowedTextureDescriptor)
 
   /**
-   * Renders the latest available map render update.
+   * Renders the latest available map render update, returning false when no frame was rendered.
    *
-   * The map retains its latest update, so repeated calls re-render it and return true again; use
-   * this to redraw on demand after resize or surface expose, and gate frame loops on
-   * render-update-available events instead of the return value. Returns false when no frame was
-   * rendered. That is a normal transient: call again on the next frame rather than wait for another
-   * render-update event.
+   * The map retains its latest update, so repeated calls re-render it. False is a normal transient:
+   * call again on the next frame rather than wait for another render-update event.
    */
   public fun renderUpdate(): Boolean
 
@@ -147,12 +129,7 @@ public expect class RenderSessionHandle : AutoCloseable {
    * Queries a feature extension from the latest render session state.
    *
    * The `supercluster` extension reads the `cluster_id` feature property and the `limit` and
-   * `offset` arguments as [JsonValue.UInt]. Other numeric types are treated as absent: a
-   * `cluster_id` that is not [JsonValue.UInt] returns [FeatureExtensionResult.Value] holding
-   * [JsonValue.Null] instead of a feature collection, and a `limit` or `offset` that is not
-   * [JsonValue.UInt] leaves `leaves` at the native defaults of ten leaves at offset zero.
-   * [QueriedFeature] properties keep their JSON value type, so a queried cluster feature can be
-   * passed back unmodified.
+   * `offset` arguments as [JsonValue.UInt]; other numeric types are treated as absent.
    */
   public fun queryFeatureExtension(
     sourceId: String,

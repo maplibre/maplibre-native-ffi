@@ -41,7 +41,7 @@ import platform.posix.usleep
 
 @OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class)
 class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
-  // BND-141, BND-069: request and response values are copied before user retention.
+  // BND-141, BND-069.
 
   @Test
   fun providerCallbackCopiesRequestAndReturnsDecision() {
@@ -169,7 +169,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
     }
   }
 
-  // BND-142, BND-150, BND-151: provider decision ownership and stale-handle behavior.
+  // BND-142, BND-150, BND-151.
 
   @Test
   fun requestHandleReleasesProviderOwnedHandleOnceAndRejectsAfterClose() {
@@ -361,8 +361,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
     }
   }
 
-  // BND-121, BND-123: host-language failure containment and close-during-callback
-  // synchronization.
+  // BND-121, BND-123.
 
   @Test
   fun hostLanguageFailureTellsNativeNotToPassThrough() {
@@ -413,7 +412,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
     }
   }
 
-  // BND-146, BND-147, BND-148, BND-152, BND-153: handled request terminal states.
+  // BND-146, BND-147, BND-148, BND-152, BND-153.
 
   @Test
   fun completionThatReachesNativeIsTerminalWhenNativeReturnsError() {

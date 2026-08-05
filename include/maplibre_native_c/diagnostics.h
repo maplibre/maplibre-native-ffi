@@ -30,9 +30,7 @@ MLN_API const char* mln_thread_last_error_message(void) MLN_NOEXCEPT;
  *
  * Owner-thread checks in this API key on the native thread. A host whose unit
  * of execution is not pinned to one, such as a Dart isolate or an unlocked
- * goroutine, compares this token across calls to detect that it moved, and
- * reports that in its own terms rather than surfacing MLN_STATUS_WRONG_THREAD
- * from an unrelated-looking call.
+ * goroutine, compares this token across calls to detect that it moved.
  *
  * Callable from any thread.
  */

@@ -3,8 +3,7 @@ import Foundation
 struct NativeHandleLeak: Equatable {
   let typeName: String
   /// The C API handle id the leak is about, or zero when the leaked resource is
-  /// a texture frame rather than a C API handle. Backend-native addresses never
-  /// appear here; they belong to ``NativePointer``.
+  /// a texture frame rather than a C API handle.
   let handle: UInt64
   /// What the leak names when it is not a C API handle.
   let detail: String

@@ -102,15 +102,14 @@ test "Metal surface set target presents through a replacement layer" {
     try testing.expect(try surface.renderUpdate());
     try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(window_layer.layer.?));
 
-    // A host surface can be destroyed and recreated while the map goes on
-    // living, and the session presents through the replacement it is handed.
+    // The session presents through whatever replacement surface it is handed.
     try surface.setMetalSurfaceTarget(.{
         .extent = .{ .width = 48, .height = 32 },
         .layer = nativePointer(replacement_layer.layer.?),
     });
 
-    // A caller-owned texture descriptor names a target this session does not
-    // have, and the rejection leaves it presenting through the new layer.
+    // A texture descriptor names a target this session does not have; the
+    // rejection leaves it presenting through the new layer.
     try testing.expectError(error.Unsupported, surface.setMetalBorrowedTextureTarget(.{
         .extent = .{ .width = 48, .height = 32 },
         .physical_width = 48,
@@ -118,8 +117,8 @@ test "Metal surface set target presents through a replacement layer" {
         .texture = nativePointer(@ptrFromInt(1)),
     }));
 
-    // Replacing the surface hands the new size to the map's owner thread, as a
-    // resize does, so the map publishes a matching update only once pumped.
+    // Replacing the surface enqueues the new size for the map's owner thread,
+    // so the map publishes a matching update only once pumped.
     try testing.expect(!try surface.renderUpdate());
     try runtime.pump(0);
     const resized = try map.getSize();

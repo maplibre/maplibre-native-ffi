@@ -403,7 +403,7 @@ test "style transition options round trip through the C API" {
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
-    // The style parser fills in its own 300ms duration for a style that declares no transition.
+    // The style parser fills in a 300ms duration when a style declares none.
     const parsed = try map.getStyleTransitionOptions();
     try testing.expectEqual(@as(?f64, 300.0), parsed.duration_ms);
     try testing.expectEqual(@as(?f64, null), parsed.delay_ms);
@@ -414,8 +414,8 @@ test "style transition options round trip through the C API" {
     try testing.expectEqual(@as(?f64, 100.0), declared.delay_ms);
     try testing.expectEqual(@as(?bool, true), declared.enable_placement_transitions);
 
-    // A present zero stays distinguishable from an absent field, and an absent field clears what
-    // the style declared rather than merging into it.
+    // A present zero stays distinguishable from an absent field, and an absent
+    // field clears what the style declared.
     const options = maplibre.StyleTransitionOptions{
         .duration_ms = 0.0,
         .enable_placement_transitions = false,

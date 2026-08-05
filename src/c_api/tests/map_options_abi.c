@@ -36,8 +36,6 @@ static mln_camera_options test_camera(void) {
   return camera;
 }
 
-// This verifies null, undersized, and unknown-mask camera descriptors that
-// typed bindings cannot construct.
 static void camera_rejects_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
   TEST_ASSERT_EQUAL_INT(
@@ -143,9 +141,6 @@ static mln_animation_options transition_animation(
   return animation;
 }
 
-// This verifies the raw transition-finished payload struct and the once-per
-// -transition guarantee for the terminal outcomes a headless map can reach
-// without pumping render frames.
 static void camera_transition_id_reports_every_terminal_outcome(void) {
   map_fixture fixture = create_map_fixture();
   mln_camera_options camera = test_camera();
@@ -164,9 +159,8 @@ static void camera_transition_id_reports_every_terminal_outcome(void) {
     MLN_CAMERA_CHANGE_MODE_IMMEDIATE, tally.last_did_change_code
   );
 
-  // A running transition reports its end when a later camera command
-  // supersedes it, and the superseding transition reports its own end when it
-  // is cancelled.
+  // A superseded transition reports its end, and so does the superseding one
+  // when it is cancelled.
   camera.zoom = 12.0;
   animation = transition_animation(11, 5000.0);
   TEST_ASSERT_EQUAL_INT(
@@ -204,8 +198,6 @@ static void camera_transition_id_reports_every_terminal_outcome(void) {
   destroy_map_fixture(fixture);
 }
 
-// This verifies raw null arrays, null outputs, and undersized fit descriptors
-// hidden by binding collections.
 static void camera_fitting_rejects_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
   mln_camera_options camera = mln_camera_options_default();
@@ -239,8 +231,6 @@ static void camera_fitting_rejects_invalid_arguments(void) {
   destroy_map_fixture(fixture);
 }
 
-// This verifies null, undersized, and unknown-mask bound descriptors before
-// binding validation applies.
 static void camera_bounds_constraints_reject_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
   TEST_ASSERT_EQUAL_INT(
@@ -287,9 +277,8 @@ static double jumped_longitude(mln_map map, double longitude) {
   return snapshot.longitude;
 }
 
-// This verifies that the geographic constraint reports and applies the
-// unbounded state distinctly from world bounds, which the southwest/northeast
-// pair alone cannot express.
+// The unbounded state is distinct from world bounds, which the
+// southwest/northeast pair alone cannot express.
 static void camera_bounds_distinguish_unbounded_from_world(void) {
   map_fixture fixture = create_map_fixture();
 
@@ -342,8 +331,6 @@ static void camera_bounds_distinguish_unbounded_from_world(void) {
   destroy_map_fixture(fixture);
 }
 
-// This verifies raw free-camera output storage, struct-size, and field-mask
-// validation.
 static void free_camera_options_reject_raw_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
   TEST_ASSERT_EQUAL_INT(
@@ -373,8 +360,6 @@ static void free_camera_options_reject_raw_invalid_arguments(void) {
   destroy_map_fixture(fixture);
 }
 
-// This verifies null, undersized, and unknown-mask projection-mode descriptors
-// hidden by binding types.
 static void map_projection_mode_rejects_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
   TEST_ASSERT_EQUAL_INT(
@@ -404,8 +389,6 @@ static void map_projection_mode_rejects_invalid_arguments(void) {
 
 static const mln_lat_lng center = {.latitude = 37.7749, .longitude = -122.4194};
 
-// This verifies raw null scalar and array outputs for coordinate conversion
-// entry points.
 static void map_coordinate_conversion_rejects_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
   mln_screen_point point = {0};
@@ -431,8 +414,6 @@ static void map_coordinate_conversion_rejects_invalid_arguments(void) {
   destroy_map_fixture(fixture);
 }
 
-// This verifies raw projection ownership, preinitialized outputs, and null or
-// undersized descriptor handling.
 static void standalone_projection_rejects_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
   TEST_ASSERT_EQUAL_INT(
@@ -482,8 +463,6 @@ static void standalone_projection_rejects_invalid_arguments(void) {
   destroy_map_fixture(fixture);
 }
 
-// This verifies the free conversion functions reject null output pointers that
-// bindings never pass.
 static void projected_meters_reject_invalid_arguments(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_projected_meters_for_lat_lng(center, NULL)
@@ -494,8 +473,6 @@ static void projected_meters_reject_invalid_arguments(void) {
   );
 }
 
-// This verifies raw null handles, null outputs, and unknown debug-mask bits
-// across the debug entry points.
 static void map_debug_options_reject_raw_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
   uint32_t out_options = 0;
@@ -540,8 +517,7 @@ static void map_debug_options_reject_raw_invalid_arguments(void) {
 }
 
 // FastPFOR decoding stays off unless a host asks for it, and a map accepts the
-// opt-in. Whether an MLT tile using those encodings actually decodes is covered
-// end to end in mlt_decode_abi.c.
+// opt-in.
 static void map_options_default_leaves_fast_pfor_decoding_off(void) {
   const mln_map_options defaults = mln_map_options_default();
   TEST_ASSERT_FALSE(defaults.fast_pfor_enabled);
@@ -555,10 +531,6 @@ static void map_options_default_leaves_fast_pfor_decoding_off(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies the raw size accessor reports the creation size, follows a
-// render session attach and resize, keeps the creation pixel ratio across a
-// render target that carries a different scale factor, and rejects each null
-// output pointer independently.
 static void map_size_tracks_attach_and_resize(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_map_options_default();
@@ -577,12 +549,9 @@ static void map_size_tracks_attach_and_resize(void) {
   TEST_ASSERT_EQUAL_UINT32(256, height);
   TEST_ASSERT_EQUAL_DOUBLE(1.1, scale_factor);
 
-  // The fixture attaches a 64x64 target at scale factor 1.0, so this also
-  // covers the map keeping its own pixel ratio.
-  //
-  // A render session enqueues the map size for the map's owner thread instead
-  // of setting it in place, because the session may be owned by another thread.
-  // The map therefore keeps its previous size until the host pumps.
+  // The fixture attaches a 64x64 target at scale factor 1.0, and the map keeps
+  // its own pixel ratio. A render session queues the size for the map's owner
+  // thread, so the map keeps its previous size until the host pumps.
   mln_test_render_fixture render = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &render));
   TEST_ASSERT_EQUAL_INT(
@@ -630,8 +599,6 @@ static void map_size_tracks_attach_and_resize(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies raw viewport struct sizes, masks, enum discriminants, and
-// output pointers.
 static void map_viewport_options_reject_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
   TEST_ASSERT_EQUAL_INT(
@@ -680,8 +647,6 @@ static void map_viewport_options_reject_invalid_arguments(void) {
   destroy_map_fixture(fixture);
 }
 
-// This verifies raw tile-option struct sizes, enum discriminants, and output
-// pointers.
 static void map_tile_options_reject_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
   TEST_ASSERT_EQUAL_INT(

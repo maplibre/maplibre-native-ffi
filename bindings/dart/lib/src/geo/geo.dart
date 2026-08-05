@@ -341,9 +341,6 @@ final class UIntFeatureIdentifier extends FeatureIdentifier {
   UIntFeatureIdentifier.fromBigInt(this.value);
 
   /// Unsigned value, represented as [BigInt] so all 64 bits are preserved.
-  ///
-  /// Use [BigInt.compareTo] for ordering and [BigInt.toString] or
-  /// [BigInt.toRadixString] for formatting.
   final BigInt value;
 }
 

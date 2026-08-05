@@ -1,20 +1,14 @@
-// The browser run loop. MapLibre's default one is built on libuv, whose event
-// loop has no browser backing, so this replaces it rather than porting it.
+// The browser run loop, replacing MapLibre's libuv-based default. It serves two
+// kinds of owner thread:
 //
-// It has to serve two kinds of owner thread, because the C API lets a host run
-// a runtime on whichever thread it created it on:
-//
-//   * A worker pthread can block, so run() parks on a condition variable the
-//     way a native run loop does.
-//   * The browser main thread cannot block -- Atomics.wait throws there -- so a
-//     host on it drives runOnce() from mln_runtime_pump(), typically out of
-//     requestAnimationFrame.
+//   * A worker pthread can block, so run() parks on a condition variable.
+//   * The browser main thread cannot block — Atomics.wait throws there — so a
+//     host on it drives runOnce() from mln_runtime_pump().
 //
 // A host driving runOnce() waits outside this loop, so the delay run() would
 // have parked for becomes a wake instead; see DeadlineWake below.
 //
-// FD watches have no browser equivalent and nothing in this build asks for
-// them, so addWatch() reports that rather than pretending.
+// FD watches have no browser equivalent, so addWatch() throws.
 
 #include <cassert>
 #include <chrono>
@@ -37,32 +31,26 @@ namespace mbgl {
 namespace util {
 namespace {
 
-// Reports a runnable's due time to whatever drives this loop, covering the one
-// window nothing else does. push(), addRunnable() and notify() all report work
-// that is ready now; a runOnce() that leaves a timer pending has work that
-// becomes ready later, and a host driving the loop from mln_runtime_pump()
-// parks with its wake flag clear in the meantime. Without this it runs that
-// timer whenever it next happens to pump, which for a host that parks on a
-// negative timeout is never.
+// Reports a runnable's future due time to whatever drives this loop. Everything
+// else reports only work that is ready now, so a host driving the loop from
+// mln_runtime_pump() would park with its wake flag clear until it happened to
+// pump again — never, if it parks on a negative timeout.
 //
-// The browser's timer is the clock, and it is armed on the main thread rather
-// than the owner thread because the wake has to come from a thread other than
-// the one it releases: a worker parked in a futex wait serves none of its own
-// JavaScript until something wakes it.
+// The timer is armed on the main thread, because the wake has to come from a
+// thread other than the one it releases: a worker parked in a futex wait serves
+// none of its own JavaScript.
 class DeadlineWake : public std::enable_shared_from_this<DeadlineWake> {
  public:
   explicit DeadlineWake(platform::emscripten::RunLoopWake& wake_)
       : wake(&wake_) {}
 
-  // Arms a wake for `delay`, from the owner thread. A delay of zero asks for
-  // nothing: nextDelay() rounds up, so zero means the earliest runnable is
-  // already due, and processRunnables() has just run everything that was.
+  // Arms a wake for `delay`, from the owner thread. Zero asks for nothing:
+  // nextDelay() rounds up, so zero means the earliest runnable is already due.
   //
-  // A wake already outstanding for an earlier deadline stands in for this one,
-  // which is what keeps a host pumping at frame rate from arming a timer per
-  // frame. A deadline that moves earlier arms a second wake and leaves the
-  // first to fire: an outstanding wake is not cancelled, so the cost of one
-  // that nothing needs any more is a single pump that finds nothing to do.
+  // A wake outstanding for an earlier deadline stands in for this one, which
+  // keeps a host pumping at frame rate from arming a timer per frame. An
+  // outstanding wake is never cancelled, so a superseded one costs a single
+  // pump that finds nothing to do.
   void arm(Milliseconds delay) {
     if (delay <= Milliseconds::zero()) {
       return;
@@ -78,8 +66,8 @@ class DeadlineWake : public std::enable_shared_from_this<DeadlineWake> {
     }
 
     // The delay travels rather than the deadline, because the two threads read
-    // the monotonic clock through different browser contexts. It costs the
-    // proxy hop's latency, which the wake is late by.
+    // the monotonic clock through different browser contexts. The wake is late
+    // by the proxy hop's latency.
     auto armed = std::make_unique<Armed>(Armed{
       .owner = shared_from_this(),
       .deadline = deadline,
@@ -96,15 +84,13 @@ class DeadlineWake : public std::enable_shared_from_this<DeadlineWake> {
       return;
     }
 
-    // No timer will fire, so readiness is reported now instead: a host that
-    // keeps pumping runs the runnable early, where one waiting on a wake that
-    // never comes would not run it at all.
+    // No timer will fire, so report readiness now: running the runnable early
+    // beats waiting on a wake that never comes.
     fire(deadline);
   }
 
-  // Cuts the arming loose from the run loop, which the owner thread does before
-  // the loop goes away. Wakes still outstanding then only release their own
-  // state.
+  // Cuts the arming loose from the run loop; the owner thread calls this before
+  // the loop goes away.
   void detach() {
     const std::lock_guard lock(mutex);
     wake = nullptr;
@@ -135,14 +121,10 @@ class DeadlineWake : public std::enable_shared_from_this<DeadlineWake> {
     if (armed != outstanding.end()) {
       outstanding.erase(armed);
     }
-    // Under the lock, which is what keeps the run loop's wake state alive
-    // across detach(). notify() takes the host's locks and none of ours, so it
-    // stays the innermost step.
-    //
-    // The main browser thread runs this, and Emscripten serves a lock it has to
-    // wait for by spinning rather than by Atomics.wait. What it waits for is
-    // bounded: the owner thread holds either lock for a flag store, a list
-    // lookup, or a condition variable signal.
+    // Under the lock, which keeps the run loop's wake state alive across
+    // detach(). notify() takes the host's locks and none of ours, so it stays
+    // the innermost step. The main browser thread runs this and spins rather
+    // than waiting, so every lock the owner thread takes must be brief.
     if (wake != nullptr) {
       wake->notify();
     }
@@ -171,11 +153,9 @@ RunLoop* RunLoop::Get() {
 
 RunLoop::RunLoop(Type type) : impl(std::make_unique<Impl>()) {
   impl->type = type;
-  // Timers and async tasks make work ready without going through push(), which
-  // is where MapLibre reports queued work to the host, so they report it from
-  // here instead. push() then reports twice, which costs a flag store: the
-  // alternative is for a runnable to leave a host parked in
-  // mln_runtime_pump() asleep with work waiting.
+  // Timers and async tasks make work ready without going through push(), where
+  // MapLibre reports queued work to the host, so they report it from here.
+  // push() then reports twice, which costs a flag store.
   impl->wake.platform_wake = [this]() {
     if (platformCallback) {
       platformCallback();
@@ -240,23 +220,14 @@ void RunLoop::stop() {
 
 void RunLoop::updateTime() {}
 
-// Runs this loop until its own work is done.
+// Runs this loop until its own work is done, ignoring the tag: an owner thread
+// runs its own queues.
 //
-// One pass runs everything outstanding: the queues drain, and so does every
-// runnable that counts, because an async task is due the moment it is queued.
-// A pass that leaves work behind found it queued while the pass ran, so each
-// repeat runs what arrived rather than asking again for the same thing. That
-// bound rests on runTask() unlisting whatever it finds; see async_task.cpp.
-//
-// It runs the work directly rather than through runOnce(), which arms a browser
-// timer for the delay it leaves pending. A caller here is draining, so the wake
-// that timer carries has nothing to release, and arming one costs a proxy hop
-// to the main thread per pass.
-//
-// The reach stops at this loop. A caller arriving from ThreadedScheduler, where
-// the tag selects one map's tasks across pool threads, gets this loop's own
-// queues instead: an owner thread runs its own work. RenderSessionScheduler
-// takes the same position; see render/render_session_common.hpp.
+// One pass runs everything outstanding, so a pass that leaves work behind found
+// it queued while the pass ran. That bound rests on runTask() unlisting
+// whatever it finds; see async_task.cpp. The work runs directly rather than
+// through runOnce(), whose browser timer costs a proxy hop per pass and has no
+// waiter to release.
 void RunLoop::waitForEmpty(
   [[maybe_unused]] const mbgl::util::SimpleIdentity tag
 ) {

@@ -26,10 +26,9 @@ auto validate_live_attached_texture(
   mln_render_session texture, mln_render_session_object*& out_texture
 ) -> mln_status;
 // The backend-independent half of texture descriptor validation: pointer, size,
-// nested size, extent, and the handles the descriptor declares required. The
-// backend that owns a descriptor adds whatever probing needs its own headers on
-// top; every other build reaches this through the unsupported stub, so both
-// learn the same verdict from one definition.
+// nested size, extent, and the handles the descriptor declares required.
+// Builds without the backend reach this through the unsupported stub, so both
+// report the same verdict.
 //
 // `require_supported_provider` is false wherever no OpenGL context can be
 // created, so a host probing for OpenGL still hears about a malformed

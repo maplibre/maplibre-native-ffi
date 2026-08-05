@@ -1,9 +1,5 @@
 // Raw C ABI coverage: a render session's owner thread is the thread that
 // attached it, which need not be the map's owner thread.
-//
-// These live below the bindings because they need a second native thread that
-// attaches and drives a session against a map owned by the thread that created
-// it, which is not a shape a single-threaded binding test can build.
 
 #include <stdatomic.h>
 #include <stddef.h>
@@ -12,8 +8,7 @@
 #include "test_support.h"
 #include "unity.h"
 
-// A background layer needs no network, so these tests are deterministic and
-// produce a known readback color.
+// A background layer needs no network, so the readback color is deterministic.
 static const char background_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":"
   "[{\"id\":\"bg\",\"type\":\"background\","
@@ -77,11 +72,6 @@ static void attach_render_readback(void* argument) {
   atomic_store(&probe->finished, true);
 }
 
-// The end-to-end proof: a thread that does not own the map attaches a session,
-// renders a real frame, and reads it back, while the map is pumped where it was
-// created. This covers the scheduler mbgl reaches for during render, the
-// observer hop back to the map's run loop, the graphics context priming at
-// attach, and the size gate together.
 static void a_second_thread_attaches_and_renders(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -176,9 +166,8 @@ static void call_session_from_a_foreign_thread(void* argument) {
   atomic_store(&probe->finished, true);
 }
 
-// Attaching binds the session to the attaching thread, so every entry point
-// rejects any other thread. This pins the whole affinity contract in one place,
-// including that destroy cannot be used to escape it.
+// Attaching binds the session to the attaching thread, so every entry point,
+// destroy included, rejects any other thread.
 static void session_entry_points_reject_a_foreign_thread(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -215,7 +204,6 @@ static void session_entry_points_reject_a_foreign_thread(void) {
     );
   }
 
-  // The session survived every rejected call and is still usable here.
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -247,10 +235,9 @@ static void attach_hold_destroy(void* argument) {
   atomic_store(&probe->destroyed, true);
 }
 
-// The map cannot be destroyed while a session is attached, and that has to hold
-// when the session belongs to a thread the destroying thread never observes.
-// The map registry mutex is what makes the check race-free rather than the
-// owner-thread check that used to imply it.
+// The map cannot be destroyed while a session is attached, including one owned
+// by a thread the destroying thread never observes. The map registry mutex is
+// what makes that check race-free.
 static void map_destroy_rejects_a_session_owned_by_another_thread(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -328,10 +315,10 @@ static void attach_resize_render(void* argument) {
   atomic_store(&probe->finished, true);
 }
 
-// A resize from the render thread reaches the map through the map's own owner
-// thread. Rendering has to wait for the map to catch up, or the frame would
-// take its projection from the old logical size and its viewport from the new
-// physical one.
+// A resize from the render thread reaches the map through the map's owner
+// thread. Rendering waits for the map to catch up, or the frame would take its
+// projection from the old logical size and its viewport from the new physical
+// one.
 static void resize_from_the_render_thread_lands_on_the_map_thread(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -394,9 +381,9 @@ static void render_then_create_runtime(void* argument) {
     mln_test_render_fixture_destroy(&fixture);
   }
 
-  // Rendering installs a scheduler as this thread's current one. If it were
-  // left installed, or if looking it up had lazily created a run loop, the
-  // thread could never host a runtime.
+  // Rendering installs a scheduler as this thread's current one; a scheduler or
+  // a lazily created run loop left behind would keep the thread from hosting a
+  // runtime.
   mln_runtime runtime = MLN_HANDLE_NULL;
   const mln_runtime_options options = mln_runtime_options_default();
   probe->create_status = mln_runtime_create(&options, &runtime);
@@ -406,9 +393,9 @@ static void render_then_create_runtime(void* argument) {
   atomic_store(&probe->finished, true);
 }
 
-// Attaching and rendering must leave the thread's MapLibre scheduler state
-// exactly as they found it. Creating a runtime is the cheapest observable
-// proof, because runtime creation refuses a thread that already has one.
+// Attaching and rendering leave the thread's MapLibre scheduler state as they
+// found it. Runtime creation observes this because it rejects a thread that
+// already has a scheduler.
 static void render_thread_is_not_poisoned_for_runtime_creation(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -441,8 +428,7 @@ static void read_thread_token(void* argument) {
 }
 
 // Hosts whose unit of execution is not pinned to a native thread compare this
-// token to detect that they moved, so it has to be stable within a thread and
-// distinct between live ones.
+// token to detect that they moved.
 static void thread_tokens_are_stable_and_distinct(void) {
   const uint64_t first = mln_thread_token();
   TEST_ASSERT_NOT_EQUAL_UINT64(0, first);

@@ -22,8 +22,6 @@ static mln_runtime_event empty_event(void) {
   };
 }
 
-// This verifies null inputs, undersized options, preinitialized outputs, and
-// null destroy calls hidden by safe bindings.
 static void runtime_rejects_invalid_arguments(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(NULL, NULL)
@@ -47,8 +45,6 @@ static void runtime_rejects_invalid_arguments(void) {
   );
 }
 
-// This verifies rejection of unknown raw flag bits that typed binding option
-// sets cannot represent.
 static void runtime_rejects_unknown_flags(void) {
   mln_runtime_options options = mln_runtime_options_default();
   options.flags = UINT32_C(1) << 31;
@@ -59,8 +55,6 @@ static void runtime_rejects_unknown_flags(void) {
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
 }
 
-// This verifies the raw handle registry rejects use-after-destroy calls that
-// binding-owned handle state prevents.
 static void runtime_rejects_stale_handles(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_test_destroy_runtime(runtime);
@@ -72,16 +66,12 @@ static void runtime_rejects_stale_handles(void) {
   );
 }
 
-// This verifies the public null-handle contract for a raw entry point that
-// bindings do not call with null.
 static void runtime_pump_rejects_null_runtime(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_pump(MLN_HANDLE_NULL, 0)
   );
 }
 
-// This verifies raw event polling rejects a null runtime handle that binding
-// handle-state checks prevent.
 static void runtime_event_polling_rejects_null_runtime(void) {
   mln_runtime_event event = empty_event();
   bool has_event = false;
@@ -91,8 +81,6 @@ static void runtime_event_polling_rejects_null_runtime(void) {
   );
 }
 
-// This verifies raw runtime, output-handle, struct-size, and enum validation
-// hidden by binding constructors.
 static void map_create_rejects_invalid_arguments(void) {
   mln_map map = MLN_HANDLE_NULL;
   const mln_map_options options = mln_map_options_default();
@@ -125,8 +113,6 @@ static void map_create_rejects_invalid_arguments(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies destroyed raw map pointers remain invalid across multiple C
-// entry points.
 static void map_lifecycle_rejects_invalid_state_and_stale_handles(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -148,7 +134,6 @@ static void map_lifecycle_rejects_invalid_state_and_stale_handles(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies null C-string validation hidden by binding strings.
 static void style_functions_reject_null_inputs(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -184,8 +169,6 @@ static void style_functions_reject_null_inputs(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies null and undersized raw output storage is rejected without
-// writes through invalid pointers.
 static void runtime_event_polling_rejects_invalid_outputs(void) {
   mln_runtime runtime = mln_test_create_runtime();
   bool has_event = false;
@@ -205,8 +188,6 @@ static void runtime_event_polling_rejects_invalid_outputs(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies the C boundary's per-call diagnostic set-and-clear contract
-// independently of binding error copying.
 static void failing_status_sets_and_successful_status_clears_diagnostics(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_destroy(MLN_HANDLE_NULL)
@@ -237,8 +218,6 @@ static void* fail_on_thread(void* opaque_result) {
 #endif
 }
 
-// This verifies native diagnostic storage isolation across host threads, below
-// binding-owned thread checks.
 static void diagnostics_are_thread_local(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_destroy(MLN_HANDLE_NULL)

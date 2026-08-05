@@ -221,8 +221,6 @@ static mln_status http_header_transform_stub(
   return out_response == NULL ? MLN_STATUS_INVALID_ARGUMENT : MLN_STATUS_OK;
 }
 
-// This verifies null request-handle behavior for release, cancellation, and
-// completion below binding wrappers.
 static void custom_provider_request_handles_reject_raw_null_handles(void) {
   mln_resource_request_release(MLN_HANDLE_NULL);
   bool cancelled = true;
@@ -237,16 +235,12 @@ static void custom_provider_request_handles_reject_raw_null_handles(void) {
   );
 }
 
-// This verifies the process-global getter rejects a null C output pointer that
-// binding APIs hide.
 static void network_status_get_rejects_raw_null_output(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_network_status_get(NULL)
   );
 }
 
-// This verifies unknown raw operation discriminants and failure-time output
-// initialization.
 static void ambient_cache_operations_validate_raw_operation_values(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_offline_operation_id operation_id = 123;
@@ -260,8 +254,6 @@ static void ambient_cache_operations_validate_raw_operation_values(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies the null C output pointer that binding APIs hide, which is the
-// only argument shape this entry point can reject before scheduling.
 static void set_maximum_ambient_cache_size_rejects_raw_null_output(void) {
   mln_runtime runtime = mln_test_create_runtime();
   TEST_ASSERT_EQUAL_INT(
@@ -271,8 +263,6 @@ static void set_maximum_ambient_cache_size_rejects_raw_null_output(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies raw union discriminants, required nested pointers, and
-// failure-time output initialization.
 static void offline_regions_reject_raw_invalid_descriptors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_offline_region_definition definition = offline_tile_definition();
@@ -345,8 +335,6 @@ static void offline_regions_reject_raw_invalid_descriptors(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies a null borrowed database path is rejected before any
-// asynchronous operation is created.
 static void offline_database_merge_rejects_raw_null_path(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_offline_operation_id operation_id = 123;
@@ -360,8 +348,6 @@ static void offline_database_merge_rejects_raw_null_path(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies wrong-result-kind rejection because typed binding operation
-// variants prevent requesting a mismatched result.
 static void offline_take_rejects_mismatched_result_kind(void) {
   mln_runtime runtime = mln_test_create_runtime();
   const uint8_t metadata[] = {1, 2, 3};
@@ -388,8 +374,6 @@ static void offline_take_rejects_mismatched_result_kind(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies null, undersized, and missing-callback descriptors that binding
-// constructors cannot produce.
 static void resource_transform_rejects_raw_invalid_descriptors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   TEST_ASSERT_EQUAL_INT(
@@ -416,11 +400,9 @@ static void resource_transform_rejects_raw_invalid_descriptors(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Whether a transform can be registered at all is a property of the platform's
-// HTTP transport, not of the arguments: a transport that cannot drop a
-// transformed header when a redirect changes origin would hand the credential
-// to the redirect's destination, so it refuses the registration instead. Hosts
-// authenticate through a resource provider there.
+// A transport that cannot drop a transformed header when a redirect changes
+// origin reports MLN_STATUS_UNSUPPORTED rather than leak the credential to the
+// redirect's destination.
 static void http_header_transform_registration_follows_the_transport(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_http_header_transform transform = {
@@ -499,9 +481,8 @@ static void http_header_transform_rejects_raw_invalid_inputs(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Shared state for the teardown lock-scope test below. The transform callback
-// runs on a MapLibre file source thread and the second runtime lives on its own
-// owner thread, so every field crosses a thread boundary.
+// The transform callback runs on a MapLibre file source thread and the second
+// runtime on its own owner thread, so every field crosses a thread boundary.
 typedef struct teardown_probe {
   atomic_bool transform_entered;
   atomic_bool teardown_started;
@@ -520,9 +501,8 @@ enum {
   provider_callback_block_milliseconds = 200,
 };
 
-// Shared state for the provider quiescence test below. The provider callback
-// runs on a MapLibre file source thread while the owner thread clears the
-// provider, so every field crosses a thread boundary.
+// The provider callback runs on a MapLibre file source thread while the owner
+// thread clears the provider, so every field crosses a thread boundary.
 typedef struct provider_quiescence_probe {
   atomic_bool entered;
   atomic_bool clear_started;
@@ -540,9 +520,8 @@ static bool wait_for_flag(atomic_bool* flag) {
   return false;
 }
 
-// The C API asks transform callbacks to return quickly. This one blocks on
-// purpose so the per-runtime transform lock stays held while the owner thread
-// tears the runtime down, and it calls no C API function while blocked.
+// Blocks so the per-runtime transform lock stays held while the owner thread
+// tears the runtime down. Calls no C API function while blocked.
 static mln_status blocking_resource_transform(
   void* user_data, uint32_t kind, const char* url,
   mln_resource_transform_response* out_response
@@ -590,9 +569,9 @@ static void other_runtime_entry(void* argument) {
   mln_runtime_destroy(runtime);
 }
 
-// Creates a region for `style_url` and activates its download. The download
-// requests the style from a MapLibre file source thread, which is where the
-// resource provider and resource transform callbacks run.
+// Creates a region for `style_url` and activates its download, which requests
+// the style from the MapLibre file source thread that runs the provider and
+// transform callbacks.
 static bool activate_style_download(
   mln_runtime runtime, const char* style_url
 ) {
@@ -660,11 +639,10 @@ static bool start_offline_region_download(
          pump_until_flag(runtime, &probe->transform_entered);
 }
 
-// This verifies that runtime teardown waits for an in-flight resource transform
-// callback without holding the process-global runtime registry lock, so calls
-// on an unrelated runtime keep running while teardown is blocked. An offline
-// download supplies the callback because it needs no live map, which teardown
-// forbids.
+// Runtime teardown waits for an in-flight resource transform callback without
+// holding the process-global runtime registry lock, so calls on an unrelated
+// runtime keep running. The callback comes from an offline download, which
+// needs no live map.
 static void runtime_teardown_leaves_other_runtimes_responsive(void) {
   teardown_probe probe = {0};
   atomic_store(&probe.other_runtime_status, MLN_STATUS_NATIVE_ERROR);
@@ -697,9 +675,8 @@ static void runtime_teardown_leaves_other_runtimes_responsive(void) {
   );
 }
 
-// Shared state for the file-source lookup lock-scope test below. The provider
-// callback, the transform callback, and the second runtime's owner thread are
-// three separate threads, so every field crosses a thread boundary.
+// The provider callback, the transform callback, and the second runtime's owner
+// thread are three threads, so every field crosses a thread boundary.
 typedef struct lookup_probe {
   atomic_bool transform_entered;
   atomic_bool provider_entered;
@@ -712,8 +689,8 @@ typedef struct lookup_probe {
 } lookup_probe;
 
 // Blocks the transform for the first region's style so its shared transform
-// lock stays held, which is what makes the pending writer below wait. It calls
-// no C API function while blocked.
+// lock stays held, making the pending writer below wait. Calls no C API
+// function while blocked.
 static mln_status lookup_blocking_transform(
   void* user_data, uint32_t kind, const char* url,
   mln_resource_transform_response* out_response
@@ -743,9 +720,9 @@ static mln_status lookup_blocking_transform(
 }
 
 // Runs on the file source thread immediately before that thread looks up the
-// resource transform, so holding it here parks the thread until the owner
-// thread has a transform writer waiting. Passing the request through is what
-// sends the thread into the lookup under test.
+// resource transform: blocking here parks the thread until the owner thread has
+// a transform writer waiting, and passing the request through then enters the
+// lookup under test.
 static uint32_t lookup_probe_resource_provider(
   void* user_data, const mln_resource_request* request,
   mln_resource_request_handle handle
@@ -796,14 +773,10 @@ static void lookup_other_runtime_entry(void* argument) {
   mln_runtime_destroy(runtime);
 }
 
-// This verifies that a file source resource transform lookup releases the
-// process-global runtime registry lock before it waits on the per-runtime
-// transform lock. A transform callback holds the shared transform lock, the
-// owner thread waits for the exclusive lock, and a second file source thread
-// then makes the lookup, which a writer-preferring shared mutex queues behind
-// that waiting writer. Holding the registry lock across that wait stalls every
-// unrelated runtime, so an ordinary call on a second runtime must still finish
-// while the lookup waits.
+// A file source resource transform lookup releases the process-global runtime
+// registry lock before it waits on the per-runtime transform lock. The setup
+// below queues that lookup behind a pending writer, where holding the registry
+// lock would stall every unrelated runtime.
 static void resource_transform_lookup_leaves_other_runtimes_responsive(void) {
   lookup_probe probe = {0};
   atomic_store(&probe.other_runtime_status, MLN_STATUS_NATIVE_ERROR);
@@ -860,8 +833,6 @@ static void resource_transform_lookup_leaves_other_runtimes_responsive(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies null, undersized, and missing-callback provider descriptors
-// below binding-owned validation.
 static void resource_provider_rejects_raw_invalid_descriptors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   TEST_ASSERT_EQUAL_INT(
@@ -913,9 +884,9 @@ static uint32_t blocking_resource_provider_for_clear(
   return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
 }
 
-// Drives an offline region download until the provider callback runs. Offline
-// downloads request the region style from a MapLibre file source thread, which
-// is where the provider callback runs, and they need no live map.
+// Drives an offline region download until the provider callback runs. The
+// download requests its style from a MapLibre file source thread and needs no
+// live map.
 static bool wait_for_clear_provider_callback(
   mln_runtime runtime, provider_quiescence_probe* probe
 ) {
@@ -971,9 +942,8 @@ static bool wait_for_clear_provider_callback(
   return false;
 }
 
-// This verifies the quiescence guarantee every binding inherits: clearing the
-// resource provider waits for a provider callback that is already running, so
-// the callback and its user data are unreferenced once the clear returns.
+// Clearing the resource provider waits for a provider callback already running,
+// so the callback and its user data are unreferenced once the clear returns.
 static void clearing_resource_provider_waits_for_in_flight_callback(void) {
   provider_quiescence_probe probe = {0};
   mln_runtime runtime = mln_test_create_runtime();
@@ -1001,9 +971,6 @@ static void clearing_resource_provider_waits_for_in_flight_callback(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies the network file source diagnostic below every binding: a
-// style URL whose scheme no file source serves reports the scheme, the URL,
-// and the resource provider remedy instead of an HTTP client parse error.
 static void unsupported_style_url_scheme_names_scheme_and_url(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -1065,8 +1032,6 @@ static void unsupported_style_url_names_declining_provider(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies inline release records the provider release and lets the native
-// callback return handled ownership before reclaiming that reference.
 static void resource_provider_defers_inline_release_until_callback_returns(
   void
 ) {
@@ -1130,14 +1095,13 @@ static uint32_t blocking_resource_provider(
     mln_test_sleep_millisecond();
   }
   atomic_store(&probe->callback_returned, true);
-  // An unknown decision is converted to a handled provider error. Keeping the
-  // request on the provider path avoids involving native network teardown in
-  // this provider-lifetime regression.
+  // An unknown decision becomes a handled provider error, which keeps the
+  // request off the native network teardown path.
   return UINT32_MAX;
 }
 
-// Starts an offline download because its network request runs on a MapLibre
-// file-source thread and does not require a live map during runtime teardown.
+// An offline download's network request runs on a MapLibre file source thread
+// and needs no live map during runtime teardown.
 static bool wait_for_provider_callback(
   mln_runtime runtime, provider_teardown_probe* probe
 ) {

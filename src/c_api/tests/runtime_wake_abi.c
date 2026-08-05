@@ -1,7 +1,6 @@
 // Raw C ABI coverage for the mln_runtime_pump() wake flag, the signal sources
 // that release a parked owner thread, wake source lifetime across runtime
-// teardown, and render-update coalescing. These need a second thread and a real
-// network response, which bindings hide.
+// teardown, and render-update coalescing.
 
 #include <stdatomic.h>
 #include <stdint.h>
@@ -51,7 +50,7 @@ static size_t drain_events(mln_runtime runtime, uint32_t counted_type) {
 }
 
 // Pumps until the runtime is idle: the wake flag is clear and no events are
-// queued. A park that follows is released by the signal the test raises.
+// queued.
 static void quiesce(mln_runtime runtime) {
   for (size_t attempt = 0; attempt < 100; attempt += 1) {
     TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
@@ -72,8 +71,7 @@ typedef struct signal_probe {
   atomic_bool signal_done;
 } signal_probe;
 
-// Signals from a thread that owns no runtime, matching a host's task
-// submission path.
+// Signals from a thread that owns no runtime.
 static void signal_wake_source_entry(void* argument) {
   signal_probe* probe = argument;
   mln_test_sleep_milliseconds(signal_delay_milliseconds);
@@ -116,7 +114,6 @@ static uint32_t wake_style_provider(
   return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
 
-// Pins the signal a foreign thread raises while the owner thread is parked.
 static void a_wake_source_releases_a_parked_owner_thread(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_wake_source source = MLN_HANDLE_NULL;
@@ -149,7 +146,6 @@ static void a_wake_source_releases_a_parked_owner_thread(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A signal raised before the pump sets the wake flag, and one pump clears it.
 static void a_signal_before_the_pump_sets_the_wake_flag(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_wake_source source = MLN_HANDLE_NULL;
@@ -184,8 +180,7 @@ static void a_signal_before_the_pump_sets_the_wake_flag(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A style response arrives on a MapLibre file source thread and releases the
-// parked owner thread.
+// The style response arrives on a MapLibre file source thread.
 static void a_style_response_wakes_a_parked_owner_thread(void) {
   mln_runtime runtime = mln_test_create_runtime();
   const mln_resource_provider provider = {
@@ -247,8 +242,8 @@ typedef struct session_resize_probe {
   bool attach_succeeded;
 } session_resize_probe;
 
-// Attaches on its own thread, so the resize below reaches the map the way a
-// host's render loop reaches it: queued from a thread that owns no runtime.
+// Attaches on its own thread, so the resize below is queued from a thread that
+// owns no runtime.
 static void resize_session_entry(void* argument) {
   session_resize_probe* probe = argument;
   mln_test_render_fixture fixture = {0};
@@ -275,9 +270,8 @@ static void resize_session_entry(void* argument) {
   mln_test_render_fixture_destroy(&fixture);
 }
 
-// A render thread's resize queues the new size for the map's owner thread. The
-// owner thread takes it from a park without a host wake source, which is what
-// lets a host resize without also arranging to release its own pump.
+// A render thread's resize queues the new size for the map's owner thread,
+// which takes it from a park without a host wake source.
 static void a_session_resize_releases_a_parked_owner_thread(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -322,7 +316,6 @@ static void a_session_resize_releases_a_parked_owner_thread(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Queued unread events return a blocking pump without parking.
 static void queued_events_return_from_the_pump_immediately(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -403,9 +396,8 @@ static void signal_stale_wake_source_entry(void* argument) {
   atomic_store(&probe->signal_done, true);
 }
 
-// Signalling is documented as any-thread, so a released wake source can reach
-// mln_wake_source_signal() from a thread that never saw the release. The
-// signal is rejected, and no later wake source can be signalled in its place.
+// Signalling is any-thread, so a released wake source can reach
+// mln_wake_source_signal() from a thread that never saw the release.
 static void a_released_wake_source_rejects_a_foreign_thread_signal(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_wake_source source = MLN_HANDLE_NULL;
@@ -414,8 +406,8 @@ static void a_released_wake_source_rejects_a_foreign_thread_signal(void) {
   );
   mln_wake_source_destroy(source);
 
-  // Acquiring again reuses the slot the release just freed, so this proves the
-  // generation and not merely the slot's emptiness.
+  // Acquiring again reuses the slot the release freed, so the rejection below
+  // comes from the generation rather than from an empty slot.
   mln_wake_source reused = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_runtime_wake_source_acquire(runtime, &reused)
@@ -439,8 +431,6 @@ static void a_released_wake_source_rejects_a_foreign_thread_signal(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies raw null handles, output initialization, and owner-thread
-// validation that binding wrappers hide.
 static void pump_and_wake_sources_reject_raw_invalid_arguments(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_pump(MLN_HANDLE_NULL, 0)

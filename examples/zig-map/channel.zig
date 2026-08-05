@@ -1,20 +1,12 @@
-//! The entire cross-thread surface between the render loop, which owns the
-//! window and the render session, and the runtime loop, which owns the runtime
-//! and the map.
-//!
-//! Three channels, matching the map example specification: a camera-command
-//! queue going one way, a render request coming back, and a map channel that
-//! publishes the map once so the render loop can attach its own session.
+//! The cross-thread surface between the render loop, which owns the window and
+//! the render session, and the runtime loop, which owns the runtime and the map.
 
 const std = @import("std");
 const maplibre = @import("maplibre_native_ffi");
 
 /// A camera change decoded on the render loop and applied on the map's owner
-/// thread.
-///
-/// Commands carry deltas rather than absolute targets wherever the map's
-/// current camera is an input, because reading the camera and writing the new
-/// one has to happen together on the thread that owns the map.
+/// thread. Commands carry deltas rather than absolute targets, because reading
+/// the camera and writing the new one has to happen together on that thread.
 pub const CameraCommand = union(enum) {
     cancel_transitions,
     set_gesture_in_progress: struct { in_progress: bool },
@@ -32,11 +24,9 @@ pub const CameraCommand = union(enum) {
 /// Pending camera commands, filled by the render loop and drained by the
 /// runtime loop.
 ///
-/// The queue grows rather than dropping. Its commands are deltas and a gesture
-/// bracket, and neither survives being discarded: a dropped delta is motion the
-/// drag never gets back, and a dropped bracket leaves every delta after it
-/// attributed to no gesture. Growing does not block the render loop either, and
-/// only a stalled runtime loop grows it at all.
+/// The queue grows rather than dropping: a dropped delta is motion the drag
+/// never gets back, and a dropped gesture bracket leaves every delta after it
+/// attributed to no gesture.
 pub const CommandQueue = struct {
     lock: std.Io.Mutex = std.Io.Mutex.init,
     allocator: std.mem.Allocator,
@@ -50,11 +40,8 @@ pub const CommandQueue = struct {
         self.items.deinit(self.allocator);
     }
 
-    /// Render loop: queues one decoded camera change.
-    ///
-    /// A queue that cannot grow is a dead demo either way, so this reports an
-    /// allocation failure as a panic rather than threading an error through
-    /// every input handler.
+    /// Render loop: queues one decoded camera change. Panics on allocation
+    /// failure.
     pub fn push(self: *CommandQueue, command: CameraCommand) void {
         std.Io.Threaded.mutexLock(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
@@ -63,12 +50,9 @@ pub const CommandQueue = struct {
     }
 
     /// Runtime loop: hands over everything queued so far and takes `out` in
-    /// exchange, so the two ping-pong, a drain allocates nothing, and the
-    /// locked section is the swap alone.
+    /// exchange.
     pub fn drainInto(self: *CommandQueue, out: *std.ArrayList(CameraCommand)) void {
-        // Clearing memsets the batch just applied, so it happens before the
-        // lock is taken. Only the runtime loop holds `out` here; the queue is
-        // still filling the other list.
+        // `out` belongs to the runtime loop alone, so clear it outside the lock.
         out.clearRetainingCapacity();
         std.Io.Threaded.mutexLock(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
@@ -77,10 +61,6 @@ pub const CommandQueue = struct {
 };
 
 /// One-bit signal that a frame is worth drawing.
-///
-/// The render loop consumes before it renders and sets again when nothing was
-/// rendered, so a request the runtime loop publishes during a render is not
-/// lost.
 pub const RenderRequest = struct {
     value: std.atomic.Value(bool) = .init(true),
 
@@ -96,11 +76,9 @@ pub const RenderRequest = struct {
 /// Publishes the map and the runtime's wake source from the runtime loop to the
 /// render loop, and carries shutdown and failure the other way.
 ///
-/// The map handle is a plain value over a lock-guarded registry, so the render
-/// loop may hold a copy. It uses that copy only to attach, which native serves
-/// from any thread; every other map call stays on the runtime loop. The wake
-/// source is signalled from this side to release the runtime loop's parked
-/// pump.
+/// The render loop uses its copy of the map handle only to attach a session,
+/// which native serves from any thread; every other map call stays on the
+/// runtime loop.
 pub const MapChannel = struct {
     lock: std.Io.Mutex = std.Io.Mutex.init,
     map: ?maplibre.MapHandle = null,
@@ -144,8 +122,7 @@ pub const MapChannel = struct {
     /// session is closed, because the map cannot be destroyed before then.
     pub fn requestShutdown(self: *MapChannel) void {
         self.shutdown.store(true, .release);
-        // Release the pump so shutdown is observed now rather than after the
-        // parking bound expires.
+        // Release the pump so shutdown is observed now.
         self.wakeRuntimeLoop();
     }
 

@@ -294,7 +294,7 @@ public class mln_feature {
             MapLibreNativeC.C_LONG.withName("int_value"),
             MapLibreNativeC.C_DOUBLE.withName("double_value"),
             mln_string_view.layout().withName("string_value")
-        ).withName("$anon$517:3");
+        ).withName("$anon$514:3");
 
         /**
          * The layout of this union

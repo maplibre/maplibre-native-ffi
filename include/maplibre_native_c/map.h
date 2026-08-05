@@ -274,12 +274,9 @@ typedef struct mln_animation_options {
    * cancelled by mln_map_cancel_transitions(), or completing instantly as a
    * zero-duration jump. A command this API rejects -- one carrying a non-finite
    * enabled camera field, for example -- starts no transition and emits no such
-   * event. MapLibre Native reports the moment a transition
-   * releases the camera and does not report which of those outcomes occurred,
-   * so this event establishes transition identity rather than a completion
-   * reason. A host that needs to tell completion from cancellation compares the
-   * resulting camera against the requested one, or tracks which transition ID
-   * is current.
+   * event. The event carries no completion reason, so a host that needs to tell
+   * completion from cancellation compares the resulting camera against the
+   * requested one, or tracks which transition ID is current.
    *
    * The event is queued on the runtime that owns the map and is drained by
    * mln_runtime_poll_event(). For a transition that runs to completion, it is

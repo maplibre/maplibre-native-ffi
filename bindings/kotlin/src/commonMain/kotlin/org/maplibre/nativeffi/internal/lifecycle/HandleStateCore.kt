@@ -27,16 +27,8 @@ internal class HandleStateCore(
   }
 
   /**
-   * Runs [block] with release held off until it returns.
-   *
-   * Handles whose release is confined to one thread get this ordering from the owner-thread rule
-   * and can call native directly after [requireLive]. Handles the host may use and release from
-   * different threads use this instead, so a release that begins mid-call waits for the call to
-   * finish. That is what keeps a losing race reporting this wrapper's own closed-handle error
-   * instead of the C API's rejection of an id retired underneath it.
-   *
-   * [block] runs outside any lock, so concurrent uses proceed together. Calling [closeOnce] from
-   * inside [block] on the same thread would wait on itself.
+   * Runs [block] with release held off until it returns, for handles the host may use and release
+   * from different threads. Calling [closeOnce] from inside [block] deadlocks.
    */
   fun <T> withLive(block: () -> T): T {
     addActiveUse(1)
@@ -61,10 +53,8 @@ internal class HandleStateCore(
   fun handleId(): Long = handleId
 
   /**
-   * Retains this handle on behalf of a live child wrapper.
-   *
-   * [childTypeName] names the child wrapper type so that a blocked parent release can identify the
-   * handles still holding it open.
+   * Retains this handle on behalf of a live child wrapper. [childTypeName] appears in the error a
+   * blocked parent release throws.
    */
   fun retainChild(childTypeName: String): ChildRetention {
     while (true) {
@@ -96,8 +86,7 @@ internal class HandleStateCore(
       releaseState.store(STATE_LIVE)
       throw Status.liveChildren(typeName, children)
     }
-    // The state is RELEASING, so withLive turns new callers away from here on. Uses that already
-    // passed their liveness check still hold the handle, so wait for them before destroying it.
+    // Uses that already passed their liveness check still hold the handle; wait them out.
     while (activeUses.load() != 0) {
       yieldWhileClosing()
     }

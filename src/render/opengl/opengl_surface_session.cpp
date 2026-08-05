@@ -81,11 +81,9 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
 
   void destroy_backend() {
     if (has_native_context()) {
-      // Making the surface current can fail, and set_target lets a host install
-      // a surface that only turns out to be unusable later, so this is
-      // reachable. Run the GL teardown against whatever can be made current,
-      // but release the context itself either way: skipping it would leak the
-      // HGLRC or EGLContext for a session the host has already destroyed.
+      // Making the surface current can fail, so run the GL teardown against
+      // whatever can be made current but release the context either way, or the
+      // HGLRC or EGLContext leaks.
       try {
         cleanup_while_current();
       } catch (...) {
@@ -106,10 +104,9 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   }
 
   // Runs GL teardown with this session's context current, through the surface
-  // it presents to or, when that cannot be made current, through the drawable
-  // the context itself was created from. The second try is what keeps the
-  // deletes reachable: this context is created in the host's share group, so
-  // the textures, buffers, and programs the renderer built there outlive it and
+  // it presents to or, failing that, through the drawable the context was
+  // created from. The second try keeps the deletes reachable: this context
+  // lives in the host's share group, so the objects the renderer built there
   // stay allocated until something in the group deletes them.
   void cleanup_while_current() {
     try {
@@ -124,11 +121,9 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
       auto guard = mbgl::gfx::BackendScope{*this};
       cleanup();
     } catch (...) {
-      // Nothing can be made current, so no GL call is safe from here. Give up
-      // the renderable resource and the mbgl context without running their
-      // teardown: destroying either issues the deletes it has queued, and after
-      // destroy_native_context() those land on whatever context is current
-      // instead. What they name is left to the host's share group.
+      // Nothing can be made current, so no GL call is safe. Leak the renderable
+      // resource and the mbgl context rather than run their teardown: their
+      // queued deletes would land on whatever context is current instead.
       static_cast<void>(resource.release());
       static_cast<void>(context.release());
       throw;
@@ -141,16 +136,13 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
 
   void resize(mbgl::Size size_) { size = size_; }
 
-  // Presents through a different host surface from here on. Nothing is touched
-  // now: the session's own context stays as it is, holding every object the
-  // renderer built in it, and activate() makes the new surface current on the
-  // next render. That deliberately never reaches for the outgoing surface,
-  // which a host may already have destroyed — the case this exists for.
+  // Presents through a different host surface from here on. The outgoing
+  // surface is never touched, which a host may already have destroyed;
+  // activate() makes the new one current on the next render.
   void set_surface(const mln_opengl_surface_descriptor& descriptor) {
     // The surface alone. The context descriptor stays as it was at attach: this
-    // session's own GL context was created from it, WGL context creation still
-    // reads its device_context, and context identity is what the caller was
-    // told cannot change here.
+    // session's GL context was created from it, and WGL context creation still
+    // reads its device_context.
     descriptor_.surface = descriptor.surface;
     size = mbgl::Size{
       mln::core::physical_dimension(
@@ -189,13 +181,10 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
     }
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
     // The browser composites the canvas itself, so a frame drawn into the
-    // context's default framebuffer is presented with nothing called here.
-    //
-    // emscripten_webgl_commit_frame() is not that call. It answers
-    // INVALID_TARGET for a context with implicit swap control, which is the
-    // default, and for one with explicit swap control it returns success
-    // without doing anything: the WebGL commit() it used to make has been
-    // removed from browsers.
+    // context's default framebuffer is presented with no call here.
+    // emscripten_webgl_commit_frame() is not that call: it answers
+    // INVALID_TARGET under implicit swap control and does nothing under
+    // explicit.
 #else
     throw std::runtime_error("OpenGL context provider is unsupported");
 #endif
@@ -290,8 +279,8 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
       );
     }
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
-    // The context carries the canvas it draws to, so making it current is the
-    // whole of it. There is no second drawable to fall back to either.
+    // The context carries the canvas it draws to, so there is no second
+    // drawable to fall back to.
     previous_webgl_context_ = emscripten_webgl_get_current_context();
     if (
       emscripten_webgl_make_context_current(

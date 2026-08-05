@@ -146,8 +146,8 @@ androidComponents {
     variant.sources.java?.addStaticSourceDirectory(
       generatedJavaCppSources.get().asFile.absolutePath
     )
-    // The JavaCPP bridge is this binding's own JNI library, so it ships here
-    // rather than in the runtime AARs an Android host of any language consumes.
+    // The JavaCPP bridge is private to this binding, so it ships in this AAR
+    // rather than in the shared runtime AARs.
     androidTargets.forEach { target ->
       variant.sources.jniLibs?.addStaticSourceDirectory(
         packagedAndroidBindingLibs.get().dir(target.cargoTarget).asFile.absolutePath
@@ -185,8 +185,7 @@ tasks.named<Test>("jvmTest") {
 }
 
 // AGP's KMP library plugin registers no lint variant, so `NewApi` never runs for
-// androidMain. This task stands in for it, and lives on the Gradle graph rather
-// than only on the mise wrapper so a direct Gradle invocation is covered too.
+// androidMain. This task stands in for it.
 val checkAndroidApiFloor =
   tasks.register<Exec>("checkAndroidApiFloor") {
     group = "verification"

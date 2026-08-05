@@ -8,9 +8,8 @@ namespace Maplibre.NativeFfi.Runtime;
 /// Releases a runtime owner thread parked in <see cref="RuntimeHandle.Pump" />.
 /// </summary>
 /// <remarks>
-/// A wake source is usable from any thread, which a host's task submission and
-/// shutdown paths rely on. It stays usable after its runtime closes, and signalling
-/// it then does nothing.
+/// A wake source is usable from any thread. It stays usable after its runtime
+/// closes, and signalling it then does nothing.
 /// </remarks>
 public sealed unsafe class WakeSource : IDisposable
 {

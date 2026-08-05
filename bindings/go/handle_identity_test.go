@@ -46,7 +46,6 @@ func TestReleasedMapIDReplayedAfterANewMapReportsItStale(t *testing.T) {
 		t.Fatalf("diagnostic = %v, want it to name the id stale", err)
 	}
 
-	// The live map is unaffected by the replay.
 	if _, _, _, err := second.Size(); err != nil {
 		t.Fatalf("second.Size(): %v", err)
 	}

@@ -7,14 +7,12 @@ import org.maplibre.nativeffi.runtime.OfflineOperationLeakReport
 /**
  * Reports owner-thread-affine native handles that become unreachable before explicit release.
  *
- * Registration runs a diagnostic line on an isolated unreachable-action worker once the public
- * wrapper is unreachable. Runtime, map, projection, and render-session handles are bound to their
- * owner thread, so this hook MUST NOT destroy them: explicit release on the owner thread stays the
- * only path that frees native state. Reporting a leak keeps the failure visible while leaving
- * native ownership untouched.
+ * Runtime, map, projection, and render-session handles are bound to their owner thread, so this
+ * hook MUST NOT destroy them; explicit release on the owner thread stays the only path that frees
+ * native state.
  *
- * Registered actions capture leak-report state only. Capturing the wrapper would keep it reachable
- * and suppress every report.
+ * Registered actions must capture leak-report state only. Capturing the wrapper would keep it
+ * reachable and suppress every report.
  */
 internal object HandleLeakCleaner {
   private val leakReportActions = UnreachableActions.isolated("maplibre-leak-reports")

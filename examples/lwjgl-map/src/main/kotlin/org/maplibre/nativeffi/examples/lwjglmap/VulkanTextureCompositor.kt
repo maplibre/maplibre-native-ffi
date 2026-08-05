@@ -31,11 +31,9 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
   private var imageAvailable = NULL
 
   /**
-   * One present-wait semaphore per swapchain image, indexed by the acquired image.
-   *
-   * The frame fence proves a submit finished, but only the next acquire of the same image proves
-   * its present consumed the semaphore, so a single reused semaphore is a race the presentation
-   * engine may lose.
+   * One present-wait semaphore per swapchain image, indexed by the acquired image. Only the next
+   * acquire of the same image proves its present consumed the semaphore, so one reused semaphore
+   * would race the presentation engine.
    */
   private var renderFinished = LongArray(0)
   private var inFlight = NULL
@@ -75,8 +73,6 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
   fun drawImageView(imageView: Long): Boolean {
     return MemoryStack.stackPush().use { stack ->
       check(vkWaitForFences(context.device(), inFlight, true, Long.MAX_VALUE), "vkWaitForFences")
-      // The frame about to present is the first content a replacement could show, so this is the
-      // moment a stale swapchain is replaced.
       if (swapchainStale) {
         recreateSwapchain()
         swapchainStale = false
@@ -92,14 +88,12 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
           imageIndex,
         )
       if (acquire == VK_ERROR_OUT_OF_DATE_KHR) {
-        // The surface outgrew this swapchain, so nothing reaches the screen until the replacement
-        // is built.
+        // The surface outgrew this swapchain, so nothing reaches the screen until it is replaced.
         swapchainStale = true
         return@use false
       }
       if (acquire == VK_SUBOPTIMAL_KHR) {
-        // Still presentable, but the surface has moved on; replace the swapchain before the next
-        // frame.
+        // Still presentable, but the surface has moved on.
         swapchainStale = true
       }
       if (acquire != VK_SUCCESS && acquire != VK_SUBOPTIMAL_KHR) {
@@ -116,12 +110,9 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
   }
 
   /**
-   * Replaces the swapchain and the state sized to it.
-   *
-   * The replacement is created before the retired swapchain is destroyed and names it as
-   * oldSwapchain, so the presentation engine hands the surface over directly. Destroying it first
-   * leaves a gap that MoltenVK fills with presents that succeed but reach no drawable the window
-   * still shows.
+   * Replaces the swapchain and the state sized to it. The replacement is created before the retired
+   * swapchain is destroyed and names it as oldSwapchain; destroying it first leaves a gap where
+   * MoltenVK presents succeed but reach no drawable the window shows.
    */
   private fun recreateSwapchain() {
     context.waitIdle()
@@ -684,8 +675,8 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
         .pImageIndices(indices)
     val status = vkQueuePresentKHR(context.graphicsQueue(), presentInfo)
     if (status == VK_SUBOPTIMAL_KHR || status == VK_ERROR_OUT_OF_DATE_KHR) {
-      // A suboptimal frame reached the screen and an out-of-date one did not, and either way the
-      // surface has moved on; replace the swapchain before the next frame.
+      // A suboptimal frame reached the screen and an out-of-date one did not; either way the
+      // surface has moved on.
       swapchainStale = true
     }
     if (status != VK_SUCCESS && status != VK_SUBOPTIMAL_KHR && status != VK_ERROR_OUT_OF_DATE_KHR) {

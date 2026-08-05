@@ -38,9 +38,8 @@ struct ResourceRequestObject {
   mbgl::ActorRef<mbgl::FileSourceRequest> actor;
 };
 
-// A request reaches host code that may complete it from any MapLibre thread,
-// and mbgl's cancel path runs on its own. Each of those holds a strong
-// reference, so the object outlives a release that races them.
+// Host code may complete a request from any thread, and mbgl's cancel path runs
+// on its own, so the object must be leasable to outlive a racing release.
 template <>
 struct HandleTraits<ResourceRequestObject> {
   static constexpr auto kind = HandleKind::ResourceRequest;
@@ -202,9 +201,7 @@ auto response_from_abi(const mln_resource_response& provider_response)
   return response;
 }
 
-// Retires the id so no later call can reach this request. Idempotent, because
-// a provider that releases inline and a provider that passes through both end
-// up here.
+// Retires the id so no later call can reach this request. Idempotent.
 void retire_request(mln_resource_request_handle handle) noexcept {
   auto object = handle_table<ResourceRequestObject>().remove(handle);
   if (object == nullptr) {
@@ -362,8 +359,7 @@ auto request_custom_resource(
   auto object = std::make_shared<ResourceRequestObject>(request->actor());
   const auto handle = handle_table<ResourceRequestObject>().insert(object);
   // Capturing the object rather than the id keeps the cancel path off the
-  // handle table, so it adds no lock-ordering edge against mbgl's own locks on
-  // the thread that cancels.
+  // handle table, adding no lock-ordering edge against mbgl's own locks.
   request->onCancel([object]() noexcept -> void {
     const std::scoped_lock lock(object->mutex);
     object->cancelled = true;
@@ -460,9 +456,8 @@ auto wait_for_resource_request_retired(mln_resource_request_handle handle)
     set_thread_error("resource request handle must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  // A handle that no longer resolves has already been retired, so there is
-  // nothing to wait for. try_lease keeps this off the thread-local diagnostic,
-  // because that is a success here rather than a fault.
+  // A handle that no longer resolves is already retired, which is a success
+  // here, so try_lease keeps it out of the thread-local diagnostic.
   const auto live = handle_table<ResourceRequestObject>().try_lease(handle);
   if (live == nullptr) {
     return MLN_STATUS_OK;
@@ -473,9 +468,6 @@ auto wait_for_resource_request_retired(mln_resource_request_handle handle)
 }
 
 void release_resource_request(mln_resource_request_handle handle) noexcept {
-  // A release that lands while the provider callback is still on the stack no
-  // longer needs deferring: the invocation holds its own reference, so
-  // retiring the id here only makes it unreachable.
   retire_request(handle);
 }
 

@@ -101,21 +101,14 @@ internal object MapLibreNativeSurfaceAdapter {
   }
 
   /**
-   * The part of a target a live render session cannot be moved across.
-   *
-   * A session takes a replacement texture for the graphics context it attached with. One naming
-   * another context or device is reported as an invalid argument, and one carrying another format
-   * as unsupported, both leaving the session rendering into the texture it has. So a target whose
-   * key still matches is handed over, and one whose key changed is a session to close and attach
-   * again, accepting a cold renderer.
-   *
-   * Extent and scale factor are absent on purpose: a session follows both through the same
-   * set-target call.
+   * The part of a target a live render session cannot be moved across. A session takes a
+   * replacement texture only for the graphics context it attached with, so a target whose key still
+   * matches is handed over and one whose key changed closes the session and attaches again.
    */
   sealed interface SessionKey {
     /**
      * A Metal texture carries its device and pixel format, which is what a session compares against
-     * its own. Sample count needs no entry: attach admits only single-sample textures.
+     * its own. Attach admits only single-sample textures, so sample count needs no entry.
      */
     data class Metal(val device: NativeHandle, val pixelFormat: Long) : SessionKey
 
@@ -132,10 +125,8 @@ internal object MapLibreNativeSurfaceAdapter {
   }
 
   /**
-   * The texture a session is rendering into right now.
-   *
-   * A bridge counts a generation up every time it allocates, so a key that still matches means the
-   * session already renders into this texture at this size and nothing has to be handed over.
+   * The texture a session is rendering into right now. A bridge counts the generation up every time
+   * it allocates, so a matching key means nothing has to be handed over.
    */
   data class TargetKey(val generation: Long, val extent: SurfaceExtent)
 

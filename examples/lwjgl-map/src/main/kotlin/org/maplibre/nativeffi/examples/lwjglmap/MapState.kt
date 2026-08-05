@@ -16,10 +16,8 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.runtime.WakeSource
 
 /**
- * Runtime and map, owned for their whole lifetime by the runtime loop thread.
- *
- * The render target is not here: it belongs to the render loop thread, which owns the window and
- * the graphics context.
+ * Runtime and map, owned for their whole lifetime by the runtime loop thread. The render target
+ * belongs to the render loop thread, which owns the window and the graphics context.
  */
 internal class MapState
 private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : AutoCloseable {
@@ -36,9 +34,7 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
     for (command in batch) {
       apply(command)
     }
-    // This thread has no display to pace it, so it takes its cadence from the runtime's own work
-    // and parks in between. The render loop signals the wake source, so the bound is a backstop
-    // rather than the cadence.
+    // This thread has no display to pace it, so the pump's park is the cadence.
     runtime.pump(PARK_TIMEOUT_MS)
     if (drainEvents()) {
       renderRequest.set()
@@ -46,9 +42,8 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
   }
 
   /**
-   * Applies one decoded camera command. Runs on the map's thread, which is why the
-   * read-modify-write commands read the current camera here rather than on the render loop that
-   * produced them.
+   * Applies one decoded camera command on the map's thread, so read-modify-write commands read the
+   * current camera here rather than on the render loop that produced them.
    */
   private fun apply(command: CameraCommand) {
     when (command) {
@@ -117,10 +112,7 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
   companion object {
     private const val STYLE_URL = "https://tiles.openfreemap.org/styles/bright"
 
-    /**
-     * Backstop for the runtime loop's park. The render loop's wake source is what normally releases
-     * it, so this only bounds a pump that nothing signals.
-     */
+    /** Backstop bound for a parked pump that nothing signals. */
     private const val PARK_TIMEOUT_MS = 100L
 
     fun create(viewport: Viewport): MapState {

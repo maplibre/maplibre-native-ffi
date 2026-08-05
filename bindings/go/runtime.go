@@ -251,15 +251,11 @@ type RuntimeEvent struct {
 	Type       RuntimeEventType
 	SourceType RuntimeEventSourceType
 	Source     RuntimeEventSource
-	// Code is a secondary event detail whose meaning Type selects.
-	//
-	// For RuntimeEventMapCameraWillChange and RuntimeEventMapCameraDidChange it
-	// is a CameraChangeMode. For RuntimeEventMapLoadingFailed it is the ordinal
-	// of MapLibre Native's internal map load error kind, which this binding does
-	// not name as a type; Message carries the failure text. For
-	// RuntimeEventOfflineOperationCompleted it is the operation result as a
-	// native status value, the same value the payload reports in ResultStatus.
-	// Every other event type reports 0.
+	// Code is a secondary event detail whose meaning Type selects: a
+	// CameraChangeMode for the camera-will-change and camera-did-change events,
+	// the ordinal of MapLibre Native's internal map load error kind for
+	// map-loading-failed, and the result status for
+	// offline-operation-completed. Every other event type reports 0.
 	Code        int32
 	PayloadType RuntimeEventPayloadType
 	PayloadSize uintptr
@@ -271,9 +267,7 @@ type RuntimeEvent struct {
 
 // CameraChangeMode reports whether a camera change belongs to an animated
 // transition. It is the meaning of RuntimeEvent.Code for
-// RuntimeEventMapCameraWillChange and RuntimeEventMapCameraDidChange, so a host
-// reads it as CameraChangeMode(event.Code). Values outside the named constants
-// stay readable as the raw code.
+// RuntimeEventMapCameraWillChange and RuntimeEventMapCameraDidChange.
 type CameraChangeMode uint32
 
 const (
@@ -356,8 +350,7 @@ type RuntimeEventTileActionPayload struct {
 
 // RuntimeEventCameraTransitionFinishedPayload is a copied camera
 // transition-finished event payload. It carries the identity the caller stamped
-// on the transition through AnimationOptions.TransitionID, which also documents
-// the terminal outcomes this event covers.
+// on the transition through AnimationOptions.TransitionID.
 type RuntimeEventCameraTransitionFinishedPayload struct {
 	TransitionID uint64
 }
@@ -410,8 +403,7 @@ type RuntimeHandle struct {
 	resourceProviderMu    sync.Mutex
 	resourceProvider      *callback.ResourceProviderState
 	mapsMu                sync.Mutex
-	// Resolves an event's source id to the public wrapper, which the C API has
-	// no way to hand back.
+	// Resolves an event's source id to the public wrapper.
 	maps map[MapID]*MapHandle
 }
 
@@ -539,27 +531,16 @@ func (runtime *RuntimeHandle) ptr() (nativeRuntime, func(), error) {
 	return borrow.Handle(), borrow.Release, nil
 }
 
-// Pump advances this runtime.
+// Pump advances this runtime. It parks the owner thread when timeout allows,
+// then drains the owner-thread task queues, including tasks the drained ones
+// enqueue. Drain the queued runtime events with PollEvent afterwards.
 //
-// The call parks the owner thread when timeout allows it, then drains the
-// owner-thread task queues. Drain the queued runtime events with PollEvent
-// afterwards.
-//
-// timeout sets the park bound. Zero drains and returns; hosts pumping from a
-// frame callback pass it. A positive value parks for up to that long; hosts that
-// own their pump goroutine pass one and take their cadence from the runtime's
-// own work. A negative value parks until a wake arrives.
-//
-// The drain runs every task queued when it begins plus every task those
-// enqueue, so a single call can span a full style parse.
-//
-// The runtime holds a wake flag. Style, tile, offline, and resource responses
-// set it, as do queued runtime events and WakeSource.Signal. A parking call
-// returns as soon as the flag is set and clears it before returning, and work
-// arriving during the drain sets it again. A call also returns without parking
-// while unread runtime events are queued. Timers and ready file descriptors set
-// the flag only when they queue owner-thread work, so pass a bounded timeout to
-// cap how long a call waits.
+// timeout sets the park bound: zero drains and returns, a positive value parks
+// for up to that long, and a negative value parks until a wake arrives. A
+// parking call returns as soon as the runtime's wake flag is set and clears it,
+// and returns without parking while unread runtime events are queued. Timers
+// and ready file descriptors set the flag only when they queue owner-thread
+// work, so pass a bounded timeout to cap how long a call waits.
 //
 // A non-zero timeout blocks the calling goroutine and its OS thread. Call it
 // outside any lock that a goroutine signalling a WakeSource takes.
@@ -607,11 +588,9 @@ func (runtime *RuntimeHandle) WakeSource() (*WakeSource, error) {
 	return source, nil
 }
 
-// WakeSource releases a runtime owner thread parked in RuntimeHandle.Pump.
-//
-// A wake source is usable from any goroutine, which a host's task submission
-// and shutdown paths rely on. It stays usable after its runtime closes, and
-// signalling it then does nothing.
+// WakeSource releases a runtime owner thread parked in RuntimeHandle.Pump. It
+// is usable from any goroutine. Signalling it after its runtime closes does
+// nothing.
 type WakeSource struct {
 	state *handle.State[nativeWakeSource]
 }
@@ -622,8 +601,8 @@ var destroyWakeSource = func(native nativeWakeSource) int32 {
 }
 
 // Signal sets the runtime's wake flag and releases the parked owner thread. A
-// signal raised while the owner thread is running leaves the flag set, so the
-// next Pump returns without parking.
+// signal raised while the owner thread runs leaves the flag set, so the next
+// Pump returns without parking.
 func (source *WakeSource) Signal() error {
 	if source == nil || source.state == nil {
 		return newBindingError(ErrInvalidArgument, "WakeSource is nil")
@@ -650,10 +629,8 @@ func (source *WakeSource) Close() {
 // PollEvent polls one queued runtime event and copies it into a Go value. It
 // reports a nil event when the queue is empty.
 //
-// Polling also advances binding-owned state: on a map-style-loaded event this
-// binding releases the map's detached custom geometry sources, closing the
-// upcall stubs for sources the new style dropped. That release happens when the
-// event is polled, so drain the queue to keep dropped sources from lingering.
+// Polling a map-style-loaded event releases that map's detached custom geometry
+// sources, so drain the queue to keep dropped sources from lingering.
 func (runtime *RuntimeHandle) PollEvent() (*RuntimeEvent, error) {
 	ptr, release, err := runtime.ptr()
 	if err != nil {
@@ -901,8 +878,8 @@ func (runtime *RuntimeHandle) StartAmbientCacheOperation(operation AmbientCacheO
 }
 
 // StartSetMaximumAmbientCacheSize starts a change to this runtime's maximum
-// ambient cache size. MapLibre evicts ambient resources to fit the new budget,
-// so lowering it discards cached resources. Offline regions are unaffected.
+// ambient cache size. Lowering it evicts ambient resources to fit the new
+// budget; offline regions are unaffected.
 func (runtime *RuntimeHandle) StartSetMaximumAmbientCacheSize(size uint64) (*OfflineOperationHandle[struct{}], error) {
 	ptr, release, err := runtime.ptr()
 	if err != nil {
@@ -924,11 +901,11 @@ func (runtime *RuntimeHandle) StartSetMaximumAmbientCacheSize(size uint64) (*Off
 }
 
 // SetResourceProvider installs or replaces the runtime-scoped network resource
-// provider. It may be called while maps are live. Native code may invoke the
+// provider, and may be called while maps are live. Native code may invoke the
 // provider on worker or network threads, so callbacks must be thread-safe and
-// must not call MapLibre map/runtime APIs. Once this call returns, a replaced
-// provider is no longer invoked; requests it already took a handle for keep that
-// handle, so complete or close each one as usual.
+// must not call MapLibre map or runtime APIs. Once this call returns, a
+// replaced provider is no longer invoked; requests it already took a handle for
+// keep that handle, so complete or close each one as usual.
 func (runtime *RuntimeHandle) SetResourceProvider(provider ResourceProviderCallback) error {
 	if provider == nil {
 		return newBindingError(ErrInvalidArgument, "ResourceProviderCallback is nil")
@@ -978,11 +955,10 @@ func (runtime *RuntimeHandle) SetResourceProvider(provider ResourceProviderCallb
 	return nil
 }
 
-// ClearResourceProvider clears the runtime-scoped network resource provider.
-// Requests that reach the C API network file source then go to MapLibre's online
-// file source. Once this call returns, the cleared provider is no longer invoked;
-// requests it already took a handle for keep that handle, so complete or close
-// each one as usual.
+// ClearResourceProvider clears the runtime-scoped network resource provider, so
+// later requests go to MapLibre's online file source. Once this call returns,
+// the cleared provider is no longer invoked; requests it already took a handle
+// for keep that handle, so complete or close each one as usual.
 func (runtime *RuntimeHandle) ClearResourceProvider() error {
 	ptr, release, err := runtime.ptr()
 	if err != nil {

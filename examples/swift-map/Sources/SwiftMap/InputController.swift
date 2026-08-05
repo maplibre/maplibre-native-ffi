@@ -6,15 +6,9 @@ private let resetAnimationDurationMS = 220.0
 private let preciseScrollDeltaDivisor = 10.0
 private let maxScrollDeltaPerEvent = 4.0
 
-/// Decodes host input into camera commands.
-///
-/// This runs on the render loop, which does not own the map, so it only
-/// produces commands; the runtime loop applies them on the map's owner thread.
-/// Anything needing the current viewport is converted to logical map
-/// coordinates here, where the viewport lives.
-///
-/// Every handler returns whether the camera changed, so the render loop can set
-/// the render request.
+/// Decodes host input into camera commands on the render loop, converting to
+/// logical map coordinates. The runtime loop applies the commands. Every
+/// handler returns whether the camera changed.
 @MainActor
 final class InputController {
   enum DragMode {
@@ -23,8 +17,6 @@ final class InputController {
     case rotate
   }
 
-  /// The button that started the live drag. A drag belongs to one button, so a
-  /// second button pressed during it neither restarts it nor ends it early.
   private enum DragButton {
     case none
     case left
@@ -71,26 +63,19 @@ final class InputController {
     at location: CGPoint,
     commands: Channels
   ) {
-    // A drag already owns the pointer, so a second button joins it rather than
-    // starting a drag of its own. Its position leaves the live drag's baseline
-    // alone, so the next delta still measures from where the owning button
-    // last was.
+    // A second button pressed during a live drag joins it, leaving the drag
+    // baseline alone.
     guard dragMode == .none else { return }
     lastLocation = location
     dragMode = mode
     dragButton = button
-    // Queued ahead of the drag's own commands, so the transition stops before
-    // the first delta lands.
+    // Cancel first, so the running transition stops before the first delta.
     commands.push(.cancelTransitions)
-    // The deltas that follow belong to one live gesture, so the map hears
-    // about the gesture rather than a stream of unrelated camera commands.
     commands.push(.setGestureInProgress(true))
   }
 
-  /// Every path that ends a drag runs through here, so the gesture mark the
-  /// drag set is always paired with a clear. Releasing a button that joined the
-  /// drag leaves it running, so the drag ends once, when the button that
-  /// started it comes up.
+  /// Ends the drag only for the button that started it, so the gesture bracket
+  /// stays paired.
   private func endDrag(
     _ button: DragButton,
     at location: CGPoint,

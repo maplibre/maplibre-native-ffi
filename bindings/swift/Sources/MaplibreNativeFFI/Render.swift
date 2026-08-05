@@ -21,12 +21,7 @@ public struct RenderTargetExtent: Equatable, Sendable {
   }
 
   /// Returns the physical device-pixel size as `ceil(logical * scaleFactor)`
-  /// per
-  /// dimension.
-  ///
-  /// Session-owned texture targets and surface targets are sized this way.
-  /// Borrowed texture targets state their physical size instead, because not
-  /// every physical size is reachable from a logical extent.
+  /// per dimension. Borrowed texture targets state their physical size instead.
   public func physicalSize() throws -> (width: UInt32, height: UInt32) {
     try mapNativeFailure {
       var native = nativeInput.native
@@ -424,10 +419,8 @@ public struct OpenGLBorrowedTextureDescriptor: Equatable, Sendable {
 
 /// A render session, affine to the thread that attached it.
 ///
-/// The session holds no Swift-level retention of its map, because a session may
-/// be attached on a thread that cannot hold a non-`Sendable` ``MapHandle``.
-/// Native keeps the map alive instead: destroying a map fails while a session
-/// is attached to it.
+/// The session holds no Swift-level retention of its map. Native keeps the map
+/// alive instead: destroying a map fails while a session is attached to it.
 public final class RenderSessionHandle {
   private let handle: NativeHandleBox<NativeRenderSessionHandle>
 
@@ -455,16 +448,12 @@ public final class RenderSessionHandle {
   /// Resizes this attached render session.
   ///
   /// Surface and owned-texture sessions resize in place. Borrowed texture
-  /// targets are sized by their owner and throw an unsupported-feature error:
-  /// allocate a texture at the new size and hand it over with the backend's
-  /// borrowed-texture target setter, such as
-  /// ``setMetalBorrowedTextureTarget(_:)``, which keeps this session.
+  /// targets throw an unsupported-feature error; hand over a new texture with
+  /// the backend's borrowed-texture target setter instead.
   ///
-  /// The session keeps its renderer across a resize, so renderer-held state
-  /// such as feature state carries over. A scale factor change is the
-  /// exception: a renderer compiles its shaders for one pixel ratio, so that
-  /// resize starts a new one with renderer-held state empty. Map state such as
-  /// camera, style, and sources lives on the map and survives either way.
+  /// The session keeps its renderer, and renderer-held state such as feature
+  /// state, across a resize. A scale factor change starts a new renderer with
+  /// that state empty.
   public func resize(width: UInt32, height: UInt32,
                      scaleFactor: Double) throws
   {
@@ -478,21 +467,12 @@ public final class RenderSessionHandle {
     }
   }
 
-  /// Presents this attached surface session through a new surface.
+  /// Presents this attached surface session through a new surface, keeping the
+  /// session's renderer and its cached state.
   ///
-  /// A host surface can be destroyed and recreated while the map goes on
-  /// living, which is what Android rotation, a Flutter `SurfaceProducer`
-  /// lifecycle change, and a window resize that reallocates all look like from
-  /// here. Replacing the surface in place keeps this session's renderer, and
-  /// with it the tile pyramid, glyph and image atlases, symbol placement, and
-  /// feature state.
-  ///
-  /// The descriptor names the same graphics context this session attached
-  /// with, and its extent applies as a resize does. A descriptor whose
-  /// `context.device` is neither nil nor this session's device throws an
-  /// invalid-argument error and leaves this session rendering into the surface
-  /// it has. The session assigns the layer its own device and pixel format, so
-  /// the layer itself carries nothing that has to match.
+  /// The descriptor's extent applies as a resize does. A `context.device` that
+  /// is neither nil nor this session's device throws an invalid-argument error
+  /// and leaves this session rendering into the surface it has.
   public func setMetalSurfaceTarget(
     _ descriptor: MetalSurfaceDescriptor
   ) throws {
@@ -508,7 +488,6 @@ public final class RenderSessionHandle {
 
   /// Presents this attached surface session through a new surface.
   ///
-  /// See ``setMetalSurfaceTarget(_:)`` for what replacing a surface preserves.
   /// The outgoing `VkSurfaceKHR` must still be valid: this session holds a
   /// swapchain built from it, and Vulkan destroys every swapchain before its
   /// surface.
@@ -527,11 +506,9 @@ public final class RenderSessionHandle {
 
   /// Presents this attached surface session through a new surface.
   ///
-  /// See ``setMetalSurfaceTarget(_:)`` for what replacing a surface preserves.
   /// The new surface is made current on the next render, so a host may hand
-  /// over a replacement for one it has already destroyed. A surface accepted
-  /// here can still prove unusable, which the next ``renderUpdate()`` reports
-  /// rather than this call.
+  /// over a replacement for one it has already destroyed. The next
+  /// ``renderUpdate()`` reports an unusable surface, not this call.
   public func setOpenGLSurfaceTarget(
     _ descriptor: OpenGLSurfaceDescriptor
   ) throws {
@@ -545,24 +522,14 @@ public final class RenderSessionHandle {
     }
   }
 
-  /// Renders this attached texture session into a new caller-owned texture.
+  /// Renders this attached texture session into a new caller-owned texture,
+  /// keeping the session's renderer. A scale factor change starts a new one.
   ///
-  /// A caller-owned texture is sized by its owner, so a host that follows a
-  /// resize reallocates rather than resizing and
-  /// ``resize(width:height:scaleFactor:)`` throws an unsupported-feature error.
-  /// Handing the replacement over here keeps this session's renderer instead,
-  /// so the map does not go cold on every resize, unless the scale factor
-  /// changes, which starts a new renderer for the new pixel ratio just as
-  /// ``resize(width:height:scaleFactor:)`` does.
-  ///
-  /// The replacement belongs to the device this session attached with, which
-  /// throws an invalid-argument error otherwise, and carries the pixel format
-  /// it attached with, which throws an unsupported-feature error otherwise.
-  /// Both leave this session rendering into the texture it has. The caller owns
-  /// the replacement and keeps it valid until the next replacement, detach, or
-  /// close. This session never retained the outgoing texture, never releases
-  /// it, and never reads it here, so a host that already released it hands over
-  /// the replacement all the same.
+  /// The replacement must belong to the device and carry the pixel format this
+  /// session attached with; a mismatch throws and leaves this session rendering
+  /// into the texture it has. The caller keeps the replacement valid until the
+  /// next replacement, detach, or close. The outgoing texture is neither read
+  /// nor released here.
   public func setMetalBorrowedTextureTarget(
     _ descriptor: MetalBorrowedTextureDescriptor
   ) throws {
@@ -578,9 +545,8 @@ public final class RenderSessionHandle {
 
   /// Renders this attached texture session into a new caller-owned image.
   ///
-  /// See ``setMetalBorrowedTextureTarget(_:)`` for what replacing a target
-  /// preserves. The replacement carries the format and both layouts this
-  /// session attached with, since its render pass was built around them.
+  /// The replacement must carry the format and both layouts this session
+  /// attached with, since its render pass was built around them.
   public func setVulkanBorrowedTextureTarget(
     _ descriptor: VulkanBorrowedTextureDescriptor
   ) throws {
@@ -596,10 +562,9 @@ public final class RenderSessionHandle {
 
   /// Renders this attached texture session into a new caller-owned texture.
   ///
-  /// See ``setMetalBorrowedTextureTarget(_:)`` for what replacing a target
-  /// preserves. The replacement belongs to the context this session attached
-  /// with, or one in its share group, and the host context must be current on
-  /// this thread.
+  /// The replacement must belong to the context this session attached with, or
+  /// one in its share group, and the host context must be current on this
+  /// thread.
   public func setOpenGLBorrowedTextureTarget(
     _ descriptor: OpenGLBorrowedTextureDescriptor
   ) throws {
@@ -615,12 +580,9 @@ public final class RenderSessionHandle {
 
   /// Renders the latest available map render update.
   ///
-  /// The map retains its latest update, so repeated calls re-render it and
-  /// return true again; use this to redraw on demand after resize or surface
-  /// expose, and gate frame loops on render-update-available events instead
-  /// of the return value. Returns false when no frame was rendered. That is
-  /// a normal transient: call again on the next frame rather than wait for
-  /// another render-update event.
+  /// The map retains its latest update, so repeated calls re-render it. Returns
+  /// false when no frame was rendered; that is a normal transient, so call
+  /// again on the next frame rather than wait for another render-update event.
   @discardableResult
   public func renderUpdate() throws -> Bool {
     try mapNativeFailure {
@@ -670,9 +632,7 @@ public final class RenderSessionHandle {
           capacity: buffer.count
         )
         // An empty destination reaches native code as the null pointer and
-        // zero capacity that mean a size probe, which succeeds without
-        // copying. Report the buffer as too small unless the frame really
-        // carries no bytes.
+        // zero capacity of a size probe, which succeeds without copying.
         if buffer.isEmpty, rawInfo.byte_length > 0 {
           throw MaplibreError.invalidArgument(
             "buffer length 0 is smaller than the required \(rawInfo.byte_length) bytes"
@@ -1027,27 +987,15 @@ public final class OpenGLOwnedTextureFrameHandle {
 
 /// A reference to a map for the sole purpose of attaching a render session.
 ///
-/// Produced by ``MapHandle/attachRef()``. Every attach function lives here
-/// rather than on ``MapHandle``, because attaching is the one map operation
-/// that runs on the render session's thread instead of the map's.
+/// Produced by ``MapHandle/attachRef()``. Attaching runs on the render
+/// session's thread rather than the map's, so it lives here instead of on the
+/// non-`Sendable` ``MapHandle``.
 ///
-/// This carries no Swift retention of the map, because ``MapHandle`` is not
-/// `Sendable`. Native keeps the map alive instead: destroying a map fails while
-/// a render session is attached to it. Closing the map marks the shared handle
-/// state closed, so a reference that outlives its map throws rather than
-/// binding
-/// a session to whatever the allocator put at that address next.
-///
-/// Dropping the last reference to a ``MapHandle`` instead of closing it, while
-/// a
-/// session is still attached on another thread, leaks the native map: the
-/// destroy fails and `deinit` can only report it. Close the session first, then
-/// the map.
-///
-/// This is plainly `Sendable`: it carries a copied handle id rather than a
-/// pointer, and the attach it performs reaches no thread-affine map state — the
-/// C API claims the map's render-session slot under its registry lock and posts
-/// the new size to the map's own owner thread.
+/// This carries no Swift retention of the map. A reference that outlives its
+/// map throws rather than attaching. Close the session before the map:
+/// dropping the last ``MapHandle`` reference while a session is still attached
+/// leaks the native map, since the destroy fails and `deinit` can only report
+/// it.
 public struct MapAttachRef: Sendable {
   private let handle: NativeHandleBox<NativeMapHandle>
 
@@ -1056,18 +1004,12 @@ public struct MapAttachRef: Sendable {
   }
 
   /// Whether the map this reference names has been closed.
-  ///
-  /// A reference can outlive its ``MapHandle``, so a host that keeps one across
-  /// a map's lifetime can check here instead of relying on the error from a
-  /// failed attach.
   public var isMapClosed: Bool {
     handle.isClosed
   }
 
-  /// The map's handle id, which the C API validates on every attach.
-  ///
-  /// A released id is rejected rather than binding the session to a later map,
-  /// so no lock is held across the attach.
+  /// The map's handle id, which the C API validates on every attach. A released
+  /// id is rejected rather than binding the session to a later map.
   func mapHandle() throws -> NativeMapHandle {
     try handle.requireLive()
   }

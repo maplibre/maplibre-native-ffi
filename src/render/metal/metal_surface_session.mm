@@ -59,11 +59,10 @@ class MetalSurfaceBackend final : public mbgl::mtl::RendererBackend,
 
     // Presents through a different layer from here on. Every layer this session
     // takes is configured for the same device and pixel format, so the render
-    // pipeline states mbgl caches against that format stay usable and the
-    // renderer keeps its resources.
+    // pipeline states mbgl caches against that format stay usable.
     void set_layer(CA::MetalLayer* layer_, mbgl::Size size_) {
-      // Release what is still bound to the outgoing layer. A drawable outlives
-      // its layer badly, and bind() acquires one from the new layer anyway.
+      // Release what is still bound to the outgoing layer: a drawable must not
+      // outlive its layer.
       commandBuffer.reset();
       renderPassDescriptor.reset();
       drawable.reset();
@@ -77,8 +76,8 @@ class MetalSurfaceBackend final : public mbgl::mtl::RendererBackend,
 
     // Acquires the frame's drawable, command buffer, and render pass, and
     // reports whether the layer had a drawable to hand out. A minimized or
-    // occluded window's layer legitimately has none, so the render update
-    // asks here first and skips the frame; bind() cannot proceed without one.
+    // occluded window's layer has none, so the render update asks here first
+    // and skips the frame; bind() cannot proceed without one.
     auto try_bind() -> bool {
       if (drawable && commandBuffer && renderPassDescriptor) {
         return true;

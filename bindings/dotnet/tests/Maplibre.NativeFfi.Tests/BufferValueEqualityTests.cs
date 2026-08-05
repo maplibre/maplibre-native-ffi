@@ -7,8 +7,7 @@ using Xunit;
 namespace Maplibre.NativeFfi.Tests;
 
 /// <summary>
-/// BND-070: public values wrapping copied byte buffers compare buffer contents, matching the
-/// Kotlin binding's <c>contentEquals</c> behavior for the same types.
+/// Public values wrapping copied byte buffers compare buffer contents.
 /// </summary>
 public sealed class BufferValueEqualityTests
 {

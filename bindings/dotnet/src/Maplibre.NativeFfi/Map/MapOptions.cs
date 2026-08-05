@@ -4,8 +4,8 @@ namespace Maplibre.NativeFfi.Map;
 
 /// <summary>Map creation options.</summary>
 /// <remarks>
-/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
-/// instance unmodified while it is a key in a hash-based collection.
+/// Compares and hashes by property value; keep an instance unmodified while it is a key in a
+/// hash-based collection.
 /// </remarks>
 public sealed record MapOptions
 {
@@ -22,10 +22,10 @@ public sealed record MapOptions
     public uint? Height { get; set; }
 
     /// <summary>
-    /// Device scale factor, fixed for the lifetime of the map. This selects sprites, glyphs, and
-    /// raster tiles for every frame. Render targets carry their own scale factor for geometry, so
-    /// attaching or resizing a session with a different one logs a warning and renders styled
-    /// imagery chosen for this density.
+    /// Device scale factor, fixed for the lifetime of the map, that selects sprites, glyphs, and
+    /// raster tiles. Render targets carry their own scale factor for geometry, so attaching or
+    /// resizing a session with a different one logs a warning and renders imagery chosen for this
+    /// density.
     /// </summary>
     public double? ScaleFactor { get; set; }
 
@@ -34,10 +34,8 @@ public sealed record MapOptions
 
     /// <summary>
     /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR encodings, fixed for
-    /// the lifetime of the map. Enable this on maps that read vector sources created with
-    /// <see cref="Style.VectorTileEncoding.Mlt"/> from a tile set that uses FastPFOR. A map created
-    /// with this <c>false</c> decodes every other MLT encoding and logs a tile parse warning for
-    /// the FastPFOR ones.
+    /// the lifetime of the map. A map created with this <c>false</c> decodes every other MLT
+    /// encoding and logs a tile parse warning for the FastPFOR ones.
     /// </summary>
     public bool? FastPforEnabled { get; set; }
 

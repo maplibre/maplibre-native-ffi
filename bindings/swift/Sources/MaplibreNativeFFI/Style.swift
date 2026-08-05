@@ -111,12 +111,7 @@ public struct StyleTileSourceOptions: Equatable, Sendable {
   }
 }
 
-/// Options for GeoJSON sources.
-///
-/// MapLibre Native fixes these options when the source is created, so
-/// ``MapHandle/setGeoJSONSourceURL(sourceId:url:)`` and
-/// ``MapHandle/setGeoJSONSourceData(sourceId:data:)`` keep the options the
-/// source was added with.
+/// Options for GeoJSON sources. They are fixed when the source is created.
 public struct StyleGeoJSONSourceOptions: Equatable, Sendable {
   public var minZoom: Double?
   public var maxZoom: Double?
@@ -131,10 +126,9 @@ public struct StyleGeoJSONSourceOptions: Equatable, Sendable {
   public var clusterMinPoints: UInt32?
   public var lineMetrics: Bool?
   public var cluster: Bool?
-  /// Applies data updates synchronously, so data set through
-  /// ``MapHandle/setGeoJSONSourceData(sourceId:data:)`` reaches the next
-  /// rendered frame instead of being tiled on a worker and shown in a later
-  /// one.
+  /// Applies data set through
+  /// ``MapHandle/setGeoJSONSourceData(sourceId:data:)`` synchronously, so it
+  /// reaches the next rendered frame.
   public var synchronousUpdate: Bool?
 
   public init(
@@ -185,9 +179,8 @@ public struct StyleGeoJSONSourceOptions: Equatable, Sendable {
 
 /// Whether a style layer draws.
 ///
-/// This is an open domain: MapLibre Native may report a value with no named
-/// case
-/// here, so it keeps the raw value instead of collapsing it.
+/// This is an open domain. The raw value preserves values that this binding
+/// does not know yet.
 public struct StyleLayerVisibility: Equatable, Sendable, Hashable {
   public static let visible =
     StyleLayerVisibility(rawValue: MLN_STYLE_LAYER_VISIBILITY_VISIBLE.rawValue)
@@ -252,9 +245,8 @@ public struct ImageContent: Equatable, Sendable {
 
 /// How a stretchable image fits text along one axis.
 ///
-/// This is an open domain: MapLibre Native may report a value with no named
-/// case
-/// here, so it keeps the raw value instead of collapsing it.
+/// This is an open domain. The raw value preserves values that this binding
+/// does not know yet.
 public struct StyleImageTextFit: Equatable, Sendable, Hashable {
   public static let stretchOrShrink = StyleImageTextFit(
     rawValue: MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK.rawValue
@@ -353,11 +345,8 @@ public struct StyleImage: Equatable, Sendable {
   public let pixels: [UInt8]
 }
 
-/// The style's global transition options.
-///
-/// These control how the style animates paint property changes and whether
-/// symbol placement changes cross-fade. They are distinct from camera animation
-/// options and from the per-property transitions a style declares.
+/// The style's global transition options for paint property changes and symbol
+/// placement cross-fades.
 public struct StyleTransitionOptions: Equatable, Sendable {
   /// Transition duration in milliseconds. `nil` falls back to the duration the
   /// style declares for each transitioning property.
@@ -366,13 +355,8 @@ public struct StyleTransitionOptions: Equatable, Sendable {
   /// declares for each transitioning property.
   public var delayMilliseconds: Double?
   /// Whether symbol placement changes cross-fade. `nil` leaves the cross-fade
-  /// on, which is MapLibre Native's own default.
-  ///
-  /// Clearing it makes symbol placement changes apply to the next rendered
-  /// frame. Hosts that move symbol-backed features at pointer frequency clear
-  /// it for the duration of the interaction so the rendered symbol keeps up.
-  /// Reading the options always reports it, because MapLibre Native always
-  /// holds a value for it.
+  /// on. Clearing it makes symbol placement changes apply to the next rendered
+  /// frame. Reading the options always reports a value.
   public var enablePlacementTransitions: Bool?
 
   public init(
@@ -591,12 +575,8 @@ public extension MapHandle {
     try mapNativeFailure { try NativeStyle.sourceIds(requireLiveHandle()) }
   }
 
-  /// Adds a GeoJSON source that loads data from a URL.
-  ///
-  /// `options` is fixed when the source is created;
-  /// ``setGeoJSONSourceURL(sourceId:url:)`` and
-  /// ``setGeoJSONSourceData(sourceId:data:)`` keep the options the source was
-  /// added with.
+  /// Adds a GeoJSON source that loads data from a URL. `options` is fixed when
+  /// the source is created.
   func addGeoJSONSourceURL(
     sourceId: String,
     url: String,
@@ -615,12 +595,8 @@ public extension MapHandle {
     }
   }
 
-  /// Adds a GeoJSON source with inline data.
-  ///
-  /// `options` is fixed when the source is created;
-  /// ``setGeoJSONSourceURL(sourceId:url:)`` and
-  /// ``setGeoJSONSourceData(sourceId:data:)`` keep the options the source was
-  /// added with.
+  /// Adds a GeoJSON source with inline data. `options` is fixed when the source
+  /// is created.
   func addGeoJSONSourceData(
     sourceId: String,
     data: GeoJSON,
@@ -1240,12 +1216,9 @@ public extension MapHandle {
     }
   }
 
-  /// Sets the style's global transition options.
-  ///
-  /// Absent duration and delay clear the style-wide override, so this call
-  /// replaces the whole transition configuration rather than merging into it.
-  /// Loading a style replaces these options with the ones that style declares,
-  /// so apply an override after the style loads.
+  /// Replaces the style's global transition options; absent fields clear the
+  /// style-wide override rather than merging. Loading a style replaces these
+  /// options, so apply an override after the style loads.
   func setStyleTransitionOptions(_ options: StyleTransitionOptions) throws {
     try mapNativeFailure {
       try NativeStyle.setTransitionOptions(

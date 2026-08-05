@@ -125,14 +125,9 @@ const VulkanTextureCompositor = struct {
         self.context.waitIdle();
     }
 
-    /// Notes a resized window without touching the swapchain.
-    ///
-    /// The swapchain the window displays stays live until the present that
-    /// replaces its content: destroying it here would blank the window for as
-    /// long as the map takes to render at the new extent, because the
-    /// compositor only presents when a map frame is ready. Presenting through
-    /// the stale swapchain scales the old content in the meantime, which is
-    /// what a resized native surface shows too.
+    /// Notes a resized window without touching the swapchain. The compositor
+    /// only presents when a map frame is ready, so destroying the swapchain
+    /// here would blank the window until the map renders at the new extent.
     fn resize(self: *VulkanTextureCompositor, viewport: types.Viewport) void {
         self.current_viewport = viewport;
         self.swapchain_stale = true;
@@ -140,11 +135,9 @@ const VulkanTextureCompositor = struct {
 
     fn recreateSwapchain(self: *VulkanTextureCompositor) !void {
         self.context.waitIdle();
-        // The replacement is created before the retired swapchain is
-        // destroyed and names it as oldSwapchain, so the presentation engine
-        // hands the surface over directly. Destroying it first leaves a gap
-        // that MoltenVK fills with presents that succeed but reach no
-        // drawable the window still shows.
+        // Create the replacement naming the retired swapchain as oldSwapchain
+        // before destroying it: on MoltenVK, destroying first leaves presents
+        // that succeed but reach no drawable the window shows.
         var previous = self.swapchain;
         const previous_format = previous.format;
         const replacement = Swapchain.init(
@@ -153,10 +146,8 @@ const VulkanTextureCompositor = struct {
             self.current_viewport,
             previous.handle,
         ) catch |err| {
-            // The failed replacement cleaned up after itself. Destroying the
-            // retired swapchain empties the struct it was copied from, and
-            // storing that back keeps teardown from destroying its handles a
-            // second time.
+            // Storing the emptied struct back keeps teardown from destroying
+            // the retired swapchain's handles a second time.
             previous.deinit(self.context.device);
             self.swapchain = previous;
             return err;
@@ -190,18 +181,14 @@ const VulkanTextureCompositor = struct {
     fn presentImageView(self: *VulkanTextureCompositor, image_view: c.VkImageView) !bool {
         try self.waitForFrame();
 
-        // The frame about to present is the first content the resized
-        // swapchain could show, so this is the moment the stale one is
-        // replaced.
         if (self.swapchain_stale) {
             try self.recreateSwapchain();
             self.swapchain_stale = false;
         }
 
-        // After the fence wait, so no in-flight commands read the descriptor
-        // set, and after the replacement, whose format change rebuilds the
-        // pipeline around an unwritten descriptor set that this check then
-        // populates.
+        // Must follow the fence wait, so no in-flight command reads the
+        // descriptor set, and the swapchain replacement, which can rebuild the
+        // pipeline.
         if (image_view != self.pipeline.descriptor_image_view) {
             self.pipeline.updateDescriptor(self.context.device, image_view);
         }
@@ -220,8 +207,7 @@ const VulkanTextureCompositor = struct {
             return false;
         }
         if (acquire == c.VK_SUBOPTIMAL_KHR) {
-            // Still presentable, but the surface has moved on; replace the
-            // swapchain before the next frame.
+            // Still presentable, but the surface has moved on.
             self.swapchain_stale = true;
         }
         try util.expectVkOrSuboptimal(acquire);
@@ -247,9 +233,8 @@ const VulkanTextureCompositor = struct {
         };
         const present = c.vkQueuePresentKHR(self.context.queue, &present_info);
         if (present == c.VK_ERROR_OUT_OF_DATE_KHR) {
-            // Nothing reached the screen. The sampling pass was submitted, so
-            // wait it out before the caller releases its frame, and report no
-            // present so the render request is set again.
+            // Nothing reached the screen, but the sampling pass was submitted;
+            // wait it out before the caller releases its frame.
             self.swapchain_stale = true;
             self.waitForFrame() catch {};
             return false;
@@ -284,8 +269,8 @@ const VulkanOwnedTextureBackend = struct {
         return self;
     }
 
-    /// Attaches the render session on this thread, which is the render loop
-    /// thread that owns the graphics resources above and will own the session.
+    /// Attaches the render session on this thread, which becomes its owner
+    /// thread for the session's whole life.
     fn attach(self: *VulkanOwnedTextureBackend, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
         self.session = try self.attachRenderTarget(map, viewport);
     }
@@ -464,8 +449,8 @@ const VulkanBorrowedTextureBackend = struct {
         return self;
     }
 
-    /// Attaches the render session on this thread, which is the render loop
-    /// thread that owns the graphics resources above and will own the session.
+    /// Attaches the render session on this thread, which becomes its owner
+    /// thread for the session's whole life.
     fn attach(self: *VulkanBorrowedTextureBackend, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
         self.session = try self.attachRenderTarget(map, viewport);
     }
@@ -477,12 +462,8 @@ const VulkanBorrowedTextureBackend = struct {
         self.compositor.deinit();
     }
 
-    /// Follows a resized window.
-    ///
-    /// This example sizes the borrowed image, not the session, so following a
-    /// resize means allocating one at the new size and handing it to the live
-    /// session. The session stays live, which is what keeps the map from going
-    /// cold on every resize.
+    /// Follows a resized window: allocates an image at the new size and hands
+    /// it to the live session, which stays attached.
     fn resize(self: *VulkanBorrowedTextureBackend, viewport: types.Viewport) !void {
         const session = try self.session.textureHandle();
         self.compositor.waitIdle();
@@ -501,16 +482,13 @@ const VulkanBorrowedTextureBackend = struct {
             .initial_layout = c.VK_IMAGE_LAYOUT_UNDEFINED,
             .final_layout = c.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         }) catch |err| {
-            // A native error may mean the session took the replacement
-            // before failing, and nothing here can tell that apart from a
-            // rejection that came first, so detach before either target is
-            // released; errdefer releases the replacement next.
+            // The session may have taken the replacement before failing, so
+            // detach before either image is released.
             session.detach() catch {};
             diagnostics.logError("Vulkan borrowed texture set target failed", err, null);
             return types.AppError.TextureResizeFailed;
         };
-        // Only once the session has taken the replacement, so a rejected one
-        // leaves this target on the image it already had.
+        // Released only once the session has taken the replacement.
         self.borrowed_image.deinit(self.compositor.context.device);
         self.borrowed_image = replacement;
     }
@@ -569,8 +547,8 @@ const VulkanSurfaceBackend = struct {
         return self;
     }
 
-    /// Attaches the render session on this thread, which is the render loop
-    /// thread that owns the graphics resources above and will own the session.
+    /// Attaches the render session on this thread, which becomes its owner
+    /// thread for the session's whole life.
     fn attach(self: *VulkanSurfaceBackend, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
         self.session = try self.attachRenderTarget(map, viewport);
     }

@@ -1,13 +1,8 @@
 """Aggregate the monorepo's project tools for the devcontainer image.
 
-The devcontainer image bakes one environment for every language ecosystem, so
-its config has to name every tool that any project declares. mise has no config
-include, so that list is generated from the project configs rather than kept in
-step with them by hand.
-
-`mise install --monorepo` reaches the same set in a working copy, but is no
-replacement here: `mise oci build` packages the config it runs on plus that
-config's parents, with no `[monorepo].config_roots` equivalent.
+mise has no config include, so the devcontainer's tool list is generated from
+the project configs. `mise install --monorepo` is not a substitute: `mise oci
+build` packages only the config it runs on and that config's parents.
 """
 
 from __future__ import annotations

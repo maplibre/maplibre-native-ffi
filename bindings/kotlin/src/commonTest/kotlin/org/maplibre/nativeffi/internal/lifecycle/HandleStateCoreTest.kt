@@ -133,7 +133,6 @@ class HandleStateCoreTest {
       bothLive.diagnostic,
     )
 
-    // Releasing one retention early is the path a detached render session takes.
     session.close()
 
     val projectionLive = assertFailsWith<InvalidStateException> { state.closeOnce(destroy) }
@@ -177,7 +176,7 @@ class HandleStateCoreTest {
     val state = HandleStateCore("TestHandle", 0x1234)
     var refusal: Throwable? = null
 
-    // Runs while closeOnce holds the releasing state, which is the window a use on another thread
+    // Runs while closeOnce holds the releasing state, the window a use on another thread
     // would land in.
     state.closeOnce(
       destroy = {

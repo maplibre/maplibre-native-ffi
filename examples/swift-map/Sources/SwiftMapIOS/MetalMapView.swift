@@ -4,17 +4,10 @@ import os
 import QuartzCore
 import UIKit
 
-/// The display-paced render loop.
-///
-/// This view runs on the main thread, which is the render loop thread: it owns
-/// the view and its layer, gesture decoding, the Metal objects, and the render
-/// session for the session's whole lifetime. The runtime and the map live on
-/// the runtime loop thread this view starts, and ``Channels`` is the only state
-/// that crosses between the two.
-///
-/// Gesture handlers never touch the map. They decode touches into camera
-/// commands, because a read-modify-write camera change has to run whole on the
-/// map's own thread.
+/// The display-paced render loop. This view runs on the main thread and owns
+/// the layer, gesture decoding, the Metal objects, and the render session. The
+/// runtime and the map live on the runtime loop thread it starts, reached
+/// through ``Channels``.
 @MainActor
 final class MetalMapView: UIView {
   static let willTerminateMapViews = Notification
@@ -34,10 +27,8 @@ final class MetalMapView: UIView {
   private var appForeground = true
   private var isShutDown = false
 
-  /// The recognizers with a gesture still open.
-  ///
-  /// Pinch, rotation, and shove recognize simultaneously, so the map hears one
-  /// gesture spanning all of them rather than a mark per recognizer.
+  /// The recognizers with a gesture still open. Pinch, rotation, and shove
+  /// recognize simultaneously and report to the map as one gesture.
   private var openGestures = Set<ObjectIdentifier>()
 
   override class var layerClass: AnyClass {
@@ -103,8 +94,8 @@ final class MetalMapView: UIView {
     teardown()
   }
 
-  /// Closes the session before the runtime loop closes the map, because native
-  /// refuses to destroy a map that still has a session attached.
+  /// Closes the session before the runtime loop closes the map; a map with an
+  /// attached session cannot be destroyed.
   private func teardown() {
     guard !isShutDown else { return }
     isShutDown = true
@@ -127,8 +118,7 @@ final class MetalMapView: UIView {
     if let failureMessage = channels.failureMessage {
       log.error("\(failureMessage, privacy: .public)")
       // The runtime loop waits for the session to close before destroying the
-      // map, so stopping the display link alone would leave it waiting out its
-      // deadline and then failing that destroy.
+      // map, so tear down rather than only stopping the display link.
       stopHostLoop()
       teardown()
       return
@@ -140,9 +130,7 @@ final class MetalMapView: UIView {
     else { return }
 
     do {
-      // Consume the request before rendering, so one the runtime loop publishes
-      // during the render call is not discarded, and set it again when nothing
-      // was rendered.
+      // Consume first, so a request published during the render survives.
       if channels.consumeRenderRequest() {
         let rendered = try renderTarget.renderUpdate()
         if !rendered {
@@ -152,18 +140,15 @@ final class MetalMapView: UIView {
       try renderTarget.finishFrame()
     } catch {
       showError(error)
-      // Stopping the display link leaves the session attached, and the runtime
-      // loop would then hold a map it can never destroy. Run the same teardown
-      // the normal path does.
+      // Stopping the display link alone leaves the session attached, and the
+      // runtime loop would hold a map it can never destroy.
       stopHostLoop()
       teardown()
     }
   }
 
-  /// Attaches the render session on this thread.
-  ///
-  /// Attach records the calling thread as the session's owner, so it happens
-  /// here, where the layer lives and where every later session call runs.
+  /// Attaches the render session on this thread. Attach records the calling
+  /// thread as the session's owner, and every later session call runs here.
   private func attachIfNeeded() {
     guard renderTarget == nil,
           let graphics,
@@ -188,9 +173,8 @@ final class MetalMapView: UIView {
       channels.setRenderRequest()
     } catch {
       showError(error)
-      // The runtime loop is already running and waits for the session to close
-      // before destroying the map, so stopping the display link alone would
-      // leave it pumping a map it can never tear down.
+      // The runtime loop waits for the session to close before destroying the
+      // map, so tear down rather than only stopping the display link.
       stopHostLoop()
       teardown()
     }
@@ -219,10 +203,6 @@ final class MetalMapView: UIView {
 
   /// Starts the runtime loop once a non-empty viewport is known, because the
   /// map takes its initial extent from it.
-  ///
-  /// The runtime loop needs a native thread whose identity is stable for its
-  /// whole life, so it is a `Thread` rather than a `DispatchQueue`, an `actor`,
-  /// or a `Task`.
   private func startRuntimeLoopIfNeeded(viewport: Viewport) {
     guard runtimeLoop == nil else { return }
     let loop = RuntimeLoopThread(channels: channels, viewport: viewport)
@@ -338,8 +318,7 @@ final class MetalMapView: UIView {
     }
   }
 
-  /// The deltas that follow belong to one live gesture, so the map hears about
-  /// the gesture rather than a stream of unrelated camera commands.
+  /// Opens the gesture bracket for the first recognizer to begin.
   private func beginGesture(
     _ recognizer: UIGestureRecognizer,
     _ commands: Channels
@@ -350,8 +329,8 @@ final class MetalMapView: UIView {
     openGestures.insert(ObjectIdentifier(recognizer))
   }
 
-  /// Every terminal recognizer state runs through here, including a cancelled
-  /// gesture, so each mark is paired with a clear.
+  /// Closes the bracket once the last recognizer ends or is cancelled, so each
+  /// open is paired with a close.
   private func endGesture(
     _ recognizer: UIGestureRecognizer,
     _ commands: Channels

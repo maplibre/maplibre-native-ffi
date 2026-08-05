@@ -85,32 +85,13 @@ public struct AnimationOptions: Equatable, Sendable {
   public var velocity: Double?
   public var minimumZoom: Double?
   public var easing: UnitBezier?
-  /// Caller-chosen identity for the transition these options start.
+  /// Caller-chosen identity for the transition these options start. When
+  /// present, the transition emits one `.mapCameraTransitionFinished` runtime
+  /// event carrying this value; when absent, it emits none.
   ///
-  /// When it is present, the transition emits one
-  /// `.mapCameraTransitionFinished` runtime event carrying this value in its
-  /// `CameraTransitionFinishedEvent` payload. MapLibre Native passes the value
-  /// through without interpreting it, so callers pick their own scheme, such
-  /// as a monotonically increasing counter.
-  ///
-  /// Each transition emits that event exactly once, whichever way it ends:
-  /// running to completion, being superseded by a later camera command, being
-  /// cancelled by `cancelTransitions()`, or completing instantly as a
-  /// zero-duration jump. A command this API rejects, such as one carrying a
-  /// non-finite enabled camera field, starts no transition and emits no such
-  /// event. MapLibre Native reports the moment a
-  /// transition releases the camera and leaves the outcome unreported, so the
-  /// event establishes transition identity rather than a completion reason. A
-  /// host that tells completion from cancellation compares the resulting
-  /// camera against the requested one, or tracks which transition ID is
-  /// current.
-  ///
-  /// The event is queued on the runtime that owns the map and is drained by
-  /// `RuntimeHandle.pollEvent()`. For a transition that runs to completion, it
-  /// is queued immediately before that transition's `.mapCameraDidChange`
-  /// event.
-  ///
-  /// Leaving it absent emits no such event.
+  /// The event fires exactly once however the transition ends, including when a
+  /// later camera command supersedes it, and reports no outcome. A rejected
+  /// command starts no transition and emits no event.
   public var transitionId: UInt64?
 
   public init(

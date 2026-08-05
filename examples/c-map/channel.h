@@ -1,10 +1,5 @@
-// The entire cross-thread surface between the render loop, which owns the
-// window and the render session, and the runtime loop, which owns the runtime
-// and the map.
-//
-// Three channels, matching the map example specification: a camera-command
-// queue going one way, a render request coming back, and a map channel that
-// publishes the map once so the render loop can attach its own session.
+// The cross-thread surface between the render loop, which owns the window and
+// the render session, and the runtime loop, which owns the runtime and the map.
 
 #ifndef C_MAP_CHANNEL_H
 #define C_MAP_CHANNEL_H
@@ -31,11 +26,8 @@ typedef enum camera_command_kind : uint8_t {
 } camera_command_kind;
 
 /// A camera change decoded on the render loop and applied on the map's owner
-/// thread.
-///
-/// Commands carry deltas rather than absolute targets wherever the map's
-/// current camera is an input, because reading the camera and writing the new
-/// one has to happen together on the thread that owns the map.
+/// thread. Commands carry deltas rather than absolute targets, because reading
+/// the camera and writing the new one has to happen together on that thread.
 typedef struct camera_command {
   camera_command_kind kind;
   union {
@@ -84,11 +76,9 @@ void command_list_deinit(command_list* list);
 /// Pending camera commands, filled by the render loop and drained by the
 /// runtime loop.
 ///
-/// The queue grows rather than dropping. Its commands are deltas and a gesture
-/// bracket, and neither survives being discarded: a dropped delta is motion the
-/// drag never gets back, and a dropped bracket leaves every delta after it
-/// attributed to no gesture. Growing does not block the render loop either,
-/// and only a stalled runtime loop grows it at all.
+/// The queue grows rather than dropping: a dropped delta is motion the drag
+/// never gets back, and a dropped gesture bracket leaves every delta after it
+/// attributed to no gesture.
 typedef struct command_queue {
   SDL_Mutex* lock;
   command_list pending;
@@ -97,23 +87,15 @@ typedef struct command_queue {
 void command_queue_init(command_queue* queue);
 void command_queue_deinit(command_queue* queue);
 
-/// Render loop: queues one decoded camera change.
-///
-/// A queue that cannot grow is a dead demo either way, so this reports an
-/// allocation failure as an abort rather than threading an error through
-/// every input handler.
+/// Render loop: queues one decoded camera change. Aborts on allocation
+/// failure.
 void command_queue_push(command_queue* queue, camera_command command);
 
 /// Runtime loop: hands over everything queued so far and takes `out` in
-/// exchange, so the two ping-pong, a drain allocates nothing, and the locked
-/// section is the swap alone.
+/// exchange.
 void command_queue_drain_into(command_queue* queue, command_list* out);
 
 /// One-bit signal that a frame is worth drawing.
-///
-/// The render loop consumes before it renders and sets again when nothing was
-/// rendered, so a request the runtime loop publishes during a render is not
-/// lost.
 typedef struct render_request {
   atomic_bool value;
 } render_request;
@@ -125,11 +107,9 @@ bool render_request_consume(render_request* request);
 /// Publishes the map and the runtime's wake source from the runtime loop to
 /// the render loop, and carries shutdown and failure the other way.
 ///
-/// The map handle is a plain value over a lock-guarded registry, so the render
-/// loop may hold a copy. It uses that copy only to attach, which native serves
-/// from any thread; every other map call stays on the runtime loop. The wake
-/// source is signalled from this side to release the runtime loop's parked
-/// pump.
+/// The render loop uses its copy of the map handle only to attach a session,
+/// which native serves from any thread; every other map call stays on the
+/// runtime loop.
 typedef struct map_channel {
   SDL_Mutex* lock;
   mln_map map;

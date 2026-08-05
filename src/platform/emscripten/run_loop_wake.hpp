@@ -30,12 +30,9 @@ struct RunLoopWake {
   std::list<std::shared_ptr<Runnable>> runnables;
 
   // Reports readiness to whatever hosts this loop, beyond the condition
-  // variable run() parks on. A host that drives runOnce() from
-  // mln_runtime_pump() instead parks on the runtime's wake state, and only
-  // RunLoop::push() reports queued work there -- timers and async tasks, which
-  // is how a fetch response comes back, arrive as runnables and would otherwise
-  // leave such a host asleep until its timeout, or forever if it passed a
-  // negative one. RunLoop sets this; see its constructor.
+  // variable run() parks on. A host driving runOnce() parks on the runtime's
+  // wake state, where only RunLoop::push() reports queued work; timers and
+  // async tasks arrive as runnables and would otherwise leave it asleep.
   std::function<void()> platform_wake;
 
   void notify() {
@@ -113,9 +110,8 @@ struct RunLoopWake {
       return mbgl::Milliseconds(-1);
     }
 
-    // Rounding up keeps a remainder under a millisecond a positive delay, so
-    // zero means due, not nearly due. A caller that only waits for what it gets
-    // back here -- see RunLoop::runOnce() -- would otherwise wait for nothing.
+    // Rounding up keeps a sub-millisecond remainder a positive delay, so zero
+    // means due rather than nearly due.
     auto const delay =
       std::chrono::ceil<mbgl::Milliseconds>(next_due - mbgl::Clock::now());
     return delay < mbgl::Milliseconds::zero() ? mbgl::Milliseconds::zero()

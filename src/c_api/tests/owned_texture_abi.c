@@ -5,8 +5,6 @@
 #include "test_support.h"
 #include "unity.h"
 
-// This verifies null render-session handles across backend-neutral maintenance
-// entry points.
 static void render_session_maintenance_rejects_null_raw_handles(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
@@ -21,8 +19,6 @@ static void render_session_maintenance_rejects_null_raw_handles(void) {
   );
 }
 
-// This verifies the raw registry rejects destroyed render-session handles after
-// binding handle state would intervene.
 static void render_session_rejects_stale_raw_handles(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

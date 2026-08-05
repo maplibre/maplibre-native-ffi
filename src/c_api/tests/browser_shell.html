@@ -1,14 +1,9 @@
 <!DOCTYPE html>
 <!--
-  Page shell for the C API suite. Replaces Emscripten's default shell so the run
-  reports a result the runner can act on rather than text in a textarea:
-
-    * A canvas, which the OpenGL fixture creates its WebGL2 context on.
-    * print/printErr collected verbatim, so a failure reads the same as a native
-      ctest run.
-    * onExit posts Unity's exit status back to the runner, which is serving this
-      page. An uncaught error or an abort posts too, so a crash fails the run
-      instead of hanging it until the timeout.
+  Page shell for the C API suite, replacing Emscripten's default shell. It posts
+  Unity's exit status and collected output back to the runner serving this page.
+  An uncaught error or an abort posts too, so a crash fails the run instead of
+  hanging it until the timeout.
 -->
 <html lang="en">
   <head>
@@ -47,8 +42,8 @@ window.addEventListener("unhandledrejection", (event) => {
 
 var Module = {
   canvas: document.getElementById("canvas"),
-  // The origin the runner serves this page from, which is also where it serves
-  // the style the HTTP test loads. The suite reads it with getenv().
+  // The origin the runner serves this page and the HTTP test's style from. The
+  // suite reads it with getenv().
   preRun: [
     () => {
       ENV.MLN_FFI_TEST_FIXTURE_ORIGIN = location.origin;

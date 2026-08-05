@@ -51,8 +51,7 @@ void command_queue_drain_into(command_queue* queue, command_list* out) {
 }
 
 void render_request_init(render_request* request) {
-  // Starts set, so the render loop draws a first frame without waiting for
-  // the runtime loop to request one.
+  // Starts set, so the render loop draws a first frame unprompted.
   render_request_set(request);
 }
 
@@ -112,8 +111,7 @@ bool map_channel_try_map(map_channel* channel, mln_map* out_map) {
 
 void map_channel_request_shutdown(map_channel* channel) {
   atomic_store_explicit(&channel->shutdown, true, memory_order_release);
-  // Release the pump so shutdown is observed now rather than after the
-  // parking bound expires.
+  // Release the pump so shutdown is observed now.
   map_channel_wake_runtime_loop(channel);
 }
 

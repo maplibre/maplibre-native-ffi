@@ -183,12 +183,10 @@ fn pumpTransitionFrame(
     session: *maplibre.RenderSessionHandle,
 ) !TransitionFramePump {
     // Metal hosts drain autoreleased backend objects once per frame-loop
-    // iteration. The other backends need no platform scope here.
+    // iteration.
     const pool = if (build_options.supports_metal) try metal_support.AutoreleasePool.init() else {};
     defer if (build_options.supports_metal) pool.deinit();
 
-    // Match the public host loop: camera invalidation, one native pump, event
-    // coalescing, and at most one render of the latest update.
     try map.requestRepaint();
     try runtime.pump(0);
 
@@ -475,9 +473,8 @@ const WglBorrowedTexture = if (supports_wgl) struct {
         self.context.deinit();
     }
 
-    /// Allocates a replacement in this helper's own context, the way a host
-    /// that reallocates on resize does. The outgoing texture stays live so the
-    /// caller can hand the replacement over before releasing it.
+    /// Allocates a replacement in this helper's own context. The outgoing
+    /// texture stays live until `adopt`.
     pub fn allocateReplacement(self: *const WglBorrowedTexture, width: u32, height: u32) !gl.uint {
         return self.context.context.createRgbaTexture(width, height);
     }
@@ -642,9 +639,9 @@ const EglAttachContext = if (supports_egl) struct {
             return initializeDisplay(egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY));
         }
         // These fixtures render into pbuffers and never present, so they name
-        // the surfaceless platform. EGL_DEFAULT_DISPLAY resolves to whichever
+        // the surfaceless platform: EGL_DEFAULT_DISPLAY resolves to whatever
         // platform libEGL was built for, commonly x11, which fails to
-        // initialize on a host with no display server.
+        // initialize with no display server.
         return initializeDisplay(egl.eglGetPlatformDisplay(EGL_PLATFORM_SURFACELESS_MESA, null, null));
     }
 
@@ -685,8 +682,7 @@ const EglAttachContext = if (supports_egl) struct {
         self.procs.BindTexture(gl.TEXTURE_2D, texture);
         self.procs.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
         self.procs.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        // Zeroed rather than left undefined: a test that reads this back to
-        // prove a session rendered into it needs a known starting value.
+        // Zeroed so a readback test starts from a known value.
         const blank = testing.allocator.alloc(u8, width * height * 4) catch @panic("oom");
         defer testing.allocator.free(blank);
         @memset(blank, 0);
@@ -752,9 +748,8 @@ const OpenGLBorrowedTexture = if (supports_wgl) WglBorrowedTexture else if (supp
         self.context.deinit();
     }
 
-    /// Allocates a replacement in this helper's own context, the way a host
-    /// that reallocates on resize does. The outgoing texture stays live so the
-    /// caller can hand the replacement over before releasing it.
+    /// Allocates a replacement in this helper's own context. The outgoing
+    /// texture stays live until `adopt`.
     pub fn allocateReplacement(self: *const @This(), width: u32, height: u32) !gl.uint {
         return self.context.createRgbaTexture(width, height);
     }
@@ -851,9 +846,9 @@ fn expectInvalidOwnedTextureExtent(map: *maplibre.MapHandle, extent: maplibre.Re
     }
 }
 
-/// Hands a session a caller-owned texture target for the configured backend,
-/// carrying placeholder backend handles. Call sites expect a rejection that
-/// lands before the C API reads the descriptor.
+/// Hands a session a caller-owned texture target carrying placeholder backend
+/// handles, which call sites expect to be rejected before the descriptor is
+/// read.
 fn setPlaceholderBorrowedTextureTarget(session: *maplibre.RenderSessionHandle) maplibre.Error!void {
     const extent = maplibre.RenderTargetExtent{ .width = 16, .height = 16, .scale_factor = 1.0 };
     if (build_options.supports_vulkan) {
@@ -1201,9 +1196,8 @@ const VulkanBorrowedImage = if (build_options.supports_vulkan) struct {
         self.context.deinit();
     }
 
-    /// Allocates a replacement on this helper's own device, the way a host that
-    /// reallocates on resize does. The outgoing image stays live so the caller
-    /// can hand the replacement over before releasing it.
+    /// Allocates a replacement on this helper's own device. The outgoing image
+    /// stays live until `adopt`.
     pub fn allocateReplacement(self: *const VulkanBorrowedImage, width: u32, height: u32) !Allocation {
         return allocate(&self.context, width, height);
     }
@@ -1333,12 +1327,9 @@ test "map size follows attach and resize and keeps the creation scale factor" {
     try testing.expectEqual(@as(u32, 32), created.height);
     try testing.expectEqual(@as(f64, 2.0), created.scale_factor);
 
-    // The target renders at a different scale factor, which leaves the map's
-    // own pixel ratio untouched.
-    //
     // A session enqueues the map size for the map's owner thread rather than
-    // setting it in place, because the session may be owned by another thread,
-    // so the map keeps its previous size until the runtime is pumped.
+    // setting it in place, so the map keeps its previous size until the runtime
+    // is pumped. The target's scale factor leaves the map's pixel ratio alone.
     var owned = try attachTestOwnedTexture(&map, .{
         .extent = .{ .width = 32, .height = 16, .scale_factor = 1.0 },
     });
@@ -1374,9 +1365,8 @@ test "set target reports unsupported for a session-owned texture" {
     });
     defer owned.close() catch {};
 
-    // A session-owned texture is sized and replaced by its own session, which
-    // resize covers. The session is checked before the descriptor, so the
-    // placeholder handles below are never read.
+    // A session-owned texture is sized by its own session, so the session is
+    // rejected before the placeholder handles are read.
     try testing.expectError(error.Unsupported, setPlaceholderBorrowedTextureTarget(&owned.session));
 
     // The rejection left the session usable.
@@ -1400,8 +1390,8 @@ test "an ease pumped through rendered frames reports its transition finish once"
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
-    // Consume the style frame before starting the transition. Leaving it
-    // pending suppresses the next update event that drives the eased frame.
+    // A pending style frame suppresses the update event that drives the eased
+    // frame, so consume it before starting the transition.
     {
         const pool = if (build_options.supports_metal) try metal_support.AutoreleasePool.init() else {};
         defer if (build_options.supports_metal) pool.deinit();
@@ -1694,8 +1684,7 @@ test "render session clips rendered box queries to the viewport" {
 
     const options = maplibre.RenderedFeatureQueryOptions{ .layer_ids = &.{"point-circle"} };
 
-    // Over-covering the viewport is the obvious way to ask for everything on
-    // screen, and must answer like the viewport itself.
+    // A box that over-covers the viewport must answer like the viewport.
     var oversized = try waitForRenderedFeatureQuery(&runtime, session, .{ .box = .{
         .min = .{ .x = -8192, .y = -8192 },
         .max = .{ .x = 8192, .y = 8192 },
@@ -1711,8 +1700,8 @@ test "render session clips rendered box queries to the viewport" {
     defer inverted.deinit();
     try testing.expectEqual(@as(usize, 1), inverted.features.len);
 
-    // Clipping keeps a fully off-screen box empty instead of collapsing it onto
-    // a viewport edge.
+    // Clipping keeps a fully off-screen box empty rather than collapsing it
+    // onto a viewport edge.
     var offscreen = try session.queryRenderedFeatures(testing.allocator, .{ .box = .{
         .min = .{ .x = 2048, .y = 2048 },
         .max = .{ .x = 4096, .y = 4096 },
@@ -1766,9 +1755,8 @@ test "render session queries cluster feature extensions" {
     };
     try testing.expect(zoom_value == .uint);
 
-    // An unsigned limit bounds the collection, and an unsigned offset selects a
-    // later leaf. Native ignores arguments of another type and falls back to ten
-    // leaves at offset zero, so both bounds must move the observed result.
+    // Native reads `limit` and `offset` only as unsigned values, falling back
+    // to ten leaves at offset zero, so both must move the observed result.
     const first_args = [_]maplibre.JsonMember{
         .{ .key = "limit", .value = .{ .uint = 1 } },
         .{ .key = "offset", .value = .{ .uint = 0 } },
@@ -1864,8 +1852,8 @@ test "GeoJSON source options cluster nearby points and aggregate cluster propert
         _ = try session.renderUpdate();
     }
 
-    // The layer only draws features carrying point_count, so a queried feature proves the source
-    // options clustered the points rather than rendering them individually.
+    // The layer only draws features carrying point_count, so a queried feature
+    // proves the source options clustered the points.
     const query_point = try map.pixelForLatLng(.{ .latitude = 0, .longitude = 0 });
     var clusters = try waitForRenderedFeatureQuery(&runtime, session, .{ .box = .{
         .min = .{ .x = query_point.x - 30, .y = query_point.y - 30 },
@@ -2013,8 +2001,8 @@ test "OpenGL owned texture frame scopes public binding access" {
     try testing.expectEqual(@as(u32, gl.UNSIGNED_BYTE), info.type);
     try testing.expect(info.texture != 0);
 
-    // The acquired texture belongs to the session context, so reading it back
-    // through the host context covers the cross-context handoff.
+    // The acquired texture belongs to the session context, so this readback
+    // covers the cross-context handoff.
     var host_pixels: [32 * 32 * 4]u8 = undefined;
     @memset(&host_pixels, 0);
     try context.readRgbaTexture(info.texture, 32, 32, &host_pixels);
@@ -2085,24 +2073,24 @@ test "OpenGL borrowed texture set target renders into a replacement texture" {
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
     try testing.expect(try session.renderUpdate());
 
-    // A caller-owned texture is sized by its owner, so a host that follows a
-    // resize allocates at the new size and hands the texture over instead.
+    // A caller-owned texture is sized by its owner, so resize is rejected and
+    // the host hands over a texture at the new size instead.
     try testing.expectError(error.Unsupported, session.resize(.{ .width = 64, .height = 96, .scale_factor = 1.0 }));
 
     const replacement = try borrowed.allocateReplacement(64, 96);
     try session.setOpenGLBorrowedTextureTarget(borrowed.descriptorFor(replacement, 64, 96));
     borrowed.adopt(replacement, 64, 96);
 
-    // A surface descriptor names a target this session does not have, and the
-    // rejection leaves it rendering into the texture it was just handed.
+    // A surface descriptor names a target this session does not have; the
+    // rejection leaves it on the texture just handed over.
     try testing.expectError(error.Unsupported, session.setOpenGLSurfaceTarget(.{
         .extent = .{ .width = 64, .height = 96 },
         .context = borrowed.context.descriptor(),
         .surface = fakeNativePointer(),
     }));
 
-    // Replacing the target hands the new size to the map's owner thread, as a
-    // resize does, so the map publishes a matching update only once pumped.
+    // Replacing the target enqueues the new size for the map's owner thread,
+    // so the map publishes a matching update only once pumped.
     try testing.expect(!try session.renderUpdate());
     try runtime.pump(0);
     const resized = try map.getSize();
@@ -2197,8 +2185,8 @@ test "Metal owned texture frame handle scopes native pointers" {
     try frame_alias.release();
     try testing.expectError(error.ClosedHandle, frame_alias.info());
 
-    // Resizing hands the new logical size to the map's owner thread, so the
-    // map publishes an update matching the new target only once pumped.
+    // Resizing enqueues the new logical size for the map's owner thread, so
+    // the map publishes a matching update only once pumped.
     try session.resize(.{ .width = 16, .height = 8, .scale_factor = 2.0 });
     try testing.expect(!try session.renderUpdate());
     try runtime.pump(0);
@@ -2300,8 +2288,7 @@ test "Metal borrowed texture set target renders into a replacement texture" {
     const pool = try metal_support.AutoreleasePool.init();
     defer pool.deinit();
 
-    // The replacement is allocated up front so the host outlives the session
-    // that borrows it, the way a host that owns both textures does.
+    // Allocated up front so the host outlives the session that borrows it.
     const borrowed = try metal_support.createTexture(device, 128, 128);
     defer metal_support.releaseObject(borrowed);
     const replacement = try metal_support.createTexture(device, 64, 96);
@@ -2326,8 +2313,8 @@ test "Metal borrowed texture set target renders into a replacement texture" {
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
     try testing.expect(try session.renderUpdate());
 
-    // A caller-owned texture is sized by its owner, so a host that follows a
-    // resize allocates at the new size and hands the texture over instead.
+    // A caller-owned texture is sized by its owner, so resize is rejected and
+    // the host hands over a texture at the new size instead.
     try testing.expectError(error.Unsupported, session.resize(.{ .width = 64, .height = 96, .scale_factor = 1.0 }));
 
     try session.setMetalBorrowedTextureTarget(.{
@@ -2337,15 +2324,15 @@ test "Metal borrowed texture set target renders into a replacement texture" {
         .texture = maplibre.NativePointer.fromPtr(replacement),
     });
 
-    // A surface descriptor names a target this session does not have, and the
-    // rejection leaves it rendering into the texture it was just handed.
+    // A surface descriptor names a target this session does not have; the
+    // rejection leaves it on the texture just handed over.
     try testing.expectError(error.Unsupported, session.setMetalSurfaceTarget(.{
         .extent = .{ .width = 64, .height = 96 },
         .layer = fakeNativePointer(),
     }));
 
-    // Replacing the target hands the new size to the map's owner thread, as a
-    // resize does, so the map publishes a matching update only once pumped.
+    // Replacing the target enqueues the new size for the map's owner thread,
+    // so the map publishes a matching update only once pumped.
     try testing.expect(!try session.renderUpdate());
     try runtime.pump(0);
     const resized = try map.getSize();
@@ -2403,8 +2390,8 @@ test "Vulkan owned texture frame handle scopes native pointers" {
     try frame_alias.release();
     try testing.expectError(error.ClosedHandle, frame_alias.info());
 
-    // Resizing hands the new logical size to the map's owner thread, so the
-    // map publishes an update matching the new target only once pumped.
+    // Resizing enqueues the new logical size for the map's owner thread, so
+    // the map publishes a matching update only once pumped.
     try session.resize(.{ .width = 16, .height = 8, .scale_factor = 2.0 });
     try testing.expect(!try session.renderUpdate());
     try runtime.pump(0);
@@ -2465,24 +2452,24 @@ test "Vulkan borrowed texture set target renders into a replacement image" {
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
     try testing.expect(try session.renderUpdate());
 
-    // A caller-owned image is sized by its owner, so a host that follows a
-    // resize allocates at the new size and hands the image over instead.
+    // A caller-owned image is sized by its owner, so resize is rejected and
+    // the host hands over an image at the new size instead.
     try testing.expectError(error.Unsupported, session.resize(.{ .width = 64, .height = 96, .scale_factor = 1.0 }));
 
     const replacement = try borrowed.allocateReplacement(64, 96);
     try session.setVulkanBorrowedTextureTarget(borrowed.descriptorFor(replacement, 64, 96));
     borrowed.adopt(replacement, 64, 96);
 
-    // A surface descriptor names a target this session does not have, and the
-    // rejection leaves it rendering into the image it was just handed.
+    // A surface descriptor names a target this session does not have; the
+    // rejection leaves it on the image just handed over.
     try testing.expectError(error.Unsupported, session.setVulkanSurfaceTarget(.{
         .extent = .{ .width = 64, .height = 96 },
         .context = borrowed.context.descriptor(),
         .surface = fakeNativePointer(),
     }));
 
-    // Replacing the target hands the new size to the map's owner thread, as a
-    // resize does, so the map publishes a matching update only once pumped.
+    // Replacing the target enqueues the new size for the map's owner thread,
+    // so the map publishes a matching update only once pumped.
     try testing.expect(!try session.renderUpdate());
     try runtime.pump(0);
     const resized = try map.getSize();

@@ -221,8 +221,8 @@ fn jumpedLongitude(map: *maplibre.MapHandle, longitude: f64) !f64 {
     return (snapshot.center orelse return error.MissingCameraCenter).longitude;
 }
 
-// The unbounded constraint is distinct from world bounds: an unbounded camera center pans across
-// the antimeridian, while world bounds clamp longitude to the -180..180 range.
+// An unbounded camera center pans across the antimeridian; world bounds clamp
+// longitude to -180..180.
 test "camera bounds separate the unbounded constraint from world bounds" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");

@@ -1,9 +1,7 @@
-// The OpenGL render target: an SDL GL context bridged to the C API through
-// EGL handles, a GL ES 3.0 fullscreen-triangle compositor, and the three
-// render-target modes behind the uniform interface in render.h.
+// The OpenGL render target: an SDL GL context bridged to the C API through EGL
+// handles, plus a GL ES 3.0 fullscreen-triangle compositor.
 //
-// This build targets EGL on Linux and macOS, where ANGLE provides the EGL
-// implementation; the WGL arm returns with Windows support.
+// Targets EGL on Linux and macOS, where ANGLE provides the EGL implementation.
 
 #include <GLES3/gl3.h>
 #include <SDL3/SDL.h>
@@ -52,8 +50,7 @@
   X(Viewport)
 
 /// The compositor's GL entry points, loaded through SDL's GL loader rather
-/// than linked, so the example needs no GLES library at link time. The
-/// prototypes in GLES3/gl3.h supply the pointer types.
+/// than linked, so the example needs no GLES library at link time.
 typedef struct gl_procs {
 #define GL_PROC_MEMBER(name) typeof(gl##name)* name;
   GL_PROC_LIST(GL_PROC_MEMBER)
@@ -301,11 +298,9 @@ static mln_opengl_context_descriptor opengl_context_descriptor(
   };
 }
 
-/// Re-reads the platform surface for this window.
-///
-/// SDL can hand back a different EGL window surface once the window has been
-/// resized, and a session still presenting through the old one draws nowhere.
-/// Reports whether the handle changed.
+/// Re-reads the platform surface for this window and reports whether the
+/// handle changed. SDL can hand back a different EGL window surface after a
+/// resize, and a session still presenting through the old one draws nowhere.
 static app_error opengl_context_refresh_platform_surface(
   opengl_context* context, bool* out_replaced
 ) {
@@ -654,12 +649,8 @@ void render_target_deinit(render_target* target) {
   free(target);
 }
 
-/// Follows a resized window in borrowed-texture mode.
-///
-/// This example sizes the borrowed texture, not the session, so following a
-/// resize means allocating one at the new size and handing it to the live
-/// session. The session stays live, which is what keeps the map from going
-/// cold on every resize.
+/// Follows a resized window in borrowed-texture mode: allocates a texture at
+/// the new size and hands it to the live session, which stays attached.
 static app_error resize_borrowed(
   render_target* target, viewport current_viewport
 ) {
@@ -678,9 +669,8 @@ static app_error resize_borrowed(
   const mln_status status =
     mln_opengl_borrowed_texture_set_target(target->session.handle, &descriptor);
   if (status != MLN_STATUS_OK) {
-    // A native error may mean the session took the replacement before
-    // failing, and nothing here can tell that apart from a rejection that
-    // came first, so detach before either target is released.
+    // The session may have taken the replacement before failing, so detach
+    // before either texture is released.
     mln_render_session_detach(target->session.handle);
     diagnostics_log_status("OpenGL borrowed texture set target failed", status);
     target->as.borrowed.texture = previous;
@@ -690,8 +680,7 @@ static app_error resize_borrowed(
     );
     return APP_ERROR_TEXTURE_RESIZE_FAILED;
   }
-  // Only once the session has taken the replacement, so a rejected one leaves
-  // this target on the texture it already had.
+  // Released only once the session has taken the replacement.
   borrowed_texture_destroy(
     &target->as.borrowed.compositor.context,
     &target->as.borrowed.compositor.procs, &previous
@@ -699,11 +688,9 @@ static app_error resize_borrowed(
   return APP_OK;
 }
 
-/// Follows a resized window in native-surface mode.
-///
-/// SDL can hand back a different EGL window surface for the resized window.
-/// The live session takes that replacement rather than being closed and
-/// attached again, so it keeps its renderer either way.
+/// Follows a resized window in native-surface mode. When SDL hands back a
+/// different EGL window surface, the live session takes the replacement rather
+/// than being closed and attached again.
 static app_error resize_surface(
   render_target* target, viewport current_viewport
 ) {
@@ -712,9 +699,8 @@ static app_error resize_surface(
     &target->as.surface.context, &replaced
   );
   if (error != APP_OK) {
-    // SDL owns the surfaces and may already have dropped the one the session
-    // presents through, so detach rather than leave it naming a surface that
-    // is gone.
+    // SDL may already have dropped the surface the session presents through,
+    // so detach rather than leave it naming a surface that is gone.
     if (target->session.kind == RENDER_SESSION_SURFACE) {
       mln_render_session_detach(target->session.handle);
     }
@@ -731,10 +717,8 @@ static app_error resize_surface(
   const mln_status status =
     mln_opengl_surface_set_target(target->session.handle, &descriptor);
   if (status != MLN_STATUS_OK) {
-    // A native error may mean the session took the replacement before
-    // failing, and nothing here can tell that apart from a rejection that
-    // came first. SDL owns both surfaces and already dropped the outgoing
-    // one, so detaching is the only way to stop the session naming either.
+    // SDL already dropped the outgoing surface and the session may have taken
+    // the replacement before failing, so detach.
     mln_render_session_detach(target->session.handle);
     diagnostics_log_status("OpenGL surface set target failed", status);
     return APP_ERROR_SURFACE_ATTACH_FAILED;

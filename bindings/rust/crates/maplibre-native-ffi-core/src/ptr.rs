@@ -37,11 +37,8 @@ impl<T> Default for OutPtr<T> {
     }
 }
 
-/// An out-parameter for a handle the C API issues.
-///
-/// The C contract requires `*out_handle` to be the null handle on entry, which
-/// this guarantees. The slot holds the handle value directly, so it takes one
-/// level of indirection where [`OutPtr`] takes two.
+/// An out-parameter for a handle the C API issues, initialized to the null
+/// handle as the C contract requires.
 #[derive(Debug)]
 pub struct OutHandle<T: crate::handle::NativeHandle> {
     value: T,
@@ -86,7 +83,6 @@ pub fn non_null_mut<T>(ptr: *mut T, name: &'static str) -> Result<NonNull<T>> {
     NonNull::new(ptr).ok_or_else(|| null_pointer_error(name))
 }
 
-/// Reports a handle that is the null handle where a live one was required.
 pub fn null_handle_error(name: &'static str) -> Error {
     Error::invalid_argument(format!("{name} must not be the null handle"))
 }

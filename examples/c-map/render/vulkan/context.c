@@ -168,9 +168,8 @@ static app_error create_device(vulkan_context* context) {
     .queueCount = 1,
     .pQueuePriorities = &priority,
   };
-  // A device that exposes the portability subset requires enabling it. The
-  // name is spelled out because its declaration lives behind the provisional
-  // vulkan_beta.h header.
+  // A device that exposes the portability subset requires enabling it. The name
+  // is spelled out because its constant lives behind vulkan_beta.h.
   bool needs_portability = false;
   MAP_TRY(has_device_extension(
     context->physical_device, "VK_KHR_portability_subset", &needs_portability

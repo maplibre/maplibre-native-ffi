@@ -34,20 +34,12 @@ struct ResourceProvider {
   void* user_data = nullptr;
 };
 
-// Holds the resource transform registration in its own reference-counted
-// object so a file-source lookup can keep the registration alive on its own.
-//
-// A lookup copies the runtime's handle to this state while it holds the
-// process-global runtime registry lock, which proves the runtime is live, and
-// takes `mutex` after releasing that lock. The copy is what keeps the state
-// readable, so the registry lock covers a non-blocking pointer copy instead of
-// a lock acquisition that a pending writer can delay.
-//
-// `callback` and `user_data` live here rather than on the runtime, so a lease
-// holder reads and invokes the registration without touching the runtime.
-// Runtime teardown clears both under the exclusive lock: a callback already
-// inside the shared lock keeps teardown waiting until it returns, and a lease
-// that takes the shared lock later observes an empty registration.
+// Holds the resource transform registration in a reference-counted object that
+// outlives the runtime. A file-source lookup copies the runtime's pointer to
+// this state under the process-global runtime registry lock and takes `mutex`
+// only after releasing that lock; taking `mutex` under the registry lock would
+// stall every unrelated runtime for the duration of an in-flight callback.
+// Runtime teardown clears the registration under the exclusive lock.
 struct ResourceTransformState {
   std::shared_mutex mutex;
   mln_resource_transform_callback callback = nullptr;
@@ -63,16 +55,8 @@ struct HttpHeaderTransformState {
 using HttpHeader = std::pair<std::string, std::string>;
 using HttpHeaders = std::vector<HttpHeader>;
 
-// Holds the resource provider registration in its own reference-counted object,
-// mirroring `ResourceTransformState`.
-//
-// A file-source lookup copies the runtime's handle to this state under the
-// process-global registry lock, which proves the runtime is live, and takes
-// `mutex` only after releasing it. Acquiring the shared lock while still
-// holding the registry lock would queue behind a pending writer and stall every
-// unrelated runtime for the duration of the in-flight callback, because
-// `validate_runtime()` and every other file-source lookup need that same
-// process-global mutex.
+// Holds the resource provider registration under the same locking rule as
+// `ResourceTransformState`.
 struct ResourceProviderState {
   std::shared_mutex mutex;
   bool registered = false;
@@ -80,11 +64,10 @@ struct ResourceProviderState {
 };
 
 // Borrows the resource provider registered on a runtime for the duration of one
-// provider callback. The lease holds a shared lock on the state's mutex, so
-// `set_resource_provider()`, `clear_resource_provider()`, and
-// `destroy_runtime()` wait for every live lease before they retire a callback
-// and its `user_data`. The lease also retains the state itself, so it stays
-// readable even after the runtime it came from is gone.
+// provider callback. `set_resource_provider()`, `clear_resource_provider()`,
+// and `destroy_runtime()` wait for every live lease before retiring a callback
+// and its `user_data`. The lease retains the state, so it stays readable after
+// the runtime is gone.
 class ResourceProviderLease {
  public:
   ResourceProviderLease(
@@ -111,12 +94,11 @@ struct OfflineRegionEventState {
 };
 
 // Holds the wake flag and the condition variable a parked owner thread blocks
-// on, in its own reference-counted object so a wake source keeps it readable
-// after the runtime is destroyed.
+// on. Reference-counted so a wake source keeps it readable after the runtime is
+// destroyed.
 //
-// `mutex` is a leaf lock. Signalling takes it while MapLibre holds the
-// `RunLoop` mutex or the runtime holds `event_mutex`, so those two order ahead
-// of it everywhere.
+// `mutex` is a leaf lock: the `RunLoop` mutex and `event_mutex` both order
+// ahead of it.
 struct WakeState {
   std::mutex mutex;
   std::condition_variable condition;
@@ -129,8 +111,8 @@ struct OfflineOperationEventState;
 struct QueuedRuntimeEvent {
   uint32_t type;
   uint32_t source_type;
-  // The mln_map for map-originated events, the mln_runtime otherwise.
-  // source_type selects the meaning.
+  // The mln_map for map-originated events, the mln_runtime otherwise, as
+  // selected by source_type.
   uint64_t source;
   int32_t code;
   uint32_t payload_type;
@@ -143,8 +125,6 @@ struct QueuedRuntimeEvent {
 };
 
 struct RuntimeObject {
-  // This runtime's own handle, so internal helpers holding the object can
-  // reach the id without a reverse lookup.
   mln_runtime self = MLN_HANDLE_NULL;
   // The token this runtime hands to mbgl as its opaque platform context.
   void* platform_context = nullptr;
@@ -174,9 +154,8 @@ struct RuntimeObject {
 template <>
 struct HandleTraits<RuntimeObject> {
   static constexpr auto kind = HandleKind::Runtime;
-  // A lease would let a foreign thread outlive destroy_runtime() and run the
-  // run-loop join and file-source teardown off the owner thread, which
-  // runtime teardown documents as owner-thread work.
+  // Run-loop join and file-source teardown are owner-thread work, so a lease
+  // must not let a foreign thread outlive destroy_runtime().
   static constexpr auto leasable = false;
 };
 
@@ -323,29 +302,26 @@ auto release_runtime_map(mln_runtime runtime) noexcept -> void;
 auto validate_runtime(mln_runtime runtime, RuntimeObject*& out_runtime)
   -> mln_status;
 
-// The run loop this runtime pumps from mln_runtime_pump(). Callers use it
-// as the mbgl::Scheduler backing a Mailbox, so work posted from a foreign
-// thread is delivered on the runtime owner thread. Prefer this over
+// The run loop this runtime pumps from mln_runtime_pump(). Use it as the
+// mbgl::Scheduler backing a Mailbox, so work posted from a foreign thread is
+// delivered on the runtime owner thread. Prefer this over
 // mbgl::util::RunLoop::Get(), which reads the calling thread's ambient
-// scheduler and is exactly the thread-local dependency the owner-thread split
-// removes.
+// scheduler.
 auto runtime_run_loop(RuntimeObject* runtime) -> mbgl::util::RunLoop&;
 
 auto resource_options_for_runtime(mln_runtime runtime) -> mbgl::ResourceOptions;
 // Leases the resource provider registered on the runtime named by a MapLibre
-// platform context. Acquiring the shared provider lock while the registry lock
-// is held hands runtime lifetime safely to the caller. Hold the returned lease
-// across the provider callback, so replacement and teardown cannot retire its
-// callback or `user_data`. Returns nullopt when the platform context names no
-// live runtime or the runtime carries no provider.
+// platform context. Hold the returned lease across the provider callback, so
+// replacement and teardown cannot retire its callback or `user_data`. Returns
+// nullopt when the platform context names no live runtime or the runtime
+// carries no provider.
 auto acquire_resource_provider_for_platform_context(
   void* platform_context
 ) noexcept -> std::optional<ResourceProviderLease>;
 
-// Reports whether a resource transform is registered. MapLibre-owned threads
-// observe a value instead of a runtime pointer teardown may retire, and the
-// process-global registry lock is released before the per-runtime transform
-// lock is taken. See `ResourceTransformState`.
+// Reports whether a resource transform is registered. Returns a value rather
+// than a runtime pointer teardown may retire, so a MapLibre-owned thread can
+// call it safely.
 auto has_resource_transform_for_platform_context(
   void* platform_context
 ) noexcept -> bool;

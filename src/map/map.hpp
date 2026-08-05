@@ -434,8 +434,7 @@ auto map_set_free_camera_options(
   mln_map map, const mln_free_camera_options* options
 ) -> mln_status;
 // Validates a map handle is non-null and live, from any thread. Use this only
-// where the caller genuinely runs off the map owner thread, such as the render
-// session detaching from its own owner thread. Everything that touches
+// from a caller that runs off the map owner thread; anything touching
 // thread-affine map state uses validate_map().
 auto validate_map_live(mln_map map, MapObject*& out_map) -> mln_status;
 auto validate_map(mln_map map, MapObject*& out_map) -> mln_status;

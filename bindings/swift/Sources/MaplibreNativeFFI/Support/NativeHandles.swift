@@ -1,12 +1,7 @@
-/// A handle the C API issued.
-///
-/// The C API spells every handle as one integer type, so each kind gets its own
-/// wrapper here to keep the kinds distinct at compile time. `raw` names one
-/// object for the life of the process, carries no ownership, and is safe to
-/// copy, compare, and hash. Zero is the null handle.
-///
-/// These are distinct from ``NativePointer``, which borrows a backend-native
-/// address such as a Metal texture or a Vulkan device.
+/// A handle the C API issued. The C API spells every handle as one integer
+/// type, so each kind gets its own wrapper here to stay distinct at compile
+/// time. `raw` names one object for the life of the process, carries no
+/// ownership, and is safe to copy. Zero is the null handle.
 protocol NativeHandle: Hashable, Sendable {
   var raw: UInt64 { get }
   init(raw: UInt64)

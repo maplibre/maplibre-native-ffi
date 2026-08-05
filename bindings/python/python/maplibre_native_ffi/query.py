@@ -23,9 +23,8 @@ class RenderedQueryGeometryType(NativeIntEnum):
 class ScreenBox:
     """Screen-space box in logical map pixels.
 
-    Corners may be given in any order, and may extend past the viewport.
-    Rendered queries normalize the corners and clip the box to the viewport, so
-    a box that over-covers the viewport queries everything visible.
+    Corners may be given in any order and may extend past the viewport;
+    rendered queries normalize and clip them.
     """
 
     min: ScreenPoint
@@ -122,7 +121,6 @@ class QueriedFeature:
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> "QueriedFeature":
-        """Build a queried feature from private native values."""
         return cls(
             feature=raw["feature"],
             source_id=raw.get("source_id"),
@@ -171,7 +169,6 @@ class FeatureExtensionResult:
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> "FeatureExtensionResult":
-        """Build a feature-extension result from private native values."""
         raw_type = int(raw["type"])
         if raw_type == FeatureExtensionResultType.VALUE:
             return cls.value_result(raw["value"])

@@ -7,8 +7,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class GeneratedLayoutTests
 {
-    // Support invariant for generated raw declarations: representative ABI
-    // layouts stay mechanically aligned with the public C headers.
     [Fact]
     public void StringViewMatchesPointerAndSizeLayout()
     {
@@ -20,8 +18,6 @@ public sealed class GeneratedLayoutTests
         );
     }
 
-    // Support invariant for generated raw declarations: native boolean storage
-    // remains ABI-compatible at the call boundary.
     [Fact]
     public void BooleanFieldsUseOneByteNativeBoolStorage()
     {

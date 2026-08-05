@@ -31,9 +31,7 @@ struct Viewport: Equatable {
 }
 
 /// Runtime and map, owned for their whole lifetime by the runtime loop thread.
-///
-/// The render target is not here: it belongs to the render loop thread, which
-/// owns the view, the Metal objects, and the render session.
+/// The render loop thread owns the view, the Metal objects, and the session.
 final class MapState {
   private let runtime: RuntimeHandle
   private let map: MapHandle
@@ -80,18 +78,13 @@ final class MapState {
   }
 
   /// The `Sendable` reference the render loop attaches its own session against.
-  ///
-  /// `MapHandle` stays on this thread; the reference is the only part of the
-  /// map that crosses.
+  /// `MapHandle` itself stays on this thread.
   func attachRef() throws -> MapAttachRef {
     try map.attachRef()
   }
 
-  /// Closes the map and then the runtime.
-  ///
-  /// The render loop closes the render session before it asks this loop to
-  /// stop, because native refuses to destroy a map that still has a session
-  /// attached.
+  /// Closes the map and then the runtime. The render session must already be
+  /// closed; a map with an attached session cannot be destroyed.
   func close() throws {
     guard !isClosed else { return }
     isClosed = true
@@ -140,11 +133,8 @@ final class MapState {
     return renderPending
   }
 
-  /// Applies one decoded camera command.
-  ///
-  /// This runs on the map's owner thread, which is why the read-modify-write
-  /// commands read the current camera here rather than on the render loop that
-  /// produced them.
+  /// Applies one decoded camera command on the map's owner thread, where
+  /// read-modify-write commands also read the current camera.
   func apply(_ command: CameraCommand) throws {
     switch command {
     case .cancelTransitions:

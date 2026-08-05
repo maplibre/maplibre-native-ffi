@@ -297,9 +297,8 @@ def assert_cluster_feature_extensions(
     assert expansion_zoom.type == query.FeatureExtensionResultType.VALUE
     assert isinstance(expansion_zoom.value, json.JsonUInt)
 
-    # An unsigned limit bounds the collection, and an unsigned offset selects a
-    # later leaf. Native ignores arguments of another type and falls back to ten
-    # leaves at offset zero, so both bounds must move the observed result.
+    # Native ignores limit and offset arguments of another type and falls back
+    # to ten leaves at offset zero, so both must move the observed result.
     first = single_cluster_leaf(session, cluster.feature, offset=0)
     second = single_cluster_leaf(session, cluster.feature, offset=1)
     assert feature_member(first, "name") != feature_member(second, "name")

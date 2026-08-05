@@ -8,8 +8,6 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class RuntimeOfflineOperationTests
 {
-    // Support invariant for offline operation handles: operations with no result
-    // data can be started, discarded, and closed idempotently.
     [Fact]
     public void AmbientCacheOperationCanBeStartedAndDiscarded()
     {
@@ -43,8 +41,6 @@ public sealed class RuntimeOfflineOperationTests
         Assert.True(operation.IsClosed);
     }
 
-    // Support invariant for runtime-owned offline cleanup: closing the parent
-    // runtime leaves stale no-result operation tokens closed and idempotent.
     [Fact]
     public void OperationCloseAfterRuntimeCloseMarksOperationClosed()
     {

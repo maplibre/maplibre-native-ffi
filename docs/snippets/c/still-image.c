@@ -1,6 +1,5 @@
 // Renders one map image offscreen and copies it to host memory. The map uses
-// static mode and the session owns its texture. OpenGL through EGL here;
-// Metal and Vulkan use their own descriptor type and attach function.
+// static mode and the session owns its texture.
 
 #include <maplibre_native_c.h>
 #include <stdlib.h>

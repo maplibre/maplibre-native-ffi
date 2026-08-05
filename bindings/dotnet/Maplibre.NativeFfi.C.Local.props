@@ -5,11 +5,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Local builds copy the install's shared libraries beside the app,
-         matching how NuGet runtime assets enter the standard native-library
-         lookup. Every shared library, not just the C API one: the OpenGL
-         presets install ANGLE beside it and resolve it through the loader. The
-         install's static archive stays behind. -->
+    <!-- Copies every shared library from the install beside the app, matching
+         how NuGet runtime assets enter the native-library lookup. Not just the
+         C API one: the OpenGL presets install ANGLE beside it. -->
     <Content Include="$(MaplibreNativeCRuntimeDir)/*.so;$(MaplibreNativeCRuntimeDir)/*.so.*;$(MaplibreNativeCRuntimeDir)/*.dylib;$(MaplibreNativeCRuntimeDir)/*.dll">
       <Link>%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

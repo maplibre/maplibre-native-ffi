@@ -3,12 +3,9 @@ package org.maplibre.nativeffi.runtime
 import kotlin.jvm.JvmInline
 
 /**
- * Camera change kind reported by camera will-change and did-change events.
- *
- * [RuntimeEvent.code] carries this value for [RuntimeEventType.MAP_CAMERA_WILL_CHANGE] and
- * [RuntimeEventType.MAP_CAMERA_DID_CHANGE]. Construct one from that code to read it:
- * `CameraChangeMode(event.code)`. A native value this binding does not name yet round-trips through
- * [nativeValue].
+ * Camera change kind carried in [RuntimeEvent.code] for [RuntimeEventType.MAP_CAMERA_WILL_CHANGE]
+ * and [RuntimeEventType.MAP_CAMERA_DID_CHANGE]. Read it as `CameraChangeMode(event.code)`. This is
+ * an open domain; unnamed values keep their raw [nativeValue].
  */
 @JvmInline
 public value class CameraChangeMode(public val nativeValue: Int) {

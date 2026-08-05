@@ -84,8 +84,7 @@ private fun Modifier.mapGestures(renderer: MapLibreSurfaceRenderer, scaleFactor:
         var previous: PointerInputChange? = null
         val scale = scaleFactor.takeIf { it > 0.0 && it.isFinite() } ?: 1.0
         // `renderer` and `scaleFactor` are pointerInput keys, so a density change restarts this
-        // handler. The finally clears a drag the restart cancelled, which the loop below would
-        // never see the release for, on a map that outlives this handler.
+        // handler mid-drag; the finally clears a gesture whose release the loop never sees.
         try {
           while (true) {
             val event = awaitPointerEvent()
@@ -102,8 +101,6 @@ private fun Modifier.mapGestures(renderer: MapLibreSurfaceRenderer, scaleFactor:
             previous = current
             if (last == null) {
               renderer.cancelTransitions()
-              // The deltas that follow belong to one live gesture, so the map hears about the
-              // gesture rather than a stream of unrelated camera commands.
               renderer.setGestureInProgress(true)
               continue
             }

@@ -270,17 +270,12 @@ auto MetalTextureBackend::has_device(const MTL::Device* other) const -> bool {
 auto MetalTextureBackend::has_borrowed_pixel_format(
   MTL::PixelFormat format
 ) const -> bool {
-  // Against the format recorded when this session took its texture, not against
-  // the outgoing texture itself: the session never retained that, and a host
-  // replacing a texture it just released would otherwise be answered from freed
-  // memory.
+  // Compared against the recorded format rather than the outgoing texture,
+  // which the session never retained and the host may already have released.
   //
-  // mbgl reads the color format off the renderable when it builds a render
-  // pipeline state, then caches that state per shader program under a key of
-  // color mode and vertex layout, with the format itself absent from it. A
-  // replacement in another format would be drawn with a pipeline built for the
-  // old one. Sample count needs no comparison here: attach admits only
-  // single-sample textures, so both sides are always one.
+  // mbgl caches render pipeline states under a key that omits the color format,
+  // so a replacement in another format would be drawn with a pipeline built for
+  // the old one.
   return format == borrowed_pixel_format_;
 }
 
@@ -291,8 +286,7 @@ void MetalTextureBackend::set_borrowed_texture(
   size = new_size;
   // Drop the renderable rather than patch it: its depth and stencil textures
   // are sized with the color attachment, and any command buffer in hand was
-  // opened against the texture being replaced. bind() builds a matching set
-  // from the new one on the next frame.
+  // opened against the texture being replaced.
   {
     auto guard = mbgl::gfx::BackendScope{*this};
     resource.reset();

@@ -176,9 +176,8 @@ pub const Context = if (builtin.os.tag == .windows) struct {
         window_class.lpszClassName = class_name;
         _ = wgl.RegisterClassA(&window_class);
 
-        // WGL bootstraps through a drawable HWND/HDC here: the pixel format is
-        // selected on a window DC before the shared context exists, so these
-        // tests use a tiny hidden window instead of a headless pbuffer.
+        // WGL selects the pixel format on a window DC before the shared context
+        // exists, so a hidden window stands in for a headless pbuffer.
         const window = wgl.CreateWindowExA(
             0,
             class_name,

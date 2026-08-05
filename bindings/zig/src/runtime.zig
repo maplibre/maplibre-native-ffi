@@ -79,10 +79,8 @@ const RequiredOfflineOperation = struct {
     operation_kind: OfflineOperationKind,
 };
 
-// The C API issues these three a generational handle and rejects a released
-// one, so each map holds only the state this binding owns on top of it. The
-// offline operation table below keeps its own generations: an operation is a
-// binding concept with no C handle behind it.
+// An offline operation is a binding concept with no C handle behind it, so the
+// operation table below carries its own generations.
 var runtime_registry_lock = std.atomic.Value(bool).init(false);
 var runtime_handle_registry: std.AutoHashMapUnmanaged(c.mln_runtime, *RuntimeState) = .empty;
 
@@ -364,10 +362,8 @@ pub const ResourceTransformRequest = struct {
 };
 
 pub const ResourceTransformResponse = struct {
-    /// Replacement URL copied by the binding before the native callback returns.
-    ///
-    /// The pointed-to storage only needs to remain valid for the handler call;
-    /// string literals and context-owned storage are suitable.
+    /// Replacement URL, copied before the native callback returns. The storage
+    /// only needs to stay valid for the handler call.
     replacement_url: ?[:0]const u8 = null,
 };
 
@@ -565,17 +561,15 @@ pub const ResourceRequestHandle = enum(c.mln_resource_request_handle) {
 
 /// Releases a runtime owner thread parked in `RuntimeHandle.pump`.
 ///
-/// A wake source is usable from any thread, which a host's task submission and
-/// shutdown paths rely on. It stays usable after its runtime closes, and
-/// signalling it then does nothing. The diagnostic store the runtime was
-/// created with must outlive the source.
+/// Usable from any thread, and still usable after its runtime closes, when
+/// signalling does nothing. The diagnostic store the runtime was created with
+/// must outlive the source.
 pub const WakeSourceHandle = enum(c.mln_wake_source) {
     _,
 
-    /// Sets the runtime's wake flag and releases the parked owner thread.
-    ///
-    /// A signal raised while the owner thread is running sets the wake flag,
-    /// so the next `RuntimeHandle.pump` returns without parking.
+    /// Sets the runtime's wake flag and releases the parked owner thread. A
+    /// signal raised while the owner thread runs leaves the flag set, so the
+    /// next `RuntimeHandle.pump` returns without parking.
     pub fn signal(self: WakeSourceHandle) status.Error!void {
         lockWakeSourceRegistry();
         defer unlockWakeSourceRegistry();
@@ -612,15 +606,10 @@ pub const OwnedRuntimeEvent = struct {
     source_type: RuntimeEventSourceType,
     source_id: ?values.MapId,
     payload_type: RuntimeEventPayloadType,
-    /// Secondary detail whose meaning `event_type` selects.
-    ///
-    /// For `map_camera_will_change` and `map_camera_did_change` it is a
-    /// `CameraChangeMode` raw value, decoded with `CameraChangeMode.fromRaw`.
-    /// For `map_loading_failed` it is the ordinal of MapLibre Native's internal
-    /// map load error kind, with the failure text in `message`. For
-    /// `offline_operation_completed` it is the raw native status of the
-    /// operation, the same value the payload reports in `result_status`. Every
-    /// other event type reports 0.
+    /// Secondary detail whose meaning `event_type` selects: a raw
+    /// `CameraChangeMode` for camera change events, MapLibre Native's map load
+    /// error ordinal for `map_loading_failed`, the raw native status for
+    /// `offline_operation_completed`, and 0 for every other event type.
     code: i32,
     message: []const u8,
     payload: RuntimeEventPayload,
@@ -871,17 +860,11 @@ pub const OfflineOperationCompletedPayload = struct {
 
 /// Payload for `map_camera_transition_finished` events.
 ///
-/// A camera command that carries `AnimationOptions.transition_id` reports this
-/// payload once for the transition it starts, whichever way that transition
-/// ends: running to completion, being superseded by a later camera command,
-/// being cancelled by `cancelTransitions`, or completing instantly as a
-/// zero-duration jump. A command this API rejects, such as one carrying a
-/// non-finite enabled camera field, starts no transition and emits no such
-/// event. MapLibre Native reports the moment a transition releases
-/// the camera and leaves the outcome unreported, so this payload establishes
-/// transition identity rather than a completion reason. A host that needs to
-/// tell completion from cancellation compares the resulting camera against the
-/// requested one, or tracks which transition ID is current.
+/// A camera command carrying `AnimationOptions.transition_id` reports this
+/// payload once, however the transition ends: completed, superseded, cancelled,
+/// or an instant zero-duration jump. A rejected command starts no transition
+/// and emits no event. The payload establishes transition identity, not a
+/// completion reason.
 pub const CameraTransitionFinishedPayload = struct {
     /// The `AnimationOptions.transition_id` of the command that started this
     /// transition.
@@ -1113,28 +1096,14 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         return createNative(&native_options, diagnostic_store);
     }
 
-    /// Advances this runtime.
+    /// Advances this runtime: parks the owner thread when `timeout_ms` allows
+    /// it, then drains the owner-thread task queues. Drain the resulting
+    /// runtime events with `pollEvent` afterwards.
     ///
-    /// The call parks the owner thread when `timeout_ms` allows it, then drains
-    /// the owner-thread task queues. Drain the queued runtime events with
-    /// `pollEvent` afterwards.
-    ///
-    /// `timeout_ms` sets the park bound. Zero drains and returns; hosts pumping
-    /// from a frame callback pass it. A positive value parks for up to that many
-    /// milliseconds; hosts that own their pump thread pass one and take their
-    /// cadence from the runtime's own work. Null parks until a wake arrives.
-    ///
-    /// The drain runs every task queued when it begins plus every task those
-    /// enqueue, so a single call can span a full style parse.
-    ///
-    /// The runtime holds a wake flag. Style, tile, offline, and resource
-    /// responses set it, as do queued runtime events and
-    /// `WakeSourceHandle.signal`. A parking call returns as soon as the flag is
-    /// set and clears it before returning, and work arriving during the drain
-    /// sets it again. A call also returns without parking while unread runtime
-    /// events are queued. Timers and ready file descriptors set the flag only
-    /// when they queue owner-thread work, so pass a bounded timeout to cap how
-    /// long a call waits.
+    /// `timeout_ms` bounds the park: zero drains and returns, a positive value
+    /// parks for at most that many milliseconds, and null parks until a wake
+    /// arrives. Timers and ready file descriptors only wake the runtime when
+    /// they queue owner-thread work, so pass a bounded timeout to cap the wait.
     ///
     /// A non-zero timeout blocks the calling thread. Call it outside any lock
     /// that a thread signalling a wake source takes.
@@ -1181,10 +1150,8 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
     /// Polls and copies the next queued runtime event, returning null when the
     /// queue is empty. The caller owns the returned event and deinits it.
     ///
-    /// Polling also advances binding-owned state: on a map-style-loaded event
-    /// this binding releases the map's detached custom geometry sources, closing
-    /// the upcall stubs for sources the new style dropped. That release happens
-    /// when the event is polled, so drain the queue to keep dropped sources from
+    /// Polling a map-style-loaded event also releases the map's detached custom
+    /// geometry sources, so drain the queue to keep dropped sources from
     /// lingering.
     pub fn pollEvent(self: *RuntimeHandle, allocator: std.mem.Allocator) status.Error!?OwnedRuntimeEvent {
         const runtime_lease = try lease(self);
@@ -1237,9 +1204,8 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         return self.operationHandleWithRuntime(runtime_lease.native, operation_id, .ambient_cache, .none);
     }
 
-    /// Starts a change to this runtime's maximum ambient cache size. MapLibre evicts ambient
-    /// resources to fit the new budget, so lowering it discards cached resources. Offline regions
-    /// are unaffected.
+    /// Starts a change to this runtime's maximum ambient cache size. Lowering
+    /// it evicts ambient resources; offline regions are unaffected.
     pub fn startSetMaximumAmbientCacheSize(self: *RuntimeHandle, size: u64) status.Error!OfflineOperationHandle {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
@@ -1472,12 +1438,9 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
     }
 
     /// Registers, replaces, or clears the runtime-scoped URL transform for
-    /// network resources; passing null clears it.
-    ///
-    /// Registering and clearing are both available for the whole life of the
-    /// runtime, including while maps exist. The binding keeps the handler and
-    /// context alive until the call that replaces or clears them returns, and
-    /// releases them when the runtime closes.
+    /// network resources; passing null clears it. The binding keeps the handler
+    /// and context alive until the call that replaces or clears them returns,
+    /// and releases them when the runtime closes.
     pub fn setResourceTransform(self: *RuntimeHandle, transform: ?ResourceTransform) status.Error!void {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
@@ -1512,14 +1475,10 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
     }
 
     /// Registers, replaces, or clears the runtime-scoped network resource
-    /// provider; passing null clears it.
-    ///
-    /// Registering and clearing are both available for the whole life of the
-    /// runtime, including while maps exist. The binding keeps the handler and
+    /// provider; passing null clears it. The binding keeps the handler and
     /// context alive until the call that replaces or clears them returns, and
-    /// releases them when the runtime closes. Requests the previous provider
-    /// already took a handle for keep that handle: complete and release each
-    /// one as usual.
+    /// releases them when the runtime closes. Handles the previous provider
+    /// already took stay valid: complete and release each one as usual.
     pub fn setResourceProvider(self: *RuntimeHandle, provider: ?ResourceProvider) status.Error!void {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
@@ -1706,8 +1665,8 @@ fn mapRegistrationForNativeSource(handle: RuntimeHandle, source: c.mln_map) ?Map
     return null;
 }
 
-// The event carries the source map's handle, which names one map for the life
-// of the process, so a registration matches on handle equality.
+// A map handle names one map for the life of the process, so a registration
+// matches on handle equality.
 fn mapIdForNativeSource(handle: *RuntimeHandle, source_type: u32, source: u64) ?values.MapId {
     if (source_type != c.MLN_RUNTIME_EVENT_SOURCE_MAP) return null;
     if (source == 0) return null;

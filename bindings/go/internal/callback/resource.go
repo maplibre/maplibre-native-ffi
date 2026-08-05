@@ -283,8 +283,8 @@ func newResourceRequestHandle(handle C.mln_resource_request_handle) (*ResourceRe
 }
 
 // A synthetic request handle for tests. It reaches only the test hooks below,
-// never the C API, and the kind byte matches a resource request so a value that
-// escapes into a diagnostic reads as an obviously synthetic handle.
+// never the C API; the kind byte matches a resource request so a value that
+// escapes into a diagnostic reads as synthetic.
 const testResourceRequestHandle = C.mln_resource_request_handle(0x0c00_0000_0000_0034)
 
 func newResourceRequestHandleForTest() *ResourceRequestHandle {

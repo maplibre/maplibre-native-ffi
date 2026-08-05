@@ -9,8 +9,7 @@ import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapOptions
 
 class WakeSourceTest {
-  // Pumps until the runtime is idle, so a park that follows is released by the signal the test
-  // raises.
+  // Pumps until the runtime is idle, so a later park is released only by the test's signal.
   private fun quiesce(runtime: RuntimeHandle) {
     repeat(100) {
       runtime.pump(0)
@@ -39,8 +38,8 @@ class WakeSourceTest {
 
     quiesce(runtime)
 
-    // The style is malformed, so native reports the failure from its own threads and the failure
-    // reaches the parked owner thread.
+    // Native reports the load failure from its own threads; it must reach the parked
+    // owner thread.
     map.setStyleUrl("unsupported://style.json")
     var loadingFailed = false
     val loadStarted = TimeSource.Monotonic.markNow()
@@ -61,8 +60,7 @@ class WakeSourceTest {
     }
     assertTrue(loadingFailed)
 
-    // A source signalled from another thread matches a host's submission path, and the park it
-    // releases has no other work to end it.
+    // Nothing else can end this park, so only the cross-thread signal releases it.
     val source = runtime.acquireWakeSource()
     quiesce(runtime)
     val signaller = Thread {
@@ -78,8 +76,7 @@ class WakeSourceTest {
     )
     signaller.join()
 
-    // A wake source stays usable after its runtime closes, so hosts tear the two down in either
-    // order.
+    // A wake source stays usable after its runtime closes, in either teardown order.
     map.close()
     runtime.close()
     source.signal()

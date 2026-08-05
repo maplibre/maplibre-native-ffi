@@ -7,16 +7,13 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Runs registered actions once their referents become unreachable.
  *
- * The JVM source set builds this on `java.lang.ref.Cleaner`. Android exposes that class from API 33
- * while this binding supports API 24, so Android builds the same contract from `PhantomReference`
- * and `ReferenceQueue`, which cover the whole supported range.
+ * Built on `PhantomReference` because `java.lang.ref.Cleaner` needs API 33 and the binding supports
+ * API 24.
  *
- * A registered action holds cleanup state only. An action that captures its referent keeps the
- * referent strongly reachable from this registry, so the registration stays pending and the action
- * never runs.
+ * A registered action must hold cleanup state only. An action that captures its referent keeps the
+ * referent strongly reachable from this registry, so the action never runs.
  *
- * Actions run on one daemon thread. An action that fails leaves the thread draining later
- * registrations, matching `Cleaner`.
+ * Actions run on one daemon thread, and a failing action does not stop later registrations.
  */
 internal class UnreachableActions private constructor(threadName: String) {
   private val queue = ReferenceQueue<Any>()
@@ -26,11 +23,9 @@ internal class UnreachableActions private constructor(threadName: String) {
   private val pendingLock = Any()
 
   init {
-    // This worker lives for the process, so it is pinned to the binding's own
-    // class loader rather than retaining the context of whichever thread
-    // triggered the first registration. The `inheritThreadLocals` constructor
-    // that would also drop inherited values arrives at API 33, above the API 24
-    // floor, so registrations stay free of `InheritableThreadLocal` state.
+    // The worker lives for the process, so pin the binding's class loader instead
+    // of retaining the context of whichever thread registered first. The
+    // constructor that also drops inherited thread locals needs API 33.
     Thread(::drain, threadName)
       .apply {
         isDaemon = true
@@ -41,9 +36,7 @@ internal class UnreachableActions private constructor(threadName: String) {
 
   /** Runs [action] once [referent] becomes unreachable. */
   fun register(referent: Any, action: Runnable) {
-    // Construct and retain the phantom reference under the same lock used by
-    // the drain path. If collection enqueues it immediately, draining waits
-    // until insertion finishes and cannot remove-before-add.
+    // Shares the drain path's lock so an immediate enqueue cannot remove before add.
     synchronized(pendingLock) { pending.add(Registration(referent, queue, action)) }
   }
 
@@ -60,7 +53,7 @@ internal class UnreachableActions private constructor(threadName: String) {
         try {
           enqueued.run()
         } catch (_: Throwable) {
-          // A failing action stays local to its own registration so later ones still run.
+          // A failing action must not stop the drain loop.
         }
       }
     }

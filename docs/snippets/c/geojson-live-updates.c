@@ -42,7 +42,7 @@ mln_status publish_vehicles(
   if (count > MAX_VEHICLES) count = MAX_VEHICLES;
 
   // #region features
-  // Stack storage is enough, because the update call copies the descriptors.
+  // The update call copies the descriptors, so stack storage is enough.
   mln_geometry geometries[MAX_VEHICLES];
   mln_feature features[MAX_VEHICLES];
   for (size_t i = 0; i < count; i++) {

@@ -7,7 +7,7 @@ import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
 
 class ActiveFrameStateTest {
-  // BND-170: session operations and nested acquisition fail while a frame is active.
+  // BND-170.
 
   @Test
   fun activeFrameRejectsForbiddenSessionOperations() {

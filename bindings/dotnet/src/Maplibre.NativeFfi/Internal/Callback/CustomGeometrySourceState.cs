@@ -87,9 +87,8 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
         }
     }
 
-    // Binding-owned cast-safety: Buffer is `double?` in the public API but the
-    // C field is uint. Values in (-1, 0) would silently truncate to 0u and
-    // bypass the C-side unsigned-domain check. Reject them before the cast.
+    // Buffer is `double?` here but uint in C: values in (-1, 0) would truncate to
+    // 0u and bypass the C-side unsigned-domain check, so reject before the cast.
     private void ValidateDescriptorShape()
     {
         if (options.Buffer is { } buffer && buffer < 0)

@@ -211,9 +211,8 @@ def test_resize_updates_vulkan_owned_texture_frame_extent(
 
     vulkan_owned_session.session.resize(16, 8, 2.0)
     # The map applies the new logical size on its next pump, and a static map
-    # renders only on request. Requesting the still image before the size lands
-    # spends it on an update the session's size gate discards, and nothing
-    # publishes another, so pump the resize through first.
+    # renders only on request, so pump the resize through before requesting the
+    # still image.
     vulkan_owned_session.runtime.pump()
     frame = wait_for_vulkan_frame(
         vulkan_owned_session,
@@ -234,10 +233,8 @@ def test_resize_updates_vulkan_owned_texture_frame_extent(
 def test_map_size_follows_attach_and_resize_and_keeps_the_creation_scale_factor(
     vulkan_owned_session: VulkanOwnedSession,
 ) -> None:
-    # The fixture creates a 64x64 map at scale factor 1.0 and attaches a 32x16
-    # target. A session enqueues the map size for the map's owner thread rather
-    # than setting it in place, because the session may be owned by another
-    # thread, so the map keeps its previous size until the runtime is pumped.
+    # A session enqueues the map size for the map's owner thread rather than
+    # setting it in place, so the map keeps its previous size until pumped.
     assert vulkan_owned_session.map.get_size() == (64, 64, pytest.approx(1.0))
     vulkan_owned_session.runtime.pump()
     assert vulkan_owned_session.map.get_size() == (32, 16, pytest.approx(1.0))

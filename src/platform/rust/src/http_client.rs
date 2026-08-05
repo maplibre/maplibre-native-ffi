@@ -12,11 +12,9 @@ use std::time::Duration;
 // Matches `mbgl::util::DEFAULT_MAXIMUM_CONCURRENT_REQUESTS` enforced by
 // `OnlineFileSource` in maplibre-native's default platform layer.
 const HTTP_WORKER_THREADS: usize = 20;
-// Upstream default `http_file_source.cpp` does not set `CURLOPT_TIMEOUT`; cap
-// connection establishment so hung TCP/TLS handshakes do not occupy a worker
-// thread indefinitely, without bounding slow but progressing body downloads.
+// Bounds connection establishment only, so a hung TCP/TLS handshake cannot
+// occupy a worker thread while a slow but progressing download still completes.
 const HTTP_CONNECT_TIMEOUT_SECONDS: u64 = 30;
-// Upstream uses `CURLOPT_FOLLOWLOCATION` without `CURLOPT_MAXREDIRS`; match
 // libcurl 8's default redirect limit.
 const HTTP_MAX_REDIRECTS: u32 = 30;
 
@@ -339,7 +337,7 @@ fn http_response(
     let retry_after = response_header(response, "retry-after");
     let x_rate_limit_reset = response_header(response, "x-rate-limit-reset");
 
-    // libcurl/minreq had no response body cap; ureq's convenience read_to_vec() defaults to 10 MiB.
+    // ureq's read_to_vec() defaults to a 10 MiB cap; map responses are uncapped.
     let body = match response
         .body_mut()
         .with_config()

@@ -47,8 +47,6 @@ public sealed unsafe class StyleJsonTests
         Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
     }
 
-    // Support invariant for BND-064: malformed native JSON containers fail
-    // deterministically instead of fabricating public JSON values.
     [Fact]
     public void JsonReaderRejectsNonZeroCountsWithNullBackingPointers()
     {
@@ -79,8 +77,6 @@ public sealed unsafe class StyleJsonTests
         Assert.Contains("mln_json_object", objectError.Message, StringComparison.Ordinal);
     }
 
-    // Support invariant for BND-064: unknown native JSON tags fail
-    // deterministically instead of fabricating public JSON values.
     [Fact]
     public void JsonReaderRejectsUnknownNativeValueTypes()
     {

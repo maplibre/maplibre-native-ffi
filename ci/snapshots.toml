@@ -1,28 +1,17 @@
 # Input scopes for the components published by .github/workflows/snapshots.yml.
-# The workflow hashes each component's inputs at the commit it would publish and
-# skips the component when that hash matches the commit it last published from,
-# so publishing follows input changes rather than commit frequency.
+# The workflow hashes each component's inputs and skips the component when that
+# hash matches the commit it last published from.
 #
 # Rules are gitignore-style and ordered, `!` marks a path as not an input, and
 # the last matching rule wins. A component's effective list is `shared`, then
 # the `paths` of everything it depends on, then its own `paths`.
 #
-# `shared` carries only what every component answers the same way: the native
-# library and the toolchain that builds it are inputs everywhere, and everything
-# no published artifact consumes is excluded everywhere. Anything one component
-# consumes and another does not — binding sources, docs sources, and the
-# language ecosystem roots their builds run through — is claimed by the
-# components that consume it.
-#
-# There is deliberately no catch-all: `ci:check-snapshot-scopes` fails when a
-# component's resolved list leaves a tracked path neither an input nor excluded,
-# so a new top-level entry has to be classified rather than inheriting a
-# default. It also fails on a rule that matches nothing, so stale patterns
-# surface after a refactor.
+# There is no catch-all. `ci:check-snapshot-scopes` fails on a tracked path that
+# a component leaves neither an input nor excluded, and on a rule that matches
+# nothing.
 
 shared = [
-  # The native library, and the sources and build that produce it. Every
-  # component ships it, embeds it, or documents it.
+  # The native library, and the sources and build that produce it.
   "CMakeLists.txt",
   "CMakePresets.json",
   "cmake/**",
@@ -44,16 +33,14 @@ shared = [
   ".miserc.toml",
   ".mise/**",
   ".config/**",
-  # The CI definitions that shape every published artifact, and the checkout
-  # behaviour that decides the bytes they are built from.
+  # The CI definitions that shape every published artifact.
   ".github/workflows/**",
   ".github/actions/**",
   "ci/**",
   ".gitattributes",
 
   # Binding sources, docs sources, and the ecosystem roots their builds run
-  # through. Each is an input to the components that consume it and to no
-  # others, so the components claim them rather than `shared`.
+  # through. The components that consume them claim them instead.
   "!bindings/**",
   "!docs/**",
   "!*.md",
@@ -78,8 +65,7 @@ shared = [
   "!build.zig",
   "!build.zig.zon",
 
-  # Not inputs to any published artifact. The example apps, development
-  # tooling, editor and service configuration.
+  # Not inputs to any published artifact.
   "!examples/**",
   "!dprint.jsonc",
   "!hk.pkl",
@@ -100,8 +86,8 @@ shared = [
   "!.zed/**",
 ]
 
-# CPack packages the CMake install tree directly, so the native tarballs are
-# exactly what `shared` describes and this component claims nothing further.
+# CPack packages the CMake install tree directly, so `shared` already describes
+# every input.
 [components.native]
 description = "Native CPack tarballs on the floating GitHub prerelease."
 
@@ -112,8 +98,7 @@ paths = [
   "bindings/kotlin/**",
   "bindings/kotlin-runtime-*/**",
   "bindings/rustls-platform-verifier-android/**",
-  # Gradle compiles the binding, embeds the native artifacts, and assembles
-  # every publication.
+  # Gradle assembles every publication.
   "buildSrc/**",
   "gradle/**",
   "build.gradle.kts",
@@ -149,8 +134,6 @@ description = "Docs site on GitHub Pages."
 depends = ["kotlin", "python", "dotnet"]
 # The site embeds an API reference generated from every binding, so it takes the
 # binding sources along with the ecosystem roots each doc tool builds through.
-# As the remaining bindings gain components of their own, `depends` should name
-# them and these entries should move to the component that owns them.
 paths = [
   "bindings/dart/**",
   "bindings/go/**",

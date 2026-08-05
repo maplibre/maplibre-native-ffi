@@ -6,8 +6,7 @@ import Testing
 private let parkTimeout: TimeInterval = 10
 
 /// Well below parkTimeout, and far above the scheduling noise a loaded CI
-/// machine
-/// adds to a condition-variable wake.
+/// machine adds to a condition-variable wake.
 private let promptReturn: TimeInterval = 5
 
 /// Pumps until the runtime is idle, so a park that follows is released by the
@@ -36,8 +35,7 @@ private func quiesce(_ runtime: RuntimeHandle) throws {
   try quiesce(runtime)
 
   // The style is malformed, so native reports the failure from its own threads
-  // and
-  // the failure reaches the parked owner thread.
+  // and it reaches the parked owner thread.
   try map.setStyleURL("unsupported://style.json")
   var loadingFailed = false
   let loadStarted = Date()
@@ -55,9 +53,7 @@ private func quiesce(_ runtime: RuntimeHandle) throws {
   }
   #expect(loadingFailed)
 
-  // A source signalled from another thread matches a host's submission path,
-  // and
-  // the park it releases has no other work to end it.
+  // The park a cross-thread signal releases has no other work to end it.
   let source = try runtime.wakeSource()
   try quiesce(runtime)
   let signalled = DispatchSemaphore(value: 0)
@@ -153,8 +149,7 @@ private func quiesce(_ runtime: RuntimeHandle) throws {
 }
 
 /// BND-197. A use that starts once close has begun is turned away by the
-/// wrapper
-/// rather than reaching native with a retired id.
+/// wrapper rather than reaching native with a retired id.
 @Test func aUseStartingAfterCloseBeginsIsRefused() throws {
   let state = try NativeHandleState(
     typeName: "TestHandle",

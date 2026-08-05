@@ -6,10 +6,6 @@ using Maplibre.NativeFfi.Runtime;
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 /// <summary>Runtime and map, owned for their whole lifetime by the runtime loop thread.</summary>
-/// <remarks>
-/// The render target is not here: it belongs to the render loop thread, which owns the window and
-/// the graphics context.
-/// </remarks>
 internal sealed class MapState : IDisposable
 {
     private const string StyleUrl = "https://tiles.openfreemap.org/styles/bright";
@@ -79,9 +75,6 @@ internal sealed class MapState : IDisposable
     /// <summary>Pumps the runtime once, reporting whether the map wants another frame.</summary>
     public bool Step(TimeSpan parkTimeout)
     {
-        // This thread has no display to pace it, so it takes its cadence from the runtime's own
-        // work and parks in between. The render loop signals the wake source, so the bound is a
-        // backstop rather than the cadence.
         runtime.Pump(parkTimeout);
         return DrainEvents();
     }
@@ -131,9 +124,8 @@ internal sealed class MapState : IDisposable
     }
 
     /// <summary>
-    /// Applies one decoded camera command. Runs on the map's owner thread, which is why the
-    /// read-modify-write commands read the current camera here rather than on the render loop that
-    /// produced them.
+    /// Applies one decoded camera command on the map's owner thread, where the read-modify-write
+    /// commands also read the current camera.
     /// </summary>
     private void Apply(CameraCommand command)
     {

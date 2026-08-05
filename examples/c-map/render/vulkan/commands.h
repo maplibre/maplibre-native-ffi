@@ -15,9 +15,8 @@ typedef struct vulkan_commands {
   VkCommandBuffer command_buffer;
   VkSemaphore image_available;
   /// One present-wait semaphore per swapchain image, indexed by the acquired
-  /// image. The frame fence proves a submit finished, but only the next
-  /// acquire of the same image proves its present consumed the semaphore, so
-  /// a single reused semaphore is a race the presentation engine may lose.
+  /// image. Only the next acquire of the same image proves its present
+  /// consumed the semaphore, so a single reused semaphore races.
   VkSemaphore* render_finished;
   uint32_t render_finished_count;
   VkFence in_flight;

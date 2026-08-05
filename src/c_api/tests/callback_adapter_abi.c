@@ -1,8 +1,6 @@
 // Raw C ABI coverage for queued provider route matching: route descriptors a
 // binding's own route type cannot express, a request that carries no requested
-// URL, and the glob language every binding shares. Which URL each flag
-// combination compares is semantic, so it belongs to the binding suites that
-// register these routes.
+// URL, and the glob language every binding shares.
 //
 // The adapter decides a route before it reads the handle, so these drive the
 // callback directly with a synthesized request rather than through a loader.
@@ -20,14 +18,13 @@ static const char alias_url[] = "maplibre://maps/style";
 static const char normalized_url[] =
   "https://demotiles.maplibre.org/style.json";
 
-// A handle the loader never issued. A route that matches hands the copied
-// record to the listener below, which releases the record without completing
-// or releasing the handle it carries.
+// A handle the loader never issued: the listener below releases the copied
+// record without completing or releasing the handle it carries.
 static const mln_resource_request_handle unissued_handle = 1;
 
 static size_t queued_requests;
-// The record's strings die with the record, so the listener records what it
-// saw rather than pointers into it.
+// The record's strings die with the record, so the listener stores what it saw
+// rather than pointers into it.
 static bool last_requested_url_null;
 static bool last_requested_url_empty;
 
@@ -53,8 +50,8 @@ static mln_resource_request style_request(void) {
   };
 }
 
-// Reports the decision one route produces for one request, and leaves
-// queued_requests incremented when the route claimed it.
+// Reports the decision one route produces for one request, and increments
+// queued_requests when the route claimed it.
 static uint32_t route_decision(
   mln_adapter_queued_resource_provider_route route,
   const mln_resource_request* request
@@ -91,10 +88,8 @@ static void assert_passes_through(
   TEST_ASSERT_EQUAL_size_t(before, queued_requests);
 }
 
-// This verifies the two route descriptors a binding route type cannot express:
-// a null comparison URL and a flag bit this C API version does not define.
-// Neither names a URL family the adapter can compare, so each matches nothing
-// rather than claiming every request the way `**` does.
+// A route with no comparable URL matches nothing rather than claiming every
+// request the way `**` does.
 static void queued_provider_routes_reject_raw_invalid_route_descriptors(void) {
   const mln_resource_request request = style_request();
 
@@ -124,11 +119,8 @@ static void queued_provider_routes_reject_raw_invalid_route_descriptors(void) {
   );
 }
 
-// This verifies a request whose requested URL is absent, which the loader does
-// not produce and a binding cannot synthesize. A `**` route over the URL that
-// is present still claims the request, while the same route over the absent URL
-// matches nothing. A claimed record reports the absent URL as the empty string,
-// so a listener reads it without a null check.
+// A claimed record reports an absent requested URL as the empty string, so a
+// listener reads it without a null check.
 static void queued_provider_routes_tolerate_raw_absent_request_urls(void) {
   mln_resource_request request = style_request();
   request.requested_url = NULL;
@@ -154,9 +146,7 @@ static void queued_provider_routes_tolerate_raw_absent_request_urls(void) {
   );
 }
 
-// Reports whether one glob pattern claims one resolved URL. Every binding
-// shares this matcher, so the language itself is covered here rather than once
-// per binding suite.
+// Reports whether one glob pattern claims one resolved URL.
 static bool glob_claims(const char* pattern, const char* resolved_url) {
   mln_resource_request request = style_request();
   request.resolved_url = resolved_url;
@@ -177,8 +167,8 @@ static void glob_routes_confine_a_star_to_one_path_segment(void) {
   TEST_ASSERT_TRUE(
     glob_claims(host_pattern, "https://tiles.maplibre.org/1/2/3.pbf")
   );
-  // A path segment carrying the host name reaches the same rule under a
-  // separator-crossing wildcard, which is what confining `*` prevents.
+  // A path segment carrying the host name would match if `*` crossed
+  // separators.
   TEST_ASSERT_FALSE(
     glob_claims(host_pattern, "https://attacker.test/x.maplibre.org/style.json")
   );

@@ -2,11 +2,8 @@ import Foundation
 import MaplibreNativeFFI
 
 /// A camera change decoded on the render loop and applied on the map's owner
-/// thread.
-///
-/// Commands carry deltas rather than absolute targets wherever the map's
-/// current camera is an input, because reading the camera and writing the new
-/// one has to happen together on the thread that owns the map.
+/// thread. Commands carry deltas wherever the current camera is an input,
+/// because the read and write have to happen together on the owner thread.
 enum CameraCommand {
   case cancelTransitions
   case setGestureInProgress(Bool)
@@ -25,20 +22,14 @@ enum CameraCommand {
   case resetOrientation(animation: AnimationOptions)
 }
 
-/// The entire cross-thread surface between the render loop, which owns the
-/// view, the Metal objects, and the render session, and the runtime loop, which
-/// owns the runtime and the map.
-///
-/// The channels match the map example specification: a camera-command queue
-/// going one way, a render request coming back, an attach reference published
-/// once so the render loop can attach its own session, and shutdown plus
-/// first-failure.
+/// The cross-thread surface between the render loop, which owns the view, the
+/// Metal objects, and the render session, and the runtime loop, which owns the
+/// runtime and the map.
 ///
 /// The runtime loop that reads these channels MUST be a dedicated `Thread`.
 /// Native owner-thread checks are keyed on the OS thread, and a serial
-/// `DispatchQueue` guarantees serialization but not thread affinity: it may run
-/// successive blocks on different threads. A queue, an `actor`, or a `Task`
-/// here would produce nondeterministic `MLN_STATUS_WRONG_THREAD` failures.
+/// `DispatchQueue`, an `actor`, or a `Task` may run successive blocks on
+/// different threads, producing `MLN_STATUS_WRONG_THREAD` failures.
 final class Channels: @unchecked Sendable {
   private let condition = NSCondition()
   private var commands: [CameraCommand] = []
@@ -53,34 +44,22 @@ final class Channels: @unchecked Sendable {
   // MARK: - Camera commands (render loop to runtime loop)
 
   /// Render loop: queues a decoded camera change and wakes the runtime loop.
-  ///
-  /// The buffer grows rather than dropping. Its commands are deltas and a
-  /// gesture bracket, and neither survives being discarded: a dropped delta is
-  /// motion the drag never gets back, and a dropped bracket leaves every delta
-  /// after it attributed to no gesture. Growing does not block the render loop
-  /// either, and only a stalled runtime loop grows it at all.
+  /// The buffer grows rather than dropping, because deltas and gesture brackets
+  /// are not recoverable once discarded.
   func push(_ command: CameraCommand) {
     condition.lock()
     commands.append(command)
     let source = wake
     condition.unlock()
-    // Release the parked pump so this command is applied now rather than after
-    // the parking bound. The runtime loop parks inside the native pump, not on
-    // this condition, so there is nothing here to signal. Signal outside the
-    // lock so a native call never runs under it.
+    // The runtime loop parks inside the native pump, not on this condition.
+    // Signal outside the lock so a native call never runs under it.
     try? source?.signal()
   }
 
-  /// Runtime loop: hands the pending commands over and takes `batch` in
-  /// exchange, so the two ping-pong and the locked section is the swap alone.
-  ///
-  /// Reading the array out and clearing it under the lock would not do: the
-  /// read leaves the buffer shared, so the clear has to allocate a fresh one
-  /// sized to the backlog, and it does that every drain.
+  /// Runtime loop: swaps `batch` in for the pending commands, keeping the
+  /// locked section to the swap alone.
   func drainCommands(into batch: inout [CameraCommand]) {
-    // Clearing releases the elements of the batch just applied, so it happens
-    // before the lock is taken. Only the runtime loop holds `batch` here; the
-    // queue is still filling the other array.
+    // Clearing releases the elements just applied, so do it outside the lock.
     batch.removeAll(keepingCapacity: true)
     condition.lock()
     defer { condition.unlock() }
@@ -96,10 +75,6 @@ final class Channels: @unchecked Sendable {
   }
 
   /// Render loop: takes the request, if any.
-  ///
-  /// The render loop consumes before it renders and sets again when nothing was
-  /// rendered, so a request the runtime loop publishes during a render is not
-  /// lost.
   func consumeRenderRequest() -> Bool {
     condition.lock()
     defer { condition.unlock() }
@@ -114,8 +89,6 @@ final class Channels: @unchecked Sendable {
   func publish(attachRef: MapAttachRef, wake: WakeSource) {
     condition.lock()
     defer { condition.unlock() }
-    // Under the same lock as every other reader, so a render loop that wakes
-    // during publication sees either no source or the published one.
     self.wake = wake
     publishedAttachRef = attachRef
   }
@@ -160,10 +133,8 @@ final class Channels: @unchecked Sendable {
     return shutdown
   }
 
-  /// Records the first failure from either loop. The other loop stops on it.
-  ///
-  /// The failure crosses as text rather than as an `Error`, because `any Error`
-  /// carries no `Sendable` guarantee.
+  /// Records the first failure from either loop. It crosses as text because
+  /// `any Error` carries no `Sendable` guarantee.
   func fail(_ error: Error) {
     condition.lock()
     defer { condition.unlock() }
@@ -188,8 +159,8 @@ final class Channels: @unchecked Sendable {
     condition.broadcast()
   }
 
-  /// Render loop: waits for the runtime loop to finish, the way a host joins a
-  /// thread. Returns false when the deadline passed first.
+  /// Render loop: waits for the runtime loop to finish. Returns false when the
+  /// deadline passed first.
   func waitForRuntimeLoopExit(timeout: TimeInterval) -> Bool {
     let deadline = Date(timeIntervalSinceNow: timeout)
     condition.lock()
@@ -202,8 +173,6 @@ final class Channels: @unchecked Sendable {
     return true
   }
 
-  /// Runtime loop: paces one iteration, waking early for a queued command or a
-  /// shutdown request.
   /// Render loop: releases the runtime loop's parked pump.
   func wakeRuntimeLoop() {
     condition.lock()

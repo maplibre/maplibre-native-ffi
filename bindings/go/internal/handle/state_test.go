@@ -15,9 +15,8 @@ const (
 	testStatusWrongThread int32 = -3
 )
 
-// A synthetic handle type for close-once tests. It reaches only the fake
-// destroy functions below, never the C API, and the safe public API cannot
-// build one.
+// A synthetic handle for close-once tests. It reaches only the fake destroy
+// functions below, never the C API.
 type testNativeHandle uint64
 
 const testHandle testNativeHandle = 0x0200_0000_0000_002a

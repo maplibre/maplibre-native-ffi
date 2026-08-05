@@ -1,9 +1,6 @@
 use maplibre_native_ffi_sys as sys;
 
 /// Internal helper trait for Rust adapter code that needs raw value conversion.
-///
-/// Public language bindings can use the free functions in this module instead
-/// when a trait would expose more raw ABI detail than their API should show.
 #[doc(hidden)]
 pub trait NativeValue: Sized {
     type Raw;
@@ -126,11 +123,8 @@ impl ScreenPoint {
     }
 }
 
-/// Screen-space box in logical map pixels.
-///
-/// Corners may be given in any order, and may extend past the viewport.
-/// Rendered queries normalize the corners and clip the box to the viewport, so
-/// a box that over-covers the viewport queries everything visible.
+/// Screen-space box in logical map pixels. Corners may be given in any order
+/// and may extend past the viewport; rendered queries normalize and clip them.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ScreenBox {
     pub min: ScreenPoint,

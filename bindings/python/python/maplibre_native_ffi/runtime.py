@@ -28,24 +28,8 @@ class NetworkStatus(UnknownIntEnum):
 class RuntimeEventType(UnknownIntEnum):
     """Runtime event type values reported by the C API.
 
-    The event type selects the meaning of ``RuntimeEvent.code`` and the payload
-    value carried by ``RuntimeEvent.payload``:
-
-    - ``MAP_CAMERA_WILL_CHANGE`` and ``MAP_CAMERA_DID_CHANGE`` carry a
-      :class:`CameraChangeMode` as ``code`` and no payload.
-    - ``MAP_CAMERA_TRANSITION_FINISHED`` carries a
-      :class:`CameraTransitionFinishedPayload`.
-    - ``MAP_LOADING_FAILED`` carries the ordinal of MapLibre Native's internal
-      map load error kind as ``code`` and the failure text as ``message``.
-    - ``MAP_RENDER_FRAME_FINISHED`` carries a :class:`RenderFramePayload`,
-      ``MAP_RENDER_MAP_FINISHED`` a :class:`RenderMapPayload`,
-      ``MAP_STYLE_IMAGE_MISSING`` a :class:`StyleImageMissingPayload`, and
-      ``MAP_TILE_ACTION`` a :class:`TileActionPayload`.
-    - ``OFFLINE_OPERATION_COMPLETED`` carries the operation result as an
-      ``MaplibreStatus`` value in ``code`` and an
-      ``OfflineOperationCompleted`` payload reporting the same status.
-    - The remaining offline event types carry their matching offline payload.
-    - Every other event type reports ``code`` as ``0`` and no payload.
+    The event type selects the meaning of ``RuntimeEvent.code`` and the type of
+    ``RuntimeEvent.payload``.
     """
 
     MAP_CAMERA_WILL_CHANGE = 1
@@ -74,11 +58,7 @@ class RuntimeEventType(UnknownIntEnum):
 
 
 class CameraChangeMode(UnknownIntEnum):
-    """Camera change kinds reported as ``code`` by camera change events.
-
-    ``MAP_CAMERA_WILL_CHANGE`` and ``MAP_CAMERA_DID_CHANGE`` events report one
-    of these values.
-    """
+    """Camera change kinds reported as ``code`` by camera change events."""
 
     IMMEDIATE = 0
     ANIMATED = 1
@@ -124,7 +104,6 @@ class RenderingStats:
 
     @classmethod
     def _from_native(cls, raw: dict[str, object]) -> "RenderingStats":
-        """Build rendering statistics from private native bridge values."""
         return cls(
             encoding_time=raw["encoding_time"],
             rendering_time=raw["rendering_time"],
@@ -145,7 +124,6 @@ class RenderFramePayload:
 
     @classmethod
     def _from_runtime_payload(cls, payload: dict[str, object]) -> "RenderFramePayload":
-        """Build a render-frame payload from RuntimeEvent.payload."""
         return cls(
             mode=RenderMode(payload["mode"]),
             needs_repaint=payload["needs_repaint"],
@@ -162,7 +140,6 @@ class RenderMapPayload:
 
     @classmethod
     def _from_runtime_payload(cls, payload: dict[str, object]) -> "RenderMapPayload":
-        """Build a render-map payload from RuntimeEvent.payload."""
         return cls(mode=RenderMode(payload["mode"]))
 
 
@@ -176,7 +153,6 @@ class StyleImageMissingPayload:
     def _from_runtime_payload(
         cls, payload: dict[str, object]
     ) -> "StyleImageMissingPayload":
-        """Build a style-image-missing payload from RuntimeEvent.payload."""
         return cls(image_id=payload["image_id"])
 
 
@@ -192,7 +168,6 @@ class TileId:
 
     @classmethod
     def _from_native(cls, raw: dict[str, object]) -> "TileId":
-        """Build a tile identity from private native bridge values."""
         return cls(
             overscaled_z=raw["overscaled_z"],
             wrap=raw["wrap"],
@@ -212,7 +187,6 @@ class TileActionPayload:
 
     @classmethod
     def _from_runtime_payload(cls, payload: dict[str, object]) -> "TileActionPayload":
-        """Build a tile-action payload from RuntimeEvent.payload."""
         return cls(
             operation=TileOperation(payload["operation"]),
             tile_id=TileId._from_native(payload["tile_id"]),
@@ -224,15 +198,8 @@ class TileActionPayload:
 class CameraTransitionFinishedPayload:
     """Runtime camera transition-finished event payload.
 
-    A transition that carried a ``transition_id`` on its ``AnimationOptions``
-    reports its end once for every terminal outcome: running to completion,
-    being superseded by a later camera command, being cancelled by
-    ``MapHandle.cancel_transitions``, or completing instantly as a
-    zero-duration jump. A command this API rejects, such as one carrying a
-    non-finite enabled camera field, starts no transition and emits no such
-    event. MapLibre Native reports the moment the transition releases the camera without naming which
-    outcome occurred, so this payload establishes transition identity rather
-    than a completion reason.
+    A transition carrying a ``transition_id`` reports its end once for every
+    terminal outcome, without naming which outcome occurred.
     """
 
     transition_id: int
@@ -241,7 +208,6 @@ class CameraTransitionFinishedPayload:
     def _from_runtime_payload(
         cls, payload: dict[str, object]
     ) -> "CameraTransitionFinishedPayload":
-        """Build a camera transition-finished payload from RuntimeEvent.payload."""
         return cls(transition_id=payload["transition_id"])
 
 
@@ -256,7 +222,6 @@ class UnknownRuntimeEventPayload:
     def _from_runtime_payload(
         cls, payload: dict[str, object]
     ) -> "UnknownRuntimeEventPayload":
-        """Build an unknown payload from RuntimeEvent.payload."""
         return cls(raw_type=payload["raw_type"], data=payload["bytes"])
 
 
@@ -268,11 +233,10 @@ class RuntimeEventSource:
     """Kind of runtime object the event came from."""
 
     map_handle: MapHandle | None = None
-    """Source map when this binding can prove its identity.
+    """Source map, or None once the map is closed or unreferenced.
 
-    The runtime holds its maps weakly, so a `MAP` event carries None here once
-    the caller drops its last reference to the source map or closes it. Keep a
-    reference to every map whose events you route by handle.
+    The runtime holds its maps weakly. Keep a reference to every map whose
+    events you route by handle.
     """
 
 
@@ -281,9 +245,6 @@ class RuntimeEvent:
     """Runtime event copied into Python-owned values.
 
     ``event_type`` selects the meaning of ``code`` and the type of ``payload``.
-    ``code`` carries a :class:`CameraChangeMode`, a ``MaplibreStatus`` value, a
-    MapLibre Native error ordinal, or ``0``; see :class:`RuntimeEventType` for
-    the per-type meaning.
     """
 
     event_type: RuntimeEventType
@@ -298,7 +259,6 @@ class RuntimeEvent:
         raw: dict[str, Any],
         runtime: RuntimeHandle | None = None,
     ) -> "RuntimeEvent":
-        """Build a copied Python event from a private native event dictionary."""
         source_type = RuntimeEventSourceType(raw["source_type"])
         source_id = raw["source_id"]
         return cls(
@@ -328,8 +288,7 @@ class RuntimeOptions:
 class WakeSource(NativeHandleMixin):
     """Releases a runtime owner thread parked in :meth:`RuntimeHandle.pump`.
 
-    A wake source is usable from any thread, which a host's task submission and
-    shutdown paths rely on. It stays usable after its runtime closes, and
+    Usable from any thread. It stays usable after its runtime closes, and
     signalling it then does nothing.
     """
 
@@ -348,8 +307,8 @@ class WakeSource(NativeHandleMixin):
     def signal(self) -> None:
         """Set the runtime's wake flag and release the parked owner thread.
 
-        A signal raised while the owner thread is running sets the wake flag,
-        so the next :meth:`RuntimeHandle.pump` returns without parking.
+        A signal raised while the owner thread runs makes the next
+        :meth:`RuntimeHandle.pump` return without parking.
         """
         self._native.signal()
 
@@ -410,30 +369,17 @@ class RuntimeHandle(NativeHandleMixin):
         the owner-thread task queues. Drain the queued runtime events with
         :meth:`poll_event` afterwards.
 
-        ``timeout`` is in seconds and sets the park bound. Zero drains and
-        returns; hosts pumping from a frame callback pass it. A positive value
-        parks for up to that long; hosts that own their pump thread pass one and
-        take their cadence from the runtime's own work. ``None`` parks until a
-        wake arrives.
-
-        The drain runs every task queued when it begins plus every task those
-        enqueue, so a single call can span a full style parse.
-
-        The runtime holds a wake flag. Style, tile, offline, and resource
-        responses set it, as do queued runtime events and
-        :meth:`WakeSource.signal`. A parking call returns as soon as the flag is
-        set and clears it before returning, and work arriving during the drain
-        sets it again. A call also returns without parking while unread runtime
-        events are queued. Timers and ready file descriptors set the flag only
+        ``timeout`` is in seconds and bounds the park: zero drains and returns,
+        a positive value parks for up to that long, and ``None`` parks until a
+        wake arrives. Timers and ready file descriptors set the wake flag only
         when they queue owner-thread work, so pass a bounded timeout to cap how
         long a call waits.
 
-        A non-zero timeout releases the GIL while it parks, so other Python
-        threads run and can signal a wake source. Call it outside any lock that
-        a signalling thread takes.
+        A non-zero timeout releases the GIL while it parks. Call it outside any
+        lock that a signalling thread takes.
         """
-        # A negative timeout is a caller mistake rather than a request for an
-        # unbounded park, which ``None`` spells, so it collapses to no wait.
+        # A negative timeout collapses to no wait; ``None`` spells an unbounded
+        # park.
         timeout_ms = -1 if timeout is None else max(0, int(timeout * 1000))
         self._native.pump(timeout_ms)
 
@@ -466,9 +412,8 @@ class RuntimeHandle(NativeHandleMixin):
         discards cached resources. Offline regions are unaffected.
         """
         if not 0 <= size < 2**64:
-            # PyO3 extracts this as `u64` and raises a bare OverflowError before
-            # the binding's error conversion runs, so range-check it here to keep
-            # invalid binding-owned input on the documented error shape.
+            # PyO3 raises a bare OverflowError extracting `u64` before the
+            # binding's error conversion runs.
             raise InvalidArgumentError(
                 f"maximum ambient cache size must fit in 64 unsigned bits, not {size}"
             )
@@ -603,9 +548,8 @@ class RuntimeHandle(NativeHandleMixin):
         """Install or replace the runtime-scoped network resource provider.
 
         Replacement is allowed while maps are live. When this call returns, the
-        previous callback is retired and no in-flight request can still reach
-        it. Requests it already took a handle for keep that handle, and each one
-        is completed and released as usual.
+        previous callback is retired, but requests it already took a handle for
+        keep that handle and are completed and released as usual.
         """
         from .resource import _adapt_resource_provider_callback
 
@@ -617,20 +561,17 @@ class RuntimeHandle(NativeHandleMixin):
     def clear_resource_provider(self) -> None:
         """Clear the runtime-scoped network resource provider.
 
-        Later requests go to MapLibre's online file source. When this call
-        returns, the previous callback is retired and no in-flight request can
-        still reach it. Requests it already took a handle for keep that handle,
-        and each one is completed and released as usual.
+        Later requests go to MapLibre's online file source. Requests the
+        previous callback already took a handle for keep that handle and are
+        completed and released as usual.
         """
         self._native.clear_resource_provider()
 
     def poll_event(self) -> RuntimeEvent | None:
         """Poll and copy one queued runtime event.
 
-        Map-originated events resolve their source map through this runtime's
-        weakly held map table, so `RuntimeEvent.source.map_handle` is None once
-        the caller drops its last reference to that map. Keep a reference to
-        every map whose events you route by handle.
+        `RuntimeEvent.source.map_handle` is None once the caller drops its last
+        reference to the source map.
         """
         event = self._native.poll_event()
         if event is None:

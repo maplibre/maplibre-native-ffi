@@ -187,7 +187,6 @@ class OfflineRegionStatus:
 
     @classmethod
     def _from_native(cls, raw: dict[str, object]) -> "OfflineRegionStatus":
-        """Build a status snapshot from private native bridge values."""
         return cls(
             download_state=OfflineRegionDownloadState(raw["download_state"]),
             completed_resource_count=raw["completed_resource_count"],
@@ -252,7 +251,6 @@ class OfflineRegionInfo:
 
     @classmethod
     def _from_native(cls, raw: dict[str, object]) -> "OfflineRegionInfo":
-        """Build region metadata from private native bridge values."""
         return cls(
             id=raw["id"],
             definition=_definition_from_native_wire(raw["definition"]),
@@ -271,7 +269,6 @@ class OfflineRegionStatusChanged:
     def _from_runtime_payload(
         cls, payload: dict[str, object]
     ) -> "OfflineRegionStatusChanged":
-        """Build a status-change payload from RuntimeEvent.payload."""
         return cls(
             region_id=_payload_int(payload, "region_id"),
             status=OfflineRegionStatus._from_native(payload["status"]),
@@ -289,7 +286,6 @@ class OfflineRegionResponseError:
     def _from_runtime_payload(
         cls, payload: dict[str, object]
     ) -> "OfflineRegionResponseError":
-        """Build a response-error payload from RuntimeEvent.payload."""
         from .resource import ResourceErrorReason
 
         return cls(
@@ -309,7 +305,6 @@ class OfflineRegionTileCountLimitExceeded:
     def _from_runtime_payload(
         cls, payload: dict[str, object]
     ) -> "OfflineRegionTileCountLimitExceeded":
-        """Build a tile-count-limit payload from RuntimeEvent.payload."""
         return cls(
             region_id=_payload_int(payload, "region_id"),
             limit=_payload_int(payload, "limit"),
@@ -330,7 +325,6 @@ class OfflineOperationCompleted:
     def _from_runtime_payload(
         cls, payload: dict[str, object]
     ) -> "OfflineOperationCompleted":
-        """Build a completion payload from RuntimeEvent.payload."""
         return cls(
             operation_id=_payload_int(payload, "operation_id"),
             operation_kind=OfflineOperationKind(

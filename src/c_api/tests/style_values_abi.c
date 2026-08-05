@@ -12,8 +12,6 @@
 #define MLN_STRING_LITERAL(text) \
   ((mln_string_view){.data = (text), .size = sizeof(text) - 1})
 
-// This verifies malformed coordinate counts and unknown rasterization enum
-// values hidden by binding value types.
 static void style_value_helpers_reject_unsafe_raw_descriptors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -158,9 +156,8 @@ static void geojson_source_options_reject_unsafe_raw_headers(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Supercluster reads every feature geometry as a point, so clustered data
-// carrying other geometry used to surface a bare variant access message. The
-// C API rejects it up front and names the source, feature, and constraint.
+// Supercluster reads every feature geometry as a point, so the C API rejects
+// other geometry up front and names the source, feature, and constraint.
 static void clustered_geojson_data_reports_non_point_geometry(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -323,8 +320,8 @@ static const char layer_accessor_style_json[] =
   "\"layers\":[{\"id\":\"lines\",\"type\":\"line\",\"source\":\"vec\","
   "\"source-layer\":\"roads\"},{\"id\":\"bg\",\"type\":\"background\"}]}";
 
-// This verifies the typed layer accessors reject a layer type that takes no
-// source, which MapLibre's own setProperty path accepts as a silent no-op.
+// MapLibre's own setProperty path accepts a sourceless layer as a silent no-op;
+// the typed accessors reject it.
 static void layer_source_accessors_reject_sourceless_layer_types(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -365,8 +362,6 @@ static void layer_source_accessors_reject_sourceless_layer_types(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies the raw buffer contract for copied layer text: the required
-// size is reported even when the caller's capacity is too small.
 static void layer_text_accessors_report_required_capacity(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -427,8 +422,7 @@ static void layer_text_accessors_report_required_capacity(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies the unbounded zoom range crosses the ABI as infinities and that
-// a raw NaN and an unknown visibility value are rejected.
+// An unbounded zoom range crosses the ABI as infinities.
 static void layer_zoom_and_visibility_accessors_carry_raw_domains(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -498,8 +492,6 @@ static void layer_zoom_and_visibility_accessors_carry_raw_domains(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies raw stretch and content descriptors, unknown text-fit values,
-// and the stretch copy buffer contract that binding image types hide.
 static void style_image_stretch_descriptors_reject_unsafe_raw_values(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -687,8 +679,6 @@ static void style_image_stretch_descriptors_reject_unsafe_raw_values(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies the copy-out family answers a null buffer with zero capacity as
-// a size probe, so a caller can size a buffer without reading it as a failure.
 static void copy_entry_points_answer_a_null_buffer_as_a_size_probe(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -786,9 +776,9 @@ static void copy_entry_points_answer_a_null_buffer_as_a_size_probe(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Source metadata is split between fixed fields, copy-out strings, and an
-// owned list because no caller-owned struct can safely retain variable-length
-// TileJSON data across the ABI.
+// Source metadata is split between fixed fields, copy-out strings, and an owned
+// list because no caller-owned struct can retain variable-length TileJSON data
+// across the ABI.
 static void style_source_info_rebuilds_an_inline_tile_source(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -1089,8 +1079,7 @@ static void style_source_info_reports_other_source_shapes(void) {
 }
 
 // The loaded document is what the style loader last parsed, not a serialization
-// of the live style, so this pins both the verbatim round trip and the fact
-// that later mutations never reach it.
+// of the live style.
 static void loaded_style_document_reports_the_parsed_bytes(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -1137,9 +1126,7 @@ static void loaded_style_document_reports_the_parsed_bytes(void) {
   );
   TEST_ASSERT_EQUAL_size_t(0, size);
 
-  // Mutating the live style does not rewrite the parsed document. This negative
-  // assertion is the point of the entry point's contract: hosts that expect
-  // getStyle()-style serialization would otherwise read staleness as a bug.
+  // Mutating the live style does not rewrite the parsed document.
   const mln_json_value layer_id = {
     .size = sizeof(mln_json_value),
     .type = MLN_JSON_VALUE_TYPE_STRING,
@@ -1173,8 +1160,7 @@ static void loaded_style_document_reports_the_parsed_bytes(void) {
   TEST_ASSERT_EQUAL_size_t(style_json_length, size);
   TEST_ASSERT_EQUAL_INT(0, memcmp(after, style_json, style_json_length));
 
-  // A failed parse leaves the previously parsed document in place, bytes and
-  // all, rather than a same-length document the loader half-applied.
+  // A failed parse leaves the previously parsed document in place.
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_NATIVE_ERROR, mln_map_set_style_json(map, "{\"version\":")
   );
@@ -1225,18 +1211,15 @@ static void style_url_reports_the_requested_url(void) {
   );
   TEST_ASSERT_EQUAL_size_t(style_url_length, size);
 
-  // Nothing parsed yet, so the document stays empty while the URL is set. The
-  // two answer different questions.
+  // Nothing parsed yet, so the document stays empty while the URL is set.
   size = 123;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_copy_loaded_style_json(map, NULL, 0, &size)
   );
   TEST_ASSERT_EQUAL_size_t(0, size);
 
-  // An empty URL is accepted by the setter and reads back as zero bytes, which
-  // is why the header documents a zero length as "no URL bytes are available"
-  // rather than "no URL was requested". This entry point cannot tell the two
-  // apart, and a presence flag could not either.
+  // An empty URL is accepted and reads back as zero bytes, which this entry
+  // point cannot tell apart from no URL requested.
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_set_style_url(map, ""));
   size = 123;
   TEST_ASSERT_EQUAL_INT(
@@ -1259,9 +1242,8 @@ static void style_transition_options_reject_unsafe_raw_headers(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
 
-  // Every rejection below must leave this applied configuration untouched, so
-  // a setter that validated one field after committing another would fail here
-  // rather than silently half-applying.
+  // Every rejection below leaves this applied configuration untouched, so a
+  // setter that committed one field before validating another fails here.
   mln_style_transition_options applied = mln_style_transition_options_default();
   applied.fields = MLN_STYLE_TRANSITION_OPTION_DURATION |
                    MLN_STYLE_TRANSITION_OPTION_DELAY |
@@ -1274,8 +1256,7 @@ static void style_transition_options_reject_unsafe_raw_headers(void) {
   );
 
   // Omitting the placement bit leaves the cross-fade on rather than carrying
-  // the struct's zero value through, so an omitted field stays distinguishable
-  // from the cleared one applied just above. The getter always reports the bit.
+  // the struct's zero value through. The getter always reports the bit.
   mln_style_transition_options omitted = mln_style_transition_options_default();
   omitted.fields = MLN_STYLE_TRANSITION_OPTION_DURATION;
   omitted.duration_ms = 5.0;
@@ -1318,8 +1299,8 @@ static void style_transition_options_reject_unsafe_raw_headers(void) {
   );
 
   // Each rejected duration carries a valid delay and vice versa, so a setter
-  // that committed one field before validating the other would leave the
-  // baseline half-overwritten whichever order it validated in.
+  // that commits before validating leaves the baseline half-overwritten in
+  // whichever order it validates.
   mln_style_transition_options infinite_duration =
     mln_style_transition_options_default();
   infinite_duration.fields =
@@ -1354,24 +1335,21 @@ static void style_transition_options_reject_unsafe_raw_headers(void) {
     mln_map_get_style_transition_options(map, &short_out)
   );
 
-  // The largest accepted duration must survive conversion into native ticks.
-  // The native maximum has no exact double representation, so accepting the
-  // rounded maximum used to wrap it to the most negative duration and read back
-  // negative. Bisect for the ceiling rather than naming it, because it follows
-  // from the native duration type rather than from this API.
+  // The largest accepted duration must survive conversion into native ticks,
+  // where a rounded-up maximum wraps to the most negative duration. The ceiling
+  // is bisected rather than named because it follows from the native duration
+  // type rather than from this API.
   mln_style_transition_options probe = mln_style_transition_options_default();
   probe.fields = MLN_STYLE_TRANSITION_OPTION_DURATION;
-  // Zero is the one duration this API always accepts, so the search starts from
-  // a bracket it proved rather than assumed.
+  // Zero is the one duration this API always accepts.
   double accepted = 0.0;
   double rejected = 1.0;
   probe.duration_ms = accepted;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_style_transition_options(map, &probe)
   );
-  // Double until one is rejected, so the bisection below starts from a bracket
-  // it can close whatever duration type the platform uses. A non-finite bound
-  // is rejected too, so this terminates.
+  // Doubling until one is rejected brackets the bisection below. A non-finite
+  // bound is rejected too, so this terminates.
   for (int step = 0; step < 4096; step++) {
     probe.duration_ms = rejected;
     if (mln_map_set_style_transition_options(map, &probe) != MLN_STATUS_OK) {

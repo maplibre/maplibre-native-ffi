@@ -14,11 +14,9 @@ import android.view.SurfaceView
  * session it attaches. It touches the map only to attach, which native serves from any thread;
  * every other map call belongs to [MapRuntimeLoop].
  *
- * The platform destroys and recreates this view's surface across a rotation and across a trip to
- * the background. A graphics context that outlives its surface keeps the session attached to it,
- * which follows the replacement and keeps its renderer, so the map comes back with its tiles,
- * atlases, and symbol placement rather than building them again. A context that goes with its
- * surface takes the session with it, and the next frame attaches a cold one.
+ * The platform destroys and recreates this view's surface across a rotation and a trip to the
+ * background. A session survives that only while its graphics context does, so a context that goes
+ * with its surface leaves the next frame attaching a cold session.
  */
 internal class AndroidMapView(context: Context) :
   SurfaceView(context), SurfaceHolder.Callback2, Choreographer.FrameCallback, AutoCloseable {
@@ -101,15 +99,13 @@ internal class AndroidMapView(context: Context) :
     if (loop != null) {
       try {
         val target = ensureRenderTarget(loop)
-        // Consume before rendering, so a request the runtime loop publishes during the render call
-        // is not discarded.
         if (target != null && loop.renderRequest.consume()) {
           if (target.renderUpdate()) {
             contextRebuildSpent = false
             finishPendingDrawing()
           } else {
             // The map applies its logical size on the runtime loop's next pump, so an attach is
-            // followed by frames with nothing to render. Keep pacing and retry.
+            // followed by frames with nothing to render.
             loop.renderRequest.set()
           }
         }
@@ -142,7 +138,6 @@ internal class AndroidMapView(context: Context) :
     requestRender()
   }
 
-  /** Presents through the surface the platform just handed over, at the size it comes with. */
   private fun surfaceAvailable(holder: SurfaceHolder) {
     if (closed) return
     val nextViewport =
@@ -153,16 +148,15 @@ internal class AndroidMapView(context: Context) :
       return
     }
     if (graphics?.setSurface(holder.surface) != true) {
-      // No context yet, or one that cannot present through this surface. The session goes with it,
-      // since a session outlives only the context it attached against, and the next frame attaches
-      // a cold one against the context built here.
+      // A session outlives only the context it attached against, so replacing the context closes
+      // the session and the next frame attaches a cold one.
       detachSurface()
       val nextGraphics = GraphicsContext.create(holder.surface)
       graphics = nextGraphics
       Log.i(TAG, "render-target=native-surface status=${nextGraphics.backendName}")
     }
-    // The runtime loop outlives surface changes: it keeps the runtime and the map alive so loading
-    // continues while there is nothing to present to.
+    // The runtime loop outlives surface changes, so loading continues while there is nothing to
+    // present to.
     if (runtimeLoop == null) {
       runtimeLoop = MapRuntimeLoop(nextViewport)
     }
@@ -170,11 +164,9 @@ internal class AndroidMapView(context: Context) :
     requestRender()
   }
 
-  /** Gives back the surface the platform is taking, keeping what outlives it. */
   private fun surfaceLost() {
     if (graphics?.releaseSurface() == true) {
-      // The context outlived the surface, so the session parks on it and keeps its renderer until
-      // a surface returns. Frames stop meanwhile: there is nothing to present to.
+      // The context outlived the surface, so the session parks on it until a surface returns.
       followSurface("surface released")
     } else {
       detachSurface()
@@ -193,11 +185,8 @@ internal class AndroidMapView(context: Context) :
     try {
       target.resize(currentGraphics, currentViewport)
     } catch (error: RuntimeException) {
-      // The surface this session was presenting through is already gone by now,
-      // and a failed handover may have left it holding either that one or the
-      // replacement. Close it here rather than let a lifecycle callback throw
-      // with a live session naming a destroyed surface; the next surface
-      // attaches a new one.
+      // A failed handover may leave the session naming a destroyed surface, so close it here; the
+      // next surface attaches a new one.
       Log.w(TAG, "$change: handing the surface over failed; the session is closed", error)
       detachSurface()
       return
@@ -206,13 +195,8 @@ internal class AndroidMapView(context: Context) :
   }
 
   /**
-   * Builds again after a failed frame, once.
-   *
-   * A lost graphics context is the one change a session cannot be carried across: nothing in it
-   * survives, so the session goes with it and the next frame attaches a cold one against a context
-   * built from the surface the platform still holds. A second failure with no good frame in between
-   * is a target that keeps throwing rather than a context that was lost, so stop scheduling instead
-   * of reposting every vsync against it.
+   * Builds the graphics context again after a failed frame, once. A second failure with no good
+   * frame in between stops scheduling rather than reposting every vsync against a broken target.
    */
   private fun rebuildAfterFrameFailure() {
     detachSurface()
@@ -267,12 +251,10 @@ internal class AndroidMapView(context: Context) :
     !closed &&
       viewVisible &&
       appForeground &&
-      // A parked context has no surface to present to, so its session waits rather than renders.
       graphics?.hasSurface == true &&
       !frameFailed &&
       runtimeLoop != null &&
-      // A loop whose setup failed never publishes a map, so reposting every
-      // vsync would spin against a blank view instead of surfacing the failure.
+      // A loop whose setup failed never publishes a map.
       runtimeLoop?.setupFailure == null
 
   private fun finishPendingDrawing() {

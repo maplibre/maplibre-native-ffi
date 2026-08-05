@@ -63,11 +63,9 @@ static void* const fake_handle = (void*)(uintptr_t)1;
     mln_test_destroy_runtime(runtime);                                \
   } while (false)
 
-// Every backend's descriptor validation runs on every build. A host that probes
-// a backend this build does not carry still has to learn its descriptor is
-// wrong before it learns the backend is missing, and the backend-native paths
-// reject the same inputs. Gating these by build left the not-this-backend paths
-// unverified, which is how they drifted apart.
+// Every backend's descriptor validation runs on every build: a descriptor error
+// is reported before a missing-backend error, whether or not this build carries
+// the backend.
 
 static mln_metal_surface_descriptor metal_surface_descriptor(void) {
   mln_metal_surface_descriptor value = mln_metal_surface_descriptor_default();
@@ -93,8 +91,6 @@ static void shrink_metal_owned(mln_metal_owned_texture_descriptor* descriptor) {
   descriptor->context.size = sizeof(mln_metal_context_descriptor) - 1;
 }
 
-// This verifies nulls, a non-null output handle, undersized descriptors, and
-// missing required Metal surface handles.
 static void metal_surface_attach_rejects_unsafe_raw_inputs(void) {
   EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(
     mln_metal_surface_descriptor, metal_surface_descriptor,
@@ -102,8 +98,6 @@ static void metal_surface_attach_rejects_unsafe_raw_inputs(void) {
   );
 }
 
-// This verifies nulls, a non-null output handle, undersized descriptors, and
-// missing required Metal texture handles.
 static void metal_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
   EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(
     mln_metal_owned_texture_descriptor, metal_owned_descriptor,
@@ -111,8 +105,6 @@ static void metal_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
   );
 }
 
-// This verifies nested extent sizing and required borrowed Metal texture
-// handles hidden by binding descriptors.
 static void metal_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -155,8 +147,6 @@ static void shrink_webgpu_owned(
   descriptor->context.size = sizeof(mln_webgpu_context_descriptor) - 1;
 }
 
-// This verifies nulls, a non-null output handle, undersized descriptors, and
-// missing required WebGPU handles.
 static void webgpu_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
   EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(
     mln_webgpu_owned_texture_descriptor, webgpu_owned_descriptor,
@@ -180,8 +170,6 @@ static void shrink_webgpu_surface(mln_webgpu_surface_descriptor* descriptor) {
   descriptor->context.size = sizeof(mln_webgpu_context_descriptor) - 1;
 }
 
-// This verifies nulls, a non-null output handle, undersized descriptors, and
-// the required WebGPU surface handle.
 static void webgpu_surface_attach_rejects_unsafe_raw_inputs(void) {
   EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(
     mln_webgpu_surface_descriptor, webgpu_surface_descriptor,
@@ -189,8 +177,8 @@ static void webgpu_surface_attach_rejects_unsafe_raw_inputs(void) {
   );
 }
 
-// A surface with no format cannot be configured, so the descriptor says so
-// rather than leaving the browser to report it after attach.
+// A surface with no format cannot be configured, so attach rejects it instead
+// of leaving the browser to report it.
 static void webgpu_surface_attach_rejects_an_unspecified_format(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -206,8 +194,6 @@ static void webgpu_surface_attach_rejects_an_unspecified_format(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// This verifies nested extent sizing, physical size, and the required borrowed
-// WebGPU handles and format hidden by binding descriptors.
 static void webgpu_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -339,8 +325,6 @@ static void shrink_opengl_owned(
   shrink_opengl_context(&descriptor->context);
 }
 
-// This verifies nulls, a non-null output handle, undersized descriptors, and
-// missing required OpenGL texture handles.
 static void opengl_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
   EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(
     mln_opengl_owned_texture_descriptor, opengl_owned_descriptor,
@@ -348,8 +332,6 @@ static void opengl_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
   );
 }
 
-// This verifies nulls, a non-null output handle, undersized descriptors, and
-// missing required OpenGL surface handles.
 static void opengl_surface_attach_rejects_unsafe_raw_inputs(void) {
   EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(
     mln_opengl_surface_descriptor, opengl_surface_descriptor,
@@ -359,8 +341,7 @@ static void opengl_surface_attach_rejects_unsafe_raw_inputs(void) {
 
 #if defined(MLN_FFI_TEST_OPENGL_WEBGL)
 // A WebGL context carries the canvas it presents to, so a surface handle
-// alongside it names a second one this session would ignore. Rejecting it keeps
-// a host from believing it chose the target.
+// alongside it names a second target the session would ignore.
 static void opengl_surface_attach_rejects_a_webgl_surface_handle(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -377,8 +358,6 @@ static void opengl_surface_attach_rejects_a_webgl_surface_handle(void) {
 }
 #endif
 
-// This verifies nested sizes and required raw texture values that typed OpenGL
-// descriptors prevent.
 static void opengl_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -451,8 +430,6 @@ static void shrink_vulkan_owned(
   descriptor->context.size = sizeof(mln_vulkan_context_descriptor) - 1;
 }
 
-// This verifies nulls, a non-null output handle, undersized descriptors, and
-// missing required Vulkan surface handles.
 static void vulkan_surface_attach_rejects_unsafe_raw_inputs(void) {
   EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(
     mln_vulkan_surface_descriptor, vulkan_surface_descriptor,
@@ -460,8 +437,6 @@ static void vulkan_surface_attach_rejects_unsafe_raw_inputs(void) {
   );
 }
 
-// This verifies nulls, a non-null output handle, undersized descriptors, and
-// missing required Vulkan texture handles.
 static void vulkan_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
   EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(
     mln_vulkan_owned_texture_descriptor, vulkan_owned_descriptor,
@@ -469,8 +444,6 @@ static void vulkan_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
   );
 }
 
-// This verifies nested descriptor sizes and required borrowed Vulkan image
-// handles hidden by bindings.
 static void vulkan_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

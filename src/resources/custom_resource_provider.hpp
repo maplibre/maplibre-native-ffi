@@ -11,8 +11,8 @@
 
 namespace mln::core {
 
-// resolved_url carries the tile server normalization the online source would
-// have applied, which the provider sees alongside the request URL.
+// resolved_url applies the tile server normalization the online source would
+// have applied. The provider sees it alongside the request URL.
 auto request_custom_resource(
   const mbgl::Resource& resource, std::string resolved_url,
   mln_resource_provider_callback provider_callback, void* user_data,
