@@ -49,12 +49,6 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
 // - BND-160's Metal and Vulkan halves — the browser module is built with OpenGL only. The
 //   unsupported-backend errors those attach paths report are covered.
 //
-// **Not implemented yet in this module.**
-// - BND-124 — custom geometry source callback teardown. MapLibre invokes those callbacks on worker
-//   threads, which cannot enter the page's WebAssembly instance where a host's callback body
-//   lives, and the browser module carries no asynchronous proxy to reach it. Asserted as refused by
-//   `StyleBrowserTest` until it does.
-//
 // **No seam for the injected failure.** The C API cannot be made to produce these here, and this
 // binding has no internal hook that would:
 // - BND-066's copy-failure half — an allocation failure after a native result handle is acquired.
@@ -239,6 +233,9 @@ internal object PageCanvases {
   /** The caller-owned texture target's, which is blitted the same way. */
   const val BORROWED_TEXTURE: String = "mln-test-borrowed-texture"
 
+  /** The custom geometry source test's, which presents tiles this page supplied. */
+  const val CUSTOM_GEOMETRY: String = "mln-test-custom-geometry"
+
   /**
    * A valid HTML id that a CSS identifier cannot spell literally, for [HostileCanvasIdBrowserTest].
    *
@@ -268,7 +265,7 @@ internal object PageCanvases {
    * consumer of the same canvas makes destroying the runtime fail.
    */
   fun reserveAll() {
-    for (id in listOf(SURFACE, OWNED_TEXTURE, BORROWED_TEXTURE, HOSTILE)) {
+    for (id in listOf(SURFACE, OWNED_TEXTURE, BORROWED_TEXTURE, CUSTOM_GEOMETRY, HOSTILE)) {
       ensureCanvasElement(id, WIDTH, HEIGHT)
       WebglContext.reserveCanvas(id)
     }

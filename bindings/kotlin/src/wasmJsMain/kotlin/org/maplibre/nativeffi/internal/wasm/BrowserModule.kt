@@ -298,6 +298,12 @@ internal object BrowserModule {
       "_mln_browser_sync_provider_thunk",
       "_mln_browser_sync_transform_install",
       "_mln_browser_sync_transform_thunk",
+      // The asynchronous callbacks native invokes per tile, from the worker its custom geometry
+      // source's tile loader runs on. Nothing waits for these, so they are posted to the page
+      // rather than proxied synchronously; see src/browser/custom_geometry.c.
+      "_mln_browser_custom_geometry_install",
+      "_mln_browser_custom_geometry_fetch_thunk",
+      "_mln_browser_custom_geometry_cancel_thunk",
       // Entry points this binding calls directly rather than through the table,
       // because they touch no runtime state and so have no owner thread to reach.
       "_mln_thread_last_error_message",

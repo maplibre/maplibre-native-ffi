@@ -555,28 +555,38 @@ public actual class RuntimeHandle private constructor(private val handle: Native
     live { call("mln_runtime_clear_http_header_transform") }
   }
 
-  public actual fun pollEvent(): RuntimeEvent? = live {
-    // The event descriptor and the has-event flag share one block, so a poll costs one scratch
-    // acquisition rather than two.
-    Heap.withScratch(MlnRuntimeEvent.SIZEOF + BOOL_BYTES) { event ->
-      val hasEvent = event + MlnRuntimeEvent.SIZEOF
-      RuntimeEventMarshal.writeHeader(event)
-      Dispatcher.call(
-        "mln_runtime_poll_event",
-        3,
-        { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, event)
-          slots.setPointer(2, hasEvent)
-        },
-        { Status.check(Heap.loadInt(it)) },
-      )
-      // Read here rather than handed back as a view. The message and payload the descriptor points
-      // at live in runtime-owned storage that the next poll for this runtime overwrites, so the
-      // public event has to be whole before this frame returns.
-      if (Heap.loadByte(hasEvent) == 0.toByte()) null
-      else RuntimeEventMarshal.readEvent(event, this)
+  public actual fun pollEvent(): RuntimeEvent? {
+    val event = live {
+      // The event descriptor and the has-event flag share one block, so a poll costs one scratch
+      // acquisition rather than two.
+      Heap.withScratch(MlnRuntimeEvent.SIZEOF + BOOL_BYTES) { block ->
+        val hasEvent = block + MlnRuntimeEvent.SIZEOF
+        RuntimeEventMarshal.writeHeader(block)
+        Dispatcher.call(
+          "mln_runtime_poll_event",
+          3,
+          { slots ->
+            slots.setLong(0, handle.raw)
+            slots.setPointer(1, block)
+            slots.setPointer(2, hasEvent)
+          },
+          { Status.check(Heap.loadInt(it)) },
+        )
+        // Read here rather than handed back as a view. The message and payload the descriptor
+        // points at live in runtime-owned storage that the next poll for this runtime overwrites,
+        // so the public event has to be whole before this frame returns.
+        if (Heap.loadByte(hasEvent) == 0.toByte()) null
+        else RuntimeEventMarshal.readEvent(block, this)
+      }
     }
+    // After the event is whole, because releasing a registration asks the map which sources it
+    // still has and that is a second call on the owner thread. A style that has finished loading is
+    // the only announcement a style set by URL makes, so it is where a source the new style dropped
+    // stops being one this binding holds a callback for.
+    if (event?.type == RuntimeEventType.MAP_STYLE_LOADED) {
+      event.mapSource?.releaseDetachedCustomGeometrySources()
+    }
+    return event
   }
 
   public actual override fun close() {

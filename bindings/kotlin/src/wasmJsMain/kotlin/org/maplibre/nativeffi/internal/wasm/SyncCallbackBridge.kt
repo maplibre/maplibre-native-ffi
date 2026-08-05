@@ -35,9 +35,6 @@ private external fun addProviderTrampoline(): Int
 )
 private external fun addTransformTrampoline(): Int
 
-@JsFun("(index) => { globalThis.__maplibreNativeC.removeFunction(index) }")
-private external fun removeTrampoline(index: Int)
-
 @JsFun("(host) => globalThis.__maplibreNativeC._mln_browser_sync_provider_install(host)")
 private external fun installProviderHost(host: Int): Boolean
 
@@ -98,98 +95,13 @@ internal fun mlnBrowserResourceTransformHost(
  * Names both trampolines from Kotlin, so the linker keeps their exports.
  *
  * Calling them rather than merely mentioning them, because a mention of a function that is never
- * invoked is itself removable. Token 0 is never issued — [SyncCallbackHost] counts from one — so
+ * invoked is itself removable. Token 0 is never issued — [HostCallbackTable] counts from one — so
  * each looks for a registration, finds none, and returns without reading any of its pointer
  * arguments. That is what makes calling them here safe as well as sufficient.
  */
 private fun retainTrampolines() {
   mlnBrowserResourceProviderHost(0, 0, 0L)
   mlnBrowserResourceTransformHost(0, 0, 0, 0)
-}
-
-/**
- * The module-global half of one family of synchronous callbacks.
- *
- * The callback a runtime registers is the module's own thunk, and the thunk forwards to one host
- * function pointer this installs. That pointer is module-global while a registration is a
- * runtime's, so this owns the trampoline and hands each registration a token to be reached by.
- * Native carries the token back as the `user_data` it was registered with, which is what lets one
- * trampoline serve a registration that is being replaced and the one replacing it at the same time.
- *
- * The trampoline is added when the first registration arrives and removed when the last one goes.
- * `sync_callback.c` requires a host to install before it registers and to clear after it has
- * cleared the registration, and both halves of that ordering are the caller's: it registers with
- * the runtime only after [add] has returned, and it calls [remove] only after the registration is
- * gone.
- *
- * A plain map and a plain counter are the whole implementation, because a Kotlin/Wasm module runs
- * on one thread and every call here is made from the page.
- */
-private class SyncCallbackHost<T : Any>(
-  private val subject: String,
-  private val addTrampoline: () -> Int,
-  private val installHost: (Int) -> Boolean,
-) {
-  private val registrations = mutableMapOf<Int, T>()
-  private var trampoline = 0
-  private var nextToken = 1
-
-  /** Returns the registration [token] names, or null once that registration has gone. */
-  fun find(token: Int): T? = registrations[token]
-
-  /**
-   * Installs the host trampoline if it is absent, and registers what [create] builds under a fresh
-   * token.
-   *
-   * [create] runs before the installation, so a failure there leaves nothing registered and the
-   * trampoline as it was.
-   */
-  fun add(create: (Int) -> T): T {
-    val token = nextToken++
-    val registration = create(token)
-    install()
-    registrations[token] = registration
-    return registration
-  }
-
-  /**
-   * Drops [token]'s registration, and clears the host pointer once the last one has gone.
-   *
-   * The host pointer is cleared before the table entry is released, because native reaches the
-   * entry through that pointer.
-   */
-  fun remove(token: Int) {
-    if (registrations.remove(token) == null) return
-    if (registrations.isNotEmpty()) return
-    installHost(0)
-    removeTrampoline(trampoline)
-    trampoline = 0
-  }
-
-  private fun install() {
-    if (trampoline != 0) return
-    BrowserModule.require()
-    // Keeps the two trampolines in the linked binary. Their only other reference is the JavaScript
-    // string that reads them out of `wasmExports`, and dead-code elimination cannot see inside a
-    // string, so a binary that links this module as a klib -- every host consuming the published
-    // artifact -- drops them. `addFunction` is then handed `undefined` and reports that a function
-    // import requires a callable, which names neither the export nor the reason.
-    retainTrampolines()
-    val added = addTrampoline()
-    if (added == 0) {
-      throw Status.invalidState(
-        "The MapLibre Native browser module could not place the $subject trampoline in its " +
-          "function table."
-      )
-    }
-    if (!installHost(added)) {
-      removeTrampoline(added)
-      throw Status.invalidState(
-        "The MapLibre Native browser module could not install the $subject host callback."
-      )
-    }
-    trampoline = added
-  }
 }
 
 /**
@@ -251,10 +163,11 @@ private constructor(private val callback: ResourceProviderCallback, private val 
     private const val SUBJECT = "resource provider callbacks"
 
     private val host =
-      SyncCallbackHost<ResourceProviderBridge>(
+      HostCallbackTable<ResourceProviderBridge>(
         SUBJECT,
         ::addProviderTrampoline,
         ::installProviderHost,
+        ::retainTrampolines,
       )
 
     /** Installs the host trampoline and registers [callback] with it. */
@@ -356,10 +269,11 @@ private constructor(private val callback: ResourceTransformCallback, private val
     private const val SUBJECT = "resource transform callbacks"
 
     private val host =
-      SyncCallbackHost<ResourceTransformBridge>(
+      HostCallbackTable<ResourceTransformBridge>(
         SUBJECT,
         ::addTransformTrampoline,
         ::installTransformHost,
+        ::retainTrampolines,
       )
 
     fun install(callback: ResourceTransformCallback): ResourceTransformBridge = host.add { token ->

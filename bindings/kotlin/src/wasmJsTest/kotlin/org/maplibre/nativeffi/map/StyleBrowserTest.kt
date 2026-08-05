@@ -12,7 +12,6 @@ import kotlin.test.assertTrue
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.browserTest
 import org.maplibre.nativeffi.error.InvalidArgumentException
-import org.maplibre.nativeffi.error.UnsupportedFeatureException
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.FeatureIdentifier
@@ -491,16 +490,15 @@ class StyleBrowserTest {
   }
 
   /**
-   * The one style workflow this binding does not carry yet.
+   * A custom geometry source, added and then described by the style that holds it.
    *
-   * MapLibre invokes a custom geometry source's tile callbacks on native worker threads, which
-   * cannot enter the page's WebAssembly instance where a host's callback body lives. Both callbacks
-   * return `void`, so an asynchronous proxy is what would carry them, and the browser module has
-   * none yet. The source is refused for now rather than added and left silently starved of tiles.
-   * Asserted here so that whoever adds the proxy sees this test fail and states the new behavior.
+   * The workflow this source exists for — tiles requested by MapLibre and supplied by the page — is
+   * `CustomGeometrySourceBrowserTest`'s. What is asserted here is that the source is an ordinary
+   * member of the style once it has been added, and that the rest of its family reports a source it
+   * cannot find the way native does.
    */
   @Test
-  fun aCustomGeometrySourceIsRefusedUntilItsAsyncProxyExists(): Promise<JsAny?> = browserTest {
+  fun aCustomGeometrySourceJoinsTheStyleItWasAddedTo(): Promise<JsAny?> = browserTest {
     maplibreScope {
       withMap { _, map ->
         map.setStyleJson(EMPTY_STYLE_JSON)
@@ -509,13 +507,26 @@ class StyleBrowserTest {
           object : CustomGeometrySourceCallback {
             override fun fetchTile(tileId: CanonicalTileId) = Unit
           }
-        assertFailsWith<UnsupportedFeatureException> {
-          map.addCustomGeometrySource("custom", CustomGeometrySourceOptions(callback))
-        }
+        map.addCustomGeometrySource(
+          "custom",
+          CustomGeometrySourceOptions(callback).apply {
+            minZoom = 0.0
+            maxZoom = 14.0
+            tolerance = 0.375
+            tileSize = 512
+            buffer = 64
+            clip = true
+            wrap = false
+          },
+        )
+        assertTrue(map.styleSourceExists("custom"))
+        assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceType("custom"))
+
+        assertTrue(map.removeStyleSource("custom"))
         assertFalse(map.styleSourceExists("custom"))
 
-        // The rest of the family is not refused by the binding: with no source to name, native is
-        // what rejects them, and it does so as an invalid argument rather than as unsupported.
+        // With no source to name, native is what rejects the rest of the family, and it does so as
+        // an invalid argument.
         assertFailsWith<InvalidArgumentException> {
           map.setCustomGeometrySourceTileData(
             "custom",

@@ -21,6 +21,7 @@ import org.maplibre.nativeffi.internal.lifecycle.NativeMapProjection
 import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.wasm.CameraMarshal
+import org.maplibre.nativeffi.internal.wasm.CustomGeometryBridge
 import org.maplibre.nativeffi.internal.wasm.Dispatcher
 import org.maplibre.nativeffi.internal.wasm.GeoJsonMarshal
 import org.maplibre.nativeffi.internal.wasm.GeometryMarshal
@@ -66,6 +67,7 @@ import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.render.WebglContext
 import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageStretch
@@ -119,6 +121,15 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   private val core = HandleStateCore("MapHandle", handle.raw, runtime)
 
   /**
+   * The tile callback registration behind each custom geometry source this map holds, by source id.
+   *
+   * A registration outlives the call that made it, because native keeps asking for tiles for as
+   * long as the source is in the style, so it is held here rather than by the caller. What ends it
+   * is the source ending: removal, a new style that does not carry it, or this map closing.
+   */
+  private val customGeometrySources = mutableMapOf<String, CustomGeometryBridge>()
+
+  /**
    * Checks this handle is live and then runs [body], without holding a use count across it.
    *
    * `withLive` would hold one, and every call here parks the Kotlin stack while the owner thread
@@ -156,6 +167,10 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         Heap.storeUtf8(text, json)
         callWithPointer("mln_map_set_style_json", text)
       }
+      // The style this parsed replaces the one the sources were added to, so none of them exists
+      // any more. A style set by URL loads later instead, and its registrations are released when
+      // the load is reported; see `RuntimeHandle.pollEvent`.
+      clearCustomGeometrySources()
     }
   }
 
@@ -167,8 +182,13 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     live { callWithIdAndJson("mln_map_add_style_source_json", sourceId, sourceJson) }
   }
 
-  public actual fun removeStyleSource(sourceId: String): Boolean =
-    flagForId("mln_map_remove_style_source", sourceId)
+  public actual fun removeStyleSource(sourceId: String): Boolean {
+    val removed = flagForId("mln_map_remove_style_source", sourceId)
+    // Only a source native really removed, because a refused removal leaves the source in the style
+    // and it goes on asking for tiles.
+    if (removed) customGeometrySources.remove(sourceId)?.close()
+    return removed
+  }
 
   public actual fun styleSourceExists(sourceId: String): Boolean =
     flagForId("mln_map_style_source_exists", sourceId)
@@ -337,32 +357,67 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   }
 
   /**
-   * Reports that this binding does not carry a custom geometry source yet.
+   * Adds a custom geometry source whose tiles this page supplies.
    *
-   * This binding runs Kotlin/Wasm on the page, so a host's callback body lives there, and MapLibre
-   * invokes `fetch_tile` and `cancel_tile` on arbitrary native worker threads, which cannot enter
-   * the page's WebAssembly instance. Reaching the host from one therefore means proxying the call
-   * to where the host code already is.
+   * MapLibre asks for a tile on the worker the source's tile loader runs on, and a worker cannot
+   * enter the page's WebAssembly instance, so the module posts the request to the page instead;
+   * `src/browser/custom_geometry.c` states what that guarantees and what it does not. The callback
+   * therefore arrives on a page task of its own, after the worker that produced it has moved on.
    *
-   * That is work this module has not done for these two callbacks. Both return `void`, so an
-   * asynchronous proxy is what they want: the worker copies the tile id, posts it, and returns
-   * without waiting, and the tile's data reaches MapLibre later through
-   * [setCustomGeometrySourceTileData], which this binding already implements. The synchronous proxy
-   * that `src/browser/sync_callback.c` uses for the resource provider is the wrong shape here,
-   * because that one blocks its worker until the page answers and only exists because the C API
-   * demands a decision back. Beyond the proxy, `cancel_tile` is best-effort — it may repeat and may
-   * race `fetch_tile` — so the page's side needs cancellation state of its own.
+   * **The callback may not answer the request from inside itself.**
+   * [setCustomGeometrySourceTileData] is owner-affine, like every other call here, and a callback
+   * runs on a stack that cannot be parked on the owner thread's answer — so calling it from
+   * [CustomGeometrySourceCallback.fetchTile] reports that rather than deadlocking. A host records
+   * the tile the callback was given and supplies its data from a `maplibreScope` afterwards, which
+   * is what the C API's asynchronous shape asks of every platform; this is the target that enforces
+   * it.
+   *
+   * The callback registration lives as long as the source does. It is released when the source is
+   * removed with [removeStyleSource], when a new style drops it, and when this map is closed, and a
+   * notification that arrives after any of those is dropped rather than delivered.
    */
   public actual fun addCustomGeometrySource(
     sourceId: String,
     options: CustomGeometrySourceOptions,
   ) {
-    throw UnsupportedFeatureException(
-      MaplibreStatus.UNSUPPORTED.nativeCode,
-      "A custom geometry source is not implemented by the browser binding yet. MapLibre invokes " +
-        "its tile callbacks on native worker threads, which reach a callback body on the page " +
-        "only through an asynchronous proxy that the browser module does not yet carry.",
-    )
+    live {
+      // Installed before native is told about it, because the module reaches the callback through
+      // the host pointer this places: a source added first could ask for a tile that had nowhere to
+      // go.
+      val bridge = CustomGeometryBridge.install(options.callback)
+      var added = false
+      try {
+        withArena(
+          bytes(
+            stringViewBytes(sourceId),
+            blockBytes(SourceMarshal.CUSTOM_GEOMETRY_SOURCE_OPTIONS_SIZEOF),
+          )
+        ) { arena ->
+          val view = writeStringView(arena, sourceId)
+          val descriptor = allocate(arena, SourceMarshal.CUSTOM_GEOMETRY_SOURCE_OPTIONS_SIZEOF)
+          SourceMarshal.writeCustomGeometrySourceOptions(
+            descriptor,
+            options,
+            CustomGeometryBridge.fetchThunk(),
+            CustomGeometryBridge.cancelThunk(),
+            bridge.userData,
+          )
+          call("mln_map_add_custom_geometry_source", 3) { slots ->
+            slots.setLong(0, handle.raw)
+            slots.setPointer(1, view)
+            slots.setPointer(2, descriptor)
+          }
+        }
+        added = true
+      } finally {
+        // A refused source has no callbacks to serve, so the registration goes back rather than
+        // holding the module's trampoline for a source that does not exist.
+        if (!added) bridge.close()
+      }
+      // Replacing an id native accepted means the previous source is gone, so its registration is
+      // released here rather than left to be found by a notification it can no longer answer.
+      customGeometrySources.put(sourceId, bridge)?.close()
+    }
   }
 
   public actual fun setCustomGeometrySourceTileData(
@@ -1574,10 +1629,40 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       // weak reference to hold one with. So the entry goes when the map closes; leaving it would
       // keep a destroyed map reachable and let a later event name it.
       afterSuccess = {
+        // The map took its sources with it, so nothing native can ask for a tile any more. The
+        // registrations are released here rather than left holding the module's trampoline for the
+        // life of the page.
+        clearCustomGeometrySources()
         runtime.unregisterMap(this)
         runtimeRetention.close()
       },
     )
+  }
+
+  /**
+   * Releases the registrations whose sources the newly loaded style dropped.
+   *
+   * Called when a `MAP_STYLE_LOADED` event is polled, which is the only moment a style set by URL
+   * announces that it has replaced the previous one. What decides is whether the id still names a
+   * custom vector source, rather than whether the style changed: a style document cannot declare
+   * one, so an id that still names one names a source this binding added, and the entry under it is
+   * the registration that source was added with.
+   */
+  internal fun releaseDetachedCustomGeometrySources() {
+    if (customGeometrySources.isEmpty()) return
+    val detached =
+      customGeometrySources.keys.filter { sourceId ->
+        styleSourceType(sourceId) != SourceType.CUSTOM_VECTOR
+      }
+    for (sourceId in detached) customGeometrySources.remove(sourceId)?.close()
+  }
+
+  private fun clearCustomGeometrySources() {
+    // Emptied before anything is closed, so a close that failed part way through could not leave a
+    // registration reachable under an id whose source has already gone.
+    val bridges = customGeometrySources.values.toList()
+    customGeometrySources.clear()
+    for (bridge in bridges) bridge.close()
   }
 
   /** The native map, for the wrappers this map owns. */
