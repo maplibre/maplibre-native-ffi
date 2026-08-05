@@ -39,6 +39,24 @@ SCCACHE_ENVIRONMENT = (
     "    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}"
 )
 
+# Tall stacks put many pull requests in flight at once, so CI runs for pushes,
+# for pull requests that target `main`, and for pull requests that are ready for
+# review. A draft deeper in a stack waits until it retargets `main` or leaves
+# draft. `changes.base` is present only when an `edited` event retargeted the
+# pull request, which keeps title, body, and label edits from starting a run.
+GATE_CLAUSES = [
+    "github.event_name != 'pull_request'",
+    "|| ((github.base_ref == 'main' || github.event.pull_request.draft == false)",
+    "&& (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))",
+]
+
+
+def gate(always: bool = False) -> list[str]:
+    clauses = [f"      {clause}" for clause in GATE_CLAUSES]
+    if always:
+        return ["    if: >-", "      always() && (", *clauses, "      )"]
+    return ["    if: >-", *clauses]
+
 
 def job_id(preset: str) -> str:
     return f"target-{preset}"
@@ -101,6 +119,7 @@ def target_job(row: dict[str, object]) -> list[str]:
         f"    runs-on: {row['runner']}",
         "    timeout-minutes: 120",
         SCCACHE_ENVIRONMENT,
+        *gate(),
         "    steps:",
         *setup(
             preset,
@@ -178,8 +197,16 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "      - main",
         # No branch filter: a pull request stacked on another one bases on that
         # branch rather than main, and a stack cannot be verified if only its
-        # first link runs CI.
+        # first link runs CI. The job-level gate decides which of those links
+        # actually build; `ready_for_review` and `edited` are the events that
+        # let a gated-off link start once it qualifies.
         "  pull_request:",
+        "    types:",
+        "      - opened",
+        "      - synchronize",
+        "      - reopened",
+        "      - ready_for_review",
+        "      - edited",
         "",
         "permissions:",
         "  contents: read",
@@ -194,6 +221,7 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "    runs-on: ubuntu-latest",
         "    timeout-minutes: 30",
         SCCACHE_ENVIRONMENT,
+        *gate(),
         "    steps:",
         *setup(gradle=False),
         "      - run: mise run ci:generate-workflow --check",
@@ -216,6 +244,7 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "    runs-on: ubuntu-latest",
         "    timeout-minutes: 60",
         SCCACHE_ENVIRONMENT,
+        *gate(),
         "    steps:",
         # Dokka configures the Kotlin Multiplatform project, including the
         # Android target, so docs generation needs Gradle and an SDK platform.
@@ -236,6 +265,7 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
             "    runs-on: ubuntu-latest",
             "    timeout-minutes: 30",
             SCCACHE_ENVIRONMENT,
+            *gate(),
             "    needs:",
             *[f"      - {job}" for job in android_package_ids],
             "    steps:",
@@ -253,7 +283,7 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
             "    name: ci-required",
             "    runs-on: ubuntu-latest",
             "    timeout-minutes: 5",
-            "    if: ${{ always() }}",
+            *gate(always=True),
             "    needs:",
             "      - hygiene",
             "      - docs",

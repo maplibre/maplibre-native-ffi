@@ -6,6 +6,12 @@ on:
     branches:
       - main
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - edited
 
 permissions:
   contents: read
@@ -20,6 +26,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -47,6 +57,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -65,6 +79,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -154,6 +172,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -245,6 +267,10 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -331,6 +357,10 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -413,6 +443,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -431,6 +465,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -448,6 +486,10 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -533,6 +575,10 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -614,6 +660,10 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -692,6 +742,10 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -733,6 +787,10 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -778,6 +836,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -822,6 +884,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -863,6 +929,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -907,6 +977,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -948,6 +1022,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -966,6 +1044,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -984,6 +1066,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1003,6 +1089,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1021,6 +1111,10 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1094,6 +1188,10 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1166,6 +1264,10 @@ jobs:
     runs-on: windows-11-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1220,6 +1322,10 @@ jobs:
     runs-on: windows-11-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1273,6 +1379,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
     needs:
       - target-android-arm64-egl
       - target-android-arm64-vulkan
@@ -1300,7 +1410,12 @@ jobs:
     name: ci-required
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: ${{ always() }}
+    if: >-
+      always() && (
+      github.event_name != 'pull_request'
+      || ((github.base_ref == 'main' || github.event.pull_request.draft == false)
+      && (github.event.action != 'edited' || github.event.changes.base.ref.from != ''))
+      )
     needs:
       - hygiene
       - docs
