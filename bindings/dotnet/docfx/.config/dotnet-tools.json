@@ -3,8 +3,10 @@
   "isRoot": true,
   "tools": {
     "docfx": {
-      "version": "2.78.4",
-      "commands": ["docfx"],
+      "version": "2.78.5",
+      "commands": [
+        "docfx"
+      ],
       "rollForward": false
     }
   }
