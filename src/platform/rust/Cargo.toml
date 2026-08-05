@@ -6,7 +6,7 @@ license.workspace = true
 repository.workspace = true
 
 [lib]
-crate-type = ["staticlib"]
+crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 # Image decoding is shared by every platform, so a raster tile decodes to the

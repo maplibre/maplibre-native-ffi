@@ -15,6 +15,9 @@ opengl = []
 vulkan = []
 webgpu = []
 
+[target.'cfg(target_os = "emscripten")'.dependencies]
+mln-ffi-platform = { path = "../../../../src/platform/rust" }
+
 [build-dependencies]
 bindgen = "0.72.1"
 flate2 = "1.1.9"

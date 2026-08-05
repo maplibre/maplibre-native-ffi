@@ -168,7 +168,7 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
                 f"mise run //bindings/dart:build:mobile {preset}",
             ]
         )
-    elif target_platform in DESKTOP:
+    elif target_platform in DESKTOP or target_platform == "emscripten":
         commands.extend(suite_commands(source, preset))
     return commands
 

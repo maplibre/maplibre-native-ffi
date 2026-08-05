@@ -18,6 +18,9 @@ opengl = ["maplibre-native-ffi-sys/opengl"]
 vulkan = ["maplibre-native-ffi-sys/vulkan"]
 webgpu = ["maplibre-native-ffi-sys/webgpu"]
 
+[build-dependencies]
+bindgen = "0.72.1"
+
 [dev-dependencies]
 static_assertions = "1.1.0"
 

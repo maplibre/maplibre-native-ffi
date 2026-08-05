@@ -31,13 +31,20 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("cargo:rustc-link-search=native={}", link_dir.display());
     println!("cargo:rustc-link-lib={LIBRARY_NAME}");
-    if target_family.split(',').any(|family| family == "unix") {
+    print_rerun_if_changed(&link_dir);
+    let descriptor = install_dir.join("share/maplibre-native-c/artifact.json");
+    println!("cargo:rerun-if-changed={}", descriptor.display());
+    if target_os != "emscripten" && target_family.split(',').any(|family| family == "unix") {
         println!("cargo:rustc-link-arg=-Wl,-rpath,{}", runtime_dir.display());
     }
     // Windows has no rpath, so a dependent has to place the DLL itself. The
     // `links` key turns this into DEP_MAPLIBRE_NATIVE_C_RUNTIME_DIR for the
     // crates that need it.
     println!("cargo:runtime-dir={}", runtime_dir.display());
+    if let Ok(descriptor) = download::read_descriptor(&install_dir) {
+        println!("cargo:render-backend={}", descriptor.render_backend());
+    }
+    println!("cargo:rerun-if-env-changed=EMSDK");
     println!("cargo:rerun-if-env-changed=LIBCLANG_PATH");
     println!("cargo:rerun-if-env-changed=BINDGEN_EXTRA_CLANG_ARGS");
     println!("cargo:rerun-if-env-changed=SDKROOT");
@@ -56,6 +63,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         if let Some(sdk_path) = apple_sdk_name(&target_os, &target).and_then(apple_sdk_path) {
             builder = builder.clang_arg(format!("-isysroot{sdk_path}"));
         }
+    }
+
+    if target_os == "emscripten" {
+        let emsdk =
+            env::var("EMSDK").map_err(|_| "EMSDK is required to generate Emscripten bindings")?;
+        builder = builder
+            .clang_arg("--target=wasm32-unknown-emscripten")
+            .clang_arg(format!(
+                "--sysroot={emsdk}/upstream/emscripten/cache/sysroot"
+            ))
+            .clang_arg("-fvisibility=default");
     }
 
     let bindings = builder
@@ -290,7 +308,7 @@ mod download {
 
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
-    struct ArtifactDescriptor {
+    pub(super) struct ArtifactDescriptor {
         /// Absent from archives published before the field was added.
         #[serde(default)]
         git_sha: Option<String>,
@@ -560,13 +578,19 @@ mod download {
         }
     }
 
-    fn read_descriptor(prefix: &Path) -> Result<ArtifactDescriptor, Box<dyn Error>> {
+    pub(super) fn read_descriptor(prefix: &Path) -> Result<ArtifactDescriptor, Box<dyn Error>> {
         let path = prefix.join("share/maplibre-native-c/artifact.json");
         let contents = fs::read_to_string(&path)
             .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
         serde_json::from_str(&contents).map_err(|error| {
             format!("invalid artifact descriptor {}: {error}", path.display()).into()
         })
+    }
+
+    impl ArtifactDescriptor {
+        pub(super) fn render_backend(&self) -> &str {
+            &self.render_backend
+        }
     }
 
     fn verify_descriptor(

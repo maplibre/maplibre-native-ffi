@@ -4,6 +4,10 @@
 //! and unsafe extern functions generated from `include/maplibre_native_c.h`.
 //! Safety policy and ergonomic adaptation live in crates above this layer.
 
+// Keep the Cargo-built platform rlib on the Emscripten link line.
+#[cfg(target_os = "emscripten")]
+extern crate mln_ffi_platform as _;
+
 mod bindings {
     #![allow(clippy::all)]
     #![allow(non_camel_case_types)]

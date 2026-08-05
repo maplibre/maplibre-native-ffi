@@ -39,7 +39,7 @@ pub unsafe extern "C" fn mlnffi_rust_decoded_image_free(image: MlnRustDecodedIma
         // SAFETY: `mlnffi_rust_decode_image` returns `data` from `Box<[u8]>`,
         // and ownership is transferred back here with the original length.
         unsafe {
-            drop(Box::from_raw(slice::from_raw_parts_mut(
+            drop(Box::from_raw(std::ptr::slice_from_raw_parts_mut(
                 image.data,
                 image.data_len,
             )));
