@@ -11233,6 +11233,60 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     public static int MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR() {
         return MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR;
     }
+    private static final int MLN_STYLE_SOURCE_INFO_URL = (int)1L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_URL = 1
+     * }
+     */
+    public static int MLN_STYLE_SOURCE_INFO_URL() {
+        return MLN_STYLE_SOURCE_INFO_URL;
+    }
+    private static final int MLN_STYLE_SOURCE_INFO_TILEJSON = (int)2L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_TILEJSON = 2
+     * }
+     */
+    public static int MLN_STYLE_SOURCE_INFO_TILEJSON() {
+        return MLN_STYLE_SOURCE_INFO_TILEJSON;
+    }
+    private static final int MLN_STYLE_SOURCE_INFO_BOUNDS = (int)4L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_BOUNDS = 4
+     * }
+     */
+    public static int MLN_STYLE_SOURCE_INFO_BOUNDS() {
+        return MLN_STYLE_SOURCE_INFO_BOUNDS;
+    }
+    private static final int MLN_STYLE_SOURCE_INFO_TILE_SIZE = (int)8L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_TILE_SIZE = 8
+     * }
+     */
+    public static int MLN_STYLE_SOURCE_INFO_TILE_SIZE() {
+        return MLN_STYLE_SOURCE_INFO_TILE_SIZE;
+    }
+    private static final int MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = (int)16L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 16
+     * }
+     */
+    public static int MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING() {
+        return MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING;
+    }
+    private static final int MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = (int)32L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 32
+     * }
+     */
+    public static int MLN_STYLE_SOURCE_INFO_RASTER_ENCODING() {
+        return MLN_STYLE_SOURCE_INFO_RASTER_ENCODING;
+    }
     private static final int MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM = (int)1L;
     /**
      * {@snippet lang=c :
@@ -12272,6 +12326,188 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
+    private static class mln_style_string_list_count {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_style_string_list_count");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_style_string_list_count(mln_style_string_list list, size_t *out_count)
+     * }
+     */
+    public static FunctionDescriptor mln_style_string_list_count$descriptor() {
+        return mln_style_string_list_count.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_style_string_list_count(mln_style_string_list list, size_t *out_count)
+     * }
+     */
+    public static MethodHandle mln_style_string_list_count$handle() {
+        return mln_style_string_list_count.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_style_string_list_count(mln_style_string_list list, size_t *out_count)
+     * }
+     */
+    public static MemorySegment mln_style_string_list_count$address() {
+        return mln_style_string_list_count.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_style_string_list_count(mln_style_string_list list, size_t *out_count)
+     * }
+     */
+    public static int mln_style_string_list_count(long list, MemorySegment out_count) {
+        var mh$ = mln_style_string_list_count.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_style_string_list_count", list, out_count);
+            }
+            return (int)mh$.invokeExact(list, out_count);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_style_string_list_get {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_style_string_list_get");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_style_string_list_get(mln_style_string_list list, size_t index, mln_string_view *out_value)
+     * }
+     */
+    public static FunctionDescriptor mln_style_string_list_get$descriptor() {
+        return mln_style_string_list_get.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_style_string_list_get(mln_style_string_list list, size_t index, mln_string_view *out_value)
+     * }
+     */
+    public static MethodHandle mln_style_string_list_get$handle() {
+        return mln_style_string_list_get.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_style_string_list_get(mln_style_string_list list, size_t index, mln_string_view *out_value)
+     * }
+     */
+    public static MemorySegment mln_style_string_list_get$address() {
+        return mln_style_string_list_get.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_style_string_list_get(mln_style_string_list list, size_t index, mln_string_view *out_value)
+     * }
+     */
+    public static int mln_style_string_list_get(long list, long index, MemorySegment out_value) {
+        var mh$ = mln_style_string_list_get.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_style_string_list_get", list, index, out_value);
+            }
+            return (int)mh$.invokeExact(list, index, out_value);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_style_string_list_destroy {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.ofVoid(
+            MapLibreNativeC.C_LONG
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_style_string_list_destroy");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * void mln_style_string_list_destroy(mln_style_string_list list)
+     * }
+     */
+    public static FunctionDescriptor mln_style_string_list_destroy$descriptor() {
+        return mln_style_string_list_destroy.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * void mln_style_string_list_destroy(mln_style_string_list list)
+     * }
+     */
+    public static MethodHandle mln_style_string_list_destroy$handle() {
+        return mln_style_string_list_destroy.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * void mln_style_string_list_destroy(mln_style_string_list list)
+     * }
+     */
+    public static MemorySegment mln_style_string_list_destroy$address() {
+        return mln_style_string_list_destroy.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * void mln_style_string_list_destroy(mln_style_string_list list)
+     * }
+     */
+    public static void mln_style_string_list_destroy(long list) {
+        var mh$ = mln_style_string_list_destroy.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_style_string_list_destroy", list);
+            }
+            mh$.invokeExact(list);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mln_map_add_style_source_json {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
@@ -12642,6 +12878,134 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
                 traceDowncall("mln_map_copy_style_source_attribution", map, source_id, out_attribution, attribution_capacity, out_attribution_size, out_found);
             }
             return (int)mh$.invokeExact(map, source_id, out_attribution, attribution_capacity, out_attribution_size, out_found);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_copy_style_source_url {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            mln_string_view.layout(),
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_copy_style_source_url");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_copy_style_source_url(mln_map map, mln_string_view source_id, char *out_url, size_t url_capacity, size_t *out_url_size, bool *out_found)
+     * }
+     */
+    public static FunctionDescriptor mln_map_copy_style_source_url$descriptor() {
+        return mln_map_copy_style_source_url.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_copy_style_source_url(mln_map map, mln_string_view source_id, char *out_url, size_t url_capacity, size_t *out_url_size, bool *out_found)
+     * }
+     */
+    public static MethodHandle mln_map_copy_style_source_url$handle() {
+        return mln_map_copy_style_source_url.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_copy_style_source_url(mln_map map, mln_string_view source_id, char *out_url, size_t url_capacity, size_t *out_url_size, bool *out_found)
+     * }
+     */
+    public static MemorySegment mln_map_copy_style_source_url$address() {
+        return mln_map_copy_style_source_url.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_copy_style_source_url(mln_map map, mln_string_view source_id, char *out_url, size_t url_capacity, size_t *out_url_size, bool *out_found)
+     * }
+     */
+    public static int mln_map_copy_style_source_url(long map, MemorySegment source_id, MemorySegment out_url, long url_capacity, MemorySegment out_url_size, MemorySegment out_found) {
+        var mh$ = mln_map_copy_style_source_url.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_copy_style_source_url", map, source_id, out_url, url_capacity, out_url_size, out_found);
+            }
+            return (int)mh$.invokeExact(map, source_id, out_url, url_capacity, out_url_size, out_found);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_get_style_source_tile_urls {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            mln_string_view.layout(),
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_get_style_source_tile_urls");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_get_style_source_tile_urls(mln_map map, mln_string_view source_id, mln_style_string_list *out_tile_urls, bool *out_found)
+     * }
+     */
+    public static FunctionDescriptor mln_map_get_style_source_tile_urls$descriptor() {
+        return mln_map_get_style_source_tile_urls.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_get_style_source_tile_urls(mln_map map, mln_string_view source_id, mln_style_string_list *out_tile_urls, bool *out_found)
+     * }
+     */
+    public static MethodHandle mln_map_get_style_source_tile_urls$handle() {
+        return mln_map_get_style_source_tile_urls.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_get_style_source_tile_urls(mln_map map, mln_string_view source_id, mln_style_string_list *out_tile_urls, bool *out_found)
+     * }
+     */
+    public static MemorySegment mln_map_get_style_source_tile_urls$address() {
+        return mln_map_get_style_source_tile_urls.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_get_style_source_tile_urls(mln_map map, mln_string_view source_id, mln_style_string_list *out_tile_urls, bool *out_found)
+     * }
+     */
+    public static int mln_map_get_style_source_tile_urls(long map, MemorySegment source_id, MemorySegment out_tile_urls, MemorySegment out_found) {
+        var mh$ = mln_map_get_style_source_tile_urls.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_get_style_source_tile_urls", map, source_id, out_tile_urls, out_found);
+            }
+            return (int)mh$.invokeExact(map, source_id, out_tile_urls, out_found);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

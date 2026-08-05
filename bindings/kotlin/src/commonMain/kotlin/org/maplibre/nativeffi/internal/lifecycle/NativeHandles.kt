@@ -35,6 +35,8 @@ internal sealed interface NativeHandle {
 
 @JvmInline internal value class NativeStyleIdList(override val raw: Long) : NativeHandle
 
+@JvmInline internal value class NativeStyleStringList(override val raw: Long) : NativeHandle
+
 @JvmInline internal value class NativeFeatureQueryResult(override val raw: Long) : NativeHandle
 
 @JvmInline internal value class NativeFeatureExtensionResult(override val raw: Long) : NativeHandle

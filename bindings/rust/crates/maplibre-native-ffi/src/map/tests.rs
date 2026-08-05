@@ -569,6 +569,63 @@ fn style_source_type_and_info_call_real_c_api() {
 }
 
 #[test]
+// Spec coverage: BND-066, BND-109.
+fn style_source_info_copies_reconstructible_source_state() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+    map.add_vector_source_url("remote", "https://example.com/source.json", None)
+        .unwrap();
+    let remote = map.style_source_info("remote").unwrap().unwrap();
+    assert_eq!(
+        remote.url.as_deref(),
+        Some("https://example.com/source.json")
+    );
+    assert_eq!(remote.tile_json, None);
+
+    let mut options = TileSourceOptions::default();
+    options.min_zoom = Some(2.0);
+    options.max_zoom = Some(7.0);
+    options.attribution = Some("Example attribution".to_owned());
+    options.scheme = Some(TileScheme::Tms);
+    options.bounds = Some(LatLngBounds::new(
+        LatLng::new(-5.0, -10.0),
+        LatLng::new(15.0, 20.0),
+    ));
+    options.vector_encoding = Some(VectorTileEncoding::Mlt);
+    let tiles = [
+        "https://a.example/{z}/{x}/{y}.mlt",
+        "https://b.example/{z}/{x}/{y}.mlt",
+    ];
+    map.add_vector_source_tiles("inline", &tiles, Some(&options))
+        .unwrap();
+    let copied = map.style_source_info("inline").unwrap().unwrap();
+    assert_eq!(copied.url, None);
+    assert_eq!(copied.attribution.as_deref(), Some("Example attribution"));
+    assert_eq!(copied.tile_size, Some(512));
+    assert_eq!(copied.vector_encoding, Some(VectorTileEncoding::Mlt));
+    let tile_json = copied.tile_json.as_ref().unwrap();
+    assert_eq!(tile_json.tiles, tiles);
+    assert_eq!(tile_json.min_zoom, 2.0);
+    assert_eq!(tile_json.max_zoom, 7.0);
+    assert_eq!(tile_json.scheme, TileScheme::Tms);
+    assert_eq!(tile_json.bounds, options.bounds);
+
+    assert!(map.remove_style_source("inline").unwrap());
+    map.close().unwrap();
+    runtime.close().unwrap();
+
+    assert_eq!(
+        copied.tile_json.unwrap().tiles,
+        [
+            "https://a.example/{z}/{x}/{y}.mlt".to_owned(),
+            "https://b.example/{z}/{x}/{y}.mlt".to_owned(),
+        ]
+    );
+}
+
+#[test]
 // Spec coverage: BND-124.
 fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_state() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();

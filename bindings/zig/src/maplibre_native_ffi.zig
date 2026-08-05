@@ -181,6 +181,7 @@ pub const FeatureIdentifier = values.FeatureIdentifier;
 pub const Feature = values.Feature;
 pub const GeoJson = values.GeoJson;
 pub const StyleSourceType = values.StyleSourceType;
+pub const StyleTileJsonInfo = values.StyleTileJsonInfo;
 pub const StyleSourceInfo = values.StyleSourceInfo;
 pub const OwnedString = values.OwnedString;
 

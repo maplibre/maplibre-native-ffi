@@ -46,7 +46,82 @@ enum NativeStyle {
         found
       ))
     }.value
-    return found ? NativeStyleSourceInfo(info) : nil
+    guard found else { return nil }
+
+    let attribution = info.has_attribution
+      ? try copySourceAttribution(
+        map,
+        sourceId: sourceId,
+        capacity: info.attribution_size
+      ).0
+      : nil
+    let url = hasSourceInfoField(info, MLN_STYLE_SOURCE_INFO_URL.rawValue)
+      ? try copySourceURL(map, sourceId: sourceId, capacity: info.url_size).0
+      : nil
+    let tileJSON: NativeStyleSourceTileJSON?
+    if hasSourceInfoField(info, MLN_STYLE_SOURCE_INFO_TILEJSON.rawValue) {
+      let tileURLs = try sourceTileURLs(map, sourceId: sourceId) ?? []
+      tileJSON = NativeStyleSourceTileJSON(
+        tileURLs: tileURLs,
+        minZoom: info.min_zoom,
+        maxZoom: info.max_zoom,
+        scheme: info.scheme,
+        bounds: hasSourceInfoField(info, MLN_STYLE_SOURCE_INFO_BOUNDS.rawValue)
+          ? NativeLatLngBounds(info.bounds)
+          : nil
+      )
+    } else {
+      tileJSON = nil
+    }
+
+    return NativeStyleSourceInfo(
+      type: info.type,
+      isVolatile: info.is_volatile,
+      attribution: attribution,
+      url: url,
+      tileJSON: tileJSON,
+      tileSize: hasSourceInfoField(
+        info,
+        MLN_STYLE_SOURCE_INFO_TILE_SIZE.rawValue
+      ) ? info.tile_size : nil,
+      vectorEncoding: hasSourceInfoField(
+        info,
+        MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING.rawValue
+      ) ? info.vector_encoding : nil,
+      rasterEncoding: hasSourceInfoField(
+        info,
+        MLN_STYLE_SOURCE_INFO_RASTER_ENCODING.rawValue
+      ) ? info.raster_encoding : nil
+    )
+  }
+
+  static func sourceAttribution(
+    _ map: NativeMapHandle,
+    sourceId: mln_string_view
+  ) throws -> String? {
+    var info = mln_style_source_info()
+    info.size = UInt32(MemoryLayout<mln_style_source_info>.size)
+    let found = try NativeMemory.withTemporary(false) { found in
+      try checkStatus(mln_map_get_style_source_info(
+        map.raw,
+        sourceId,
+        &info,
+        found
+      ))
+    }.value
+    guard found, info.has_attribution else { return nil }
+    return try copySourceAttribution(
+      map,
+      sourceId: sourceId,
+      capacity: info.attribution_size
+    ).0
+  }
+
+  private static func hasSourceInfoField(
+    _ info: mln_style_source_info,
+    _ field: UInt32
+  ) -> Bool {
+    (info.fields & field) != 0
   }
 
   static func copySourceAttribution(
@@ -86,6 +161,81 @@ enum NativeStyle {
       )
     }
     return (attribution, size)
+  }
+
+  static func copySourceURL(
+    _ map: NativeMapHandle,
+    sourceId: mln_string_view,
+    capacity: Int
+  ) throws -> (String?, Int) {
+    var bytes = [UInt8](repeating: 0, count: capacity)
+    var found = false
+    let size = try bytes.withUnsafeMutableBufferPointer { buffer in
+      try NativeMemory.withTemporary(0) { outSize in
+        try NativeMemory.withTemporary(false) { outFound in
+          try checkStatus(mln_map_copy_style_source_url(
+            map.raw,
+            sourceId,
+            buffer.baseAddress,
+            capacity,
+            outSize,
+            outFound
+          ))
+          found = outFound.pointee
+        }
+      }.value
+    }
+    guard found else { return (nil, size) }
+    guard size <= capacity else {
+      throw NativeStatusFailure(
+        rawStatus: MLN_STATUS_NATIVE_ERROR.rawValue,
+        diagnostic: "native style source URL size exceeded caller buffer"
+      )
+    }
+    let url = try bytes.withUnsafeBufferPointer { buffer in
+      try NativeString.copyUTF8(
+        data: buffer.baseAddress
+          .map { UnsafeRawPointer($0).assumingMemoryBound(to: CChar.self) },
+        size: size
+      )
+    }
+    return (url, size)
+  }
+
+  static func sourceTileURLs(
+    _ map: NativeMapHandle,
+    sourceId: mln_string_view
+  ) throws -> [String]? {
+    var found = false
+    let listValue = try NativeMemory.withTemporary(UInt64(0)) { outHandle in
+      try NativeMemory.withTemporary(false) { outFound in
+        try checkStatus(mln_map_get_style_source_tile_urls(
+          map.raw,
+          sourceId,
+          outHandle,
+          outFound
+        ))
+        found = outFound.pointee
+      }
+    }.value
+    guard found else { return nil }
+    let list = NativeStyleStringListHandle(raw: listValue)
+    guard !list.isNull else {
+      throw NativeStatusFailure.swiftNativeError("tile URL list was null")
+    }
+    defer { mln_style_string_list_destroy(list.raw) }
+    let count = try NativeMemory.withTemporary(0) { count in
+      try checkStatus(mln_style_string_list_count(list.raw, count))
+    }.value
+    return try (0 ..< count).map { index in
+      let output = try NativeMemory.withTemporary(mln_string_view()) { value in
+        try checkStatus(mln_style_string_list_get(list.raw, index, value))
+      }
+      return try NativeString.copyUTF8(
+        data: output.value.data,
+        size: output.value.size
+      )
+    }
   }
 
   static func sourceIds(_ map: NativeMapHandle) throws -> [String] {
@@ -469,7 +619,7 @@ enum NativeStyle {
     }
     return try bytes.withUnsafeBufferPointer { buffer in
       try NativeString.copyUTF8(data: buffer.baseAddress, size: size)
-    } ?? ""
+    }
   }
 
   static func copyLayerText(
@@ -508,7 +658,7 @@ enum NativeStyle {
     }
     return try bytes.withUnsafeBufferPointer { buffer in
       try NativeString.copyUTF8(data: buffer.baseAddress, size: size)
-    } ?? ""
+    }
   }
 
   private static func copyStyleIdList(_ list: NativeStyleIdListHandle) throws

@@ -537,6 +537,12 @@
 --include-constant MLN_STYLE_IMAGE_OPTION_SDF
 --include-constant MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX
 --include-constant MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM
+--include-constant MLN_STYLE_SOURCE_INFO_BOUNDS
+--include-constant MLN_STYLE_SOURCE_INFO_RASTER_ENCODING
+--include-constant MLN_STYLE_SOURCE_INFO_TILEJSON
+--include-constant MLN_STYLE_SOURCE_INFO_TILE_SIZE
+--include-constant MLN_STYLE_SOURCE_INFO_URL
+--include-constant MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING
 --include-constant MLN_STYLE_SOURCE_TYPE_ANNOTATIONS
 --include-constant MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR
 --include-constant MLN_STYLE_SOURCE_TYPE_GEOJSON
@@ -580,6 +586,7 @@
 --include-function mln_map_add_vector_source_url
 --include-function mln_map_copy_style_image_premultiplied_rgba8
 --include-function mln_map_copy_style_source_attribution
+--include-function mln_map_copy_style_source_url
 --include-function mln_map_get_image_source_coordinates
 --include-function mln_map_get_layer_filter
 --include-function mln_map_get_layer_property
@@ -588,6 +595,7 @@
 --include-function mln_map_get_style_layer_type
 --include-function mln_map_get_style_light_property
 --include-function mln_map_get_style_source_info
+--include-function mln_map_get_style_source_tile_urls
 --include-function mln_map_get_style_source_type
 --include-function mln_map_get_style_transition_options
 --include-function mln_map_invalidate_custom_geometry_source_region
@@ -621,6 +629,9 @@
 --include-function mln_style_id_list_count
 --include-function mln_style_id_list_destroy
 --include-function mln_style_id_list_get
+--include-function mln_style_string_list_count
+--include-function mln_style_string_list_destroy
+--include-function mln_style_string_list_get
 --include-function mln_style_image_info_default
 --include-function mln_style_image_options_default
 --include-function mln_style_tile_source_options_default

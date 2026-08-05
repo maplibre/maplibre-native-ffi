@@ -17,10 +17,20 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  * struct mln_style_source_info {
  *     uint32_t size;
  *     uint32_t type;
+ *     uint32_t fields;
  *     size_t id_size;
  *     bool is_volatile;
  *     bool has_attribution;
  *     size_t attribution_size;
+ *     size_t url_size;
+ *     size_t tile_count;
+ *     double min_zoom;
+ *     double max_zoom;
+ *     uint32_t scheme;
+ *     mln_lat_lng_bounds bounds;
+ *     uint32_t tile_size;
+ *     uint32_t vector_encoding;
+ *     uint32_t raster_encoding;
  * }
  * }
  */
@@ -33,11 +43,24 @@ public class mln_style_source_info {
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
         MapLibreNativeC.C_INT.withName("size"),
         MapLibreNativeC.C_INT.withName("type"),
+        MapLibreNativeC.C_INT.withName("fields"),
+        MemoryLayout.paddingLayout(4),
         MapLibreNativeC.C_LONG.withName("id_size"),
         MapLibreNativeC.C_BOOL.withName("is_volatile"),
         MapLibreNativeC.C_BOOL.withName("has_attribution"),
         MemoryLayout.paddingLayout(6),
-        MapLibreNativeC.C_LONG.withName("attribution_size")
+        MapLibreNativeC.C_LONG.withName("attribution_size"),
+        MapLibreNativeC.C_LONG.withName("url_size"),
+        MapLibreNativeC.C_LONG.withName("tile_count"),
+        MapLibreNativeC.C_DOUBLE.withName("min_zoom"),
+        MapLibreNativeC.C_DOUBLE.withName("max_zoom"),
+        MapLibreNativeC.C_INT.withName("scheme"),
+        MemoryLayout.paddingLayout(4),
+        mln_lat_lng_bounds.layout().withName("bounds"),
+        MapLibreNativeC.C_INT.withName("tile_size"),
+        MapLibreNativeC.C_INT.withName("vector_encoding"),
+        MapLibreNativeC.C_INT.withName("raster_encoding"),
+        MemoryLayout.paddingLayout(4)
     ).withName("mln_style_source_info");
 
     /**
@@ -133,6 +156,50 @@ public class mln_style_source_info {
      */
     public static void type(MemorySegment struct, int fieldValue) {
         struct.set(type$LAYOUT, type$OFFSET, fieldValue);
+    }
+
+    private static final OfInt fields$LAYOUT = (OfInt)$LAYOUT.select(groupElement("fields"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * uint32_t fields
+     * }
+     */
+    public static final OfInt fields$layout() {
+        return fields$LAYOUT;
+    }
+
+    private static final long fields$OFFSET = $LAYOUT.byteOffset(groupElement("fields"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * uint32_t fields
+     * }
+     */
+    public static final long fields$offset() {
+        return fields$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * uint32_t fields
+     * }
+     */
+    public static int fields(MemorySegment struct) {
+        return struct.get(fields$LAYOUT, fields$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * uint32_t fields
+     * }
+     */
+    public static void fields(MemorySegment struct, int fieldValue) {
+        struct.set(fields$LAYOUT, fields$OFFSET, fieldValue);
     }
 
     private static final OfLong id_size$LAYOUT = (OfLong)$LAYOUT.select(groupElement("id_size"));
@@ -309,6 +376,402 @@ public class mln_style_source_info {
      */
     public static void attribution_size(MemorySegment struct, long fieldValue) {
         struct.set(attribution_size$LAYOUT, attribution_size$OFFSET, fieldValue);
+    }
+
+    private static final OfLong url_size$LAYOUT = (OfLong)$LAYOUT.select(groupElement("url_size"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * size_t url_size
+     * }
+     */
+    public static final OfLong url_size$layout() {
+        return url_size$LAYOUT;
+    }
+
+    private static final long url_size$OFFSET = $LAYOUT.byteOffset(groupElement("url_size"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * size_t url_size
+     * }
+     */
+    public static final long url_size$offset() {
+        return url_size$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * size_t url_size
+     * }
+     */
+    public static long url_size(MemorySegment struct) {
+        return struct.get(url_size$LAYOUT, url_size$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * size_t url_size
+     * }
+     */
+    public static void url_size(MemorySegment struct, long fieldValue) {
+        struct.set(url_size$LAYOUT, url_size$OFFSET, fieldValue);
+    }
+
+    private static final OfLong tile_count$LAYOUT = (OfLong)$LAYOUT.select(groupElement("tile_count"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * size_t tile_count
+     * }
+     */
+    public static final OfLong tile_count$layout() {
+        return tile_count$LAYOUT;
+    }
+
+    private static final long tile_count$OFFSET = $LAYOUT.byteOffset(groupElement("tile_count"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * size_t tile_count
+     * }
+     */
+    public static final long tile_count$offset() {
+        return tile_count$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * size_t tile_count
+     * }
+     */
+    public static long tile_count(MemorySegment struct) {
+        return struct.get(tile_count$LAYOUT, tile_count$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * size_t tile_count
+     * }
+     */
+    public static void tile_count(MemorySegment struct, long fieldValue) {
+        struct.set(tile_count$LAYOUT, tile_count$OFFSET, fieldValue);
+    }
+
+    private static final OfDouble min_zoom$LAYOUT = (OfDouble)$LAYOUT.select(groupElement("min_zoom"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * double min_zoom
+     * }
+     */
+    public static final OfDouble min_zoom$layout() {
+        return min_zoom$LAYOUT;
+    }
+
+    private static final long min_zoom$OFFSET = $LAYOUT.byteOffset(groupElement("min_zoom"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * double min_zoom
+     * }
+     */
+    public static final long min_zoom$offset() {
+        return min_zoom$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * double min_zoom
+     * }
+     */
+    public static double min_zoom(MemorySegment struct) {
+        return struct.get(min_zoom$LAYOUT, min_zoom$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * double min_zoom
+     * }
+     */
+    public static void min_zoom(MemorySegment struct, double fieldValue) {
+        struct.set(min_zoom$LAYOUT, min_zoom$OFFSET, fieldValue);
+    }
+
+    private static final OfDouble max_zoom$LAYOUT = (OfDouble)$LAYOUT.select(groupElement("max_zoom"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * double max_zoom
+     * }
+     */
+    public static final OfDouble max_zoom$layout() {
+        return max_zoom$LAYOUT;
+    }
+
+    private static final long max_zoom$OFFSET = $LAYOUT.byteOffset(groupElement("max_zoom"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * double max_zoom
+     * }
+     */
+    public static final long max_zoom$offset() {
+        return max_zoom$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * double max_zoom
+     * }
+     */
+    public static double max_zoom(MemorySegment struct) {
+        return struct.get(max_zoom$LAYOUT, max_zoom$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * double max_zoom
+     * }
+     */
+    public static void max_zoom(MemorySegment struct, double fieldValue) {
+        struct.set(max_zoom$LAYOUT, max_zoom$OFFSET, fieldValue);
+    }
+
+    private static final OfInt scheme$LAYOUT = (OfInt)$LAYOUT.select(groupElement("scheme"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * uint32_t scheme
+     * }
+     */
+    public static final OfInt scheme$layout() {
+        return scheme$LAYOUT;
+    }
+
+    private static final long scheme$OFFSET = $LAYOUT.byteOffset(groupElement("scheme"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * uint32_t scheme
+     * }
+     */
+    public static final long scheme$offset() {
+        return scheme$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * uint32_t scheme
+     * }
+     */
+    public static int scheme(MemorySegment struct) {
+        return struct.get(scheme$LAYOUT, scheme$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * uint32_t scheme
+     * }
+     */
+    public static void scheme(MemorySegment struct, int fieldValue) {
+        struct.set(scheme$LAYOUT, scheme$OFFSET, fieldValue);
+    }
+
+    private static final GroupLayout bounds$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("bounds"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * mln_lat_lng_bounds bounds
+     * }
+     */
+    public static final GroupLayout bounds$layout() {
+        return bounds$LAYOUT;
+    }
+
+    private static final long bounds$OFFSET = $LAYOUT.byteOffset(groupElement("bounds"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * mln_lat_lng_bounds bounds
+     * }
+     */
+    public static final long bounds$offset() {
+        return bounds$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * mln_lat_lng_bounds bounds
+     * }
+     */
+    public static MemorySegment bounds(MemorySegment struct) {
+        return struct.asSlice(bounds$OFFSET, bounds$LAYOUT.byteSize());
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * mln_lat_lng_bounds bounds
+     * }
+     */
+    public static void bounds(MemorySegment struct, MemorySegment fieldValue) {
+        MemorySegment.copy(fieldValue, 0L, struct, bounds$OFFSET, bounds$LAYOUT.byteSize());
+    }
+
+    private static final OfInt tile_size$LAYOUT = (OfInt)$LAYOUT.select(groupElement("tile_size"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * uint32_t tile_size
+     * }
+     */
+    public static final OfInt tile_size$layout() {
+        return tile_size$LAYOUT;
+    }
+
+    private static final long tile_size$OFFSET = $LAYOUT.byteOffset(groupElement("tile_size"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * uint32_t tile_size
+     * }
+     */
+    public static final long tile_size$offset() {
+        return tile_size$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * uint32_t tile_size
+     * }
+     */
+    public static int tile_size(MemorySegment struct) {
+        return struct.get(tile_size$LAYOUT, tile_size$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * uint32_t tile_size
+     * }
+     */
+    public static void tile_size(MemorySegment struct, int fieldValue) {
+        struct.set(tile_size$LAYOUT, tile_size$OFFSET, fieldValue);
+    }
+
+    private static final OfInt vector_encoding$LAYOUT = (OfInt)$LAYOUT.select(groupElement("vector_encoding"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * uint32_t vector_encoding
+     * }
+     */
+    public static final OfInt vector_encoding$layout() {
+        return vector_encoding$LAYOUT;
+    }
+
+    private static final long vector_encoding$OFFSET = $LAYOUT.byteOffset(groupElement("vector_encoding"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * uint32_t vector_encoding
+     * }
+     */
+    public static final long vector_encoding$offset() {
+        return vector_encoding$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * uint32_t vector_encoding
+     * }
+     */
+    public static int vector_encoding(MemorySegment struct) {
+        return struct.get(vector_encoding$LAYOUT, vector_encoding$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * uint32_t vector_encoding
+     * }
+     */
+    public static void vector_encoding(MemorySegment struct, int fieldValue) {
+        struct.set(vector_encoding$LAYOUT, vector_encoding$OFFSET, fieldValue);
+    }
+
+    private static final OfInt raster_encoding$LAYOUT = (OfInt)$LAYOUT.select(groupElement("raster_encoding"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * uint32_t raster_encoding
+     * }
+     */
+    public static final OfInt raster_encoding$layout() {
+        return raster_encoding$LAYOUT;
+    }
+
+    private static final long raster_encoding$OFFSET = $LAYOUT.byteOffset(groupElement("raster_encoding"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * uint32_t raster_encoding
+     * }
+     */
+    public static final long raster_encoding$offset() {
+        return raster_encoding$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * uint32_t raster_encoding
+     * }
+     */
+    public static int raster_encoding(MemorySegment struct) {
+        return struct.get(raster_encoding$LAYOUT, raster_encoding$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * uint32_t raster_encoding
+     * }
+     */
+    public static void raster_encoding(MemorySegment struct, int fieldValue) {
+        struct.set(raster_encoding$LAYOUT, raster_encoding$OFFSET, fieldValue);
     }
 
     /**

@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Maplibre.NativeFfi.Error;
+using Maplibre.NativeFfi.Geo;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Struct;
 using Maplibre.NativeFfi.Json;
@@ -127,7 +128,99 @@ public sealed unsafe class StyleJsonTests
         Assert.Equal(SourceType.Vector, map.StyleSourceType("vector-tiles"));
         Assert.Equal(SourceType.Raster, map.StyleSourceType("raster-tiles"));
         Assert.Equal(SourceType.RasterDem, map.StyleSourceType("dem-tiles"));
+        Assert.Equal("https://example.test/other.geojson", map.StyleSourceInfo("geo-url")?.Url);
         Assert.Equal("Vector attribution", map.StyleSourceInfo("vector-tiles")?.Attribution);
+        Assert.Equal(256u, map.StyleSourceInfo("raster-tiles")?.TileSize);
+        Assert.Equal(RasterDemEncoding.Mapbox, map.StyleSourceInfo("dem-tiles")?.RasterDemEncoding);
+        Assert.Equal(
+            (uint)RasterDemEncoding.Mapbox,
+            map.StyleSourceInfo("dem-tiles")?.RawRasterDemEncoding
+        );
+    }
+
+    [BindingSpecTest("BND-109")]
+    [Fact]
+    public void SourceInspectionCopiesUrlAndInlineTileJsonAfterSourceRelease()
+    {
+        SourceInfo urlInfo;
+        SourceInfo inlineInfo;
+        var bounds = new LatLngBounds(new LatLng(-40, -120), new LatLng(40, 120));
+        var tileUrls = new[]
+        {
+            "https://example.test/vector-a/{z}/{x}/{y}.pbf",
+            "https://example.test/vector-b/{z}/{x}/{y}.pbf",
+        };
+
+        using (var runtime = RuntimeHandle.Create(new RuntimeOptions()))
+        using (var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 }))
+        {
+            map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+            map.AddVectorSourceUrl("url-vector", "https://example.test/vector.json", null);
+            map.AddVectorSourceTiles(
+                "inline-vector",
+                tileUrls,
+                new TileSourceOptions
+                {
+                    MinimumZoom = 0,
+                    MaximumZoom = 12,
+                    Attribution = "Inline attribution",
+                    Scheme = TileScheme.Tms,
+                    VectorEncoding = VectorTileEncoding.Mlt,
+                    Bounds = bounds,
+                }
+            );
+
+            urlInfo = Assert.IsType<SourceInfo>(map.StyleSourceInfo("url-vector"));
+            inlineInfo = Assert.IsType<SourceInfo>(map.StyleSourceInfo("inline-vector"));
+
+            Assert.Equal("https://example.test/vector.json", urlInfo.Url);
+            Assert.Null(urlInfo.TileJson);
+            Assert.Null(urlInfo.Attribution);
+
+            Assert.Null(inlineInfo.Url);
+            Assert.Equal("Inline attribution", inlineInfo.Attribution);
+            var tileJson = Assert.IsType<TileJson>(inlineInfo.TileJson);
+            Assert.Equal(tileUrls, tileJson.TileUrls);
+            Assert.Equal(0, tileJson.MinimumZoom);
+            Assert.Equal(12, tileJson.MaximumZoom);
+            Assert.Equal(TileScheme.Tms, tileJson.Scheme);
+            Assert.Equal((uint)TileScheme.Tms, tileJson.RawScheme);
+            Assert.Equal(bounds, tileJson.Bounds);
+            Assert.Equal(512u, inlineInfo.TileSize);
+            Assert.Equal(VectorTileEncoding.Mlt, inlineInfo.VectorEncoding);
+            Assert.Equal((uint)VectorTileEncoding.Mlt, inlineInfo.RawVectorEncoding);
+            Assert.Null(inlineInfo.RasterDemEncoding);
+            Assert.Null(inlineInfo.RawRasterDemEncoding);
+
+            Assert.True(map.RemoveStyleSource("url-vector"));
+            Assert.True(map.RemoveStyleSource("inline-vector"));
+        }
+
+        Assert.Equal("https://example.test/vector.json", urlInfo.Url);
+        Assert.Equal(tileUrls, inlineInfo.TileJson?.TileUrls);
+        Assert.Equal(bounds, inlineInfo.TileJson?.Bounds);
+
+        using var rebuiltRuntime = RuntimeHandle.Create(new RuntimeOptions());
+        using var rebuiltMap = MapHandle.Create(
+            rebuiltRuntime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
+        rebuiltMap.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        rebuiltMap.AddVectorSourceTiles(
+            "rebuilt",
+            inlineInfo.TileJson!.TileUrls,
+            new TileSourceOptions
+            {
+                MinimumZoom = inlineInfo.TileJson.MinimumZoom,
+                MaximumZoom = inlineInfo.TileJson.MaximumZoom,
+                Scheme = inlineInfo.TileJson.Scheme,
+                Bounds = inlineInfo.TileJson.Bounds,
+                TileSize = inlineInfo.TileSize,
+                Attribution = inlineInfo.Attribution,
+                VectorEncoding = inlineInfo.VectorEncoding,
+            }
+        );
+        Assert.True(rebuiltMap.StyleSourceExists("rebuilt"));
     }
 
     [BindingSpecTest("BND-101")]

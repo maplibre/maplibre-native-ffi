@@ -10,7 +10,7 @@ use crate::json::{JsonValue, NativeJsonValue, json_value_try_to_native};
 use crate::string::{StringView, string_view};
 use crate::values::{
     LatLngBounds, PremultipliedRgba8Image, StyleImageInfo, TextureImageInfo,
-    lat_lng_bounds_to_native,
+    lat_lng_bounds_from_native, lat_lng_bounds_to_native,
 };
 
 /// Options for vector, raster, and raster DEM tile sources.
@@ -305,36 +305,88 @@ pub fn custom_geometry_source_options_to_native(
     raw
 }
 
-/// Copied fixed metadata for one style source.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Copied fields from a parsed TileJSON source description.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct TileJsonInfo {
+    pub tiles: Vec<String>,
+    pub min_zoom: f64,
+    pub max_zoom: f64,
+    pub scheme: TileScheme,
+    pub bounds: Option<LatLngBounds>,
+}
+
+/// Copied retained metadata for one style source.
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct SourceInfo {
     pub source_type: SourceType,
     pub raw_source_type: u32,
     pub is_volatile: bool,
     pub attribution: Option<String>,
+    pub url: Option<String>,
+    pub tile_json: Option<TileJsonInfo>,
+    pub tile_size: Option<u32>,
+    pub vector_encoding: Option<VectorTileEncoding>,
+    pub raster_dem_encoding: Option<RasterDemEncoding>,
 }
 
 pub fn empty_style_source_info() -> sys::mln_style_source_info {
     sys::mln_style_source_info {
         size: std::mem::size_of::<sys::mln_style_source_info>() as u32,
         type_: sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN,
+        fields: 0,
         id_size: 0,
         is_volatile: false,
         has_attribution: false,
         attribution_size: 0,
+        url_size: 0,
+        tile_count: 0,
+        min_zoom: 0.0,
+        max_zoom: 0.0,
+        scheme: sys::MLN_STYLE_TILE_SCHEME_XYZ,
+        bounds: sys::mln_lat_lng_bounds {
+            southwest: sys::mln_lat_lng {
+                latitude: 0.0,
+                longitude: 0.0,
+            },
+            northeast: sys::mln_lat_lng {
+                latitude: 0.0,
+                longitude: 0.0,
+            },
+        },
+        tile_size: 0,
+        vector_encoding: sys::MLN_STYLE_VECTOR_TILE_ENCODING_MVT,
+        raster_encoding: sys::MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX,
     }
 }
 
 pub fn style_source_info_from_native(
     info: &sys::mln_style_source_info,
     attribution: Option<String>,
+    url: Option<String>,
+    tiles: Vec<String>,
 ) -> SourceInfo {
+    let has = |field| info.fields & field != 0;
     SourceInfo {
         source_type: SourceType::from_raw(info.type_),
         raw_source_type: info.type_,
         is_volatile: info.is_volatile,
         attribution,
+        url,
+        tile_json: has(sys::MLN_STYLE_SOURCE_INFO_TILEJSON).then(|| TileJsonInfo {
+            tiles,
+            min_zoom: info.min_zoom,
+            max_zoom: info.max_zoom,
+            scheme: TileScheme::from_raw(info.scheme),
+            bounds: has(sys::MLN_STYLE_SOURCE_INFO_BOUNDS)
+                .then(|| lat_lng_bounds_from_native(info.bounds)),
+        }),
+        tile_size: has(sys::MLN_STYLE_SOURCE_INFO_TILE_SIZE).then_some(info.tile_size),
+        vector_encoding: has(sys::MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING)
+            .then(|| VectorTileEncoding::from_raw(info.vector_encoding)),
+        raster_dem_encoding: has(sys::MLN_STYLE_SOURCE_INFO_RASTER_ENCODING)
+            .then(|| RasterDemEncoding::from_raw(info.raster_encoding)),
     }
 }
 
@@ -651,6 +703,36 @@ pub unsafe fn copy_style_id_list(handle: sys::mln_style_id_list) -> crate::Resul
     Ok(ids)
 }
 
+/// Copies an owned native style string list into owned Rust strings.
+///
+/// # Safety
+///
+/// `handle` must be a live `mln_style_string_list` owned by the caller and
+/// returned by the matching C API. This function takes ownership of the handle
+/// and releases it before returning, including on copy errors.
+pub unsafe fn copy_style_string_list(
+    handle: sys::mln_style_string_list,
+) -> crate::Result<Vec<String>> {
+    // SAFETY: handle is an owned string list returned by C and released by the guard.
+    let list = unsafe { crate::handle::style_string_list(handle) }?;
+    let mut count = 0;
+    // SAFETY: list is live and count points to writable storage.
+    crate::check(unsafe { sys::mln_style_string_list_count(list.handle(), &mut count) })?;
+
+    let mut values = Vec::with_capacity(count);
+    for index in 0..count {
+        let mut view = sys::mln_string_view {
+            data: ptr::null(),
+            size: 0,
+        };
+        // SAFETY: list is live, index is in range, and view is writable.
+        crate::check(unsafe { sys::mln_style_string_list_get(list.handle(), index, &mut view) })?;
+        // SAFETY: The borrowed view remains valid until the list guard drops.
+        values.push(unsafe { crate::string::copy_string_view(view) }?);
+    }
+    Ok(values)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -849,18 +931,49 @@ mod tests {
     fn style_source_info_copies_raw_fields_and_attribution() {
         let raw = sys::mln_style_source_info {
             type_: sys::MLN_STYLE_SOURCE_TYPE_VECTOR,
+            fields: sys::MLN_STYLE_SOURCE_INFO_TILEJSON
+                | sys::MLN_STYLE_SOURCE_INFO_BOUNDS
+                | sys::MLN_STYLE_SOURCE_INFO_TILE_SIZE
+                | sys::MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING,
             is_volatile: true,
             has_attribution: true,
             attribution_size: 11,
+            min_zoom: 1.0,
+            max_zoom: 10.0,
+            scheme: sys::MLN_STYLE_TILE_SCHEME_TMS,
+            bounds: lat_lng_bounds_to_native(LatLngBounds::new(
+                LatLng::new(-5.0, -10.0),
+                LatLng::new(15.0, 20.0),
+            )),
+            tile_size: 512,
+            vector_encoding: sys::MLN_STYLE_VECTOR_TILE_ENCODING_MLT,
             ..empty_style_source_info()
         };
 
-        let copied = style_source_info_from_native(&raw, Some("© MapLibre".to_string()));
+        let copied = style_source_info_from_native(
+            &raw,
+            Some("© MapLibre".to_string()),
+            None,
+            vec!["https://example.com/{z}/{x}/{y}.mlt".to_owned()],
+        );
 
         assert_eq!(copied.source_type, SourceType::Vector);
         assert_eq!(copied.raw_source_type, sys::MLN_STYLE_SOURCE_TYPE_VECTOR);
         assert!(copied.is_volatile);
         assert_eq!(copied.attribution.as_deref(), Some("© MapLibre"));
+        assert_eq!(copied.tile_size, Some(512));
+        assert_eq!(copied.vector_encoding, Some(VectorTileEncoding::Mlt));
+        let tile_json = copied.tile_json.unwrap();
+        assert_eq!(tile_json.scheme, TileScheme::Tms);
+        assert_eq!(tile_json.min_zoom, 1.0);
+        assert_eq!(tile_json.tiles.len(), 1);
+        assert_eq!(
+            tile_json.bounds,
+            Some(LatLngBounds::new(
+                LatLng::new(-5.0, -10.0),
+                LatLng::new(15.0, 20.0)
+            ))
+        );
     }
 
     #[test]

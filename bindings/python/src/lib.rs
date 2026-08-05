@@ -2609,7 +2609,7 @@ impl MapHandle {
                 )
             })
             .map_err(map_error)?;
-            if attribution_found && attribution_size > 0 {
+            if attribution_found {
                 bytes.truncate(attribution_size);
                 Some(String::from_utf8(bytes).map_err(|error| {
                     invalid_argument_error(format!("native attribution is not UTF-8: {error}"))
@@ -2620,7 +2620,56 @@ impl MapHandle {
         } else {
             None
         };
-        let copied = maplibre_core::style::style_source_info_from_native(&info, attribution);
+        let url = if info.fields & sys::MLN_STYLE_SOURCE_INFO_URL != 0 {
+            let mut bytes = vec![0u8; info.url_size];
+            let mut url_size = 0;
+            let mut url_found = false;
+            // SAFETY: bytes and both output values remain writable for this call.
+            maplibre_core::check(unsafe {
+                sys::mln_map_copy_style_source_url(
+                    state.handle(),
+                    source_id.raw(),
+                    bytes.as_mut_ptr().cast::<c_char>(),
+                    bytes.len(),
+                    &mut url_size,
+                    &mut url_found,
+                )
+            })
+            .map_err(map_error)?;
+            if !url_found {
+                return Ok(None);
+            }
+            bytes.truncate(url_size);
+            Some(String::from_utf8(bytes).map_err(|error| {
+                invalid_argument_error(format!("native source URL is not UTF-8: {error}"))
+            })?)
+        } else {
+            None
+        };
+        let tiles = if info.fields & sys::MLN_STYLE_SOURCE_INFO_TILEJSON != 0 {
+            let mut out = maplibre_core::ptr::OutHandle::<sys::mln_style_string_list>::new();
+            let mut tiles_found = false;
+            // SAFETY: out starts null and both output values remain writable for this call.
+            maplibre_core::check(unsafe {
+                sys::mln_map_get_style_source_tile_urls(
+                    state.handle(),
+                    source_id.raw(),
+                    out.as_mut_ptr(),
+                    &mut tiles_found,
+                )
+            })
+            .map_err(map_error)?;
+            if !tiles_found {
+                return Ok(None);
+            }
+            let native = out.into_live("mln_style_string_list").map_err(map_error)?;
+            // SAFETY: native is an owned style string list returned by C.
+            unsafe { maplibre_core::style::copy_style_string_list(native) }.map_err(map_error)?
+        } else {
+            Vec::new()
+        };
+        let copied =
+            maplibre_core::style::style_source_info_from_native(&info, attribution, url, tiles);
         source_info_to_py(py, copied).map(Some)
     }
 
@@ -5382,15 +5431,7 @@ fn tile_source_options_from_parts(
         options.attribution = Some(attribution);
     }
     if let Some(scheme) = scheme {
-        options.scheme = Some(match scheme {
-            sys::MLN_STYLE_TILE_SCHEME_XYZ => maplibre_core::TileScheme::Xyz,
-            sys::MLN_STYLE_TILE_SCHEME_TMS => maplibre_core::TileScheme::Tms,
-            raw => {
-                return Err(invalid_argument_error(format!(
-                    "unknown tile scheme: {raw}"
-                )));
-            }
-        });
+        options.scheme = Some(maplibre_core::TileScheme::from_raw(scheme));
     }
     if let Some((
         (southwest_latitude, southwest_longitude),
@@ -5406,28 +5447,13 @@ fn tile_source_options_from_parts(
         options.tile_size = Some(tile_size);
     }
     if let Some(vector_encoding) = vector_encoding {
-        options.vector_encoding = Some(match vector_encoding {
-            sys::MLN_STYLE_VECTOR_TILE_ENCODING_MVT => maplibre_core::VectorTileEncoding::Mvt,
-            sys::MLN_STYLE_VECTOR_TILE_ENCODING_MLT => maplibre_core::VectorTileEncoding::Mlt,
-            raw => {
-                return Err(invalid_argument_error(format!(
-                    "unknown vector tile encoding: {raw}"
-                )));
-            }
-        });
+        options.vector_encoding =
+            Some(maplibre_core::VectorTileEncoding::from_raw(vector_encoding));
     }
     if let Some(raster_dem_encoding) = raster_dem_encoding {
-        options.raster_dem_encoding = Some(match raster_dem_encoding {
-            sys::MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX => maplibre_core::RasterDemEncoding::Mapbox,
-            sys::MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM => {
-                maplibre_core::RasterDemEncoding::Terrarium
-            }
-            raw => {
-                return Err(invalid_argument_error(format!(
-                    "unknown raster DEM encoding: {raw}"
-                )));
-            }
-        });
+        options.raster_dem_encoding = Some(maplibre_core::RasterDemEncoding::from_raw(
+            raster_dem_encoding,
+        ));
     }
     Ok(options)
 }
@@ -6725,6 +6751,36 @@ fn source_info_to_py(py: Python<'_>, info: maplibre_core::SourceInfo) -> PyResul
     dict.set_item("source_type", info.raw_source_type)?;
     dict.set_item("is_volatile", info.is_volatile)?;
     dict.set_item("attribution", info.attribution)?;
+    dict.set_item("url", info.url)?;
+    if let Some(tile_json) = info.tile_json {
+        let raw = PyDict::new(py);
+        raw.set_item("tiles", tile_json.tiles)?;
+        raw.set_item("min_zoom", tile_json.min_zoom)?;
+        raw.set_item("max_zoom", tile_json.max_zoom)?;
+        raw.set_item("scheme", tile_json.scheme.raw_value())?;
+        raw.set_item(
+            "bounds",
+            tile_json
+                .bounds
+                .as_ref()
+                .map(|bounds| lat_lng_bounds_core_to_py(py, bounds))
+                .transpose()?,
+        )?;
+        dict.set_item("tile_json", raw)?;
+    } else {
+        dict.set_item("tile_json", py.None())?;
+    }
+    dict.set_item("tile_size", info.tile_size)?;
+    dict.set_item(
+        "vector_encoding",
+        info.vector_encoding
+            .map(maplibre_core::VectorTileEncoding::raw_value),
+    )?;
+    dict.set_item(
+        "raster_dem_encoding",
+        info.raster_dem_encoding
+            .map(maplibre_core::RasterDemEncoding::raw_value),
+    )?;
     Ok(dict.into_any().unbind())
 }
 

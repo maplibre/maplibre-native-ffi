@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.cinterop.BooleanVar
@@ -34,6 +35,7 @@ import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.RasterDemEncoding
+import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleLayerVisibility
@@ -51,6 +53,13 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     val value = SourceType(999)
 
     assertEquals(999, value.nativeValue)
+  }
+
+  @Test
+  fun styleMetadataEnumsPreserveUnknownRawNativeValues() {
+    assertEquals(997, TileScheme(997).nativeValue)
+    assertEquals(998, VectorTileEncoding(998).nativeValue)
+    assertEquals(999, RasterDemEncoding(999).nativeValue)
   }
 
   // BND-124: style-scoped callback state follows native source lifetime and reload events.
@@ -601,6 +610,7 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
         },
       )
       assertEquals(SourceType.RASTER, map.styleSourceType("raster"))
+      assertEquals(256, map.styleSourceInfo("raster")?.tileSize)
       map.addRasterDemSourceTiles(
         "dem",
         listOf("https://example.com/dem/{z}/{x}/{y}.png"),
@@ -610,6 +620,7 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
         },
       )
       assertEquals(SourceType.RASTER_DEM, map.styleSourceType("dem"))
+      assertEquals(RasterDemEncoding.TERRARIUM, map.styleSourceInfo("dem")?.rasterDemEncoding)
       map.addHillshadeLayer("hillshade", "dem", "")
       assertEquals("hillshade", map.styleLayerType("hillshade"))
       map.addColorReliefLayer("relief", "dem", "")
@@ -618,6 +629,64 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       map.close()
       runtime.close()
     }
+  }
+
+  // BND-109: source inspection copies reconstructible URL and parsed TileJSON state.
+
+  @Test
+  fun styleSourceInfoCopiesUrlAndInlineTileMetadataPastNativeLifetime() {
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+        },
+      )
+    lateinit var retainedInfo: SourceInfo
+    val tileUrls =
+      listOf("https://a.example.com/{z}/{x}/{y}.pbf", "https://b.example.com/{z}/{x}/{y}.pbf")
+    val bounds = LatLngBounds(LatLng(-5.0, -10.0), LatLng(15.0, 20.0))
+    try {
+      map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
+      map.addVectorSourceUrl("remote", "https://example.com/vector.json", null)
+      val remote = assertNotNull(map.styleSourceInfo("remote"))
+      assertEquals("https://example.com/vector.json", remote.url)
+      assertNull(remote.tileJson)
+
+      map.addVectorSourceTiles(
+        "inline",
+        tileUrls,
+        TileSourceOptions().apply {
+          minZoom = 0.0
+          maxZoom = 12.0
+          attribution = "inline attribution"
+          scheme = TileScheme.TMS
+          this.bounds = bounds
+          tileSize = 256
+          vectorEncoding = VectorTileEncoding.MLT
+        },
+      )
+      retainedInfo = assertNotNull(map.styleSourceInfo("inline"))
+      assertNull(retainedInfo.url)
+      assertEquals("inline attribution", retainedInfo.attribution)
+      assertEquals(tileUrls, retainedInfo.tileJson?.tileUrls)
+      assertEquals(0.0, retainedInfo.tileJson?.minZoom)
+      assertEquals(12.0, retainedInfo.tileJson?.maxZoom)
+      assertEquals(TileScheme.TMS, retainedInfo.tileJson?.scheme)
+      assertEquals(bounds, retainedInfo.tileJson?.bounds)
+      assertEquals(512, retainedInfo.tileSize)
+      assertEquals(VectorTileEncoding.MLT, retainedInfo.vectorEncoding)
+      assertNull(retainedInfo.rasterDemEncoding)
+      assertTrue(map.removeStyleSource("inline"))
+    } finally {
+      map.close()
+      runtime.close()
+    }
+
+    assertEquals(tileUrls, retainedInfo.tileJson?.tileUrls)
+    assertEquals(bounds, retainedInfo.tileJson?.bounds)
   }
 
   @Test

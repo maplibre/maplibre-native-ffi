@@ -73,7 +73,7 @@ pub use runtime::{
 };
 pub use style::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, SourceInfo, StyleImage, StyleImageOptions,
-    StyleTransitionOptions, TileSourceOptions,
+    StyleTransitionOptions, TileJsonInfo, TileSourceOptions,
 };
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, PremultipliedRgba8Image, ProjectedMeters, Quaternion,

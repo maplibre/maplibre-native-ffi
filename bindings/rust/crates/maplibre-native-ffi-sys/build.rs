@@ -72,6 +72,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "^mln_(runtime|map|map_projection|render_session|wake_source",
             "|resource_request_handle|offline_region_snapshot",
             "|offline_region_list|json_snapshot|style_id_list",
+            "|style_string_list",
             "|feature_query_result|feature_extension_result)$"
         ))
         .prepend_enum_name(false)

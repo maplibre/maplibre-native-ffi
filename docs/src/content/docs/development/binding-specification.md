@@ -443,6 +443,40 @@ Runtime event polling returns values independent of the next native poll.
 Map-originated events identify a live source map when identity can be proven. If
 lookup misses, they carry no public map handle or only copied source metadata.
 
+### Style source metadata
+
+Style source inspection returns one copied, language-owned source information
+value. It combines the fixed fields from `mln_style_source_info` with copied
+attribution, source URL, and parsed TileJSON tile URLs. The native string-list
+handle is an internal copy mechanism and MUST NOT appear in the public API.
+
+The public value represents these concepts:
+
+- source type, volatility, and optional attribution;
+- an optional retained source URL;
+- optional parsed TileJSON containing the complete copied tile URL list, minimum
+  and maximum zoom, scheme, and optional bounds;
+- optional tile size, vector encoding, and DEM raster encoding.
+
+A binding MAY expose the parsed TileJSON fields as a nested value or flatten
+them into its source information value. Either shape MUST preserve the same
+presence boundary: no parsed TileJSON is different from parsed TileJSON with an
+empty tile list or zero-valued fields. Optional tile size, bounds, and encodings
+likewise distinguish absence from a present default or zero value.
+
+The value describes retained live state. A URL-backed tile source exposes its
+source URL before its description loads and exposes parsed TileJSON after the
+load completes. An inline tile source exposes parsed TileJSON immediately and
+has no source URL. GeoJSON and image sources expose a retained URL when one is
+present. The value does not preserve the original TileJSON document or members
+that MapLibre discarded while parsing it.
+
+Bindings copy every string before returning and destroy the native tile URL list
+on success and on copy failure. They preserve unknown source, scheme, vector
+encoding, and raster encoding values through the binding's ordinary unknown-enum
+representation. A returned value remains valid after source removal, style
+replacement, and map release.
+
 ## Callbacks And Requests
 
 Callbacks and request handles preserve C lifetimes while protecting
@@ -874,7 +908,7 @@ the other isolate, which makes its id stale rather than live.
 | BND-063 | Borrowed native strings and string views are copied before their native borrow window ends.                                                                                                                |
 | BND-064 | JSON values round-trip scalar and nested container values without type loss.                                                                                                                               |
 | BND-065 | GeoJSON values copy nested geometries, features, properties, and identifiers.                                                                                                                              |
-| BND-066 | Native snapshot/list/result handles are released on success and on copy failure, using fault injection for copy failure.                                                                                   |
+| BND-066 | Native snapshot/list/result handles, including style tile-URL lists, are released on success and on copy failure, using fault injection for copy failure.                                                  |
 | BND-067 | Structured JSON preserves object member order, repeated member names, and signed or unsigned integer width.                                                                                                |
 | BND-068 | Unknown enum values preserve their raw value, and public input APIs report the C API's status and diagnostic unless the binding owns a stricter pre-C invariant.                                           |
 | BND-069 | Public values and descriptors that accept caller-owned mutable storage remain unchanged after later caller mutation, and accessors do not expose mutable storage that can mutate the stored value.         |
@@ -898,16 +932,17 @@ the other isolate, which makes its id stale rather than live.
 
 ### Map, camera, projection, style, and query
 
-| ID      | Test                                                                                                                                                            |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-100 | Map creation applies public map options, extent, and mode, then releases through the runtime parent relationship.                                               |
-| BND-101 | Style URL and style JSON loading succeed through public map APIs and return copied style-loaded events through polling.                                         |
-| BND-102 | Camera set/get, animated camera commands, transition cancellation, and gesture-in-progress bracketing produce the expected native camera state and statuses.    |
-| BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance.                             |
-| BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.                                  |
-| BND-105 | Style source, layer, image, and feature-state workflows add, update, query/list, and remove public input values and copied IDs.                                 |
-| BND-106 | Query workflows return copied feature geometry, properties, feature identifiers, feature state, and optional source/layer identifiers.                          |
-| BND-108 | The loaded style document reads back byte-for-byte through public map APIs, the style URL reads back the last requested URL, and both report empty when absent. |
+| ID      | Test                                                                                                                                                                                       |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| BND-100 | Map creation applies public map options, extent, and mode, then releases through the runtime parent relationship.                                                                          |
+| BND-101 | Style URL and style JSON loading succeed through public map APIs and return copied style-loaded events through polling.                                                                    |
+| BND-102 | Camera set/get, animated camera commands, transition cancellation, and gesture-in-progress bracketing produce the expected native camera state and statuses.                               |
+| BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance.                                                        |
+| BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.                                                             |
+| BND-105 | Style source, layer, image, and feature-state workflows add, update, query/list, and remove public input values and copied IDs.                                                            |
+| BND-106 | Query workflows return copied feature geometry, properties, feature identifiers, feature state, and optional source/layer identifiers.                                                     |
+| BND-108 | The loaded style document reads back byte-for-byte through public map APIs, the style URL reads back the last requested URL, and both report empty when absent.                            |
+| BND-109 | Source inspection copies URL-backed and inline tile-source metadata, including multiple tile URLs and absent fields, and the result remains valid after the map no longer owns the source. |
 
 ### Logging and callbacks
 

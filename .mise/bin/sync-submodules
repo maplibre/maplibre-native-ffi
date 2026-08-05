@@ -56,6 +56,7 @@ mlt_vendor_paths=(
 # pointing at maplibre/maplibre-native. See patches/maplibre-native/README.md.
 mln_patches=(
   "$repo_root/patches/maplibre-native/0001-configurable-emdawnwebgpu-suspension.patch"
+  "$repo_root/patches/maplibre-native/0002-expose-retained-tile-source-tileset.patch"
 )
 
 # A patch counts as applied when it reverses cleanly, which is also what makes

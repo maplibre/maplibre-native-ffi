@@ -974,6 +974,17 @@ def test_geojson_source_options_reject_negative_unsigned_fields(field: str) -> N
     assert field in raised.value.diagnostic
 
 
+def test_style_source_metadata_enums_preserve_unknown_values() -> None:
+    for enum_type in (
+        style.TileScheme,
+        style.VectorTileEncoding,
+        style.RasterDemEncoding,
+    ):
+        value = enum_type(999_040)
+        assert value.is_unknown
+        assert value.native_code == 999_040
+
+
 def test_loaded_style_document_and_url_read_back_what_was_loaded() -> None:
     style_json = '{"version":8,"sources":{},"layers":[]}'
     with mln.RuntimeHandle() as runtime:
@@ -1075,7 +1086,20 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             )
             map_handle.add_vector_source_tiles(
                 "vector-inline",
-                ("https://example.test/vector/{z}/{x}/{y}.pbf",),
+                (
+                    "https://a.example.test/vector/{z}/{x}/{y}.mlt",
+                    "https://b.example.test/vector/{z}/{x}/{y}.mlt",
+                ),
+                style.TileSourceOptions(
+                    min_zoom=2.0,
+                    max_zoom=7.0,
+                    attribution="Example attribution",
+                    scheme=style.TileScheme.TMS,
+                    bounds=geo.LatLngBounds(
+                        geo.LatLng(-5.0, -10.0), geo.LatLng(15.0, 20.0)
+                    ),
+                    vector_encoding=style.VectorTileEncoding.MLT,
+                ),
             )
             map_handle.add_raster_source_tiles(
                 "raster-inline",
@@ -1140,7 +1164,32 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             assert info is not None
             assert info.source_type == style.StyleSourceType.GEOJSON
             assert info.attribution is None
+            assert info.url == "https://example.test/points.geojson"
+            assert info.tile_json is None
             assert map_handle.get_style_source_info("missing") is None
+
+            remote_info = map_handle.get_style_source_info("vector-tiles")
+            assert remote_info is not None
+            assert remote_info.url == "https://example.test/vector.json"
+            assert remote_info.tile_json is None
+
+            copied_inline = map_handle.get_style_source_info("vector-inline")
+            assert copied_inline is not None
+            assert copied_inline.url is None
+            assert copied_inline.attribution == "Example attribution"
+            assert copied_inline.tile_size == 512
+            assert copied_inline.vector_encoding == style.VectorTileEncoding.MLT
+            assert copied_inline.tile_json is not None
+            assert copied_inline.tile_json.tiles == (
+                "https://a.example.test/vector/{z}/{x}/{y}.mlt",
+                "https://b.example.test/vector/{z}/{x}/{y}.mlt",
+            )
+            assert copied_inline.tile_json.min_zoom == 2.0
+            assert copied_inline.tile_json.max_zoom == 7.0
+            assert copied_inline.tile_json.scheme == style.TileScheme.TMS
+            assert copied_inline.tile_json.bounds == geo.LatLngBounds(
+                geo.LatLng(-5.0, -10.0), geo.LatLng(15.0, 20.0)
+            )
 
             assert map_handle.remove_style_source("style-json-points") is True
             assert map_handle.remove_style_source("points") is True
@@ -1162,6 +1211,8 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             assert "vector-inline" not in source_ids
             assert "raster-inline" not in source_ids
             assert "dem-inline" not in source_ids
+            assert copied_inline.tile_json is not None
+            assert len(copied_inline.tile_json.tiles) == 2
 
 
 def test_image_source_url_image_and_coordinates_public_api() -> None:

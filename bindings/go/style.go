@@ -29,13 +29,28 @@ const (
 	StyleSourceTypeCustomVector StyleSourceType = StyleSourceType(C.MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR)
 )
 
-// StyleSourceInfo contains fixed metadata for one style source.
+// StyleSourceInfo contains copied metadata for one style source.
 type StyleSourceInfo struct {
 	Type            StyleSourceType
 	IDSize          uint64
 	IsVolatile      bool
 	HasAttribution  bool
 	AttributionSize uint64
+	Attribution     *string
+	URL             *string
+	TileJSON        *StyleSourceTileJSON
+	TileSize        *uint32
+	VectorEncoding  *StyleVectorTileEncoding
+	RasterEncoding  *StyleRasterDEMEncoding
+}
+
+// StyleSourceTileJSON contains the parsed TileJSON fields retained by a tile source.
+type StyleSourceTileJSON struct {
+	TileURLs []string
+	MinZoom  float64
+	MaxZoom  float64
+	Scheme   StyleTileScheme
+	Bounds   *LatLngBounds
 }
 
 // StyleTileScheme selects tile URL coordinate scheme.
@@ -858,13 +873,37 @@ const (
 )
 
 func styleSourceInfoFromC(info C.mln_style_source_info) StyleSourceInfo {
-	return StyleSourceInfo{
+	result := StyleSourceInfo{
 		Type:            StyleSourceType(info._type),
 		IDSize:          uint64(info.id_size),
 		IsVolatile:      bool(info.is_volatile),
 		HasAttribution:  bool(info.has_attribution),
 		AttributionSize: uint64(info.attribution_size),
 	}
+	if info.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0 {
+		result.TileJSON = &StyleSourceTileJSON{
+			MinZoom: float64(info.min_zoom),
+			MaxZoom: float64(info.max_zoom),
+			Scheme:  StyleTileScheme(info.scheme),
+		}
+		if info.fields&C.MLN_STYLE_SOURCE_INFO_BOUNDS != 0 {
+			bounds := goLatLngBounds(info.bounds)
+			result.TileJSON.Bounds = &bounds
+		}
+	}
+	if info.fields&C.MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0 {
+		value := uint32(info.tile_size)
+		result.TileSize = &value
+	}
+	if info.fields&C.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING != 0 {
+		value := StyleVectorTileEncoding(info.vector_encoding)
+		result.VectorEncoding = &value
+	}
+	if info.fields&C.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING != 0 {
+		value := StyleRasterDEMEncoding(info.raster_encoding)
+		result.RasterEncoding = &value
+	}
+	return result
 }
 
 // AddGeoJSONSourceURL adds a GeoJSON source that loads from a URL. MapLibre Native fixes options
@@ -1522,7 +1561,7 @@ func (m *MapHandle) StyleSourceType(sourceID string) (StyleSourceType, bool, err
 	return StyleSourceType(sourceType), bool(found), nil
 }
 
-// StyleSourceInfo returns source metadata and whether the source exists.
+// StyleSourceInfo returns copied source metadata and whether the source exists.
 func (m *MapHandle) StyleSourceInfo(sourceID string) (StyleSourceInfo, bool, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -1539,16 +1578,79 @@ func (m *MapHandle) StyleSourceInfo(sourceID string) (StyleSourceInfo, bool, err
 	}); err != nil {
 		return StyleSourceInfo{}, false, err
 	}
-	return styleSourceInfoFromC(info), bool(found), nil
+	if !bool(found) {
+		return StyleSourceInfo{}, false, nil
+	}
+
+	result := styleSourceInfoFromC(info)
+	if result.HasAttribution {
+		attribution, copied, err := copyStyleSourceString(func(buffer *C.char, capacity C.size_t, size *C.size_t, valueFound *C.bool) int32 {
+			return int32(C.mln_map_copy_style_source_attribution(
+				C.mln_map(ptr), sourceView.raw(), buffer, capacity, size, valueFound,
+			))
+		})
+		if err != nil {
+			return StyleSourceInfo{}, false, err
+		}
+		if copied {
+			result.Attribution = &attribution
+		}
+	}
+	if info.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0 {
+		url, copied, err := copyStyleSourceString(func(buffer *C.char, capacity C.size_t, size *C.size_t, valueFound *C.bool) int32 {
+			return int32(C.mln_map_copy_style_source_url(
+				C.mln_map(ptr), sourceView.raw(), buffer, capacity, size, valueFound,
+			))
+		})
+		if err != nil {
+			return StyleSourceInfo{}, false, err
+		}
+		if copied {
+			result.URL = &url
+		}
+	}
+	if result.TileJSON != nil {
+		var list C.mln_style_string_list
+		var listFound C.bool
+		if err := checkNative(func() int32 {
+			return int32(C.mln_map_get_style_source_tile_urls(C.mln_map(ptr), sourceView.raw(), &list, &listFound))
+		}); err != nil {
+			return StyleSourceInfo{}, false, err
+		}
+		tileURLs, err := styleStringListStrings(list)
+		if err != nil {
+			return StyleSourceInfo{}, false, err
+		}
+		if bool(listFound) {
+			result.TileJSON.TileURLs = tileURLs
+		}
+	}
+	return result, true, nil
+}
+
+func copyStyleSourceString(copy func(*C.char, C.size_t, *C.size_t, *C.bool) int32) (string, bool, error) {
+	var required C.size_t
+	var found C.bool
+	if err := checkNative(func() int32 { return copy(nil, 0, &required, &found) }); err != nil {
+		return "", false, err
+	}
+	if !bool(found) || required == 0 {
+		return "", bool(found), nil
+	}
+
+	buffer := make([]byte, int(required))
+	var size C.size_t
+	if err := checkNative(func() int32 {
+		return copy((*C.char)(unsafe.Pointer(&buffer[0])), C.size_t(len(buffer)), &size, &found)
+	}); err != nil {
+		return "", false, err
+	}
+	return string(buffer[:int(size)]), bool(found), nil
 }
 
 // StyleSourceAttribution returns copied source attribution and whether the
 // source exists.
 func (m *MapHandle) StyleSourceAttribution(sourceID string) (string, bool, error) {
-	info, found, err := m.StyleSourceInfo(sourceID)
-	if err != nil || !found || !info.HasAttribution || info.AttributionSize == 0 {
-		return "", found, err
-	}
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return "", false, err
@@ -1557,22 +1659,11 @@ func (m *MapHandle) StyleSourceAttribution(sourceID string) (string, bool, error
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
-	buffer := make([]byte, int(info.AttributionSize))
-	var size C.size_t
-	var rawFound C.bool
-	if err := checkNative(func() int32 {
+	return copyStyleSourceString(func(buffer *C.char, capacity C.size_t, size *C.size_t, found *C.bool) int32 {
 		return int32(C.mln_map_copy_style_source_attribution(
-			C.mln_map(ptr),
-			sourceView.raw(),
-			(*C.char)(unsafe.Pointer(&buffer[0])),
-			C.size_t(len(buffer)),
-			&size,
-			&rawFound,
+			C.mln_map(ptr), sourceView.raw(), buffer, capacity, size, found,
 		))
-	}); err != nil {
-		return "", false, err
-	}
-	return string(buffer[:int(size)]), bool(rawFound), nil
+	})
 }
 
 // StyleSourceIDs returns copied source IDs in style order.
@@ -1607,6 +1698,25 @@ func styleIDListStrings(list C.mln_style_id_list) ([]string, error) {
 		ids[i] = goStringView(view)
 	}
 	return ids, nil
+}
+
+func styleStringListStrings(list C.mln_style_string_list) ([]string, error) {
+	defer C.mln_style_string_list_destroy(list)
+	var count C.size_t
+	if err := checkNative(func() int32 { return int32(C.mln_style_string_list_count(list, &count)) }); err != nil {
+		return nil, err
+	}
+	values := make([]string, int(count))
+	for i := range values {
+		var view C.mln_string_view
+		if err := checkNative(func() int32 {
+			return int32(C.mln_style_string_list_get(list, C.size_t(i), &view))
+		}); err != nil {
+			return nil, err
+		}
+		values[i] = goStringView(view)
+	}
+	return values, nil
 }
 
 // AddHillshadeLayer adds a hillshade layer for a raster DEM source. Passing an

@@ -25,6 +25,7 @@ mln_offline_region_snapshot=MlnOfflineRegionSnapshot
 mln_offline_region_list=MlnOfflineRegionList
 mln_json_snapshot=MlnJsonSnapshot
 mln_style_id_list=MlnStyleIdList
+mln_style_string_list=MlnStyleStringList
 mln_feature_query_result=MlnFeatureQueryResult
 mln_feature_extension_result=MlnFeatureExtensionResult
 --config

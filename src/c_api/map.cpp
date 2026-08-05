@@ -157,6 +157,27 @@ auto mln_style_id_list_destroy(mln_style_id_list list) noexcept -> void {
   mln::core::style_id_list_destroy(list);
 }
 
+auto mln_style_string_list_count(
+  mln_style_string_list list, size_t* out_count
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::style_string_list_count(list, out_count);
+  });
+}
+
+auto mln_style_string_list_get(
+  mln_style_string_list list, size_t index, mln_string_view* out_value
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::style_string_list_get(list, index, out_value);
+  });
+}
+
+auto mln_style_string_list_destroy(mln_style_string_list list) noexcept
+  -> void {
+  mln::core::style_string_list_destroy(list);
+}
+
 auto mln_map_add_style_source_json(
   mln_map map, mln_string_view source_id, const mln_json_value* source_json
 ) noexcept -> mln_status {
@@ -211,6 +232,28 @@ auto mln_map_copy_style_source_attribution(
     return mln::core::map_copy_style_source_attribution(
       map, source_id, out_attribution, attribution_capacity,
       out_attribution_size, out_found
+    );
+  });
+}
+
+auto mln_map_copy_style_source_url(
+  mln_map map, mln_string_view source_id, char* out_url, size_t url_capacity,
+  size_t* out_url_size, bool* out_found
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_copy_style_source_url(
+      map, source_id, out_url, url_capacity, out_url_size, out_found
+    );
+  });
+}
+
+auto mln_map_get_style_source_tile_urls(
+  mln_map map, mln_string_view source_id, mln_style_string_list* out_tile_urls,
+  bool* out_found
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_get_style_source_tile_urls(
+      map, source_id, out_tile_urls, out_found
     );
   });
 }

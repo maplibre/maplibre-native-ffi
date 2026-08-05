@@ -1,30 +1,70 @@
 internal import CMaplibreNativeC
 
-public enum StyleSourceType: UInt32, Sendable, Hashable {
-  case unknown = 0
-  case vector = 1
-  case raster = 2
-  case rasterDEM = 3
-  case geoJSON = 4
-  case image = 5
-  case video = 6
-  case annotations = 7
-  case customVector = 8
+/// A style source type reported by MapLibre Native.
+///
+/// This is an open domain. The raw value preserves source types that this
+/// binding does not know yet.
+public struct StyleSourceType: Equatable, Sendable, Hashable {
+  public static let unknown = Self(rawValue: 0)
+  public static let vector = Self(rawValue: 1)
+  public static let raster = Self(rawValue: 2)
+  public static let rasterDEM = Self(rawValue: 3)
+  public static let geoJSON = Self(rawValue: 4)
+  public static let image = Self(rawValue: 5)
+  public static let video = Self(rawValue: 6)
+  public static let annotations = Self(rawValue: 7)
+  public static let customVector = Self(rawValue: 8)
+
+  public let rawValue: UInt32
+
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
 }
 
-public enum StyleTileScheme: UInt32, Sendable, Hashable {
-  case xyz = 0
-  case tms = 1
+/// The coordinate scheme for tile URLs.
+///
+/// This is an open domain. The raw value preserves schemes that this binding
+/// does not know yet.
+public struct StyleTileScheme: Equatable, Sendable, Hashable {
+  public static let xyz = Self(rawValue: 0)
+  public static let tms = Self(rawValue: 1)
+
+  public let rawValue: UInt32
+
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
 }
 
-public enum StyleVectorTileEncoding: UInt32, Sendable, Hashable {
-  case mvt = 0
-  case mlt = 1
+/// A vector tile encoding reported by MapLibre Native.
+///
+/// This is an open domain. The raw value preserves encodings that this binding
+/// does not know yet.
+public struct StyleVectorTileEncoding: Equatable, Sendable, Hashable {
+  public static let mvt = Self(rawValue: 0)
+  public static let mlt = Self(rawValue: 1)
+
+  public let rawValue: UInt32
+
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
 }
 
-public enum StyleRasterDEMEncoding: UInt32, Sendable, Hashable {
-  case mapbox = 0
-  case terrarium = 1
+/// A DEM raster encoding reported by MapLibre Native.
+///
+/// This is an open domain. The raw value preserves encodings that this binding
+/// does not know yet.
+public struct StyleRasterDEMEncoding: Equatable, Sendable, Hashable {
+  public static let mapbox = Self(rawValue: 0)
+  public static let terrarium = Self(rawValue: 1)
+
+  public let rawValue: UInt32
+
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
 }
 
 public struct StyleTileSourceOptions: Equatable, Sendable {
@@ -360,19 +400,47 @@ public struct StyleTransitionOptions: Equatable, Sendable {
   }
 }
 
+/// The parsed TileJSON fields that MapLibre Native retains for a tile source.
+public struct StyleSourceTileJSON: Equatable, Sendable {
+  public let tileURLs: [String]
+  public let minZoom: Double
+  public let maxZoom: Double
+  public let scheme: StyleTileScheme
+  public let bounds: LatLngBounds?
+
+  init(native: NativeStyleSourceTileJSON) {
+    tileURLs = native.tileURLs
+    minZoom = native.minZoom
+    maxZoom = native.maxZoom
+    scheme = StyleTileScheme(rawValue: native.scheme)
+    bounds = native.bounds.map(LatLngBounds.init(native:))
+  }
+}
+
+/// A copied snapshot of the retained state for one style source.
 public struct StyleSourceInfo: Equatable, Sendable {
   public let type: StyleSourceType
-  public let idSize: Int
   public let isVolatile: Bool
-  public let hasAttribution: Bool
-  public let attributionSize: Int
+  public let attribution: String?
+  public let url: String?
+  public let tileJSON: StyleSourceTileJSON?
+  public let tileSize: UInt32?
+  public let vectorEncoding: StyleVectorTileEncoding?
+  public let rasterEncoding: StyleRasterDEMEncoding?
 
   init(native: NativeStyleSourceInfo) {
-    type = StyleSourceType(rawValue: native.type) ?? .unknown
-    idSize = native.idSize
+    type = StyleSourceType(rawValue: native.type)
     isVolatile = native.isVolatile
-    hasAttribution = native.hasAttribution
-    attributionSize = native.attributionSize
+    attribution = native.attribution
+    url = native.url
+    tileJSON = native.tileJSON.map(StyleSourceTileJSON.init(native:))
+    tileSize = native.tileSize
+    vectorEncoding = native.vectorEncoding.map(StyleVectorTileEncoding.init(
+      rawValue:
+    ))
+    rasterEncoding = native.rasterEncoding.map(StyleRasterDEMEncoding.init(
+      rawValue:
+    ))
   }
 }
 
@@ -495,7 +563,7 @@ public extension MapHandle {
       return try NativeStyle.sourceType(
         requireLiveHandle(),
         sourceId: arena.view(sourceId)
-      ).map { StyleSourceType(rawValue: $0) ?? .unknown }
+      ).map(StyleSourceType.init(rawValue:))
     }
   }
 
@@ -512,17 +580,10 @@ public extension MapHandle {
   func styleSourceAttribution(_ sourceId: String) throws -> String? {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      let sourceIdView = arena.view(sourceId)
-      guard let info = try NativeStyle.sourceInfo(
+      return try NativeStyle.sourceAttribution(
         requireLiveHandle(),
-        sourceId: sourceIdView
-      ) else { return nil }
-      guard info.hasAttribution else { return nil }
-      return try NativeStyle.copySourceAttribution(
-        requireLiveHandle(),
-        sourceId: sourceIdView,
-        capacity: info.attributionSize
-      ).0
+        sourceId: arena.view(sourceId)
+      )
     }
   }
 

@@ -47,6 +47,7 @@ native_handle!(
     sys::mln_offline_region_list,
     sys::mln_json_snapshot,
     sys::mln_style_id_list,
+    sys::mln_style_string_list,
     sys::mln_feature_query_result,
     sys::mln_feature_extension_result,
 );
@@ -327,6 +328,13 @@ native_guard!(
     sys::mln_style_id_list_destroy,
     "mln_style_id_list",
     style_id_list
+);
+native_guard!(
+    StyleStringListGuard,
+    sys::mln_style_string_list,
+    sys::mln_style_string_list_destroy,
+    "mln_style_string_list",
+    style_string_list
 );
 
 #[cfg(test)]

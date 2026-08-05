@@ -12,6 +12,10 @@ only until it lands there.
    here; the browser WebGPU build needs `-sJSPI` instead. See
    `cmake/mln_ffi_emscripten.cmake` for why that matters. Upstream:
    [maplibre-native#4451](https://github.com/maplibre/maplibre-native/pull/4451).
+2. `0002-expose-retained-tile-source-tileset.patch` adds a read-only accessor
+   for the parsed TileJSON state that a tile source retains. The C API uses it
+   to return live source metadata without depending on MapLibre's private source
+   implementation or reparsing a style document.
 
 Drop a patch once the pin moves to a commit that carries it. Applying is
 idempotent, and the sync restores the files a patch touches before moving the

@@ -829,7 +829,7 @@ class MapHandle(NativeHandleMixin):
         return StyleSourceType(raw) if raw is not None else None
 
     def get_style_source_info(self, source_id: str) -> StyleSourceInfo | None:
-        """Return copied fixed metadata for one style source."""
+        """Return copied retained metadata for one style source."""
         from .style import StyleSourceInfo
 
         raw = self._native.get_style_source_info(source_id)

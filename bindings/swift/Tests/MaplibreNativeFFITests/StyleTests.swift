@@ -41,23 +41,118 @@ import Testing
   }
 }
 
-@Test func styleSourceInfoPreservesAbsentAttribution() {
-  var raw = mln_style_source_info()
-  raw.type = MLN_STYLE_SOURCE_TYPE_VECTOR.rawValue
-  raw.id_size = 6
-  raw.is_volatile = true
-  raw.has_attribution = false
-  raw.attribution_size = 12
-
-  let native = NativeStyleSourceInfo(raw)
+@Test func styleSourceInfoPreservesAbsentFieldsAndUnknownEnums() {
+  let native = NativeStyleSourceInfo(
+    type: 700,
+    isVolatile: true,
+    attribution: nil,
+    url: nil,
+    tileJSON: NativeStyleSourceTileJSON(
+      tileURLs: [],
+      minZoom: 0,
+      maxZoom: 0,
+      scheme: 701,
+      bounds: nil
+    ),
+    tileSize: 0,
+    vectorEncoding: 702,
+    rasterEncoding: 703
+  )
   let publicInfo = StyleSourceInfo(native: native)
 
-  #expect(native.hasAttribution == false)
-  #expect(native.attributionSize == 12)
-  #expect(publicInfo.type == .vector)
+  #expect(publicInfo.type.rawValue == 700)
   #expect(publicInfo.isVolatile)
-  #expect(publicInfo.hasAttribution == false)
-  #expect(publicInfo.attributionSize == 12)
+  #expect(publicInfo.attribution == nil)
+  #expect(publicInfo.url == nil)
+  #expect(publicInfo.tileJSON?.tileURLs == [])
+  #expect(publicInfo.tileJSON?.minZoom == 0)
+  #expect(publicInfo.tileJSON?.scheme.rawValue == 701)
+  #expect(publicInfo.tileJSON?.bounds == nil)
+  #expect(publicInfo.tileSize == 0)
+  #expect(publicInfo.vectorEncoding?.rawValue == 702)
+  #expect(publicInfo.rasterEncoding?.rawValue == 703)
+}
+
+@Test func sourceInspectionCopiesReconstructibleMetadata() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 1, height: 1)
+  )
+  defer { try? map.close() }
+
+  try map.setStyleJSON(#"{"version":8,"sources":{},"layers":[]}"#)
+  let bounds = LatLngBounds(
+    southwest: LatLng(latitude: -1, longitude: -2),
+    northeast: LatLng(latitude: 3, longitude: 4)
+  )
+  try map.addVectorSourceTiles(
+    sourceId: "inline",
+    tiles: [
+      "https://a.example/{z}/{x}/{y}.mvt",
+      "https://b.example/{z}/{x}/{y}.mvt",
+    ],
+    options: StyleTileSourceOptions(
+      minZoom: 0,
+      maxZoom: 9,
+      attribution: "© inline",
+      scheme: .tms,
+      bounds: bounds,
+      tileSize: 256,
+      vectorEncoding: .mlt
+    )
+  )
+  try map.addVectorSourceURL(
+    sourceId: "remote",
+    url: "https://example.com/source.json"
+  )
+  try map.addGeoJSONSourceData(
+    sourceId: "data",
+    data: .featureCollection([])
+  )
+
+  let inline = try #require(try map.styleSourceInfo("inline"))
+  #expect(inline.type == .vector)
+  #expect(inline.url == nil)
+  #expect(inline.attribution == "© inline")
+  #expect(
+    inline.tileJSON?.tileURLs == [
+      "https://a.example/{z}/{x}/{y}.mvt",
+      "https://b.example/{z}/{x}/{y}.mvt",
+    ]
+  )
+  #expect(inline.tileJSON?.minZoom == 0)
+  #expect(inline.tileJSON?.maxZoom == 9)
+  #expect(inline.tileJSON?.scheme == .tms)
+  #expect(inline.tileJSON?.bounds == bounds)
+  #expect(inline.tileSize == 512)
+  #expect(inline.vectorEncoding == .mlt)
+  #expect(inline.rasterEncoding == nil)
+
+  let remote = try #require(try map.styleSourceInfo("remote"))
+  #expect(remote.url == "https://example.com/source.json")
+  #expect(remote.tileJSON == nil)
+  #expect(remote.attribution == nil)
+
+  let data = try #require(try map.styleSourceInfo("data"))
+  #expect(data.url == nil)
+  #expect(data.tileJSON == nil)
+  #expect(data.tileSize == nil)
+  #expect(data.vectorEncoding == nil)
+  #expect(data.rasterEncoding == nil)
+  #expect(try map.styleSourceInfo("missing") == nil)
+
+  #expect(try map.removeStyleSource("inline"))
+  try map.close()
+
+  // Every nested string and value remains valid after its native source and
+  // owning map are gone.
+  #expect(inline.attribution == "© inline")
+  #expect(inline.tileJSON?.tileURLs.count == 2)
+  #expect(inline.tileJSON?.bounds == bounds)
+  #expect(remote.url == "https://example.com/source.json")
 }
 
 @Test func styleImageDescriptorsMaterializeScopedPixelsAndOptions() throws {

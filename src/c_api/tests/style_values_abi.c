@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "abi_tests.h"
+#include "maplibre_native_c/callback_adapter.h"
 #include "test_support.h"
 #include "unity.h"
 
@@ -785,6 +786,359 @@ static void copy_entry_points_answer_a_null_buffer_as_a_size_probe(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Source metadata is split between fixed fields, copy-out strings, and an
+// owned list because no caller-owned struct can safely retain variable-length
+// TileJSON data across the ABI.
+static void style_source_info_rebuilds_an_inline_tile_source(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_style_json(
+      map,
+      "{\"version\":8,\"sources\":{\"vec\":{\"type\":\"vector\","
+      "\"tiles\":[\"https://a.example/{z}/{x}/{y}.mlt\","
+      "\"https://b.example/{z}/{x}/{y}.mlt\"],\"minzoom\":2,"
+      "\"maxzoom\":7,\"scheme\":\"tms\",\"bounds\":[-10,-5,20,15],"
+      "\"encoding\":\"mlt\",\"attribution\":\"example\"}},"
+      "\"layers\":[]}"
+    )
+  );
+
+  const mln_string_view source_id = MLN_STRING_LITERAL("vec");
+  mln_style_source_info info = {.size = sizeof(mln_style_source_info)};
+  bool found = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_source_info(map, source_id, &info, &found)
+  );
+  TEST_ASSERT_TRUE(found);
+  TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_SOURCE_TYPE_VECTOR, info.type);
+  TEST_ASSERT_BITS_HIGH(
+    MLN_STYLE_SOURCE_INFO_TILEJSON | MLN_STYLE_SOURCE_INFO_BOUNDS |
+      MLN_STYLE_SOURCE_INFO_TILE_SIZE | MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING,
+    info.fields
+  );
+  TEST_ASSERT_BITS_LOW(MLN_STYLE_SOURCE_INFO_URL, info.fields);
+  TEST_ASSERT_EQUAL_size_t(2, info.tile_count);
+  TEST_ASSERT_EQUAL_DOUBLE(2.0, info.min_zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(7.0, info.max_zoom);
+  TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_TILE_SCHEME_TMS, info.scheme);
+  TEST_ASSERT_EQUAL_DOUBLE(-5.0, info.bounds.southwest.latitude);
+  TEST_ASSERT_EQUAL_DOUBLE(-10.0, info.bounds.southwest.longitude);
+  TEST_ASSERT_EQUAL_DOUBLE(15.0, info.bounds.northeast.latitude);
+  TEST_ASSERT_EQUAL_DOUBLE(20.0, info.bounds.northeast.longitude);
+  TEST_ASSERT_EQUAL_UINT32(512, info.tile_size);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_STYLE_VECTOR_TILE_ENCODING_MLT, info.vector_encoding
+  );
+
+  mln_style_string_list tile_urls = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_get_style_source_tile_urls(map, source_id, &tile_urls, &found)
+  );
+  TEST_ASSERT_TRUE(found);
+  size_t tile_count = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_style_string_list_count(tile_urls, &tile_count)
+  );
+  TEST_ASSERT_EQUAL_size_t(2, tile_count);
+
+  mln_string_view tiles[2] = {0};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_style_string_list_get(tile_urls, 0, &tiles[0])
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_style_string_list_get(tile_urls, 1, &tiles[1])
+  );
+  TEST_ASSERT_EQUAL_STRING_LEN(
+    "https://a.example/{z}/{x}/{y}.mlt", tiles[0].data, tiles[0].size
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_style_string_list_get(tile_urls, tile_count, &tiles[0])
+  );
+
+  char attribution[7] = {0};
+  size_t attribution_size = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_copy_style_source_attribution(
+                     map, source_id, attribution, sizeof(attribution),
+                     &attribution_size, &found
+                   )
+  );
+  TEST_ASSERT_EQUAL_size_t(7, attribution_size);
+  TEST_ASSERT_EQUAL_STRING_LEN("example", attribution, attribution_size);
+
+  mln_style_tile_source_options options =
+    mln_style_tile_source_options_default();
+  options.fields = MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM |
+                   MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM |
+                   MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION |
+                   MLN_STYLE_TILE_SOURCE_OPTION_SCHEME |
+                   MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS |
+                   MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;
+  options.min_zoom = info.min_zoom;
+  options.max_zoom = info.max_zoom;
+  options.attribution =
+    (mln_string_view){.data = attribution, .size = attribution_size};
+  options.scheme = info.scheme;
+  options.bounds = info.bounds;
+  options.vector_encoding = info.vector_encoding;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_add_vector_source_tiles(
+      map, MLN_STRING_LITERAL("rebuilt"), tiles, tile_count, &options
+    )
+  );
+
+  mln_style_string_list_destroy(tile_urls);
+  mln_style_string_list_destroy(tile_urls);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_style_string_list_count(tile_urls, &tile_count)
+  );
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// URL is retained at construction, while fields sourced from TileJSON appear
+// only after the source description has loaded.
+static void style_source_info_tracks_loaded_tilejson(void) {
+  static const char source_url[] = "https://example.com/source.json";
+  static const uint8_t tilejson[] =
+    "{\"tilejson\":\"3.0.0\",\"tiles\":[\"https://tiles.example/{z}/{x}/"
+    "{y}.pbf\"],"
+    "\"minzoom\":1,\"maxzoom\":9,\"scheme\":\"tms\",\"bounds\":[-30,-20,40,50]"
+    "}";
+  const mln_adapter_resource_provider_rule rule = {
+    .kind = MLN_RESOURCE_KIND_SOURCE,
+    .requested_url = source_url,
+    .response = {
+      .size = sizeof(mln_resource_response),
+      .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+      .error_reason = MLN_RESOURCE_ERROR_REASON_NONE,
+      .bytes = tilejson,
+      .byte_count = sizeof(tilejson) - 1,
+    },
+  };
+  const mln_adapter_resource_provider_rules rules = {
+    .rules = &rule, .count = 1
+  };
+
+  mln_runtime runtime = mln_test_create_runtime();
+  const mln_resource_provider provider = {
+    .size = sizeof(mln_resource_provider),
+    .callback = mln_adapter_resource_provider_rules_callback,
+    .user_data = (void*)&rules,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
+  );
+  mln_map map = mln_test_create_map(runtime);
+  const mln_string_view source_id = MLN_STRING_LITERAL("remote");
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_add_vector_source_url(
+                     map, source_id, MLN_STRING_LITERAL(source_url), NULL
+                   )
+  );
+
+  mln_style_source_info info = {.size = sizeof(mln_style_source_info)};
+  bool found = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_source_info(map, source_id, &info, &found)
+  );
+  TEST_ASSERT_TRUE(found);
+  TEST_ASSERT_BITS_HIGH(MLN_STYLE_SOURCE_INFO_URL, info.fields);
+  TEST_ASSERT_EQUAL_size_t(sizeof(source_url) - 1, info.url_size);
+
+  size_t copied_size = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_copy_style_source_url(map, source_id, NULL, 0, &copied_size, &found)
+  );
+  TEST_ASSERT_EQUAL_size_t(sizeof(source_url) - 1, copied_size);
+  char too_small[2] = {0};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_copy_style_source_url(
+      map, source_id, too_small, sizeof(too_small), &copied_size, &found
+    )
+  );
+  char copied_url[sizeof(source_url)] = {0};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_copy_style_source_url(
+      map, source_id, copied_url, sizeof(copied_url), &copied_size, &found
+    )
+  );
+  TEST_ASSERT_EQUAL_STRING_LEN(source_url, copied_url, copied_size);
+
+  for (unsigned int attempt = 0;
+       attempt < 600 && (info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) == 0;
+       attempt += 1) {
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
+    info.size = sizeof(mln_style_source_info);
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_map_get_style_source_info(map, source_id, &info, &found)
+    );
+    if ((info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) == 0) {
+      mln_test_sleep_millisecond();
+    }
+  }
+  TEST_ASSERT_BITS_HIGH(
+    MLN_STYLE_SOURCE_INFO_TILEJSON | MLN_STYLE_SOURCE_INFO_BOUNDS, info.fields
+  );
+  TEST_ASSERT_EQUAL_size_t(1, info.tile_count);
+  TEST_ASSERT_EQUAL_DOUBLE(1.0, info.min_zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(9.0, info.max_zoom);
+  TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_TILE_SCHEME_TMS, info.scheme);
+
+  mln_style_string_list urls = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_get_style_source_tile_urls(map, source_id, &urls, &found)
+  );
+  size_t count = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_style_string_list_count(urls, &count)
+  );
+  TEST_ASSERT_EQUAL_size_t(1, count);
+  mln_style_string_list_destroy(urls);
+
+  mln_test_destroy_map(map);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_clear_resource_provider(runtime)
+  );
+  mln_test_destroy_runtime(runtime);
+}
+
+static void style_source_info_reports_other_source_shapes(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_style_json(
+      map,
+      "{\"version\":8,\"sources\":{"
+      "\"dem\":{\"type\":\"raster-dem\",\"tiles\":[\"https://example.com/dem/"
+      "{z}/{x}/{y}.png\"],\"tileSize\":256,\"encoding\":\"terrarium\"},"
+      "\"geo-url\":{\"type\":\"geojson\",\"data\":\"https://example.com/"
+      "data.geojson\"},"
+      "\"geo-data\":{\"type\":\"geojson\",\"data\":{\"type\":"
+      "\"FeatureCollection\",\"features\":[]}},"
+      "\"image\":{\"type\":\"image\",\"url\":\"https://example.com/"
+      "image.png\",\"coordinates\":[[-1,1],[1,1],[1,-1],[-1,-1]]}},"
+      "\"layers\":[]}"
+    )
+  );
+
+  bool found = false;
+  mln_style_source_info info = {.size = sizeof(mln_style_source_info)};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_get_style_source_info(map, MLN_STRING_LITERAL("dem"), &info, &found)
+  );
+  TEST_ASSERT_TRUE(found);
+  TEST_ASSERT_BITS_HIGH(
+    MLN_STYLE_SOURCE_INFO_TILEJSON | MLN_STYLE_SOURCE_INFO_TILE_SIZE |
+      MLN_STYLE_SOURCE_INFO_RASTER_ENCODING,
+    info.fields
+  );
+  TEST_ASSERT_EQUAL_UINT32(256, info.tile_size);
+  TEST_ASSERT_EQUAL_DOUBLE(0.0, info.min_zoom);
+  TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_TILE_SCHEME_XYZ, info.scheme);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM, info.raster_encoding
+  );
+
+  const mln_string_view url_ids[] = {
+    MLN_STRING_LITERAL("geo-url"), MLN_STRING_LITERAL("image")
+  };
+  for (size_t index = 0; index < 2; index += 1) {
+    info = (mln_style_source_info){.size = sizeof(mln_style_source_info)};
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_map_get_style_source_info(map, url_ids[index], &info, &found)
+    );
+    TEST_ASSERT_TRUE(found);
+    TEST_ASSERT_BITS_HIGH(MLN_STYLE_SOURCE_INFO_URL, info.fields);
+    TEST_ASSERT_TRUE(info.url_size > 0);
+  }
+
+  info = (mln_style_source_info){.size = sizeof(mln_style_source_info)};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_source_info(
+                     map, MLN_STRING_LITERAL("geo-data"), &info, &found
+                   )
+  );
+  TEST_ASSERT_TRUE(found);
+  TEST_ASSERT_EQUAL_UINT32(0, info.fields);
+
+  size_t url_size = 123;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_copy_style_source_url(
+      map, MLN_STRING_LITERAL("geo-data"), NULL, 0, &url_size, &found
+    )
+  );
+  TEST_ASSERT_TRUE(found);
+  TEST_ASSERT_EQUAL_size_t(0, url_size);
+
+  mln_style_string_list empty = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_source_tile_urls(
+                     map, MLN_STRING_LITERAL("geo-data"), &empty, &found
+                   )
+  );
+  size_t count = 123;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_style_string_list_count(empty, &count)
+  );
+  TEST_ASSERT_EQUAL_size_t(0, count);
+  mln_style_string_list_destroy(empty);
+
+  mln_style_string_list missing = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_source_tile_urls(
+                     map, MLN_STRING_LITERAL("missing"), &missing, &found
+                   )
+  );
+  TEST_ASSERT_FALSE(found);
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, missing);
+  url_size = 123;
+  found = true;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_copy_style_source_url(
+      map, MLN_STRING_LITERAL("missing"), NULL, 0, &url_size, &found
+    )
+  );
+  TEST_ASSERT_FALSE(found);
+  TEST_ASSERT_EQUAL_size_t(0, url_size);
+
+  info = (mln_style_source_info){.size = sizeof(mln_style_source_info)};
+  found = true;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_source_info(
+                     map, MLN_STRING_LITERAL("missing"), &info, &found
+                   )
+  );
+  TEST_ASSERT_FALSE(found);
+  TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_SOURCE_TYPE_UNKNOWN, info.type);
+  TEST_ASSERT_EQUAL_UINT32(0, info.fields);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_get_style_source_tile_urls(
+      map, MLN_STRING_LITERAL("dem"), &empty, &found
+    )
+  );
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // The loaded document is what the style loader last parsed, not a serialization
 // of the live style, so this pins both the verbatim round trip and the fact
 // that later mutations never reach it.
@@ -1128,6 +1482,9 @@ void run_style_values_abi_tests(void) {
   RUN_TEST(layer_zoom_and_visibility_accessors_carry_raw_domains);
   RUN_TEST(style_image_stretch_descriptors_reject_unsafe_raw_values);
   RUN_TEST(copy_entry_points_answer_a_null_buffer_as_a_size_probe);
+  RUN_TEST(style_source_info_rebuilds_an_inline_tile_source);
+  RUN_TEST(style_source_info_tracks_loaded_tilejson);
+  RUN_TEST(style_source_info_reports_other_source_shapes);
   RUN_TEST(loaded_style_document_reports_the_parsed_bytes);
   RUN_TEST(style_url_reports_the_requested_url);
   RUN_TEST(style_transition_options_reject_unsafe_raw_headers);

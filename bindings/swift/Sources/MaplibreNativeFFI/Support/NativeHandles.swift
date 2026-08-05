@@ -50,6 +50,10 @@ struct NativeStyleIdListHandle: NativeHandle {
   let raw: UInt64
 }
 
+struct NativeStyleStringListHandle: NativeHandle {
+  let raw: UInt64
+}
+
 struct NativeFeatureQueryResultHandle: NativeHandle {
   let raw: UInt64
 }

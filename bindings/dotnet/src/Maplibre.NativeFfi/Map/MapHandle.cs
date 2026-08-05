@@ -731,7 +731,7 @@ public sealed unsafe class MapHandle : IDisposable
         return found ? (SourceType)sourceType : null;
     }
 
-    /// <summary>Gets fixed style source metadata when the source exists.</summary>
+    /// <summary>Gets copied style source metadata when the source exists.</summary>
     public SourceInfo? StyleSourceInfo(string sourceId)
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
@@ -787,12 +787,103 @@ public sealed unsafe class MapHandle : IDisposable
             }
         }
 
+        var fields = (mln_style_source_info_field)info.fields;
+        string? url = null;
+        if (fields.HasFlag(mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_URL))
+        {
+            url = string.Empty;
+            if (info.url_size > 0)
+            {
+                var buffer = new byte[checked((int)info.url_size)];
+                nuint urlSize = 0;
+                bool urlFound = false;
+                fixed (byte* bufferPointer = buffer)
+                {
+                    NativeStatus.Check(
+                        NativeMethods.mln_map_copy_style_source_url(
+                            Handle,
+                            nativeSourceId.Value,
+                            (sbyte*)bufferPointer,
+                            (nuint)buffer.Length,
+                            &urlSize,
+                            &urlFound
+                        )
+                    );
+                }
+
+                if (!urlFound)
+                {
+                    return null;
+                }
+
+                if (urlSize > (nuint)buffer.Length)
+                {
+                    throw new InvalidOperationException(
+                        $"Native style source URL size {urlSize} exceeds buffer length {buffer.Length}."
+                    );
+                }
+
+                fixed (byte* bufferPointer = buffer)
+                {
+                    url = RuntimeStructs.CopyUtf8((sbyte*)bufferPointer, urlSize);
+                }
+            }
+        }
+
+        TileJson? tileJson = null;
+        if (fields.HasFlag(mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_TILEJSON))
+        {
+            MlnStyleStringList tileUrlList = default;
+            bool tileUrlsFound = false;
+            NativeStatus.Check(
+                NativeMethods.mln_map_get_style_source_tile_urls(
+                    Handle,
+                    nativeSourceId.Value,
+                    &tileUrlList,
+                    &tileUrlsFound
+                )
+            );
+            if (!tileUrlsFound)
+            {
+                return null;
+            }
+
+            var tileUrls = CopyStyleStringList(tileUrlList);
+            tileJson = new TileJson(
+                tileUrls,
+                info.min_zoom,
+                info.max_zoom,
+                (TileScheme)info.scheme,
+                info.scheme,
+                fields.HasFlag(mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_BOUNDS)
+                    ? MapStructs.FromNative(info.bounds)
+                    : null
+            );
+        }
+
         return new SourceInfo(
             sourceId,
             (SourceType)info.type,
             info.type,
             info.is_volatile != 0,
-            attribution
+            attribution,
+            url,
+            tileJson,
+            fields.HasFlag(mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_TILE_SIZE)
+                ? info.tile_size
+                : null,
+            fields.HasFlag(mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING)
+                ? (VectorTileEncoding)info.vector_encoding
+                : null,
+            fields.HasFlag(mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING)
+                ? info.vector_encoding
+                : null,
+            fields.HasFlag(mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING)
+                ? (RasterDemEncoding)info.raster_encoding
+                : null,
+            fields.HasFlag(mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING)
+                ? info.raster_encoding
+                : null
         );
     }
 
@@ -1969,6 +2060,35 @@ public sealed unsafe class MapHandle : IDisposable
         finally
         {
             NativeMethods.mln_style_id_list_destroy(list);
+        }
+    }
+
+    private static string[] CopyStyleStringList(MlnStyleStringList list)
+    {
+        if (list.IsNull)
+        {
+            return [];
+        }
+
+        try
+        {
+            nuint count = 0;
+            NativeStatus.Check(NativeMethods.mln_style_string_list_count(list, &count));
+            var values = new string[checked((int)count)];
+            for (var index = 0; index < values.Length; index++)
+            {
+                mln_string_view value = default;
+                NativeStatus.Check(
+                    NativeMethods.mln_style_string_list_get(list, (nuint)index, &value)
+                );
+                values[index] = RuntimeStructs.CopyUtf8(value.data, value.size);
+            }
+
+            return values;
+        }
+        finally
+        {
+            NativeMethods.mln_style_string_list_destroy(list);
         }
     }
 
