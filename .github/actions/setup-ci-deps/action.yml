@@ -158,7 +158,7 @@ runs:
     # process access to hardware acceleration. Without it both emulators fall
     # back to software emulation, which no job here has the time budget for.
     - name: Enable KVM for the emulator
-      if: ${{ runner.os == 'Linux' && (inputs.target == 'ohos-x64-egl' || inputs.target == 'android-x64-egl') }}
+      if: ${{ runner.os == 'Linux' && (inputs.target == 'ohos-x64-egl' || startsWith(inputs.target, 'android-x64-')) }}
       shell: bash
       run: |
         echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

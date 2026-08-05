@@ -70,64 +70,26 @@ function environmentSupport(
   );
 }
 
-function backendSignature(backends: Backend[]): string {
-  return backends
-    .map((backend) => backend.backendLabel)
-    .sort()
-    .join("|");
-}
-
-function supportLabel(
-  label: string,
-  environment: EnvironmentColumn & {
-    backends: Backend[];
-  },
-  support: EnvironmentSupport,
-): string {
-  if (
-    backendSignature(support.backends) ===
-    backendSignature(environment.backends)
-  ) {
-    return label;
+function supportStatus(support: EnvironmentSupport): Status {
+  if (support.backends.some((backend) => backend.status === "tested")) {
+    return "tested";
   }
-  return `${label} (${support.backends.map((backend) => backend.backendLabel).join(", ")})`;
+  return "build-only";
 }
 
 function subprojectSupport(
   subprojects: SubprojectSupport[],
-  environment: EnvironmentColumn & { backends: Backend[] },
-  labelFor: (
-    subproject: SubprojectSupport,
-    support: EnvironmentSupport,
-  ) => string,
+  environment: EnvironmentColumn,
 ): { label: string; status: Status; url: string }[] {
   return subprojects.flatMap((subproject) => {
     const support = environmentSupport(subproject, environment.environment);
     if (!support) {
       return [];
     }
-    const statuses = new Set(support.backends.map((backend) => backend.status));
-    if (statuses.size > 1) {
-      return statusBadges.flatMap(({ status }) => {
-        const backends = support.backends.filter(
-          (backend) => backend.status === status,
-        );
-        if (backends.length === 0) {
-          return [];
-        }
-        return [
-          {
-            label: `${subproject.label} (${backends.map((backend) => backend.backendLabel).join(", ")})`,
-            status,
-            url: sourceUrl(subproject.sourceDirectory),
-          },
-        ];
-      });
-    }
     return [
       {
-        label: labelFor(subproject, support),
-        status: support.backends[0].status,
+        label: subproject.label,
+        status: supportStatus(support),
         url: sourceUrl(subproject.sourceDirectory),
       },
     ];
@@ -158,16 +120,8 @@ function subprojectSupport(
   </thead>
   <tbody>
     {environmentRows.map((environment) => {
-      const bindings = subprojectSupport(
-        supportMatrix.bindings,
-        environment,
-        (binding, support) => supportLabel(binding.label, environment, support),
-      );
-      const examples = subprojectSupport(
-        supportMatrix.examples,
-        environment,
-        (example) => example.label,
-      );
+      const bindings = subprojectSupport(supportMatrix.bindings, environment);
+      const examples = subprojectSupport(supportMatrix.examples, environment);
       return (
         <tr>
           <th scope="row">{environment.label}</th>
@@ -214,8 +168,7 @@ function subprojectSupport(
   </tbody>
 </table>
 <p>
-  OpenGL uses WGL on Windows and EGL on other platforms. macOS EGL uses ANGLE. A
-  binding or example has separate badges when its CI status differs by backend.
+  OpenGL uses WGL on Windows and EGL on other platforms. macOS EGL uses ANGLE.
 </p>
 
 <style>

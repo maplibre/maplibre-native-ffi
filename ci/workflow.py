@@ -10,7 +10,11 @@ DESKTOP = {"linux", "macos", "windows"}
 # Targets whose suite runs on an emulator instead of through ctest. CMake
 # registers no test preset for them, because the `test` mise task boots the
 # emulator and drives the device shell itself.
-EMULATOR_TESTED = {"android-x64-egl", "ohos-x64-egl"}
+EMULATOR_TESTED = {
+    "android-x64-egl",
+    "android-x64-vulkan",
+    "ohos-x64-egl",
+}
 
 
 def runtime_tested(preset: str, tested: set[str]) -> bool:
@@ -100,8 +104,8 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
         # would before it runs anything, so it stands in for that command.
         commands.extend(
             [
-                "mise run //bindings/go:test:android-emulator",
-                "mise run //bindings/rust:test:android-emulator",
+                f"mise run //bindings/go:test:android-emulator {preset}",
+                f"mise run //bindings/rust:test:android-emulator {preset}",
             ]
         )
     else:

@@ -1,11 +1,11 @@
 function(mln_ffi_configure_platform_dependencies target)
   target_link_libraries(${target} INTERFACE android atomic z)
-  # The emulator this repository boots runs x86_64 with a SwiftShader GLES
-  # driver, so that is the one Android configuration whose suite can execute.
-  set(android_test_supported FALSE)
-  if(ANDROID_ABI STREQUAL "x86_64"
-     AND MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
+  # The emulator this repository boots runs x86_64 with SwiftShader drivers for
+  # both render backends, so every x86_64 configuration can execute its suite.
+  if(ANDROID_ABI STREQUAL "x86_64")
     set(android_test_supported TRUE)
+  else()
+    set(android_test_supported FALSE)
   endif()
   set_target_properties(
     ${target}

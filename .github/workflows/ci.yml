@@ -952,10 +952,10 @@ jobs:
       - run: mise run //bindings/kotlin:androidBuild opengl x86_64 --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/go:test:android-emulator
+      - run: mise run //bindings/go:test:android-emulator android-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/rust:test:android-emulator
+      - run: mise run //bindings/rust:test:android-emulator android-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/android-map:build opengl x86_64 --prebuilt
@@ -989,7 +989,7 @@ jobs:
           target: android-x64-vulkan
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-      - run: mise run build android-x64-vulkan
+      - run: mise run test android-x64-vulkan
       - name: Archive native artifact
         run: mise run archive-native android-x64-vulkan
       - name: Install packaged native artifact
@@ -1000,10 +1000,10 @@ jobs:
       - run: mise run //bindings/kotlin:androidBuild vulkan x86_64 --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/go:build android-x64-vulkan
+      - run: mise run //bindings/go:test:android-emulator android-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/rust:build android-x64-vulkan
+      - run: mise run //bindings/rust:test:android-emulator android-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/dart:build:mobile android-x64-vulkan
