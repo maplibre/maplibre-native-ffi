@@ -140,6 +140,10 @@ uint64_t mln_abi_owner_create(void);
  * context can reach them once their owner is gone. Registration identities the
  * owner minted stop naming anything, so a record a MapLibre thread pushes
  * afterwards is released the same way.
+ *
+ * Like mln_abi_queue_set_notifier(), this returns only once every call to this
+ * owner's notifier has returned, so the caller may release what the notifier
+ * read.
  */
 void mln_abi_owner_destroy(uint64_t owner);
 
@@ -201,6 +205,15 @@ void mln_abi_record_destroy(uint32_t kind, void* record);
  * does the least possible: wake the owner's own execution context, which then
  * drains. Passing null clears this owner's. Each owner keeps its own, so a
  * context that installs one later does not silence the ones already there.
+ *
+ * This returns only once every call to the notifier it replaced has returned,
+ * so the caller may release whatever the old notifier's user_data named. A
+ * producer reads the notifier under a lock this does not hold while it waits,
+ * which is what keeps a wake from deadlocking against the thread that produced
+ * the record.
+ *
+ * A notifier therefore must not install or clear a notifier, or destroy an
+ * owner, from inside itself: it would be waiting for its own call to return.
  */
 void mln_abi_queue_set_notifier(
   uint64_t owner, void (*notify)(void* user_data), void* user_data

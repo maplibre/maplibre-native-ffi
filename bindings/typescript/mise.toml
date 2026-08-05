@@ -148,3 +148,10 @@ cd bindings/typescript/api
 pnpm exec playwright install --with-deps chromium
 pnpm exec vitest run --config vitest.browser.config.ts
 '''
+
+[tasks."test:notifier-lifetime"]
+description = "Prove the support layer's notifier outlives a concurrent stop."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+dir = "../.."
+run = 'bindings/typescript/scripts/run-notifier-lifetime-test.sh "$usage_preset"'

@@ -310,6 +310,22 @@ typedef struct mln_abi_owner {
   uint32_t count;
   void (*notify)(void*);
   void* notify_data;
+  /*
+   * How many notifier calls this owner has begun and how many have returned.
+   *
+   * The notifier runs outside the queue lock, so between reading it and calling
+   * it the host could otherwise have stopped notifications and freed the state
+   * notify_data names. These count that window: a producer takes a count while
+   * the notifier is still installed, and whoever replaces or removes the
+   * notifier waits for the counts to meet before the host releases anything the
+   * old notifier reads.
+   *
+   * Two monotonic counts rather than one in-flight count, because a waiter only
+   * owes the calls that began before it: a steady stream of records would keep
+   * an in-flight count above zero forever and hold the waiter open with it.
+   */
+  uint64_t notify_started;
+  uint64_t notify_finished;
 } mln_abi_owner;
 
 static mln_abi_owner* mln_abi_owners;
@@ -331,22 +347,58 @@ static uintptr_t mln_abi_owner_sequence;
 #define MLN_ABI_IDENTITY_HALF_MAX \
   ((uintptr_t)((((uintptr_t)1U) << MLN_ABI_IDENTITY_HALF_BITS) - 1U))
 
+/*
+ * The condition variable alongside the queue lock reports that a notifier call
+ * has returned. Only the notifier wait below uses it, so a wake is a broadcast:
+ * several owners can be waiting, and each decides for itself whether the count
+ * it was waiting for has been reached.
+ */
 #if defined(_WIN32)
 static SRWLOCK mln_abi_queue_lock = SRWLOCK_INIT;
+static CONDITION_VARIABLE mln_abi_queue_settled = CONDITION_VARIABLE_INIT;
 static void mln_abi_queue_acquire(void) {
   AcquireSRWLockExclusive(&mln_abi_queue_lock);
 }
 static void mln_abi_queue_release(void) {
   ReleaseSRWLockExclusive(&mln_abi_queue_lock);
 }
+/* Callers hold the queue lock, which the wait drops and takes again. */
+static void mln_abi_queue_wait(void) {
+  SleepConditionVariableSRW(
+    &mln_abi_queue_settled, &mln_abi_queue_lock, INFINITE, 0
+  );
+}
+static void mln_abi_queue_wake(void) {
+  WakeAllConditionVariable(&mln_abi_queue_settled);
+}
 #else
 static pthread_mutex_t mln_abi_queue_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t mln_abi_queue_settled = PTHREAD_COND_INITIALIZER;
 static void mln_abi_queue_acquire(void) {
   pthread_mutex_lock(&mln_abi_queue_lock);
 }
 static void mln_abi_queue_release(void) {
   pthread_mutex_unlock(&mln_abi_queue_lock);
 }
+/* Callers hold the queue lock, which the wait drops and takes again. */
+static void mln_abi_queue_wait(void) {
+  pthread_cond_wait(&mln_abi_queue_settled, &mln_abi_queue_lock);
+}
+static void mln_abi_queue_wake(void) {
+  pthread_cond_broadcast(&mln_abi_queue_settled);
+}
+#endif
+
+/*
+ * A test build widens the window between reading an owner's notifier and
+ * calling it, so a stop that races it lands inside that window every time
+ * rather than once in a very long while. Nothing outside that build defines
+ * this, and nothing outside it compiles anything but the empty expansion.
+ */
+#if defined(MLN_ABI_TEST_HOOKS)
+extern void mln_abi_test_before_notify(void);
+#else
+#define mln_abi_test_before_notify() ((void)0)
 #endif
 
 /* Callers hold the queue lock. The list is one entry per live host execution
@@ -362,6 +414,24 @@ static mln_abi_owner* mln_abi_owner_find(uintptr_t id) {
     }
   }
   return NULL;
+}
+
+/*
+ * Waits until every notifier call an owner had begun by `target` has returned.
+ *
+ * Callers hold the queue lock, which the wait drops while it sleeps. The owner
+ * is looked up again on each turn rather than held across the sleep, because a
+ * caller that let go of the lock cannot assume the owner it started with is
+ * still there; an owner that has gone has no notifier call left to wait for.
+ */
+static void mln_abi_queue_await_notifiers(uintptr_t id, uint64_t target) {
+  for (;;) {
+    const mln_abi_owner* owner = mln_abi_owner_find(id);
+    if (owner == NULL || owner->notify_finished >= target) {
+      return;
+    }
+    mln_abi_queue_wait();
+  }
 }
 
 /** Releases a list of nodes and the records they carry. */
@@ -395,6 +465,8 @@ MLN_ABI_KEEP uint64_t mln_abi_owner_create(void) {
   owner->count = 0U;
   owner->notify = NULL;
   owner->notify_data = NULL;
+  owner->notify_started = 0U;
+  owner->notify_finished = 0U;
   owner->next = mln_abi_owners;
   mln_abi_owners = owner;
   mln_abi_queue_release();
@@ -415,6 +487,13 @@ MLN_ABI_KEEP void mln_abi_owner_destroy(uint64_t owner) {
     link = &(*link)->next;
   }
   if (found != NULL) {
+    /* Unlinked before this waits, so no producer can begin another notifier
+     * call for it and the counts can only converge. Waiting here is what lets
+     * the host free the state its notifier reads once this returns, and what
+     * keeps a producer from writing its completion into an owner this frees. */
+    while (found->notify_finished < found->notify_started) {
+      mln_abi_queue_wait();
+    }
     orphaned = found->head;
   }
   mln_abi_queue_release();
@@ -475,6 +554,12 @@ static void mln_abi_queue_push(
     owner->count += 1U;
     notify = owner->notify;
     notify_data = owner->notify_data;
+    if (notify != NULL) {
+      /* Counted while the notifier is still this owner's. A host that stops
+       * notifications afterwards waits for this call, so what notify_data names
+       * cannot be freed while this producer is about to read it. */
+      owner->notify_started += 1U;
+    }
   }
   mln_abi_queue_release();
 
@@ -489,7 +574,15 @@ static void mln_abi_queue_push(
   /* Outside the lock: the notifier reaches the host's runtime, which must not
    * be able to deadlock against a producer. */
   if (notify != NULL) {
+    mln_abi_test_before_notify();
     notify(notify_data);
+    mln_abi_queue_acquire();
+    /* The owner is still there to write into: a destroy waits for exactly this
+     * count before it frees the owner, so the pointer read before the notifier
+     * ran is still the one that names it. */
+    owner->notify_finished += 1U;
+    mln_abi_queue_wake();
+    mln_abi_queue_release();
   }
 }
 
@@ -570,6 +663,12 @@ void mln_abi_queue_set_notifier(
   if (found != NULL) {
     found->notify = notify;
     found->notify_data = user_data;
+    /* Every notifier call already begun read the notifier this replaced, so
+     * this returns only once each of them has returned. That is what makes the
+     * host's next step safe: whatever the old notifier read is now out of
+     * reach. A call begun after this line reads the new notifier and is not
+     * waited for. */
+    mln_abi_queue_await_notifiers((uintptr_t)owner, found->notify_started);
   }
   mln_abi_queue_release();
 }

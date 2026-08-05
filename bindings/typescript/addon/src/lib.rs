@@ -239,9 +239,18 @@ pub fn create_callback_owner() -> BigInt {
 }
 
 /// Destroys an owner, releasing records still queued for it.
+///
+/// A host that destroys an owner without stopping its notifications first is
+/// still done with it, so the notifier goes here too rather than being left in
+/// the list for a process that never asks about that owner again. Destroying the
+/// owner waits for the producers already inside the notifier, so the box is
+/// dropped afterwards.
 #[napi]
 pub fn destroy_callback_owner(owner: BigInt) -> Result<()> {
-    unsafe { mln_abi_owner_destroy(address(owner, "owner")?) };
+    let owner = address(owner, "owner")?;
+    unsafe { mln_abi_owner_destroy(owner) };
+    let mut notifiers = NOTIFIERS.lock().unwrap();
+    notifiers.retain(|(installed, _)| *installed != owner);
     Ok(())
 }
 
@@ -316,8 +325,9 @@ pub fn start_record_notifications(
     // into the list afterwards leaves the address valid.
     let pointer = (&*notifier as *const RecordNotifier) as *mut std::ffi::c_void;
     let mut notifiers = NOTIFIERS.lock().unwrap();
-    // This owner's previous notifier is cleared from native first, so no
-    // producer can be inside it while it is dropped.
+    // Clearing this owner's previous notifier waits for every producer that had
+    // already read it, so the box is dropped below with nobody able to reach it.
+    // Dropping it first would free the box a producer thread is about to read.
     unsafe { mln_abi_queue_set_notifier(owner, None, std::ptr::null_mut()) };
     notifiers.retain(|(installed, _)| *installed != owner);
     notifiers.push((owner, notifier));
@@ -326,6 +336,11 @@ pub fn start_record_notifications(
 }
 
 /// Removes one owner's drain signal, leaving its records for an explicit drain.
+///
+/// The order is what makes this safe. Clearing the notifier natively returns
+/// only once every producer that had already read it has finished calling it, so
+/// the box is dropped afterwards with no thread able to reach it. Dropping it
+/// first would hand a producer a freed threadsafe function.
 #[napi]
 pub fn stop_record_notifications(owner: BigInt) -> Result<()> {
     let owner = address(owner, "owner")?;
