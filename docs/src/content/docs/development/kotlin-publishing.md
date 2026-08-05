@@ -168,15 +168,14 @@ Explicit native-library path configuration remains available as an override.
 The wasmJs target calls a prelinked WebAssembly module that the page fetches, so
 it loads no library and takes no runtime publication. The
 `maplibre-native-ffi-wasm-js` module carries that module as a `browser-module`
-archive holding `maplibre_native_c.mjs`, its wasm, and the ABI manifest. The
-binding reads the manifest before it instantiates the module, so both come from
-one version of one build. The [install page](/maplibre-native-ffi/install/)
-covers how a host resolves and unpacks the archive.
+archive holding `maplibre_native_c.mjs` and its wasm. The
+[install page](/maplibre-native-ffi/install/) covers how a host resolves and
+unpacks the archive.
 
 The Emscripten CMake preset links that module and installs it under
 `lib/browser`, and the browser native package carries the same prefix. The
-publication copies those three files out of that package, so a browser host and
-a Kotlin host receive the bytes that one CI job produced.
+publication copies those two files out of that package, so a browser host and a
+Kotlin host receive the bytes that one CI job produced.
 
 ## Snapshot publication
 

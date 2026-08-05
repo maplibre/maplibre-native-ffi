@@ -511,21 +511,6 @@ cleanup reports the leak and keeps callback memory reachable from native alive.
 Style-scoped callback retention follows current native source ownership, not
 stale event timing or source ID reuse alone.
 
-#### Log record consumption in the browser
-
-A log callback reports whether it consumed the record it received, and native
-logging handles every record that a callback did not consume.
-
-The browser binding delivers log records asynchronously, because MapLibre
-produces them on threads that cannot enter the page's WebAssembly instance where
-a host's callback body lives. Native needs the consumption answer on the thread
-that produced the record, so the binding MUST answer in advance with a fixed
-not-consumed result and MUST ignore what the host callback returns. Every record
-therefore reaches both the host callback and MapLibre's platform logger, and a
-host that wants a single sink filters at its own or narrows the async severity
-mask. The binding MUST state this policy on the public callback type and on the
-entry point that installs one.
-
 ### Resource transforms
 
 Resource transform callbacks are synchronous.
@@ -542,6 +527,15 @@ Resource transform invocation follows this operation:
 5. Host-language failures must not unwind or otherwise escape across the C
    callback boundary. If the public handler returns a recoverable host failure,
    convert the failure to the C callback's documented behavior.
+
+#### The browser
+
+Resource transform registration reports unsupported in the browser, where
+MapLibre raises the callback on worker threads. Each worker is a separate
+JavaScript agent, and a host callback belongs to the single agent that defined
+it. The browser binding exposes native rewrite rules instead: a rule matches a
+resource kind and a URL, exactly or as a glob, and the first matching rule
+supplies the replacement URL.
 
 ### HTTP header transforms
 
@@ -609,6 +603,10 @@ Resource provider invocation follows this operation:
 5. Defer inline request release until the callback returns handled ownership.
 6. Allow deferred or cross-thread completion when the C API allows it, without
    changing one-shot or release behavior.
+
+A binding that cannot answer the callback synchronously registers
+`mln_adapter_queued_resource_provider` instead, declaring at registration the
+routes it claims and completing each claimed request later.
 
 Provider registration is replaceable for a runtime's whole life. A binding keeps
 the registered callback state reachable until the C call that replaces or clears
@@ -783,11 +781,10 @@ those resources. The caller keeps them valid for the C API's documented borrow
 window.
 
 Where the host graphics API is the binding's own module, the binding supplies
-those resources instead. A browser host cannot make a WebGL context a render
-target accepts: the handle in a WebGL context descriptor indexes the module's
-own table, and a context belongs to the agent that created it, which is the
-thread the binding places owner-affine work on. The browser binding therefore
-exposes context creation, canvas reservation and resize, texture creation and
+those resources instead. A browser host cannot create a WebGL context that a
+render target accepts: the handle in a WebGL context descriptor indexes the
+module's own table, and a context belongs to the agent that created it. The
+browser binding therefore exposes context creation, resize, texture creation and
 destruction, presentation, and readback as public API. Every other target leaves
 those to the host, which owns EGL, Metal, or Vulkan itself.
 
@@ -1011,6 +1008,10 @@ When the binding routes provider requests through
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | BND-156 | A glob route claims every request URL its pattern matches, and a request URL the pattern leaves unmatched passes through to native loading.                                                |
 | BND-157 | A route comparing the requested URL claims a request for a configured URI-scheme alias, and a route comparing the resolved URL claims that same request by its tile-server-normalized URL. |
+
+BND-150 does not apply to that binding, because the queued provider decides
+handled ownership by route before the request reaches host code, leaving no
+callback return path to override.
 
 ### Rendering
 

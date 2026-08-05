@@ -62,27 +62,26 @@ dependencies {
 ```
 
 Resolve that configuration and unpack the archive into the directory that serves
-your page. It holds `maplibre_native_c.mjs`, `maplibre_native_c.wasm`, and
-`maplibre_native_c-abi.json`. The binding fetches the first at
-`./maplibre_native_c.mjs` and resolves the other two against it, so all three
-belong in one directory. Pass a URL of your own to the loader when that
-directory is somewhere else.
+your page. It holds `maplibre_native_c.mjs` and `maplibre_native_c.wasm`. Your
+page imports the first, and that file resolves the second against its own URL,
+so both belong in one directory.
 
-Take the archive at the version you depend on. The binding reads the ABI
-manifest before it instantiates the module, and a module built from different
-headers than the binding was generated from fails to load.
+Take the archive at the version you depend on. The binding checks the module's C
+ABI version as it loads, and a module built from different headers than the
+binding was generated from fails that check.
 
 Serve every response cross-origin isolated, with
 `Cross-Origin-Opener-Policy: same-origin` and
 `Cross-Origin-Embedder-Policy: require-corp`. The module runs MapLibre on
-threads of its own, which need `SharedArrayBuffer`, and the workers those
-threads run in are documents that lose the isolation without the headers.
+threads of its own. Those threads need `SharedArrayBuffer`, which a browser
+exposes only to a cross-origin isolated page, and the workers they run in
+inherit that state from the page that started them.
 
-Calling the binding then differs from the other Kotlin targets in three ways.
-[Render a map in a
-browser](/maplibre-native-ffi/guides/render-a-map-in-a-browser/) covers loading
-the module, the scope that owner-affine calls run inside, and the canvas that a
-host claims before the first native call.
+Your page starts the module, and the module starts your Kotlin program on the
+thread it owns. [Render a map in a
+browser](/maplibre-native-ffi/guides/render-a-map-in-a-browser/) covers that
+boot, the WebGL context the binding creates there, and the canvas a page hands
+over.
 
 ## Rust
 
