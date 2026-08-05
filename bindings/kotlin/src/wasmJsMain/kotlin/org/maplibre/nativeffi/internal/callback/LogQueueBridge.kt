@@ -184,17 +184,25 @@ internal object LogQueueDrain {
       running = false
       return
     }
-    var delivered = 0
-    var address = takeRecord(mark)
-    while (address != 0) {
-      deliver(HeapPointer(address))
-      delivered++
-      if (delivered == BATCH) break
-      address = takeRecord(mark)
+    // Rescheduled from a finally for the reason the dispatcher's drain is: `running` is set by an
+    // install and cleared only by a turn, so a turn that threw between here and the tail would stop
+    // log delivery for the life of the page, and `install`'s `if (!running)` would never start it
+    // again. Nothing here strands a caller the way a stranded completion drain would -- the cost is
+    // that the host stops hearing records -- but it is silent, and a page has no other way back.
+    try {
+      var delivered = 0
+      var address = takeRecord(mark)
+      while (address != 0) {
+        deliver(HeapPointer(address))
+        delivered++
+        if (delivered == BATCH) break
+        address = takeRecord(mark)
+      }
+      val dropped = takeDropped()
+      if (dropped > 0L) droppedRecords += dropped
+    } finally {
+      scheduleDrain(::drainTurn)
     }
-    val dropped = takeDropped()
-    if (dropped > 0L) droppedRecords += dropped
-    scheduleDrain(::drainTurn)
   }
 
   private fun deliver(record: HeapPointer) {

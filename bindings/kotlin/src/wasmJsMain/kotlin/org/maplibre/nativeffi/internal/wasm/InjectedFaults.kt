@@ -2,16 +2,23 @@ package org.maplibre.nativeffi.internal.wasm
 
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.status.NativeDiagnostics
+import org.maplibre.nativeffi.internal.status.Status
 
 /**
  * Failures this suite has to prove the binding survives, and which the module will not produce.
  *
  * **This exists for the tests.** Nothing in the binding arms it, and everything below is inert
- * until something does: the entry point armed for failure is null and the result-copy flag is
- * false, so each hook is one field read on the path it sits on. The binding specification allows an
- * internal seam for exactly these failures — native destroy, request release, frame release and
- * callback-install failure, and an allocation or copy failure after a result handle is acquired —
- * because none of them can be produced through the public library on demand.
+ * until something does: the entry point armed for failure is null and every flag is false, so each
+ * hook is one field read on the path it sits on. The binding specification allows an internal seam
+ * for exactly these failures — native destroy, request release, frame release and callback-install
+ * failure, and an allocation or copy failure after a native handle is acquired, which covers both a
+ * result handle's copy and the wrapper an acquired frame is still to be given — because none of
+ * them can be produced through the public library on demand.
+ *
+ * The drain-turn failure below is this binding's own addition to that set, under the rule the list
+ * illustrates rather than under one of its entries. A completion drain turn is a page task the
+ * dispatcher scheduled for itself, so nothing a host or the module can be asked to do reaches it,
+ * and what it must survive is not a status but the fact of having thrown at all.
  *
  * What the injected failures replace is the answer, never the recovery. A faulted call does not
  * reach native at all, which is what makes the state afterwards the real thing rather than a
@@ -31,6 +38,9 @@ internal object InjectedFaults {
   private var failResultCopies = false
   private val copiedResults = mutableListOf<Long>()
 
+  private var failNextDrainTurn = false
+  private var failNextFrameWrap = false
+
   /**
    * Makes the next dispatched call to [entry] report [status] without reaching the owner thread.
    *
@@ -48,6 +58,51 @@ internal object InjectedFaults {
     faultedEntry = null
     failResultCopies = false
     copiedResults.clear()
+    failNextDrainTurn = false
+    failNextFrameWrap = false
+  }
+
+  /**
+   * Makes the next completion drain turn throw before it takes anything.
+   *
+   * The turn is the one piece of this binding that runs with no caller: a page task the dispatcher
+   * scheduled for itself. Nothing a host can do makes one fail, and what a failure costs is the
+   * whole page rather than one call -- the turn is what resolves every parked caller -- so it is
+   * worth proving that a turn which failed leaves the drain able to run again.
+   *
+   * The failure it raises stands for any of them rather than naming one, which is the whole point:
+   * what the turn has to survive is that it threw, not what it threw. It arrives as an uncaught
+   * error on the page, because a task with no caller has nowhere else to report to; a test that
+   * arms this takes the page's error handler for as long as the arming stands.
+   */
+  fun failNextDrainTurn() {
+    failNextDrainTurn = true
+  }
+
+  /** Fails one drain turn if that is armed. Called at the top of [Dispatcher]'s turn. */
+  fun injectDrainFailure() {
+    if (!failNextDrainTurn) return
+    failNextDrainTurn = false
+    throw Status.invalidState("An injected fault failed a MapLibre Native completion drain turn")
+  }
+
+  /**
+   * Makes the next owned-frame acquisition fail after native has handed the frame over.
+   *
+   * The window this stands in is the one BND-172 names: native has the frame, and the page has
+   * still to copy the descriptor into a Kotlin value and wrap it. Both of those are object
+   * construction, which fails only when the Kotlin heap is exhausted -- a condition a page cannot
+   * ask for and could not leave behind for the next test if it could.
+   */
+  fun failNextFrameWrap() {
+    failNextFrameWrap = true
+  }
+
+  /** Fails one frame wrap, of a descriptor of [bytes], if that is armed. */
+  fun beginFrameWrap(bytes: Int) {
+    if (!failNextFrameWrap) return
+    failNextFrameWrap = false
+    throw Heap.allocationFailure(bytes)
   }
 
   /**

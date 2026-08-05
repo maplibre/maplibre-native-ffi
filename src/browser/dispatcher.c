@@ -73,6 +73,7 @@
 #include <emscripten/proxying.h>
 #include <emscripten/threading.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -126,9 +127,10 @@ typedef struct mln_browser_dispatcher {
   mln_browser_call* head;
   mln_browser_call* tail;
   bool stopping;
-  bool started;
-  // Set when the host stopped without joining, which makes releasing the
-  // dispatcher the thread's own last act.
+  // Set when the host gave up its join, which makes releasing the dispatcher
+  // the thread's own last act. Both teardown entry points can set it: a stop
+  // always does, and a destroy does when the wake it needs cannot be posted and
+  // an older one is still outstanding.
   bool detached;
   // Wakes posted to the owner thread and not yet finished. There is no
   // condition variable to signal any more, so this is what says whether another
@@ -190,6 +192,22 @@ static void mln_browser_copy_diagnostic(
   memcpy(destination, message, length);
   destination[length] = '\0';
 }
+
+// Dispatchers that have been told to stop and whose release has not happened
+// yet.
+//
+// A stop is fire-and-forget: it posts a wake and returns, and that wake is what
+// drops the keepalive and frees the dispatcher. So a host that stops has no way
+// of its own to learn that the thread got there -- it may not join, and the
+// dispatcher it would otherwise ask is the thing being freed. The count lives
+// here instead, in the module, because it has to outlive every dispatcher it
+// describes.
+//
+// Counted up wherever a dispatcher becomes the thread's to release, which is
+// wherever `detached` is set, and counted down by whichever call performs that
+// release. Sequential consistency is what makes it readable from the host's
+// thread: a host that reads zero also sees everything the release did.
+static atomic_uint pending_stops;
 
 static pthread_once_t queue_once = PTHREAD_ONCE_INIT;
 static em_proxying_queue* dispatch_queue;
@@ -325,6 +343,10 @@ static void mln_browser_dispatcher_drain(void* argument) {
     // other wake is outstanding to read it.
     pthread_mutex_destroy(&dispatcher->mutex);
     free(dispatcher);
+    // After the free rather than before it, because this is what a host waits
+    // on: the count reaching zero has to mean the release is done rather than
+    // that it has started.
+    atomic_fetch_sub(&pending_stops, 1);
   }
 }
 
@@ -622,7 +644,6 @@ MLN_API mln_browser_dispatcher* mln_browser_dispatcher_create_with_canvases(
     free(dispatcher);
     return NULL;
   }
-  dispatcher->started = true;
   return dispatcher;
 }
 
@@ -740,6 +761,15 @@ MLN_API bool mln_browser_dispatcher_submit_task(
  * This **joins**, which Emscripten implements by spinning. A page host must not
  * call it and uses mln_browser_dispatcher_stop() instead; only a host on a
  * thread that may block joins.
+ *
+ * **The one case that does not wait** is a stop that cannot be posted, which
+ * needs a single allocation and so happens only under memory pressure. There is
+ * then nothing left to join for, and what becomes of the dispatcher depends on
+ * whether an older wake is still outstanding: one that is releases the
+ * dispatcher when it finishes, and this returns without waiting for it, while
+ * with none outstanding the dispatcher is released here. Either way the thread
+ * keeps its keepalive and its worker survives for the document's lifetime,
+ * because the wake that failed was the only way left to reach it.
  */
 MLN_API void mln_browser_dispatcher_destroy(
   mln_browser_dispatcher* dispatcher
@@ -747,6 +777,10 @@ MLN_API void mln_browser_dispatcher_destroy(
   if (dispatcher == NULL) {
     return;
   }
+  // Taken while this call is still the only thing that could release the
+  // dispatcher, which is what makes reading it safe: nothing frees one that is
+  // not detached, and the hand-over below is where that stops being true.
+  const pthread_t thread = dispatcher->thread;
   pthread_mutex_lock(&dispatcher->mutex);
   dispatcher->stopping = true;
   dispatcher->wakes++;
@@ -755,15 +789,53 @@ MLN_API void mln_browser_dispatcher_destroy(
   // waiting on anything this could signal: it is in its event loop, and this is
   // what reaches it there. The wake it runs is the one that drops the keepalive
   // and lets Emscripten end the thread, which is what the join below waits for.
-  const bool woken = mln_browser_dispatcher_wake(dispatcher);
-  if (dispatcher->started && woken) {
-    pthread_join(dispatcher->thread, NULL);
+  if (mln_browser_dispatcher_wake(dispatcher)) {
+    pthread_join(thread, NULL);
+    // Safe here and nowhere earlier. The thread ends only after the drain that
+    // found no wake outstanding, so a join that has returned is also a promise
+    // that nothing is left to read this.
+    pthread_mutex_destroy(&dispatcher->mutex);
+    free(dispatcher);
+    return;
   }
-  // Only reachable when the wake could not be allocated, which leaves the
-  // thread holding its keepalive with nothing left to reach it. Releasing the
-  // dispatcher anyway is the lesser harm: joining would wait forever, and
-  // nothing outstanding can name this dispatcher, because the wake that would
-  // have was never posted.
+
+  // The stop could not be posted, so the count taken above has to come back the
+  // way mln_browser_dispatcher_enqueue() and mln_browser_dispatcher_stop() take
+  // theirs back. Left standing it would be a wake that never arrives, and no
+  // later drain could ever find the count at zero.
+  pthread_mutex_lock(&dispatcher->mutex);
+  dispatcher->wakes--;
+  // Another wake still in flight is what makes freeing here a use-after-free
+  // rather than a leak, and the reason the count is consulted at all. Such a
+  // wake may have published its completion and not yet reached its own
+  // decrement, so the host can have collected every answer and still be one
+  // lock away from a dispatcher it is about to free. It finds the count at zero
+  // when it finishes, with the dispatcher stopping, and that is the drain that
+  // pops the keepalive and releases this.
+  //
+  // Handing the dispatcher over is what gives up the join: a thread has to be
+  // detached to release itself, and a detached thread cannot be joined. So a
+  // destroy that reaches here returns without waiting, which is the whole of
+  // what this failure costs a caller.
+  const bool orphaned = dispatcher->wakes == 0;
+  if (!orphaned) {
+    // Detached before `detached` is published, and through the handle read
+    // above: once that flag is visible the wake may free the dispatcher and the
+    // thread may end, and detaching a thread that has already ended falls
+    // through to a join -- which is exactly what there is no longer anything to
+    // wait for.
+    pthread_detach(thread);
+    atomic_fetch_add(&pending_stops, 1);
+    dispatcher->detached = true;
+  }
+  pthread_mutex_unlock(&dispatcher->mutex);
+  if (!orphaned) {
+    return;
+  }
+  // Nothing will ever run on this dispatcher again and nothing else refers to
+  // it, so it is released here -- the same lesser harm
+  // mln_browser_dispatcher_stop() settles for when its own wake cannot be
+  // posted.
   pthread_mutex_destroy(&dispatcher->mutex);
   free(dispatcher);
 }
@@ -774,12 +846,16 @@ MLN_API void mln_browser_dispatcher_destroy(
  * The thread drains what is queued, releases the dispatcher, and exits. The
  * caller must not touch the dispatcher after this returns.
  *
+ * All of that happens after this returns, so a host that needs to know it has
+ * finished -- one about to terminate the module's worker pool, say -- reads
+ * mln_browser_dispatcher_pending_stops() rather than this call's outcome.
+ *
  * When the stop cannot be posted to the thread -- the one allocation this
- * needs, and so only under memory pressure -- the dispatcher is released here
- * instead and the thread is left holding its keepalive, because nothing remains
- * that can reach it. That is a worker that survives for the document's lifetime
- * and is the lesser of the two harms; the alternative is leaking the dispatcher
- * beside it.
+ * needs, and so only under memory pressure -- the dispatcher is released by
+ * whichever wake is still outstanding, or here when none is, and the thread is
+ * left holding its keepalive because nothing remains that can reach it. That is
+ * a worker that survives for the document's lifetime and is the lesser of the
+ * two harms; the alternative is leaking the dispatcher beside it.
  *
  * **Stop with nothing outstanding and nothing live.** A call still in flight
  * has argument and result storage the worker may still be reading, and its
@@ -809,6 +885,7 @@ MLN_API void mln_browser_dispatcher_stop(
   pthread_detach(thread);
   pthread_mutex_lock(&dispatcher->mutex);
   dispatcher->stopping = true;
+  atomic_fetch_add(&pending_stops, 1);
   dispatcher->detached = true;
   dispatcher->wakes++;
   pthread_mutex_unlock(&dispatcher->mutex);
@@ -848,6 +925,35 @@ MLN_API void mln_browser_dispatcher_stop(
   // posted.
   pthread_mutex_destroy(&dispatcher->mutex);
   free(dispatcher);
+  // The stop counted above is finished, however little of it happened. A host
+  // waiting on the count would otherwise wait out its whole bound for a
+  // dispatcher that is already gone.
+  atomic_fetch_sub(&pending_stops, 1);
+}
+
+/**
+ * Reports how many stopped dispatchers have not finished releasing themselves.
+ *
+ * mln_browser_dispatcher_stop() returns as soon as it has posted its wake, so a
+ * host that stops learns nothing about what became of the thread: the wake that
+ * drains the queue, drops the keepalive, and frees the dispatcher runs later,
+ * and a page may not join a thread to find out. This is what it reads instead.
+ * Zero means every dispatcher this module stopped has been released and its
+ * thread's last act has run.
+ *
+ * A host that is about to terminate the module's worker pool polls this from
+ * its own task, so that a worker is not killed part way through a teardown it
+ * was told to perform. **Bound the wait.** The count includes a thread still
+ * inside a call queued before the stop, and a host that stopped with work
+ * outstanding would otherwise wait for it here rather than at the drain where
+ * the contract puts it.
+ *
+ * A destroy counts too, but only in the one case where it cannot wait -- see
+ * mln_browser_dispatcher_destroy(). A destroy that joins has already waited for
+ * everything this reports.
+ */
+MLN_API uint32_t mln_browser_dispatcher_pending_stops(void) MLN_NOEXCEPT {
+  return atomic_load(&pending_stops);
 }
 
 /**

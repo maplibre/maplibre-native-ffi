@@ -182,25 +182,42 @@ already destroyed its owner-affine handles and drained its outstanding calls: a
 runtime, map, or render session can only be destroyed on the thread that owns
 it.
 
-Neither reports anything, and one case is worth stating because a host cannot
-observe it. A stop reaches the thread as a wake, and a wake needs an allocation.
+Neither returns anything. A stop reaches the thread as a wake, so it has
+returned long before the thread drains what was queued, drops its keepalive, and
+frees the dispatcher. `mln_browser_dispatcher_pending_stops` reports how many
+stopped dispatchers have not finished that yet, and a host polls it from its own
+task. Zero means every stop this module was given has run to the end.
+
+Bound that wait. The count also covers a thread still inside a call that was
+queued before the stop, which is work the host was supposed to drain first.
+
+One failure is worth stating on its own, because the count reads the same
+afterwards as a clean stop does. The wake a stop needs is a single allocation.
 When that allocation fails, the dispatcher is released where the stop was called
-and the thread is left holding the keepalive that keeps its worker alive, since
-the wake that failed was the only thing that could have reached it. The worker
-then survives for the document's lifetime. That is the lesser harm: the
-alternative leaks the dispatcher beside it and leaves the same worker running.
+and the thread keeps the keepalive that holds its worker open, since the failed
+wake was the only thing that could have reached it. The count still falls to
+zero, because the release did happen, and the worker survives for the document's
+lifetime. That is the lesser harm: the alternative leaks the dispatcher beside
+it and leaves the same worker running. A destroy whose wake fails settles for
+the same thing, and gives up its join rather than free a dispatcher that an
+older wake may still be about to lock.
 
 **Stopping the thread is not releasing the module.** The worker pool and the
 heap belong to the instance rather than to a dispatcher, so they outlive every
 stop and stay reachable for as long as the document does. A host that is
 finished releases them by terminating the pool with
 `PThread.terminateAllThreads()` and dropping its reference to the instance — in
-one step, because neither half is safe alone. A stop is fire-and-forget, so the
-owner thread frees the dispatcher after the stop has returned, and a terminate
-can kill it inside that `free` and leave the module's allocator lock held in
-shared memory. Dropping the reference is what guarantees nothing allocates
-against a held lock afterwards, and it has to be the same step for that
-guarantee to hold.
+one step, because neither half is safe alone. A terminate kills each worker
+wherever it happens to be, which can be inside the module's allocator, and the
+lock it holds there stays held in shared memory. Dropping the reference is what
+guarantees nothing allocates against a held lock afterwards, and it has to be
+the same step for that guarantee to hold.
+
+Wait for `mln_browser_dispatcher_pending_stops` to reach zero before
+terminating. A stop is fire-and-forget, so a terminate that follows it
+immediately can kill the owner thread before it has drained what was queued,
+dropped its keepalive, or freed the dispatcher. The wait is what makes a stop
+mean the teardown ran rather than that it was requested.
 
 Releasing is final. A page instantiates one module, so loading again builds a
 second pool and a second heap beside the one just given back rather than

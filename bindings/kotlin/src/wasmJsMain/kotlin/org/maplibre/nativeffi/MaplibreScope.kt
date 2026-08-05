@@ -128,6 +128,13 @@ public suspend fun <T> maplibreScope(block: () -> T): T = SuspensionGate.withGat
  * the page allocates afterwards. Every later call reports the release rather than loading a second
  * sixteen-worker module.
  *
+ * **The owner thread is given a moment to finish first.** Its stop arrives as a wake rather than as
+ * a call that returns, so terminating the pool straight away can kill the thread before it has
+ * drained what was queued, dropped the keepalive that ends it, or freed the dispatcher. The wait is
+ * bounded and polls page tasks rather than blocking, and expiry releases the module anyway: a page
+ * that cannot finish shutting down is worse than a thread killed part way through a teardown whose
+ * storage goes with the heap in any case.
+ *
  * @throws org.maplibre.nativeffi.error.InvalidStateException if a handle created on the owner
  *   thread is still open.
  */
@@ -144,10 +151,14 @@ public suspend fun shutdownMaplibre() {
     // anything in the module's heap, and the one a host could not drop afterwards. Dropped here,
     // while the module is still there for the clear to take its ordinary path.
     Maplibre.discardLogCallbackAfterShutdown()
+    // Between the two because that is the only place it fits: the stop above is what it waits for,
+    // and the release below is what it has to happen before. Nothing it waits through can reach the
+    // page any more either, since the callback that a drain turn would have called has just gone.
+    BrowserModule.awaitOwnerThreadRelease()
     // Last, and only once the stop was accepted: a refused stop throws above, which is what leaves
     // the module intact for the host to close what was named and try again. Nothing between the two
-    // reaches the module -- stopping allocates nothing after it posts its wake, and a drain turn
-    // returns immediately once the dispatcher handle is gone.
+    // reaches the module for anything but that wait -- stopping allocates nothing after it posts
+    // its wake, and a drain turn returns immediately once the dispatcher handle is gone.
     BrowserModule.discardAfterShutdown()
   }
 }

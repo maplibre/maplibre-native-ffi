@@ -454,11 +454,28 @@ internal constructor(
   public actual fun acquireVulkanOwnedTextureFrame(): VulkanOwnedTextureFrameHandle =
     throw unsupportedBackend("Vulkan")
 
+  /**
+   * Takes the session's next frame, giving it back to native if this cannot hand it to the caller.
+   *
+   * What follows a successful acquire is not free of failure, and treating it as if it were is how
+   * a native frame gets stranded. The descriptor has to be copied out into a Kotlin value and that
+   * value wrapped in a handle, and object construction fails when the Kotlin heap is exhausted; so
+   * does a page that reads the descriptor's fields. A session with a frame acquired and no handle
+   * to release it refuses to render, resize, detach, and close, for the life of the page.
+   *
+   * The release is made from the descriptor native just filled rather than from the frame value,
+   * because that value is one of the things that can fail to be built. It has to happen inside the
+   * scratch, before the block is freed -- and it is sound for the same reason [releaseOpenGLFrame]
+   * is: the C API matches a release by the frame's generation and frame id rather than by the
+   * address they arrive through.
+   *
+   * The borrow this took is given back outside, so it covers the failures before the acquire as
+   * well -- a closed session, a heap with no room for the descriptor, and native's own refusal.
+   */
   public actual fun acquireOpenGLOwnedTextureFrame(): OpenGLOwnedTextureFrameHandle {
     activeFrame.beginAcquire()
     try {
-      val scope = FrameScope()
-      val frame = live {
+      return live {
         Heap.withScratch(RenderMarshal.OPENGL_OWNED_TEXTURE_FRAME_SIZEOF) { out ->
           RenderMarshal.writeOpenGLFrameHeader(out)
           Dispatcher.call(
@@ -470,14 +487,25 @@ internal constructor(
             },
             { Status.check(Heap.loadInt(it)) },
           )
-          // Copied out here rather than kept: the descriptor lives in scratch this call frees,
-          // and release matches a frame by generation and frame id rather than by its address.
-          RenderMarshal.readOpenGLFrame(out, scope)
+          try {
+            // The seam for the exhaustion this window cannot be put into on request; see
+            // InjectedFaults. Armed or real, the recovery below is the same one.
+            InjectedFaults.beginFrameWrap(RenderMarshal.OPENGL_OWNED_TEXTURE_FRAME_SIZEOF)
+            val scope = FrameScope()
+            // Copied out here rather than kept: the descriptor lives in scratch this call frees,
+            // and release matches a frame by generation and frame id rather than by its address.
+            OpenGLOwnedTextureFrameHandle(this, scope, RenderMarshal.readOpenGLFrame(out, scope))
+          } catch (error: Throwable) {
+            FrameAcquirePolicy.cleanupAfterWrapperFailure(
+              acquired = true,
+              releaseNative = { callWithDescriptor("mln_opengl_owned_texture_release_frame", out) },
+              // The borrow is the outer catch's, which sees this failure too.
+              closeLocal = {},
+              failure = error,
+            )
+          }
         }
       }
-      // Nothing between the acquire and this line can fail, so a native frame is never left
-      // acquired with no handle to release it.
-      return OpenGLOwnedTextureFrameHandle(this, scope, frame)
     } catch (error: Throwable) {
       activeFrame.endBorrow()
       throw error

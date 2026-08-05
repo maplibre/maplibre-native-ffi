@@ -15,20 +15,8 @@ import org.maplibre.nativeffi.internal.status.Status
  * layout serve every entry point. An entry point that returns a struct by value takes its
  * destination as the first slot, matching the hidden out-pointer its lowered signature already has.
  */
-@JsFun(
-  """
-  (name) => {
-    const module = globalThis.__maplibreNativeC
-    const bytes = module.lengthBytesUTF8(name) + 1
-    const address = module._malloc(bytes)
-    module.stringToUTF8(name, address, bytes)
-    const index = module._mln_browser_entry_index(address)
-    module._free(address)
-    return index
-  }
-"""
-)
-private external fun entryIndex(name: String): Int
+@JsFun("(address) => globalThis.__maplibreNativeC._mln_browser_entry_index(address)")
+private external fun entryIndex(address: Int): Int
 
 @JsFun(
   "(index, slots, count, result) => " +
@@ -77,11 +65,25 @@ internal object NativeCall {
    *
    * A name the module does not carry means the binding and the module disagree about the API, which
    * is worth reporting where it is noticed rather than as a call that quietly does nothing.
+   *
+   * The name crosses through the same scratch every other argument does, rather than through an
+   * allocation of its own inside the snippet. That is not tidiness: the allocation the snippet made
+   * was unchecked, and one the module refuses hands back the null pointer -- so the name went to
+   * address zero, over the bottom of linear memory, and the lookup that followed reported an entry
+   * point the module does not carry. A binding that disagrees with its module is what a host would
+   * then have been told to go and look for, for a heap that had simply filled up.
    */
   fun index(name: String): Int =
     indices.getOrPut(name) {
+      // Asked before the name is measured, because measuring reaches the module too and a module
+      // that has been released would report a JavaScript type error naming its own helper rather
+      // than the binding failure that says the host shut it down.
       BrowserModule.require()
-      val resolved = entryIndex(name)
+      val resolved =
+        Heap.withScratch(Heap.utf8Size(name)) { block ->
+          Heap.storeUtf8(block, name)
+          entryIndex(block.address)
+        }
       if (resolved < 0) {
         throw Status.invalidState(
           "The MapLibre Native browser module carries no entry point named $name."

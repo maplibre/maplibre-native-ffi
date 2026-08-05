@@ -28,10 +28,18 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
  * Everything else about a shutdown, including the refusals that keep a host from reaching this by
  * mistake, is in [ShutdownMaplibreBrowserTest] and runs with the rest of the suite.
  *
- * Without this run, `mln_browser_dispatcher_stop` is never called successfully by anything: not by
- * this suite, and not by the C tests, which join their dispatcher instead because they may block.
- * The detach, the final wake, the keepalive the owner thread drops and the free it does on the way
- * out would all be code no test had executed.
+ * Without this run, `mln_browser_dispatcher_stop` is never called successfully by anything: no
+ * other test stops the owner thread, and the C suite creates no dispatcher at all. The detach, the
+ * final wake, the keepalive the owner thread drops and the free it does on the way out would all be
+ * code no test had executed.
+ *
+ * **That the thread ran them is what the wait below establishes, and nothing else here does.** A
+ * stop posts a wake and returns, and releasing the module terminates every worker wherever it
+ * happens to be, so a thread killed before its wake ran leaves each assertion in this test true
+ * anyway — they read Kotlin state, a cleared module reference, and refusals, none of which the
+ * owner thread has anything to do with. The module counts a stopped dispatcher until its own
+ * teardown has run, `shutdownMaplibre` waits for that count to reach zero before it releases the
+ * module, and the first assertion after the shutdown reads that outcome.
  *
  * It is also the only place the state a shutdown does *not* count can be observed after the module
  * has gone. A buffer, a resource request handle, and the process-global log callback are none of
@@ -82,6 +90,17 @@ class ShutdownMaplibreFinalBrowserTest {
     )
 
     shutdownMaplibre()
+
+    // The owner thread finished its own teardown before the module went, rather than being
+    // terminated part way through one it had only been told to start. This is the one assertion
+    // here that is about the thread rather than about the page: the module counts a stopped
+    // dispatcher until the wake that drains its queue, drops its keepalive, and frees it has run,
+    // and the shutdown above waits for that count to reach zero.
+    assertTrue(
+      BrowserModule.ownerThreadReleased,
+      "the owner thread never reported that it had released its dispatcher, so the shutdown " +
+        "terminated its worker with the final wake still owed",
+    )
 
     // The buffer's bytes went with the heap they lived in, and this is the binding saying so
     // rather than a JavaScript type error naming `HEAPU8`. Read before the close below, because a

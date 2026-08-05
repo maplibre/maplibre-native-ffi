@@ -155,6 +155,27 @@ internal object Heap {
    * than it would natively: a browser host cannot restart the process to recover leaked heap.
    */
   fun <T> withScratch(size: Int, body: (HeapPointer) -> T): T {
+    val block = acquire(size)
+    try {
+      return body(block)
+    } finally {
+      release(block)
+    }
+  }
+
+  /**
+   * Takes [size] zeroed bytes of Emscripten heap that outlive the call that asked for them.
+   *
+   * [withScratch] is what a call into native should use, and this is for the few blocks whose
+   * lifetime belongs to a component rather than to a call. There is exactly one: the dispatcher's
+   * completion block, which is held for the owner thread's life because the drain that reads it is
+   * itself what recovers heap — a drain that had to allocate before it could resolve the callers
+   * holding the heap could not run when it was needed most.
+   *
+   * The caller releases it with [release]. Nothing else does: a browser host has no finalizer, and
+   * only a final shutdown reclaims what this hands out by discarding the whole heap.
+   */
+  fun acquire(size: Int): HeapPointer {
     Status.requireArgument(size > 0) { "scratch size must be positive" }
     // Asked before the allocator is, because this is the first thing most calls into the binding
     // touch. A final shutdown releases the module, and every accessor here reaches it through a
@@ -170,11 +191,12 @@ internal object Heap {
     // the allocator is about to say anyway.
     if (address == 0) throw allocationFailure(size)
     heapClear(address, size)
-    try {
-      return body(HeapPointer(address))
-    } finally {
-      heapFree(address)
-    }
+    return HeapPointer(address)
+  }
+
+  /** Returns a block [acquire] handed out. Freeing in a finally is why [withScratch] exists. */
+  fun release(block: HeapPointer) {
+    heapFree(block.address)
   }
 
   /**

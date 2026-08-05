@@ -55,8 +55,8 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
 //
 // **Injected through an internal seam.** The module will not produce these on request, so
 // `InjectedFaults` produces them instead, which the binding specification's test-seam rules allow
-// for exactly this set. Each of these tests asserts the state the failure left behind rather than
-// only the error it reported:
+// for every one of these but the last. Each of these tests asserts the state the failure left
+// behind rather than only the error it reported:
 // - BND-066's copy-failure half — `StyleBrowserTest` and `QueryBrowserTest` fail the copy after a
 //   native list, snapshot, or result handle is acquired, and replay the handle to prove native
 //   destroyed it.
@@ -65,6 +65,15 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
 //   duplicate source id by itself, which `CustomGeometrySourceBrowserTest` uses.
 // - BND-169 — `RenderSessionBrowserTest` has native refuse a frame release, and the frame stays
 //   retryable.
+// - BND-172 — `RenderSessionBrowserTest` fails the wrapper construction that follows a successful
+//   frame acquire, and the session goes on rendering, resizing, and handing out frames, which it
+//   could not do if the frame it acquired had been stranded.
+// - A completion drain turn that threw — `DispatcherBrowserTest`. This one is not a row in the
+//   table and not one of the failures the seam list enumerates; it is the binding's own machinery
+//   rather than anything the C API does, and it is here because the rule the list illustrates
+//   covers it: a page task the dispatcher scheduled for itself cannot be made to fail from
+//   outside, and a turn that failed without leaving a successor scheduled would strand every
+//   parked caller on the page.
 //
 // **The C API has no such call to refuse.**
 // - BND-122's log family. The module's log queue is registered with native once and never
@@ -72,9 +81,6 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
 //   attributed to the registration retiring -- so replacing a log callback swaps a Kotlin
 //   reference and makes no native install call at all. `LogQueueBridge` states why. There is
 //   nothing for native to refuse, and the replacement holds no native state to release.
-// - BND-172 — fallible owned-frame wrapper construction. This is a conditional requirement, and
-//   the condition does not hold here: `OpenGLOwnedTextureFrameHandle`'s constructor takes values
-//   already copied out of the acquire, and nothing between the acquire and the return can fail.
 //
 // ---------------------------------------------------------------------------------------------
 
@@ -133,6 +139,47 @@ internal external fun runOnNextPageTask(task: () -> Unit)
 
 /** Milliseconds on the page's clock, for measuring how long a parked call actually waited. */
 @JsFun("() => Date.now()") internal external fun pageTimeMillis(): Double
+
+/**
+ * Takes the page's uncaught-error handler, so a failure with no caller can be asserted on.
+ *
+ * A task the binding scheduled for itself has nowhere to report a failure but the page, and the
+ * harness's own handler treats one as the run having collapsed: Karma binds `window.onerror`, and
+ * its handler ends the whole browser session rather than the test. So a test that expects an
+ * uncaught error stands in front of that handler for as long as it expects one, and puts it back
+ * afterwards — which [endCapturingUncaughtErrors] must therefore be reached from a finally.
+ *
+ * Returning true is what keeps the error out of the console as well, so an expected failure does
+ * not read as a real one in the log.
+ */
+@JsFun(
+  """
+  () => {
+    const seen = []
+    globalThis.__maplibreTestUncaught = seen
+    globalThis.__maplibreTestOnError = globalThis.onerror
+    globalThis.onerror = (message, source, line, column, error) => {
+      seen.push(String((error && error.message) || message || 'uncaught'))
+      return true
+    }
+  }
+"""
+)
+internal external fun beginCapturingUncaughtErrors()
+
+/** Gives the handler back and reports what arrived while it was taken, one line each. */
+@JsFun(
+  """
+  () => {
+    globalThis.onerror = globalThis.__maplibreTestOnError ?? null
+    const seen = globalThis.__maplibreTestUncaught ?? []
+    globalThis.__maplibreTestUncaught = undefined
+    globalThis.__maplibreTestOnError = undefined
+    return seen.join('\n')
+  }
+"""
+)
+internal external fun endCapturingUncaughtErrors(): String
 
 /**
  * The origin the test page was served from.

@@ -31,7 +31,7 @@ import org.maplibre.nativeffi.withMap
  */
 class RenderSessionBrowserTest {
   // Spec coverage: BND-161, BND-162, BND-163, BND-164, BND-165, BND-166, BND-167, BND-168,
-  // BND-169, BND-170, BND-173, BND-175, BND-176.
+  // BND-169, BND-170, BND-172, BND-173, BND-175, BND-176.
 
   @Test
   fun aDescriptorMaterializesAnExtentAndABorrowedContextItDoesNotOwn(): Promise<JsAny?> =
@@ -374,6 +374,56 @@ class RenderSessionBrowserTest {
         }
       }
     }
+
+  /**
+   * A frame native handed over and the page could not wrap goes back, rather than being stranded.
+   *
+   * The window is the one between a successful acquire and the handle the caller is given: the
+   * descriptor is copied into a Kotlin value and that value wrapped, both of which are object
+   * construction and so both of which fail when there is no memory to construct into. A page that
+   * only ended its own borrow there would leave native holding a frame with nothing left that could
+   * release it — and a session with a frame acquired refuses to render, resize, detach, and close,
+   * so the map would be lost for the life of the page.
+   *
+   * So the assertions are about what the session can do afterwards rather than about the error. The
+   * failure is injected because a page cannot be made to run out of Kotlin heap on request, and it
+   * is injected before the wrap rather than in place of the acquire, which is the point: native
+   * really has a frame at that moment, so the release that follows is a real one.
+   */
+  // Spec coverage: BND-172.
+  @Test
+  fun aFrameTheWrapperCouldNotBeBuiltForIsGivenBackToNative(): Promise<JsAny?> = browserTest {
+    maplibreScope {
+      withMap(WIDTH, HEIGHT) { runtime, map ->
+        withSession(map) { _, session ->
+          map.setStyleJson(BACKGROUND_STYLE_JSON)
+          assertTrue(renderOneFrame(runtime, session))
+
+          try {
+            InjectedFaults.failNextFrameWrap()
+            val error =
+              assertFailsWith<InvalidStateException> { session.acquireOpenGLOwnedTextureFrame() }
+            assertEquals(MaplibreStatus.INVALID_STATE, error.status)
+          } finally {
+            InjectedFaults.reset()
+          }
+
+          // Each of these is refused while a frame is acquired, so all three together say the
+          // frame went back: the binding's own borrow ended, and native's did too. The resize
+          // comes first because it retires whatever generation was rendered, which is what the
+          // acquire below is asking for.
+          session.resize(WIDTH, HEIGHT, 1.0)
+          assertTrue(renderOneFrame(runtime, session))
+          val frame = session.acquireOpenGLOwnedTextureFrame()
+          try {
+            assertNotEquals(0, frame.frame().texture())
+          } finally {
+            frame.close()
+          }
+        }
+      }
+    }
+  }
 
   @Test
   fun closingAMapWithASessionAttachedIsRefusedUntilTheSessionGoes(): Promise<JsAny?> = browserTest {

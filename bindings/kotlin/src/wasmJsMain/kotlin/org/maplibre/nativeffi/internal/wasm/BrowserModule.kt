@@ -125,12 +125,12 @@ private external fun claimPage(id: Int): Int
  * Terminates the module's worker pool and drops the page's last reference to it, as one step.
  *
  * One step because neither half is safe alone. Terminating kills each worker wherever it happens to
- * be, which for the dispatcher's own thread can be inside the `free` that releases the dispatcher
- * after a stop -- `mln_browser_dispatcher_stop` posts a wake and returns, so that free happens
- * later and nothing on the page can wait for it. A worker killed there leaves the module's
- * allocator lock held in shared memory, and the next allocation on the page would block forever on
- * a thread that may not block. Dropping the reference is what guarantees there is no next
- * allocation.
+ * be, and a worker killed inside the module's allocator leaves its lock held in shared memory,
+ * where the next allocation on the page would block forever on a thread that may not block.
+ * Dropping the reference is what guarantees there is no next allocation. Waiting for the owner
+ * thread first -- see [awaitOwnerThreadRelease] -- keeps the one worker whose teardown the page
+ * knows about out of that window, and cannot cover the rest: a thread's own exit path allocates
+ * too, and every MapLibre worker is somewhere the page cannot see.
  *
  * The reference goes first, and the memo with it, so a terminate that throws still leaves nothing
  * reachable. The flag is what every entry point reads afterwards: it separates a page that has
@@ -156,6 +156,31 @@ private external fun releaseInstance()
 @OptIn(ExperimentalWasmJsInterop::class)
 @JsFun("() => globalThis.__maplibreNativeCReleased === true")
 private external fun isReleased(): Boolean
+
+/**
+ * Reports how many stopped owner threads have not finished releasing themselves.
+ *
+ * Read off the page global rather than through [BrowserModule.require], because the one caller is a
+ * shutdown: a refusal there has nobody left to report to, and a page with no module has nothing
+ * left to wait for either, which is what the zero says.
+ */
+@OptIn(ExperimentalWasmJsInterop::class)
+@JsFun("() => globalThis.__maplibreNativeC?._mln_browser_dispatcher_pending_stops() ?? 0")
+private external fun pendingStops(): Int
+
+/**
+ * Resolves on the next page task, which is the cadence the wait below polls on.
+ *
+ * A task rather than a microtask, because what it is waiting for happens on another thread and
+ * reaches this one as a message. Draining microtasks would spin without ever letting one arrive.
+ */
+@OptIn(ExperimentalWasmJsInterop::class)
+@JsFun("() => new Promise((resolve) => { setTimeout(() => resolve(null), 0) })")
+private external fun nextPageTask(): Promise<JsAny?>
+
+@OptIn(ExperimentalWasmJsInterop::class)
+@JsFun("() => Date.now()")
+private external fun nowMillis(): Double
 
 /**
  * Verifies and instantiates the module as one memoized operation.
@@ -393,6 +418,52 @@ internal object BrowserModule {
   }
 
   /**
+   * What the last [awaitOwnerThreadRelease] saw, and false before the first one.
+   *
+   * True says the owner thread finished releasing itself, or that there was nothing to release.
+   * False says the wait ran out first, which leaves a thread that was still mid-teardown when the
+   * pool was terminated.
+   *
+   * This is the only place the outcome is recorded. A shutdown reports nothing about it, because
+   * there is nothing a host could do with it: the module goes either way, and the host's own state
+   * is the same afterwards. The suite's final-shutdown test reads it, because it is what turns "the
+   * stop was posted" into "the stop ran".
+   */
+  internal var ownerThreadReleased: Boolean = false
+    private set
+
+  /**
+   * Waits for every stopped owner thread to finish releasing itself, for up to a second.
+   *
+   * A stop is fire-and-forget -- it posts a wake to the owner thread and returns -- so without this
+   * the pool is terminated with no idea whether that wake ran. A worker killed before it does never
+   * drains what was queued, never drops the keepalive that ends it, and never frees the dispatcher.
+   * The module counts a stopped dispatcher until its own teardown has run, and that count reaching
+   * zero is what this waits for.
+   *
+   * **Polled from page tasks rather than blocked on.** A page may not block, and what it is waiting
+   * for is a worker that reports through shared memory, so this returns to the event loop between
+   * reads. That also keeps the page able to answer a synchronous callback from a call that was
+   * still queued when the stop arrived.
+   *
+   * **Bounded, and expiry is not a failure.** A worker can be inside a call queued before the stop,
+   * or gone before it could acknowledge anything, and a shutdown that waited for either would hang
+   * the page rather than release the module. The bound is generous next to the single message turn
+   * a stopped thread needs, so reaching it means something is wrong rather than slow.
+   */
+  internal suspend fun awaitOwnerThreadRelease() {
+    val deadline = nowMillis() + OWNER_THREAD_RELEASE_TIMEOUT_MILLIS
+    while (pendingStops() != 0) {
+      if (nowMillis() >= deadline) {
+        ownerThreadReleased = false
+        return
+      }
+      nextPageTask().awaitOrThrow()
+    }
+    ownerThreadReleased = true
+  }
+
+  /**
    * Refuses a page whose module has been released.
    *
    * Separated from "never loaded" because the remedy is opposite. A page that never loaded is told
@@ -551,6 +622,15 @@ internal object BrowserModule {
   }
 
   /**
+   * How long a shutdown waits for a stopped owner thread, in milliseconds.
+   *
+   * A stopped thread needs one message turn to run the wake it was sent, so this is three orders of
+   * magnitude more than the wait costs when everything works, and it is spent only by a page that
+   * is being torn down anyway.
+   */
+  private const val OWNER_THREAD_RELEASE_TIMEOUT_MILLIS = 1000.0
+
+  /**
    * The module entry points this binding cannot work without.
    *
    * A module built from the same headers and the same call protocol can still have been linked
@@ -574,6 +654,8 @@ internal object BrowserModule {
       "_mln_browser_dispatcher_submit",
       "_mln_browser_dispatcher_take_completion",
       "_mln_browser_dispatcher_stop",
+      // What a stop reports through, since the stop itself returns before the thread has run it.
+      "_mln_browser_dispatcher_pending_stops",
       // The WebGL contexts a render target draws through, and the GL work a host does with what one
       // rendered. All of it has to run on that same owner thread, because a WebGL context belongs
       // to the thread that made it and shares nothing with any other context.

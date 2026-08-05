@@ -92,8 +92,8 @@ private external fun awaitCall(token: Int): Int
 )
 private external fun resolveCall(token: Int, ok: Int)
 
-@JsFun("(drain) => globalThis.setTimeout(drain, 0)")
-private external fun scheduleDrain(drain: () -> Unit)
+@JsFun("(drain, delay) => globalThis.setTimeout(drain, delay)")
+private external fun scheduleDrain(drain: () -> Unit, delayMillis: Int)
 
 /**
  * The thread that owns this binding's runtimes, and the calls placed on it.
@@ -182,6 +182,24 @@ internal object Dispatcher {
     get() = draining
 
   /**
+   * Where the owner thread's answers are collected, held for as long as that thread runs.
+   *
+   * Taken once, beside the thread itself, rather than per turn. A turn is what resolves the callers
+   * that are parked, and a parked caller is holding the argument block it packed, so the drain is
+   * the page's way out of a heap that has filled up. Allocating to run it would make the way out
+   * need the very thing that has run short: the turn would throw, the callers would stay parked,
+   * their blocks would stay taken, and the next turn would find no more heap than this one did. So
+   * this is acquired where a failure is still an ordinary error on the caller's own stack -- before
+   * the thread exists and before any call has been registered -- and from then on a turn allocates
+   * nothing at all.
+   *
+   * Not zeroed between turns, because every completion overwrites all of it: the module writes the
+   * token and the outcome unconditionally and always terminates the diagnostic, so a message from a
+   * previous turn cannot be read as this one's.
+   */
+  private var completions = HeapPointer(0)
+
+  /**
    * Diagnostics the drain has collected, by the token of the call that produced each.
    *
    * A message reaches the page only here, in the completion, because the C API's own is
@@ -245,6 +263,10 @@ internal object Dispatcher {
   private fun require(): Int {
     if (handle != 0) return handle
     BrowserModule.require()
+    // Before the thread rather than after it, so a heap that cannot serve this leaves nothing
+    // started and nothing to unwind. Kept across a failed thread creation for the same reason it is
+    // kept across a turn: the retry needs it and it is the same block either way.
+    if (completions.address == 0) completions = Heap.acquire(COMPLETION_BYTES + DIAGNOSTIC_BYTES)
     val ids = reservedCanvases.joinToString(",")
     val created =
       if (ids.isEmpty()) createDispatcher(0)
@@ -421,38 +443,62 @@ internal object Dispatcher {
   private fun startDraining() {
     if (draining) return
     draining = true
-    scheduleDrain(::drainTurn)
+    scheduleDrain(::drainTurn, 0)
   }
 
+  /**
+   * Takes whatever the owner thread has answered, and decides whether to run again.
+   *
+   * [draining] says a turn is scheduled, and this is the only thing that can schedule one while it
+   * is set, so a turn that ended without either clearing the flag or scheduling its successor would
+   * strand the drain for the life of the page: the parked callers would never be resolved, and
+   * every later call would find the flag set and start nothing. That is why the decision below is a
+   * finally rather than the last statement of the turn. Nothing here is expected to throw -- the
+   * block is already taken and the loop only reads it -- but "expected" is what the last
+   * unreachable null check was too, and the cost of being wrong is the whole page rather than one
+   * call.
+   */
   private fun drainTurn() {
     val dispatcher = handle
     if (dispatcher == 0) {
       draining = false
       return
     }
-    Heap.withScratch(COMPLETION_BYTES + DIAGNOSTIC_BYTES) { out ->
-      val diagnostic = out + COMPLETION_BYTES
-      while (takeCompletion(dispatcher, out.address, diagnostic.address, DIAGNOSTIC_BYTES)) {
-        val token = Heap.loadInt(out)
+    var completed = false
+    try {
+      // The test seam for the one failure a page cannot arrange: see InjectedFaults. It stands at
+      // the top of the turn because every failure this recovers from is one that leaves the ring
+      // untouched, whatever raised it.
+      InjectedFaults.injectDrainFailure()
+      val diagnostic = completions + COMPLETION_BYTES
+      while (
+        takeCompletion(dispatcher, completions.address, diagnostic.address, DIAGNOSTIC_BYTES)
+      ) {
+        val token = Heap.loadInt(completions)
         // Only a failing call leaves one, so the common case stores nothing. Recorded before the
         // token is resolved for order rather than for safety: the parked caller resumes on a
         // microtask, which cannot run while this loop holds the stack.
         val message = Heap.loadUtf8(diagnostic)
         if (message.isNotEmpty()) diagnostics[token] = message
-        resolveCall(token, Heap.loadInt(out + 4))
+        resolveCall(token, Heap.loadInt(completions + 4))
       }
+      completed = true
+    } finally {
+      // Stopped on the count rather than on an empty turn. A caller registers its wait and counts
+      // itself before its call is submitted, so an empty turn says nothing about whether a park is
+      // still coming -- a drain that stopped on one could leave a caller with nothing left to wake
+      // it. The count closes that window, and stopping matters because the alternative is a
+      // zero-delay task rescheduling itself for as long as the page is open, burning a browser task
+      // per turn on a map that is doing nothing.
+      if (outstanding == 0) draining = false
+      // A turn that failed waits before the next one, where an ordinary turn does not. The answers
+      // it did not take are still in the ring and the callers waiting for them are still parked, so
+      // stopping is not an option; but a failure that repeats would otherwise become a task the
+      // page runs as fast as it can schedule one, reporting the same error each time and leaving no
+      // room for whatever would have cleared it. One frame is far below what any caller notices and
+      // far above a spin.
+      else scheduleDrain(::drainTurn, if (completed) 0 else FAILED_TURN_BACKOFF_MILLIS)
     }
-    // Stopped on the count rather than on an empty turn. A caller registers its wait and counts
-    // itself before its call is submitted, so an empty turn says nothing about whether a park is
-    // still coming -- a drain that stopped on one could leave a caller with nothing left to wake
-    // it. The count closes that window, and stopping matters because the alternative is a
-    // zero-delay task rescheduling itself for as long as the page is open, burning a browser task
-    // per turn on a map that is doing nothing.
-    if (outstanding == 0) {
-      draining = false
-      return
-    }
-    scheduleDrain(::drainTurn)
   }
 
   /** Counts a handle only the owner thread can destroy, so a stop can refuse while it is open. */
@@ -489,6 +535,14 @@ internal object Dispatcher {
     // Set whether or not a thread was ever started, because what this says is that the host is
     // finished with the module rather than that a particular thread has gone.
     stopped = true
+    // Given back before the thread is asked to stop, and before the early return below, because a
+    // thread that failed to start still left this taken. A turn already scheduled cannot reach it:
+    // the handle goes with it, and a turn that finds no dispatcher returns before it reads
+    // anything.
+    if (completions.address != 0) {
+      Heap.release(completions)
+      completions = HeapPointer(0)
+    }
     val dispatcher = handle
     if (dispatcher == 0) return
     handle = 0
@@ -521,6 +575,10 @@ internal object Dispatcher {
   // this bounds only what this binding is willing to receive: the module truncates to whatever it
   // is given, on a UTF-8 boundary.
   private const val DIAGNOSTIC_BYTES = 512
+  // What a turn that threw waits before the next one, in milliseconds. One display frame: nothing a
+  // caller parked on an answer would notice, and enough that a failure repeating every turn cannot
+  // fill the page's task queue with itself.
+  private const val FAILED_TURN_BACKOFF_MILLIS = 16
   // Tokens must be unique among outstanding calls, and the counter alone is what makes them so:
   // every call takes the next value, and no two calls in flight can hold the same one. More than
   // one can now be in flight -- a tile notification is delivered on a promising stack of its own
