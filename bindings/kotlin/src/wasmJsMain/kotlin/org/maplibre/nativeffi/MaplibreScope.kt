@@ -104,6 +104,15 @@ public suspend fun <T> maplibreScope(block: () -> T): T = SuspensionGate.withGat
  * its scope is an ordinary live object, and stopping the one thread that could destroy it would
  * otherwise lose it with nothing said.
  *
+ * **What it does not refuse for is state that lives only in the module's heap.** A
+ * [WakeSource][org.maplibre.nativeffi.runtime.WakeSource], a
+ * [NativeBuffer][org.maplibre.nativeffi.render.NativeBuffer], and a resource request handle a
+ * provider still holds need no particular thread to release, and the release below reclaims all
+ * three at once by discarding the heap they live in. Closing one afterwards therefore succeeds and
+ * does nothing, rather than reaching a module that is gone. The process-global log callback is the
+ * same rule inverted: it is a Kotlin reference that releasing the module would *not* reclaim, and
+ * that no later call could drop either, so this drops it.
+ *
  * **This is final.** No later call starts another owner thread; every one reports an invalid-state
  * failure naming the shutdown instead. A thread started afterwards would be a thread that has never
  * seen the handles the host still holds, so it could only answer them with the C API's wrong-thread
@@ -131,6 +140,10 @@ public suspend fun shutdownMaplibre() {
     // to wait for -- and a shutdown with a handle open is refused below in any case.
     if (Dispatcher.openHandles.isEmpty()) AsyncDelivery.awaitIdle()
     Dispatcher.stop()
+    // The one root that survives releasing the module, because it is a Kotlin reference rather than
+    // anything in the module's heap, and the one a host could not drop afterwards. Dropped here,
+    // while the module is still there for the clear to take its ordinary path.
+    Maplibre.discardLogCallbackAfterShutdown()
     // Last, and only once the stop was accepted: a refused stop throws above, which is what leaves
     // the module intact for the host to close what was named and try again. Nothing between the two
     // reaches the module -- stopping allocates nothing after it posts its wake, and a drain turn

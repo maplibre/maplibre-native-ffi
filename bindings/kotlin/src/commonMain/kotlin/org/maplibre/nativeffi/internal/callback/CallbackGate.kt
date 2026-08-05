@@ -32,6 +32,20 @@ internal class CallbackGate(private val name: String, private val closeNative: (
     }
   }
 
+  /**
+   * Stops admitting callbacks and returns once the last body already inside has left.
+   *
+   * Waiting is what a retired callback owes its host: the host may dispose of whatever it gave the
+   * callback the moment this returns, and a body that resumed afterwards would use it. So the
+   * closer waits for the bodies it is not, on [yieldWhileClosing], which is a yield to the thread
+   * holding the count on a target with threads and a park on the browser, where the body holding it
+   * is a suspended stack.
+   *
+   * A closer that *is* inside this gate's callback is the one case that cannot wait, because the
+   * body it would wait for is the frame below it. It stops admitting and returns; the body releases
+   * the gate as it leaves, and [closeNative] runs there instead. That is what makes a callback that
+   * ends its own registration legal rather than a deadlock.
+   */
   override fun close() {
     val closingFromCallback = threadState.isInCallback()
     while (true) {
@@ -52,37 +66,6 @@ internal class CallbackGate(private val name: String, private val closeNative: (
         }
       } else {
         yieldWhileClosing()
-      }
-    }
-  }
-
-  /**
-   * Stops admitting callbacks and lets whatever is already inside finish on its own.
-   *
-   * For a callback family whose bodies may suspend. [close] waits for the last body to leave, and
-   * the two ways it can do that both assume a body that runs to completion once it has been
-   * entered: either the closer is the thread inside the callback, and says so, or it is a thread
-   * that can usefully wait for the one that is. A body that has parked is neither. Its frame is not
-   * on the closing stack, so the closer cannot be it, and it is not on another thread either, so
-   * waiting cannot bring it any closer to finishing -- only the event loop can resume it, and a
-   * close that spins never returns to one. Such a close does not take longer; it never completes.
-   *
-   * So this does not wait. What a caller gives up is the guarantee that no body is running when
-   * this returns, which is only worth having for a gate that holds something native a running body
-   * would be left without. [closeNative] still runs after the last body leaves, on whichever stack
-   * that turns out to be, so a gate that does hold something still releases it in the right order.
-   */
-  fun closeWithoutDraining() {
-    while (true) {
-      val current = state.load()
-      if (current and CLOSED_FLAG != 0) return
-      if (current and ACTIVE_MASK == 0) {
-        if (state.compareAndSet(current, CLOSED_FLAG)) {
-          closeNativeOnce()
-          return
-        }
-      } else if (state.compareAndSet(current, current or CLOSING_FLAG)) {
-        return
       }
     }
   }

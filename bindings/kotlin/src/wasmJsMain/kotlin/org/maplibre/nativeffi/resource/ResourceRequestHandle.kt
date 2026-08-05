@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.resource
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.lifecycle.NativeResourceRequest
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.internal.wasm.BrowserModule
 import org.maplibre.nativeffi.internal.wasm.Heap
 import org.maplibre.nativeffi.internal.wasm.NativeCall
 import org.maplibre.nativeffi.internal.wasm.ResourceMarshal
@@ -95,6 +96,13 @@ internal constructor(private val request: NativeResourceRequest) : AutoCloseable
     core.finishProviderException()?.nativeValue ?: UNKNOWN_DECISION
 
   private fun releaseRequest() {
+    // A request handle is not owner-affine and is deliberately not one of the handles a shutdown
+    // refuses to leave open: releasing it needs no particular thread, and a shutdown released the
+    // module the native request lived inside, so there is nothing left to release. Calling native
+    // here would report the binding's own module-released failure from inside a close, which is
+    // worse than doing nothing: the close core has already marked this handle released by the time
+    // it runs, so the failure could not be acted on and would only break a `finally`.
+    if (!BrowserModule.isLoaded()) return
     NativeCall.call(
       "mln_resource_request_release",
       RELEASE_SLOTS,

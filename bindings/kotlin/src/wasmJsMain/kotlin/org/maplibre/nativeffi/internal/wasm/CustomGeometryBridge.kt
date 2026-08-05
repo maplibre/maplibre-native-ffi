@@ -114,30 +114,47 @@ private constructor(private val callback: CustomGeometrySourceCallback, private 
     get() = HeapPointer(token)
 
   /**
-   * Stops delivering to this callback and releases the trampoline when it was the last one.
+   * Stops delivering to this callback, waits for a delivery already inside it, and releases the
+   * trampoline when it was the last one.
    *
    * Called once the source it belongs to is gone from the style, or once the map that held it has
-   * been destroyed. Neither of those waits for an in-flight notification, and neither has to: a
-   * notification is a copy of a tile id on a page task, so the worst a late one can do is arrive
-   * after this, which is what the gate and the retired token answer.
+   * been destroyed. Waiting is what the binding specification asks of every close that retires a
+   * callback, and it is not about the callback object -- Kotlin keeps that alive as long as
+   * anything holds it. It is about what the *host* gave the callback. A buffer, a connection, a
+   * handle of its own: a host is entitled to dispose of any of them the moment teardown returns,
+   * and a body that resumed afterwards would use what is gone.
    *
-   * A host may reach this from inside its own callback, because a delivery can call the owner
-   * thread and removing a source is such a call. That needs no refusal the way the synchronous
-   * callbacks' does: the gate stops admitting as this runs, the delivery already inside it finishes
-   * on its own, and the gate holds nothing native that a still-running body could be left without.
-   * A source that ends itself from `fetchTile` therefore hears nothing further, which is what a
-   * host asked for.
+   * The wait is a suspension rather than a spin, and it has to be. A delivery reaching the owner
+   * thread parks its stack, and the host's stack -- parked on a call it made earlier -- is resumed
+   * first, so the ordinary case is a close arriving from a stack that is not the delivery's while
+   * the delivery is suspended partway through a host body. Only the event loop can resume that
+   * body, so a close that spun on the count would never reach one. `yieldWhileClosing` hands the
+   * page back a turn at a time instead, and nothing about that reaches a signature: every path here
+   * is already an owner-affine call standing on a `maplibreScope` stack, which is what makes
+   * parking legal.
    *
-   * Closed without draining, and it is the only gate in the binding that is. A delivery reaching
-   * the owner thread parks its stack, and the host's stack -- parked on a call it made earlier --
-   * is resumed first, so the ordinary case is a close arriving from a stack that is not the
-   * delivery's while the delivery is suspended partway through a host body. Draining there is not
-   * slow but impossible: the suspended frame resumes from the event loop, which a close spinning on
-   * a count is never going to reach. [CallbackGate.closeWithoutDraining] says the rest.
+   * Nothing waits on this in turn. The delivery it waits for is parked on the owner thread, which
+   * is running and independent, and it holds no gate this stack holds -- a delivery deliberately
+   * does not take [SuspensionGate], which the closing scope has held since it began.
+   *
+   * A host may also reach this from inside its own callback, because a delivery can call the owner
+   * thread and removing a source is such a call. That close does not wait and must not: the body it
+   * would wait for is the frame below it. [CallbackGate] answers that the way it does on every
+   * other target -- it stops admitting, returns, and lets the body it is standing on close the gate
+   * as it leaves -- and `CallbackThreadState` is what makes the question answerable on a target
+   * whose stacks outnumber its threads. A source that ends itself from `fetchTile` therefore hears
+   * nothing further, which is what a host asked for.
+   *
+   * The registration goes whatever the wait does. Native has already dropped the source by the time
+   * anything here runs, so a notification that arrives afterwards must find nothing -- including
+   * after a wait that failed part way through.
    */
   override fun close() {
-    gate.closeWithoutDraining()
-    host.remove(token)
+    try {
+      gate.close()
+    } finally {
+      host.remove(token)
+    }
   }
 
   private fun invoke(kind: Int, tileId: CanonicalTileId) {

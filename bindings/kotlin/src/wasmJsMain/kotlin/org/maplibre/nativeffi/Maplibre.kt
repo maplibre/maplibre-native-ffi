@@ -148,6 +148,33 @@ public actual object Maplibre {
     logCallbacks.clear { LogQueueDrain.clear() }
   }
 
+  /**
+   * Drops the process-global log callback as part of a shutdown.
+   *
+   * The registration is a Kotlin reference rather than anything in the module's heap, so releasing
+   * the module does not reclaim it: the bridge, the host's [LogCallback], and everything that
+   * callback closes over would stay reachable from this object for the life of the document. It is
+   * also the one root a host could not drop afterwards, because [clearLogCallback] refuses once the
+   * module has been released.
+   *
+   * Runs while the module is still there, which is what lets it take the ordinary clear path.
+   * Unlike [clearLogCallback] it does not refuse a callback that is mid-delivery: the dispatcher
+   * has already been stopped by the time this runs, so a refusal here would leave a host with a
+   * half-finished shutdown and nothing useful to do about it.
+   */
+  internal fun discardLogCallbackAfterShutdown() {
+    logCallbacks.clear { LogQueueDrain.clear() }
+  }
+
+  /**
+   * Whether a host log callback is installed.
+   *
+   * The seam the shutdown test reads. A page has no other way to see this root: the callback is
+   * write-only from outside, and the thing that would prove it had gone -- the host's callback
+   * becoming unreachable -- is not observable from Kotlin at all.
+   */
+  internal fun hasLogCallback(): Boolean = logCallbacks.current() != null
+
   /** Configures severities that native logging may dispatch asynchronously. */
   public actual fun setAsyncLogSeverities(severities: Set<LogSeverity>) {
     val mask = severities.fold(0) { accumulated, severity -> accumulated or severity.nativeMask }

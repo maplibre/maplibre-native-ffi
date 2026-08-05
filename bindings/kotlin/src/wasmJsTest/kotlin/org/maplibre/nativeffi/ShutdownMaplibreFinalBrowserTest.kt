@@ -6,11 +6,15 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.internal.wasm.BrowserModule
 import org.maplibre.nativeffi.internal.wasm.Dispatcher
+import org.maplibre.nativeffi.render.NativeBuffer
 import org.maplibre.nativeffi.render.WebglContext
+import org.maplibre.nativeffi.resource.ResourceProviderDecision
+import org.maplibre.nativeffi.resource.ResourceRequestHandle
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 
@@ -28,14 +32,49 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
  * this suite, and not by the C tests, which join their dispatcher instead because they may block.
  * The detach, the final wake, the keepalive the owner thread drops and the free it does on the way
  * out would all be code no test had executed.
+ *
+ * It is also the only place the state a shutdown does *not* count can be observed after the module
+ * has gone. A buffer, a resource request handle, and the process-global log callback are none of
+ * them owner-affine, so each is still the host's when the module is released, and each reaches the
+ * module by a route the handle registry does not describe.
  */
 class ShutdownMaplibreFinalBrowserTest {
   @Test
   fun shutdownStopsTheOwnerThreadAndRefusesEverythingAfterwards(): Promise<JsAny?> = browserTest {
+    // The three pieces of state a shutdown does not count as an open handle, each reaching the
+    // module by a different route: page memory, a native object a provider still holds, and a
+    // Kotlin reference that native never sees. Taken before the shutdown, so the assertions below
+    // describe a page that really held all three when the module went.
+    val buffer = NativeBuffer.allocate(BUFFER_BYTES)
+    Maplibre.setLogCallback { false }
+    var handled: ResourceRequestHandle? = null
+
     // Real owner-thread work first, so the thread this stops is one that was started, used, and
     // drained rather than one that never ran. A stop of an unused module would exercise none of
     // the drain-and-release path the thread takes on its way out.
-    maplibreScope { withMap { _, _ -> } }
+    maplibreScope {
+      withMap { runtime, map ->
+        runtime.setResourceProvider { request, handle ->
+          if (request.requestedUrl != STYLE_URL) {
+            return@setResourceProvider ResourceProviderDecision.PASS_THROUGH
+          }
+          handled = handle
+          ResourceProviderDecision.HANDLE
+        }
+        map.setStyleUrl(STYLE_URL)
+        assertTrue(pumpUntil(runtime) { handled != null }, "the provider was never asked")
+
+        // Abandoned so that native stops waiting for an answer, which is what lets the map and the
+        // runtime close under a request the host still holds. The handle stays the host's, and its
+        // native request is the object the release below would have reached.
+        map.setStyleJson(EMPTY_STYLE_JSON)
+        assertTrue(
+          pumpUntil(runtime) { handled?.isCancelled() == true },
+          "the abandoned request was never reported as cancelled",
+        )
+      }
+    }
+    val request = assertNotNull(handled, "no request handle survived the map that produced it")
     assertEquals(
       emptyList(),
       Dispatcher.openHandles,
@@ -43,6 +82,24 @@ class ShutdownMaplibreFinalBrowserTest {
     )
 
     shutdownMaplibre()
+
+    // The buffer's bytes went with the heap they lived in, and this is the binding saying so
+    // rather than a JavaScript type error naming `HEAPU8`. Read before the close below, because a
+    // closed buffer refuses for a different reason.
+    assertFailsWith<InvalidStateException> { buffer.toByteArray() }
+
+    // Closing the other two succeeds and does nothing, and the callback is gone without being
+    // closed at all. Neither a buffer nor a request handle is one of the handles the shutdown
+    // counts, so a host arrives here with them open by following the documented order rather than
+    // by making a mistake. A close that threw would break the `finally` it belongs in, and would
+    // throw after the close core had already marked the resource released.
+    buffer.close()
+    request.close()
+    assertFalse(
+      Maplibre.hasLogCallback(),
+      "the log callback is still installed, so it and everything it closes over stay reachable " +
+        "for the life of the document with no call left able to drop them",
+    )
 
     // The refusal every owner-affine call reports from here on. It names the shutdown rather than
     // starting a replacement thread, because a thread started now has never seen the handles a
@@ -109,5 +166,15 @@ class ShutdownMaplibreFinalBrowserTest {
     // in a task with no caller to report it to.
     nextPageTask()
     nextPageTask()
+  }
+
+  private companion object {
+    /** A url no transport serves, so the provider is the only thing that could answer it. */
+    const val STYLE_URL = "custom://shutdown-style.json"
+
+    /**
+     * Non-empty, so the buffer holds a real allocation rather than the zero-length special case.
+     */
+    const val BUFFER_BYTES = 64L
   }
 }

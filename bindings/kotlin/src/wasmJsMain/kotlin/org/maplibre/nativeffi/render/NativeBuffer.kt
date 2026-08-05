@@ -13,6 +13,22 @@ private external fun allocate(size: Int): Int
 private external fun free(address: Int)
 
 /**
+ * Returns the storage at [address] to the module's allocator, or retires it when the module has
+ * gone.
+ *
+ * A buffer is not owner-affine and is deliberately not one of the handles a shutdown refuses to
+ * leave open: nothing about it needs the owner thread, and the thing that would free it is the
+ * heap's own allocator. A shutdown that released the module took this storage with the heap it
+ * lived in, so there is nothing left to free and the close simply retires. Calling the allocator
+ * there would reach a module reference that is now null and report a JavaScript type error naming
+ * `_free`, from inside a close that has nothing left to fail at.
+ */
+private fun releaseStorage(address: Int) {
+  if (!BrowserModule.isLoaded()) return
+  free(address)
+}
+
+/**
  * Reusable readback and upload storage, held in the Emscripten heap.
  *
  * Native writes readback pixels through a pointer, so the storage has to live where native can
@@ -21,15 +37,23 @@ private external fun free(address: Int)
  * be given, and copying one in and out per frame would cost a transfer each way.
  *
  * A browser host cannot recover leaked heap by restarting a process, and Kotlin/Wasm has no
- * finalizer to release it from, so closing this is the only thing that frees it.
+ * finalizer to release it from, so closing this is the only thing that frees it. The one exception
+ * is a shutdown, which releases the whole heap at once: closing afterwards succeeds and does
+ * nothing, and reading the bytes reports that they went with it.
  */
 public actual class NativeBuffer
 private constructor(private val address: Int, private val length: Long) : AutoCloseable {
-  private val core = BorrowedResourceCore("NativeBuffer") { free(address) }
+  private val core = BorrowedResourceCore("NativeBuffer") { releaseStorage(address) }
 
   public actual fun byteLength(): Long = core.withOpenResource { length }
 
   public actual fun toByteArray(): ByteArray = core.withOpenResource {
+    // Asked before the copy, and the one place this differs from closing: a shutdown released the
+    // heap these bytes lived in, so there is nothing to free but there is also nothing to read.
+    // Without this the copy below would reach a module reference that is now null and report a
+    // JavaScript type error naming `HEAPU8` rather than the binding failure that says what
+    // happened.
+    BrowserModule.require()
     // One boundary crossing regardless of size; see Heap.
     Heap.loadBytes(HeapPointer(address), length.toInt())
   }

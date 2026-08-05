@@ -93,8 +93,18 @@ EM_JS(void, mln_browser_webgl_unregister_canvas, (const char* name), {
 // thread. Checked before a context is created against it, so a mistyped id
 // fails saying the canvas is missing rather than failing as a context that
 // could not be made.
+//
+// Own properties only. The registry is a plain object, so a lookup by element
+// id also reaches everything `Object.prototype` carries: an id of `toString` or
+// `constructor` would report a canvas that no transfer ever put there, and the
+// creation below would then fail as a canvas without a drawing buffer rather
+// than as the missing canvas it is. `Object.hasOwn` asks the question this
+// check means. An entry is also set to null when the canvas moves to another
+// thread, which is present but not usable, so the value is tested as well.
 EM_JS(int, mln_browser_webgl_has_canvas, (const char* name), {
-  return Module["GL"].offscreenCanvases[UTF8ToString(name)] ? 1 : 0;
+  const registry = Module["GL"].offscreenCanvases;
+  const id = UTF8ToString(name);
+  return Object.hasOwn(registry, id) && registry[id] ? 1 : 0;
 });
 
 // Sizes a registered canvas's drawing buffer, reporting whether the entry was
@@ -111,7 +121,13 @@ EM_JS(int, mln_browser_webgl_has_canvas, (const char* name), {
 EM_JS(
   int, mln_browser_webgl_size_canvas, (const char* name, int width, int height),
   {
-    const entry = Module["GL"].offscreenCanvases[UTF8ToString(name)];
+    const registry = Module["GL"].offscreenCanvases;
+    const id = UTF8ToString(name);
+    // Own properties only, for the reason given on
+    // mln_browser_webgl_has_canvas(): an inherited name would arrive here as an
+    // object with neither of the two canvas fields, and the checks below would
+    // report a canvas that had gone rather than one that was never there.
+    const entry = Object.hasOwn(registry, id) ? registry[id] : undefined;
     if (!entry) {
       return 0;
     }

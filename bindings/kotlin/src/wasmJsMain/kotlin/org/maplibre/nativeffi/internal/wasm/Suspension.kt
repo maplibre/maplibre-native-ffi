@@ -6,6 +6,7 @@ import kotlin.coroutines.suspendCoroutine
 import kotlin.js.ExperimentalWasmJsInterop
 import kotlin.js.JsAny
 import kotlin.js.Promise
+import org.maplibre.nativeffi.internal.callback.RunningCallbacks
 import org.maplibre.nativeffi.internal.status.Status
 
 /**
@@ -157,11 +158,17 @@ internal object PromisingStack {
    *
    * The count is given back for the duration, so that anything entering Kotlin while this stack is
    * away is told it may not park -- which it may not, being on a stack of its own.
+   *
+   * The callbacks this stack is inside are surrendered here too, and for the same reason: the stack
+   * that runs meanwhile entered none of them. That is what lets a close tell a callback body it is
+   * standing on from one that is suspended elsewhere, which is the difference between a wait it
+   * must not make and one it must. This is the only place a stack parks, so it is the only place
+   * either has to be said.
    */
   fun <T> parked(body: () -> T): T {
     depth--
     try {
-      return body()
+      return RunningCallbacks.whileParked(body)
     } finally {
       depth++
     }

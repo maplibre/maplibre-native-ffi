@@ -408,18 +408,24 @@ class CustomGeometrySourceBrowserTest {
    * callback body suspended beside it, and whatever it does next to end the source closes that
    * body's registration from a stack that is not the body's.
    *
-   * The claim is that such a close returns rather than waiting. Waiting cannot work: the body that
-   * holds the registration is a suspended stack, only the event loop can resume it, and a close
-   * running on the host's stack never reaches one. A close that drained would spin until
-   * `yieldWhileClosing` gave up, and the source would still be registered afterwards.
+   * The claim is that such a close **waits**, which is what the binding specification requires of
+   * clearing, replacing, or closing a callback anywhere. The reason is not the callback object,
+   * which Kotlin keeps alive as long as the delivery holds it; it is whatever the host gave that
+   * callback and is entitled to dispose of the moment teardown returns. A body resumed afterwards
+   * would use what is gone. Waiting works here because the closing stack parks rather than spins:
+   * the page keeps turning, so the delivery's own call completes and its body runs to its end.
    *
-   * The window is held open deliberately rather than caught by luck. The callback goes on making
-   * owner-affine calls for as long as the test asks it to, so the window is open when the host
-   * looks, and the flag is read on the same stack the close ran on, where nothing can have resumed
-   * in between. A true read there is therefore an answer that really was suspended at that moment.
-   * A style reload is the close path because it is the shortest — the sources go the instant the
-   * call returns, without a layer to remove first — and every path ends in the same
-   * `CustomGeometryBridge.close`.
+   * The window is opened deliberately rather than caught by luck. The body goes on making
+   * owner-affine calls for a fixed number of turns, so it is still inside its answer when the host
+   * looks and is still inside it when the close begins — and it is released by nothing the closing
+   * stack does, which is what makes the close's return an observation about the close rather than
+   * about the test. Both flags are read on the stack the close ran on, where nothing can have
+   * resumed in between. A style reload is the close path because it is the shortest — the sources
+   * go the instant the call returns, without a layer to remove first — and every path ends in the
+   * same `CustomGeometryBridge.close`.
+   *
+   * A late notification is the other half, and it is still dropped: the ones posted for this source
+   * before the teardown are delivered to nobody afterwards, which is what the count below says.
    *
    * Rendered into a texture of its own, for the reason the teardown test above gives.
    */
@@ -434,10 +440,14 @@ class CustomGeometrySourceBrowserTest {
           // means it is either running or suspended -- and the host stack can only read it while
           // the host stack runs, so a true read there is a suspended body.
           var answering = false
-          // Released by the host once it has closed the registration. Until then the body below
-          // goes on parking, which is what keeps the window open for as long as the test needs it
-          // rather than for as long as one owner-thread call happens to take.
-          var holdAnswer = true
+          // How many bodies have run all the way to their last line, so that a close that returned
+          // early can be told from one that waited: the flag above goes false either way.
+          var answersFinished = 0
+          // How far through its turns the body inside its answer is. The host closes only while
+          // this is small, so the body it retires provably has turns left when the close begins --
+          // otherwise a body that was about to end could finish during the close's own call, and
+          // the next notification's body, not this one, would be what the close waited for.
+          var turnsIntoAnswer = 0
           var retired = false
           var afterClose = 0
           val callback =
@@ -447,20 +457,21 @@ class CustomGeometrySourceBrowserTest {
                   afterClose++
                   return
                 }
+                turnsIntoAnswer = 0
                 answering = true
                 try {
                   // The inline answer a shared host writes, and the first park of this stack.
                   runCatching { map.setCustomGeometrySourceTileData(SOURCE, tileId, worldFill()) }
-                  // Each of these parks again. Bounded so that a test that failed to release this
-                  // fails rather than hanging the page, and failures are swallowed because the
+                  // Each of these parks again, and the count is fixed so that nothing the closing
+                  // stack does decides when this body ends. Failures are swallowed because the
                   // style this asks about is replaced underneath it by the close being tested.
-                  var parks = 0
-                  while (holdAnswer && parks < ANSWER_PARK_LIMIT) {
-                    parks++
+                  repeat(ANSWER_PARKS) {
+                    turnsIntoAnswer++
                     runCatching { map.isFullyLoaded }
                   }
                 } finally {
                   answering = false
+                  answersFinished++
                 }
               }
 
@@ -484,6 +495,11 @@ class CustomGeometrySourceBrowserTest {
               map.addStyleLayerJson(fillLayer(), "")
 
               var closedMidAnswer = false
+              var answeringAfterClose = true
+              // How many bodies had finished before the close began, so the one it waited for can
+              // be counted rather than inferred: earlier attempts may have delivered tiles that
+              // came and went while this stack was parked.
+              var finishedBeforeClose = 0
               var attempts = 0
               while (!closedMidAnswer && attempts < ATTEMPTS) {
                 attempts++
@@ -492,18 +508,31 @@ class CustomGeometrySourceBrowserTest {
                 // delivered and its body reaches its own first park while this stack is away.
                 runtime.pump(PUMP_MILLIS)
                 while (runtime.pollEvent() != null) {}
-                if (!answering) continue
+                // Early in its answer, so the body has turns left for the close to wait through.
+                if (!answering || turnsIntoAnswer > ANSWER_PARKS / 2) continue
+                closedMidAnswer = true
+                finishedBeforeClose = answersFinished
                 // The style reload takes the source, and with it the registration the suspended
-                // body belongs to. This parks once itself, which the body outlasts because it goes
-                // on parking until released below.
+                // body belongs to. The body outlasts the call's own park, because it has turns of
+                // its own left to spend, so what this returns from is the wait for that body.
                 map.setStyleJson(backgroundStyle(FILL_COLOR))
-                closedMidAnswer = answering
+                answeringAfterClose = answering
                 retired = true
-                holdAnswer = false
               }
               assertTrue(
                 closedMidAnswer,
                 "the source was never closed while its callback was parked inside an answer",
+              )
+              // The claim, read on the stack the close ran on: teardown returned only once the body
+              // it retired had reached its last line.
+              assertFalse(
+                answeringAfterClose,
+                "retiring a source returned while its callback was still inside its answer",
+              )
+              assertEquals(
+                finishedBeforeClose + 1,
+                answersFinished,
+                "the callback that was inside its answer when its source closed never finished",
               )
               assertEquals(
                 registrationsBefore,
@@ -511,12 +540,6 @@ class CustomGeometrySourceBrowserTest {
                 "closing a source while its callback was parked left its registration behind",
               )
 
-              // The body must still be allowed to finish: closing the registration stops further
-              // deliveries, and says nothing about the one already inside.
-              assertTrue(
-                renderUntil(runtime, session) { !answering },
-                "the callback that was parked when its source closed never finished",
-              )
               renderTurns(runtime, session, TEARDOWN_ATTEMPTS)
               assertEquals(0, afterClose, "a source closed mid-answer went on being called")
             } finally {
@@ -683,9 +706,10 @@ class CustomGeometrySourceBrowserTest {
     const val TEARDOWN_ATTEMPTS = 32
     const val PUMP_MILLIS = 2L
 
-    // How many times a held answer may park before it gives up on being released. Reached only if
-    // the test that is holding it never gets far enough to let go, which is a failure rather than a
-    // reason to keep the page busy forever.
-    const val ANSWER_PARK_LIMIT = 1_000
+    // How many further times an answer parks after answering its tile. Enough that the body is
+    // still inside it while the host observes it and while the close that retires it runs — each of
+    // those costs a turn or two of the same kind — and small enough that the close it makes wait is
+    // a fraction of a second.
+    const val ANSWER_PARKS = 24
   }
 }

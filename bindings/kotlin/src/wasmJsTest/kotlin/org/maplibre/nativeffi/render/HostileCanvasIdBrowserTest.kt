@@ -159,6 +159,53 @@ class HostileCanvasIdBrowserTest {
   }
 
   /**
+   * The one id a JavaScript object cannot hold as a key, and the ones that only look like it.
+   *
+   * Both registries a canvas passes through are plain objects keyed by element id: the one
+   * Emscripten fills as it transfers a `<canvas>` at `pthread_create`, and the one this module asks
+   * when it creates a context. Assigning under the name `__proto__` sets an object's prototype
+   * instead of adding an entry, so reserving such an id would transfer the element — which cannot
+   * be undone — and register it nowhere, leaving a `<canvas>` no context could ever name and no
+   * page code could draw into. Those registries are Emscripten's, so refusing the id is the only
+   * place this can be answered, and both calls that name a canvas refuse it.
+   *
+   * Names that `Object.prototype` merely carries are a different case and stay legal. Assigning
+   * under `toString` creates an ordinary own property that shadows the inherited one, so such a
+   * canvas transfers and resolves like any other; the module looks its registry up as an own
+   * property, so an id that was never reserved reports the missing canvas rather than the inherited
+   * value.
+   */
+  @Test
+  fun theIdNoJavaScriptObjectCanKeyIsRefusedWhileInheritedNamesStayLegal(): Promise<JsAny?> =
+    browserTest {
+      for (diagnostic in
+        listOf(
+          assertFailsWith<InvalidArgumentException> { WebglContext.reserveCanvas(PROTOTYPE_KEY) }
+            .diagnostic,
+          assertFailsWith<InvalidArgumentException> {
+              WebglContext.createForCanvas(PROTOTYPE_KEY, WIDTH, HEIGHT)
+            }
+            .diagnostic,
+        )) {
+        assertTrue(
+          diagnostic.contains(PROTOTYPE_KEY),
+          "the refusal did not name the id it refused: $diagnostic",
+        )
+      }
+
+      maplibreScope {
+        val error =
+          assertFailsWith<InvalidStateException> {
+            WebglContext.createForCanvas(INHERITED_NAME, WIDTH, HEIGHT)
+          }
+        assertTrue(
+          error.diagnostic.contains(INHERITED_NAME),
+          "the refusal was not the canvas's: ${error.diagnostic}",
+        )
+      }
+    }
+
+  /**
    * Renders until the session has nothing left to draw, pumping the runtime in between.
    *
    * The first render after a new style still paints the old one, because a render draws whatever
@@ -200,5 +247,13 @@ class HostileCanvasIdBrowserTest {
     // MLN_BROWSER_WEBGL_CANVAS_ID_BYTES in src/browser/webgl_context.c, terminator included, so an
     // id of this many bytes is the first one too long to carry.
     const val MAX_ID_BYTES = 64
+
+    // The one property name whose assignment JavaScript routes to a setter on Object.prototype
+    // rather than to the object being assigned.
+    const val PROTOTYPE_KEY = "__proto__"
+
+    // An ordinary Object.prototype member, and so a legal id: assigning under it shadows the
+    // inherited value with an own property of the registry.
+    const val INHERITED_NAME = "toString"
   }
 }

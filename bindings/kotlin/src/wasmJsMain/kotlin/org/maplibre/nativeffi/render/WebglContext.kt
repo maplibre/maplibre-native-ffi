@@ -296,7 +296,17 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
     Status.requireArgument(width > 0) { "width must be positive, but was $width" }
     Status.requireArgument(height > 0) { "height must be positive, but was $height" }
     requireOpen()
-    val bytes = width * height * 4
+    // Taken in Long and refused here, rather than left to an Int multiply of two caller-supplied
+    // extents. Native caps an extent at 16384 and would refuse this read, but only after this frame
+    // had already asked the module for the buffer, and both halves of that are bad answers: the
+    // unwrapped product for a 20000-by-20000 read is 1.6 GiB of scratch a page allocates and throws
+    // away, and a wrapped one is a small allocation native is then handed the real extents for.
+    val pixelCount = width.toLong() * height.toLong()
+    Status.requireArgument(pixelCount <= MAX_READBACK_PIXELS) {
+      "a ${width}x$height frame is $pixelCount pixels, and a readback can address at most " +
+        "$MAX_READBACK_PIXELS on this target"
+    }
+    val bytes = (pixelCount * BYTES_PER_PIXEL).toInt()
     // The flag first, because it is the only member here that has an alignment to satisfy.
     return Heap.withScratch(FLAG_BYTES + bytes) { out ->
       val pixels = out + FLAG_BYTES
@@ -366,10 +376,11 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
      * give it away, and the thread that receives it does not exist yet.
      *
      * [id] may be any `id` an HTML document accepts, including one no CSS identifier can spell,
-     * within three limits the module imposes: no comma, because the ids cross to native as one
-     * comma-separated list; no ASCII whitespace, which that list trims off each entry and which
-     * HTML forbids in an `id` anyway; and at most 63 bytes of UTF-8, which is what the module's
-     * fixed-size canvas record holds.
+     * within four limits: no comma, because the ids cross to native as one comma-separated list; no
+     * ASCII whitespace, which that list trims off each entry and which HTML forbids in an `id`
+     * anyway; at most 63 bytes of UTF-8, which is what the module's fixed-size canvas record holds;
+     * and not `__proto__`, which the plain JavaScript object holding transferred canvases cannot
+     * take as a key.
      *
      * Those are checked here as well as at [createForCanvas], because transferring a canvas cannot
      * be undone. A host that learned about a limit from the context failing would learn about it
@@ -412,6 +423,11 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
      *   one and not the other.
      * - The module carries the id in a record of [MAX_CANVAS_ID_BYTES] bytes with the terminator
      *   inside it, so an id may encode to one byte fewer than that.
+     * - Both registries that hold a canvas are plain JavaScript objects keyed by element id, and
+     *   assigning under the name `__proto__` sets an object's prototype instead of adding an entry.
+     *   Reserving one would transfer the `<canvas>` and then register nothing, so the element would
+     *   be gone and no context could ever name it. That registry belongs to Emscripten, so refusing
+     *   the id is the only place this can be answered.
      *
      * Checked here rather than left to native because of *when* native checks. Reserving a canvas
      * transfers it, transferring cannot be undone, and the module refuses the id only afterwards —
@@ -423,6 +439,10 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
       Status.requireArgument(',' !in id) { "a canvas id must not contain a comma, but was \"$id\"" }
       Status.requireArgument(id.none(::isAsciiWhitespace)) {
         "a canvas id must not contain whitespace, but was \"$id\""
+      }
+      Status.requireArgument(id != PROTOTYPE_KEY) {
+        "a canvas id must not be \"$PROTOTYPE_KEY\", because the browser's canvas registry is a " +
+          "plain JavaScript object and cannot hold an entry under that name"
       }
       Heap.requireCString(id, "canvas id")
       // Encoded here rather than measured with Heap.utf8Size, which asks the module for the length
@@ -530,6 +550,16 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
     /** One four-byte output: a context handle, a texture name, or a success flag. */
     private const val FLAG_BYTES = 4
 
+    /** RGBA8, which is what a readback produces and what native writes. */
+    private const val BYTES_PER_PIXEL = 4
+
+    /**
+     * The largest frame a readback can stage, which is what a 32-bit pointer leaves room for.
+     *
+     * The flag shares the block with the pixels, so it comes out of the same budget.
+     */
+    private const val MAX_READBACK_PIXELS = (Int.MAX_VALUE - FLAG_BYTES) / BYTES_PER_PIXEL
+
     /**
      * The bytes the module's fixed-size canvas record holds, terminator included.
      *
@@ -540,5 +570,15 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
      * the limit is stated and enforced rather than lifted.
      */
     private const val MAX_CANVAS_ID_BYTES = 64
+
+    /**
+     * The one element id that a JavaScript object cannot hold as a key.
+     *
+     * `object[key] = value` is an ordinary assignment for every other name, including the ones
+     * `Object.prototype` already carries, because it creates an own property that shadows the
+     * inherited one. This name goes to `Object.prototype`'s setter instead and changes the object's
+     * prototype, so the entry a canvas transfer meant to add is never there.
+     */
+    private const val PROTOTYPE_KEY = "__proto__"
   }
 }

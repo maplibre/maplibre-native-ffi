@@ -221,11 +221,52 @@ class WebglContextBrowserTest {
     assertTrue(context.isClosed)
   }
 
+  /**
+   * A readback whose pixel count no 32-bit pointer could address.
+   *
+   * The scratch a readback stages into is sized from two extents the caller chose, and the product
+   * of two positive `Int`s is not one. Twenty-five by 42,949,673 is a gibibyte of pixels, and it
+   * wraps to four bytes: the module would hand back a four-byte block, native would be told the
+   * real extents, and what stopped it from reading past that block would be native's own extent cap
+   * rather than anything this binding did. Refused here instead, before the allocator is asked.
+   */
+  @Test
+  fun aReadbackTooLargeToAddressIsRefusedBeforeTheModuleIsAsked(): Promise<JsAny?> = browserTest {
+    maplibreScope {
+      val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
+      try {
+        val error =
+          assertFailsWith<InvalidArgumentException> {
+            context.readPixels(DEFAULT_FRAMEBUFFER, WRAPPING_WIDTH, WRAPPING_HEIGHT)
+          }
+        assertTrue(
+          error.diagnostic.contains("pixels"),
+          "the refusal did not name the pixel count: ${error.diagnostic}",
+        )
+        // And the context is untouched by the refusal, so a host that got the extent wrong once
+        // still has the context it was reading from.
+        assertFalse(context.isClosed)
+        context.readPixels(DEFAULT_FRAMEBUFFER, WIDTH, HEIGHT)
+      } finally {
+        context.close()
+      }
+    }
+  }
+
   private fun descriptorFor(context: WebglContext) =
     OpenGLOwnedTextureDescriptor(RenderTargetExtent(WIDTH, HEIGHT, 1.0), context.descriptor())
 
   private companion object {
     const val WIDTH = 64
     const val HEIGHT = 32
+
+    /** Framebuffer zero, which is the canvas's own. */
+    const val DEFAULT_FRAMEBUFFER = 0
+
+    // 25 * 42_949_673 is 2^30 + 1 pixels, so four bytes each wraps an Int product to exactly four.
+    // Both extents are positive and each fits an Int on its own, which is what makes the product
+    // the only place this can be caught.
+    const val WRAPPING_WIDTH = 25
+    const val WRAPPING_HEIGHT = 42_949_673
   }
 }

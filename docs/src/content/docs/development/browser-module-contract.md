@@ -76,12 +76,15 @@ not in the document or control of it has already been transferred.
 
 These are element ids rather than selectors. An id a CSS identifier cannot spell
 — a leading digit, a colon, a dot, a bracket — works, because the module escapes
-each id before it reaches the selector Emscripten resolves. Three limits apply.
-A comma separates the list, so it cannot appear inside an entry. Surrounding
-whitespace is trimmed, and an id may not contain any. And an id must fit the 64
+each id before it reaches the selector Emscripten resolves. Four limits apply. A
+comma separates the list, so it cannot appear inside an entry. Surrounding
+whitespace is trimmed, and an id may not contain any. An id must fit the 64
 bytes, terminator included, that `mln_browser_webgl_context_create` accepts: a
 longer one can be transferred here and never named again, because a context is
-what a transferred canvas is for.
+what a transferred canvas is for. And the id `__proto__` is refused, because the
+registries that hold a canvas are plain JavaScript objects keyed by element id:
+assigning under that name sets an object's prototype rather than adding an
+entry, so the `<canvas>` would be transferred and then registered nowhere.
 
 **Transferring cannot be undone**, which is what makes those the caller's to
 check first. This call is the only moment a canvas can move, so a host that
@@ -222,6 +225,9 @@ is what lets the module copy a canvas key out from under its own lock and carry
 a creation request by value to the owner thread without allocating, so **an id
 of 64 bytes or more, terminator included, is refused**. A truncated key would
 name a different canvas or none, so the length is refused rather than trimmed.
+The id is looked up as an own property of the canvas registry, so a name that
+`Object.prototype` already carries — `toString`, `constructor` — reports the
+missing canvas that it is rather than the inherited value.
 
 - A page canvas the dispatcher was created with. What a surface session renders
   into that context's default framebuffer is composited onto the page's canvas
