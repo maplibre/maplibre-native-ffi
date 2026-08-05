@@ -516,10 +516,11 @@ callback state. Replacement, clear, and runtime close release the old state only
 after the native registration call has retired every in-flight callback.
 
 Bindings that cannot answer a synchronous callback expose native rule tables. An
-exact rule matches the complete transformed URL, a prefix rule performs a
-literal case-sensitive prefix match, and the first matching rule supplies its
-complete header collection. Unknown flags, null match operands, and requests
-outside the matched URL family pass through without transformed headers.
+exact rule matches the complete transformed URL, a glob rule matches it against
+the pattern language the C API reference defines, and the first matching rule
+supplies its complete header collection. Unknown flags, null match operands, and
+requests outside the matched URL family pass through without transformed
+headers.
 
 Every transformed header is redirect-sensitive. A same-origin redirect, with the
 same scheme, host, and effective port, preserves transformed headers. A redirect
@@ -949,7 +950,7 @@ When the binding routes provider requests through
 
 | ID      | Test                                                                                                                                                                                       |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| BND-156 | A prefix route claims every request URL that starts with its value, and a request URL outside that prefix passes through to native loading.                                                |
+| BND-156 | A glob route claims every request URL its pattern matches, and a request URL the pattern leaves unmatched passes through to native loading.                                                |
 | BND-157 | A route comparing the requested URL claims a request for a configured URI-scheme alias, and a route comparing the resolved URL claims that same request by its tile-server-normalized URL. |
 
 ### Rendering

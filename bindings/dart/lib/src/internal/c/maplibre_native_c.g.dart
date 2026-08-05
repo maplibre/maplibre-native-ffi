@@ -5604,9 +5604,28 @@ final class mln_texture_image_info extends ffi.Struct {
   external int byte_length;
 }
 
+enum mln_adapter_url_match_flags {
+  MLN_ADAPTER_URL_MATCH_FLAGS_NONE(0),
+  MLN_ADAPTER_URL_MATCH_GLOB(1);
+
+  final int value;
+  const mln_adapter_url_match_flags(this.value);
+
+  static mln_adapter_url_match_flags fromValue(int value) => switch (value) {
+    0 => MLN_ADAPTER_URL_MATCH_FLAGS_NONE,
+    1 => MLN_ADAPTER_URL_MATCH_GLOB,
+    _ => throw ArgumentError(
+      'Unknown value for mln_adapter_url_match_flags: $value',
+    ),
+  };
+}
+
 final class mln_adapter_resource_rewrite_rule extends ffi.Struct {
   @ffi.Uint32()
   external int kind;
+
+  @ffi.Uint32()
+  external int flags;
 
   external ffi.Pointer<ffi.Char> url;
 
@@ -5618,23 +5637,6 @@ final class mln_adapter_resource_rewrite_rules extends ffi.Struct {
 
   @ffi.Size()
   external int count;
-}
-
-enum mln_adapter_http_header_route_flags {
-  MLN_ADAPTER_HTTP_HEADER_ROUTE_FLAGS_NONE(0),
-  MLN_ADAPTER_HTTP_HEADER_ROUTE_MATCH_PREFIX(1);
-
-  final int value;
-  const mln_adapter_http_header_route_flags(this.value);
-
-  static mln_adapter_http_header_route_flags fromValue(int value) =>
-      switch (value) {
-        0 => MLN_ADAPTER_HTTP_HEADER_ROUTE_FLAGS_NONE,
-        1 => MLN_ADAPTER_HTTP_HEADER_ROUTE_MATCH_PREFIX,
-        _ => throw ArgumentError(
-          'Unknown value for mln_adapter_http_header_route_flags: $value',
-        ),
-      };
 }
 
 final class mln_adapter_http_header extends ffi.Struct {
@@ -5669,6 +5671,9 @@ final class mln_adapter_resource_provider_rule extends ffi.Struct {
   @ffi.Uint32()
   external int kind;
 
+  @ffi.Uint32()
+  external int flags;
+
   external ffi.Pointer<ffi.Char> requested_url;
 
   external mln_resource_response response;
@@ -5683,7 +5688,7 @@ final class mln_adapter_resource_provider_rules extends ffi.Struct {
 
 enum mln_adapter_resource_route_flags {
   MLN_ADAPTER_RESOURCE_ROUTE_FLAGS_NONE(0),
-  MLN_ADAPTER_RESOURCE_ROUTE_MATCH_PREFIX(1),
+  MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB(1),
   MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL(2);
 
   final int value;
@@ -5692,7 +5697,7 @@ enum mln_adapter_resource_route_flags {
   static mln_adapter_resource_route_flags fromValue(int value) =>
       switch (value) {
         0 => MLN_ADAPTER_RESOURCE_ROUTE_FLAGS_NONE,
-        1 => MLN_ADAPTER_RESOURCE_ROUTE_MATCH_PREFIX,
+        1 => MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB,
         2 => MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL,
         _ => throw ArgumentError(
           'Unknown value for mln_adapter_resource_route_flags: $value',

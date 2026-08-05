@@ -32,11 +32,8 @@
 
 namespace {
 
-using AdapterResourceRewriteRule = mln_adapter_resource_rewrite_rule;
 using AdapterResourceRewriteRules = mln_adapter_resource_rewrite_rules;
-using AdapterHttpHeaderTransformRule = mln_adapter_http_header_transform_rule;
 using AdapterHttpHeaderTransformRules = mln_adapter_http_header_transform_rules;
-using AdapterResourceProviderRule = mln_adapter_resource_provider_rule;
 using AdapterResourceProviderRules = mln_adapter_resource_provider_rules;
 using AdapterQueuedResourceProviderRoute =
   mln_adapter_queued_resource_provider_route;
@@ -81,67 +78,149 @@ auto matches_rule(std::uint32_t rule_kind, std::uint32_t request_kind) -> bool {
          rule_kind == request_kind;
 }
 
-auto string_equals(const char* left, const char* right) -> bool {
-  if (left == nullptr || right == nullptr) {
-    return false;
+// Compares one non-wildcard pattern element against one candidate character,
+// and reports how many pattern characters it spans. Zero reports no match.
+auto literal_span(std::string_view pattern, std::size_t index, char candidate)
+  -> std::size_t {
+  const auto element = pattern[index];
+  if (element == '?') {
+    return candidate == '/' ? 0 : 1;
   }
-  return std::strcmp(left, right) == 0;
+  if (element == '\\' && index + 1 < pattern.size()) {
+    return pattern[index + 1] == candidate ? 2 : 0;
+  }
+  return element == candidate ? 1 : 0;
 }
 
-constexpr auto KnownHttpHeaderRouteFlags =
-  static_cast<std::uint32_t>(MLN_ADAPTER_HTTP_HEADER_ROUTE_MATCH_PREFIX);
+// Matches one glob pattern against a candidate URL, in the language
+// callback_adapter.h documents.
+//
+// Confining '*' to one path segment is what the host patterns rely on, so a
+// wildcard run stops at a '/' unless the pattern spelled '**'. The latest run
+// of each kind stays available as a backtrack point, so an exhausted '*' can
+// yield to an earlier '**'. This costs at most the product of the two lengths.
+// Matching allocates nothing and never recurses, so a host pattern cannot
+// overflow the MapLibre thread this runs on.
+auto glob_matches(std::string_view pattern, std::string_view candidate)
+  -> bool {
+  auto pattern_index = std::size_t{0};
+  auto candidate_index = std::size_t{0};
 
-auto http_header_rule_matches_url(
-  const AdapterHttpHeaderTransformRule& rule, const char* url
-) -> bool {
-  if (
-    rule.url == nullptr || url == nullptr ||
-    (rule.flags & ~KnownHttpHeaderRouteFlags) != 0
-  ) {
-    return false;
+  struct WildcardCheckpoint {
+    std::size_t pattern_index = std::string_view::npos;
+    std::size_t candidate_index = 0;
+  };
+  auto segment_wildcard = WildcardCheckpoint{};
+  auto spanning_wildcard = WildcardCheckpoint{};
+
+  const auto backtrack = [&]() -> bool {
+    if (segment_wildcard.pattern_index != std::string_view::npos) {
+      if (
+        segment_wildcard.candidate_index < candidate.size() &&
+        candidate[segment_wildcard.candidate_index] != '/'
+      ) {
+        ++segment_wildcard.candidate_index;
+        pattern_index = segment_wildcard.pattern_index;
+        candidate_index = segment_wildcard.candidate_index;
+        return true;
+      }
+      segment_wildcard = {};
+    }
+    if (
+      spanning_wildcard.pattern_index == std::string_view::npos ||
+      spanning_wildcard.candidate_index == candidate.size()
+    ) {
+      return false;
+    }
+    ++spanning_wildcard.candidate_index;
+    segment_wildcard = {};
+    pattern_index = spanning_wildcard.pattern_index;
+    candidate_index = spanning_wildcard.candidate_index;
+    return true;
+  };
+
+  while (true) {
+    if (pattern_index < pattern.size() && pattern[pattern_index] == '*') {
+      const auto run_start = pattern_index;
+      while (pattern_index < pattern.size() && pattern[pattern_index] == '*') {
+        ++pattern_index;
+      }
+      const auto checkpoint =
+        WildcardCheckpoint{pattern_index, candidate_index};
+      if (pattern_index - run_start > 1) {
+        spanning_wildcard = checkpoint;
+        segment_wildcard = {};
+      } else {
+        segment_wildcard = checkpoint;
+      }
+      continue;
+    }
+    if (candidate_index < candidate.size()) {
+      const auto span =
+        pattern_index < pattern.size()
+          ? literal_span(pattern, pattern_index, candidate[candidate_index])
+          : 0;
+      if (span != 0) {
+        pattern_index += span;
+        ++candidate_index;
+        continue;
+      }
+    } else if (pattern_index == pattern.size()) {
+      return true;
+    }
+    if (!backtrack()) {
+      return false;
+    }
   }
-  const auto expected = std::string_view{rule.url};
-  const auto candidate = std::string_view{url};
-  if (
-    (rule.flags &
-     static_cast<std::uint32_t>(MLN_ADAPTER_HTTP_HEADER_ROUTE_MATCH_PREFIX)) !=
-    0
-  ) {
-    return candidate.starts_with(expected);
-  }
-  return candidate == expected;
 }
+
+constexpr auto KnownUrlMatchFlags =
+  static_cast<std::uint32_t>(MLN_ADAPTER_URL_MATCH_GLOB);
 
 constexpr auto KnownRouteFlags =
-  static_cast<std::uint32_t>(MLN_ADAPTER_RESOURCE_ROUTE_MATCH_PREFIX) |
+  static_cast<std::uint32_t>(MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB) |
   static_cast<std::uint32_t>(MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL);
+
+static_assert(
+  static_cast<std::uint32_t>(MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB) ==
+    static_cast<std::uint32_t>(MLN_ADAPTER_URL_MATCH_GLOB),
+  "a queued provider route selects glob matching with the shared flag bit"
+);
+
+// Compares one rule's url against the candidate URL under the rule's flags. A
+// null url, an absent candidate, or a flag bit outside known_flags describes no
+// URL family this version can compare, so such a rule claims nothing rather
+// than everything.
+auto url_matches(
+  std::uint32_t flags, std::uint32_t known_flags, const char* url,
+  const char* candidate
+) -> bool {
+  if (url == nullptr || candidate == nullptr || (flags & ~known_flags) != 0) {
+    return false;
+  }
+  const auto pattern = std::string_view{url};
+  const auto target = std::string_view{candidate};
+  if ((flags & static_cast<std::uint32_t>(MLN_ADAPTER_URL_MATCH_GLOB)) != 0) {
+    return glob_matches(pattern, target);
+  }
+  return pattern == target;
+}
 
 auto has_flag(std::uint32_t flags, mln_adapter_resource_route_flags flag)
   -> bool {
   return (flags & static_cast<std::uint32_t>(flag)) != 0;
 }
 
-// Compares one route's literal url against the request URL its flags select. A
-// null url or an unknown flag bit describes no URL family this version can
-// compare, so such a route claims nothing rather than everything.
+// Compares one route's url against the request URL its flags select.
 auto route_matches_url(
   const AdapterQueuedResourceProviderRoute& route,
   const mln_resource_request& request
 ) -> bool {
-  if (route.url == nullptr || (route.flags & ~KnownRouteFlags) != 0) {
-    return false;
-  }
   const auto* candidate =
     has_flag(route.flags, MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL)
       ? request.requested_url
       : request.resolved_url;
-  if (candidate == nullptr) {
-    return false;
-  }
-  if (has_flag(route.flags, MLN_ADAPTER_RESOURCE_ROUTE_MATCH_PREFIX)) {
-    return std::string_view{candidate}.starts_with(std::string_view{route.url});
-  }
-  return string_equals(candidate, route.url);
+  return url_matches(route.flags, KnownRouteFlags, route.url, candidate);
 }
 
 auto request_matches_route(
@@ -396,7 +475,10 @@ extern "C" MLN_API auto mln_adapter_resource_transform_rewrite_callback(
   const auto& table =
     *static_cast<const AdapterResourceRewriteRules*>(user_data);
   for (const auto& rule : std::span{table.rules, table.count}) {
-    if (matches_rule(rule.kind, kind) && string_equals(rule.url, url)) {
+    if (
+      matches_rule(rule.kind, kind) &&
+      url_matches(rule.flags, KnownUrlMatchFlags, rule.url, url)
+    ) {
       if (rule.replacement_url == nullptr) {
         return MLN_STATUS_OK;
       }
@@ -423,7 +505,8 @@ extern "C" MLN_API auto mln_adapter_http_header_transform_callback(
   }
   for (const auto& rule : std::span{table.rules, table.count}) {
     if (
-      !matches_rule(rule.kind, kind) || !http_header_rule_matches_url(rule, url)
+      !matches_rule(rule.kind, kind) ||
+      !url_matches(rule.flags, KnownUrlMatchFlags, rule.url, url)
     ) {
       continue;
     }
@@ -476,7 +559,10 @@ extern "C" MLN_API auto mln_adapter_resource_provider_rules_callback(
   for (const auto& rule : std::span{table.rules, table.count}) {
     if (
       matches_rule(rule.kind, request->kind) &&
-      string_equals(rule.requested_url, request->requested_url)
+      url_matches(
+        rule.flags, KnownUrlMatchFlags, rule.requested_url,
+        request->requested_url
+      )
     ) {
       static_cast<void>(mln_resource_request_complete(handle, &rule.response));
       mln_resource_request_release(handle);
