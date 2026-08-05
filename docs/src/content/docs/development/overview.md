@@ -63,12 +63,6 @@ Mise installs them automatically when a namespaced project task runs, so the
 initial bootstrap stays focused on tools used across the repository. The
 published devcontainer image bakes the complete tool union for fast startup.
 
-The Rust binding is the one that targets the browser. Its suite runs as a page
-in headless Chromium against the Emscripten build:
-`mise run //bindings/rust:test:browser [preset]`. The C API suite runs the same
-way through `mise run test emscripten-wasm32-webgl`, and both reach the browser
-through `scripts/run-browser-test.mjs`.
-
 The bootstrap includes the Android, Emscripten, and OpenHarmony SDKs, because
 `mise.toml` pins them like every other tool. It also installs the Oniro emulator
 image that matches the OpenHarmony SDK. Each SDK exports the paths its CMake
