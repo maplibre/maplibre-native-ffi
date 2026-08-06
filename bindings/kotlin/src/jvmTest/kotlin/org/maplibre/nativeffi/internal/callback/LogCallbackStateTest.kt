@@ -16,12 +16,7 @@ class LogCallbackStateTest {
     var copiedRecord: LogRecord? = null
 
     try {
-      LogCallbackState.set(
-        LogCallback { record ->
-          copiedRecord = record
-        },
-        consume = true,
-      )
+      LogCallbackState.set(LogCallback { record -> copiedRecord = record }, consume = true)
       val state = assertNotNull(LogCallbackState.currentForTesting())
 
       Arena.ofConfined().use { arena ->

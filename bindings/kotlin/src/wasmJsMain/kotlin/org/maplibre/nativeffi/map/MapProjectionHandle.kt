@@ -9,45 +9,31 @@ import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.NativeMapProjection
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.wasm.CameraMarshal
-import org.maplibre.nativeffi.internal.wasm.Dispatcher
 import org.maplibre.nativeffi.internal.wasm.GeometryMarshal
 import org.maplibre.nativeffi.internal.wasm.Heap
 import org.maplibre.nativeffi.internal.wasm.HeapArena
-import org.maplibre.nativeffi.internal.wasm.HeapPointer
 import org.maplibre.nativeffi.internal.wasm.generated.MlnEdgeInsets
 import org.maplibre.nativeffi.internal.wasm.generated.MlnLatLng
 import org.maplibre.nativeffi.internal.wasm.generated.MlnScreenPoint
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_projection_destroy
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_projection_get_camera
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_projection_lat_lng_for_pixel
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_projection_pixel_for_lat_lng
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_projection_set_camera
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_projection_set_visible_coordinates
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_projection_set_visible_geometry
 
 /**
  * A standalone projection snapshot, owned by the thread the module runs its maps on.
  *
- * Every call here is placed on that thread rather than run on the page. A projection is affine to
- * the thread that owns the map it was taken from, and the C API reports an owner-thread status for
- * a call from anywhere else, so the dispatcher is what lets this keep the ordinary synchronous
- * shape the other platforms have.
+ * A projection is affine to the thread that owns the map it was taken from, which is the thread
+ * this binding runs on, so every call here is an ordinary synchronous call as on every other
+ * platform.
  */
 public actual class MapProjectionHandle
 internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
   private val core = HandleStateCore(TYPE_NAME, handle.raw)
 
-  init {
-    // Counted with the module, because a projection is the one owner-affine handle that retains
-    // nothing: it is a snapshot of a map's transform and outlives both that map and the runtime
-    // behind it. So there is no other handle whose refusal to close could stand in for this one,
-    // and a shutdown that could not see it would be accepted while the only thread that may
-    // destroy this is stopped.
-    Dispatcher.retainHandle(TYPE_NAME)
-  }
-
-  /**
-   * Checks this handle is live and then runs [body], without holding a use count across it.
-   *
-   * `withLive` would hold one, and every call here parks the Kotlin stack while the owner thread
-   * works. A close arriving during that park would drain a count that cannot be released until the
-   * park ends, which is the invariant `yieldWhileClosing` refuses to spin on. The window this
-   * leaves is the one the C API already closes: a handle destroyed between the check and the call
-   * is a stale handle, and native reports invalid argument for it.
-   */
   private inline fun <T> live(body: () -> T): T {
     core.requireLive()
     return body()
@@ -59,7 +45,7 @@ internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
         // An output descriptor states its own size too: native reads it to decide which fields it
         // may write, and a zeroed block would ask for a zero-sized camera.
         CameraMarshal.writeHeader(out)
-        call("mln_map_projection_get_camera", out)
+        Status.check(mln_map_projection_get_camera(handle.raw, out.address))
         CameraMarshal.read(out)
       }
     }
@@ -68,7 +54,7 @@ internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
     live {
       Heap.withScratch(CameraMarshal.SIZEOF) { descriptor ->
         CameraMarshal.write(descriptor, camera)
-        call("mln_map_projection_set_camera", descriptor)
+        Status.check(mln_map_projection_set_camera(handle.raw, descriptor.address))
       }
     }
   }
@@ -84,16 +70,13 @@ internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
         }
         val insets = scratch + coordinateBytes
         CameraMarshal.writeEdgeInsets(insets, padding)
-        Dispatcher.call(
-          "mln_map_projection_set_visible_coordinates",
-          4,
-          { slots ->
-            slots.setLong(0, handle.raw)
-            slots.setPointer(1, scratch)
-            slots.setInt(2, coordinates.size)
-            slots.setPointer(3, insets)
-          },
-          { Status.check(Heap.loadInt(it)) },
+        Status.check(
+          mln_map_projection_set_visible_coordinates(
+            handle.raw,
+            scratch.address,
+            coordinates.size,
+            insets.address,
+          )
         )
       }
     }
@@ -108,15 +91,8 @@ internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
         val root = GeometryMarshal.write(HeapArena(scratch, geometryBytes), geometry)
         val insets = scratch + geometryBytes
         CameraMarshal.writeEdgeInsets(insets, padding)
-        Dispatcher.call(
-          "mln_map_projection_set_visible_geometry",
-          3,
-          { slots ->
-            slots.setLong(0, handle.raw)
-            slots.setPointer(1, root)
-            slots.setPointer(2, insets)
-          },
-          { Status.check(Heap.loadInt(it)) },
+        Status.check(
+          mln_map_projection_set_visible_geometry(handle.raw, root.address, insets.address)
         )
       }
     }
@@ -126,7 +102,7 @@ internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
     Heap.withScratch(MlnLatLng.SIZEOF + MlnScreenPoint.SIZEOF) { scratch ->
       val out = scratch + MlnLatLng.SIZEOF
       CameraMarshal.writeLatLng(scratch, coordinate)
-      convert("mln_map_projection_pixel_for_lat_lng", scratch, out)
+      Status.check(mln_map_projection_pixel_for_lat_lng(handle.raw, scratch.address, out.address))
       ScreenPoint(MlnScreenPoint.x(out), MlnScreenPoint.y(out))
     }
   }
@@ -136,7 +112,7 @@ internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
       val out = scratch + MlnScreenPoint.SIZEOF
       MlnScreenPoint.setX(scratch, point.x)
       MlnScreenPoint.setY(scratch, point.y)
-      convert("mln_map_projection_lat_lng_for_pixel", scratch, out)
+      Status.check(mln_map_projection_lat_lng_for_pixel(handle.raw, scratch.address, out.address))
       CameraMarshal.readLatLng(out)
     }
   }
@@ -145,47 +121,7 @@ internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
     get() = core.isReleased()
 
   public actual override fun close() {
-    core.closeOnce(
-      destroy = {
-        Dispatcher.call(
-          "mln_map_projection_destroy",
-          1,
-          { slots -> slots.setLong(0, handle.raw) },
-          { Heap.loadInt(it) },
-        )
-      },
-      // Only a destroy that happened stops the count. A destroy the C API refuses leaves the
-      // native projection there and this wrapper open for a retry, and releasing here would let a
-      // shutdown be accepted while it still exists.
-      afterSuccess = { Dispatcher.releaseHandle(TYPE_NAME) },
-    )
-  }
-
-  /** One handle argument and one descriptor, which is the shape most of these calls take. */
-  private fun call(name: String, descriptor: HeapPointer) {
-    Dispatcher.call(
-      name,
-      2,
-      { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, descriptor)
-      },
-      { Status.check(Heap.loadInt(it)) },
-    )
-  }
-
-  /** One handle argument, one input descriptor, and one output descriptor. */
-  private fun convert(name: String, input: HeapPointer, output: HeapPointer) {
-    Dispatcher.call(
-      name,
-      3,
-      { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, input)
-        slots.setPointer(2, output)
-      },
-      { Status.check(Heap.loadInt(it)) },
-    )
+    core.closeOnce(destroy = { mln_map_projection_destroy(handle.raw) })
   }
 
   internal companion object {

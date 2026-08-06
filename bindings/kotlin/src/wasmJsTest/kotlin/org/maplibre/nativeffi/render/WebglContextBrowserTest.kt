@@ -1,7 +1,5 @@
 package org.maplibre.nativeffi.render
 
-import kotlin.js.JsAny
-import kotlin.js.Promise
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -9,11 +7,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
-import org.maplibre.nativeffi.browserTest
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
-import org.maplibre.nativeffi.maplibreScope
 import org.maplibre.nativeffi.withMap
 
 /**
@@ -39,80 +35,75 @@ class WebglContextBrowserTest {
   // Spec coverage: BND-041, BND-042.
 
   @Test
-  fun closingAContextUnderALiveRenderTargetIsRefusedUntilTheTargetGoes(): Promise<JsAny?> =
-    browserTest {
-      maplibreScope {
-        withMap(WIDTH, HEIGHT) { _, map ->
-          val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
-          try {
-            val session = map.attachOpenGLOwnedTexture(descriptorFor(context))
-            try {
-              // The backend makes this context current on every frame and again while it releases
-              // the GL objects the session built, so destroying it here would leave native working
-              // in a context that is gone — and the destructor that would find out swallows it.
-              val error = assertFailsWith<InvalidStateException> { context.close() }
-              assertEquals(MaplibreStatus.INVALID_STATE, error.status)
-              assertEquals(
-                "WebglContext has 1 live child handle(s): RenderSessionHandle",
-                error.diagnostic,
-              )
-              assertFalse(context.isClosed)
+  fun closingAContextUnderALiveRenderTargetIsRefusedUntilTheTargetGoes() {
+    withMap(WIDTH, HEIGHT) { _, map ->
+      val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
+      try {
+        val session = map.attachOpenGLOwnedTexture(descriptorFor(context))
+        try {
+          // The backend makes this context current on every frame and again while it releases
+          // the GL objects the session built, so destroying it here would leave native working
+          // in a context that is gone — and the destructor that would find out swallows it.
+          val error = assertFailsWith<InvalidStateException> { context.close() }
+          assertEquals(MaplibreStatus.INVALID_STATE, error.status)
+          assertEquals(
+            "WebglContext has 1 live child handle(s): RenderSessionHandle",
+            error.diagnostic,
+          )
+          assertFalse(context.isClosed)
 
-              // A refused close leaves a working context rather than a half-released one: this
-              // does real GL work on the owner thread, in the context the session renders in.
-              val texture = context.createTexture(WIDTH, HEIGHT)
-              assertNotEquals(0, texture)
-              context.destroyTexture(texture)
+          // A refused close leaves a working context rather than a half-released one: this
+          // does real GL work in the context the session renders in.
+          val texture = context.createTexture(WIDTH, HEIGHT)
+          assertNotEquals(0, texture)
+          context.destroyTexture(texture)
 
-              // Detaching is what releases the backend, so the context becomes closeable there
-              // rather than only at close. That is the order a host tearing a map down takes: the
-              // detached session is live for its own destroy and nothing else, so releasing the
-              // context it no longer touches must not wait for that destroy.
-              session.detach()
-              context.close()
-              assertTrue(context.isClosed)
-            } finally {
-              // Closed here rather than at the end, so an assertion that fails above still leaves
-              // the map closeable and the failure this test reports is its own.
-              session.close()
-            }
-          } finally {
-            if (!context.isClosed) context.close()
-          }
+          // Detaching is what releases the backend, so the context becomes closeable there
+          // rather than only at close. That is the order a host tearing a map down takes: the
+          // detached session is live for its own destroy and nothing else, so releasing the
+          // context it no longer touches must not wait for that destroy.
+          session.detach()
+          context.close()
+          assertTrue(context.isClosed)
+        } finally {
+          // Closed here rather than at the end, so an assertion that fails above still leaves
+          // the map closeable and the failure this test reports is its own.
+          session.close()
         }
+      } finally {
+        if (!context.isClosed) context.close()
       }
     }
+  }
 
   @Test
-  fun attachingWithADescriptorFromAClosedContextIsRefused(): Promise<JsAny?> = browserTest {
-    maplibreScope {
-      withMap(WIDTH, HEIGHT) { _, map ->
-        val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
-        val stale = context.descriptor()
-        context.close()
+  fun attachingWithADescriptorFromAClosedContextIsRefused() {
+    withMap(WIDTH, HEIGHT) { _, map ->
+      val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
+      val stale = context.descriptor()
+      context.close()
 
-        // The handle in it is still positive, which is every check native makes and every check a
-        // descriptor can make on its own. Only the binding knows the context it named is gone.
-        assertTrue(stale.context > 0)
-        val error =
-          assertFailsWith<InvalidArgumentException> {
-            map.attachOpenGLOwnedTexture(
-              OpenGLOwnedTextureDescriptor(RenderTargetExtent(WIDTH, HEIGHT, 1.0), stale)
-            )
-          }
-        assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status)
-        assertTrue(
-          error.diagnostic.contains("has been closed"),
-          "the refusal reported ${error.diagnostic}",
-        )
-
-        // The map is where it was, so a target attaches with a context that is open.
-        val replacement = WebglContext.createOffscreen(WIDTH, HEIGHT)
-        try {
-          map.attachOpenGLOwnedTexture(descriptorFor(replacement)).close()
-        } finally {
-          replacement.close()
+      // The handle in it is still positive, which is every check native makes and every check a
+      // descriptor can make on its own. Only the binding knows the context it named is gone.
+      assertTrue(stale.context > 0)
+      val error =
+        assertFailsWith<InvalidArgumentException> {
+          map.attachOpenGLOwnedTexture(
+            OpenGLOwnedTextureDescriptor(RenderTargetExtent(WIDTH, HEIGHT, 1.0), stale)
+          )
         }
+      assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status)
+      assertTrue(
+        error.diagnostic.contains("has been closed"),
+        "the refusal reported ${error.diagnostic}",
+      )
+
+      // The map is where it was, so a target attaches with a context that is open.
+      val replacement = WebglContext.createOffscreen(WIDTH, HEIGHT)
+      try {
+        map.attachOpenGLOwnedTexture(descriptorFor(replacement)).close()
+      } finally {
+        replacement.close()
       }
     }
   }
@@ -138,141 +129,112 @@ class WebglContextBrowserTest {
    * rendering in and is accepted.
    */
   @Test
-  fun attachingWithAStaleDescriptorIsRefusedAfterItsHandleIsReused(): Promise<JsAny?> =
-    browserTest {
-      maplibreScope {
-        withMap(WIDTH, HEIGHT) { _, map ->
-          val original = WebglContext.createOffscreen(WIDTH, HEIGHT)
-          val stale = original.descriptor()
-          original.close()
+  fun attachingWithAStaleDescriptorIsRefusedAfterItsHandleIsReused() {
+    withMap(WIDTH, HEIGHT) { _, map ->
+      val original = WebglContext.createOffscreen(WIDTH, HEIGHT)
+      val stale = original.descriptor()
+      original.close()
 
-          // Reuse is what makes this the ABA case rather than merely a closed-context case, but the
-          // module's allocator is under no obligation to hand the number straight back: what it
-          // returns depends on whatever else has been allocated in this page. So the number is
-          // hunted for rather than assumed, and every context opened on the way is kept open, since
-          // closing one would free the very number being waited for.
-          val opened = mutableListOf<WebglContext>()
-          var replacement = WebglContext.createOffscreen(WIDTH, HEIGHT)
-          opened.add(replacement)
-          while (
-            replacement.descriptor().context != stale.context && opened.size < REUSE_ATTEMPTS
-          ) {
-            replacement = WebglContext.createOffscreen(WIDTH, HEIGHT)
-            opened.add(replacement)
-          }
-          val reused = replacement.descriptor().context == stale.context
+      // Reuse is what makes this the ABA case rather than merely a closed-context case, but the
+      // module's allocator is under no obligation to hand the number straight back: what it
+      // returns depends on whatever else has been allocated in this page. So the number is
+      // hunted for rather than assumed, and every context opened on the way is kept open, since
+      // closing one would free the very number being waited for.
+      val opened = mutableListOf<WebglContext>()
+      var replacement = WebglContext.createOffscreen(WIDTH, HEIGHT)
+      opened.add(replacement)
+      while (replacement.descriptor().context != stale.context && opened.size < REUSE_ATTEMPTS) {
+        replacement = WebglContext.createOffscreen(WIDTH, HEIGHT)
+        opened.add(replacement)
+      }
+      val reused = replacement.descriptor().context == stale.context
+      try {
+
+        // Caught rather than left to assertFailsWith. A session that attached holds the map
+        // open, so it would fail the map's own close on the way out, and that cleanup failure
+        // is what the report would show instead of this one. Released first, reported second.
+        val leaked =
           try {
-
-            // Caught rather than left to assertFailsWith. A session that attached holds the map
-            // open, so it would fail the map's own close on the way out, and that cleanup failure
-            // is what the report would show instead of this one. Released first, reported second.
-            val leaked =
-              try {
-                map.attachOpenGLOwnedTexture(
-                  OpenGLOwnedTextureDescriptor(RenderTargetExtent(WIDTH, HEIGHT, 1.0), stale)
-                )
-              } catch (error: InvalidArgumentException) {
-                assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status)
-                assertTrue(
-                  error.diagnostic.contains("has been closed"),
-                  "the refusal reported ${error.diagnostic}",
-                )
-                null
+            map.attachOpenGLOwnedTexture(
+              OpenGLOwnedTextureDescriptor(RenderTargetExtent(WIDTH, HEIGHT, 1.0), stale)
+            )
+          } catch (error: InvalidArgumentException) {
+            assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status)
+            assertTrue(
+              error.diagnostic.contains("has been closed"),
+              "the refusal reported ${error.diagnostic}",
+            )
+            null
+          }
+        if (leaked != null) {
+          leaked.close()
+          fail(
+            "attaching with a descriptor from a closed context succeeded" +
+              if (reused) {
+                "; the handle ${stale.context} it carries now belongs to a different context, " +
+                  "so the session would have rendered through one the host never named"
+              } else {
+                ", so a descriptor outliving its context is not refused at all"
               }
-            if (leaked != null) {
-              leaked.close()
-              fail(
-                "attaching with a descriptor from a closed context succeeded" +
-                  if (reused) {
-                    "; the handle ${stale.context} it carries now belongs to a different context, " +
-                      "so the session would have rendered through one the host never named"
-                  } else {
-                    ", so a descriptor outliving its context is not refused at all"
-                  }
+          )
+        }
+
+        // And the context that really holds that number still attaches, so what was refused was
+        // the stale descriptor rather than the handle it happens to carry. Only meaningful once
+        // the number has actually been reused; otherwise this is an ordinary live context.
+        if (reused) map.attachOpenGLOwnedTexture(descriptorFor(replacement)).close()
+
+        // The other way in. Each session below is attached with the live context and then
+        // offered the stale descriptor for the same target kind, so the only thing wrong with
+        // the retarget is the context it names.
+        val texture = replacement.createTexture(WIDTH, HEIGHT)
+        try {
+          val borrowed =
+            map.attachOpenGLBorrowedTexture(borrowedDescriptorFor(replacement, texture))
+          try {
+            assertStaleContextRefused(reused, stale.context, "a borrowed texture target") {
+              borrowed.setOpenGLBorrowedTextureTarget(
+                OpenGLBorrowedTextureDescriptor(
+                  RenderTargetExtent(WIDTH, HEIGHT, 1.0),
+                  WIDTH,
+                  HEIGHT,
+                  stale,
+                  texture,
+                  TEXTURE_2D,
+                )
               )
             }
 
-            // And the context that really holds that number still attaches, so what was refused was
-            // the stale descriptor rather than the handle it happens to carry. Only meaningful once
-            // the number has actually been reused; otherwise this is an ordinary live context.
-            if (reused) map.attachOpenGLOwnedTexture(descriptorFor(replacement)).close()
-
-            // The other way in. Each session below is attached with the live context and then
-            // offered the stale descriptor for the same target kind, so the only thing wrong with
-            // the retarget is the context it names.
-            val texture = replacement.createTexture(WIDTH, HEIGHT)
-            try {
-              val borrowed =
-                map.attachOpenGLBorrowedTexture(borrowedDescriptorFor(replacement, texture))
-              try {
-                assertStaleContextRefused(reused, stale.context, "a borrowed texture target") {
-                  borrowed.setOpenGLBorrowedTextureTarget(
-                    OpenGLBorrowedTextureDescriptor(
-                      RenderTargetExtent(WIDTH, HEIGHT, 1.0),
-                      WIDTH,
-                      HEIGHT,
-                      stale,
-                      texture,
-                      TEXTURE_2D,
-                    )
-                  )
-                }
-
-                // The same retarget with a descriptor from the context that is open goes through,
-                // so what was refused was the descriptor and not the call.
-                borrowed.setOpenGLBorrowedTextureTarget(borrowedDescriptorFor(replacement, texture))
-              } finally {
-                borrowed.close()
-              }
-            } finally {
-              replacement.destroyTexture(texture)
-            }
-
-            val surface = map.attachOpenGLSurface(surfaceDescriptorFor(replacement))
-            try {
-              assertStaleContextRefused(reused, stale.context, "a surface target") {
-                surface.setOpenGLSurfaceTarget(
-                  OpenGLSurfaceDescriptor(
-                    RenderTargetExtent(WIDTH, HEIGHT, 1.0),
-                    stale,
-                    NativePointer.NULL,
-                  )
-                )
-              }
-
-              surface.setOpenGLSurfaceTarget(surfaceDescriptorFor(replacement))
-            } finally {
-              surface.close()
-            }
+            // The same retarget with a descriptor from the context that is open goes through,
+            // so what was refused was the descriptor and not the call.
+            borrowed.setOpenGLBorrowedTextureTarget(borrowedDescriptorFor(replacement, texture))
           } finally {
-            opened.forEach { it.close() }
+            borrowed.close()
           }
+        } finally {
+          replacement.destroyTexture(texture)
         }
+
+        val surface = map.attachOpenGLSurface(surfaceDescriptorFor(replacement))
+        try {
+          assertStaleContextRefused(reused, stale.context, "a surface target") {
+            surface.setOpenGLSurfaceTarget(
+              OpenGLSurfaceDescriptor(
+                RenderTargetExtent(WIDTH, HEIGHT, 1.0),
+                stale,
+                NativePointer.NULL,
+              )
+            )
+          }
+
+          surface.setOpenGLSurfaceTarget(surfaceDescriptorFor(replacement))
+        } finally {
+          surface.close()
+        }
+      } finally {
+        opened.forEach { it.close() }
       }
     }
-
-  @Test
-  fun aContextCloseTheModuleRefusesLeavesItOpenForARetry(): Promise<JsAny?> = browserTest {
-    val context = maplibreScope { WebglContext.createOffscreen(WIDTH, HEIGHT) }
-
-    // Destroying a context is owner-thread work, and outside a scope there is no promising stack to
-    // park it on, so the module refuses the submission. A browser host has no finalizer and cannot
-    // restart a process, so a wrapper that marked itself closed here would strand the native
-    // context for the page's whole life with nothing left able to name it.
-    val error = assertFailsWith<InvalidStateException> { context.close() }
-    assertTrue(
-      error.diagnostic.contains("maplibreScope"),
-      "the refusal reported ${error.diagnostic}",
-    )
-    assertFalse(context.isClosed)
-
-    maplibreScope {
-      // Still a context that works, and still one that closes, which is what restoring the live
-      // state is for.
-      context.destroyTexture(context.createTexture(WIDTH, HEIGHT))
-      context.close()
-    }
-    assertTrue(context.isClosed)
   }
 
   /**
@@ -285,25 +247,23 @@ class WebglContextBrowserTest {
    * rather than anything this binding did. Refused here instead, before the allocator is asked.
    */
   @Test
-  fun aReadbackTooLargeToAddressIsRefusedBeforeTheModuleIsAsked(): Promise<JsAny?> = browserTest {
-    maplibreScope {
-      val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
-      try {
-        val error =
-          assertFailsWith<InvalidArgumentException> {
-            context.readPixels(DEFAULT_FRAMEBUFFER, WRAPPING_WIDTH, WRAPPING_HEIGHT)
-          }
-        assertTrue(
-          error.diagnostic.contains("pixels"),
-          "the refusal did not name the pixel count: ${error.diagnostic}",
-        )
-        // And the context is untouched by the refusal, so a host that got the extent wrong once
-        // still has the context it was reading from.
-        assertFalse(context.isClosed)
-        context.readPixels(DEFAULT_FRAMEBUFFER, WIDTH, HEIGHT)
-      } finally {
-        context.close()
-      }
+  fun aReadbackTooLargeToAddressIsRefusedBeforeTheModuleIsAsked() {
+    val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
+    try {
+      val error =
+        assertFailsWith<InvalidArgumentException> {
+          context.readPixels(DEFAULT_FRAMEBUFFER, WRAPPING_WIDTH, WRAPPING_HEIGHT)
+        }
+      assertTrue(
+        error.diagnostic.contains("pixels"),
+        "the refusal did not name the pixel count: ${error.diagnostic}",
+      )
+      // And the context is untouched by the refusal, so a host that got the extent wrong once
+      // still has the context it was reading from.
+      assertFalse(context.isClosed)
+      context.readPixels(DEFAULT_FRAMEBUFFER, WIDTH, HEIGHT)
+    } finally {
+      context.close()
     }
   }
 

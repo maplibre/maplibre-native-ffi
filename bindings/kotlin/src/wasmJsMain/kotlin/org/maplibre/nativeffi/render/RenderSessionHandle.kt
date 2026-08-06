@@ -6,15 +6,38 @@ import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
 import org.maplibre.nativeffi.internal.status.Status
-import org.maplibre.nativeffi.internal.wasm.Dispatcher
 import org.maplibre.nativeffi.internal.wasm.GeoJsonMarshal
 import org.maplibre.nativeffi.internal.wasm.Heap
 import org.maplibre.nativeffi.internal.wasm.HeapArena
 import org.maplibre.nativeffi.internal.wasm.HeapPointer
 import org.maplibre.nativeffi.internal.wasm.InjectedFaults
 import org.maplibre.nativeffi.internal.wasm.JsonMarshal
-import org.maplibre.nativeffi.internal.wasm.NativeCall
 import org.maplibre.nativeffi.internal.wasm.RenderMarshal
+import org.maplibre.nativeffi.internal.wasm.generated.mln_feature_extension_result_destroy
+import org.maplibre.nativeffi.internal.wasm.generated.mln_feature_extension_result_get
+import org.maplibre.nativeffi.internal.wasm.generated.mln_feature_query_result_count
+import org.maplibre.nativeffi.internal.wasm.generated.mln_feature_query_result_destroy
+import org.maplibre.nativeffi.internal.wasm.generated.mln_feature_query_result_get
+import org.maplibre.nativeffi.internal.wasm.generated.mln_json_snapshot_destroy
+import org.maplibre.nativeffi.internal.wasm.generated.mln_json_snapshot_get
+import org.maplibre.nativeffi.internal.wasm.generated.mln_opengl_borrowed_texture_set_target
+import org.maplibre.nativeffi.internal.wasm.generated.mln_opengl_owned_texture_acquire_frame
+import org.maplibre.nativeffi.internal.wasm.generated.mln_opengl_owned_texture_release_frame
+import org.maplibre.nativeffi.internal.wasm.generated.mln_opengl_surface_set_target
+import org.maplibre.nativeffi.internal.wasm.generated.mln_render_session_clear_data
+import org.maplibre.nativeffi.internal.wasm.generated.mln_render_session_destroy
+import org.maplibre.nativeffi.internal.wasm.generated.mln_render_session_detach
+import org.maplibre.nativeffi.internal.wasm.generated.mln_render_session_dump_debug_logs
+import org.maplibre.nativeffi.internal.wasm.generated.mln_render_session_get_feature_state
+import org.maplibre.nativeffi.internal.wasm.generated.mln_render_session_query_feature_extensions
+import org.maplibre.nativeffi.internal.wasm.generated.mln_render_session_query_rendered_features
+import org.maplibre.nativeffi.internal.wasm.generated.mln_render_session_query_source_features
+import org.maplibre.nativeffi.internal.wasm.generated.mln_render_session_reduce_memory_use
+import org.maplibre.nativeffi.internal.wasm.generated.mln_render_session_remove_feature_state
+import org.maplibre.nativeffi.internal.wasm.generated.mln_render_session_render_update
+import org.maplibre.nativeffi.internal.wasm.generated.mln_render_session_resize
+import org.maplibre.nativeffi.internal.wasm.generated.mln_render_session_set_feature_state
+import org.maplibre.nativeffi.internal.wasm.generated.mln_texture_read_premultiplied_rgba8
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.query.FeatureExtensionResult
@@ -25,18 +48,11 @@ import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 
 /**
- * A render session, owned by the thread the module runs its maps on.
+ * A render session, owned by the thread this binding runs on.
  *
- * Session work is placed on that thread rather than run on the page: the C API reports an
- * owner-thread status for a session call from anywhere else, and MapLibre blocks, which a browser
- * page may not. The dispatcher is what lets this keep the ordinary synchronous shape the other
- * platforms have.
- *
- * Not every call here is owner-affine. A query hands back a result handle whose contents are a
- * plain snapshot, and the C API places no thread rule on reading or destroying one, so those calls
- * run on the page. That matters more here than it would elsewhere: each dispatched call is an
- * event-loop round trip, and a query that dispatched its count, every getter, and its destroy would
- * cost one per feature.
+ * That thread created the runtime the session's map belongs to, so it is the session's owner thread
+ * as far as the C API is concerned, and every call below is an ordinary synchronous call made on
+ * it.
  *
  * The browser build compiles one render backend, OpenGL against WebGL, and every render target that
  * backend has: a native surface, which here is the canvas the context is bound to, and both the
@@ -56,30 +72,18 @@ internal constructor(
   // this module was not built against and which native refuses at attach.
   private val contextRetention: HandleStateCore.ChildRetention?,
 ) : AutoCloseable {
-  // Held so the map reports a live session rather than letting native refuse the destroy. Passing
-  // the map to HandleStateCore only names the parent; this is what makes closing the map while a
-  // session is attached the binding's own INVALID_STATE, which is what the common KDoc promises.
+  // Held so that closing the map while a session is attached is the binding's own INVALID_STATE,
+  // which is what the common KDoc promises. Naming the map to HandleStateCore does not do that.
   private val mapRetention = map.retainChild(TYPE_NAME)
   private val core = HandleStateCore(TYPE_NAME, handle.raw, map)
   private val activeFrame = ActiveFrameState()
 
-  init {
-    // Counted with the module as well as with the map, because [detach] gives the map back while
-    // this session stays live and still has to be destroyed on the owner thread. From then on no
-    // other handle is holding the module open on this one's account, so a shutdown that read only
-    // the retentions would be accepted and strand a session nothing could ever destroy. Last of
-    // the initializers, so a retention this constructor failed to take leaves no count behind.
-    Dispatcher.retainHandle(TYPE_NAME)
-  }
-
   /**
    * Checks this handle is live and then runs [body], without holding a use count across it.
    *
-   * `withLive` would hold one, and a dispatched call parks the Kotlin stack while the owner thread
-   * works. A close arriving during that park would drain a count that cannot be released until the
-   * park ends, which is the invariant `yieldWhileClosing` refuses to spin on. The window this
-   * leaves is the one the C API already closes: a handle destroyed between the check and the call
-   * is a stale handle, and native reports invalid argument for it.
+   * A use count covers a host that uses a handle on one thread and closes it on another, and this
+   * binding has one thread: a close can only arrive from a frame below the call it would wait for,
+   * which is the wait `yieldWhileClosing` refuses to make.
    */
   private inline fun <T> live(body: () -> T): T {
     core.requireLive()
@@ -95,19 +99,7 @@ internal constructor(
     activeFrame.ensureInactive("resize")
     Status.requireArgument(width >= 0) { "width must be non-negative" }
     Status.requireArgument(height >= 0) { "height must be non-negative" }
-    live {
-      Dispatcher.call(
-        "mln_render_session_resize",
-        4,
-        { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setInt(1, width)
-          slots.setInt(2, height)
-          slots.setDouble(3, scaleFactor)
-        },
-        { Status.check(Heap.loadInt(it)) },
-      )
-    }
+    live { Status.check(mln_render_session_resize(handle.raw, width, height, scaleFactor)) }
   }
 
   public actual fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor) {
@@ -122,14 +114,9 @@ internal constructor(
    * Takes a new extent for a surface session, which is all this can change in a browser.
    *
    * There is no surface object to replace: the session presents through the canvas its context is
-   * bound to, and `descriptor.surface` must be [NativePointer.NULL] as it was at attach. Resizing
-   * the canvas's drawing buffer is the host's to do, on the thread that owns the context, and is
-   * not something this binding can reach.
-   *
-   * The context in the descriptor is resolved the way an attach resolves it, for the reason
-   * `WebglContext.requireOpenForTarget` gives: native compares a WebGL context by its handle alone,
-   * so a descriptor from a closed context whose number has been recycled matches whatever holds
-   * that number now.
+   * bound to, and `descriptor.surface` must be [NativePointer.NULL] as it was at attach. Sizing
+   * that canvas's drawing buffer is [WebglContext.resizeCanvas], and neither call implies the
+   * other.
    */
   public actual fun setOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor) {
     activeFrame.ensureInactive("set target")
@@ -137,7 +124,7 @@ internal constructor(
     live {
       Heap.withScratch(RenderMarshal.OPENGL_SURFACE_SIZEOF) { block ->
         RenderMarshal.writeOpenGLSurface(block, descriptor)
-        callWithDescriptor("mln_opengl_surface_set_target", block)
+        Status.check(mln_opengl_surface_set_target(handle.raw, block.address))
       }
     }
   }
@@ -150,22 +137,13 @@ internal constructor(
     throw unsupportedBackend("Vulkan")
   }
 
-  /**
-   * Gives this session another texture to draw into, in the context it attached with.
-   *
-   * The context in the descriptor is resolved the way an attach resolves it, for the reason
-   * `WebglContext.requireOpenForTarget` gives: native compares a WebGL context by its handle alone,
-   * so a descriptor from a closed context whose number has been recycled matches whatever holds
-   * that number now — and the texture beside it, made in a context that is gone, names either
-   * nothing or something the replacement owns.
-   */
   public actual fun setOpenGLBorrowedTextureTarget(descriptor: OpenGLBorrowedTextureDescriptor) {
     activeFrame.ensureInactive("set target")
     WebglContext.requireOpenForTarget(descriptor.context)
     live {
       Heap.withScratch(RenderMarshal.OPENGL_BORROWED_TEXTURE_SIZEOF) { block ->
         RenderMarshal.writeOpenGLBorrowedTexture(block, descriptor)
-        callWithDescriptor("mln_opengl_borrowed_texture_set_target", block)
+        Status.check(mln_opengl_borrowed_texture_set_target(handle.raw, block.address))
       }
     }
   }
@@ -174,15 +152,7 @@ internal constructor(
     activeFrame.ensureInactive("render")
     return live {
       Heap.withScratch(BOOL_BYTES) { out ->
-        Dispatcher.call(
-          "mln_render_session_render_update",
-          2,
-          { slots ->
-            slots.setLong(0, handle.raw)
-            slots.setPointer(1, out)
-          },
-          { Status.check(Heap.loadInt(it)) },
-        )
+        Status.check(mln_render_session_render_update(handle.raw, out.address))
         Heap.loadByte(out) != 0.toByte()
       }
     }
@@ -190,52 +160,43 @@ internal constructor(
 
   public actual fun detach() {
     activeFrame.ensureInactive("detach")
-    live { callWithSession("mln_render_session_detach") }
-    // A detached session no longer holds the map, so the map becomes closeable again even though
-    // this handle is still live. Live for destruction and nothing else: the C API answers every
-    // target, render, readback and maintenance call on a detached session with an invalid-state
-    // status, and has no way to attach one again. A host that wants to render after this destroys
-    // the session and attaches a new one.
+    live { Status.check(mln_render_session_detach(handle.raw)) }
+    // A detached session is live for destruction and nothing else, so it holds neither the map nor
+    // the WebGL context whose GL objects the detach released.
     mapRetention.close()
-    // The backend released its GL objects during the detach, so nothing here names the WebGL
-    // context any more and the host may close it.
     contextRetention?.close()
   }
 
   public actual fun reduceMemoryUse() {
     activeFrame.ensureInactive("reduce memory use")
-    live { callWithSession("mln_render_session_reduce_memory_use") }
+    live { Status.check(mln_render_session_reduce_memory_use(handle.raw)) }
   }
 
   public actual fun clearData() {
     activeFrame.ensureInactive("clear data")
-    live { callWithSession("mln_render_session_clear_data") }
+    live { Status.check(mln_render_session_clear_data(handle.raw)) }
   }
 
   public actual fun dumpDebugLogs() {
     activeFrame.ensureInactive("dump debug logs")
-    live { callWithSession("mln_render_session_dump_debug_logs") }
+    live { Status.check(mln_render_session_dump_debug_logs(handle.raw)) }
   }
 
   public actual fun setFeatureState(selector: FeatureStateSelector, value: JsonValue) {
     activeFrame.ensureInactive("set feature state")
     live {
-      // The selector and the state share one block, so this costs one scratch acquisition rather
-      // than two, and both are measured before either is written.
+      // One block for both, so both are measured before either is written.
       val bytes =
         RenderMarshal.measureFeatureStateSelector(selector) + JsonMarshal.measureValue(value, 0)
       withArena(bytes) { arena ->
         val selectorBlock = RenderMarshal.writeFeatureStateSelector(arena, selector)
         val stateBlock = JsonMarshal.write(arena, value)
-        Dispatcher.call(
-          "mln_render_session_set_feature_state",
-          3,
-          { slots ->
-            slots.setLong(0, handle.raw)
-            slots.setPointer(1, selectorBlock)
-            slots.setPointer(2, stateBlock)
-          },
-          { Status.check(Heap.loadInt(it)) },
+        Status.check(
+          mln_render_session_set_feature_state(
+            handle.raw,
+            selectorBlock.address,
+            stateBlock.address,
+          )
         )
       }
     }
@@ -249,21 +210,12 @@ internal constructor(
       withArena(bytes) { arena ->
         val selectorBlock = RenderMarshal.writeFeatureStateSelector(arena, selector)
         val out = arena.allocate(RenderMarshal.OUT_SLOT_BYTES, RenderMarshal.OUT_SLOT_BYTES)
-        Dispatcher.call(
-          "mln_render_session_get_feature_state",
-          3,
-          { slots ->
-            slots.setLong(0, handle.raw)
-            slots.setPointer(1, selectorBlock)
-            slots.setPointer(2, out)
-          },
-          { Status.check(Heap.loadInt(it)) },
+        Status.check(
+          mln_render_session_get_feature_state(handle.raw, selectorBlock.address, out.address)
         )
         Heap.loadLong(out)
       }
     }
-    // A snapshot is a copied tree with no owner thread, so borrowing its root and destroying it run
-    // on the page rather than costing two more event-loop round trips.
     return readJsonSnapshot(snapshot) ?: JsonValue.ObjectValue(emptyList())
   }
 
@@ -271,10 +223,8 @@ internal constructor(
     activeFrame.ensureInactive("remove feature state")
     live {
       withArena(RenderMarshal.measureFeatureStateSelector(selector)) { arena ->
-        callWithDescriptor(
-          "mln_render_session_remove_feature_state",
-          RenderMarshal.writeFeatureStateSelector(arena, selector),
-        )
+        val selectorBlock = RenderMarshal.writeFeatureStateSelector(arena, selector)
+        Status.check(mln_render_session_remove_feature_state(handle.raw, selectorBlock.address))
       }
     }
   }
@@ -293,16 +243,13 @@ internal constructor(
         val geometryBlock = RenderMarshal.writeRenderedQueryGeometry(arena, geometry)
         val optionsBlock = RenderMarshal.writeRenderedFeatureQueryOptions(arena, options)
         val out = arena.allocate(RenderMarshal.OUT_SLOT_BYTES, RenderMarshal.OUT_SLOT_BYTES)
-        Dispatcher.call(
-          "mln_render_session_query_rendered_features",
-          4,
-          { slots ->
-            slots.setLong(0, handle.raw)
-            slots.setPointer(1, geometryBlock)
-            slots.setPointer(2, optionsBlock)
-            slots.setPointer(3, out)
-          },
-          { Status.check(Heap.loadInt(it)) },
+        Status.check(
+          mln_render_session_query_rendered_features(
+            handle.raw,
+            geometryBlock.address,
+            optionsBlock.address,
+            out.address,
+          )
         )
         Heap.loadLong(out)
       }
@@ -321,21 +268,18 @@ internal constructor(
           RenderMarshal.measureSourceFeatureQueryOptions(options) +
           RenderMarshal.OUT_SLOT_BYTES.toLong()
       withArena(bytes) { arena ->
+        // A source ID is a string view by value in C, which this target passes indirectly, so the
+        // argument is a pointer to the view rather than to its bytes.
         val sourceBlock = RenderMarshal.writeStringViewRoot(arena, sourceId)
         val optionsBlock = RenderMarshal.writeSourceFeatureQueryOptions(arena, options)
         val out = arena.allocate(RenderMarshal.OUT_SLOT_BYTES, RenderMarshal.OUT_SLOT_BYTES)
-        Dispatcher.call(
-          "mln_render_session_query_source_features",
-          4,
-          { slots ->
-            slots.setLong(0, handle.raw)
-            // A source ID is a string view by value in C, which this target passes indirectly,
-            // so the argument is a pointer to the view rather than to its bytes.
-            slots.setPointer(1, sourceBlock)
-            slots.setPointer(2, optionsBlock)
-            slots.setPointer(3, out)
-          },
-          { Status.check(Heap.loadInt(it)) },
+        Status.check(
+          mln_render_session_query_source_features(
+            handle.raw,
+            sourceBlock.address,
+            optionsBlock.address,
+            out.address,
+          )
         )
         Heap.loadLong(out)
       }
@@ -368,19 +312,16 @@ internal constructor(
         // object, which would mean something else.
         val argumentBlock = arguments?.let { JsonMarshal.write(arena, it) } ?: HeapPointer(0)
         val out = arena.allocate(RenderMarshal.OUT_SLOT_BYTES, RenderMarshal.OUT_SLOT_BYTES)
-        Dispatcher.call(
-          "mln_render_session_query_feature_extensions",
-          7,
-          { slots ->
-            slots.setLong(0, handle.raw)
-            slots.setPointer(1, sourceBlock)
-            slots.setPointer(2, featureBlock)
-            slots.setPointer(3, extensionBlock)
-            slots.setPointer(4, fieldBlock)
-            slots.setPointer(5, argumentBlock)
-            slots.setPointer(6, out)
-          },
-          { Status.check(Heap.loadInt(it)) },
+        Status.check(
+          mln_render_session_query_feature_extensions(
+            handle.raw,
+            sourceBlock.address,
+            featureBlock.address,
+            extensionBlock.address,
+            fieldBlock.address,
+            argumentBlock.address,
+            out.address,
+          )
         )
         Heap.loadLong(out)
       }
@@ -395,18 +336,7 @@ internal constructor(
         RenderMarshal.writeTextureImageInfoHeader(out)
         // A null destination with zero capacity is the C API's size probe: it fills the metadata
         // and succeeds without copying.
-        val status =
-          Dispatcher.call(
-            "mln_texture_read_premultiplied_rgba8",
-            4,
-            { slots ->
-              slots.setLong(0, handle.raw)
-              slots.setPointer(1, HeapPointer(0))
-              slots.setInt(2, 0)
-              slots.setPointer(3, out)
-            },
-            { Heap.loadInt(it) },
-          )
+        val status = mln_texture_read_premultiplied_rgba8(handle.raw, 0, 0, out.address)
         val info = RenderMarshal.readTextureImageInfo(out)
         // A backend that answered with a length still answered the question the caller asked, even
         // where it also rejected the empty destination.
@@ -424,19 +354,14 @@ internal constructor(
     return live {
       Heap.withScratch(RenderMarshal.TEXTURE_IMAGE_INFO_SIZEOF) { out ->
         RenderMarshal.writeTextureImageInfoHeader(out)
-        // The buffer already lives in the module's heap, so native writes the pixels straight into
-        // it and nothing here copies a frame through Kotlin.
         buffer.borrow { pixels, length ->
-          Dispatcher.call(
-            "mln_texture_read_premultiplied_rgba8",
-            4,
-            { slots ->
-              slots.setLong(0, handle.raw)
-              slots.setPointer(1, pixels)
-              slots.setInt(2, length.toInt())
-              slots.setPointer(3, out)
-            },
-            { Status.check(Heap.loadInt(it)) },
+          Status.check(
+            mln_texture_read_premultiplied_rgba8(
+              handle.raw,
+              pixels.address,
+              length.toInt(),
+              out.address,
+            )
           )
         }
         val info = RenderMarshal.readTextureImageInfo(out)
@@ -457,20 +382,12 @@ internal constructor(
   /**
    * Takes the session's next frame, giving it back to native if this cannot hand it to the caller.
    *
-   * What follows a successful acquire is not free of failure, and treating it as if it were is how
-   * a native frame gets stranded. The descriptor has to be copied out into a Kotlin value and that
-   * value wrapped in a handle, and object construction fails when the Kotlin heap is exhausted; so
-   * does a page that reads the descriptor's fields. A session with a frame acquired and no handle
-   * to release it refuses to render, resize, detach, and close, for the life of the page.
-   *
-   * The release is made from the descriptor native just filled rather than from the frame value,
-   * because that value is one of the things that can fail to be built. It has to happen inside the
-   * scratch, before the block is freed -- and it is sound for the same reason [releaseOpenGLFrame]
-   * is: the C API matches a release by the frame's generation and frame id rather than by the
-   * address they arrive through.
-   *
-   * The borrow this took is given back outside, so it covers the failures before the acquire as
-   * well -- a closed session, a heap with no room for the descriptor, and native's own refusal.
+   * Copying the descriptor into a Kotlin value and wrapping it is object construction, which fails
+   * on an exhausted Kotlin heap, and a session holding a frame no handle can release refuses to
+   * render, resize, detach, and close for the life of the host. So the release below is made from
+   * the descriptor native just filled, before the scratch is freed, rather than from the value that
+   * failed to be built; the C API matches a release by the frame's generation and frame id rather
+   * than by the address they arrive through.
    */
   public actual fun acquireOpenGLOwnedTextureFrame(): OpenGLOwnedTextureFrameHandle {
     activeFrame.beginAcquire()
@@ -478,27 +395,19 @@ internal constructor(
       return live {
         Heap.withScratch(RenderMarshal.OPENGL_OWNED_TEXTURE_FRAME_SIZEOF) { out ->
           RenderMarshal.writeOpenGLFrameHeader(out)
-          Dispatcher.call(
-            "mln_opengl_owned_texture_acquire_frame",
-            2,
-            { slots ->
-              slots.setLong(0, handle.raw)
-              slots.setPointer(1, out)
-            },
-            { Status.check(Heap.loadInt(it)) },
-          )
+          Status.check(mln_opengl_owned_texture_acquire_frame(handle.raw, out.address))
           try {
             // The seam for the exhaustion this window cannot be put into on request; see
             // InjectedFaults. Armed or real, the recovery below is the same one.
             InjectedFaults.beginFrameWrap(RenderMarshal.OPENGL_OWNED_TEXTURE_FRAME_SIZEOF)
             val scope = FrameScope()
-            // Copied out here rather than kept: the descriptor lives in scratch this call frees,
-            // and release matches a frame by generation and frame id rather than by its address.
             OpenGLOwnedTextureFrameHandle(this, scope, RenderMarshal.readOpenGLFrame(out, scope))
           } catch (error: Throwable) {
             FrameAcquirePolicy.cleanupAfterWrapperFailure(
               acquired = true,
-              releaseNative = { callWithDescriptor("mln_opengl_owned_texture_release_frame", out) },
+              releaseNative = {
+                Status.check(mln_opengl_owned_texture_release_frame(handle.raw, out.address))
+              },
               // The borrow is the outer catch's, which sees this failure too.
               closeLocal = {},
               failure = error,
@@ -515,23 +424,12 @@ internal constructor(
   public actual override fun close() {
     activeFrame.ensureInactive("destroy")
     core.closeOnce(
-      destroy = {
-        Dispatcher.call(
-          "mln_render_session_destroy",
-          1,
-          { slots -> slots.setLong(0, handle.raw) },
-          { Heap.loadInt(it) },
-        )
-      },
-      // Closing twice is what a detach followed by a close would otherwise do; both retentions are
-      // idempotent for that reason, so this needs no flag of its own. Released only after native
-      // has destroyed the session, because destroying is itself GL work in the context this holds.
+      destroy = { mln_render_session_destroy(handle.raw) },
+      // Both retentions are idempotent, because a detach released them already. Released after the
+      // destroy, because destroying is itself GL work in the context this holds.
       afterSuccess = {
         mapRetention.close()
         contextRetention?.close()
-        // Native has destroyed it, so the owner thread no longer owns anything on this session's
-        // account and a shutdown is no longer refused for it.
-        Dispatcher.releaseHandle(TYPE_NAME)
       },
     )
   }
@@ -540,36 +438,16 @@ internal constructor(
     live {
       Heap.withScratch(RenderMarshal.OPENGL_OWNED_TEXTURE_FRAME_SIZEOF) { descriptor ->
         RenderMarshal.writeOpenGLFrame(descriptor, frame)
-        callWithDescriptor("mln_opengl_owned_texture_release_frame", descriptor)
+        // A native release refuses nothing a host can ask for, so BND-169's retry is reachable
+        // only through the seam.
+        InjectedFaults.beginCall("mln_opengl_owned_texture_release_frame")
+        Status.check(mln_opengl_owned_texture_release_frame(handle.raw, descriptor.address))
       }
     }
   }
 
   internal fun finishFrameBorrow() {
     activeFrame.endBorrow()
-  }
-
-  /** One session argument, which is the shape most of the maintenance calls take. */
-  private fun callWithSession(name: String) {
-    Dispatcher.call(
-      name,
-      1,
-      { slots -> slots.setLong(0, handle.raw) },
-      { Status.check(Heap.loadInt(it)) },
-    )
-  }
-
-  /** One session argument and one descriptor. */
-  private fun callWithDescriptor(name: String, descriptor: HeapPointer) {
-    Dispatcher.call(
-      name,
-      2,
-      { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, descriptor)
-      },
-      { Status.check(Heap.loadInt(it)) },
-    )
   }
 
   /**
@@ -586,23 +464,16 @@ internal constructor(
     return Heap.withScratch(size) { block -> body(HeapArena(block, size)) }
   }
 
-  /**
-   * Copies a query result and destroys it, without dispatching any of it.
-   *
-   * A result is a snapshot the C API places no thread rule on, so the count, every getter, and the
-   * destroy run on the page. Dispatching them would cost an event-loop round trip per feature, and
-   * the C API has no composite entry point that would collapse them into one.
-   */
+  /** Copies a query result and destroys it. A result is a snapshot with no owner thread. */
   private fun readFeatureQueryResult(result: Long): List<QueriedFeature> {
     try {
       InjectedFaults.beginResultCopy(result, SIZE_BYTES)
       val count =
         Heap.withScratch(SIZE_BYTES) { out ->
-          callResult("mln_feature_query_result_count", result, out)
+          Status.check(mln_feature_query_result_count(result, out.address))
           Heap.loadInt(out)
         }
-      // A count is `size_t`, which is thirty-two bits here, so one past Int.MAX_VALUE arrives
-      // negative. No result that large could exist, so a negative one means the handle read is not
+      // A count is `size_t`, thirty-two bits here, so a negative one means the handle read is not
       // the result it was taken for.
       if (count < 0) {
         throw Status.invalidState(
@@ -615,23 +486,14 @@ internal constructor(
           // Rewritten every iteration, not only once: the size field is what tells native which
           // fields it may fill, and the block is reused across features.
           RenderMarshal.writeQueriedFeatureHeader(out)
-          NativeCall.call(
-            "mln_feature_query_result_get",
-            3,
-            { slots ->
-              slots.setLong(0, result)
-              slots.setInt(1, index)
-              slots.setPointer(2, out)
-            },
-            { Status.check(Heap.loadInt(it)) },
-          )
+          Status.check(mln_feature_query_result_get(result, index, out.address))
           // Copied before the result is destroyed below: every string and JSON value in it is a
           // view into storage the destroy frees.
           RenderMarshal.readQueriedFeature(out)
         }
       }
     } finally {
-      destroyResult("mln_feature_query_result_destroy", result)
+      mln_feature_query_result_destroy(result)
     }
   }
 
@@ -640,11 +502,11 @@ internal constructor(
       InjectedFaults.beginResultCopy(result, RenderMarshal.FEATURE_EXTENSION_RESULT_INFO_SIZEOF)
       return Heap.withScratch(RenderMarshal.FEATURE_EXTENSION_RESULT_INFO_SIZEOF) { out ->
         RenderMarshal.writeFeatureExtensionResultInfoHeader(out)
-        callResult("mln_feature_extension_result_get", result, out)
+        Status.check(mln_feature_extension_result_get(result, out.address))
         RenderMarshal.readFeatureExtensionResultInfo(out)
       }
     } finally {
-      destroyResult("mln_feature_extension_result_destroy", result)
+      mln_feature_extension_result_destroy(result)
     }
   }
 
@@ -654,30 +516,12 @@ internal constructor(
     try {
       InjectedFaults.beginResultCopy(snapshot, POINTER_BYTES)
       return Heap.withScratch(POINTER_BYTES) { out ->
-        callResult("mln_json_snapshot_get", snapshot, out)
+        Status.check(mln_json_snapshot_get(snapshot, out.address))
         RenderMarshal.readJsonPointer(HeapPointer(Heap.loadInt(out)))
       }
     } finally {
-      destroyResult("mln_json_snapshot_destroy", snapshot)
+      mln_json_snapshot_destroy(snapshot)
     }
-  }
-
-  /** One result handle and one output pointer, run on the page rather than dispatched. */
-  private fun callResult(name: String, result: Long, out: HeapPointer) {
-    NativeCall.call(
-      name,
-      2,
-      { slots ->
-        slots.setLong(0, result)
-        slots.setPointer(1, out)
-      },
-      { Status.check(Heap.loadInt(it)) },
-    )
-  }
-
-  /** Destroys a result handle. These return nothing, so there is no status to check. */
-  private fun destroyResult(name: String, result: Long) {
-    NativeCall.call(name, 1, { slots -> slots.setLong(0, result) }, {})
   }
 
   private fun unsupportedBackend(backend: String): UnsupportedFeatureException =

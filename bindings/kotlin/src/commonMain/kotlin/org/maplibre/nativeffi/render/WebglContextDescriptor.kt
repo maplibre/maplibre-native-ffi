@@ -1,6 +1,15 @@
 package org.maplibre.nativeffi.render
 
 /**
+ * The `WebglContext` that a [WebglContextDescriptor] came from.
+ *
+ * Only the browser binding's context class implements this, and common code needs nothing from it
+ * beyond identity. It exists so that a descriptor names an object rather than only a recyclable
+ * handle; see [WebglContextDescriptor.owner].
+ */
+internal interface WebglContextOwner
+
+/**
  * WebGL context descriptor for OpenGL render targets in a browser.
  *
  * The browser owns the context and a session draws into it rather than creating one, so the handle
@@ -25,13 +34,6 @@ public class WebglContextDescriptor
 internal constructor(
   /** Borrowed `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`. Always positive. */
   public val context: Int,
-  /**
-   * The `WebglContext` this names, which is what a render target is really attached to.
-   *
-   * Typed as [Any] because that class belongs to the browser target and this is common API: a
-   * public class may not name an internal supertype, so there is no shared interface to declare
-   * here instead. Only `WebglContext.descriptor()` constructs a descriptor, so the browser arm's
-   * cast back is total.
-   */
-  internal val owner: Any,
+  /** The `WebglContext` this names, which is what a render target is really attached to. */
+  internal val owner: WebglContextOwner,
 ) : OpenGLContextDescriptor

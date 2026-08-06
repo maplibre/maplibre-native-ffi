@@ -72,11 +72,15 @@ commands = [{ task = "//bindings/python:test" }]
 # restores in that job. WebGPU is left out because the binding renders through
 # WebGL.
 #
-# The export check runs first: it is what makes each generated external a
-# checked call against the module the suite is about to load.
+# The two checks run first, and between them they are what makes a generated
+# external a checked call: one regenerates the Kotlin from the headers and
+# reports any difference, the other compares it against the module the suite is
+# about to load. Neither runs in the hygiene job, because both need the emsdk
+# clang that lays the module out.
 [[suites]]
 platforms = ["emscripten"]
 commands = [
+  { task = "//bindings/kotlin:check-wasm-generated", include = ["emscripten-wasm32-webgl"], preset = false },
   { task = "//bindings/kotlin:check-wasm-externs", include = ["emscripten-wasm32-webgl"], preset = false },
   { task = "//bindings/kotlin:wasmJsTest", include = ["emscripten-wasm32-webgl"], preset = false },
 ]

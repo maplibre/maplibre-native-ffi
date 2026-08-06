@@ -22,7 +22,6 @@ import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.wasm.CameraMarshal
 import org.maplibre.nativeffi.internal.wasm.CustomGeometryBridge
-import org.maplibre.nativeffi.internal.wasm.Dispatcher
 import org.maplibre.nativeffi.internal.wasm.GeoJsonMarshal
 import org.maplibre.nativeffi.internal.wasm.GeometryMarshal
 import org.maplibre.nativeffi.internal.wasm.Heap
@@ -31,7 +30,6 @@ import org.maplibre.nativeffi.internal.wasm.HeapPointer
 import org.maplibre.nativeffi.internal.wasm.InjectedFaults
 import org.maplibre.nativeffi.internal.wasm.JsonMarshal
 import org.maplibre.nativeffi.internal.wasm.MapOptionsMarshal
-import org.maplibre.nativeffi.internal.wasm.NativeCall
 import org.maplibre.nativeffi.internal.wasm.RenderMarshal
 import org.maplibre.nativeffi.internal.wasm.SourceMarshal
 import org.maplibre.nativeffi.internal.wasm.StyleMarshal
@@ -53,6 +51,135 @@ import org.maplibre.nativeffi.internal.wasm.generated.MlnStringView
 import org.maplibre.nativeffi.internal.wasm.generated.MlnStyleSourceInfo
 import org.maplibre.nativeffi.internal.wasm.generated.MlnUnitBezier
 import org.maplibre.nativeffi.internal.wasm.generated.MlnVec3
+import org.maplibre.nativeffi.internal.wasm.generated.mln_json_snapshot_destroy
+import org.maplibre.nativeffi.internal.wasm.generated.mln_json_snapshot_get
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_add_color_relief_layer
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_add_custom_geometry_source
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_add_geojson_source_data
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_add_geojson_source_url
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_add_hillshade_layer
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_add_image_source_image
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_add_image_source_url
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_add_location_indicator_layer
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_add_raster_dem_source_tiles
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_add_raster_dem_source_url
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_add_raster_source_tiles
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_add_raster_source_url
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_add_style_layer_json
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_add_style_source_json
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_add_vector_source_tiles
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_add_vector_source_url
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_camera_for_geometry
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_camera_for_lat_lng_bounds
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_camera_for_lat_lngs
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_cancel_transitions
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_copy_layer_source_id
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_copy_layer_source_layer
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_copy_loaded_style_json
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_copy_style_image_premultiplied_rgba8
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_copy_style_image_stretches
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_copy_style_source_attribution
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_copy_style_source_url
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_copy_style_url
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_create
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_destroy
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_dump_debug_logs
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_ease_to
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_fly_to
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_bounds
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_camera
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_debug_options
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_free_camera_options
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_image_source_coordinates
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_layer_filter
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_layer_max_zoom
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_layer_min_zoom
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_layer_property
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_layer_visibility
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_projection_mode
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_rendering_stats_view_enabled
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_size
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_style_image_info
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_style_layer_json
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_style_layer_type
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_style_light_property
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_style_source_info
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_style_source_tile_urls
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_style_source_type
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_style_transition_options
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_tile_options
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_get_viewport_options
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_invalidate_custom_geometry_source_region
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_invalidate_custom_geometry_source_tile
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_is_fully_loaded
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_is_gesture_in_progress
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_jump_to
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_lat_lng_bounds_for_camera
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_lat_lng_bounds_for_camera_unwrapped
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_lat_lng_for_pixel
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_lat_lngs_for_pixels
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_list_style_layer_ids
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_list_style_source_ids
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_move_by
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_move_by_animated
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_move_style_layer
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_pitch_by
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_pitch_by_animated
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_pixel_for_lat_lng
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_pixels_for_lat_lngs
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_projection_create
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_remove_style_image
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_remove_style_layer
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_remove_style_source
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_request_repaint
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_request_still_image
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_rotate_by
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_rotate_by_animated
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_scale_by
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_scale_by_animated
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_bounds
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_custom_geometry_source_tile_data
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_debug_options
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_free_camera_options
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_geojson_source_data
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_geojson_source_url
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_gesture_in_progress
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_image_source_coordinates
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_image_source_image
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_image_source_url
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_layer_filter
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_layer_max_zoom
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_layer_min_zoom
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_layer_property
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_layer_source_id
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_layer_source_layer
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_layer_visibility
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_location_indicator_accuracy_radius
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_location_indicator_bearing
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_location_indicator_image_name
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_location_indicator_location
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_projection_mode
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_rendering_stats_view_enabled
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_style_image
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_style_json
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_style_light_json
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_style_light_property
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_style_transition_options
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_style_url
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_tile_options
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_set_viewport_options
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_style_image_exists
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_style_layer_exists
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_style_source_exists
+import org.maplibre.nativeffi.internal.wasm.generated.mln_opengl_borrowed_texture_attach
+import org.maplibre.nativeffi.internal.wasm.generated.mln_opengl_owned_texture_attach
+import org.maplibre.nativeffi.internal.wasm.generated.mln_opengl_surface_attach
+import org.maplibre.nativeffi.internal.wasm.generated.mln_style_id_list_count
+import org.maplibre.nativeffi.internal.wasm.generated.mln_style_id_list_destroy
+import org.maplibre.nativeffi.internal.wasm.generated.mln_style_id_list_get
+import org.maplibre.nativeffi.internal.wasm.generated.mln_style_string_list_count
+import org.maplibre.nativeffi.internal.wasm.generated.mln_style_string_list_destroy
+import org.maplibre.nativeffi.internal.wasm.generated.mln_style_string_list_get
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
@@ -97,17 +224,11 @@ private const val IMAGE_SOURCE_COORDINATE_COUNT = 4
 private const val NUL = '\u0000'
 
 /**
- * An owned map, and the thread the module runs it on.
+ * An owned map, on the thread the module gave this binding.
  *
- * A browser page cannot own a thread and MapLibre blocks, so every call here is placed on the
- * dispatcher's owner thread rather than run on the page. That thread created the runtime this map
- * belongs to, which is what makes it the map's owner thread as far as the C API is concerned; a
- * call from anywhere else reports an owner-thread status. Parking the Kotlin stack on the answer is
- * what lets this keep the ordinary synchronous shape the other platforms have.
- *
- * Style ID lists and JSON snapshots are the exception. The C API places no thread rule on reading
- * or destroying one, so those run on the page rather than costing an event-loop round trip per ID
- * or per node.
+ * That thread created the runtime this map belongs to, which is what makes it the map's owner
+ * thread as far as the C API is concerned, so every call here is an ordinary synchronous call as on
+ * every other platform.
  *
  * The browser build compiles one render backend, OpenGL against WebGL, and every render target that
  * backend has: a native surface, which here is the canvas the context is bound to, and both the
@@ -124,20 +245,11 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
    * The tile callback registration behind each custom geometry source this map holds, by source id.
    *
    * A registration outlives the call that made it, because native keeps asking for tiles for as
-   * long as the source is in the style, so it is held here rather than by the caller. What ends it
-   * is the source ending: removal, a new style that does not carry it, or this map closing.
+   * long as the source is in the style. What ends it is the source ending: removal, a new style
+   * that does not carry it, or this map closing.
    */
   private val customGeometrySources = mutableMapOf<String, CustomGeometryBridge>()
 
-  /**
-   * Checks this handle is live and then runs [body], without holding a use count across it.
-   *
-   * `withLive` would hold one, and every call here parks the Kotlin stack while the owner thread
-   * works. A close arriving during that park would drain a count that cannot be released until the
-   * park ends, which is the invariant `yieldWhileClosing` refuses to spin on. The window this
-   * leaves is the one the C API already closes: a handle destroyed between the check and the call
-   * is a stale handle, and native reports invalid argument for it.
-   */
   private inline fun <T> live(body: () -> T): T {
     core.requireLive()
     return body()
@@ -155,7 +267,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     live {
       Heap.withScratch(Heap.utf8Size(url)) { text ->
         Heap.storeUtf8(text, url)
-        callWithPointer("mln_map_set_style_url", text)
+        Status.check(mln_map_set_style_url(handle.raw, text.address))
       }
     }
   }
@@ -165,7 +277,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     live {
       Heap.withScratch(Heap.utf8Size(json)) { text ->
         Heap.storeUtf8(text, json)
-        callWithPointer("mln_map_set_style_json", text)
+        Status.check(mln_map_set_style_json(handle.raw, text.address))
       }
       // The style this parsed replaces the one the sources were added to, so none of them exists
       // any more. A style set by URL loads later instead, and its registrations are released when
@@ -174,16 +286,16 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     }
   }
 
-  public actual fun loadedStyleJson(): String = copyMapText("mln_map_copy_loaded_style_json")
+  public actual fun loadedStyleJson(): String = copyMapText(::mln_map_copy_loaded_style_json)
 
-  public actual fun styleUrl(): String = copyMapText("mln_map_copy_style_url")
+  public actual fun styleUrl(): String = copyMapText(::mln_map_copy_style_url)
 
   public actual fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue) {
-    live { callWithIdAndJson("mln_map_add_style_source_json", sourceId, sourceJson) }
+    live { callWithIdAndJson(::mln_map_add_style_source_json, sourceId, sourceJson) }
   }
 
   public actual fun removeStyleSource(sourceId: String): Boolean {
-    val removed = flagForId("mln_map_remove_style_source", sourceId)
+    val removed = flagForId(::mln_map_remove_style_source, sourceId)
     // Only a source native really removed, because a refused removal leaves the source in the style
     // and it goes on asking for tiles.
     if (removed) customGeometrySources.remove(sourceId)?.close()
@@ -191,7 +303,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   }
 
   public actual fun styleSourceExists(sourceId: String): Boolean =
-    flagForId("mln_map_style_source_exists", sourceId)
+    flagForId(::mln_map_style_source_exists, sourceId)
 
   public actual fun styleSourceType(sourceId: String): SourceType? = live {
     withArena(bytes(stringViewBytes(sourceId), blockBytes(SIZE_BYTES), blockBytes(BOOL_BYTES))) {
@@ -199,66 +311,84 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       val view = writeStringView(arena, sourceId)
       val type = allocate(arena, SIZE_BYTES)
       val found = allocate(arena, BOOL_BYTES)
-      call("mln_map_get_style_source_type", 4) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, view)
-        slots.setPointer(2, type)
-        slots.setPointer(3, found)
-      }
+      Status.check(
+        mln_map_get_style_source_type(handle.raw, view.address, type.address, found.address)
+      )
       if (isSet(found)) SourceMarshal.readSourceType(type) else null
     }
   }
 
-  public actual fun styleSourceInfo(sourceId: String): SourceInfo? {
-    // The metadata carries the attribution's length rather than its bytes, so the text comes from a
-    // second call that this one has to complete before it can size.
-    val attributionSize =
-      live {
-        withArena(
-          bytes(
-            stringViewBytes(sourceId),
-            blockBytes(SourceMarshal.SOURCE_INFO_SIZEOF),
-            blockBytes(BOOL_BYTES),
-          )
-        ) { arena ->
-          val view = writeStringView(arena, sourceId)
-          val info = allocate(arena, SourceMarshal.SOURCE_INFO_SIZEOF)
-          val found = allocate(arena, BOOL_BYTES)
-          // An output descriptor states its own size too: native reads it to decide which fields it
-          // may write, and a zeroed block would ask for a zero-sized descriptor.
-          SourceMarshal.writeSourceInfoHeader(info)
-          call("mln_map_get_style_source_info", 4) { slots ->
-            slots.setLong(0, handle.raw)
-            slots.setPointer(1, view)
-            slots.setPointer(2, info)
-            slots.setPointer(3, found)
-          }
-          if (!isSet(found)) {
-            return@withArena null
-          }
-          // The size is read here, while the descriptor is still alive, together with the type and
-          // volatility the attribution is folded into below. A source with no attribution reports
-          // no size, which is distinct from reporting an empty one.
-          val size =
-            if (SourceMarshal.sourceInfoHasAttribution(info)) {
-              readCount(MlnStyleSourceInfo.attributionSize(info), "style source attribution size")
-            } else {
-              null
-            }
-          size to SourceMarshal.readSourceInfo(info, null)
-        }
-      } ?: return null
-    val (size, info) = attributionSize
-    val attribution =
-      when (size) {
-        null -> return info
-        0 -> ""
-        else -> copyStyleSourceAttribution(sourceId, size)
+  public actual fun styleSourceInfo(sourceId: String): SourceInfo? = live {
+    withArena(
+      bytes(
+        stringViewBytes(sourceId),
+        blockBytes(SourceMarshal.SOURCE_INFO_SIZEOF),
+        blockBytes(BOOL_BYTES),
+      )
+    ) { arena ->
+      val view = writeStringView(arena, sourceId)
+      val info = allocate(arena, SourceMarshal.SOURCE_INFO_SIZEOF)
+      val found = allocate(arena, BOOL_BYTES)
+      // An output descriptor states its own size too: native reads it to decide which fields it may
+      // write, and a zeroed block would ask for a zero-sized descriptor.
+      SourceMarshal.writeSourceInfoHeader(info)
+      Status.check(
+        mln_map_get_style_source_info(handle.raw, view.address, info.address, found.address)
+      )
+      if (!isSet(found)) {
+        return@withArena null
       }
-    return SourceInfo(info.type, info.volatileSource, attribution)
+      // The descriptor carries lengths and counts rather than the strings themselves, so the three
+      // copies below run while it is still alive and are folded into the value it returns.
+      SourceMarshal.readSourceInfo(
+        info,
+        copyStyleSourceAttribution(sourceId, info),
+        copyStyleSourceUrl(sourceId, info),
+        styleSourceTileUrls(sourceId, info),
+      )
+    }
   }
 
-  private fun copyStyleSourceAttribution(sourceId: String, capacity: Int): String? = live {
+  /** Copies the attribution the metadata at [info] reports a length for. */
+  private fun copyStyleSourceAttribution(sourceId: String, info: HeapPointer): String? {
+    // A source with no attribution reports no size, which is distinct from reporting an empty one.
+    if (!SourceMarshal.sourceInfoHasAttribution(info)) return null
+    val capacity =
+      readCount(MlnStyleSourceInfo.attributionSize(info), "style source attribution size")
+    if (capacity == 0) return ""
+    return copyStyleSourceText(
+      ::mln_map_copy_style_source_attribution,
+      sourceId,
+      capacity,
+      "style source attribution size",
+    )
+  }
+
+  /** Copies the URL the metadata at [info] reports a length for. */
+  private fun copyStyleSourceUrl(sourceId: String, info: HeapPointer): String? {
+    if (!SourceMarshal.sourceInfoHasUrl(info)) return null
+    val capacity = readCount(MlnStyleSourceInfo.urlSize(info), "style source URL size")
+    if (capacity == 0) return ""
+    return copyStyleSourceText(
+      ::mln_map_copy_style_source_url,
+      sourceId,
+      capacity,
+      "style source URL size",
+    )
+  }
+
+  /**
+   * Copies one of the texts a source metadata length sizes.
+   *
+   * Null when the source went missing between the metadata call and this one, which is a race the
+   * caller loses rather than an error.
+   */
+  private fun copyStyleSourceText(
+    entry: (Long, Int, Int, Int, Int, Int) -> Int,
+    sourceId: String,
+    capacity: Int,
+    subject: String,
+  ): String? = live {
     withArena(
       bytes(
         stringViewBytes(sourceId),
@@ -271,24 +401,39 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       val text = allocate(arena, capacity)
       val copied = allocate(arena, SIZE_BYTES)
       val found = allocate(arena, BOOL_BYTES)
-      call("mln_map_copy_style_source_attribution", 6) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, view)
-        slots.setPointer(2, text)
-        slots.setInt(3, capacity)
-        slots.setPointer(4, copied)
-        slots.setPointer(5, found)
-      }
+      Status.check(
+        entry(handle.raw, view.address, text.address, capacity, copied.address, found.address)
+      )
       if (!isSet(found)) {
         null
       } else {
-        Heap.loadBytes(text, readCount(Heap.loadInt(copied), "style source attribution size"))
-          .decodeToString()
+        Heap.loadBytes(text, readCount(Heap.loadInt(copied), subject)).decodeToString()
       }
     }
   }
 
-  public actual fun styleSourceIds(): List<String> = listStyleIds("mln_map_list_style_source_ids")
+  /** Copies the inline TileJSON tile URLs of the source the metadata at [info] describes. */
+  private fun styleSourceTileUrls(sourceId: String, info: HeapPointer): List<String>? {
+    if (!SourceMarshal.sourceInfoHasTileJson(info)) return null
+    val list = live {
+      withArena(
+        bytes(stringViewBytes(sourceId), blockBytes(HANDLE_BYTES), blockBytes(BOOL_BYTES))
+      ) { arena ->
+        val view = writeStringView(arena, sourceId)
+        // Native refuses an out-parameter that is not the null handle, which the zeroed arena
+        // already satisfies.
+        val out = allocate(arena, HANDLE_BYTES)
+        val found = allocate(arena, BOOL_BYTES)
+        Status.check(
+          mln_map_get_style_source_tile_urls(handle.raw, view.address, out.address, found.address)
+        )
+        if (isSet(found)) Heap.loadLong(out) else 0L
+      }
+    }
+    return readStyleStringList(list)
+  }
+
+  public actual fun styleSourceIds(): List<String> = listStyleIds(::mln_map_list_style_source_ids)
 
   public actual fun addGeoJsonSourceUrl(
     sourceId: String,
@@ -302,12 +447,14 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         val sourceView = writeStringView(arena, sourceId)
         val urlView = writeStringView(arena, url)
         val descriptor = writeGeoJsonSourceOptions(arena, options)
-        call("mln_map_add_geojson_source_url", 4) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, sourceView)
-          slots.setPointer(2, urlView)
-          slots.setPointer(3, descriptor)
-        }
+        Status.check(
+          mln_map_add_geojson_source_url(
+            handle.raw,
+            sourceView.address,
+            urlView.address,
+            descriptor.address,
+          )
+        )
       }
     }
   }
@@ -328,18 +475,20 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         val sourceView = writeStringView(arena, sourceId)
         val root = GeoJsonMarshal.write(arena, data)
         val descriptor = writeGeoJsonSourceOptions(arena, options)
-        call("mln_map_add_geojson_source_data", 4) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, sourceView)
-          slots.setPointer(2, root)
-          slots.setPointer(3, descriptor)
-        }
+        Status.check(
+          mln_map_add_geojson_source_data(
+            handle.raw,
+            sourceView.address,
+            root.address,
+            descriptor.address,
+          )
+        )
       }
     }
   }
 
   public actual fun setGeoJsonSourceUrl(sourceId: String, url: String) {
-    live { callWithTwoIds("mln_map_set_geojson_source_url", sourceId, url) }
+    live { callWithTwoIds(::mln_map_set_geojson_source_url, sourceId, url) }
   }
 
   public actual fun setGeoJsonSourceData(sourceId: String, data: GeoJson) {
@@ -347,44 +496,30 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       withArena(bytes(stringViewBytes(sourceId), GeoJsonMarshal.measure(data).toLong())) { arena ->
         val view = writeStringView(arena, sourceId)
         val root = GeoJsonMarshal.write(arena, data)
-        call("mln_map_set_geojson_source_data", 3) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, view)
-          slots.setPointer(2, root)
-        }
+        Status.check(mln_map_set_geojson_source_data(handle.raw, view.address, root.address))
       }
     }
   }
 
   /**
-   * Adds a custom geometry source whose tiles this page supplies.
+   * Adds a custom geometry source whose tiles the host supplies.
    *
-   * MapLibre asks for a tile on the worker the source's tile loader runs on, and a worker cannot
-   * enter the page's WebAssembly instance, so the module posts the request to the page instead;
-   * `src/browser/custom_geometry.c` states what that guarantees and what it does not. The callback
-   * therefore arrives on a page task of its own, after the worker that produced it has moved on.
-   *
-   * **The callback may answer the request from inside itself**, with
-   * [setCustomGeometrySourceTileData], exactly as it may on JVM, Android, and Kotlin/Native, and it
-   * needs no `maplibreScope` of its own to do so. This is the one callback family here that native
-   * does not wait for, so the binding is free to choose the stack it delivers on and picks one that
-   * may reach the owner thread. The other families — the resource provider and the URL transform —
-   * are entered with a MapLibre worker blocked on their answer, so they must still hand
-   * owner-affine work back rather than doing it. Answering later, from a `maplibreScope`, works
-   * here too: the request and the answer are separate calls in the C API on every platform.
+   * MapLibre asks for a tile on the worker the source's tile loader runs on, which is not the
+   * thread this binding runs on, so the module queues the request and the runtime delivers it from
+   * [org.maplibre.nativeffi.runtime.RuntimeHandle.pump]. The callback may answer from inside itself
+   * with [setCustomGeometrySourceTileData], exactly as it may on every other platform.
    *
    * The callback registration lives as long as the source does. It is released when the source is
    * removed with [removeStyleSource], when a new style drops it, and when this map is closed, and a
-   * notification that arrives after any of those is dropped rather than delivered.
+   * request that arrives after any of those is dropped rather than delivered.
    */
   public actual fun addCustomGeometrySource(
     sourceId: String,
     options: CustomGeometrySourceOptions,
   ) {
     live {
-      // Installed before native is told about it, because the module reaches the callback through
-      // the host pointer this places: a source added first could ask for a tile that had nowhere to
-      // go.
+      // Installed before native is told about it, because the module names the callback by the
+      // pointer this places: a source added first could ask for a tile that had nowhere to go.
       val bridge = CustomGeometryBridge.install(options.callback)
       var added = false
       try {
@@ -399,24 +534,22 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
           SourceMarshal.writeCustomGeometrySourceOptions(
             descriptor,
             options,
-            CustomGeometryBridge.fetchThunk(),
-            CustomGeometryBridge.cancelThunk(),
+            CustomGeometryBridge.fetchCallback(),
+            CustomGeometryBridge.cancelCallback(),
             bridge.userData,
           )
-          call("mln_map_add_custom_geometry_source", 3) { slots ->
-            slots.setLong(0, handle.raw)
-            slots.setPointer(1, view)
-            slots.setPointer(2, descriptor)
-          }
+          Status.check(
+            mln_map_add_custom_geometry_source(handle.raw, view.address, descriptor.address)
+          )
         }
         added = true
       } finally {
         // A refused source has no callbacks to serve, so the registration goes back rather than
-        // holding the module's trampoline for a source that does not exist.
+        // standing for a source that does not exist.
         if (!added) bridge.close()
       }
       // Replacing an id native accepted means the previous source is gone, so its registration is
-      // released here rather than left to be found by a notification it can no longer answer.
+      // released here rather than left to be found by a request it can no longer answer.
       customGeometrySources.put(sourceId, bridge)?.close()
     }
   }
@@ -437,12 +570,14 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         val view = writeStringView(arena, sourceId)
         val tile = writeCanonicalTileId(arena, tileId)
         val root = GeoJsonMarshal.write(arena, data)
-        call("mln_map_set_custom_geometry_source_tile_data", 4) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, view)
-          slots.setPointer(2, tile)
-          slots.setPointer(3, root)
-        }
+        Status.check(
+          mln_map_set_custom_geometry_source_tile_data(
+            handle.raw,
+            view.address,
+            tile.address,
+            root.address,
+          )
+        )
       }
     }
   }
@@ -452,11 +587,9 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       withArena(bytes(stringViewBytes(sourceId), blockBytes(MlnCanonicalTileId.SIZEOF))) { arena ->
         val view = writeStringView(arena, sourceId)
         val tile = writeCanonicalTileId(arena, tileId)
-        call("mln_map_invalidate_custom_geometry_source_tile", 3) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, view)
-          slots.setPointer(2, tile)
-        }
+        Status.check(
+          mln_map_invalidate_custom_geometry_source_tile(handle.raw, view.address, tile.address)
+        )
       }
     }
   }
@@ -467,17 +600,15 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         val view = writeStringView(arena, sourceId)
         val region = allocate(arena, MlnLatLngBounds.SIZEOF)
         MapOptionsMarshal.writeLatLngBounds(region, bounds)
-        call("mln_map_invalidate_custom_geometry_source_region", 3) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, view)
-          slots.setPointer(2, region)
-        }
+        Status.check(
+          mln_map_invalidate_custom_geometry_source_region(handle.raw, view.address, region.address)
+        )
       }
     }
   }
 
   public actual fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
-    addTileSourceUrl("mln_map_add_vector_source_url", sourceId, url, options)
+    addTileSourceUrl(::mln_map_add_vector_source_url, sourceId, url, options)
   }
 
   public actual fun addVectorSourceTiles(
@@ -485,11 +616,11 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     tiles: List<String>,
     options: TileSourceOptions?,
   ) {
-    addTileSourceTiles("mln_map_add_vector_source_tiles", sourceId, tiles, options)
+    addTileSourceTiles(::mln_map_add_vector_source_tiles, sourceId, tiles, options)
   }
 
   public actual fun addRasterSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
-    addTileSourceUrl("mln_map_add_raster_source_url", sourceId, url, options)
+    addTileSourceUrl(::mln_map_add_raster_source_url, sourceId, url, options)
   }
 
   public actual fun addRasterSourceTiles(
@@ -497,7 +628,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     tiles: List<String>,
     options: TileSourceOptions?,
   ) {
-    addTileSourceTiles("mln_map_add_raster_source_tiles", sourceId, tiles, options)
+    addTileSourceTiles(::mln_map_add_raster_source_tiles, sourceId, tiles, options)
   }
 
   public actual fun addRasterDemSourceUrl(
@@ -505,7 +636,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     url: String,
     options: TileSourceOptions?,
   ) {
-    addTileSourceUrl("mln_map_add_raster_dem_source_url", sourceId, url, options)
+    addTileSourceUrl(::mln_map_add_raster_dem_source_url, sourceId, url, options)
   }
 
   public actual fun addRasterDemSourceTiles(
@@ -513,7 +644,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     tiles: List<String>,
     options: TileSourceOptions?,
   ) {
-    addTileSourceTiles("mln_map_add_raster_dem_source_tiles", sourceId, tiles, options)
+    addTileSourceTiles(::mln_map_add_raster_dem_source_tiles, sourceId, tiles, options)
   }
 
   public actual fun setStyleImage(
@@ -532,22 +663,24 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         ) { arena ->
           val view = writeStringView(arena, imageId)
           val optionsDescriptor = StyleMarshal.writeImageOptions(arena, options)
-          call("mln_map_set_style_image", 4) { slots ->
-            slots.setLong(0, handle.raw)
-            slots.setPointer(1, view)
-            slots.setPointer(2, imageDescriptor)
-            slots.setPointer(3, optionsDescriptor)
-          }
+          Status.check(
+            mln_map_set_style_image(
+              handle.raw,
+              view.address,
+              imageDescriptor.address,
+              optionsDescriptor.address,
+            )
+          )
         }
       }
     }
   }
 
   public actual fun removeStyleImage(imageId: String): Boolean =
-    flagForId("mln_map_remove_style_image", imageId)
+    flagForId(::mln_map_remove_style_image, imageId)
 
   public actual fun styleImageExists(imageId: String): Boolean =
-    flagForId("mln_map_style_image_exists", imageId)
+    flagForId(::mln_map_style_image_exists, imageId)
 
   public actual fun styleImageInfo(imageId: String): StyleImageInfo? = live {
     withArena(
@@ -561,12 +694,9 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       val info = allocate(arena, StyleMarshal.IMAGE_INFO_SIZEOF)
       val found = allocate(arena, BOOL_BYTES)
       StyleMarshal.writeImageInfoHeader(info)
-      call("mln_map_get_style_image_info", 4) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, view)
-        slots.setPointer(2, info)
-        slots.setPointer(3, found)
-      }
+      Status.check(
+        mln_map_get_style_image_info(handle.raw, view.address, info.address, found.address)
+      )
       if (isSet(found)) StyleMarshal.readImageInfo(info) else null
     }
   }
@@ -660,14 +790,16 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         val pixels = allocate(arena, capacity)
         val copied = allocate(arena, SIZE_BYTES)
         val found = allocate(arena, BOOL_BYTES)
-        call("mln_map_copy_style_image_premultiplied_rgba8", 6) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, view)
-          slots.setPointer(2, pixels)
-          slots.setInt(3, capacity)
-          slots.setPointer(4, copied)
-          slots.setPointer(5, found)
-        }
+        Status.check(
+          mln_map_copy_style_image_premultiplied_rgba8(
+            handle.raw,
+            view.address,
+            pixels.address,
+            capacity,
+            copied.address,
+            found.address,
+          )
+        )
         if (!isSet(found)) {
           null
         } else {
@@ -698,13 +830,15 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         val sourceView = writeStringView(arena, sourceId)
         val quad = writeLatLngs(arena, coordinates)
         val urlView = writeStringView(arena, url)
-        call("mln_map_add_image_source_url", 5) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, sourceView)
-          slots.setPointer(2, quad)
-          slots.setInt(3, coordinates.size)
-          slots.setPointer(4, urlView)
-        }
+        Status.check(
+          mln_map_add_image_source_url(
+            handle.raw,
+            sourceView.address,
+            quad.address,
+            coordinates.size,
+            urlView.address,
+          )
+        )
       }
     }
   }
@@ -720,20 +854,22 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         withArena(bytes(stringViewBytes(sourceId), blockBytes(coordinateBytes))) { arena ->
           val view = writeStringView(arena, sourceId)
           val quad = writeLatLngs(arena, coordinates)
-          call("mln_map_add_image_source_image", 5) { slots ->
-            slots.setLong(0, handle.raw)
-            slots.setPointer(1, view)
-            slots.setPointer(2, quad)
-            slots.setInt(3, coordinates.size)
-            slots.setPointer(4, imageDescriptor)
-          }
+          Status.check(
+            mln_map_add_image_source_image(
+              handle.raw,
+              view.address,
+              quad.address,
+              coordinates.size,
+              imageDescriptor.address,
+            )
+          )
         }
       }
     }
   }
 
   public actual fun setImageSourceUrl(sourceId: String, url: String) {
-    live { callWithTwoIds("mln_map_set_image_source_url", sourceId, url) }
+    live { callWithTwoIds(::mln_map_set_image_source_url, sourceId, url) }
   }
 
   public actual fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image) {
@@ -741,11 +877,9 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       StyleMarshal.withImage(image) { imageDescriptor ->
         withArena(stringViewBytes(sourceId)) { arena ->
           val view = writeStringView(arena, sourceId)
-          call("mln_map_set_image_source_image", 3) { slots ->
-            slots.setLong(0, handle.raw)
-            slots.setPointer(1, view)
-            slots.setPointer(2, imageDescriptor)
-          }
+          Status.check(
+            mln_map_set_image_source_image(handle.raw, view.address, imageDescriptor.address)
+          )
         }
       }
     }
@@ -757,12 +891,14 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       withArena(bytes(stringViewBytes(sourceId), blockBytes(coordinateBytes))) { arena ->
         val view = writeStringView(arena, sourceId)
         val quad = writeLatLngs(arena, coordinates)
-        call("mln_map_set_image_source_coordinates", 4) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, view)
-          slots.setPointer(2, quad)
-          slots.setInt(3, coordinates.size)
-        }
+        Status.check(
+          mln_map_set_image_source_coordinates(
+            handle.raw,
+            view.address,
+            quad.address,
+            coordinates.size,
+          )
+        )
       }
     }
   }
@@ -783,14 +919,16 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       val quad = allocate(arena, coordinateBytes)
       val count = allocate(arena, SIZE_BYTES)
       val found = allocate(arena, BOOL_BYTES)
-      call("mln_map_get_image_source_coordinates", 6) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, view)
-        slots.setPointer(2, quad)
-        slots.setInt(3, IMAGE_SOURCE_COORDINATE_COUNT)
-        slots.setPointer(4, count)
-        slots.setPointer(5, found)
-      }
+      Status.check(
+        mln_map_get_image_source_coordinates(
+          handle.raw,
+          view.address,
+          quad.address,
+          IMAGE_SOURCE_COORDINATE_COUNT,
+          count.address,
+          found.address,
+        )
+      )
       if (!isSet(found)) {
         null
       } else {
@@ -805,25 +943,21 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         arena ->
         val root = JsonMarshal.write(arena, layerJson)
         val view = writeStringView(arena, beforeLayerId)
-        call("mln_map_add_style_layer_json", 3) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, root)
-          slots.setPointer(2, view)
-        }
+        Status.check(mln_map_add_style_layer_json(handle.raw, root.address, view.address))
       }
     }
   }
 
   public actual fun addHillshadeLayer(layerId: String, sourceId: String, beforeLayerId: String) {
-    live { callWithThreeIds("mln_map_add_hillshade_layer", layerId, sourceId, beforeLayerId) }
+    live { callWithThreeIds(::mln_map_add_hillshade_layer, layerId, sourceId, beforeLayerId) }
   }
 
   public actual fun addColorReliefLayer(layerId: String, sourceId: String, beforeLayerId: String) {
-    live { callWithThreeIds("mln_map_add_color_relief_layer", layerId, sourceId, beforeLayerId) }
+    live { callWithThreeIds(::mln_map_add_color_relief_layer, layerId, sourceId, beforeLayerId) }
   }
 
   public actual fun addLocationIndicatorLayer(layerId: String, beforeLayerId: String) {
-    live { callWithTwoIds("mln_map_add_location_indicator_layer", layerId, beforeLayerId) }
+    live { callWithTwoIds(::mln_map_add_location_indicator_layer, layerId, beforeLayerId) }
   }
 
   public actual fun setLocationIndicatorLocation(
@@ -836,22 +970,24 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         val view = writeStringView(arena, layerId)
         val position = allocate(arena, MlnLatLng.SIZEOF)
         CameraMarshal.writeLatLng(position, coordinate)
-        call("mln_map_set_location_indicator_location", 4) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, view)
-          slots.setPointer(2, position)
-          slots.setDouble(3, altitude)
-        }
+        Status.check(
+          mln_map_set_location_indicator_location(
+            handle.raw,
+            view.address,
+            position.address,
+            altitude,
+          )
+        )
       }
     }
   }
 
   public actual fun setLocationIndicatorBearing(layerId: String, bearing: Double) {
-    live { setDoubleForId("mln_map_set_location_indicator_bearing", layerId, bearing) }
+    live { setDoubleForId(::mln_map_set_location_indicator_bearing, layerId, bearing) }
   }
 
   public actual fun setLocationIndicatorAccuracyRadius(layerId: String, radius: Double) {
-    live { setDoubleForId("mln_map_set_location_indicator_accuracy_radius", layerId, radius) }
+    live { setDoubleForId(::mln_map_set_location_indicator_accuracy_radius, layerId, radius) }
   }
 
   public actual fun setLocationIndicatorImageName(
@@ -863,21 +999,23 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       withArena(bytes(stringViewBytes(layerId), stringViewBytes(imageId))) { arena ->
         val layerView = writeStringView(arena, layerId)
         val imageView = writeStringView(arena, imageId)
-        call("mln_map_set_location_indicator_image_name", 4) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, layerView)
-          slots.setInt(2, imageKind.nativeValue)
-          slots.setPointer(3, imageView)
-        }
+        Status.check(
+          mln_map_set_location_indicator_image_name(
+            handle.raw,
+            layerView.address,
+            imageKind.nativeValue,
+            imageView.address,
+          )
+        )
       }
     }
   }
 
   public actual fun removeStyleLayer(layerId: String): Boolean =
-    flagForId("mln_map_remove_style_layer", layerId)
+    flagForId(::mln_map_remove_style_layer, layerId)
 
   public actual fun styleLayerExists(layerId: String): Boolean =
-    flagForId("mln_map_style_layer_exists", layerId)
+    flagForId(::mln_map_style_layer_exists, layerId)
 
   public actual fun styleLayerType(layerId: String): String? = live {
     withArena(
@@ -886,22 +1024,19 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       val view = writeStringView(arena, layerId)
       val type = allocate(arena, MlnStringView.SIZEOF)
       val found = allocate(arena, BOOL_BYTES)
-      call("mln_map_get_style_layer_type", 4) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, view)
-        slots.setPointer(2, type)
-        slots.setPointer(3, found)
-      }
+      Status.check(
+        mln_map_get_style_layer_type(handle.raw, view.address, type.address, found.address)
+      )
       // Copied here rather than handed back as a view: the bytes belong to the style, which the
       // next call on this map may replace.
       if (isSet(found)) JsonMarshal.readText(type) else null
     }
   }
 
-  public actual fun styleLayerIds(): List<String> = listStyleIds("mln_map_list_style_layer_ids")
+  public actual fun styleLayerIds(): List<String> = listStyleIds(::mln_map_list_style_layer_ids)
 
   public actual fun moveStyleLayer(layerId: String, beforeLayerId: String) {
-    live { callWithTwoIds("mln_map_move_style_layer", layerId, beforeLayerId) }
+    live { callWithTwoIds(::mln_map_move_style_layer, layerId, beforeLayerId) }
   }
 
   public actual fun styleLayerJson(layerId: String): JsonValue? {
@@ -910,16 +1045,11 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         bytes(stringViewBytes(layerId), blockBytes(HANDLE_BYTES), blockBytes(BOOL_BYTES))
       ) { arena ->
         val view = writeStringView(arena, layerId)
-        // Native refuses an out-parameter that is not the null handle, which the zeroed arena
-        // already satisfies.
         val out = allocate(arena, HANDLE_BYTES)
         val found = allocate(arena, BOOL_BYTES)
-        call("mln_map_get_style_layer_json", 4) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, view)
-          slots.setPointer(2, out)
-          slots.setPointer(3, found)
-        }
+        Status.check(
+          mln_map_get_style_layer_json(handle.raw, view.address, out.address, found.address)
+        )
         if (isSet(found)) Heap.loadLong(out) else 0L
       }
     }
@@ -930,23 +1060,23 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     live {
       withArena(JsonMarshal.measure(lightJson).toLong()) { arena ->
         val root = JsonMarshal.write(arena, lightJson)
-        callWithPointer("mln_map_set_style_light_json", root)
+        Status.check(mln_map_set_style_light_json(handle.raw, root.address))
       }
     }
   }
 
   public actual fun setStyleLightProperty(propertyName: String, value: JsonValue) {
-    live { callWithIdAndJson("mln_map_set_style_light_property", propertyName, value) }
+    live { callWithIdAndJson(::mln_map_set_style_light_property, propertyName, value) }
   }
 
   public actual fun styleLightProperty(propertyName: String): JsonValue? =
-    jsonSnapshotForId("mln_map_get_style_light_property", propertyName)
+    jsonSnapshotForId(::mln_map_get_style_light_property, propertyName)
 
   public actual fun setStyleTransitionOptions(options: StyleTransitionOptions) {
     live {
       Heap.withScratch(StyleMarshal.TRANSITION_OPTIONS_SIZEOF) { descriptor ->
         StyleMarshal.writeTransitionOptions(descriptor, options)
-        callWithPointer("mln_map_set_style_transition_options", descriptor)
+        Status.check(mln_map_set_style_transition_options(handle.raw, descriptor.address))
       }
     }
   }
@@ -954,7 +1084,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   public actual fun styleTransitionOptions(): StyleTransitionOptions = live {
     Heap.withScratch(StyleMarshal.TRANSITION_OPTIONS_SIZEOF) { out ->
       StyleMarshal.writeTransitionOptionsHeader(out)
-      callWithPointer("mln_map_get_style_transition_options", out)
+      Status.check(mln_map_get_style_transition_options(handle.raw, out.address))
       StyleMarshal.readTransitionOptions(out)
     }
   }
@@ -971,12 +1101,14 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         val layerView = writeStringView(arena, layerId)
         val propertyView = writeStringView(arena, propertyName)
         val root = JsonMarshal.write(arena, value)
-        call("mln_map_set_layer_property", 4) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, layerView)
-          slots.setPointer(2, propertyView)
-          slots.setPointer(3, root)
-        }
+        Status.check(
+          mln_map_set_layer_property(
+            handle.raw,
+            layerView.address,
+            propertyView.address,
+            root.address,
+          )
+        )
       }
     }
   }
@@ -989,12 +1121,14 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         val layerView = writeStringView(arena, layerId)
         val propertyView = writeStringView(arena, propertyName)
         val out = allocate(arena, HANDLE_BYTES)
-        call("mln_map_get_layer_property", 4) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, layerView)
-          slots.setPointer(2, propertyView)
-          slots.setPointer(3, out)
-        }
+        Status.check(
+          mln_map_get_layer_property(
+            handle.raw,
+            layerView.address,
+            propertyView.address,
+            out.address,
+          )
+        )
         Heap.loadLong(out)
       }
     }
@@ -1002,55 +1136,51 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   }
 
   public actual fun setLayerFilter(layerId: String, filter: JsonValue) {
-    live { callWithIdAndJson("mln_map_set_layer_filter", layerId, filter) }
+    live { callWithIdAndJson(::mln_map_set_layer_filter, layerId, filter) }
   }
 
   public actual fun clearLayerFilter(layerId: String) {
     // The same entry point with a null filter, which is how the C API spells "no filter" rather
     // than an empty expression, which would mean something else.
-    live { callWithIdAndJson("mln_map_set_layer_filter", layerId, null) }
+    live { callWithIdAndJson(::mln_map_set_layer_filter, layerId, null) }
   }
 
   public actual fun layerFilter(layerId: String): JsonValue? =
-    jsonSnapshotForId("mln_map_get_layer_filter", layerId)
+    jsonSnapshotForId(::mln_map_get_layer_filter, layerId)
 
   public actual fun setLayerSourceLayer(layerId: String, sourceLayer: String) {
-    live { callWithTwoIds("mln_map_set_layer_source_layer", layerId, sourceLayer) }
+    live { callWithTwoIds(::mln_map_set_layer_source_layer, layerId, sourceLayer) }
   }
 
   public actual fun layerSourceLayer(layerId: String): String =
-    copyLayerText("mln_map_copy_layer_source_layer", layerId)
+    copyLayerText(::mln_map_copy_layer_source_layer, layerId)
 
   public actual fun setLayerSourceId(layerId: String, sourceId: String) {
-    live { callWithTwoIds("mln_map_set_layer_source_id", layerId, sourceId) }
+    live { callWithTwoIds(::mln_map_set_layer_source_id, layerId, sourceId) }
   }
 
   public actual fun layerSourceId(layerId: String): String =
-    copyLayerText("mln_map_copy_layer_source_id", layerId)
+    copyLayerText(::mln_map_copy_layer_source_id, layerId)
 
   public actual fun setLayerMinZoom(layerId: String, minZoom: Double) {
-    live { setDoubleForId("mln_map_set_layer_min_zoom", layerId, minZoom) }
+    live { setDoubleForId(::mln_map_set_layer_min_zoom, layerId, minZoom) }
   }
 
   public actual fun layerMinZoom(layerId: String): Double =
-    doubleForId("mln_map_get_layer_min_zoom", layerId)
+    doubleForId(::mln_map_get_layer_min_zoom, layerId)
 
   public actual fun setLayerMaxZoom(layerId: String, maxZoom: Double) {
-    live { setDoubleForId("mln_map_set_layer_max_zoom", layerId, maxZoom) }
+    live { setDoubleForId(::mln_map_set_layer_max_zoom, layerId, maxZoom) }
   }
 
   public actual fun layerMaxZoom(layerId: String): Double =
-    doubleForId("mln_map_get_layer_max_zoom", layerId)
+    doubleForId(::mln_map_get_layer_max_zoom, layerId)
 
   public actual fun setLayerVisibility(layerId: String, visibility: StyleLayerVisibility) {
     live {
       withArena(stringViewBytes(layerId)) { arena ->
         val view = writeStringView(arena, layerId)
-        call("mln_map_set_layer_visibility", 3) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, view)
-          slots.setInt(2, visibility.nativeValue)
-        }
+        Status.check(mln_map_set_layer_visibility(handle.raw, view.address, visibility.nativeValue))
       }
     }
   }
@@ -1059,52 +1189,43 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     withArena(bytes(stringViewBytes(layerId), blockBytes(SIZE_BYTES))) { arena ->
       val view = writeStringView(arena, layerId)
       val out = allocate(arena, SIZE_BYTES)
-      call("mln_map_get_layer_visibility", 3) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, view)
-        slots.setPointer(2, out)
-      }
+      Status.check(mln_map_get_layer_visibility(handle.raw, view.address, out.address))
       StyleLayerVisibility.fromNative(Heap.loadInt(out))
     }
   }
 
   public actual fun requestRepaint() {
-    live { callWithMap("mln_map_request_repaint") }
+    live { Status.check(mln_map_request_repaint(handle.raw)) }
   }
 
   public actual fun requestStillImage() {
-    live { callWithMap("mln_map_request_still_image") }
+    live { Status.check(mln_map_request_still_image(handle.raw)) }
   }
 
   public actual var debugOptions: Set<DebugOption>
     get() = live {
       Heap.withScratch(SIZE_BYTES) { out ->
-        callWithPointer("mln_map_get_debug_options", out)
+        Status.check(mln_map_get_debug_options(handle.raw, out.address))
         val mask = Heap.loadInt(out)
         DebugOption.entries.filterTo(mutableSetOf()) { (mask and it.nativeMask) != 0 }
       }
     }
     set(options) {
       val mask = options.fold(0) { accumulated, option -> accumulated or option.nativeMask }
-      live {
-        call("mln_map_set_debug_options", 2) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setInt(1, mask)
-        }
-      }
+      live { Status.check(mln_map_set_debug_options(handle.raw, mask)) }
     }
 
   public actual var isRenderingStatsViewEnabled: Boolean
-    get() = flagForMap("mln_map_get_rendering_stats_view_enabled")
+    get() = flagForMap(::mln_map_get_rendering_stats_view_enabled)
     set(enabled) {
-      live { setFlagForMap("mln_map_set_rendering_stats_view_enabled", enabled) }
+      live { setFlagForMap(::mln_map_set_rendering_stats_view_enabled, enabled) }
     }
 
   public actual val isFullyLoaded: Boolean
-    get() = flagForMap("mln_map_is_fully_loaded")
+    get() = flagForMap(::mln_map_is_fully_loaded)
 
   public actual fun dumpDebugLogs() {
-    live { callWithMap("mln_map_dump_debug_logs") }
+    live { Status.check(mln_map_dump_debug_logs(handle.raw)) }
   }
 
   public actual val size: MapSize
@@ -1116,12 +1237,9 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       Heap.withScratch(DOUBLE_BYTES + SIZE_BYTES + SIZE_BYTES) { scaleFactor ->
         val width = scaleFactor + DOUBLE_BYTES
         val height = width + SIZE_BYTES
-        call("mln_map_get_size", 4) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, width)
-          slots.setPointer(2, height)
-          slots.setPointer(3, scaleFactor)
-        }
+        Status.check(
+          mln_map_get_size(handle.raw, width.address, height.address, scaleFactor.address)
+        )
         MapSize(Heap.loadInt(width), Heap.loadInt(height), Heap.loadDouble(scaleFactor))
       }
     }
@@ -1130,7 +1248,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     get() = live {
       Heap.withScratch(MapOptionsMarshal.VIEWPORT_OPTIONS_SIZEOF) { out ->
         MapOptionsMarshal.writeViewportOptionsHeader(out)
-        callWithPointer("mln_map_get_viewport_options", out)
+        Status.check(mln_map_get_viewport_options(handle.raw, out.address))
         MapOptionsMarshal.readViewportOptions(out)
       }
     }
@@ -1138,7 +1256,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       live {
         Heap.withScratch(MapOptionsMarshal.VIEWPORT_OPTIONS_SIZEOF) { descriptor ->
           MapOptionsMarshal.writeViewportOptions(descriptor, options)
-          callWithPointer("mln_map_set_viewport_options", descriptor)
+          Status.check(mln_map_set_viewport_options(handle.raw, descriptor.address))
         }
       }
     }
@@ -1147,7 +1265,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     get() = live {
       Heap.withScratch(MapOptionsMarshal.TILE_OPTIONS_SIZEOF) { out ->
         MapOptionsMarshal.writeTileOptionsHeader(out)
-        callWithPointer("mln_map_get_tile_options", out)
+        Status.check(mln_map_get_tile_options(handle.raw, out.address))
         MapOptionsMarshal.readTileOptions(out)
       }
     }
@@ -1155,7 +1273,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       live {
         Heap.withScratch(MapOptionsMarshal.TILE_OPTIONS_SIZEOF) { descriptor ->
           MapOptionsMarshal.writeTileOptions(descriptor, options)
-          callWithPointer("mln_map_set_tile_options", descriptor)
+          Status.check(mln_map_set_tile_options(handle.raw, descriptor.address))
         }
       }
     }
@@ -1163,10 +1281,8 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   public actual val camera: CameraOptions
     get() = live {
       Heap.withScratch(CameraMarshal.SIZEOF) { out ->
-        // An output descriptor states its own size too: native reads it to decide which fields it
-        // may write, and a zeroed block would ask for a zero-sized camera.
         CameraMarshal.writeHeader(out)
-        callWithPointer("mln_map_get_camera", out)
+        Status.check(mln_map_get_camera(handle.raw, out.address))
         CameraMarshal.read(out)
       }
     }
@@ -1175,39 +1291,28 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     live {
       Heap.withScratch(CameraMarshal.SIZEOF) { descriptor ->
         CameraMarshal.write(descriptor, camera)
-        callWithPointer("mln_map_jump_to", descriptor)
+        Status.check(mln_map_jump_to(handle.raw, descriptor.address))
       }
     }
   }
 
   public actual fun easeTo(camera: CameraOptions, animation: AnimationOptions?) {
-    live { transitionTo("mln_map_ease_to", camera, animation) }
+    live { transitionTo(::mln_map_ease_to, camera, animation) }
   }
 
   public actual fun flyTo(camera: CameraOptions, animation: AnimationOptions?) {
-    live { transitionTo("mln_map_fly_to", camera, animation) }
+    live { transitionTo(::mln_map_fly_to, camera, animation) }
   }
 
   public actual fun moveBy(deltaX: Double, deltaY: Double) {
-    live {
-      call("mln_map_move_by", 3) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setDouble(1, deltaX)
-        slots.setDouble(2, deltaY)
-      }
-    }
+    live { Status.check(mln_map_move_by(handle.raw, deltaX, deltaY)) }
   }
 
   public actual fun moveByAnimated(deltaX: Double, deltaY: Double, animation: AnimationOptions?) {
     live {
       withArena(animationBytes(animation)) { arena ->
         val descriptor = writeAnimationOptions(arena, animation)
-        call("mln_map_move_by_animated", 4) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setDouble(1, deltaX)
-          slots.setDouble(2, deltaY)
-          slots.setPointer(3, descriptor)
-        }
+        Status.check(mln_map_move_by_animated(handle.raw, deltaX, deltaY, descriptor.address))
       }
     }
   }
@@ -1216,11 +1321,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     live {
       withArena(anchorBytes(anchor)) { arena ->
         val point = writeScreenPointOrNull(arena, anchor)
-        call("mln_map_scale_by", 3) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setDouble(1, scale)
-          slots.setPointer(2, point)
-        }
+        Status.check(mln_map_scale_by(handle.raw, scale, point.address))
       }
     }
   }
@@ -1234,12 +1335,9 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       withArena(bytes(anchorBytes(anchor), animationBytes(animation))) { arena ->
         val point = writeScreenPointOrNull(arena, anchor)
         val descriptor = writeAnimationOptions(arena, animation)
-        call("mln_map_scale_by_animated", 4) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setDouble(1, scale)
-          slots.setPointer(2, point)
-          slots.setPointer(3, descriptor)
-        }
+        Status.check(
+          mln_map_scale_by_animated(handle.raw, scale, point.address, descriptor.address)
+        )
       }
     }
   }
@@ -1250,11 +1348,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         ->
         val start = writeScreenPoint(arena, first)
         val end = writeScreenPoint(arena, second)
-        call("mln_map_rotate_by", 3) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, start)
-          slots.setPointer(2, end)
-        }
+        Status.check(mln_map_rotate_by(handle.raw, start.address, end.address))
       }
     }
   }
@@ -1275,46 +1369,34 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         val start = writeScreenPoint(arena, first)
         val end = writeScreenPoint(arena, second)
         val descriptor = writeAnimationOptions(arena, animation)
-        call("mln_map_rotate_by_animated", 4) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, start)
-          slots.setPointer(2, end)
-          slots.setPointer(3, descriptor)
-        }
+        Status.check(
+          mln_map_rotate_by_animated(handle.raw, start.address, end.address, descriptor.address)
+        )
       }
     }
   }
 
   public actual fun pitchBy(pitch: Double) {
-    live {
-      call("mln_map_pitch_by", 2) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setDouble(1, pitch)
-      }
-    }
+    live { Status.check(mln_map_pitch_by(handle.raw, pitch)) }
   }
 
   public actual fun pitchByAnimated(pitch: Double, animation: AnimationOptions?) {
     live {
       withArena(animationBytes(animation)) { arena ->
         val descriptor = writeAnimationOptions(arena, animation)
-        call("mln_map_pitch_by_animated", 3) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setDouble(1, pitch)
-          slots.setPointer(2, descriptor)
-        }
+        Status.check(mln_map_pitch_by_animated(handle.raw, pitch, descriptor.address))
       }
     }
   }
 
   public actual fun cancelTransitions() {
-    live { callWithMap("mln_map_cancel_transitions") }
+    live { Status.check(mln_map_cancel_transitions(handle.raw)) }
   }
 
   public actual var isGestureInProgress: Boolean
-    get() = flagForMap("mln_map_is_gesture_in_progress")
+    get() = flagForMap(::mln_map_is_gesture_in_progress)
     set(inProgress) {
-      live { setFlagForMap("mln_map_set_gesture_in_progress", inProgress) }
+      live { setFlagForMap(::mln_map_set_gesture_in_progress, inProgress) }
     }
 
   public actual fun cameraForLatLngBounds(
@@ -1333,12 +1415,9 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       val fit = writeCameraFitOptions(arena, fitOptions)
       val out = allocate(arena, CameraMarshal.SIZEOF)
       CameraMarshal.writeHeader(out)
-      call("mln_map_camera_for_lat_lng_bounds", 4) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, region)
-        slots.setPointer(2, fit)
-        slots.setPointer(3, out)
-      }
+      Status.check(
+        mln_map_camera_for_lat_lng_bounds(handle.raw, region.address, fit.address, out.address)
+      )
       CameraMarshal.read(out)
     }
   }
@@ -1359,13 +1438,15 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       val fit = writeCameraFitOptions(arena, fitOptions)
       val out = allocate(arena, CameraMarshal.SIZEOF)
       CameraMarshal.writeHeader(out)
-      call("mln_map_camera_for_lat_lngs", 5) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, points)
-        slots.setInt(2, coordinates.size)
-        slots.setPointer(3, fit)
-        slots.setPointer(4, out)
-      }
+      Status.check(
+        mln_map_camera_for_lat_lngs(
+          handle.raw,
+          points.address,
+          coordinates.size,
+          fit.address,
+          out.address,
+        )
+      )
       CameraMarshal.read(out)
     }
   }
@@ -1387,27 +1468,22 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       val fit = writeCameraFitOptions(arena, fitOptions)
       val out = allocate(arena, CameraMarshal.SIZEOF)
       CameraMarshal.writeHeader(out)
-      call("mln_map_camera_for_geometry", 4) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, root)
-        slots.setPointer(2, fit)
-        slots.setPointer(3, out)
-      }
+      Status.check(mln_map_camera_for_geometry(handle.raw, root.address, fit.address, out.address))
       CameraMarshal.read(out)
     }
   }
 
   public actual fun latLngBoundsForCamera(camera: CameraOptions): LatLngBounds =
-    boundsForCamera("mln_map_lat_lng_bounds_for_camera", camera)
+    boundsForCamera(::mln_map_lat_lng_bounds_for_camera, camera)
 
   public actual fun latLngBoundsForCameraUnwrapped(camera: CameraOptions): LatLngBounds =
-    boundsForCamera("mln_map_lat_lng_bounds_for_camera_unwrapped", camera)
+    boundsForCamera(::mln_map_lat_lng_bounds_for_camera_unwrapped, camera)
 
   public actual var bounds: BoundOptions
     get() = live {
       Heap.withScratch(MapOptionsMarshal.BOUND_OPTIONS_SIZEOF) { out ->
         MapOptionsMarshal.writeBoundOptionsHeader(out)
-        callWithPointer("mln_map_get_bounds", out)
+        Status.check(mln_map_get_bounds(handle.raw, out.address))
         MapOptionsMarshal.readBoundOptions(out)
       }
     }
@@ -1415,7 +1491,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       live {
         Heap.withScratch(MapOptionsMarshal.BOUND_OPTIONS_SIZEOF) { descriptor ->
           MapOptionsMarshal.writeBoundOptions(descriptor, options)
-          callWithPointer("mln_map_set_bounds", descriptor)
+          Status.check(mln_map_set_bounds(handle.raw, descriptor.address))
         }
       }
     }
@@ -1424,7 +1500,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     get() = live {
       Heap.withScratch(MlnFreeCameraOptions.SIZEOF) { out ->
         MlnFreeCameraOptions.setSize(out, MlnFreeCameraOptions.SIZEOF)
-        callWithPointer("mln_map_get_free_camera_options", out)
+        Status.check(mln_map_get_free_camera_options(handle.raw, out.address))
         readFreeCameraOptions(out)
       }
     }
@@ -1432,7 +1508,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       live {
         Heap.withScratch(MlnFreeCameraOptions.SIZEOF) { descriptor ->
           writeFreeCameraOptions(descriptor, options)
-          callWithPointer("mln_map_set_free_camera_options", descriptor)
+          Status.check(mln_map_set_free_camera_options(handle.raw, descriptor.address))
         }
       }
     }
@@ -1441,7 +1517,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     get() = live {
       Heap.withScratch(MlnProjectionMode.SIZEOF) { out ->
         MlnProjectionMode.setSize(out, MlnProjectionMode.SIZEOF)
-        callWithPointer("mln_map_get_projection_mode", out)
+        Status.check(mln_map_get_projection_mode(handle.raw, out.address))
         readProjectionMode(out)
       }
     }
@@ -1449,7 +1525,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       live {
         Heap.withScratch(MlnProjectionMode.SIZEOF) { descriptor ->
           writeProjectionMode(descriptor, mode)
-          callWithPointer("mln_map_set_projection_mode", descriptor)
+          Status.check(mln_map_set_projection_mode(handle.raw, descriptor.address))
         }
       }
     }
@@ -1458,7 +1534,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     Heap.withScratch(MlnLatLng.SIZEOF + MlnScreenPoint.SIZEOF) { scratch ->
       val out = scratch + MlnLatLng.SIZEOF
       CameraMarshal.writeLatLng(scratch, coordinate)
-      convert("mln_map_pixel_for_lat_lng", scratch, out)
+      Status.check(mln_map_pixel_for_lat_lng(handle.raw, scratch.address, out.address))
       ScreenPoint(MlnScreenPoint.x(out), MlnScreenPoint.y(out))
     }
   }
@@ -1468,7 +1544,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       val out = scratch + MlnScreenPoint.SIZEOF
       MlnScreenPoint.setX(scratch, point.x)
       MlnScreenPoint.setY(scratch, point.y)
-      convert("mln_map_lat_lng_for_pixel", scratch, out)
+      Status.check(mln_map_lat_lng_for_pixel(handle.raw, scratch.address, out.address))
       CameraMarshal.readLatLng(out)
     }
   }
@@ -1483,12 +1559,9 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       withArena(bytes(blockBytes(inputBytes), blockBytes(outputBytes))) { arena ->
         val points = writeLatLngs(arena, coordinates)
         val out = allocate(arena, outputBytes)
-        call("mln_map_pixels_for_lat_lngs", 4) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, points)
-          slots.setInt(2, coordinates.size)
-          slots.setPointer(3, out)
-        }
+        Status.check(
+          mln_map_pixels_for_lat_lngs(handle.raw, points.address, coordinates.size, out.address)
+        )
         List(coordinates.size) { index ->
           val entry = out + index * MlnScreenPoint.SIZEOF
           ScreenPoint(MlnScreenPoint.x(entry), MlnScreenPoint.y(entry))
@@ -1510,12 +1583,9 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
           MlnScreenPoint.setY(entry, point.y)
         }
         val out = allocate(arena, outputBytes)
-        call("mln_map_lat_lngs_for_pixels", 4) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, block)
-          slots.setInt(2, points.size)
-          slots.setPointer(3, out)
-        }
+        Status.check(
+          mln_map_lat_lngs_for_pixels(handle.raw, block.address, points.size, out.address)
+        )
         readLatLngs(out, points.size)
       }
     }
@@ -1556,7 +1626,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
           block + MlnOpenglOwnedTextureDescriptor.OFFSET_CONTEXT,
           descriptor.context,
         )
-        attach("mln_opengl_owned_texture_attach", block, out, retention)
+        attach(::mln_opengl_owned_texture_attach, block, out, retention)
       }
     }
   }
@@ -1568,7 +1638,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
       Heap.withScratch(HANDLE_BYTES + RenderMarshal.OPENGL_BORROWED_TEXTURE_SIZEOF) { out ->
         val block = out + HANDLE_BYTES
         RenderMarshal.writeOpenGLBorrowedTexture(block, descriptor)
-        attach("mln_opengl_borrowed_texture_attach", block, out, retention)
+        attach(::mln_opengl_borrowed_texture_attach, block, out, retention)
       }
     }
   }
@@ -1587,67 +1657,36 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
    * canvas, and the session renders into that canvas's default framebuffer. Presenting is the
    * browser compositing that canvas, so a canvas the page displays shows the frame with no copy.
    *
-   * The context is the host's. It names an entry in the browser module's own table, so the host
-   * creates it on the thread this session will run on and passes the handle; this binding neither
-   * creates one nor knows which canvas it selects.
+   * The context names an entry in the browser module's own table rather than anything a host could
+   * produce, so it comes from [org.maplibre.nativeffi.render.WebglContext], created on this thread.
    */
   public actual fun attachOpenGLSurface(descriptor: OpenGLSurfaceDescriptor): RenderSessionHandle =
     live {
       withWebglContext(descriptor.context) { retention ->
-        // The out-handle goes first because it is the only member here that needs eight-byte
-        // alignment.
         Heap.withScratch(HANDLE_BYTES + RenderMarshal.OPENGL_SURFACE_SIZEOF) { out ->
           val block = out + HANDLE_BYTES
           RenderMarshal.writeOpenGLSurface(block, descriptor)
-          attach("mln_opengl_surface_attach", block, out, retention)
+          attach(::mln_opengl_surface_attach, block, out, retention)
         }
       }
     }
 
   public actual fun createProjection(): MapProjectionHandle = live {
     Heap.withScratch(HANDLE_BYTES) { out ->
-      // Native refuses an out-parameter that is not the null handle, which the zeroed scratch
-      // already satisfies.
-      call("mln_map_projection_create", 2) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, out)
-      }
+      Status.check(mln_map_projection_create(handle.raw, out.address))
       MapProjectionHandle.fromNative(NativeMapProjection(Heap.loadLong(out)))
     }
   }
 
   public actual override fun close() {
     core.closeOnce(
-      destroy = {
-        Dispatcher.call(
-          "mln_map_destroy",
-          1,
-          { slots -> slots.setLong(0, handle.raw) },
-          { Heap.loadInt(it) },
-        )
-      },
+      destroy = { mln_map_destroy(handle.raw) },
       // The registry holds a strong reference, because this target has neither finalization nor a
-      // weak reference to hold one with. So the entry goes when the map closes; leaving it would
-      // keep a destroyed map reachable and let a later event name it.
+      // weak reference to hold one with, so the entry goes when the map closes.
       afterSuccess = {
-        // The map took its sources with it, so nothing native can ask for a tile any more. The
-        // registrations are released here rather than left holding the module's trampoline for the
-        // life of the page.
-        //
-        // In a `try` because this is the one teardown in this binding whose cleanup can fail: a
-        // bridge waits for a tile callback already inside its body, and on this target that wait is
-        // bounded, so a host body that never returns makes it report rather than hang the page. By
-        // the time anything here runs the map is destroyed and this wrapper is closed, so a second
-        // `close` does nothing and there is no later call that could finish the job -- which makes
-        // the two lines below the last chance to take them. Skipping them would leave the runtime
-        // holding a destroyed map and refusing to close for the life of the page, which is a worse
-        // outcome than the failure that caused it and is not one the host could act on.
-        try {
-          clearCustomGeometrySources()
-        } finally {
-          runtime.unregisterMap(this)
-          runtimeRetention.close()
-        }
+        clearCustomGeometrySources()
+        runtime.unregisterMap(this)
+        runtimeRetention.close()
       },
     )
   }
@@ -1687,115 +1726,74 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     core.retainChild(childTypeName)
 
   // ---------------------------------------------------------------- shared call shapes
-
-  /** Performs [name] on the owner thread and checks the status it returned. */
-  private fun call(name: String, slotCount: Int, fill: (NativeCall.Slots) -> Unit) {
-    Dispatcher.call(name, slotCount, fill, { Status.check(Heap.loadInt(it)) })
-  }
-
-  /** One map argument and nothing else, which is the shape the command calls take. */
-  private fun callWithMap(name: String) {
-    call(name, 1) { slots -> slots.setLong(0, handle.raw) }
-  }
-
-  /** One map argument and one pointer, which is the shape most descriptor calls take. */
-  private fun callWithPointer(name: String, pointer: HeapPointer) {
-    call(name, 2) { slots ->
-      slots.setLong(0, handle.raw)
-      slots.setPointer(1, pointer)
-    }
-  }
-
-  /** One map argument, one input descriptor, and one output descriptor. */
-  private fun convert(name: String, input: HeapPointer, output: HeapPointer) {
-    call(name, 3) { slots ->
-      slots.setLong(0, handle.raw)
-      slots.setPointer(1, input)
-      slots.setPointer(2, output)
-    }
-  }
+  //
+  // Each of these takes the entry point it calls, because the C API spells one shape many times:
+  // six existence queries over a string view and a boolean, four property setters over a string
+  // view and a JSON tree. The parameters are in C order, so a helper's body reads as the call it
+  // makes.
 
   /** One map argument and one boolean output, which several of these queries share. */
-  private fun flagForMap(name: String): Boolean = live {
+  private fun flagForMap(entry: (Long, Int) -> Int): Boolean = live {
     Heap.withScratch(BOOL_BYTES) { out ->
-      callWithPointer(name, out)
+      Status.check(entry(handle.raw, out.address))
       isSet(out)
     }
   }
 
-  private fun setFlagForMap(name: String, value: Boolean) {
-    call(name, 2) { slots ->
-      slots.setLong(0, handle.raw)
-      slots.setInt(1, if (value) 1 else 0)
-    }
+  private fun setFlagForMap(entry: (Long, Int) -> Int, value: Boolean) {
+    Status.check(entry(handle.raw, if (value) 1 else 0))
   }
 
   /** One string-view argument and one boolean output, which the existence queries share. */
-  private fun flagForId(name: String, id: String): Boolean = live {
+  private fun flagForId(entry: (Long, Int, Int) -> Int, id: String): Boolean = live {
     withArena(bytes(stringViewBytes(id), blockBytes(BOOL_BYTES))) { arena ->
       val view = writeStringView(arena, id)
       val out = allocate(arena, BOOL_BYTES)
-      call(name, 3) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, view)
-        slots.setPointer(2, out)
-      }
+      Status.check(entry(handle.raw, view.address, out.address))
       isSet(out)
     }
   }
 
   /** One string-view argument and one double, which the layer and indicator setters share. */
-  private fun setDoubleForId(name: String, id: String, value: Double) {
+  private fun setDoubleForId(entry: (Long, Int, Double) -> Int, id: String, value: Double) {
     withArena(stringViewBytes(id)) { arena ->
       val view = writeStringView(arena, id)
-      call(name, 3) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, view)
-        slots.setDouble(2, value)
-      }
+      Status.check(entry(handle.raw, view.address, value))
     }
   }
 
   /** One string-view argument and one double output, which the zoom-bound getters share. */
-  private fun doubleForId(name: String, id: String): Double = live {
+  private fun doubleForId(entry: (Long, Int, Int) -> Int, id: String): Double = live {
     withArena(bytes(stringViewBytes(id), blockBytes(DOUBLE_BYTES))) { arena ->
       val view = writeStringView(arena, id)
       val out = allocate(arena, DOUBLE_BYTES)
-      call(name, 3) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, view)
-        slots.setPointer(2, out)
-      }
+      Status.check(entry(handle.raw, view.address, out.address))
       Heap.loadDouble(out)
     }
   }
 
   /** Two string-view arguments, which most of the style mutators take. */
-  private fun callWithTwoIds(name: String, first: String, second: String) {
+  private fun callWithTwoIds(entry: (Long, Int, Int) -> Int, first: String, second: String) {
     withArena(bytes(stringViewBytes(first), stringViewBytes(second))) { arena ->
       val firstView = writeStringView(arena, first)
       val secondView = writeStringView(arena, second)
-      call(name, 3) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, firstView)
-        slots.setPointer(2, secondView)
-      }
+      Status.check(entry(handle.raw, firstView.address, secondView.address))
     }
   }
 
   /** Three string-view arguments, which the typed layer additions take. */
-  private fun callWithThreeIds(name: String, first: String, second: String, third: String) {
+  private fun callWithThreeIds(
+    entry: (Long, Int, Int, Int) -> Int,
+    first: String,
+    second: String,
+    third: String,
+  ) {
     withArena(bytes(stringViewBytes(first), stringViewBytes(second), stringViewBytes(third))) {
       arena ->
       val firstView = writeStringView(arena, first)
       val secondView = writeStringView(arena, second)
       val thirdView = writeStringView(arena, third)
-      call(name, 4) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, firstView)
-        slots.setPointer(2, secondView)
-        slots.setPointer(3, thirdView)
-      }
+      Status.check(entry(handle.raw, firstView.address, secondView.address, thirdView.address))
     }
   }
 
@@ -1805,55 +1803,48 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
    * A null [value] reaches native as the null pointer the C API documents, which is how clearing a
    * layer filter is spelled.
    */
-  private fun callWithIdAndJson(name: String, id: String, value: JsonValue?) {
+  private fun callWithIdAndJson(entry: (Long, Int, Int) -> Int, id: String, value: JsonValue?) {
     withArena(bytes(stringViewBytes(id), value?.let { JsonMarshal.measure(it).toLong() } ?: 0L)) {
       arena ->
       val view = writeStringView(arena, id)
       val root = value?.let { JsonMarshal.write(arena, it) } ?: HeapPointer(0)
-      call(name, 3) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, view)
-        slots.setPointer(2, root)
-      }
+      Status.check(entry(handle.raw, view.address, root.address))
     }
   }
 
   /** One string-view argument and one snapshot output, which the property getters take. */
-  private fun jsonSnapshotForId(name: String, id: String): JsonValue? {
+  private fun jsonSnapshotForId(entry: (Long, Int, Int) -> Int, id: String): JsonValue? {
     val snapshot = live {
       withArena(bytes(stringViewBytes(id), blockBytes(HANDLE_BYTES))) { arena ->
         val view = writeStringView(arena, id)
         val out = allocate(arena, HANDLE_BYTES)
-        call(name, 3) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, view)
-          slots.setPointer(2, out)
-        }
+        Status.check(entry(handle.raw, view.address, out.address))
         Heap.loadLong(out)
       }
     }
     return readJsonSnapshot(snapshot)
   }
 
-  private fun boundsForCamera(name: String, camera: CameraOptions): LatLngBounds = live {
-    Heap.withScratch(CameraMarshal.SIZEOF + MlnLatLngBounds.SIZEOF) { descriptor ->
-      val out = descriptor + CameraMarshal.SIZEOF
-      CameraMarshal.write(descriptor, camera)
-      convert(name, descriptor, out)
-      MapOptionsMarshal.readLatLngBounds(out)
+  private fun boundsForCamera(entry: (Long, Int, Int) -> Int, camera: CameraOptions): LatLngBounds =
+    live {
+      Heap.withScratch(CameraMarshal.SIZEOF + MlnLatLngBounds.SIZEOF) { descriptor ->
+        val out = descriptor + CameraMarshal.SIZEOF
+        CameraMarshal.write(descriptor, camera)
+        Status.check(entry(handle.raw, descriptor.address, out.address))
+        MapOptionsMarshal.readLatLngBounds(out)
+      }
     }
-  }
 
-  private fun transitionTo(name: String, camera: CameraOptions, animation: AnimationOptions?) {
+  private fun transitionTo(
+    entry: (Long, Int, Int) -> Int,
+    camera: CameraOptions,
+    animation: AnimationOptions?,
+  ) {
     withArena(bytes(blockBytes(CameraMarshal.SIZEOF), animationBytes(animation))) { arena ->
       val cameraDescriptor = allocate(arena, CameraMarshal.SIZEOF)
       CameraMarshal.write(cameraDescriptor, camera)
       val animationDescriptor = writeAnimationOptions(arena, animation)
-      call(name, 3) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, cameraDescriptor)
-        slots.setPointer(2, animationDescriptor)
-      }
+      Status.check(entry(handle.raw, cameraDescriptor.address, animationDescriptor.address))
     }
   }
 
@@ -1861,8 +1852,6 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
    * Holds the WebGL context an OpenGL target names open for as long as [body] and its session need
    * it.
    *
-   * Taken before anything is written or dispatched, because an attach parks this stack on the owner
-   * thread and a page task that ran meanwhile could otherwise close the context between the two.
    * Released again when the attach fails, so a refused target leaves nothing holding the context.
    * The retention is idempotent, so releasing it here and in the session is the same release.
    */
@@ -1880,16 +1869,12 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   }
 
   private fun attach(
-    name: String,
+    entry: (Long, Int, Int) -> Int,
     descriptor: HeapPointer,
     out: HeapPointer,
     contextRetention: HandleStateCore.ChildRetention?,
   ): RenderSessionHandle {
-    call(name, 3) { slots ->
-      slots.setLong(0, handle.raw)
-      slots.setPointer(1, descriptor)
-      slots.setPointer(2, out)
-    }
+    Status.check(entry(handle.raw, descriptor.address, out.address))
     return RenderSessionHandle.fromNative(
       this,
       NativeRenderSession(Heap.loadLong(out)),
@@ -1898,7 +1883,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   }
 
   private fun addTileSourceUrl(
-    name: String,
+    entry: (Long, Int, Int, Int) -> Int,
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
@@ -1910,18 +1895,13 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         val sourceView = writeStringView(arena, sourceId)
         val urlView = writeStringView(arena, url)
         val descriptor = writeTileSourceOptions(arena, options)
-        call(name, 4) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, sourceView)
-          slots.setPointer(2, urlView)
-          slots.setPointer(3, descriptor)
-        }
+        Status.check(entry(handle.raw, sourceView.address, urlView.address, descriptor.address))
       }
     }
   }
 
   private fun addTileSourceTiles(
-    name: String,
+    entry: (Long, Int, Int, Int, Int) -> Int,
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
@@ -1937,13 +1917,9 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
         val sourceView = writeStringView(arena, sourceId)
         val templates = writeStringViewArray(arena, tiles)
         val descriptor = writeTileSourceOptions(arena, options)
-        call(name, 5) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, sourceView)
-          slots.setPointer(2, templates)
-          slots.setInt(3, tiles.size)
-          slots.setPointer(4, descriptor)
-        }
+        Status.check(
+          entry(handle.raw, sourceView.address, templates.address, tiles.size, descriptor.address)
+        )
       }
     }
   }
@@ -1958,17 +1934,19 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     yCount: HeapPointer,
     found: HeapPointer,
   ) {
-    call("mln_map_copy_style_image_stretches", 9) { slots ->
-      slots.setLong(0, handle.raw)
-      slots.setPointer(1, view)
-      slots.setPointer(2, stretchX)
-      slots.setInt(3, xCapacity)
-      slots.setPointer(4, xCount)
-      slots.setPointer(5, stretchY)
-      slots.setInt(6, yCapacity)
-      slots.setPointer(7, yCount)
-      slots.setPointer(8, found)
-    }
+    Status.check(
+      mln_map_copy_style_image_stretches(
+        handle.raw,
+        view.address,
+        stretchX.address,
+        xCapacity,
+        xCount.address,
+        stretchY.address,
+        yCapacity,
+        yCount.address,
+        found.address,
+      )
+    )
   }
 
   /**
@@ -1977,15 +1955,10 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
    * A null buffer with zero capacity is a size probe the C API answers with OK, so the two calls
    * below are how a caller learns a length it has no descriptor field for.
    */
-  private fun copyMapText(name: String): String = live {
+  private fun copyMapText(entry: (Long, Int, Int, Int) -> Int): String = live {
     val required =
       Heap.withScratch(SIZE_BYTES) { out ->
-        call(name, 4) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, HeapPointer(0))
-          slots.setInt(2, 0)
-          slots.setPointer(3, out)
-        }
+        Status.check(entry(handle.raw, 0, 0, out.address))
         readCount(Heap.loadInt(out), "map text size")
       }
     if (required == 0) {
@@ -1994,127 +1967,98 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     withArena(bytes(blockBytes(required), blockBytes(SIZE_BYTES))) { arena ->
       val text = allocate(arena, required)
       val copied = allocate(arena, SIZE_BYTES)
-      call(name, 4) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, text)
-        slots.setInt(2, required)
-        slots.setPointer(3, copied)
-      }
+      Status.check(entry(handle.raw, text.address, required, copied.address))
       Heap.loadBytes(text, readCount(Heap.loadInt(copied), "map copied text size")).decodeToString()
     }
   }
 
   /** The same probe-then-copy shape, for the texts a map answers about one layer. */
-  private fun copyLayerText(name: String, layerId: String): String = live {
-    val required =
-      withArena(bytes(stringViewBytes(layerId), blockBytes(SIZE_BYTES))) { arena ->
-        val view = writeStringView(arena, layerId)
-        val out = allocate(arena, SIZE_BYTES)
-        call(name, 5) { slots ->
-          slots.setLong(0, handle.raw)
-          slots.setPointer(1, view)
-          slots.setPointer(2, HeapPointer(0))
-          slots.setInt(3, 0)
-          slots.setPointer(4, out)
+  private fun copyLayerText(entry: (Long, Int, Int, Int, Int) -> Int, layerId: String): String =
+    live {
+      val required =
+        withArena(bytes(stringViewBytes(layerId), blockBytes(SIZE_BYTES))) { arena ->
+          val view = writeStringView(arena, layerId)
+          val out = allocate(arena, SIZE_BYTES)
+          Status.check(entry(handle.raw, view.address, 0, 0, out.address))
+          readCount(Heap.loadInt(out), "layer text size")
         }
-        readCount(Heap.loadInt(out), "layer text size")
+      if (required == 0) {
+        return@live ""
       }
-    if (required == 0) {
-      return@live ""
-    }
-    withArena(bytes(stringViewBytes(layerId), blockBytes(required), blockBytes(SIZE_BYTES))) { arena
-      ->
-      val view = writeStringView(arena, layerId)
-      val text = allocate(arena, required)
-      val copied = allocate(arena, SIZE_BYTES)
-      call(name, 5) { slots ->
-        slots.setLong(0, handle.raw)
-        slots.setPointer(1, view)
-        slots.setPointer(2, text)
-        slots.setInt(3, required)
-        slots.setPointer(4, copied)
+      withArena(bytes(stringViewBytes(layerId), blockBytes(required), blockBytes(SIZE_BYTES))) {
+        arena ->
+        val view = writeStringView(arena, layerId)
+        val text = allocate(arena, required)
+        val copied = allocate(arena, SIZE_BYTES)
+        Status.check(entry(handle.raw, view.address, text.address, required, copied.address))
+        Heap.loadBytes(text, readCount(Heap.loadInt(copied), "layer copied text size"))
+          .decodeToString()
       }
-      Heap.loadBytes(text, readCount(Heap.loadInt(copied), "layer copied text size"))
-        .decodeToString()
     }
-  }
 
-  private fun listStyleIds(name: String): List<String> {
+  private fun listStyleIds(entry: (Long, Int) -> Int): List<String> {
     val list = live {
       Heap.withScratch(HANDLE_BYTES) { out ->
-        callWithPointer(name, out)
+        Status.check(entry(handle.raw, out.address))
         Heap.loadLong(out)
       }
     }
     return readStyleIdList(list)
   }
 
-  // ---------------------------------------------------------------- results with no owner thread
+  // ---------------------------------------------------------------- owned results
 
-  /**
-   * Copies every ID out of a list and destroys it, without dispatching any of it.
-   *
-   * The C API places no thread rule on reading or destroying one of these, so the count, every
-   * getter, and the destroy run on the page. Dispatching them would cost an event-loop round trip
-   * per ID, and there is no composite entry point that would collapse them into one.
-   */
+  /** Copies every ID out of a list and destroys it. */
   private fun readStyleIdList(list: Long): List<String> {
     if (list == 0L) return emptyList()
     try {
       InjectedFaults.beginResultCopy(list, SIZE_BYTES + MlnStringView.SIZEOF)
       return Heap.withScratch(SIZE_BYTES + MlnStringView.SIZEOF) { count ->
         val id = count + SIZE_BYTES
-        NativeCall.call(
-          "mln_style_id_list_count",
-          2,
-          { slots ->
-            slots.setLong(0, list)
-            slots.setPointer(1, count)
-          },
-          { Status.check(Heap.loadInt(it)) },
-        )
+        Status.check(mln_style_id_list_count(list, count.address))
         List(readCount(Heap.loadInt(count), "style ID count")) { index ->
-          NativeCall.call(
-            "mln_style_id_list_get",
-            3,
-            { slots ->
-              slots.setLong(0, list)
-              slots.setInt(1, index)
-              slots.setPointer(2, id)
-            },
-            { Status.check(Heap.loadInt(it)) },
-          )
+          Status.check(mln_style_id_list_get(list, index, id.address))
           // Copied before the list is destroyed below: the view points into storage the destroy
           // frees.
           JsonMarshal.readText(id)
         }
       }
     } finally {
-      NativeCall.call("mln_style_id_list_destroy", 1, { slots -> slots.setLong(0, list) }, {})
+      mln_style_id_list_destroy(list)
     }
   }
 
-  /** Copies a JSON snapshot's tree and destroys it, on the page for the reason above. */
+  /** Copies every string out of a list and destroys it. */
+  private fun readStyleStringList(list: Long): List<String> {
+    if (list == 0L) return emptyList()
+    try {
+      InjectedFaults.beginResultCopy(list, SIZE_BYTES + MlnStringView.SIZEOF)
+      return Heap.withScratch(SIZE_BYTES + MlnStringView.SIZEOF) { count ->
+        val value = count + SIZE_BYTES
+        Status.check(mln_style_string_list_count(list, count.address))
+        List(readCount(Heap.loadInt(count), "style string count")) { index ->
+          Status.check(mln_style_string_list_get(list, index, value.address))
+          JsonMarshal.readText(value)
+        }
+      }
+    } finally {
+      mln_style_string_list_destroy(list)
+    }
+  }
+
+  /** Copies a JSON snapshot's tree and destroys it. */
   private fun readJsonSnapshot(snapshot: Long): JsonValue? {
     // The C API reports an absent value as the null snapshot rather than as a failure.
     if (snapshot == 0L) return null
     try {
       InjectedFaults.beginResultCopy(snapshot, POINTER_BYTES)
       return Heap.withScratch(POINTER_BYTES) { out ->
-        NativeCall.call(
-          "mln_json_snapshot_get",
-          2,
-          { slots ->
-            slots.setLong(0, snapshot)
-            slots.setPointer(1, out)
-          },
-          { Status.check(Heap.loadInt(it)) },
-        )
+        Status.check(mln_json_snapshot_get(snapshot, out.address))
         val root = HeapPointer(Heap.loadInt(out))
         if (root.address == 0) null else JsonMarshal.read(root)
       }
     } finally {
-      NativeCall.call("mln_json_snapshot_destroy", 1, { slots -> slots.setLong(0, snapshot) }, {})
+      mln_json_snapshot_destroy(snapshot)
     }
   }
 
@@ -2445,24 +2389,10 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
 
   public actual companion object {
     public actual fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle =
-      // The out-handle goes first because it is the only member here that needs eight-byte
-      // alignment.
       Heap.withScratch(HANDLE_BYTES + MapOptionsMarshal.MAP_OPTIONS_SIZEOF) { out ->
         val descriptor = out + HANDLE_BYTES
         MapOptionsMarshal.writeMapOptions(descriptor, options)
-        // Placed on the owner thread like every other call, and for a stronger reason than the
-        // rest: the thread that runs this becomes the map's owner thread, so creating on the page
-        // would make every later call a wrong-thread one.
-        Dispatcher.call(
-          "mln_map_create",
-          3,
-          { slots ->
-            slots.setLong(0, runtime.nativeHandle().raw)
-            slots.setPointer(1, descriptor)
-            slots.setPointer(2, out)
-          },
-          { Status.check(Heap.loadInt(it)) },
-        )
+        Status.check(mln_map_create(runtime.nativeHandle().raw, descriptor.address, out.address))
         MapHandle(runtime, NativeMap(Heap.loadLong(out))).also(runtime::registerMap)
       }
   }

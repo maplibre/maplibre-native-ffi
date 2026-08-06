@@ -3,156 +3,57 @@ package org.maplibre.nativeffi.render
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
-import org.maplibre.nativeffi.internal.wasm.Dispatcher
 import org.maplibre.nativeffi.internal.wasm.Heap
+import org.maplibre.nativeffi.internal.wasm.generated.mln_kotlin_webgl_canvas_create
+import org.maplibre.nativeffi.internal.wasm.generated.mln_kotlin_webgl_canvas_destroy
+import org.maplibre.nativeffi.internal.wasm.generated.mln_kotlin_webgl_canvas_resize
+import org.maplibre.nativeffi.internal.wasm.generated.mln_kotlin_webgl_context_create
+import org.maplibre.nativeffi.internal.wasm.generated.mln_kotlin_webgl_context_destroy
+import org.maplibre.nativeffi.internal.wasm.generated.mln_kotlin_webgl_present_texture
+import org.maplibre.nativeffi.internal.wasm.generated.mln_kotlin_webgl_read_pixels
+import org.maplibre.nativeffi.internal.wasm.generated.mln_kotlin_webgl_texture_create
+import org.maplibre.nativeffi.internal.wasm.generated.mln_kotlin_webgl_texture_destroy
 
-@JsFun(
-  "(d, canvas, width, height, out, token) => " +
-    "globalThis.__maplibreNativeC._mln_browser_webgl_context_create(" +
-    "d, canvas, width, height, out, token)"
-)
-private external fun submitCreate(
-  dispatcher: Int,
-  canvasId: Int,
-  width: Int,
-  height: Int,
-  out: Int,
-  token: Int,
-): Boolean
-
-@JsFun(
-  "(d, context, token) => " +
-    "globalThis.__maplibreNativeC._mln_browser_webgl_context_destroy(d, context, token)"
-)
-private external fun submitDestroy(dispatcher: Int, context: Int, token: Int): Boolean
-
-@JsFun(
-  "(d, context, width, height, out, token) => " +
-    "globalThis.__maplibreNativeC._mln_browser_webgl_canvas_resize(" +
-    "d, context, width, height, out, token)"
-)
-private external fun submitCanvasResize(
-  dispatcher: Int,
-  context: Int,
-  width: Int,
-  height: Int,
-  out: Int,
-  token: Int,
-): Boolean
-
-@JsFun(
-  "(d, context, texture, width, height, out, token) => " +
-    "globalThis.__maplibreNativeC._mln_browser_webgl_present_texture(" +
-    "d, context, texture, width, height, out, token)"
-)
-private external fun submitPresent(
-  dispatcher: Int,
-  context: Int,
-  texture: Int,
-  width: Int,
-  height: Int,
-  out: Int,
-  token: Int,
-): Boolean
-
-@JsFun(
-  "(d, context, width, height, out, token) => " +
-    "globalThis.__maplibreNativeC._mln_browser_webgl_texture_create(" +
-    "d, context, width, height, out, token)"
-)
-private external fun submitTextureCreate(
-  dispatcher: Int,
-  context: Int,
-  width: Int,
-  height: Int,
-  out: Int,
-  token: Int,
-): Boolean
-
-@JsFun(
-  "(d, context, texture, token) => " +
-    "globalThis.__maplibreNativeC._mln_browser_webgl_texture_destroy(d, context, texture, token)"
-)
-private external fun submitTextureDestroy(
-  dispatcher: Int,
-  context: Int,
-  texture: Int,
-  token: Int,
-): Boolean
-
-@JsFun(
-  "(d, context, texture, width, height, pixels, capacity, out, token) => " +
-    "globalThis.__maplibreNativeC._mln_browser_webgl_read_pixels(" +
-    "d, context, texture, width, height, pixels, capacity, out, token)"
-)
-private external fun submitReadPixels(
-  dispatcher: Int,
-  context: Int,
-  texture: Int,
-  width: Int,
-  height: Int,
-  pixels: Int,
-  capacity: Int,
-  out: Int,
-  token: Int,
-): Boolean
-
-/**
- * What this wrapper is called where the module counts what its owner thread still owns.
- *
- * The same name the release bookkeeping uses, because both name it to a host: one in the failure
- * for closing a context a render target still holds, the other in the failure for shutting the
- * module down while this is open.
- */
+/** What the release bookkeeping calls this, and what a failure blaming it names. */
 private const val TYPE_NAME = "WebglContext"
 
 /**
- * A WebGL context on the thread this binding's maps render on, and the GL work a host does there.
+ * A WebGL context on the thread this binding runs on, and the GL work a host does in it.
  *
  * Every other platform hands a render target a context the host made with its own graphics API, and
- * a browser host cannot make one at all. The handle a [WebglContextDescriptor] carries is an index
- * into the Emscripten module's own context table, so a context the page created with
+ * a browser host cannot make one at all: the handle a [WebglContextDescriptor] carries indexes the
+ * Emscripten module's own context table, so a context the page created with
  * `canvas.getContext("webgl2")` names nothing native can look up. A WebGL context also belongs to
- * the agent that created it, and the agent that renders is the thread this binding places
- * owner-affine work on rather than the page. The entry points that satisfy both conditions are
- * inside the module this binding distributes, so this is where a host reaches them.
- *
- * That is why a context is the binding's to make here and the host's everywhere else. On a desktop
- * or a phone the graphics API is EGL, Metal, or Vulkan, which the host genuinely owns; in a browser
- * it is this module and this module's thread.
+ * the agent that created it, and this binding renders on the module's own thread rather than on the
+ * page. So on a desktop or a phone the graphics API is EGL, Metal, or Vulkan, which the host
+ * genuinely owns; in a browser it is this module, and the context is the binding's to make.
  *
  * WebGL has no share groups, so a texture belongs to the one context it was made in. A host that
- * wants a texture for a caller-owned target, or wants a rendered one on the page, issues those GL
- * calls in this context on that thread, which is what [createTexture] and [presentTexture] are.
+ * wants a texture for a caller-owned target, or wants a rendered one on the page, issues those
+ * calls here — [createTexture], [presentTexture], [readPixels].
  *
- * The canvas behind the context is either a page canvas reserved with [reserveCanvas] — whose
- * `<canvas>` element keeps displaying whatever this draws, with no copy — or a private
- * `OffscreenCanvas` on the owner thread, which nothing displays and which a host reads back from.
- *
- * Every call here reaches the owner thread, so every call belongs inside a
- * [maplibreScope][org.maplibre.nativeffi.maplibreScope], as on every other path into this binding.
- * [reserveCanvas] is the exception, because it runs before that thread exists.
- *
- * Closing is what releases the context, and there is no finalizer behind it: a browser host cannot
- * recover leaked resources by restarting a process. A render target borrows the handle for its
- * whole life, so this context stays open while one is attached: closing it then returns an
- * invalid-state status naming the render session that holds it, and the host detaches or closes
- * that session first. A close that native refuses leaves this context open for a retry.
+ * The canvas behind a context is either the one page canvas ([createForPageCanvas]) or a private
+ * `OffscreenCanvas` that nothing displays ([createOffscreen]). Closing releases the context and,
+ * with it, every texture made in it. There is no finalizer behind that: a browser host cannot
+ * recover leaked GPU resources by restarting a process. A render target borrows the handle for its
+ * whole life, so a context with a target attached refuses to close and names the render session
+ * instead.
  */
-public class WebglContext private constructor(private val handle: Int) : AutoCloseable {
-  // The same release bookkeeping every owned handle in this binding uses, for the two properties it
-  // brings. A render target retains this as a child, so the context outlives every target naming
-  // it; and a destroy the module refuses restores the open state, so the wrapper is retryable
-  // rather than spent while the native context is still there.
+public class WebglContext
+private constructor(
+  private val handle: Int,
+  private val canvas: String,
+  private val page: Boolean,
+) : AutoCloseable {
   private val core = HandleStateCore(TYPE_NAME, handle.toLong())
 
-  init {
-    // Counted so that shutting the module down while this is open is refused and names it, rather
-    // than reaching the terminal failure a shutdown reports for anything it could not see. Every
-    // other owner-affine handle is covered by the runtime it retains; a context has no runtime
-    // behind it, so it is the one that has to say so itself.
-    Dispatcher.retainHandle(TYPE_NAME)
-  }
+  /**
+   * What a descriptor carries so that it names this context rather than only its number.
+   *
+   * A separate object because [WebglContextOwner] is internal and a public class may not expose an
+   * internal supertype.
+   */
+  private val identity = Identity(this)
 
   /** Reports whether this context has been released. */
   public val isClosed: Boolean
@@ -162,26 +63,13 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
    * Returns a descriptor naming this context, for a render target to be attached with.
    *
    * The descriptor names this object and not merely its handle, which is what makes it safe to hold
-   * on to. Emscripten allocates a context handle and frees it when the context is destroyed, so the
-   * number is reused by the next context created afterwards; a descriptor that carried only the
-   * number would, once this context is closed, start naming whichever context inherited it and
-   * would attach a render target to that one instead. Carrying the object means a descriptor from a
-   * closed context stays a descriptor from a closed context.
+   * on to. Emscripten frees a context handle when its context is destroyed and gives the number to
+   * the next context created, so a descriptor carrying only the number would, once this context is
+   * closed, start naming whichever context inherited it.
    */
   public fun descriptor(): WebglContextDescriptor {
-    requireOpen()
-    return WebglContextDescriptor(handle, this)
-  }
-
-  /**
-   * Reports that this context is still open, without holding a use count while native works.
-   *
-   * Every call below parks its stack on the owner thread, and a use count held across that park
-   * would be a count held for as long as native takes. Closing is the caller's own next statement,
-   * on the same single-threaded page, so the check is what is wanted here and the count is not.
-   */
-  private fun requireOpen() {
     core.requireLive()
+    return WebglContextDescriptor(handle, identity)
   }
 
   /**
@@ -193,60 +81,18 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
    * extent. Neither implies the other — the session's extent is what MapLibre lays a frame out for,
    * and this is what the frame has room to land in.
    *
-   * The context's contents survive. Resizing a canvas reallocates its drawing buffer and nothing
-   * else, so every texture, buffer, and program the session built stays as it was.
+   * The context's contents survive: resizing reallocates the drawing buffer and nothing else, so
+   * every texture, buffer, and program the session built stays as it was.
    */
   public fun resizeCanvas(width: Int, height: Int) {
-    Status.requireArgument(width > 0) { "width must be positive, but was $width" }
-    Status.requireArgument(height > 0) { "height must be positive, but was $height" }
-    requireOpen()
-    val resized =
-      Heap.withScratch(FLAG_BYTES) { out ->
-        Dispatcher.submitTask("mln_browser_webgl_canvas_resize") { dispatcher, token ->
-          submitCanvasResize(dispatcher, handle, width, height, out.address, token)
-        }
-        Heap.loadInt(out) != 0
-      }
+    requireExtent(width, height)
+    core.requireLive()
+    val resized = withCanvasName { name ->
+      mln_kotlin_webgl_canvas_resize(name, width, height) != 0
+    }
     if (!resized) {
       throw Status.invalidState(
-        "The MapLibre Native browser module could not size this context's canvas to " +
-          "${width}x$height."
-      )
-    }
-  }
-
-  /**
-   * Puts a texture this context owns onto the canvas the page displays.
-   *
-   * A texture target renders into a framebuffer of its own, so something has to move those pixels
-   * onto the canvas's default framebuffer, and it has to happen in this context on the thread that
-   * owns it. Native blits them there, which keeps them in GPU memory: they are never read back,
-   * never enter the module's heap, and never cross into JavaScript.
-   *
-   * [texture] is a name from [createTexture] for a caller-owned target, or
-   * [OpenGLOwnedTextureFrame.texture] for a session-owned one, and [width] and [height] are its
-   * size in device pixels.
-   *
-   * The frame becomes visible on the next turn of the page's event loop rather than as this
-   * returns: a browser composites a canvas when the task that drew into it ends, and that task is
-   * the owner thread's, not the page's.
-   */
-  public fun presentTexture(texture: Int, width: Int, height: Int) {
-    Status.requireArgument(texture != 0) { "texture must name a texture" }
-    Status.requireArgument(width > 0) { "width must be positive, but was $width" }
-    Status.requireArgument(height > 0) { "height must be positive, but was $height" }
-    requireOpen()
-    val presented =
-      Heap.withScratch(FLAG_BYTES) { out ->
-        Dispatcher.submitTask("mln_browser_webgl_present_texture") { dispatcher, token ->
-          submitPresent(dispatcher, handle, texture, width, height, out.address, token)
-        }
-        Heap.loadInt(out) != 0
-      }
-    if (!presented) {
-      throw Status.invalidState(
-        "The MapLibre Native browser module could not present texture $texture at " +
-          "${width}x$height."
+        "The MapLibre Native browser module could not size the canvas \"$canvas\" to ${width}x$height."
       )
     }
   }
@@ -260,22 +106,47 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
    * a context releases everything made in it.
    */
   public fun createTexture(width: Int, height: Int): Int {
-    Status.requireArgument(width > 0) { "width must be positive, but was $width" }
-    Status.requireArgument(height > 0) { "height must be positive, but was $height" }
-    requireOpen()
-    val texture =
-      Heap.withScratch(FLAG_BYTES) { out ->
-        Dispatcher.submitTask("mln_browser_webgl_texture_create") { dispatcher, token ->
-          submitTextureCreate(dispatcher, handle, width, height, out.address, token)
-        }
-        Heap.loadInt(out)
-      }
+    requireExtent(width, height)
+    core.requireLive()
+    val texture = mln_kotlin_webgl_texture_create(handle, width, height)
     if (texture == 0) {
       throw Status.invalidState(
         "The MapLibre Native browser module could not create a ${width}x$height texture."
       )
     }
     return texture
+  }
+
+  /** Releases a texture from [createTexture], once no target borrows it any more. */
+  public fun destroyTexture(texture: Int) {
+    core.requireLive()
+    mln_kotlin_webgl_texture_destroy(handle, texture)
+  }
+
+  /**
+   * Puts a texture this context owns onto the canvas this context draws to.
+   *
+   * A texture target renders into a framebuffer of its own, so something has to move those pixels
+   * onto the canvas's default framebuffer. Native blits them there, which keeps them in GPU memory:
+   * they are never read back, never enter the module's heap, and never cross into JavaScript. A
+   * surface target needs none of this, because it already renders into that framebuffer.
+   *
+   * [texture] is a name from [createTexture] for a caller-owned target, or
+   * [OpenGLOwnedTextureFrame.texture] for a session-owned one, and [width] and [height] are its
+   * size in device pixels.
+   *
+   * The frame becomes visible on the next turn of this thread's event loop rather than as this
+   * returns: a browser composites a canvas when the task that drew into it ends.
+   */
+  public fun presentTexture(texture: Int, width: Int, height: Int) {
+    Status.requireArgument(texture != 0) { "texture must name a texture" }
+    requireExtent(width, height)
+    core.requireLive()
+    if (mln_kotlin_webgl_present_texture(handle, texture, width, height) == 0) {
+      throw Status.invalidState(
+        "The MapLibre Native browser module could not present texture $texture at ${width}x$height."
+      )
+    }
   }
 
   /**
@@ -285,45 +156,29 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
    * the context is bound to — which is what a surface target renders into and what [presentTexture]
    * blits onto.
    *
-   * This is the expensive way to use a frame: it stalls the owner thread until the GPU is done, and
-   * it copies every pixel through the module's heap. A host that only wants the frame seen presents
-   * it instead. Reading back is for a host that consumes the pixels itself — encoding an image,
+   * This is the expensive way to use a frame: it stalls this thread until the GPU is done, and it
+   * copies every pixel through the module's heap. A host that only wants the frame seen presents it
+   * instead. Reading back is for a host that consumes the pixels itself — encoding an image,
    * comparing two frames — and for telling a frame that was never drawn from a frame that was drawn
    * and never composited, which are the same symptom from the page's side and completely different
    * underneath.
    */
   public fun readPixels(texture: Int, width: Int, height: Int): ByteArray {
-    Status.requireArgument(width > 0) { "width must be positive, but was $width" }
-    Status.requireArgument(height > 0) { "height must be positive, but was $height" }
-    requireOpen()
-    // Taken in Long and refused here, rather than left to an Int multiply of two caller-supplied
-    // extents. Native caps an extent at 16384 and would refuse this read, but only after this frame
-    // had already asked the module for the buffer, and both halves of that are bad answers: the
-    // unwrapped product for a 20000-by-20000 read is 1.6 GiB of scratch a page allocates and throws
-    // away, and a wrapped one is a small allocation native is then handed the real extents for.
+    requireExtent(width, height)
+    core.requireLive()
+    // Multiplied in Long rather than as an Int product of two caller-supplied extents, whose
+    // product for a 20000-by-20000 read wraps to a small allocation that native is then handed the
+    // real extents for.
     val pixelCount = width.toLong() * height.toLong()
     Status.requireArgument(pixelCount <= MAX_READBACK_PIXELS) {
       "a ${width}x$height frame is $pixelCount pixels, and a readback can address at most " +
         "$MAX_READBACK_PIXELS on this target"
     }
     val bytes = (pixelCount * BYTES_PER_PIXEL).toInt()
-    // The flag first, because it is the only member here that has an alignment to satisfy.
-    return Heap.withScratch(FLAG_BYTES + bytes) { out ->
-      val pixels = out + FLAG_BYTES
-      Dispatcher.submitTask("mln_browser_webgl_read_pixels") { dispatcher, token ->
-        submitReadPixels(
-          dispatcher,
-          handle,
-          texture,
-          width,
-          height,
-          pixels.address,
-          bytes,
-          out.address,
-          token,
-        )
-      }
-      if (Heap.loadInt(out) == 0) {
+    return Heap.withScratch(bytes) { pixels ->
+      if (
+        mln_kotlin_webgl_read_pixels(handle, texture, width, height, pixels.address, bytes) == 0
+      ) {
         throw Status.invalidState(
           "The MapLibre Native browser module could not read a ${width}x$height frame."
         )
@@ -332,182 +187,86 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
     }
   }
 
-  /** Releases a texture from [createTexture], once no target borrows it any more. */
-  public fun destroyTexture(texture: Int) {
-    requireOpen()
-    Dispatcher.submitTask("mln_browser_webgl_texture_destroy") { dispatcher, token ->
-      submitTextureDestroy(dispatcher, handle, texture, token)
-    }
-  }
-
   override fun close() {
     core.closeOnce(
+      // Destroying a context reports nothing: a handle that names no context on this thread is
+      // already the state a close is asking for.
       destroy = {
-        // The module reports a refused submission by throwing rather than by a status, and that
-        // throw is what closeOnce turns back into an open context. A task that was accepted always
-        // completes, so there is no destroy status to check here.
-        Dispatcher.submitTask("mln_browser_webgl_context_destroy") { dispatcher, token ->
-          submitDestroy(dispatcher, handle, token)
-        }
+        mln_kotlin_webgl_context_destroy(handle)
         MaplibreStatus.OK.nativeCode
       },
-      // Only a destroy that happened stops the count. A refused submission leaves the native
-      // context there and this wrapper open for a retry, and releasing here would let a shutdown be
-      // accepted while it still exists.
-      afterSuccess = { Dispatcher.releaseHandle(TYPE_NAME) },
+      afterSuccess = {
+        if (page) {
+          // The page still displays the element, and a canvas reaches this thread only as it is
+          // created, so the registration outlives every context made against it.
+          pageCanvas = null
+        } else {
+          withName(canvas, ::mln_kotlin_webgl_canvas_destroy)
+        }
+      },
     )
   }
 
+  private fun <T> withCanvasName(body: (Int) -> T): T = withName(canvas, body)
+
+  private class Identity(val context: WebglContext) : WebglContextOwner
+
   public companion object {
     /**
-     * Claims the `<canvas>` element with this `id` for the thread maps render on.
+     * Creates a WebGL2 context against the canvas the page displays.
      *
-     * The element must already be in the document, and this must run before the first call that
-     * reaches native, because a browser hands a canvas to a thread only as that thread is created
-     * and this binding creates its thread on first use. Afterwards the element is a placeholder
-     * that displays what the owner thread draws, and page code can no longer draw into it.
+     * There is one such canvas. A page transfers it to this thread as the module is instantiated,
+     * by passing an `OffscreenCanvas` as the module option `mlnPageCanvas`, and a canvas can be
+     * transferred to a thread only as that thread is created — so the number of on-screen maps is
+     * fixed before any Kotlin runs. A host that transferred nothing gets a placeholder canvas that
+     * nothing displays, and a second live context for the page canvas is refused rather than
+     * silently drawing where the first one draws.
      *
-     * This is what makes presentation zero-copy: [createForCanvas] builds a context whose default
-     * framebuffer is that canvas, so a surface target's frame — or a texture [presentTexture] blits
-     * onto it — appears on the page without being copied anywhere.
-     *
-     * Called from the page rather than from inside a
-     * [maplibreScope][org.maplibre.nativeffi.maplibreScope]: only the agent holding a canvas can
-     * give it away, and the thread that receives it does not exist yet.
-     *
-     * [id] may be any `id` an HTML document accepts, including one no CSS identifier can spell,
-     * within four limits: no comma, because the ids cross to native as one comma-separated list; no
-     * ASCII whitespace, which that list trims off each entry and which HTML forbids in an `id`
-     * anyway; at most 63 bytes of UTF-8, which is what the module's fixed-size canvas record holds;
-     * and not `__proto__`, which the plain JavaScript object holding transferred canvases cannot
-     * take as a key.
-     *
-     * Those are checked here as well as at [createForCanvas], because transferring a canvas cannot
-     * be undone. A host that learned about a limit from the context failing would learn about it
-     * with the `<canvas>` element already given away for the page's whole life and nothing left
-     * able to draw into it.
-     */
-    public fun reserveCanvas(id: String) {
-      requireCanvasId(id)
-      Dispatcher.reserveCanvas(id)
-    }
-
-    /**
-     * Creates a WebGL2 context against a canvas reserved with [reserveCanvas].
-     *
-     * [width] and [height] size that canvas's drawing buffer in device pixels, which for a surface
-     * target is the target's physical extent and for a texture target is the size anything
+     * [width] and [height] size the canvas's drawing buffer in device pixels, which for a surface
+     * target is that target's physical extent and for a texture target is the size anything
      * [presentTexture] shows must fit.
-     *
-     * [id] follows [reserveCanvas]'s rules, and names a canvas reserved there: the two spell the id
-     * differently on the way to the browser — a selector there, a registry key here — so an id both
-     * accept is what makes the pair name one element.
      */
-    public fun createForCanvas(id: String, width: Int, height: Int): WebglContext {
-      requireCanvasId(id)
-      return create(id, width, height)
-    }
-
-    /**
-     * Reports that [id] is a canvas id both halves of the module can name.
-     *
-     * A `<canvas>` reaches the owner thread through [reserveCanvas] and is found again here, and
-     * the two spell an id differently — a selector there, a registry key here — so an id has to
-     * survive both. What that rules out is narrower than what an HTML document accepts, and each
-     * exclusion is one of the two spellings:
-     * - A comma separates the ids in the list that crosses to native, so one inside an id would
-     *   split it into two that name nothing.
-     * - ASCII whitespace is trimmed off each entry of that list, so a reserved `" map "` transfers
-     *   the element `map` while a context asks the registry for `" map "` and finds nothing. HTML
-     *   forbids whitespace in an id anyway, so refusing is the honest answer rather than trimming
-     *   one and not the other.
-     * - The module carries the id in a record of [MAX_CANVAS_ID_BYTES] bytes with the terminator
-     *   inside it, so an id may encode to one byte fewer than that.
-     * - Both registries that hold a canvas are plain JavaScript objects keyed by element id, and
-     *   assigning under the name `__proto__` sets an object's prototype instead of adding an entry.
-     *   Reserving one would transfer the `<canvas>` and then register nothing, so the element would
-     *   be gone and no context could ever name it. That registry belongs to Emscripten, so refusing
-     *   the id is the only place this can be answered.
-     *
-     * Checked here rather than left to native because of *when* native checks. Reserving a canvas
-     * transfers it, transferring cannot be undone, and the module refuses the id only afterwards —
-     * so a host that learned about the limit from the failure would learn about it with the element
-     * already gone.
-     */
-    private fun requireCanvasId(id: String) {
-      Status.requireArgument(id.isNotEmpty()) { "a canvas id must not be empty" }
-      Status.requireArgument(',' !in id) { "a canvas id must not contain a comma, but was \"$id\"" }
-      Status.requireArgument(id.none(::isAsciiWhitespace)) {
-        "a canvas id must not contain whitespace, but was \"$id\""
-      }
-      Status.requireArgument(id != PROTOTYPE_KEY) {
-        "a canvas id must not be \"$PROTOTYPE_KEY\", because the browser's canvas registry is a " +
-          "plain JavaScript object and cannot hold an entry under that name"
-      }
-      Heap.requireCString(id, "canvas id")
-      // Encoded here rather than measured with Heap.utf8Size, which asks the module for the length
-      // and so needs the module loaded. Reserving happens before it is, which is the whole point of
-      // reserving, so this check has to be one Kotlin can make on its own.
-      val bytes = id.encodeToByteArray().size
-      Status.requireArgument(bytes < MAX_CANVAS_ID_BYTES) {
-        "a canvas id must be at most ${MAX_CANVAS_ID_BYTES - 1} bytes of UTF-8, but \"$id\" is " +
-          "$bytes"
-      }
-    }
-
-    /**
-     * The whitespace HTML forbids in an `id`, which is also what the module's id list trims.
-     *
-     * Narrower than [Char.isWhitespace], deliberately: that one also matches a non-breaking space
-     * and the other Unicode separators, which an HTML id may hold and which the module carries
-     * through untouched. Refusing those would refuse ids that work.
-     */
-    private fun isAsciiWhitespace(character: Char): Boolean =
-      character == ' ' ||
-        character == '\t' ||
-        character == '\n' ||
-        character == '\u000C' ||
-        character == '\r'
-
-    /**
-     * Creates a WebGL2 context against a private `OffscreenCanvas` the owner thread makes.
-     *
-     * Nothing displays that canvas, which is what a host that reads frames back wants. A texture
-     * target renders into a framebuffer of its own rather than into it, so for one the size bounds
-     * nothing the map draws and only has to be positive, because a zero-sized canvas has no drawing
-     * buffer to create a context against.
-     */
-    public fun createOffscreen(width: Int, height: Int): WebglContext = create("", width, height)
-
-    private fun create(id: String, width: Int, height: Int): WebglContext {
-      Status.requireArgument(width > 0) { "width must be positive, but was $width" }
-      Status.requireArgument(height > 0) { "height must be positive, but was $height" }
-      Heap.requireCString(id, "canvas id")
-      // One block for both, with the four-byte output first so it is the aligned member; the id is
-      // bytes and has no alignment of its own.
-      val handle =
-        Heap.withScratch(FLAG_BYTES + Heap.utf8Size(id)) { out ->
-          val canvas = out + FLAG_BYTES
-          Heap.storeUtf8(canvas, id)
-          Dispatcher.submitTask("mln_browser_webgl_context_create") { dispatcher, token ->
-            submitCreate(dispatcher, canvas.address, width, height, out.address, token)
-          }
-          // Written by the owner thread while this frame was parked, which is why the scratch is
-          // read only after the task's completion has come back.
-          Heap.loadInt(out)
-        }
-      // Zero is what the module reports for a context it could not create, and it is also the value
-      // the C API refuses in a descriptor, so it is turned into a failure here rather than into a
-      // handle that fails at attach.
-      if (handle == 0) {
+    public fun createForPageCanvas(width: Int, height: Int): WebglContext {
+      requireExtent(width, height)
+      pageCanvas?.let {
         throw Status.invalidState(
-          "The MapLibre Native browser module could not create a ${width}x$height WebGL2 " +
-            (if (id.isEmpty()) "context." else "context for the canvas \"$id\". ") +
-            "The browser may have no WebGL2 support, too many contexts may be live, or the " +
-            "canvas may not have been reserved before the owner thread started."
+          "The page canvas already has a WebGL context. This build supports one on-screen canvas, " +
+            "transferred to the render thread as the module was instantiated, so a second " +
+            "on-screen map is not something the binding can create. Close the first context, or " +
+            "render the second map to a texture."
         )
       }
-      return WebglContext(handle)
+      val context = create(PAGE_CANVAS, width, height, page = true)
+      pageCanvas = context
+      return context
+    }
+
+    /**
+     * Creates a WebGL2 context against a private `OffscreenCanvas` on this thread.
+     *
+     * Nothing displays that canvas, which is what a host that reads frames back wants, and there is
+     * no limit on how many there are. A texture target renders into a framebuffer of its own rather
+     * than into the canvas, so for one the size bounds nothing the map draws and only has to be
+     * positive, because a zero-sized canvas has no drawing buffer to create a context against.
+     */
+    public fun createOffscreen(width: Int, height: Int): WebglContext {
+      requireExtent(width, height)
+      val name = "mln-offscreen-${offscreenCanvases++}"
+      if (
+        withName(name) { address -> mln_kotlin_webgl_canvas_create(address, width, height) } == 0
+      ) {
+        throw Status.invalidState(
+          "The MapLibre Native browser module could not create a ${width}x$height offscreen canvas."
+        )
+      }
+      try {
+        return create(name, width, height, page = false)
+      } catch (error: Throwable) {
+        // The canvas outlives a context that could not be created against it, and nothing else
+        // holds a name this method invented.
+        withName(name, ::mln_kotlin_webgl_canvas_destroy)
+        throw error
+      }
     }
 
     /**
@@ -537,17 +296,12 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
      * makes a stale descriptor safe. Emscripten's handles are allocated and freed, so the number in
      * a descriptor from a closed context is one a later context can be given; a lookup by number
      * would find that later context and hand a render target a context the host never named.
-     * Resolving the object cannot confuse the two, however many contexts have come and gone.
      *
      * Asked at every entry point that hands native a context descriptor, not only at attach. Native
      * compares a WebGL descriptor by its handle alone — `opengl_context_matches` in
      * `src/render/render_session_common.cpp` has nothing else to compare — so a retarget whose
-     * descriptor came from a closed context whose number has since come back matches the context
-     * the session is really rendering in and is accepted there. What that costs depends on what
-     * else was recycled: the texture the descriptor names may now belong to the replacement
-     * context, in which case the session renders into an unrelated texture, and otherwise the frame
-     * fails somewhere below the call that set the target. Both are the same mistake, and this is
-     * where it is still attributable.
+     * descriptor came from a closed context whose number has since come back would be accepted
+     * there, and the texture beside it would belong to whatever inherited the number.
      *
      * Returns null for the WGL and EGL arms, which this build was not compiled against and which
      * carry no object to resolve; native is where a missing provider is refused.
@@ -555,7 +309,7 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
     internal fun requireOpenForTarget(context: OpenGLContextDescriptor): WebglContext? {
       if (context !is WebglContextDescriptor) return null
       // Total, because the descriptor's constructor is internal and descriptor() is its one caller.
-      val owner = context.owner as WebglContext
+      val owner = (context.owner as Identity).context
       if (owner.isClosed) {
         throw Status.invalidArgument(
           "A WebGL context descriptor names a WebglContext that has been closed. A render target's " +
@@ -568,38 +322,58 @@ public class WebglContext private constructor(private val handle: Int) : AutoClo
       return owner
     }
 
-    /** One four-byte output: a context handle, a texture name, or a success flag. */
-    private const val FLAG_BYTES = 4
+    private fun create(name: String, width: Int, height: Int, page: Boolean): WebglContext {
+      val handle =
+        withName(name) { address -> mln_kotlin_webgl_context_create(address, width, height) }
+      // Zero is what the module reports for a context it could not create, and it is also the value
+      // the C API refuses in a descriptor, so it becomes a failure here rather than a handle that
+      // fails at attach.
+      if (handle == 0) {
+        throw Status.invalidState(
+          "The MapLibre Native browser module could not create a ${width}x$height WebGL2 context " +
+            "for the canvas \"$name\". The browser may have no WebGL2 support, or too many " +
+            "contexts may be live."
+        )
+      }
+      return WebglContext(handle, name, page)
+    }
+
+    /** Runs [body] with [name] staged in the module's heap, which is how the shim takes one. */
+    private fun <T> withName(name: String, body: (Int) -> T): T =
+      Heap.withScratch(Heap.utf8Size(name)) { address ->
+        Heap.storeUtf8(address, name)
+        body(address.address)
+      }
+
+    private fun requireExtent(width: Int, height: Int) {
+      Status.requireArgument(width > 0) { "width must be positive, but was $width" }
+      Status.requireArgument(height > 0) { "height must be positive, but was $height" }
+    }
+
+    /**
+     * The context holding the page canvas, so a second one is refused rather than made.
+     *
+     * A plain field because this binding runs on one thread: the module's `main()` imported Kotlin
+     * into it, and nothing here is reachable from another agent.
+     */
+    private var pageCanvas: WebglContext? = null
+
+    /** Names offscreen canvases apart. Never reused, so a stale name cannot find a live canvas. */
+    private var offscreenCanvases = 0
+
+    /**
+     * The registry key the page canvas is transferred under.
+     *
+     * Fixed at link time by `-sOFFSCREENCANVASES_TO_PTHREAD` in
+     * `cmake/mln_ffi_browser_module.cmake` and registered by
+     * `bindings/kotlin/emscripten/mln_kotlin_pre.js`, which is why a host names no canvas here.
+     */
+    private const val PAGE_CANVAS = "maplibre"
 
     /** RGBA8, which is what a readback produces and what native writes. */
     private const val BYTES_PER_PIXEL = 4
 
-    /**
-     * The largest frame a readback can stage, which is what a 32-bit pointer leaves room for.
-     *
-     * The flag shares the block with the pixels, so it comes out of the same budget.
-     */
-    private const val MAX_READBACK_PIXELS = (Int.MAX_VALUE - FLAG_BYTES) / BYTES_PER_PIXEL
-
-    /**
-     * The bytes the module's fixed-size canvas record holds, terminator included.
-     *
-     * `MLN_BROWSER_WEBGL_CANVAS_ID_BYTES` in `src/browser/webgl_context.c`, and a real limit rather
-     * than a defensive one: the record is what lets the module copy a canvas key out from under its
-     * own lock into a stack buffer, and lets a create request carry the id by value to the owner
-     * thread, neither of which allocates. Sixty-three bytes is past what an element id needs, so
-     * the limit is stated and enforced rather than lifted.
-     */
-    private const val MAX_CANVAS_ID_BYTES = 64
-
-    /**
-     * The one element id that a JavaScript object cannot hold as a key.
-     *
-     * `object[key] = value` is an ordinary assignment for every other name, including the ones
-     * `Object.prototype` already carries, because it creates an own property that shadows the
-     * inherited one. This name goes to `Object.prototype`'s setter instead and changes the object's
-     * prototype, so the entry a canvas transfer meant to add is never there.
-     */
-    private const val PROTOTYPE_KEY = "__proto__"
+    /** The largest frame a readback can stage, which is what a 32-bit pointer leaves room for. */
+    private const val MAX_READBACK_PIXELS = Int.MAX_VALUE / BYTES_PER_PIXEL
   }
 }

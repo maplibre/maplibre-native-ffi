@@ -6,13 +6,18 @@ import org.maplibre.nativeffi.internal.wasm.generated.MlnCustomGeometrySourceOpt
 import org.maplibre.nativeffi.internal.wasm.generated.MlnGeojsonSourceOptionField
 import org.maplibre.nativeffi.internal.wasm.generated.MlnGeojsonSourceOptions
 import org.maplibre.nativeffi.internal.wasm.generated.MlnStyleSourceInfo
+import org.maplibre.nativeffi.internal.wasm.generated.MlnStyleSourceInfoField
 import org.maplibre.nativeffi.internal.wasm.generated.MlnStyleTileSourceOptionField
 import org.maplibre.nativeffi.internal.wasm.generated.MlnStyleTileSourceOptions
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
+import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
+import org.maplibre.nativeffi.style.TileJson
+import org.maplibre.nativeffi.style.TileScheme
 import org.maplibre.nativeffi.style.TileSourceOptions
+import org.maplibre.nativeffi.style.VectorTileEncoding
 
 /**
  * Places the style source descriptors into the Emscripten heap, and reads source metadata back.
@@ -232,18 +237,65 @@ internal object SourceMarshal {
   /** Reports whether the source at [base] carries attribution worth a second call to copy. */
   fun sourceInfoHasAttribution(base: HeapPointer): Boolean = MlnStyleSourceInfo.hasAttribution(base)
 
+  /** Reports whether the source at [base] retains a URL, which a second call copies. */
+  fun sourceInfoHasUrl(base: HeapPointer): Boolean =
+    sourceInfoHas(base, MlnStyleSourceInfoField.MLN_STYLE_SOURCE_INFO_URL)
+
+  /** Reports whether the source at [base] was defined with inline TileJSON. */
+  fun sourceInfoHasTileJson(base: HeapPointer): Boolean =
+    sourceInfoHas(base, MlnStyleSourceInfoField.MLN_STYLE_SOURCE_INFO_TILEJSON)
+
   /**
-   * Reads the source metadata at [base], with the [attribution] the caller copied.
+   * Reads the source metadata at [base], with the strings the caller copied.
    *
-   * The C descriptor carries string lengths rather than string contents, so the attribution text
-   * arrives from a separate copy call rather than from these bytes.
+   * The C descriptor carries string lengths and counts rather than string contents, so the
+   * attribution, the URL, and the inline tile URLs arrive from separate calls rather than from
+   * these bytes.
    */
-  fun readSourceInfo(base: HeapPointer, attribution: String?): SourceInfo =
+  fun readSourceInfo(
+    base: HeapPointer,
+    attribution: String?,
+    url: String?,
+    tileUrls: List<String>?,
+  ): SourceInfo =
     SourceInfo(
       SourceType.fromNative(MlnStyleSourceInfo.type(base)),
       MlnStyleSourceInfo.isVolatile(base),
       attribution,
+      if (sourceInfoHasUrl(base)) url else null,
+      if (sourceInfoHasTileJson(base)) readTileJson(base, tileUrls.orEmpty()) else null,
+      if (sourceInfoHas(base, MlnStyleSourceInfoField.MLN_STYLE_SOURCE_INFO_TILE_SIZE)) {
+        MlnStyleSourceInfo.tileSize(base)
+      } else {
+        null
+      },
+      if (sourceInfoHas(base, MlnStyleSourceInfoField.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING)) {
+        VectorTileEncoding.fromNative(MlnStyleSourceInfo.vectorEncoding(base))
+      } else {
+        null
+      },
+      if (sourceInfoHas(base, MlnStyleSourceInfoField.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING)) {
+        RasterDemEncoding.fromNative(MlnStyleSourceInfo.rasterEncoding(base))
+      } else {
+        null
+      },
     )
+
+  private fun readTileJson(base: HeapPointer, tileUrls: List<String>): TileJson =
+    TileJson(
+      tileUrls,
+      MlnStyleSourceInfo.minZoom(base),
+      MlnStyleSourceInfo.maxZoom(base),
+      TileScheme.fromNative(MlnStyleSourceInfo.scheme(base)),
+      if (sourceInfoHas(base, MlnStyleSourceInfoField.MLN_STYLE_SOURCE_INFO_BOUNDS)) {
+        MapOptionsMarshal.readLatLngBounds(base + MlnStyleSourceInfo.OFFSET_BOUNDS)
+      } else {
+        null
+      },
+    )
+
+  private fun sourceInfoHas(base: HeapPointer, field: Int): Boolean =
+    (MlnStyleSourceInfo.fields(base) and field) != 0
 
   /**
    * Reads a source type from the out-parameter at [pointer].

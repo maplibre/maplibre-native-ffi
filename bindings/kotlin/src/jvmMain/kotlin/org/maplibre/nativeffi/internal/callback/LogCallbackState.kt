@@ -19,10 +19,8 @@ import org.maplibre.nativeffi.log.LogSeverity
 
 /** Owns process-global JVM FFM logging callback state. */
 @OptIn(ExperimentalAtomicApi::class)
-internal class LogCallbackState private constructor(
-  private val callback: LogCallback,
-  private val consume: Boolean,
-) :
+internal class LogCallbackState
+private constructor(private val callback: LogCallback, private val consume: Boolean) :
   AutoCloseable {
   private val arena = Arena.ofShared()
   private val gate = CallbackGate("log callbacks") { arena.close() }

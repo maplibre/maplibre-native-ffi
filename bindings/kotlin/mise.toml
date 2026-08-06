@@ -14,11 +14,28 @@ dir = "../.."
 # Both generators read the headers with the pinned Emscripten clang, which is
 # the compiler that lays out the module the binding calls, and take their paths
 # from $EMSDK.
+#
+# The generators write each declaration on one line, however long it runs.
+# Formatting them here is what makes the committed files the same text the
+# generators produce, so `mise run fix` has nothing left to rewrite and
+# check-wasm-generated has nothing to report.
 run = '''
 set -euo pipefail
 python3 scripts/generate-wasm-struct-layouts.py
 python3 scripts/generate-wasm-externs.py
+dprint fmt "bindings/kotlin/src/wasmJsMain/generated/**/*.kt"
 '''
+
+[tasks.check-wasm-generated]
+description = "Verify the committed browser struct offsets and entry points match the headers."
+depends = [":generate-wasm"]
+dir = "../.."
+# The export check compares the generated Kotlin against the module, and both
+# are built from the same headers, so a header change that nobody regenerated
+# for passes it. This is what catches that: it regenerates and reports any
+# difference, following the pattern the hygiene job uses for every other
+# generated file in the repository.
+run = "git diff --exit-code -- bindings/kotlin/src/wasmJsMain/generated/"
 
 [tasks.check-wasm-externs]
 description = "Verify each generated browser entry point matches the linked module."
@@ -145,19 +162,14 @@ esac
 description = "Run the Kotlin browser binding tests in headless Chromium."
 depends = [{ task = "//:build", args = ["emscripten-wasm32-webgl"] }]
 dir = "../.."
-# The browser build installs the module under its prefix, beside its wasm and its ABI manifest, and
-# that prefix is also what the packaged browser artifact unpacks to. Pointing the tests there means
-# they drive the same layout a host downloads, and it keeps them working in CI, where the packaged
-# artifact replaces the build tree before this task runs.
-#
-# Kotlin resolves its Karma tooling with Yarn 1 by default, which refuses to run under a checkout
-# whose package.json names another package manager. This repository's does, so the wasm test
-# tooling is resolved with npm instead.
+# The browser build installs the module under its prefix, beside its wasm, and that prefix is also
+# what the packaged browser artifact unpacks to. Pointing the tests there means they drive the same
+# layout a host downloads, and it keeps them working in CI, where the packaged artifact replaces the
+# build tree before this task runs.
 run = '''
 ./gradlew \
-  -Pkotlin.js.yarn=false \
   -Pmaplibre.browser.moduleDir=build/emscripten-wasm32-webgl/install/lib/browser \
-  :bindings:kotlin:wasmJsBrowserTest
+  :bindings:kotlin:wasmJsBrowserSuite
 '''
 
 [tasks.iosBuild]

@@ -1,18 +1,11 @@
 package org.maplibre.nativeffi
 
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.EmptyCoroutineContext
-import kotlin.coroutines.startCoroutine
-import kotlin.js.JsAny
-import kotlin.js.Promise
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.wasm.Heap
-import org.maplibre.nativeffi.internal.wasm.NativeCall
-import org.maplibre.nativeffi.internal.wasm.awaitOrThrow
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.render.WebglContext
@@ -27,14 +20,17 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
 // Each is recorded here rather than dropped, so the gap between this suite and the table is a
 // stated one. Everything else in the table is covered by a test marked `Spec coverage: BND-xxx`.
 //
-// **No second host thread.** A page is one thread, and every owner-affine call is placed on the
-// module's thread by the binding rather than by the host. Host code therefore cannot make a call
-// from the wrong thread, race a release against a use, or attach a render session from a thread
-// that does not own the map:
-// - BND-046 — concurrent releases: a page cannot release the same handle twice at once.
-// - BND-049, BND-190, BND-191 — wrong-thread calls: the binding never makes one.
-// - BND-145 — completing a handled request from another thread: there is no other thread.
-// - BND-153 — a release waiting for an in-flight use: no use can be in flight from elsewhere.
+// **No second thread this binding can reach.** Kotlin/Wasm runs on the Emscripten pthread the
+// module's `main()` imported it into, and a Kotlin/Wasm module cannot create a thread of its own:
+// there is no `pthread_create` it can call and no worker that would share its memory. Every call
+// this binding makes into the C API is therefore made from the same native thread, and every
+// callback body reaches it by being drained from the module's record ring on that same thread. So
+// no test here can make a call from the wrong thread, race a release against a use, or hold a
+// handle from a thread that does not own it:
+// - BND-046 — concurrent releases.
+// - BND-049, BND-190, BND-191 — wrong-thread calls.
+// - BND-145 — completing a handled request from another thread.
+// - BND-153 — a release waiting for an in-flight use from elsewhere.
 // - BND-193, BND-194, BND-195, BND-196 — render sessions on a second thread.
 // - BND-197 — a release racing a use of the same handle.
 // - BND-174 — closing a map whose session was attached on another thread.
@@ -44,186 +40,80 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
 // - BND-044 — cleanup hooks reporting leaked thread-affine handles.
 // - BND-048 — best-effort cleanup failure reported through a leak channel.
 //
+// **Answered by a native rule table rather than by host code.** MapLibre raises a resource
+// transform on worker threads, each of which is a separate JavaScript agent, so this binding
+// registers `mln_adapter_resource_transform_rewrite_callback` and reports the host-callback form
+// as unsupported, which is what the specification's `#### The browser` clause sanctions. No host
+// code receives a transform request, so there is nothing for a copy to protect:
+// - BND-141 — transform request data copied into language-owned values.
+// BND-140 is covered by `ResourceProviderBrowserTest`, through the rule table.
+//
+// **Decided by route rather than by a callback return.** Requests reach host code through
+// `mln_adapter_queued_resource_provider`, which claims a request by matching a route declared at
+// registration. The specification states that BND-150 does not apply to such a binding, because
+// there is no callback return path left to override.
+//
 // **Absent by design in this module.**
 // - BND-158, BND-159 — outgoing HTTP header transforms. The browser's fetch transport follows
 //   redirects itself, so a transformed header cannot be kept out of a cross-origin hop. Asserted
 //   as permanently unsupported by `RuntimeHandleBrowserTest` instead.
-// - BND-156, BND-157 — queued provider routes. This binding does not route provider requests
-//   through `mln_adapter_queued_resource_provider`.
 // - BND-160's Metal and Vulkan halves — the browser module is built with OpenGL only. The
 //   unsupported-backend errors those attach paths report are covered.
 //
 // **Injected through an internal seam.** The module will not produce these on request, so
-// `InjectedFaults` produces them instead, which the binding specification's test-seam rules allow
-// for every one of these but the last. Each of these tests asserts the state the failure left
-// behind rather than only the error it reported:
+// `InjectedFaults` produces them instead, which the binding specification's test-seam rules allow.
+// Each of these tests asserts the state the failure left behind rather than only the error it
+// reported:
 // - BND-066's copy-failure half — `StyleBrowserTest` and `QueryBrowserTest` fail the copy after a
 //   native list, snapshot, or result handle is acquired, and replay the handle to prove native
 //   destroyed it.
 // - BND-122's failed-replacement half — `ResourceProviderBrowserTest` has native refuse the
-//   provider and transform installs. The custom geometry family needs no seam: native refuses a
+//   provider and rewrite-rule installs. The custom geometry family needs no seam: native refuses a
 //   duplicate source id by itself, which `CustomGeometrySourceBrowserTest` uses.
 // - BND-169 — `RenderSessionBrowserTest` has native refuse a frame release, and the frame stays
 //   retryable.
 // - BND-172 — `RenderSessionBrowserTest` fails the wrapper construction that follows a successful
 //   frame acquire, and the session goes on rendering, resizing, and handing out frames, which it
 //   could not do if the frame it acquired had been stranded.
-// - A completion drain turn that threw — `DispatcherBrowserTest`. This one is not a row in the
-//   table and not one of the failures the seam list enumerates; it is the binding's own machinery
-//   rather than anything the C API does, and it is here because the rule the list illustrates
-//   covers it: a page task the dispatcher scheduled for itself cannot be made to fail from
-//   outside, and a turn that failed without leaving a successor scheduled would strand every
-//   parked caller on the page.
-//
-// **The C API has no such call to refuse.**
-// - BND-122's log family. The module's log queue is registered with native once and never
-//   withdrawn -- the adapter's listener takes no user data, so a withdrawal could not be
-//   attributed to the registration retiring -- so replacing a log callback swaps a Kotlin
-//   reference and makes no native install call at all. `LogQueueBridge` states why. There is
-//   nothing for native to refuse, and the replacement holds no native state to release.
-//
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Where the Karma harness serves the prelinked Emscripten module.
+ * The origin this module was served from.
  *
- * Paired with the proxy in `karma.config.d/maplibre-browser-module.js`. The wasm and the ABI
- * manifest sit beside it, which is what the loader expects of any deployment.
- */
-private const val MODULE_URL: String = "/maplibre/maplibre_native_c.mjs"
-
-@JsFun("(message) => new Error(message)") private external fun jsError(message: String): JsAny
-
-/**
- * Runs [block] as one test, with the browser module loaded.
- *
- * The browser binding's entry points are suspending, because loading a module and parking a stack
- * on native work are both promise-shaped. A test therefore returns the promise its body settles,
- * which is what the test framework waits on; a test that called the body and returned would report
- * success before the body had run.
- *
- * Loading is memoized by the loader itself, so every test names the module and the first one to
- * arrive is the one that fetches it.
- */
-internal fun browserTest(block: suspend () -> Unit): Promise<JsAny?> = Promise { resolve, reject ->
-  val body: suspend () -> Unit = {
-    // Before the module is even loaded, because reserving a canvas has to happen before the owner
-    // thread starts and that thread starts on the first call any test makes. Which test runs first
-    // is the framework's choice, so every test does this and the first one to arrive is the one it
-    // takes effect for.
-    PageCanvases.reserveAll()
-    Maplibre.loadNativeLibraryAsync(MODULE_URL)
-    block()
-  }
-  body.startCoroutine(
-    Continuation(EmptyCoroutineContext) { result ->
-      result.fold(
-        onSuccess = { resolve(null) },
-        // Carried across as a JavaScript error, which is the only failure shape a promise has.
-        // The Kotlin type and stack are written into the message so the report still names the
-        // line that failed.
-        onFailure = { reject(jsError("$it\n${it.stackTraceToString()}")) },
-      )
-    }
-  )
-}
-
-/**
- * Runs [task] on the page's next browser task.
- *
- * Used to observe the page while a scope is parked. A parked scope resumes from the event loop, so
- * a task that never ran would say the page had stopped servicing it.
- */
-@JsFun("(task) => { globalThis.setTimeout(task, 0) }")
-internal external fun runOnNextPageTask(task: () -> Unit)
-
-/** Milliseconds on the page's clock, for measuring how long a parked call actually waited. */
-@JsFun("() => Date.now()") internal external fun pageTimeMillis(): Double
-
-/**
- * Takes the page's uncaught-error handler, so a failure with no caller can be asserted on.
- *
- * A task the binding scheduled for itself has nowhere to report a failure but the page, and the
- * harness's own handler treats one as the run having collapsed: Karma binds `window.onerror`, and
- * its handler ends the whole browser session rather than the test. So a test that expects an
- * uncaught error stands in front of that handler for as long as it expects one, and puts it back
- * afterwards — which [endCapturingUncaughtErrors] must therefore be reached from a finally.
- *
- * Returning true is what keeps the error out of the console as well, so an expected failure does
- * not read as a real one in the log.
- */
-@JsFun(
-  """
-  () => {
-    const seen = []
-    globalThis.__maplibreTestUncaught = seen
-    globalThis.__maplibreTestOnError = globalThis.onerror
-    globalThis.onerror = (message, source, line, column, error) => {
-      seen.push(String((error && error.message) || message || 'uncaught'))
-      return true
-    }
-  }
-"""
-)
-internal external fun beginCapturingUncaughtErrors()
-
-/** Gives the handler back and reports what arrived while it was taken, one line each. */
-@JsFun(
-  """
-  () => {
-    globalThis.onerror = globalThis.__maplibreTestOnError ?? null
-    const seen = globalThis.__maplibreTestUncaught ?? []
-    globalThis.__maplibreTestUncaught = undefined
-    globalThis.__maplibreTestOnError = undefined
-    return seen.join('\n')
-  }
-"""
-)
-internal external fun endCapturingUncaughtErrors(): String
-
-/**
- * The origin the test page was served from.
- *
- * Used where a test needs a URL the module's HTTP transport can really fetch. The harness's own
- * origin is the only one available: the page is cross-origin isolated, so a request anywhere else
- * would be refused before it left the browser.
+ * Used where a test needs a URL the module's HTTP transport can really fetch. This thread is a
+ * worker of the host page, so its location is the module's own URL; the page is cross-origin
+ * isolated, and a request anywhere else would be refused before it left the browser.
  */
 @JsFun("() => globalThis.location.origin") internal external fun pageOrigin(): String
 
-/** Yields the page for one browser task, so anything queued on it runs before this returns. */
-internal suspend fun nextPageTask() {
-  Promise<JsAny?> { resolve, _ -> runOnNextPageTask { resolve(null) } }.awaitOrThrow()
+@JsFun("() => Date.now()") private external fun nowMillis(): Double
+
+/** Reports how long [body] took, for the waits whose whole claim is that they ended early. */
+internal fun elapsedMillis(body: () -> Unit): Long {
+  val started = nowMillis()
+  body()
+  return (nowMillis() - started).toLong()
 }
 
 /**
  * Asserts that native no longer holds the snapshot, list, or result handle [handle] named.
  *
- * Asking native is the only way a page can tell a destroyed result handle from a leaked one. A
- * leaked one sits in the module's handle table doing nothing until the page is gone. A destroyed
- * one names a retired generation of its slot, and native answers that with an invalid argument
- * saying so. So the handle is replayed through [entry], which is any entry point that takes a
- * handle of this [kind] and one output pointer, and the diagnostic is what carries the proof.
+ * Asking native is the only way to tell a destroyed result handle from a leaked one. A leaked one
+ * sits in the module's handle table doing nothing until the page is gone. A destroyed one names a
+ * retired generation of its slot, and native answers that with an invalid argument saying so. So
+ * the handle is replayed through [replay], which is any entry point taking a handle of this [kind]
+ * and one output pointer.
  *
  * The replay is what a released handle costs a caller anyway, and the binding's own wrappers cannot
  * express it: a result handle never leaves the call that reads it.
  */
-internal fun assertResultHandleDestroyed(handle: Long, entry: String, kind: String) {
+internal fun assertResultHandleDestroyed(handle: Long, kind: String, replay: (Long, Int) -> Int) {
   assertTrue(handle != 0L, "no native $kind was acquired, so nothing was there to destroy")
   val error =
     assertFailsWith<InvalidArgumentException>(
       "native still holds $kind $handle, so the failed copy leaked it"
     ) {
-      Heap.withScratch(RESULT_HANDLE_OUT_BYTES) { out ->
-        NativeCall.call(
-          entry,
-          2,
-          { slots ->
-            slots.setLong(0, handle)
-            slots.setPointer(1, out)
-          },
-          { Status.check(Heap.loadInt(it)) },
-        )
-      }
+      Heap.withScratch(RESULT_HANDLE_OUT_BYTES) { out -> Status.check(replay(handle, out.address)) }
     }
   assertTrue(error.diagnostic.contains(kind), error.diagnostic)
   assertTrue(error.diagnostic.contains("stale"), error.diagnostic)
@@ -232,124 +122,22 @@ internal fun assertResultHandleDestroyed(handle: Long, entry: String, kind: Stri
 /** Room for the widest output any of the replayed entry points above writes. */
 private const val RESULT_HANDLE_OUT_BYTES = 8
 
-// ---------------------------------------------------------------------------------------------
-// Presenting to the page, and looking at what arrived there.
-//
-// A render test that reads the texture back proves the map drew something. It does not prove the
-// frame ever reached the page, and in a browser those are different questions with different
-// answers: pixels reach a page only when a canvas the page displays is composited, and a canvas is
-// composited only when the task that drew into it ends. So the tests below assert on the `<canvas>`
-// *element* — through `drawImage` into a scratch two-dimensional canvas and `getImageData`, which
-// is what any page code would see — and never through a readback, which would pass just as well
-// against a canvas nothing displays.
-// ---------------------------------------------------------------------------------------------
-
 /**
- * Creates a `<canvas>` element with this id if the document has none, and reports its presence.
+ * The one `<canvas>` element of the host page this thread can render into.
  *
- * Idempotent, because every test calls it and only the first one can matter: control of a canvas is
- * given away once, and a second element with the same id would be a different canvas the owner
- * thread never received.
+ * A canvas reaches a pthread by being transferred as that thread is created, and the module's link
+ * names this element id in `-sOFFSCREENCANVASES_TO_PTHREAD`. So there is exactly one, it is the
+ * page's own element rather than a private surface, and no test can make a second: a page hosting
+ * more than one on-screen map is a documented limitation of this binding rather than something a
+ * test could reach.
+ *
+ * The context is created once and never destroyed, because a WebGL context belongs to its canvas —
+ * asking the same canvas for a second one hands back the first. That is also what a page host does:
+ * one canvas, one context, for as long as the page lives.
  */
-@JsFun(
-  """
-  (id, width, height) => {
-    let canvas = document.getElementById(id)
-    if (!canvas) {
-      canvas = document.createElement('canvas')
-      canvas.id = id
-      canvas.width = width
-      canvas.height = height
-      document.body.appendChild(canvas)
-    }
-    return true
-  }
-"""
-)
-private external fun ensureCanvasElement(id: String, width: Int, height: Int): Boolean
-
-/**
- * Copies what the page's canvas element currently shows into the module's heap, as RGBA8.
- *
- * Read the way page code would: the element is drawn into a scratch two-dimensional canvas and
- * sampled with `getImageData`. That is the whole point — it reaches the placeholder element rather
- * than the render target, so it can only see what the browser actually composited.
- *
- * `getImageData` returns top-down rows and un-premultiplied colour, where GL's own origin is the
- * bottom row. The styles these tests render fill the viewport with one colour, so neither
- * difference shows; a test that drew something asymmetric would have to account for both.
- */
-@JsFun(
-  """
-  (id, width, height, address) => {
-    const source = document.getElementById(id)
-    if (!source) return false
-    const scratch = document.createElement('canvas')
-    scratch.width = width
-    scratch.height = height
-    const context = scratch.getContext('2d', { willReadFrequently: true })
-    // Cleared first, so a canvas that never received a frame reads as transparent rather than as
-    // whatever the scratch happened to hold.
-    context.clearRect(0, 0, width, height)
-    context.drawImage(source, 0, 0, width, height)
-    const data = context.getImageData(0, 0, width, height).data
-    globalThis.__maplibreNativeC.HEAPU8.set(data, address)
-    return true
-  }
-"""
-)
-private external fun readCanvasElement(id: String, width: Int, height: Int, address: Int): Boolean
-
-/**
- * Parks this stack until the page has had a chance to composite.
- *
- * A suspending import, for the same reason every dispatched call is one: this runs inside a
- * `maplibreScope`, where the stack may unwind to the event loop and be resumed, and it has to yield
- * the page rather than spin on it — a page that spins never composites anything.
- *
- * An animation frame is what a compositor drives, and a timeout is the fallback, because a headless
- * browser that decides the page is not being painted would otherwise never resume this at all.
- */
-@JsFun(
-  """
-  new WebAssembly.Suspending(async () => {
-    await Promise.race([
-      new Promise((resolve) => globalThis.requestAnimationFrame(() => resolve(null))),
-      new Promise((resolve) => globalThis.setTimeout(() => resolve(null), 20)),
-    ])
-    return 0
-  })
-"""
-)
-private external fun awaitPageFrame(): Int
-
-/** The canvases this suite hands to the owner thread, one per test that presents to the page. */
-internal object PageCanvases {
-  /** The surface session's, which renders straight into this canvas's default framebuffer. */
-  const val SURFACE: String = "mln-test-surface"
-
-  /** The session-owned texture target's, which is blitted onto this canvas to present. */
-  const val OWNED_TEXTURE: String = "mln-test-owned-texture"
-
-  /** The caller-owned texture target's, which is blitted the same way. */
-  const val BORROWED_TEXTURE: String = "mln-test-borrowed-texture"
-
-  /** The custom geometry source test's, which presents tiles this page supplied. */
-  const val CUSTOM_GEOMETRY: String = "mln-test-custom-geometry"
-
+internal object PageCanvas {
   /**
-   * A valid HTML id that a CSS identifier cannot spell literally, for [HostileCanvasIdBrowserTest].
-   *
-   * An id may be anything without ASCII whitespace, and the module reaches a page canvas through
-   * `document.querySelector`, so every character here is one that has to be escaped on the way or
-   * the transfer selects the wrong element or none: a leading digit, a colon, a dot, and brackets.
-   * Reserved alongside the others because a canvas reaches the owner thread only as that thread is
-   * created.
-   */
-  const val HOSTILE: String = "9mln:test.hostile[canvas]"
-
-  /**
-   * The size every one of them is created at.
+   * The size the canvas is used at.
    *
    * Small, because a software rasteriser draws every pixel of every frame these tests render, and
    * an image that fills a viewport says everything a larger one would.
@@ -357,114 +145,63 @@ internal object PageCanvases {
   const val WIDTH: Int = 64
   const val HEIGHT: Int = 32
 
-  /**
-   * Puts each canvas in the document and claims it for the owner thread.
-   *
-   * One canvas per presenting test rather than one shared between them, which is also what a real
-   * host does: a canvas belongs to the thing rendering onto it. It is not only tidiness — a
-   * transferred canvas tolerates about two WebGL contexts over a page's lifetime, and a third
-   * consumer of the same canvas makes destroying the runtime fail.
-   */
-  fun reserveAll() {
-    for (id in listOf(SURFACE, OWNED_TEXTURE, BORROWED_TEXTURE, CUSTOM_GEOMETRY, HOSTILE)) {
-      ensureCanvasElement(id, WIDTH, HEIGHT)
-      WebglContext.reserveCanvas(id)
-    }
+  private var shared: WebglContext? = null
+
+  /** The context every presenting test renders through, sized back to [WIDTH] by [HEIGHT]. */
+  fun context(): WebglContext {
+    val context = shared ?: WebglContext.createForPageCanvas(WIDTH, HEIGHT).also { shared = it }
+    context.resizeCanvas(WIDTH, HEIGHT)
+    return context
   }
 }
 
 /**
- * Asserts that the page's canvas element comes to show one opaque colour.
+ * Asserts that the page canvas's own drawing buffer holds one opaque colour.
  *
- * Presenting is not synchronous with the call that asks for it. The owner thread's task has to end
- * before the browser composites what it drew, and the page has to reach a frame before the element
- * it displays is updated — so this yields the page until the colour arrives, and only then makes
- * the assertion. Waiting for the frame to *appear* is not enough on its own: a canvas that already
- * holds a previous frame is opaque from the start, and a test that reads the first opaque image it
- * sees would keep asserting against the frame before the one it asked for.
+ * Read with `glReadPixels` against framebuffer zero, which for a transferred canvas is the element
+ * the page displays rather than a surface of this binding's own. That is what makes this a claim
+ * about presenting: a surface session draws straight into this framebuffer, and a texture session's
+ * frame reaches it only by being blitted there.
  *
- * A colour that never arrives is not silently tolerated. The last image the page actually held is
- * what the assertion runs against, so the failure names the colour that was really there.
+ * What it does not claim is that the browser composited what it read. Compositing happens when the
+ * task that drew ends, and the page's `<canvas>` element can only be sampled from the page's own
+ * agent, which this thread is not.
  */
 internal fun assertPresentedColor(
-  id: String,
+  context: WebglContext,
   red: Int,
   green: Int,
   blue: Int,
-  width: Int = PageCanvases.WIDTH,
-  height: Int = PageCanvases.HEIGHT,
+  width: Int = PageCanvas.WIDTH,
+  height: Int = PageCanvas.HEIGHT,
 ) {
-  var pixels = ByteArray(0)
-  repeat(PRESENT_ATTEMPTS) {
-    awaitPageFrame()
-    pixels = readPageCanvas(id, width, height)
-    // One pixel decides whether to stop waiting, and the whole image is then checked below. A
-    // partly arrived frame therefore fails on the pixels that are wrong rather than waiting for a
-    // frame that is already as complete as it will get.
-    if (isPresentedColor(pixels, 0, red, green, blue)) {
-      assertUniformColor(pixels, red, green, blue, width, height, "presented")
-      return
-    }
-  }
-  assertUniformColor(pixels, red, green, blue, width, height, "presented")
+  assertUniformColor(context.readPixels(0, width, height), red, green, blue, width, height, "page")
 }
 
 /**
  * Asserts that a frame read back out of a render target is one opaque colour.
  *
- * Read back rather than presented, which is the point of having both: a page canvas showing the
- * wrong colour says nothing about whether the map drew the right one, and these two assertions
- * together say which half failed. The page assertion is the one that matters; this one is what
- * makes its failure diagnosable.
- *
- * Row zero is the bottom row here, where the presented image has it at the top, so a uniform colour
- * is all these two can be compared on directly.
+ * Read back rather than presented, which is the point of having both: a canvas showing the wrong
+ * colour says nothing about whether the map drew the right one, and these two assertions together
+ * say which half failed.
  */
 internal fun assertRenderedColor(
   pixels: ByteArray,
   red: Int,
   green: Int,
   blue: Int,
-  width: Int = PageCanvases.WIDTH,
-  height: Int = PageCanvases.HEIGHT,
+  width: Int = PageCanvas.WIDTH,
+  height: Int = PageCanvas.HEIGHT,
 ) {
   assertUniformColor(pixels, red, green, blue, width, height, "rendered")
 }
 
-private fun isPresentedColor(
-  pixels: ByteArray,
-  offset: Int,
-  red: Int,
-  green: Int,
-  blue: Int,
-): Boolean =
-  pixels.size > offset + 3 &&
-    channelMatches(pixels, offset, red) &&
-    channelMatches(pixels, offset + 1, green) &&
-    channelMatches(pixels, offset + 2, blue) &&
-    channelMatches(pixels, offset + 3, 255)
-
-private fun channelMatches(pixels: ByteArray, offset: Int, expected: Int): Boolean =
-  (pixels[offset].toInt() and 0xFF) in
-    (expected - PRESENT_TOLERANCE)..(expected + PRESENT_TOLERANCE)
-
-private fun readPageCanvas(id: String, width: Int, height: Int): ByteArray {
-  val bytes = width * height * 4
-  return Heap.withScratch(bytes) { pixels ->
-    if (!readCanvasElement(id, width, height, pixels.address)) {
-      error("the document has no canvas element with the id \"$id\"")
-    }
-    Heap.loadBytes(pixels, bytes)
-  }
-}
-
 /**
- * Asserts every pixel of a presented image is one opaque colour.
+ * Asserts every pixel of an image is one opaque colour.
  *
  * Checked as a whole image rather than a sample: these styles paint one background over the whole
- * viewport, so a frame that reached the page only in part shows up here where a single sample would
- * miss it. The tolerance is for the round trip through a float shader, an eight-bit target, a
- * compositor, and `getImageData`'s un-premultiplication.
+ * viewport, so a frame that arrived only in part shows up here where a single sample would miss it.
+ * The tolerance is for the round trip through a float shader and an eight-bit target.
  */
 private fun assertUniformColor(
   pixels: ByteArray,
@@ -504,26 +241,17 @@ private fun assertChannel(
 ) {
   val actual = pixels[offset].toInt() and 0xFF
   assertTrue(
-    actual in (expected - PRESENT_TOLERANCE)..(expected + PRESENT_TOLERANCE),
+    actual in (expected - COLOR_TOLERANCE)..(expected + COLOR_TOLERANCE),
     "the $where pixel ($x, $y) has $channel $actual, but the frame's is $expected",
   )
 }
+
+private const val COLOR_TOLERANCE = 3
 
 /** A style painting one opaque background colour and nothing else: no network, no tiles. */
 internal fun backgroundStyle(color: String): String =
   """{"version":8,"sources":{},"layers":[""" +
     """{"id":"background","type":"background","paint":{"background-color":"$color"}}]}"""
-
-/**
- * How many page frames a present is given to arrive.
- *
- * Each is an animation frame or twenty milliseconds, whichever comes first, so this bounds a wait
- * at a couple of seconds — far longer than a compositor takes, and short enough that a frame that
- * never arrives fails the run rather than hanging it.
- */
-private const val PRESENT_ATTEMPTS = 100
-
-private const val PRESENT_TOLERANCE = 3
 
 /** A style with a background layer and nothing else: no network, no tiles, no glyphs. */
 internal const val BACKGROUND_STYLE_JSON: String =
@@ -535,14 +263,22 @@ internal const val EMPTY_STYLE_JSON: String = """{"version":8,"sources":{},"laye
 /**
  * How long each wait pumps for, and how many times.
  *
- * A pump with a timeout parks the module's owner thread rather than the page, so the page keeps
- * servicing the event loop that resumes this stack. The product bounds a wait at a few seconds,
- * which is far longer than any style this suite loads takes.
+ * A pump blocks this thread on the runtime's own condition variable, which is legal here and is
+ * what gives MapLibre's workers a chance to run. The product bounds a wait at a few seconds, far
+ * longer than any style this suite loads takes.
  */
 private const val PUMP_MILLIS = 2L
 private const val PUMP_ATTEMPTS = 2_000
 
-/** Runs [body] with a runtime, closing it afterwards. Owner-affine: call inside a scope. */
+/**
+ * Runs [body] with a runtime, closing it afterwards.
+ *
+ * The provider is cleared and the ring drained before the close, because a queued provider's
+ * registration is only released when its retirement marker comes out of the ring — and a runtime
+ * that is gone can no longer drain one. A registration left waiting for its marker is the module's
+ * state rather than this runtime's, so it would be the *next* test that found its provider
+ * unreachable.
+ */
 internal fun <T> withRuntime(
   options: RuntimeOptions = RuntimeOptions(),
   body: (RuntimeHandle) -> T,
@@ -551,9 +287,18 @@ internal fun <T> withRuntime(
   try {
     return body(runtime)
   } finally {
+    if (!runtime.isClosed) {
+      runCatching { runtime.clearResourceProvider() }
+      runCatching { pumpTurns(runtime, RETIREMENT_PUMPS) }
+    }
     runtime.close()
   }
 }
+
+/**
+ * Enough turns for the retirement markers of anything a test registered to come out of the ring.
+ */
+private const val RETIREMENT_PUMPS = 8
 
 /** Runs [body] with a runtime and a map of [width] by [height], closing both afterwards. */
 internal fun <T> withMap(
@@ -617,5 +362,19 @@ internal fun drain(runtime: RuntimeHandle) {
       drained = true
     }
     if (!drained) return
+  }
+}
+
+/**
+ * Pumps [turns] times without waiting for anything.
+ *
+ * Used where the claim is that nothing arrives. A record native produced reaches host code by being
+ * drained inside a pump, so the runtime has to be pumped that many times before its absence means
+ * anything.
+ */
+internal fun pumpTurns(runtime: RuntimeHandle, turns: Int) {
+  repeat(turns) {
+    runtime.pump(PUMP_MILLIS)
+    while (runtime.pollEvent() != null) {}
   }
 }

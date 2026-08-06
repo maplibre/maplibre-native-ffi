@@ -18,8 +18,6 @@
 
 #include <GLES3/gl3.h>
 #include <emscripten.h>
-
-#include "mln_kotlin.h"
 #include <emscripten/html5.h>
 #include <emscripten/html5_webgl.h>
 #include <stdbool.h>
@@ -27,6 +25,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "mln_kotlin.h"
 
 // The canvas registry, from mln_kotlin_host.js.
 void mln_kotlin_canvas_register(const char* name, int width, int height);

@@ -15,10 +15,8 @@ import org.maplibre.nativeffi.log.LogSeverity
 
 /** Owns process-global logging callback state. */
 @OptIn(ExperimentalForeignApi::class)
-internal class LogCallbackState private constructor(
-  private val callback: LogCallback,
-  private val consume: Boolean,
-) :
+internal class LogCallbackState
+private constructor(private val callback: LogCallback, private val consume: Boolean) :
   AutoCloseable {
   private val gate = CallbackGate("log callbacks")
 

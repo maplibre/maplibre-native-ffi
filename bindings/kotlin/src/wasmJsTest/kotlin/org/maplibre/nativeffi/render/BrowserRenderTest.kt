@@ -1,14 +1,10 @@
 package org.maplibre.nativeffi.render
 
-import kotlin.js.JsAny
-import kotlin.js.Promise
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.browserTest
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapOptions
-import org.maplibre.nativeffi.maplibreScope
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 
@@ -16,7 +12,7 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
  * Renders a real map frame in a real browser and looks at the pixels.
  *
  * This is the test the whole browser render path exists for. Everything below it — the module, the
- * owner thread, the descriptors, the readback — can be exercised without a GPU ever being asked to
+ * WebGL context, the descriptors, the readback — can be exercised without a GPU ever being asked to
  * draw anything, and each of those pieces can be right while the frame is still blank. So the
  * assertion is on the image: a background layer of a known colour fills the viewport, and the
  * readback has to come back as that colour rather than as the zeroed buffer a target that never
@@ -27,60 +23,58 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
  */
 class BrowserRenderTest {
   @Test
-  fun rendersABackgroundFrameAndReadsItBack(): Promise<JsAny?> = browserTest {
-    maplibreScope {
-      val runtime = RuntimeHandle.create(RuntimeOptions())
+  fun rendersABackgroundFrameAndReadsItBack() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    try {
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = WIDTH
+            height = HEIGHT
+          },
+        )
       try {
-        val map =
-          MapHandle.create(
-            runtime,
-            MapOptions().apply {
-              width = WIDTH
-              height = HEIGHT
-            },
-          )
+        // The context has to exist before the target that borrows it, and it outlives the
+        // session: the C API borrows the handle for the target's lifetime.
+        val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
         try {
-          // The context has to exist before the target that borrows it, and it outlives the
-          // session: the C API borrows the handle for the target's lifetime.
-          val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
+          map.setStyleJson(BACKGROUND_STYLE_JSON)
+          val session =
+            map.attachOpenGLOwnedTexture(
+              OpenGLOwnedTextureDescriptor(
+                extent = RenderTargetExtent(WIDTH, HEIGHT, 1.0),
+                context = context.descriptor(),
+              )
+            )
           try {
-            map.setStyleJson(BACKGROUND_STYLE_JSON)
-            val session =
-              map.attachOpenGLOwnedTexture(
-                OpenGLOwnedTextureDescriptor(
-                  extent = RenderTargetExtent(WIDTH, HEIGHT, 1.0),
-                  context = context.descriptor(),
-                )
-              )
-            try {
-              assertTrue(
-                renderUntilFrame(runtime, session),
-                "the session never reported a rendered frame",
-              )
+            assertTrue(
+              renderUntilFrame(runtime, session),
+              "the session never reported a rendered frame",
+            )
 
-              val info = session.textureImageInfo()
-              assertEquals(WIDTH, info.width)
-              assertEquals(HEIGHT, info.height)
-              assertEquals(WIDTH * 4, info.stride)
+            val info = session.textureImageInfo()
+            assertEquals(WIDTH, info.width)
+            assertEquals(HEIGHT, info.height)
+            assertEquals(WIDTH * 4, info.stride)
 
-              val pixels =
-                NativeBuffer.allocate(info.byteLength).use { buffer ->
-                  assertEquals(info, session.readPremultipliedRgba8(buffer))
-                  buffer.toByteArray()
-                }
-              assertBackgroundImage(pixels, info)
-            } finally {
-              session.close()
-            }
+            val pixels =
+              NativeBuffer.allocate(info.byteLength).use { buffer ->
+                assertEquals(info, session.readPremultipliedRgba8(buffer))
+                buffer.toByteArray()
+              }
+            assertBackgroundImage(pixels, info)
           } finally {
-            context.close()
+            session.close()
           }
         } finally {
-          map.close()
+          context.close()
         }
       } finally {
-        runtime.close()
+        map.close()
       }
+    } finally {
+      runtime.close()
     }
   }
 
@@ -89,7 +83,7 @@ class BrowserRenderTest {
    *
    * The first render has nothing to draw yet: the style is still parsing on a MapLibre worker, and
    * the map only becomes renderable once the update it produces has been pumped through. Pumping
-   * blocks on the owner thread, which is legal there and is what gives that worker a chance to run.
+   * blocks this thread, which is legal here and is what gives that worker a chance to run.
    */
   private fun renderUntilFrame(runtime: RuntimeHandle, session: RenderSessionHandle): Boolean {
     repeat(ATTEMPTS) {

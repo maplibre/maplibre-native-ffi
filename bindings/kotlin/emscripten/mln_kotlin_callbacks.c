@@ -25,7 +25,6 @@
 // Kotlin reports lost records rather than believing it saw them all.
 #define MLN_KOTLIN_RING_CAPACITY 1024
 
-
 // Kotlin reads these offsets from a hand-written layout.
 _Static_assert(sizeof(mln_kotlin_record) == 20, "record layout changed");
 _Static_assert(offsetof(mln_kotlin_record, payload) == 16, "payload moved");

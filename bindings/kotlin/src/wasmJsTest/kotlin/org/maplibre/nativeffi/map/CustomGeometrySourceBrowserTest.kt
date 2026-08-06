@@ -1,18 +1,16 @@
 package org.maplibre.nativeffi.map
 
-import kotlin.js.JsAny
-import kotlin.js.Promise
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.PageCanvases
+import org.maplibre.nativeffi.PageCanvas
 import org.maplibre.nativeffi.assertPresentedColor
 import org.maplibre.nativeffi.backgroundStyle
-import org.maplibre.nativeffi.browserTest
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.geo.CanonicalTileId
@@ -23,15 +21,14 @@ import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.internal.wasm.CustomGeometryBridge
 import org.maplibre.nativeffi.json.JsonValue
-import org.maplibre.nativeffi.maplibreScope
-import org.maplibre.nativeffi.nextPageTask
+import org.maplibre.nativeffi.pumpTurns
 import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
 import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.RenderTargetExtent
 import org.maplibre.nativeffi.render.WebglContext
-import org.maplibre.nativeffi.resource.ResourceProviderDecision
+import org.maplibre.nativeffi.resource.ResourceProviderRoute
 import org.maplibre.nativeffi.resource.ResourceResponse
 import org.maplibre.nativeffi.resource.ResourceResponseStatus
 import org.maplibre.nativeffi.runtime.RuntimeEventType
@@ -44,193 +41,139 @@ import org.maplibre.nativeffi.waitForMapEvent
 import org.maplibre.nativeffi.withMap
 
 /**
- * Parks the calling stack until the page releases it, holding whatever it stands on.
+ * A custom geometry source whose tiles this binding supplies, end to end.
  *
- * A suspending import, the same mechanism the binding's own waits use, so this parks a real stack
- * rather than simulating one. It is called from inside a tile callback, whose delivery runs on a
- * promising stack of its own — which is what makes parking there legal — and it holds that
- * callback's gate for as long as it is parked. That is the whole point: it stands in for the host
- * body that never returns, which is the case the binding's bounded close wait exists for.
+ * MapLibre asks for a tile from the worker the source's tile loader runs on, and that worker cannot
+ * enter this WebAssembly instance. So the C shim copies the tile id into the module's record ring
+ * and the binding delivers it while draining that ring inside `pump`. The body therefore runs on an
+ * ordinary stack, after the pump's own C call has returned, and may answer with
+ * `setCustomGeometrySourceTileData` from inside itself — which is what shared expect/actual code
+ * written for JVM, Android, or Kotlin/Native does — or record the tile and answer afterwards.
  *
- * The resolver is left on the page rather than kept here, because the stack that releases it is not
- * this one. One at a time: a second park would overwrite the first one's resolver and strand it.
- */
-@JsFun(
-  """
-  new WebAssembly.Suspending(() => new Promise((resolve) => {
-    globalThis.__mlnTestReleaseParkedTile = () => resolve(0)
-  }))
-"""
-)
-private external fun parkUntilReleased(): Int
-
-/** Lets the parked callback body finish, reporting whether one was parked. */
-@JsFun(
-  """
-  () => {
-    const release = globalThis.__mlnTestReleaseParkedTile
-    globalThis.__mlnTestReleaseParkedTile = undefined
-    if (!release) return false
-    release()
-    return true
-  }
-"""
-)
-private external fun releaseParkedTile(): Boolean
-
-/**
- * A custom geometry source whose tiles this page supplies, end to end.
+ * Retirement travels in the same ring, behind the notifications it retires: the shim invokes the
+ * tile callbacks once more with a tile id no real tile uses. So a source that is gone stops being
+ * delivered when that marker comes out of the ring, and the notifications already queued for it
+ * reach nobody.
  *
- * This is the one callback family in the binding that native invokes without waiting for an answer.
- * MapLibre asks for a tile from the worker the source's tile loader runs on; that worker cannot
- * enter the page's WebAssembly instance, so the module copies the tile id and posts it to the page,
- * where the host's callback body is. Because nothing is blocked while that body runs, the binding
- * delivers it on a stack that may reach the owner thread — so the host may answer with
- * `setCustomGeometrySourceTileData` from inside the callback, which is what shared expect/actual
- * code written for JVM, Android, or Kotlin/Native does, or record the tile and answer from a
- * `maplibreScope` afterwards.
- *
- * So the proof has to be the whole chain rather than any part of it, and it has to be both answers.
- * A tile the host was asked for and answered has to end up as pixels on a `<canvas>` the page
- * displays — read the way page code would read it — because every intermediate step can be right
- * while the geometry never reaches the screen. A fill layer over the custom source paints one
- * colour over a background of another, so the page changing colour is the source's geometry
- * arriving and nothing else.
+ * The proof of the working path has to be the whole chain rather than any part of it, and it has to
+ * be both answers. A fill layer over the custom source paints one colour over a background of
+ * another, so the canvas changing colour is the source's geometry arriving and nothing else.
  */
 class CustomGeometrySourceBrowserTest {
   // Spec coverage: BND-124.
   @Test
-  fun presentsTheTilesItsCallbackWasAskedForAndThePageSupplied(): Promise<JsAny?> = browserTest {
-    maplibreScope {
-      withMap(WIDTH, HEIGHT) { runtime, map ->
-        val requested = mutableListOf<CanonicalTileId>()
-        val cancelled = mutableListOf<CanonicalTileId>()
-        val deferred =
-          object : CustomGeometrySourceCallback {
-            override fun fetchTile(tileId: CanonicalTileId) {
-              requested.add(tileId)
-            }
-
-            override fun cancelTile(tileId: CanonicalTileId) {
-              cancelled.add(tileId)
-            }
+  fun presentsTheTilesItsCallbackWasAskedForAndTheHostSupplied() {
+    withMap(WIDTH, HEIGHT) { runtime, map ->
+      val requested = mutableListOf<CanonicalTileId>()
+      val cancelled = mutableListOf<CanonicalTileId>()
+      val deferred =
+        object : CustomGeometrySourceCallback {
+          override fun fetchTile(tileId: CanonicalTileId) {
+            requested.add(tileId)
           }
 
-        // The shared-code shape: answer the request inside the callback that made it. Failures are
-        // captured rather than thrown, because nothing above a callback would catch one and the
-        // test would then only see a tile that never arrived.
-        val answeredInline = mutableListOf<CanonicalTileId>()
-        var inlineFailure: Throwable? = null
-        val inline =
-          object : CustomGeometrySourceCallback {
-            override fun fetchTile(tileId: CanonicalTileId) {
-              runCatching {
-                  map.setCustomGeometrySourceTileData(SOURCE, tileId, worldFill())
-                  answeredInline.add(tileId)
-                }
-                .exceptionOrNull()
-                ?.let { if (inlineFailure == null) inlineFailure = it }
-            }
-
-            override fun cancelTile(tileId: CanonicalTileId) {}
+          override fun cancelTile(tileId: CanonicalTileId) {
+            cancelled.add(tileId)
           }
-
-        val context = WebglContext.createForCanvas(PageCanvases.CUSTOM_GEOMETRY, WIDTH, HEIGHT)
-        try {
-          val session =
-            map.attachOpenGLSurface(
-              OpenGLSurfaceDescriptor(
-                RenderTargetExtent(WIDTH, HEIGHT, 1.0),
-                context.descriptor(),
-                // A WebGL context is already bound to its canvas, so there is no drawable to name.
-                NativePointer.NULL,
-              )
-            )
-          try {
-            map.setStyleJson(backgroundStyle(BACKGROUND_COLOR))
-            waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
-
-            map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(deferred))
-            assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceType(SOURCE))
-            map.addStyleLayerJson(fillLayer(), "")
-
-            // Nothing asks a custom source for a tile until a layer that uses it is being drawn, so
-            // the request arrives while the map renders rather than when the source is added.
-            assertTrue(
-              renderUntil(runtime, session) { requested.isNotEmpty() },
-              "the source never asked the page for a tile",
-            )
-            // The whole world at the zoom the map opens at, which is the tile the fill below
-            // covers.
-            assertContains(requested, CanonicalTileId(0, 0, 0))
-
-            // The layer has a source and the source has no data, so what the page shows so far is
-            // the background alone. Asserted before the answer, so the colour below is provably the
-            // geometry arriving rather than a frame that was already there.
-            renderUntilSettled(runtime, session)
-            assertPresentedColor(
-              PageCanvases.CUSTOM_GEOMETRY,
-              BACKGROUND_RED,
-              BACKGROUND_GREEN,
-              BACKGROUND_BLUE,
-            )
-
-            // The answer, from the scope rather than from the callback. One polygon covering the
-            // world fills the viewport at this zoom, so the fill colour is what the page must come
-            // to show.
-            for (tileId in requested.toList()) {
-              map.setCustomGeometrySourceTileData(SOURCE, tileId, worldFill())
-            }
-            assertTrue(
-              renderUntil(runtime, session) { map.isFullyLoaded },
-              "the map never finished loading the tiles the page supplied",
-            )
-            renderUntilSettled(runtime, session)
-            assertPresentedColor(PageCanvases.CUSTOM_GEOMETRY, FILL_RED, FILL_GREEN, FILL_BLUE)
-
-            // A cancel is best-effort and may never arrive, so nothing here waits for one. What is
-            // true whenever one does arrive is that it names a tile this source asked for.
-            for (tileId in cancelled) assertContains(requested, tileId)
-
-            // Removing the layer and then the source takes the geometry away again, which is the
-            // other half of the claim: the fill was the source's rather than anything the style
-            // held on its own. It is also what puts the page back to one colour, so the second half
-            // of this test starts from a screen that provably holds no custom geometry.
-            assertTrue(map.removeStyleLayer(FILL_LAYER))
-            assertTrue(map.removeStyleSource(SOURCE))
-            assertFalse(map.styleSourceExists(SOURCE))
-            renderUntilSettled(runtime, session)
-            assertPresentedColor(
-              PageCanvases.CUSTOM_GEOMETRY,
-              BACKGROUND_RED,
-              BACKGROUND_GREEN,
-              BACKGROUND_BLUE,
-            )
-
-            // The same source again, answered from inside the callback this time. This is the
-            // workflow a multiplatform host writes once and runs everywhere, and the claim is that
-            // it is not merely accepted here but that its geometry reaches the screen: nothing
-            // between this and the assertion below supplies a tile, so the page can only come to
-            // show the fill because the callback's own answer arrived.
-            map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(inline))
-            map.addStyleLayerJson(fillLayer(), "")
-            assertTrue(
-              renderUntil(runtime, session) { answeredInline.isNotEmpty() },
-              "the callback never answered from inside itself: ${inlineFailure?.message}",
-            )
-            assertNull(inlineFailure, "answering inside the callback failed")
-            assertTrue(
-              renderUntil(runtime, session) { map.isFullyLoaded },
-              "the map never finished loading the tiles the callback answered with",
-            )
-            renderUntilSettled(runtime, session)
-            assertPresentedColor(PageCanvases.CUSTOM_GEOMETRY, FILL_RED, FILL_GREEN, FILL_BLUE)
-          } finally {
-            session.close()
-          }
-        } finally {
-          context.close()
         }
+
+      // The shared-code shape: answer the request inside the callback that made it. Failures are
+      // captured rather than thrown, because nothing above a callback body would catch one and the
+      // test would then only see a tile that never arrived.
+      val answeredInline = mutableListOf<CanonicalTileId>()
+      var inlineFailure: Throwable? = null
+      val inline =
+        object : CustomGeometrySourceCallback {
+          override fun fetchTile(tileId: CanonicalTileId) {
+            runCatching {
+                map.setCustomGeometrySourceTileData(SOURCE, tileId, worldFill())
+                answeredInline.add(tileId)
+              }
+              .exceptionOrNull()
+              ?.let { if (inlineFailure == null) inlineFailure = it }
+          }
+
+          override fun cancelTile(tileId: CanonicalTileId) {}
+        }
+
+      val context = PageCanvas.context()
+      val session =
+        map.attachOpenGLSurface(
+          OpenGLSurfaceDescriptor(
+            RenderTargetExtent(WIDTH, HEIGHT, 1.0),
+            context.descriptor(),
+            // A WebGL context is already bound to its canvas, so there is no drawable to name.
+            NativePointer.NULL,
+          )
+        )
+      try {
+        map.setStyleJson(backgroundStyle(BACKGROUND_COLOR))
+        waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
+
+        map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(deferred))
+        assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceType(SOURCE))
+        map.addStyleLayerJson(fillLayer(), "")
+
+        // Nothing asks a custom source for a tile until a layer that uses it is being drawn, so the
+        // request arrives while the map renders rather than when the source is added.
+        assertTrue(
+          renderUntil(runtime, session) { requested.isNotEmpty() },
+          "the source never asked for a tile",
+        )
+        // The whole world at the zoom the map opens at, which is the tile the fill below covers.
+        assertContains(requested, CanonicalTileId(0, 0, 0))
+
+        // The layer has a source and the source has no data, so what the canvas holds so far is the
+        // background alone. Asserted before the answer, so the colour below is provably the
+        // geometry arriving rather than a frame that was already there.
+        renderUntilSettled(runtime, session)
+        assertPresentedColor(context, BACKGROUND_RED, BACKGROUND_GREEN, BACKGROUND_BLUE)
+
+        // The answer, from outside the callback. One polygon covering the world fills the viewport
+        // at this zoom, so the fill colour is what the canvas must come to show.
+        for (tileId in requested.toList()) {
+          map.setCustomGeometrySourceTileData(SOURCE, tileId, worldFill())
+        }
+        assertTrue(
+          renderUntil(runtime, session) { map.isFullyLoaded },
+          "the map never finished loading the tiles the host supplied",
+        )
+        renderUntilSettled(runtime, session)
+        assertPresentedColor(context, FILL_RED, FILL_GREEN, FILL_BLUE)
+
+        // A cancel is best-effort and may never arrive, so nothing here waits for one. What is true
+        // whenever one does arrive is that it names a tile this source asked for.
+        for (tileId in cancelled) assertContains(requested, tileId)
+
+        // Removing the layer and then the source takes the geometry away again, which is the other
+        // half of the claim: the fill was the source's rather than anything the style held on its
+        // own. It also puts the canvas back to one colour, so the second half of this test starts
+        // from a frame that provably holds no custom geometry.
+        assertTrue(map.removeStyleLayer(FILL_LAYER))
+        assertTrue(map.removeStyleSource(SOURCE))
+        assertFalse(map.styleSourceExists(SOURCE))
+        renderUntilSettled(runtime, session)
+        assertPresentedColor(context, BACKGROUND_RED, BACKGROUND_GREEN, BACKGROUND_BLUE)
+
+        // The same source again, answered from inside the callback this time. This is the workflow
+        // a multiplatform host writes once and runs everywhere, and the claim is that it is not
+        // merely accepted here but that its geometry reaches the target: nothing between this and
+        // the assertion below supplies a tile.
+        map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(inline))
+        map.addStyleLayerJson(fillLayer(), "")
+        assertTrue(
+          renderUntil(runtime, session) { answeredInline.isNotEmpty() },
+          "the callback never answered from inside itself: ${inlineFailure?.message}",
+        )
+        assertNull(inlineFailure, "answering inside the callback failed")
+        assertTrue(
+          renderUntil(runtime, session) { map.isFullyLoaded },
+          "the map never finished loading the tiles the callback answered with",
+        )
+        renderUntilSettled(runtime, session)
+        assertPresentedColor(context, FILL_RED, FILL_GREEN, FILL_BLUE)
+      } finally {
+        session.close()
       }
     }
   }
@@ -238,111 +181,103 @@ class CustomGeometrySourceBrowserTest {
   /**
    * The teardown paths, with tile requests in flight.
    *
-   * A notification is a copy of a tile id travelling on a page task, so it outlives the worker that
-   * posted it and can arrive after the source it belongs to is gone. What the binding promises is
-   * that such a notification is dropped rather than delivered to a registration that has retired —
-   * and that a source added again under the same id is a new registration, not the old one coming
-   * back.
+   * A notification is a copy of a tile id sitting in the ring, so it outlives the source it belongs
+   * to and can still be there when that source is gone. What the binding promises is that such a
+   * notification reaches nobody — the retirement marker travels behind it, and delivery stops when
+   * the marker comes out — and that a source added again under the same id is a new registration
+   * rather than the old one coming back.
    *
-   * Rendered into a texture of its own rather than onto the page: nothing here is about what a
-   * frame looks like, and a page canvas tolerates only about two WebGL contexts over the page's
-   * lifetime.
+   * Rendered into a texture of its own, because nothing here is about what a frame looks like and
+   * the one page canvas belongs to whichever test is presenting.
    */
   // Spec coverage: BND-124.
   @Test
-  fun dropsNotificationsForSourcesThatAreGoneAndReusesTheIdCleanly(): Promise<JsAny?> =
-    browserTest {
-      maplibreScope {
-        withMap(WIDTH, HEIGHT) { runtime, map ->
-          val first = RecordingCallback()
-          val second = RecordingCallback()
-          // What the registry held before this test, so each teardown below can be asserted to have
-          // put it back rather than to have reached zero by luck. A registration that outlives its
-          // source is invisible from the outside — it does nothing until native calls it, and the
-          // teardown is what made native calling it impossible — so this is what says it went.
-          val registrationsBefore = CustomGeometryBridge.liveRegistrations
-          val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
-          try {
-            val session =
-              map.attachOpenGLOwnedTexture(
-                OpenGLOwnedTextureDescriptor(
-                  RenderTargetExtent(WIDTH, HEIGHT, 1.0),
-                  context.descriptor(),
-                )
-              )
-            try {
-              map.setStyleJson(backgroundStyle(BACKGROUND_COLOR))
-              waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
-              map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(first))
-              map.addStyleLayerJson(fillLayer(), "")
-              assertTrue(
-                renderUntil(runtime, session) { first.tiles.isNotEmpty() },
-                "the source never asked the page for a tile",
-              )
+  fun dropsNotificationsForSourcesThatAreGoneAndReusesTheIdCleanly() {
+    withMap(WIDTH, HEIGHT) { runtime, map ->
+      val first = RecordingCallback()
+      val second = RecordingCallback()
+      // What the registry held before this test, so each teardown below can be asserted to have put
+      // it back rather than to have reached zero by luck. A registration that outlives its source
+      // is
+      // invisible from the outside — it does nothing until native calls it, and the teardown is
+      // what
+      // made native calling it impossible — so this is what says it went.
+      val registrationsBefore = CustomGeometryBridge.liveRegistrations
+      val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
+      try {
+        val session =
+          map.attachOpenGLOwnedTexture(
+            OpenGLOwnedTextureDescriptor(
+              RenderTargetExtent(WIDTH, HEIGHT, 1.0),
+              context.descriptor(),
+            )
+          )
+        try {
+          map.setStyleJson(backgroundStyle(BACKGROUND_COLOR))
+          waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
+          map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(first))
+          map.addStyleLayerJson(fillLayer(), "")
+          assertTrue(
+            renderUntil(runtime, session) { first.tiles.isNotEmpty() },
+            "the source never asked for a tile",
+          )
 
-              // Removed with the request still unanswered, so the tile is one MapLibre is still
-              // waiting on: dropping the layer retires that tile and produces the cancels this
-              // source's loader posts to the page, and the source goes before the page has run
-              // them. The layer goes first because native refuses to remove a source a layer still
-              // uses. From here the callback must hear nothing at all.
-              assertTrue(map.removeStyleLayer(FILL_LAYER))
-              assertTrue(map.removeStyleSource(SOURCE))
-              first.closeEra()
-              renderTurns(runtime, session, TEARDOWN_ATTEMPTS)
-              assertEquals(0, first.afterEra, "a removed source's callback was still called")
-              assertEquals(
-                registrationsBefore,
-                CustomGeometryBridge.liveRegistrations,
-                "removing the source left its registration behind",
-              )
+          // Removed with the request still unanswered, so the tile is one MapLibre is still waiting
+          // on: dropping the layer retires that tile and produces the cancels this source's loader
+          // pushes into the ring, and the source goes before the ring has been drained. The layer
+          // goes first because native refuses to remove a source a layer still uses. From here the
+          // callback must hear nothing at all.
+          assertTrue(map.removeStyleLayer(FILL_LAYER))
+          assertTrue(map.removeStyleSource(SOURCE))
+          first.closeEra()
+          renderTurns(runtime, session, TEARDOWN_ATTEMPTS)
+          assertEquals(0, first.afterEra, "a removed source's callback was still called")
+          assertEquals(
+            registrationsBefore,
+            CustomGeometryBridge.liveRegistrations,
+            "removing the source left its registration behind",
+          )
 
-              // The same id again, and a different callback. A registration is reached by a token
-              // native carries back, and a token is issued once, so the source added here is a new
-              // registration rather than the previous one under a familiar name.
-              map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(second))
-              map.addStyleLayerJson(fillLayer(), "")
-              assertTrue(
-                renderUntil(runtime, session) { second.tiles.isNotEmpty() },
-                "the source added under the reused id never asked the page for a tile",
-              )
-              assertEquals(0, first.afterEra, "the replaced callback was called for the new source")
+          // The same id again, and a different callback. A registration is reached through state
+          // native carries back, and that state is fresh, so the source added here is a new
+          // registration rather than the previous one under a familiar name.
+          map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(second))
+          map.addStyleLayerJson(fillLayer(), "")
+          assertTrue(
+            renderUntil(runtime, session) { second.tiles.isNotEmpty() },
+            "the source added under the reused id never asked for a tile",
+          )
+          assertEquals(0, first.afterEra, "the replaced callback was called for the new source")
 
-              // Closing the map with a source still registered is the last teardown path, and it is
-              // the one that leaves native with no way to ask again: the map took its style, its
-              // sources, and their tile loaders with it.
-              //
-              // The boundary is the close returning rather than it being called. Until then the
-              // source is still the map's, and a notification the page runs while this stack is
-              // parked on the close is one the callback is entitled to. What must not happen is a
-              // delivery afterwards — and there is one to fear, because retiring the map's tiles
-              // makes their loader post cancels from its own thread, which can land here after the
-              // close has returned.
-              session.close()
-              map.close()
-              second.closeEra()
-              pumpTurns(runtime, TEARDOWN_ATTEMPTS)
-              assertEquals(0, second.afterEra, "a closed map's source callback was still called")
-              assertEquals(
-                registrationsBefore,
-                CustomGeometryBridge.liveRegistrations,
-                "closing the map left its source's registration behind",
-              )
-            } finally {
-              session.close()
-            }
-          } finally {
-            context.close()
-          }
+          // Closing the map with a source still registered is the last teardown path, and the one
+          // that leaves native with no way to ask again: the map took its style, its sources, and
+          // their tile loaders with it. Retiring those tiles makes their loader push cancels from
+          // its own thread, which can land in the ring after the close has returned.
+          session.close()
+          map.close()
+          second.closeEra()
+          pumpTurns(runtime, TEARDOWN_ATTEMPTS)
+          assertEquals(0, second.afterEra, "a closed map's source callback was still called")
+          assertEquals(
+            registrationsBefore,
+            CustomGeometryBridge.liveRegistrations,
+            "closing the map left its source's registration behind",
+          )
+        } finally {
+          session.close()
         }
+      } finally {
+        context.close()
       }
     }
+  }
 
   /**
    * A style reload, which drops every source the previous style held.
    *
    * The registration behind a custom geometry source belongs to that source, so a style that
    * replaces it ends the registration too — while the tiles the previous style had are being
-   * retired, which is exactly when their loader posts the cancels this must not deliver.
+   * retired, which is exactly when their loader pushes the cancels this must not deliver.
    *
    * A style arrives two ways and the moment differs. A style set as JSON has replaced the previous
    * one by the time the call returns, so the registrations go there. A style set by URL loads
@@ -353,346 +288,163 @@ class CustomGeometrySourceBrowserTest {
    */
   // Spec coverage: BND-124.
   @Test
-  fun releasesSourcesAStyleReloadDropped(): Promise<JsAny?> = browserTest {
-    maplibreScope {
-      withMap(WIDTH, HEIGHT) { runtime, map ->
-        val callback = RecordingCallback()
-        val registrationsBefore = CustomGeometryBridge.liveRegistrations
-        val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
+  fun releasesSourcesAStyleReloadDropped() {
+    withMap(WIDTH, HEIGHT) { runtime, map ->
+      val callback = RecordingCallback()
+      val registrationsBefore = CustomGeometryBridge.liveRegistrations
+      val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
+      try {
+        val session =
+          map.attachOpenGLOwnedTexture(
+            OpenGLOwnedTextureDescriptor(
+              RenderTargetExtent(WIDTH, HEIGHT, 1.0),
+              context.descriptor(),
+            )
+          )
         try {
-          val session =
-            map.attachOpenGLOwnedTexture(
-              OpenGLOwnedTextureDescriptor(
-                RenderTargetExtent(WIDTH, HEIGHT, 1.0),
-                context.descriptor(),
-              )
-            )
-          try {
-            map.setStyleJson(backgroundStyle(BACKGROUND_COLOR))
-            waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
-            map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(callback))
-            map.addStyleLayerJson(fillLayer(), "")
-            assertTrue(
-              renderUntil(runtime, session) { callback.tiles.isNotEmpty() },
-              "the source never asked the page for a tile",
-            )
+          map.setStyleJson(backgroundStyle(BACKGROUND_COLOR))
+          waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
+          map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(callback))
+          map.addStyleLayerJson(fillLayer(), "")
+          assertTrue(
+            renderUntil(runtime, session) { callback.tiles.isNotEmpty() },
+            "the source never asked for a tile",
+          )
 
-            map.setStyleJson(backgroundStyle(FILL_COLOR))
-            callback.closeEra()
-            // Asserted before anything is polled or rendered, because this is the claim about a
-            // style set as JSON: the source is gone by the time the call returns, so its
-            // registration is too.
-            assertEquals(
-              registrationsBefore,
-              CustomGeometryBridge.liveRegistrations,
-              "setting a style as JSON left the dropped source's registration behind",
-            )
-            assertFalse(map.styleSourceExists(SOURCE))
-            renderTurns(runtime, session, TEARDOWN_ATTEMPTS)
-            assertEquals(0, callback.afterEra, "a dropped source's callback was still called")
+          map.setStyleJson(backgroundStyle(FILL_COLOR))
+          callback.closeEra()
+          // Asserted before anything is polled or rendered, because this is the claim about a style
+          // set as JSON: the source is gone by the time the call returns, so its registration is
+          // too.
+          assertEquals(
+            registrationsBefore,
+            CustomGeometryBridge.liveRegistrations,
+            "setting a style as JSON left the dropped source's registration behind",
+          )
+          assertFalse(map.styleSourceExists(SOURCE))
+          renderTurns(runtime, session, TEARDOWN_ATTEMPTS)
+          assertEquals(0, callback.afterEra, "a dropped source's callback was still called")
 
-            // The id belongs to nobody now, so it can be taken again — by a source of its own with
-            // a registration of its own.
-            val reloaded = RecordingCallback()
-            map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(reloaded))
-            assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceType(SOURCE))
-            assertEquals(0, callback.afterEra, "the dropped callback was called for the new source")
+          // The id belongs to nobody now, so it can be taken again — by a source of its own with a
+          // registration of its own.
+          val reloaded = RecordingCallback()
+          map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(reloaded))
+          assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceType(SOURCE))
+          assertEquals(0, callback.afterEra, "the dropped callback was called for the new source")
 
-            // A style by URL, served from the page so that nothing here waits on a network. It has
-            // not replaced anything yet, so the registration is still the map's — which is what
-            // makes the event below the moment it stops being.
-            runtime.setResourceProvider { request, handle ->
-              if (request.requestedUrl != STYLE_URL) {
-                return@setResourceProvider ResourceProviderDecision.PASS_THROUGH
+          // A style by URL, answered by a provider route so that nothing here waits on a network.
+          // It
+          // has not replaced anything yet, so the registration is still the map's — which is what
+          // makes the event below the moment it stops being.
+          runtime.setResourceProvider(listOf(ResourceProviderRoute(url = STYLE_URL))) { _, handle ->
+            handle.complete(
+              ResourceResponse(ResourceResponseStatus.OK).apply {
+                bytes = backgroundStyle(BACKGROUND_COLOR).encodeToByteArray()
               }
-              handle.complete(
-                ResourceResponse(ResourceResponseStatus.OK).apply {
-                  bytes = backgroundStyle(BACKGROUND_COLOR).encodeToByteArray()
-                }
-              )
-              ResourceProviderDecision.PASS_THROUGH
-            }
-            map.setStyleUrl(STYLE_URL)
-            reloaded.closeEra()
-            assertEquals(
-              registrationsBefore + 1,
-              CustomGeometryBridge.liveRegistrations,
-              "setting a style by URL released a registration before the style had loaded",
             )
-
-            waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
-            assertEquals(
-              registrationsBefore,
-              CustomGeometryBridge.liveRegistrations,
-              "the loaded style left the dropped source's registration behind",
-            )
-            renderTurns(runtime, session, TEARDOWN_ATTEMPTS)
-            assertEquals(0, reloaded.afterEra, "a dropped source's callback was still called")
-          } finally {
-            session.close()
           }
+          map.setStyleUrl(STYLE_URL)
+          reloaded.closeEra()
+          assertEquals(
+            registrationsBefore + 1,
+            CustomGeometryBridge.liveRegistrations,
+            "setting a style by URL released a registration before the style had loaded",
+          )
+
+          waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
+          assertEquals(
+            registrationsBefore,
+            CustomGeometryBridge.liveRegistrations,
+            "the loaded style left the dropped source's registration behind",
+          )
+          renderTurns(runtime, session, TEARDOWN_ATTEMPTS)
+          assertEquals(0, reloaded.afterEra, "a dropped source's callback was still called")
         } finally {
-          context.close()
+          session.close()
         }
+      } finally {
+        context.close()
       }
     }
   }
 
   /**
-   * A registration closed while the callback holding it is parked partway through its answer.
+   * A map closed from inside its own tile callback, and the runtime that has to survive it.
    *
-   * This is the interleaving the asynchronous delivery made reachable, and it is the one no other
-   * test here drives. A tile notification runs on a promising stack of its own, so a `fetchTile`
-   * that answers inline parks that stack on the owner thread — and the host's own stack, parked on
-   * a pump that was submitted earlier, is resumed first. The host is therefore running, with a full
-   * callback body suspended beside it, and whatever it does next to end the source closes that
-   * body's registration from a stack that is not the body's.
+   * Closing a map releases the source registrations it holds, and releasing one waits for a
+   * callback body that is already inside it. Here that body is the frame below the close, on the
+   * one stack this target has, so the wait can never finish and the binding refuses it rather than
+   * spinning forever.
    *
-   * The claim is that such a close **waits**, which is what the binding specification requires of
-   * clearing, replacing, or closing a callback anywhere. The reason is not the callback object,
-   * which Kotlin keeps alive as long as the delivery holds it; it is whatever the host gave that
-   * callback and is entitled to dispose of the moment teardown returns. A body resumed afterwards
-   * would use what is gone. Waiting works here because the closing stack parks rather than spins:
-   * the page keeps turning, so the delivery's own call completes and its body runs to its end.
-   *
-   * The window is opened deliberately rather than caught by luck. The body goes on making
-   * owner-affine calls for a fixed number of turns, so it is still inside its answer when the host
-   * looks and is still inside it when the close begins — and it is released by nothing the closing
-   * stack does, which is what makes the close's return an observation about the close rather than
-   * about the test. Both flags are read on the stack the close ran on, where nothing can have
-   * resumed in between. A style reload is the close path because it is the shortest — the sources
-   * go the instant the call returns, without a layer to remove first — and every path ends in the
-   * same `CustomGeometryBridge.close`.
-   *
-   * A late notification is the other half, and it is still dropped: the ones posted for this source
-   * before the teardown are delivered to nobody afterwards, which is what the count below says.
-   *
-   * Rendered into a texture of its own, for the reason the teardown test above gives.
-   */
-  // Spec coverage: BND-124.
-  @Test
-  fun releasesASourceClosedWhileItsCallbackWasParkedInsideItsAnswer(): Promise<JsAny?> =
-    browserTest {
-      maplibreScope {
-        withMap(WIDTH, HEIGHT) { runtime, map ->
-          val registrationsBefore = CustomGeometryBridge.liveRegistrations
-          // Whether a callback body is between its first line and its last, which on this target
-          // means it is either running or suspended -- and the host stack can only read it while
-          // the host stack runs, so a true read there is a suspended body.
-          var answering = false
-          // How many bodies have run all the way to their last line, so that a close that returned
-          // early can be told from one that waited: the flag above goes false either way.
-          var answersFinished = 0
-          // How far through its turns the body inside its answer is. The host closes only while
-          // this is small, so the body it retires provably has turns left when the close begins --
-          // otherwise a body that was about to end could finish during the close's own call, and
-          // the next notification's body, not this one, would be what the close waited for.
-          var turnsIntoAnswer = 0
-          var retired = false
-          var afterClose = 0
-          val callback =
-            object : CustomGeometrySourceCallback {
-              override fun fetchTile(tileId: CanonicalTileId) {
-                if (retired) {
-                  afterClose++
-                  return
-                }
-                turnsIntoAnswer = 0
-                answering = true
-                try {
-                  // The inline answer a shared host writes, and the first park of this stack.
-                  runCatching { map.setCustomGeometrySourceTileData(SOURCE, tileId, worldFill()) }
-                  // Each of these parks again, and the count is fixed so that nothing the closing
-                  // stack does decides when this body ends. Failures are swallowed because the
-                  // style this asks about is replaced underneath it by the close being tested.
-                  repeat(ANSWER_PARKS) {
-                    turnsIntoAnswer++
-                    runCatching { map.isFullyLoaded }
-                  }
-                } finally {
-                  answering = false
-                  answersFinished++
-                }
-              }
-
-              override fun cancelTile(tileId: CanonicalTileId) {
-                if (retired) afterClose++
-              }
-            }
-          val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
-          try {
-            val session =
-              map.attachOpenGLOwnedTexture(
-                OpenGLOwnedTextureDescriptor(
-                  RenderTargetExtent(WIDTH, HEIGHT, 1.0),
-                  context.descriptor(),
-                )
-              )
-            try {
-              map.setStyleJson(backgroundStyle(BACKGROUND_COLOR))
-              waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
-              map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(callback))
-              map.addStyleLayerJson(fillLayer(), "")
-
-              var closedMidAnswer = false
-              var answeringAfterClose = true
-              // How many bodies had finished before the close began, so the one it waited for can
-              // be counted rather than inferred: earlier attempts may have delivered tiles that
-              // came and went while this stack was parked.
-              var finishedBeforeClose = 0
-              var attempts = 0
-              while (!closedMidAnswer && attempts < ATTEMPTS) {
-                attempts++
-                session.renderUpdate()
-                // The park that hands the page back, so a notification the module posted is
-                // delivered and its body reaches its own first park while this stack is away.
-                runtime.pump(PUMP_MILLIS)
-                while (runtime.pollEvent() != null) {}
-                // Early in its answer, so the body has turns left for the close to wait through.
-                if (!answering || turnsIntoAnswer > ANSWER_PARKS / 2) continue
-                closedMidAnswer = true
-                finishedBeforeClose = answersFinished
-                // The style reload takes the source, and with it the registration the suspended
-                // body belongs to. The body outlasts the call's own park, because it has turns of
-                // its own left to spend, so what this returns from is the wait for that body.
-                map.setStyleJson(backgroundStyle(FILL_COLOR))
-                answeringAfterClose = answering
-                retired = true
-              }
-              assertTrue(
-                closedMidAnswer,
-                "the source was never closed while its callback was parked inside an answer",
-              )
-              // The claim, read on the stack the close ran on: teardown returned only once the body
-              // it retired had reached its last line.
-              assertFalse(
-                answeringAfterClose,
-                "retiring a source returned while its callback was still inside its answer",
-              )
-              assertEquals(
-                finishedBeforeClose + 1,
-                answersFinished,
-                "the callback that was inside its answer when its source closed never finished",
-              )
-              assertEquals(
-                registrationsBefore,
-                CustomGeometryBridge.liveRegistrations,
-                "closing a source while its callback was parked left its registration behind",
-              )
-
-              renderTurns(runtime, session, TEARDOWN_ATTEMPTS)
-              assertEquals(0, afterClose, "a source closed mid-answer went on being called")
-            } finally {
-              session.close()
-            }
-          } finally {
-            context.close()
-          }
-        }
-      }
-    }
-
-  /**
-   * A map whose source teardown failed still gives its runtime up.
-   *
-   * Closing a map destroys it natively and then releases what the wrapper held on its account: the
-   * source registrations, the runtime's registry entry, and the retention that keeps the runtime
-   * from closing underneath it. Releasing a registration waits for a tile callback already inside
-   * its body, and on this target that wait is bounded rather than endless — a page has one thread,
-   * so a host body that never returns would otherwise leave the page waiting for it forever. This
-   * drives exactly that: a `fetchTile` parks and does not come back, so the wait reaches its limit
-   * and reports.
-   *
-   * The failure is not the claim. By the time it happens the map is destroyed and the wrapper is
+   * The refusal is not the claim. By the time it happens the map is destroyed and the wrapper is
    * closed, so closing again does nothing and no later call can finish what the teardown did not —
    * which makes the state this leaves behind permanent. The claim is therefore that the rest of the
-   * accounting happened anyway: **the runtime is still closable**. If it were not, a page would be
-   * left holding a runtime it can never close and a map that no longer exists, for its whole life,
-   * with nothing it could do about either.
-   *
-   * The parked body is released afterwards rather than abandoned, because the delivery queue runs
-   * one body at a time and a stack left parked in it would hold the queue for every test after this
-   * one.
+   * accounting happened anyway: **the runtime is still closable**. If it were not, a host would be
+   * left holding a runtime it can never close and a map that no longer exists, for the whole life
+   * of the page, with nothing it could do about either.
    */
   @Test
-  fun aMapWhoseSourceTeardownFailedStillGivesUpItsRuntime(): Promise<JsAny?> = browserTest {
-    // Read from the callback and from the test, which on this target are two stacks and one thread,
-    // so neither can observe the other partway through a statement.
-    var parked = false
-    var finished = false
+  fun aMapWhoseSourceTeardownFailedStillGivesUpItsRuntime() {
+    var closeFailure: Throwable? = null
+    var closed = false
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = WIDTH
+          height = HEIGHT
+        },
+      )
     val callback =
       object : CustomGeometrySourceCallback {
         override fun fetchTile(tileId: CanonicalTileId) {
-          // Only the first tile parks. The rest return at once, so the source has exactly one body
-          // inside it when the teardown begins and the wait provably ends at its limit rather than
-          // on whichever body happened to be last.
-          if (parked) return
-          parked = true
-          parkUntilReleased()
-          finished = true
+          // Only the first tile closes. The rest return at once, so exactly one body is inside the
+          // registration when the teardown begins.
+          if (closed) return
+          closed = true
+          closeFailure = runCatching { map.close() }.exceptionOrNull()
         }
 
         override fun cancelTile(tileId: CanonicalTileId) {}
       }
 
-    maplibreScope {
-      val runtime = RuntimeHandle.create(RuntimeOptions())
-      val map =
-        MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = WIDTH
-            height = HEIGHT
-          },
-        )
-      val registrationsBefore = CustomGeometryBridge.liveRegistrations
-      val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
-      val session =
-        map.attachOpenGLOwnedTexture(
-          OpenGLOwnedTextureDescriptor(RenderTargetExtent(WIDTH, HEIGHT, 1.0), context.descriptor())
-        )
-      map.setStyleJson(backgroundStyle(BACKGROUND_COLOR))
-      waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
-      map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(callback))
-      map.addStyleLayerJson(fillLayer(), "")
-      assertTrue(
-        renderUntil(runtime, session) { parked },
-        "no tile callback ever parked, so the teardown below had nothing to wait for",
+    val registrationsBefore = CustomGeometryBridge.liveRegistrations
+    val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
+    val session =
+      map.attachOpenGLOwnedTexture(
+        OpenGLOwnedTextureDescriptor(RenderTargetExtent(WIDTH, HEIGHT, 1.0), context.descriptor())
       )
-      assertEquals(registrationsBefore + 1, CustomGeometryBridge.liveRegistrations)
+    map.setStyleJson(backgroundStyle(BACKGROUND_COLOR))
+    waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
+    map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(callback))
+    map.addStyleLayerJson(fillLayer(), "")
+    assertTrue(
+      renderUntil(runtime, session) { closed },
+      "no tile callback ever ran, so the close below never happened",
+    )
+    session.close()
+    context.close()
 
-      // Both are the map's children and neither is what this is about, so they go first and the
-      // close below is refused for the source alone.
-      session.close()
-      context.close()
+    val failure = assertIs<InvalidStateException>(closeFailure, "closing reported $closeFailure")
+    assertContains(failure.diagnostic, "callback")
+    // The map is gone whatever the teardown did: native destroyed it, and a wrapper that called
+    // itself live afterwards would offer calls that could only fail.
+    assertTrue(map.isClosed, "a map whose teardown failed was left claiming to be open")
+    assertEquals(
+      registrationsBefore,
+      CustomGeometryBridge.liveRegistrations,
+      "a source whose release was refused kept its registration, so a late tile could still reach it",
+    )
 
-      val failure = assertFailsWith<InvalidStateException> { map.close() }
-      assertContains(failure.diagnostic, "never returned")
-      // The map is gone whatever the teardown did: native destroyed it, and a wrapper that called
-      // itself live afterwards would offer calls that could only fail.
-      assertTrue(map.isClosed, "a map whose teardown failed was left claiming to be open")
-      assertEquals(
-        registrationsBefore,
-        CustomGeometryBridge.liveRegistrations,
-        "a source whose wait timed out kept its registration, so a late tile could still reach it",
-      )
-
-      // The claim. A runtime the closed map still retained would refuse this for the life of the
-      // page, and nothing could release it.
-      val runtimeFailure = runCatching { runtime.close() }.exceptionOrNull()
-      assertNull(
-        runtimeFailure,
-        "the runtime could not be closed after its map's source teardown failed: $runtimeFailure",
-      )
-    }
-
-    assertTrue(releaseParkedTile(), "the callback body was not parked when the test finished")
-    var turns = 0
-    while (!finished && turns < TEARDOWN_ATTEMPTS) {
-      turns++
-      nextPageTask()
-    }
-    assertTrue(finished, "the released callback body never finished")
+    // The claim. A runtime the closed map still retained would refuse this for the life of the
+    // page,
+    // and nothing could release it.
+    val runtimeFailure = runCatching { runtime.close() }.exceptionOrNull()
+    assertNull(
+      runtimeFailure,
+      "the runtime could not be closed after its map's source teardown failed: $runtimeFailure",
+    )
   }
 
   /** Records what it was asked for, and whether anything arrived after its source was retired. */
@@ -723,78 +475,73 @@ class CustomGeometrySourceBrowserTest {
    * This family needs nothing injected. A style holds one source per id, so adding a second under
    * an id it already carries is refused by native itself — which is precisely a replacement
    * failing, and it fails at the point that matters: the binding has already installed the
-   * replacement's host registration, because the module reaches a tile callback through the pointer
+   * replacement's registration state, because the shim reaches a tile callback through the pointer
    * that installation places and a source added first could ask for a tile with nowhere to send it.
    *
-   * So the refusal has to give that registration back and leave the previous one alone, and both
-   * halves are asserted: the registry count says the replacement's state went, and the tiles the
-   * page is still asked for say whose callback native reaches.
-   *
-   * Rendered into a texture of its own rather than onto the page, for the reason the teardown test
-   * above gives.
+   * So the refusal has to give that state back and leave the previous one alone, and both halves
+   * are asserted: the registry count says the replacement's state went, and the tiles that are
+   * still asked for say whose callback native reaches.
    */
   // Spec coverage: BND-122.
   @Test
-  fun aSourceReplacementNativeRefusesKeepsThePreviousCallback(): Promise<JsAny?> = browserTest {
-    maplibreScope {
-      withMap(WIDTH, HEIGHT) { runtime, map ->
-        val installed = RecordingCallback()
-        val refused = RecordingCallback()
-        val registrationsBefore = CustomGeometryBridge.liveRegistrations
-        val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
+  fun aSourceReplacementNativeRefusesKeepsThePreviousCallback() {
+    withMap(WIDTH, HEIGHT) { runtime, map ->
+      val installed = RecordingCallback()
+      val refused = RecordingCallback()
+      val registrationsBefore = CustomGeometryBridge.liveRegistrations
+      val context = WebglContext.createOffscreen(WIDTH, HEIGHT)
+      try {
+        val session =
+          map.attachOpenGLOwnedTexture(
+            OpenGLOwnedTextureDescriptor(
+              RenderTargetExtent(WIDTH, HEIGHT, 1.0),
+              context.descriptor(),
+            )
+          )
         try {
-          val session =
-            map.attachOpenGLOwnedTexture(
-              OpenGLOwnedTextureDescriptor(
-                RenderTargetExtent(WIDTH, HEIGHT, 1.0),
-                context.descriptor(),
-              )
-            )
-          try {
-            map.setStyleJson(backgroundStyle(BACKGROUND_COLOR))
-            waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
-            map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(installed))
-            map.addStyleLayerJson(fillLayer(), "")
-            assertTrue(
-              renderUntil(runtime, session) { installed.tiles.isNotEmpty() },
-              "the source never asked the page for a tile",
-            )
-            assertEquals(registrationsBefore + 1, CustomGeometryBridge.liveRegistrations)
+          map.setStyleJson(backgroundStyle(BACKGROUND_COLOR))
+          waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
+          map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(installed))
+          map.addStyleLayerJson(fillLayer(), "")
+          assertTrue(
+            renderUntil(runtime, session) { installed.tiles.isNotEmpty() },
+            "the source never asked for a tile",
+          )
+          assertEquals(registrationsBefore + 1, CustomGeometryBridge.liveRegistrations)
 
-            // The same id again. Native holds one source per id and says so.
-            val error =
-              assertFailsWith<InvalidArgumentException> {
-                map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(refused))
-              }
-            assertContains(error.diagnostic, "already exists")
+          // The same id again. Native holds one source per id and says so.
+          val error =
+            assertFailsWith<InvalidArgumentException> {
+              map.addCustomGeometrySource(SOURCE, CustomGeometrySourceOptions(refused))
+            }
+          assertContains(error.diagnostic, "already exists")
 
-            // The refused source's registration went back rather than holding the module's
-            // trampoline open for a source that does not exist.
-            assertEquals(
-              registrationsBefore + 1,
-              CustomGeometryBridge.liveRegistrations,
-              "the refused source left its registration behind",
-            )
+          // The refused source's registration went back rather than holding the shim's listener
+          // open for a source that does not exist.
+          assertEquals(
+            registrationsBefore + 1,
+            CustomGeometryBridge.liveRegistrations,
+            "the refused source left its registration behind",
+          )
 
-            // And native still asks the callback that was already there, which is the half the
-            // count cannot show.
-            val askedBefore = installed.tiles.size
-            map.invalidateCustomGeometrySourceTile(SOURCE, installed.tiles.first())
-            assertTrue(
-              renderUntil(runtime, session) { installed.tiles.size > askedBefore },
-              "the source stopped asking the callback it was added with",
-            )
-            assertTrue(refused.tiles.isEmpty(), "the refused source's callback was called anyway")
+          // And native still asks the callback that was already there, which is the half the count
+          // cannot show.
+          val askedBefore = installed.tiles.size
+          map.invalidateCustomGeometrySourceTile(SOURCE, installed.tiles.first())
+          assertTrue(
+            renderUntil(runtime, session) { installed.tiles.size > askedBefore },
+            "the source stopped asking the callback it was added with",
+          )
+          assertTrue(refused.tiles.isEmpty(), "the refused source's callback was called anyway")
 
-            assertTrue(map.removeStyleLayer(FILL_LAYER))
-            assertTrue(map.removeStyleSource(SOURCE))
-            assertEquals(registrationsBefore, CustomGeometryBridge.liveRegistrations)
-          } finally {
-            session.close()
-          }
+          assertTrue(map.removeStyleLayer(FILL_LAYER))
+          assertTrue(map.removeStyleSource(SOURCE))
+          assertEquals(registrationsBefore, CustomGeometryBridge.liveRegistrations)
         } finally {
-          context.close()
+          session.close()
         }
+      } finally {
+        context.close()
       }
     }
   }
@@ -803,9 +550,8 @@ class CustomGeometrySourceBrowserTest {
    * Renders until [predicate] holds, pumping the runtime in between.
    *
    * Both halves matter. Rendering is what makes MapLibre decide which tiles it needs, so a request
-   * only reaches the page while frames are being drawn; and a pump parks this stack on the owner
-   * thread, which hands the page back to its event loop — where the module's proxied notification
-   * is waiting to be delivered.
+   * is only produced while frames are being drawn; and the pump is what drains the ring the request
+   * arrived in.
    */
   private fun renderUntil(
     runtime: RuntimeHandle,
@@ -821,24 +567,10 @@ class CustomGeometrySourceBrowserTest {
     return predicate()
   }
 
-  /**
-   * Renders [turns] frames, giving the page a task between each.
-   *
-   * Used where the claim is that nothing arrives: a notification the module already posted is
-   * delivered on a page task, so the page has to be handed back that many times before its absence
-   * means anything.
-   */
+  /** Renders [turns] frames, draining the ring between each. */
   private fun renderTurns(runtime: RuntimeHandle, session: RenderSessionHandle, turns: Int) {
     repeat(turns) {
       session.renderUpdate()
-      runtime.pump(PUMP_MILLIS)
-      while (runtime.pollEvent() != null) {}
-    }
-  }
-
-  /** Pumps [turns] times, for after the map that was rendering has been closed. */
-  private fun pumpTurns(runtime: RuntimeHandle, turns: Int) {
-    repeat(turns) {
       runtime.pump(PUMP_MILLIS)
       while (runtime.pollEvent() != null) {}
     }
@@ -907,16 +639,15 @@ class CustomGeometrySourceBrowserTest {
     )
 
   private companion object {
-    const val WIDTH = PageCanvases.WIDTH
-    const val HEIGHT = PageCanvases.HEIGHT
+    const val WIDTH = PageCanvas.WIDTH
+    const val HEIGHT = PageCanvas.HEIGHT
 
     const val SOURCE = "custom-geometry"
-    // Served by the provider above rather than fetched, so nothing here waits on a network.
-    const val STYLE_URL = "https://example.invalid/custom-geometry-style.json"
+    // Answered by the provider above rather than fetched, so nothing here waits on a network.
+    const val STYLE_URL = "custom://custom-geometry-style.json"
     const val FILL_LAYER = "custom-geometry-fill"
 
-    // Three distinct channels each, and neither colour is another test's, so a canvas showing
-    // somebody else's frame fails rather than passing.
+    // Three distinct channels each, so a path that swapped or duplicated one would still be caught.
     const val BACKGROUND_COLOR = "#2060a0"
     const val BACKGROUND_RED = 0x20
     const val BACKGROUND_GREEN = 0x60
@@ -930,11 +661,5 @@ class CustomGeometrySourceBrowserTest {
     const val ATTEMPTS = 200
     const val TEARDOWN_ATTEMPTS = 32
     const val PUMP_MILLIS = 2L
-
-    // How many further times an answer parks after answering its tile. Enough that the body is
-    // still inside it while the host observes it and while the close that retires it runs — each of
-    // those costs a turn or two of the same kind — and small enough that the close it makes wait is
-    // a fraction of a second.
-    const val ANSWER_PARKS = 24
   }
 }

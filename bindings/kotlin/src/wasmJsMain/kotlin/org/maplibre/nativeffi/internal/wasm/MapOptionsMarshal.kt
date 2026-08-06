@@ -12,6 +12,7 @@ import org.maplibre.nativeffi.internal.wasm.generated.MlnMapTileOptionField
 import org.maplibre.nativeffi.internal.wasm.generated.MlnMapTileOptions
 import org.maplibre.nativeffi.internal.wasm.generated.MlnMapViewportOptionField
 import org.maplibre.nativeffi.internal.wasm.generated.MlnMapViewportOptions
+import org.maplibre.nativeffi.internal.wasm.generated.mln_map_options_default
 import org.maplibre.nativeffi.map.ConstrainMode
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.map.NorthOrientation
@@ -34,12 +35,6 @@ internal object MapOptionsMarshal {
   val VIEWPORT_OPTIONS_SIZEOF: Int = MlnMapViewportOptions.SIZEOF
   val TILE_OPTIONS_SIZEOF: Int = MlnMapTileOptions.SIZEOF
 
-  /** The entry point that fills a map descriptor with the C API's own defaults. */
-  private const val MAP_OPTIONS_DEFAULT = "mln_map_options_default"
-
-  /** Slots that entry point reads: a struct return takes its destination as the first one. */
-  private const val MAP_OPTIONS_DEFAULT_SLOTS = 1
-
   /**
    * Writes [options] at [base], leaving every absent value at the C API's own default.
    *
@@ -49,12 +44,9 @@ internal object MapOptionsMarshal {
    * binding matches one created through any other.
    */
   fun writeMapOptions(base: HeapPointer, options: MapOptions) {
-    NativeCall.call(
-      MAP_OPTIONS_DEFAULT,
-      MAP_OPTIONS_DEFAULT_SLOTS,
-      fill = { it.setPointer(0, base) },
-      read = {},
-    )
+    // The entry point returns the descriptor by value, which this target lowers to a write through
+    // a destination the caller passes.
+    mln_map_options_default(base.address)
     // The default carries a size too, but it is the module's rather than this binding's. Stating it
     // here keeps every descriptor reporting the size these offsets were generated against.
     MlnMapOptions.setSize(base, MlnMapOptions.SIZEOF)

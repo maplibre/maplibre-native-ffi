@@ -7,6 +7,38 @@
 
 package org.maplibre.nativeffi.internal.wasm.generated
 
+@JsFun(
+  "(fetch_tile, cancel_tile, user_data) => { globalThis.__maplibreNativeC._mln_adapter_custom_geometry_callbacks_retire(fetch_tile, cancel_tile, user_data) }"
+)
+internal external fun mln_adapter_custom_geometry_callbacks_retire(
+  fetch_tile: Int,
+  cancel_tile: Int,
+  user_data: Int,
+)
+
+@JsFun("(record) => { globalThis.__maplibreNativeC._mln_adapter_log_record_destroy(record) }")
+internal external fun mln_adapter_log_record_destroy(record: Int)
+
+@JsFun(
+  "(provider) => { globalThis.__maplibreNativeC._mln_adapter_queued_resource_provider_retire(provider) }"
+)
+internal external fun mln_adapter_queued_resource_provider_retire(provider: Int)
+
+@JsFun(
+  "(request) => { globalThis.__maplibreNativeC._mln_adapter_resource_provider_request_destroy(request) }"
+)
+internal external fun mln_adapter_resource_provider_request_destroy(request: Int)
+
+@JsFun(
+  "(user_data, kind, url, out_response) => globalThis.__maplibreNativeC._mln_adapter_resource_transform_rewrite_callback(user_data, kind, url, out_response)"
+)
+internal external fun mln_adapter_resource_transform_rewrite_callback(
+  user_data: Int,
+  kind: Int,
+  url: Int,
+  out_response: Int,
+): Int
+
 @JsFun("() => globalThis.__maplibreNativeC._mln_c_version()")
 internal external fun mln_c_version(): Int
 
@@ -38,6 +70,89 @@ internal external fun mln_json_snapshot_destroy(snapshot: Long)
   "(snapshot, out_value) => globalThis.__maplibreNativeC._mln_json_snapshot_get(snapshot, out_value)"
 )
 internal external fun mln_json_snapshot_get(snapshot: Long, out_value: Int): Int
+
+@JsFun("() => globalThis.__maplibreNativeC._mln_kotlin_dropped_records()")
+internal external fun mln_kotlin_dropped_records(): Long
+
+@JsFun("() => globalThis.__maplibreNativeC._mln_kotlin_log_clear()")
+internal external fun mln_kotlin_log_clear(): Int
+
+@JsFun("(consume) => globalThis.__maplibreNativeC._mln_kotlin_log_install(consume)")
+internal external fun mln_kotlin_log_install(consume: Int): Int
+
+@JsFun("() => globalThis.__maplibreNativeC._mln_kotlin_queued_provider_callback()")
+internal external fun mln_kotlin_queued_provider_callback(): Int
+
+@JsFun("() => globalThis.__maplibreNativeC._mln_kotlin_resource_request_listener()")
+internal external fun mln_kotlin_resource_request_listener(): Int
+
+@JsFun("() => globalThis.__maplibreNativeC._mln_kotlin_rewrite_transform_callback()")
+internal external fun mln_kotlin_rewrite_transform_callback(): Int
+
+@JsFun("(source) => { globalThis.__maplibreNativeC._mln_kotlin_set_wake(source) }")
+internal external fun mln_kotlin_set_wake(source: Long)
+
+@JsFun("(out) => globalThis.__maplibreNativeC._mln_kotlin_take_record(out)")
+internal external fun mln_kotlin_take_record(out: Int): Int
+
+@JsFun("() => globalThis.__maplibreNativeC._mln_kotlin_tile_cancel_callback()")
+internal external fun mln_kotlin_tile_cancel_callback(): Int
+
+@JsFun("() => globalThis.__maplibreNativeC._mln_kotlin_tile_fetch_callback()")
+internal external fun mln_kotlin_tile_fetch_callback(): Int
+
+@JsFun(
+  "(name, width, height) => globalThis.__maplibreNativeC._mln_kotlin_webgl_canvas_create(name, width, height)"
+)
+internal external fun mln_kotlin_webgl_canvas_create(name: Int, width: Int, height: Int): Int
+
+@JsFun("(name) => { globalThis.__maplibreNativeC._mln_kotlin_webgl_canvas_destroy(name) }")
+internal external fun mln_kotlin_webgl_canvas_destroy(name: Int)
+
+@JsFun(
+  "(name, width, height) => globalThis.__maplibreNativeC._mln_kotlin_webgl_canvas_resize(name, width, height)"
+)
+internal external fun mln_kotlin_webgl_canvas_resize(name: Int, width: Int, height: Int): Int
+
+@JsFun(
+  "(name, width, height) => globalThis.__maplibreNativeC._mln_kotlin_webgl_context_create(name, width, height)"
+)
+internal external fun mln_kotlin_webgl_context_create(name: Int, width: Int, height: Int): Int
+
+@JsFun("(context) => { globalThis.__maplibreNativeC._mln_kotlin_webgl_context_destroy(context) }")
+internal external fun mln_kotlin_webgl_context_destroy(context: Int)
+
+@JsFun(
+  "(context, texture, width, height) => globalThis.__maplibreNativeC._mln_kotlin_webgl_present_texture(context, texture, width, height)"
+)
+internal external fun mln_kotlin_webgl_present_texture(
+  context: Int,
+  texture: Int,
+  width: Int,
+  height: Int,
+): Int
+
+@JsFun(
+  "(context, texture, width, height, out_pixels, out_capacity) => globalThis.__maplibreNativeC._mln_kotlin_webgl_read_pixels(context, texture, width, height, out_pixels, out_capacity)"
+)
+internal external fun mln_kotlin_webgl_read_pixels(
+  context: Int,
+  texture: Int,
+  width: Int,
+  height: Int,
+  out_pixels: Int,
+  out_capacity: Int,
+): Int
+
+@JsFun(
+  "(context, width, height) => globalThis.__maplibreNativeC._mln_kotlin_webgl_texture_create(context, width, height)"
+)
+internal external fun mln_kotlin_webgl_texture_create(context: Int, width: Int, height: Int): Int
+
+@JsFun(
+  "(context, texture) => { globalThis.__maplibreNativeC._mln_kotlin_webgl_texture_destroy(context, texture) }"
+)
+internal external fun mln_kotlin_webgl_texture_destroy(context: Int, texture: Int)
 
 @JsFun(
   "(meters, out_coordinate) => globalThis.__maplibreNativeC._mln_lat_lng_for_projected_meters(meters, out_coordinate)"
@@ -314,6 +429,18 @@ internal external fun mln_map_copy_style_source_attribution(
 ): Int
 
 @JsFun(
+  "(map, source_id, out_url, url_capacity, out_url_size, out_found) => globalThis.__maplibreNativeC._mln_map_copy_style_source_url(map, source_id, out_url, url_capacity, out_url_size, out_found)"
+)
+internal external fun mln_map_copy_style_source_url(
+  map: Long,
+  source_id: Int,
+  out_url: Int,
+  url_capacity: Int,
+  out_url_size: Int,
+  out_found: Int,
+): Int
+
+@JsFun(
   "(map, out_url, url_capacity, out_url_size) => globalThis.__maplibreNativeC._mln_map_copy_style_url(map, out_url, url_capacity, out_url_size)"
 )
 internal external fun mln_map_copy_style_url(
@@ -472,6 +599,16 @@ internal external fun mln_map_get_style_source_info(
   map: Long,
   source_id: Int,
   out_info: Int,
+  out_found: Int,
+): Int
+
+@JsFun(
+  "(map, source_id, out_tile_urls, out_found) => globalThis.__maplibreNativeC._mln_map_get_style_source_tile_urls(map, source_id, out_tile_urls, out_found)"
+)
+internal external fun mln_map_get_style_source_tile_urls(
+  map: Long,
+  source_id: Int,
+  out_tile_urls: Int,
   out_found: Int,
 ): Int
 
@@ -1093,6 +1230,15 @@ internal external fun mln_render_session_set_feature_state(
 ): Int
 
 @JsFun(
+  "(extent, out_width, out_height) => globalThis.__maplibreNativeC._mln_render_target_extent_physical_size(extent, out_width, out_height)"
+)
+internal external fun mln_render_target_extent_physical_size(
+  extent: Int,
+  out_width: Int,
+  out_height: Int,
+): Int
+
+@JsFun(
   "(handle, out_cancelled) => globalThis.__maplibreNativeC._mln_resource_request_cancelled(handle, out_cancelled)"
 )
 internal external fun mln_resource_request_cancelled(handle: Long, out_cancelled: Int): Int
@@ -1335,6 +1481,19 @@ internal external fun mln_style_id_list_destroy(list: Long)
 )
 internal external fun mln_style_id_list_get(list: Long, index: Int, out_id: Int): Int
 
+@JsFun(
+  "(list, out_count) => globalThis.__maplibreNativeC._mln_style_string_list_count(list, out_count)"
+)
+internal external fun mln_style_string_list_count(list: Long, out_count: Int): Int
+
+@JsFun("(list) => { globalThis.__maplibreNativeC._mln_style_string_list_destroy(list) }")
+internal external fun mln_style_string_list_destroy(list: Long)
+
+@JsFun(
+  "(list, index, out_value) => globalThis.__maplibreNativeC._mln_style_string_list_get(list, index, out_value)"
+)
+internal external fun mln_style_string_list_get(list: Long, index: Int, out_value: Int): Int
+
 @JsFun("() => globalThis.__maplibreNativeC._mln_supported_render_backend_mask()")
 internal external fun mln_supported_render_backend_mask(): Int
 
@@ -1350,3 +1509,6 @@ internal external fun mln_texture_read_premultiplied_rgba8(
 
 @JsFun("() => globalThis.__maplibreNativeC._mln_thread_last_error_message()")
 internal external fun mln_thread_last_error_message(): Int
+
+@JsFun("(source) => { globalThis.__maplibreNativeC._mln_wake_source_destroy(source) }")
+internal external fun mln_wake_source_destroy(source: Long)

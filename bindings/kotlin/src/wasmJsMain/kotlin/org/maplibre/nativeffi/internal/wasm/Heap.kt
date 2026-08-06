@@ -167,22 +167,18 @@ internal object Heap {
    * Takes [size] zeroed bytes of Emscripten heap that outlive the call that asked for them.
    *
    * [withScratch] is what a call into native should use, and this is for the few blocks whose
-   * lifetime belongs to a component rather than to a call. There is exactly one: the dispatcher's
-   * completion block, which is held for the owner thread's life because the drain that reads it is
-   * itself what recovers heap — a drain that had to allocate before it could resolve the callers
-   * holding the heap could not run when it was needed most.
+   * lifetime belongs to a component rather than to a call: a
+   * [org.maplibre.nativeffi.render .NativeBuffer]'s storage, and the route and rule tables that
+   * native borrows for as long as a registration stands.
    *
    * The caller releases it with [release]. Nothing else does: a browser host has no finalizer, and
    * only a final shutdown reclaims what this hands out by discarding the whole heap.
    */
   fun acquire(size: Int): HeapPointer {
     Status.requireArgument(size > 0) { "scratch size must be positive" }
-    // Asked before the allocator is, because this is the first thing most calls into the binding
-    // touch. A final shutdown releases the module, and every accessor here reaches it through a
-    // page global that is then null -- so without this, a call after a shutdown reports a
-    // JavaScript type error naming `_malloc` rather than the binding failure that says what
-    // happened. The check is a global read, which is nothing beside the allocation it guards.
-    BrowserModule.require()
+    // Named before the allocator is reached, because a host's own main() runs while this
+    // distribution is imported, which is before the module calls mlnKotlinMain().
+    BrowserModule.attach()
     val address = heapAllocate(size)
     // Reachable, which it was not always: the module is linked with `-sABORTING_MALLOC=0`, so an
     // exhausted heap returns null here rather than aborting the module out from under the page. The

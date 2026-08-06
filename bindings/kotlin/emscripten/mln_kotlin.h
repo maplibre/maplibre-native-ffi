@@ -106,8 +106,8 @@ mln_status mln_kotlin_log_clear(void);
  */
 mln_resource_transform_callback mln_kotlin_rewrite_transform_callback(void);
 mln_resource_provider_callback mln_kotlin_queued_provider_callback(void);
-mln_adapter_queued_resource_request_listener mln_kotlin_resource_request_listener(
-);
+mln_adapter_queued_resource_request_listener
+mln_kotlin_resource_request_listener();
 mln_custom_geometry_source_tile_callback mln_kotlin_tile_fetch_callback(void);
 mln_custom_geometry_source_tile_callback mln_kotlin_tile_cancel_callback(void);
 

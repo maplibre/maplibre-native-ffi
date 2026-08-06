@@ -15,6 +15,19 @@ package org.maplibre.nativeffi.internal.wasm.generated
 import org.maplibre.nativeffi.internal.wasm.Heap
 import org.maplibre.nativeffi.internal.wasm.HeapPointer
 
+/** Values of `enum mln_adapter_resource_route_flags`. */
+internal object MlnAdapterResourceRouteFlags {
+  const val MLN_ADAPTER_RESOURCE_ROUTE_FLAGS_NONE: Int = 0
+  const val MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB: Int = 1
+  const val MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL: Int = 2
+}
+
+/** Values of `enum mln_adapter_url_match_flags`. */
+internal object MlnAdapterUrlMatchFlags {
+  const val MLN_ADAPTER_URL_MATCH_FLAGS_NONE: Int = 0
+  const val MLN_ADAPTER_URL_MATCH_GLOB: Int = 1
+}
+
 /** Values of `enum mln_animation_option_field`. */
 internal object MlnAnimationOptionField {
   const val MLN_ANIMATION_OPTION_DURATION: Int = 1
@@ -140,6 +153,16 @@ internal object MlnJsonValueType {
   const val MLN_JSON_VALUE_TYPE_OBJECT: Int = 7
 }
 
+/** Values of `enum mln_kotlin_record_kind`. */
+internal object MlnKotlinRecordKind {
+  const val MLN_KOTLIN_RECORD_LOG: Int = 1
+  const val MLN_KOTLIN_RECORD_LOG_RETIRED: Int = 2
+  const val MLN_KOTLIN_RECORD_RESOURCE_REQUEST: Int = 3
+  const val MLN_KOTLIN_RECORD_RESOURCE_PROVIDER_RETIRED: Int = 4
+  const val MLN_KOTLIN_RECORD_TILE_FETCH: Int = 5
+  const val MLN_KOTLIN_RECORD_TILE_CANCEL: Int = 6
+}
+
 /** Values of `enum mln_map_tile_option_field`. */
 internal object MlnMapTileOptionField {
   const val MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA: Int = 1
@@ -228,6 +251,16 @@ internal object MlnStyleImageOptionField {
   const val MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT: Int = 64
 }
 
+/** Values of `enum mln_style_source_info_field`. */
+internal object MlnStyleSourceInfoField {
+  const val MLN_STYLE_SOURCE_INFO_URL: Int = 1
+  const val MLN_STYLE_SOURCE_INFO_TILEJSON: Int = 2
+  const val MLN_STYLE_SOURCE_INFO_BOUNDS: Int = 4
+  const val MLN_STYLE_SOURCE_INFO_TILE_SIZE: Int = 8
+  const val MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING: Int = 16
+  const val MLN_STYLE_SOURCE_INFO_RASTER_ENCODING: Int = 32
+}
+
 /** Values of `enum mln_style_tile_source_option_field`. */
 internal object MlnStyleTileSourceOptionField {
   const val MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM: Int = 1
@@ -285,6 +318,213 @@ internal object MlnAdapterLogRecord {
 
   fun setMessage(base: HeapPointer, value: HeapPointer) {
     Heap.storeInt(base + 24, value.address)
+  }
+}
+
+/** Fields of `struct mln_adapter_queued_resource_provider`. */
+internal object MlnAdapterQueuedResourceProvider {
+  const val SIZEOF: Int = 12
+
+  fun routes(base: HeapPointer): HeapPointer = HeapPointer(Heap.loadInt(base + 0))
+
+  fun setRoutes(base: HeapPointer, value: HeapPointer) {
+    Heap.storeInt(base + 0, value.address)
+  }
+
+  fun routeCount(base: HeapPointer): Int = Heap.loadInt(base + 4)
+
+  fun setRouteCount(base: HeapPointer, value: Int) {
+    Heap.storeInt(base + 4, value)
+  }
+
+  const val OFFSET_LISTENER: Int = 8
+}
+
+/** Fields of `struct mln_adapter_queued_resource_provider_route`. */
+internal object MlnAdapterQueuedResourceProviderRoute {
+  const val SIZEOF: Int = 12
+
+  fun kind(base: HeapPointer): Int = Heap.loadInt(base + 0)
+
+  fun setKind(base: HeapPointer, value: Int) {
+    Heap.storeInt(base + 0, value)
+  }
+
+  fun flags(base: HeapPointer): Int = Heap.loadInt(base + 4)
+
+  fun setFlags(base: HeapPointer, value: Int) {
+    Heap.storeInt(base + 4, value)
+  }
+
+  fun url(base: HeapPointer): HeapPointer = HeapPointer(Heap.loadInt(base + 8))
+
+  fun setUrl(base: HeapPointer, value: HeapPointer) {
+    Heap.storeInt(base + 8, value.address)
+  }
+}
+
+/** Fields of `struct mln_adapter_queued_resource_request`. */
+internal object MlnAdapterQueuedResourceRequest {
+  const val SIZEOF: Int = 112
+
+  fun owner(base: HeapPointer): HeapPointer = HeapPointer(Heap.loadInt(base + 0))
+
+  fun setOwner(base: HeapPointer, value: HeapPointer) {
+    Heap.storeInt(base + 0, value.address)
+  }
+
+  fun handle(base: HeapPointer): Long = Heap.loadLong(base + 8)
+
+  fun setHandle(base: HeapPointer, value: Long) {
+    Heap.storeLong(base + 8, value)
+  }
+
+  fun requestedUrl(base: HeapPointer): HeapPointer = HeapPointer(Heap.loadInt(base + 16))
+
+  fun setRequestedUrl(base: HeapPointer, value: HeapPointer) {
+    Heap.storeInt(base + 16, value.address)
+  }
+
+  fun resolvedUrl(base: HeapPointer): HeapPointer = HeapPointer(Heap.loadInt(base + 20))
+
+  fun setResolvedUrl(base: HeapPointer, value: HeapPointer) {
+    Heap.storeInt(base + 20, value.address)
+  }
+
+  fun kind(base: HeapPointer): Int = Heap.loadInt(base + 24)
+
+  fun setKind(base: HeapPointer, value: Int) {
+    Heap.storeInt(base + 24, value)
+  }
+
+  fun loadingMethod(base: HeapPointer): Int = Heap.loadInt(base + 28)
+
+  fun setLoadingMethod(base: HeapPointer, value: Int) {
+    Heap.storeInt(base + 28, value)
+  }
+
+  fun priority(base: HeapPointer): Int = Heap.loadInt(base + 32)
+
+  fun setPriority(base: HeapPointer, value: Int) {
+    Heap.storeInt(base + 32, value)
+  }
+
+  fun usage(base: HeapPointer): Int = Heap.loadInt(base + 36)
+
+  fun setUsage(base: HeapPointer, value: Int) {
+    Heap.storeInt(base + 36, value)
+  }
+
+  fun storagePolicy(base: HeapPointer): Int = Heap.loadInt(base + 40)
+
+  fun setStoragePolicy(base: HeapPointer, value: Int) {
+    Heap.storeInt(base + 40, value)
+  }
+
+  fun hasRange(base: HeapPointer): Boolean = Heap.loadByte(base + 44) != 0.toByte()
+
+  fun setHasRange(base: HeapPointer, value: Boolean) {
+    Heap.storeByte(base + 44, if (value) 1 else 0)
+  }
+
+  fun rangeStart(base: HeapPointer): Long = Heap.loadLong(base + 48)
+
+  fun setRangeStart(base: HeapPointer, value: Long) {
+    Heap.storeLong(base + 48, value)
+  }
+
+  fun rangeEnd(base: HeapPointer): Long = Heap.loadLong(base + 56)
+
+  fun setRangeEnd(base: HeapPointer, value: Long) {
+    Heap.storeLong(base + 56, value)
+  }
+
+  fun hasPriorModified(base: HeapPointer): Boolean = Heap.loadByte(base + 64) != 0.toByte()
+
+  fun setHasPriorModified(base: HeapPointer, value: Boolean) {
+    Heap.storeByte(base + 64, if (value) 1 else 0)
+  }
+
+  fun priorModifiedUnixMs(base: HeapPointer): Long = Heap.loadLong(base + 72)
+
+  fun setPriorModifiedUnixMs(base: HeapPointer, value: Long) {
+    Heap.storeLong(base + 72, value)
+  }
+
+  fun hasPriorExpires(base: HeapPointer): Boolean = Heap.loadByte(base + 80) != 0.toByte()
+
+  fun setHasPriorExpires(base: HeapPointer, value: Boolean) {
+    Heap.storeByte(base + 80, if (value) 1 else 0)
+  }
+
+  fun priorExpiresUnixMs(base: HeapPointer): Long = Heap.loadLong(base + 88)
+
+  fun setPriorExpiresUnixMs(base: HeapPointer, value: Long) {
+    Heap.storeLong(base + 88, value)
+  }
+
+  fun priorEtag(base: HeapPointer): HeapPointer = HeapPointer(Heap.loadInt(base + 96))
+
+  fun setPriorEtag(base: HeapPointer, value: HeapPointer) {
+    Heap.storeInt(base + 96, value.address)
+  }
+
+  fun priorData(base: HeapPointer): HeapPointer = HeapPointer(Heap.loadInt(base + 100))
+
+  fun setPriorData(base: HeapPointer, value: HeapPointer) {
+    Heap.storeInt(base + 100, value.address)
+  }
+
+  fun priorDataSize(base: HeapPointer): Int = Heap.loadInt(base + 104)
+
+  fun setPriorDataSize(base: HeapPointer, value: Int) {
+    Heap.storeInt(base + 104, value)
+  }
+}
+
+/** Fields of `struct mln_adapter_resource_rewrite_rule`. */
+internal object MlnAdapterResourceRewriteRule {
+  const val SIZEOF: Int = 16
+
+  fun kind(base: HeapPointer): Int = Heap.loadInt(base + 0)
+
+  fun setKind(base: HeapPointer, value: Int) {
+    Heap.storeInt(base + 0, value)
+  }
+
+  fun flags(base: HeapPointer): Int = Heap.loadInt(base + 4)
+
+  fun setFlags(base: HeapPointer, value: Int) {
+    Heap.storeInt(base + 4, value)
+  }
+
+  fun url(base: HeapPointer): HeapPointer = HeapPointer(Heap.loadInt(base + 8))
+
+  fun setUrl(base: HeapPointer, value: HeapPointer) {
+    Heap.storeInt(base + 8, value.address)
+  }
+
+  fun replacementUrl(base: HeapPointer): HeapPointer = HeapPointer(Heap.loadInt(base + 12))
+
+  fun setReplacementUrl(base: HeapPointer, value: HeapPointer) {
+    Heap.storeInt(base + 12, value.address)
+  }
+}
+
+/** Fields of `struct mln_adapter_resource_rewrite_rules`. */
+internal object MlnAdapterResourceRewriteRules {
+  const val SIZEOF: Int = 8
+
+  fun rules(base: HeapPointer): HeapPointer = HeapPointer(Heap.loadInt(base + 0))
+
+  fun setRules(base: HeapPointer, value: HeapPointer) {
+    Heap.storeInt(base + 0, value.address)
+  }
+
+  fun count(base: HeapPointer): Int = Heap.loadInt(base + 4)
+
+  fun setCount(base: HeapPointer, value: Int) {
+    Heap.storeInt(base + 4, value)
   }
 }
 
@@ -1013,6 +1253,41 @@ internal object MlnJsonValue {
   }
 
   const val OFFSET_DATA: Int = 8
+}
+
+/** Fields of `struct mln_kotlin_record`. */
+internal object MlnKotlinRecord {
+  const val SIZEOF: Int = 20
+
+  fun kind(base: HeapPointer): Int = Heap.loadInt(base + 0)
+
+  fun setKind(base: HeapPointer, value: Int) {
+    Heap.storeInt(base + 0, value)
+  }
+
+  fun tileZ(base: HeapPointer): Int = Heap.loadInt(base + 4)
+
+  fun setTileZ(base: HeapPointer, value: Int) {
+    Heap.storeInt(base + 4, value)
+  }
+
+  fun tileX(base: HeapPointer): Int = Heap.loadInt(base + 8)
+
+  fun setTileX(base: HeapPointer, value: Int) {
+    Heap.storeInt(base + 8, value)
+  }
+
+  fun tileY(base: HeapPointer): Int = Heap.loadInt(base + 12)
+
+  fun setTileY(base: HeapPointer, value: Int) {
+    Heap.storeInt(base + 12, value)
+  }
+
+  fun payload(base: HeapPointer): HeapPointer = HeapPointer(Heap.loadInt(base + 16))
+
+  fun setPayload(base: HeapPointer, value: HeapPointer) {
+    Heap.storeInt(base + 16, value.address)
+  }
 }
 
 /** Fields of `struct mln_lat_lng`. */

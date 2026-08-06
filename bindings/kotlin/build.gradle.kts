@@ -5,7 +5,6 @@ import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
-import org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
@@ -60,11 +59,10 @@ val packagedBrowserModule = layout.buildDirectory.dir("wasmJsBrowserModule")
 val browserNoticeDir = browserModuleSourceDir.map {
   it.parentFile.parentFile.resolve("share/maplibre-native-c/licenses")
 }
-val testBrowserPath =
-  providers
-    .environmentVariable("MLN_FFI_TEST_BROWSER")
-    .orElse(providers.environmentVariable("CHROME_PATH"))
-    .orElse(providers.environmentVariable("CHROME_BIN"))
+// Where the browser suite runs from. The module boots the Kotlin distribution served beside it, and
+// the Kotlin test binary resolves its wasm and its import object against its own URL, so one flat
+// directory holds everything the run fetches.
+val packagedBrowserSuite = layout.buildDirectory.dir("wasmJsBrowserSuite")
 val packagedAndroidBindingLibs = layout.buildDirectory.dir("generated/jniLibs/androidMain")
 val generatedJavaCppSources =
   layout.buildDirectory.dir("generated/sources/javacpp/androidMain/java")
@@ -83,16 +81,11 @@ kotlin {
   // are target-wide rather than repeated on every declaration that reaches native.
   @OptIn(ExperimentalWasmDsl::class)
   wasmJs {
-    browser {
-      testTask {
-        // Karma serves the page, so it also sets the cross-origin isolation headers the module's
-        // pthreads need and serves the module beside the test bundle. Both live in karma.config.d,
-        // which Kotlin appends to the generated Karma configuration. Naming the launcher here is
-        // what puts karma-chrome-launcher on the harness; karma.config.d then selects a launcher of
-        // its own that carries the flags a container needs.
-        useKarma { useChromeHeadless() }
-      }
-    }
+    // Karma loads a test binary as a page script, which would run the suite on the page's own
+    // thread. That thread is the module's main runtime thread, and it serves the proxied calls and
+    // timers every other thread depends on, so the binding blocks there at the cost of a deadlock.
+    // wasmJsBrowserSuite runs the same test binary the way the module runs an application.
+    browser { testTask { enabled = false } }
     compilerOptions {
       optIn.addAll(
         "kotlin.js.ExperimentalWasmJsInterop",
@@ -309,20 +302,56 @@ plugins.withId("maven-publish") {
   }
 }
 
-tasks.named<KotlinJsTest>("wasmJsBrowserTest") {
-  dependsOn(packageBrowserModule)
-  inputs.dir(packagedBrowserModule).withPropertyName("browserModule")
-  // Read by karma.config.d, which serves this directory to the test page. Karma runs as its own
-  // process, so a Gradle-side path reaches it through the environment rather than through a
-  // property.
-  environment["MLN_FFI_BROWSER_MODULE_DIR"] = packagedBrowserModule.get().asFile.path
-  // The same variables the C API browser runner honours, so one host setting names one browser for
-  // every browser suite in the repository.
-  testBrowserPath.orNull?.let { environment["CHROME_BIN"] = it }
+// The module, the Kotlin test binary, and the entry point that boots it, collected into the one
+// directory the runner serves.
+//
+// The test binary is renamed to the name its entry point imports, because the Kotlin compiler names
+// the file after the compilation and the entry point is checked in. The rename reaches only that
+// one file, and the files it imports beside itself keep the names it imports them under.
+val packageBrowserSuite =
+  tasks.register<Sync>("packageBrowserSuite") {
+    group = "verification"
+    description = "Collects the browser suite: the module, the test binary, and its entry point."
+    from(packageBrowserModule)
+    from(tasks.named("wasmJsTestTestDevelopmentExecutableCompileSync")) {
+      rename {
+        val isBinary =
+          it.endsWith(".mjs") &&
+            !it.endsWith(".import-object.mjs") &&
+            !it.endsWith(".js-builtins.mjs")
+        if (isBinary) "maplibre-native-kotlin-suite.mjs" else it
+      }
+    }
+    from(layout.projectDirectory.dir("browser-test"))
+    into(packagedBrowserSuite)
+  }
+
+// The suite. The runner serves the staged directory with the cross-origin isolation the module's
+// pthreads need, opens it in a headless Chromium, and turns the page's report into an exit status.
+// It is the same runner the C API and Rust browser suites use.
+tasks.register<Exec>("wasmJsBrowserSuite") {
+  group = "verification"
+  description = "Runs the Kotlin browser binding tests in headless Chromium."
+  dependsOn(packageBrowserSuite)
+  inputs.dir(packagedBrowserSuite).withPropertyName("browserSuite")
+  workingDir = rootProject.layout.projectDirectory.asFile
+  commandLine(
+    "node",
+    rootProject.layout.projectDirectory.file("scripts/run-browser-test.mjs").asFile.path,
+    packagedBrowserSuite.get().file("maplibre_native_c.mjs").asFile.path,
+    "--timeout-seconds",
+    "600",
+    // Software WebGL2, for a runner with no GPU.
+    "--render-backend",
+    "opengl",
+    // A canvas the page displays, which the presentation coverage renders to. Only a document has
+    // one to hand the module, so the page instantiates the module itself.
+    "--page-canvas",
+  )
   val moduleConfigured = browserModuleConfigured
   doFirst {
     check(moduleConfigured) {
-      "The wasmJs browser tests drive the prelinked Emscripten module. Build it with " +
+      "The wasmJs browser suite drives the prelinked Emscripten module. Build it with " +
         "`mise run build emscripten-wasm32-webgl` and name it with " +
         "-Pmaplibre.browser.moduleDir=build/emscripten-wasm32-webgl/install/lib/browser."
     }

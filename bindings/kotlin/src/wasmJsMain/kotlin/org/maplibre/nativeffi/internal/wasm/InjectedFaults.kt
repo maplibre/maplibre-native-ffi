@@ -1,96 +1,71 @@
 package org.maplibre.nativeffi.internal.wasm
 
+import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
-import org.maplibre.nativeffi.internal.status.Status
 
 /**
  * Failures this suite has to prove the binding survives, and which the module will not produce.
  *
  * **This exists for the tests.** Nothing in the binding arms it, and everything below is inert
- * until something does: the entry point armed for failure is null and every flag is false, so each
- * hook is one field read on the path it sits on. The binding specification allows an internal seam
- * for exactly these failures — native destroy, request release, frame release and callback-install
- * failure, and an allocation or copy failure after a native handle is acquired, which covers both a
- * result handle's copy and the wrapper an acquired frame is still to be given — because none of
- * them can be produced through the public library on demand.
+ * until something does, so each hook is one field read on the path it sits on. The binding
+ * specification allows an internal seam for an allocation or copy failure raised after a native
+ * handle has been acquired -- both a result handle's copy and the wrapper an acquired frame is
+ * still to be given -- because neither can be produced through the public library on demand.
  *
- * The drain-turn failure below is this binding's own addition to that set, under the rule the list
- * illustrates rather than under one of its entries. A completion drain turn is a page task the
- * dispatcher scheduled for itself, so nothing a host or the module can be asked to do reaches it,
- * and what it must survive is not a status but the fact of having thrown at all.
- *
- * What the injected failures replace is the answer, never the recovery. A faulted call does not
+ * What the injected failures replace is the answer, never the recovery. A faulted copy does not
  * reach native at all, which is what makes the state afterwards the real thing rather than a
- * simulation of it: a frame whose release was refused is still acquired natively, so the retry that
- * follows really does release it, and a provider replacement that was refused really does leave the
- * runtime holding its predecessor. A seam that let the call through and rewrote its status would
- * prove neither.
- *
- * Every arming is one-shot, taken by the first call that matches, so a test that fails part way
- * through cannot leave a fault standing for whichever test the framework runs next.
+ * simulation of it: the result handle it refused is still live, so the replay that follows really
+ * does tell a released handle from a leaked one.
  */
 internal object InjectedFaults {
-  private var faultedEntry: String? = null
-  private var faultedStatus: Int = 0
-  private var faultedDiagnostic: String = ""
-
   private var failResultCopies = false
   private val copiedResults = mutableListOf<Long>()
 
-  private var failNextDrainTurn = false
   private var failNextFrameWrap = false
 
-  /**
-   * Makes the next dispatched call to [entry] report [status] without reaching the owner thread.
-   *
-   * [diagnostic] stands in for the message native would have left, which the caller's exception
-   * copies exactly as it copies a real one.
-   */
-  fun failNextCall(entry: String, status: MaplibreStatus, diagnostic: String) {
-    faultedEntry = entry
-    faultedStatus = status.nativeCode
-    faultedDiagnostic = diagnostic
-  }
+  private var failedEntryPoint: String? = null
+  private var failedStatus = MaplibreStatus.OK
+  private var failedDiagnostic = ""
 
   /** Forgets an arming that was never taken, so a failing test cannot leak one. */
   fun reset() {
-    faultedEntry = null
     failResultCopies = false
     copiedResults.clear()
-    failNextDrainTurn = false
     failNextFrameWrap = false
+    failedEntryPoint = null
   }
 
   /**
-   * Makes the next completion drain turn throw before it takes anything.
+   * Makes the next call to [entryPoint] report [status] with [diagnostic] instead of reaching it.
    *
-   * The turn is the one piece of this binding that runs with no caller: a page task the dispatcher
-   * scheduled for itself. Nothing a host can do makes one fail, and what a failure costs is the
-   * whole page rather than one call -- the turn is what resolves every parked caller -- so it is
-   * worth proving that a turn which failed leaves the drain able to run again.
+   * The calls that carry this seam are the registration installs and the frame release: each one
+   * hands native something the binding has already built, and the recovery afterwards -- keeping
+   * the previous registration, keeping the frame open for a retry -- is what BND-122 and BND-169
+   * ask for. Native refuses none of them for any input the public library can produce.
    *
-   * The failure it raises stands for any of them rather than naming one, which is the whole point:
-   * what the turn has to survive is that it threw, not what it threw. It arrives as an uncaught
-   * error on the page, because a task with no caller has nowhere else to report to; a test that
-   * arms this takes the page's error handler for as long as the arming stands.
+   * Naming the entry point rather than intercepting one is deliberate. Every call is now a direct
+   * extern, so there is no chokepoint to hook; the seam is the [beginCall] line at the few sites
+   * that need it, and it is inert for every other call in the binding.
    */
-  fun failNextDrainTurn() {
-    failNextDrainTurn = true
+  fun failNextCall(entryPoint: String, status: MaplibreStatus, diagnostic: String) {
+    failedEntryPoint = entryPoint
+    failedStatus = status
+    failedDiagnostic = diagnostic
   }
 
-  /** Fails one drain turn if that is armed. Called at the top of [Dispatcher]'s turn. */
-  fun injectDrainFailure() {
-    if (!failNextDrainTurn) return
-    failNextDrainTurn = false
-    throw Status.invalidState("An injected fault failed a MapLibre Native completion drain turn")
+  /** Reports the armed failure for [entryPoint], once, instead of letting the call through. */
+  fun beginCall(entryPoint: String) {
+    if (failedEntryPoint != entryPoint) return
+    failedEntryPoint = null
+    throw MaplibreException.forStatus(failedStatus, failedStatus.nativeCode, failedDiagnostic)
   }
 
   /**
    * Makes the next owned-frame acquisition fail after native has handed the frame over.
    *
-   * The window this stands in is the one BND-172 names: native has the frame, and the page has
+   * The window this stands in is the one BND-172 names: native has the frame, and the binding has
    * still to copy the descriptor into a Kotlin value and wrap it. Both of those are object
-   * construction, which fails only when the Kotlin heap is exhausted -- a condition a page cannot
+   * construction, which fails only when the Kotlin heap is exhausted -- a condition a host cannot
    * ask for and could not leave behind for the next test if it could.
    */
   fun failNextFrameWrap() {
@@ -104,22 +79,6 @@ internal object InjectedFaults {
     throw Heap.allocationFailure(bytes)
   }
 
-  /**
-   * Reports the diagnostic [entry] is armed to fail with, having written its status into [result],
-   * or null when nothing is armed for it.
-   *
-   * Called by [Dispatcher.call] where the submission would go. The status lands in the caller's own
-   * result slot and the message goes back to the caller rather than being published from here, so
-   * both reach the reader above by the ordinary path rather than by one this knows about -- and so
-   * a faulted call's message is scoped to that call exactly as a real one is.
-   */
-  fun injectedCallFailure(entry: String, result: HeapPointer): String? {
-    if (faultedEntry != entry) return null
-    faultedEntry = null
-    Heap.storeInt(result, faultedStatus)
-    return faultedDiagnostic
-  }
-
   /** Makes every result-handle copy fail as an allocation failure, until [takeCopiedResults]. */
   fun failResultCopies() {
     failResultCopies = true
@@ -130,8 +89,8 @@ internal object InjectedFaults {
    * Disarms the copy failure and reports the result handles it was asked about, oldest first.
    *
    * The handles are what the test replays: a destroyed one is stale to native, so replaying it is
-   * how a page tells a released result handle from a leaked one. Nothing else can — a leaked handle
-   * does nothing observable until the module runs out of table slots.
+   * how a caller tells a released result handle from a leaked one. Nothing else can -- a leaked
+   * handle does nothing observable until the module runs out of table slots.
    */
   fun takeCopiedResults(): List<Long> {
     failResultCopies = false
@@ -146,13 +105,12 @@ internal object InjectedFaults {
    * Called at the top of every read that copies a native snapshot, list, or result handle and
    * destroys it. The failure is the one the module's allocator would have raised for that scratch,
    * because that is the failure the copy has: everything below this line reads native storage
-   * through a block the page has to allocate first.
+   * through a block this binding has to allocate first.
    *
    * What cannot be produced here is the *placement*, not the failure. A real allocation failure is
-   * ordinary now that the module reports one instead of aborting — `NativeBufferBrowserTest` asks
-   * for more heap than exists and gets it — but exhausting the heap in the window between native
-   * handing back a result handle and the page copying it would mean filling half a gigabyte and
-   * leaving it full for whichever test ran next.
+   * ordinary now that the module reports one instead of aborting, but exhausting the heap in the
+   * window between native handing back a result handle and the copy would mean filling half a
+   * gigabyte and leaving it full for whichever test ran next.
    */
   fun beginResultCopy(handle: Long, bytes: Int) {
     if (!failResultCopies) return

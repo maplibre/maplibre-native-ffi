@@ -8,8 +8,8 @@ package org.maplibre.nativeffi.log
  * code and contains callback exceptions so they do not unwind into native code.
  *
  * Whether a record also reaches MapLibre's platform logger is fixed when the callback is
- * registered, not decided per record, because a host that cannot answer on the producing thread
- * has no way to decide it there.
+ * registered, not decided per record, because a host that cannot answer on the producing thread has
+ * no way to decide it there.
  */
 public fun interface LogCallback {
   /** Receives one log record. */
