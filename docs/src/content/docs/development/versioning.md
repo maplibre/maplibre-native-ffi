@@ -25,11 +25,10 @@ signal of [Semantic Versioning](https://semver.org/) with the temporal signal of
 | ----------- | --------------------------------------------------------------------------- |
 | `API_EPOCH` | Compatibility generation for the component. `0` identifies an unstable API. |
 | `YYYYMM`    | UTC year and month in which the tagged release is published.                |
-| `REVISION`  | Compatible tagged release number within that month, starting at `0`.        |
+| `REVISION`  | Tagged release number within that month, starting at `0`.                   |
 
-An `API_EPOCH` of `0` makes no compatibility promise across release months. A
-new `YYYYMM` may require host changes. Releases that share an epoch and month
-remain compatible as their revision advances.
+An `API_EPOCH` of `0` makes no compatibility promise. A new `YYYYMM` or
+`REVISION` may require host changes.
 
 An `API_EPOCH` of `1` or greater promises compatibility throughout that epoch. A
 release that breaks a component's public API, ABI, or documented behavior
@@ -39,7 +38,7 @@ same month.
 
 ```text
 0.202608.0  unstable release
-0.202608.1  compatible revision in the same month
+0.202608.1  later unstable revision; compatibility is not promised
 0.202609.0  later unstable release; compatibility is not promised
 1.202701.0  first stable compatibility epoch
 1.202702.0  compatible release in a later month
@@ -48,9 +47,9 @@ same month.
 ```
 
 The version month matches the publication month. A release delayed across a UTC
-month boundary takes the new month and starts its revision at `0`. An
-incompatible epoch-`0` change waits for a later release month. Snapshots carry
-intervening development builds and do not consume tagged release revisions.
+month boundary takes the new month and starts its revision at `0`. Snapshots
+carry intervening development builds and do not consume tagged release
+revisions.
 
 ## Release components
 
