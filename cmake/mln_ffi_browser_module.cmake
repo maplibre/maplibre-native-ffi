@@ -20,6 +20,7 @@ function(mln_ffi_add_browser_module target api_target)
 
   set(shim_dir "${PROJECT_SOURCE_DIR}/bindings/kotlin/emscripten")
   set(host_library "${shim_dir}/mln_kotlin_host.js")
+  set(pre_library "${shim_dir}/mln_kotlin_pre.js")
 
   set(export_list "${CMAKE_CURRENT_BINARY_DIR}/${target}-exports.txt")
   # CMAKE_NM is the emsdk's llvm-nm, which reads the wasm archive the toolchain
@@ -105,17 +106,22 @@ function(mln_ffi_add_browser_module target api_target)
       -sEXPORT_ES6=1
       -sEXPORT_NAME=createMaplibreNativeC
       -sPROXY_TO_PTHREAD
-      "-sOFFSCREENCANVASES_TO_PTHREAD=''"
+      # The thread this binding runs on is created during instantiation, which
+      # is the only moment a canvas can be transferred to it. The pre-js
+      # registers one under this name either way, so a host with no on-screen
+      # map does not fail thread creation on a selector matching nothing.
+      "-sOFFSCREENCANVASES_TO_PTHREAD=#maplibre"
       -sOFFSCREENCANVAS_SUPPORT=1
       -sWASM_BIGINT=1
       "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPU16,HEAPU32,HEAPF32,HEAPF64,GL,UTF8ToString,stringToUTF8,lengthBytesUTF8"
       "-sEXPORTED_FUNCTIONS=@${export_list}"
       "--js-library=${host_library}"
+      "--pre-js=${pre_library}"
       -lexports.js)
   set_property(
     TARGET ${target}
     APPEND
-    PROPERTY LINK_DEPENDS "${export_list}" "${host_library}")
+    PROPERTY LINK_DEPENDS "${export_list}" "${host_library}" "${pre_library}")
 
   install(
     FILES "${CMAKE_CURRENT_BINARY_DIR}/browser/maplibre_native_c.mjs"
