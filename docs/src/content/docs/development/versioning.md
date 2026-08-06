@@ -5,8 +5,9 @@ sidebar:
   order: 5
 ---
 
-This document outlines the intended versioning and release conventions. It does
-not document the current status.
+This document defines versioning and release tags. Kotlin uses these conventions
+for published releases. Other components adopt them when their release workflow
+is added.
 
 Tagged releases use a calendar-based version that retains one semantic
 compatibility boundary:
@@ -15,9 +16,9 @@ compatibility boundary:
 API_EPOCH.YYYYMM.REVISION
 ```
 
-Each release component has its own version. This combines the compatibility
-signal of [Semantic Versioning](https://semver.org/) with the temporal signal of
-[Calendar Versioning](https://calver.org/).
+Each release component has its own version. The format combines the
+compatibility signal of [Semantic Versioning](https://semver.org/) with the
+temporal signal of [Calendar Versioning](https://calver.org/).
 
 ## Version format
 
@@ -25,11 +26,10 @@ signal of [Semantic Versioning](https://semver.org/) with the temporal signal of
 | ----------- | --------------------------------------------------------------------------- |
 | `API_EPOCH` | Compatibility generation for the component. `0` identifies an unstable API. |
 | `YYYYMM`    | UTC year and month in which the tagged release is published.                |
-| `REVISION`  | Compatible tagged release number within that month, starting at `0`.        |
+| `REVISION`  | Tagged release number within that month, starting at `0`.                   |
 
-An `API_EPOCH` of `0` makes no compatibility promise across release months. A
-new `YYYYMM` may require host changes. Releases that share an epoch and month
-remain compatible as their revision advances.
+An `API_EPOCH` of `0` makes no compatibility promise. A new `YYYYMM` or
+`REVISION` may require host changes.
 
 An `API_EPOCH` of `1` or greater promises compatibility throughout that epoch. A
 release that breaks a component's public API, ABI, or documented behavior
@@ -39,7 +39,7 @@ same month.
 
 ```text
 0.202608.0  unstable release
-0.202608.1  compatible revision in the same month
+0.202608.1  later unstable revision; compatibility is not promised
 0.202609.0  later unstable release; compatibility is not promised
 1.202701.0  first stable compatibility epoch
 1.202702.0  compatible release in a later month
@@ -48,9 +48,9 @@ same month.
 ```
 
 The version month matches the publication month. A release delayed across a UTC
-month boundary takes the new month and starts its revision at `0`. An
-incompatible epoch-`0` change waits for a later release month. Snapshots carry
-intervening development builds and do not consume tagged release revisions.
+month boundary takes the new month and starts its revision at `0`. Snapshots
+carry intervening development builds and do not consume tagged release
+revisions.
 
 ## Release components
 
@@ -92,3 +92,10 @@ Release tags name the exact source commit and never move. Every artifact in a
 release family is built from that commit and carries the version from its tag.
 The Kotlin family follows the coordinate and finalization design in
 [Kotlin publishing](/maplibre-native-ffi/development/kotlin-publishing/).
+
+Pushing a Kotlin source tag starts its release. The publishing workflow accepts
+the latest tag when its revision follows every earlier tag in the same epoch and
+month, its month is the current UTC month, and its commit belongs to `main`. The
+exact commit must have a successful main CI run because the release reuses that
+run's native artifacts. The workflow repeats the tag and month checks before it
+publishes the complete Kotlin release family automatically.

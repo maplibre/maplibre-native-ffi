@@ -235,7 +235,7 @@ mod download {
         &[("metal", "metal"), ("vulkan", "vulkan"), ("opengl", "egl")];
     const APPLE_MOBILE: &[(&str, &str)] = &[("metal", "metal")];
 
-    /// The presets `.github/workflows/snapshots.yml` publishes a shared library
+    /// The presets `.github/workflows/publishing.yml` publishes a shared library
     /// for. OpenHarmony, musl, and windows-gnu ship no archive. Device iOS
     /// ships only a static archive, which needs Apple framework link metadata
     /// this does not emit.

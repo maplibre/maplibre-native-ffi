@@ -1,35 +1,22 @@
 #!/usr/bin/env python3
-# [MISE] description="Verify staged Kotlin Maven snapshot payloads."
+# [MISE] description="Verify staged Kotlin Maven payloads."
 # [MISE] shell="python3"
 
 import json
 import pathlib
 import sys
-import zipfile
 import xml.etree.ElementTree as element_tree
+import zipfile
 
-MODULES = {
-    "maplibre-native-ffi",
-    "maplibre-native-ffi-android",
-    "maplibre-native-ffi-iosarm64",
-    "maplibre-native-ffi-iossimulatorarm64",
-    "maplibre-native-ffi-jvm",
-    "maplibre-native-ffi-linuxx64",
-    "maplibre-native-ffi-macosarm64",
-    "maplibre-native-ffi-runtime-metal",
-    "maplibre-native-ffi-runtime-metal-iosarm64",
-    "maplibre-native-ffi-runtime-metal-iossimulatorarm64",
-    "maplibre-native-ffi-runtime-metal-jvm",
-    "maplibre-native-ffi-runtime-metal-macosarm64",
-    "maplibre-native-ffi-runtime-opengl",
-    "maplibre-native-ffi-runtime-opengl-android",
-    "maplibre-native-ffi-runtime-opengl-jvm",
-    "maplibre-native-ffi-runtime-opengl-linuxx64",
-    "maplibre-native-ffi-runtime-vulkan",
-    "maplibre-native-ffi-runtime-vulkan-android",
-    "maplibre-native-ffi-runtime-vulkan-jvm",
-    "maplibre-native-ffi-runtime-vulkan-linuxx64",
-}
+MODULES = set(
+    json.loads(
+        (
+            pathlib.Path(__file__).resolve().parents[3]
+            / "ci"
+            / "kotlin_maven_modules.json"
+        ).read_text(encoding="utf-8")
+    )
+)
 
 # Modules with public Kotlin API. Their javadoc jars must carry the Dokka site,
 # not the manifest-only placeholders Maven Central tolerates for API-free modules.
@@ -77,6 +64,8 @@ COMMON_NATIVE_LICENSES = {
     "pmtiles.txt",
 }
 
+POM_NAMESPACE = {"m": "http://maven.apache.org/POM/4.0.0"}
+
 
 def native_licenses(backend: str, target: str) -> set[str]:
     licenses = set(COMMON_NATIVE_LICENSES)
@@ -104,7 +93,65 @@ def module_files(root: pathlib.Path, module: str, suffix: str) -> list[pathlib.P
     return sorted(path for path in module_root.rglob(f"*{suffix}") if path.is_file())
 
 
-def verify_metadata(root: pathlib.Path) -> None:
+def required_pom_text(
+    pom: pathlib.Path, project: element_tree.Element, path: str
+) -> str:
+    value = project.findtext(path, namespaces=POM_NAMESPACE)
+    if value is None or not value.strip():
+        raise SystemExit(f"{pom} is missing required POM field {path}")
+    return value.strip()
+
+
+def verify_repository_layout(root: pathlib.Path, expected_version: str | None) -> None:
+    group_root = root / "org" / "maplibre" / "nativeffi"
+    if not group_root.is_dir():
+        raise SystemExit(f"the Maven repository is missing {group_root}")
+    actual_modules = {path.name for path in group_root.iterdir() if path.is_dir()}
+    if actual_modules != MODULES:
+        raise SystemExit(
+            f"the Maven repository contains modules {sorted(actual_modules)}; "
+            f"expected {sorted(MODULES)}"
+        )
+
+    for module in MODULES:
+        module_root = group_root / module
+        version_directories = {path.name for path in module_root.iterdir() if path.is_dir()}
+        if expected_version is not None and version_directories != {expected_version}:
+            raise SystemExit(
+                f"{module_root} contains versions {sorted(version_directories)}; "
+                f"expected only {expected_version}"
+            )
+
+        pom = one(module_files(root, module, ".pom"), f"{module} POM")
+        project = element_tree.parse(pom).getroot()
+        group = required_pom_text(pom, project, "m:groupId")
+        artifact = required_pom_text(pom, project, "m:artifactId")
+        version = required_pom_text(pom, project, "m:version")
+        if group != "org.maplibre.nativeffi" or artifact != module:
+            raise SystemExit(
+                f"{pom} has coordinates {group}:{artifact}; "
+                f"expected org.maplibre.nativeffi:{module}"
+            )
+        if expected_version is not None and version != expected_version:
+            raise SystemExit(f"{pom} has version {version}; expected {expected_version}")
+
+        for field in (
+            "m:name",
+            "m:description",
+            "m:url",
+            "m:licenses/m:license/m:name",
+            "m:licenses/m:license/m:url",
+            "m:developers/m:developer/m:id",
+            "m:developers/m:developer/m:name",
+            "m:developers/m:developer/m:url",
+            "m:scm/m:connection",
+            "m:scm/m:developerConnection",
+            "m:scm/m:url",
+        ):
+            required_pom_text(pom, project, field)
+
+
+def verify_metadata(root: pathlib.Path, expected_version: str | None) -> None:
     for module in MODULES:
         pom = one(module_files(root, module, ".pom"), f"{module} POM")
         metadata = one(
@@ -127,6 +174,10 @@ def verify_metadata(root: pathlib.Path) -> None:
         if component["module"] != root_module:
             raise SystemExit(
                 f"{metadata_path} has invalid module {component['module']}"
+            )
+        if expected_version is not None and version != expected_version:
+            raise SystemExit(
+                f"{metadata_path} has version {version}; expected {expected_version}"
             )
 
         referenced_targets = set()
@@ -383,13 +434,17 @@ def verify_native(root: pathlib.Path) -> None:
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
+    if len(sys.argv) not in (2, 3):
         print(
-            f"usage: {pathlib.Path(sys.argv[0]).name} <maven-staging>", file=sys.stderr
+            f"usage: {pathlib.Path(sys.argv[0]).name} "
+            "<maven-staging> [expected-version]",
+            file=sys.stderr,
         )
         return 2
     root = pathlib.Path(sys.argv[1])
-    verify_metadata(root)
+    expected_version = sys.argv[2] if len(sys.argv) == 3 else None
+    verify_repository_layout(root, expected_version)
+    verify_metadata(root, expected_version)
     verify_javadoc(root)
     verify_android(root)
     verify_android_runtime_independence(root)

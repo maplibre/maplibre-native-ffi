@@ -1,4 +1,4 @@
-# Input scopes for the components published by .github/workflows/snapshots.yml.
+# Input scopes for the components published by .github/workflows/publishing.yml.
 # The workflow hashes each component's inputs and skips the component when that
 # hash matches the commit it last published from.
 #

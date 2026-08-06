@@ -30,7 +30,7 @@ allprojects {
       repositoryPath ->
       extensions.configure<PublishingExtension>("publishing") {
         repositories.maven {
-          name = "snapshotStaging"
+          name = "mavenStaging"
           url = rootProject.uri(repositoryPath)
         }
       }

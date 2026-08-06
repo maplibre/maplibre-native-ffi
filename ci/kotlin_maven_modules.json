@@ -1,0 +1,22 @@
+[
+  "maplibre-native-ffi",
+  "maplibre-native-ffi-android",
+  "maplibre-native-ffi-iosarm64",
+  "maplibre-native-ffi-iossimulatorarm64",
+  "maplibre-native-ffi-jvm",
+  "maplibre-native-ffi-linuxx64",
+  "maplibre-native-ffi-macosarm64",
+  "maplibre-native-ffi-runtime-metal",
+  "maplibre-native-ffi-runtime-metal-iosarm64",
+  "maplibre-native-ffi-runtime-metal-iossimulatorarm64",
+  "maplibre-native-ffi-runtime-metal-jvm",
+  "maplibre-native-ffi-runtime-metal-macosarm64",
+  "maplibre-native-ffi-runtime-opengl",
+  "maplibre-native-ffi-runtime-opengl-android",
+  "maplibre-native-ffi-runtime-opengl-jvm",
+  "maplibre-native-ffi-runtime-opengl-linuxx64",
+  "maplibre-native-ffi-runtime-vulkan",
+  "maplibre-native-ffi-runtime-vulkan-android",
+  "maplibre-native-ffi-runtime-vulkan-jvm",
+  "maplibre-native-ffi-runtime-vulkan-linuxx64"
+]

@@ -5,10 +5,10 @@ sidebar:
   order: 6
 ---
 
-The Kotlin Multiplatform binding publishes snapshot builds through Maven. Stable
-releases will use the finalization design below. Consumers obtain every MapLibre
-Native FFI component through Gradle; the host operating system continues to
-provide its graphics frameworks, loaders, and drivers.
+The Kotlin Multiplatform binding publishes snapshots and tagged releases through
+Maven. Consumers obtain every MapLibre Native FFI component through Gradle; the
+host operating system continues to provide its graphics frameworks, loaders, and
+drivers.
 
 ## Coordinates
 
@@ -189,17 +189,19 @@ whether or not its inputs changed.
 The Central Portal namespace covering `org.maplibre.nativeffi` must be
 registered with snapshot publishing enabled. The repository stores a Central
 Portal user token in the `MAVEN_CENTRAL_USERNAME` and `MAVEN_CENTRAL_PASSWORD`
-GitHub Actions secrets. Snapshot publication does not require signing.
+GitHub Actions secrets. Central does not require snapshot signing. The workflow
+still signs snapshots with the release key so that every publish exercises the
+shared signing path.
 
-Each host first stages its publications in a local Maven repository. CI merges
-the Android and Apple repositories, then inspects the published AAR, JAR, and
-KLIB payloads and compiles the example consumers against the merged repository.
-After every local check succeeds, each host publishes its own target artifacts
-to the Central Portal. Android and Apple leaf modules publish first; the
-canonical multiplatform root modules publish last, after every leaf upload
-succeeds. Snapshot workflows are serialized so two commits cannot interleave
-those uploads. Publication jobs reuse the CI-produced native archives; they do
-not rebuild MapLibre Native.
+Each host first stages its publications in a local Maven repository. CI rejects
+duplicate paths while it merges the Android and Apple repositories, then
+inspects the published AAR, JAR, and KLIB payloads and compiles the example
+consumers against the merged repository. The snapshot finalizer uploads that
+verified repository to the Central Portal snapshot endpoint. It uploads every
+leaf module before the canonical multiplatform root modules. Serialized
+publishing prevents two commits from interleaving those uploads. Both snapshot
+and tagged release jobs reuse the CI-produced native archives and the same
+staged repository; they do not rebuild MapLibre Native.
 
 The initial snapshot workflow validates:
 
@@ -216,26 +218,23 @@ Existing binding tests continue to cover Kotlin/Native behavior. An iOS target
 for the Compose map example is a separate follow-up and is not required for the
 initial snapshot publication.
 
-## Stable release finalization
+## Tagged release finalization
 
-Stable releases use the same host build and staging partitions as snapshots.
-Host jobs have no publishing credentials: they upload their local Maven
-repositories as workflow artifacts. A single finalizer then:
+Pushing a `bindings/kotlin/v<version>` tag starts a release for the tag's exact
+commit. Tagged releases use the same host staging and merged-repository
+verification as snapshots. Host jobs have no publishing credentials. The release
+path then:
 
 1. merges the partitions and rejects missing modules or conflicting paths;
 2. runs the same semantic payload and coordinate verification used for
    snapshots;
 3. signs every publishable file and writes the required checksums;
 4. creates one ZIP whose root is the Maven repository layout; and
-5. uploads that ZIP once through the Central Publisher API.
+5. uploads that ZIP once through the Central Publisher API with automatic
+   publication.
 
-The first stable release should use a user-managed Central deployment so the
-validated bundle can be inspected before it is published. Switching to automatic
-publication changes only the final API request, not target builds, staging,
-merging, signing, or bundle assembly.
-
-This makes the merged, verified repository the release source of truth and gives
-stable releases one Central deployment boundary. Snapshot uploads use Central's
-mutable Maven snapshot endpoint, so their finalizer instead preserves
-leaf-first/root-last ordering; it cannot provide the same atomic deployment
-semantics.
+The finalizer waits for Central to validate and publish the deployment. A failed
+validation fails the workflow with the deployment's errors. The merged, verified
+repository is the source of truth for both publication modes. Tagged releases
+gain one atomic Central deployment boundary, while snapshot uploads preserve
+leaf-first/root-last ordering on Central's mutable snapshot endpoint.

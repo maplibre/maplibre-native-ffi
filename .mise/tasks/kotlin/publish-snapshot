@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-#MISE description="Stage, verify, or publish Kotlin Multiplatform snapshots."
-#MISE shell="bash"
-#MISE tools={java="{{vars.java_version}}"}
+# [MISE] description="Stage and verify Kotlin Multiplatform Maven artifacts."
+# [MISE] shell="bash"
+# [MISE] tools={java="{{vars.java_version}}"}
 
 set -euo pipefail
 
@@ -10,10 +10,8 @@ install_root="${MISE_MONOREPO_ROOT}/build/packages/kotlin/install"
 staging_base="${MISE_MONOREPO_ROOT}/build/packages/kotlin"
 
 usage() {
-  echo "usage: $(basename "$0") stage <linux|apple>" >&2
-  echo "       $(basename "$0") publish-leaves <linux|apple>" >&2
-  echo "       $(basename "$0") publish-roots apple" >&2
-  echo "       $(basename "$0") verify <maven-staging>" >&2
+  echo "usage: $(basename "$0") stage <linux|apple> [version]" >&2
+  echo "       $(basename "$0") verify <maven-staging> [version]" >&2
 }
 
 extract_preset() {
@@ -67,19 +65,6 @@ prepare_native_inputs() {
       return 2
       ;;
   esac
-
-  rm -rf "$install_root"
-  for preset in "${presets[@]}"; do
-    extract_preset "$preset"
-  done
-}
-
-prepare_apple_root_inputs() {
-  local presets=(
-    macos-arm64-metal
-    ios-arm64-metal
-    ios-simulator-arm64-metal
-  )
 
   rm -rf "$install_root"
   for preset in "${presets[@]}"; do
@@ -273,9 +258,14 @@ publish_partition() {
 
 operation="${1:-}"
 partition="${2:-}"
+version="${3:-}"
 
 case "$operation" in
   stage)
+    if [[ "$#" -lt 2 || "$#" -gt 3 ]]; then
+      usage
+      exit 2
+    fi
     case "$partition" in
       linux | apple) ;;
       *)
@@ -286,42 +276,37 @@ case "$operation" in
     staging_root="${staging_base}/maven-staging-${partition}"
     rm -rf "$staging_root"
     prepare_native_inputs "$partition"
+    release_version_args=()
+    if [[ -n "$version" ]]; then
+      release_version_args=("-Pmaplibre.maven.version=$version")
+    fi
     publish_partition \
       "$partition" \
-      SnapshotStagingRepository \
+      MavenStagingRepository \
+      "${release_version_args[@]}" \
       -Pmaplibre.maven.localRepository="$staging_root"
     ;;
-  publish-leaves)
-    case "$partition" in
-      linux | apple) ;;
-      *)
-        usage
-        exit 2
-        ;;
-    esac
-    prepare_native_inputs "$partition"
-    publish_leaf_partition "$partition" MavenCentralRepository
-    ;;
-  publish-roots)
-    if [[ "$partition" != "apple" ]]; then
-      usage
-      exit 2
-    fi
-    prepare_apple_root_inputs
-    publish_apple_roots MavenCentralRepository
-    ;;
   verify)
-    if [[ -z "$partition" || "$#" -ne 2 ]]; then
+    if [[ -z "$partition" || "$#" -lt 2 || "$#" -gt 3 ]]; then
       usage
       exit 2
     fi
-    mise run //:kotlin:verify-staging "$partition"
+    release_version_args=()
+    if [[ -n "$version" ]]; then
+      release_version_args=("-Pmaplibre.maven.version=$version")
+    fi
+    verify_args=("$partition")
+    if [[ -n "$version" ]]; then
+      verify_args+=("$version")
+    fi
+    mise run //:kotlin:verify-staging "${verify_args[@]}"
 
     ./gradlew \
       :examples:compose-map:packageUberJarForCurrentOS \
       :examples:lwjgl-map:installDist \
       -Pmaplibre.usePublishedKotlin=true \
       -Pmaplibre.runtime.backend=metal \
+      "${release_version_args[@]}" \
       -Pmaplibre.maven.localRepository="$partition"
 
     ./gradlew \
@@ -329,6 +314,7 @@ case "$operation" in
       -Pmaplibre.usePublishedKotlin=true \
       -Pmaplibre.android.backend=opengl \
       -Pmaplibre.android.abis=arm64-v8a,x86_64 \
+      "${release_version_args[@]}" \
       -Pmaplibre.maven.localRepository="$partition"
     ;;
   *)
