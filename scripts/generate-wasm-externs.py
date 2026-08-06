@@ -42,7 +42,12 @@ WIDE = ("long long", "unsigned long long")
 FLOAT_TYPES = {"float": "Float", "double": "Double"}
 
 #: Kotlin and JavaScript both reject some C parameter names as identifiers.
+#: `arguments` and `eval` are not keywords but cannot be bound in strict mode,
+#: which an ES module always is -- and a binding for one is a syntax error that
+#: fails the whole module rather than the one call it appears in.
 RESERVED = {
+    "arguments", "eval", "implements", "private", "protected", "public",
+    "static",
     "as", "break", "class", "continue", "do", "else", "false", "for", "fun",
     "if", "in", "interface", "is", "null", "object", "package", "return",
     "super", "this", "throw", "true", "try", "typealias", "typeof", "val",

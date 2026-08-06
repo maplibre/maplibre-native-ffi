@@ -1165,7 +1165,7 @@ internal external fun mln_render_session_get_feature_state(
 ): Int
 
 @JsFun(
-  "(session, source_id, feature, extension, extension_field, arguments, out_result) => globalThis.__maplibreNativeC._mln_render_session_query_feature_extensions(session, source_id, feature, extension, extension_field, arguments, out_result)"
+  "(session, source_id, feature, extension, extension_field, arguments_, out_result) => globalThis.__maplibreNativeC._mln_render_session_query_feature_extensions(session, source_id, feature, extension, extension_field, arguments_, out_result)"
 )
 internal external fun mln_render_session_query_feature_extensions(
   session: Long,
@@ -1173,7 +1173,7 @@ internal external fun mln_render_session_query_feature_extensions(
   feature: Int,
   extension: Int,
   extension_field: Int,
-  arguments: Int,
+  arguments_: Int,
   out_result: Int,
 ): Int
 
