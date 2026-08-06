@@ -67,5 +67,5 @@ echo "Installing Android SDK packages: ${missing[*]}"
 # It also prints a notice pointing at `android sdk`, its replacement, which downloads
 # a further CLI on first use and reports usage metrics by default.
 accepts="$(printf 'y\n%.0s' "${missing[@]}")"
-mise exec "core:java@$java_version" -- \
+mise exec --no-deps "core:java@$java_version" -- \
   "$sdkmanager" --sdk_root="$sdk_root" --install "${missing[@]}" <<<"$accepts"

@@ -147,7 +147,7 @@ swiftformat = { version = "{{vars.swiftformat_version}}", backend = "github:nick
 #
 # The Android SDK tool installs the command-line tools alone, so the packages the
 # builds need are installed once the SDK is in place.
-android-sdk = { version = "{{vars.android_cmdline_tools_version}}", postinstall = ".mise/bin/sync-android-packages {{vars.java_version}} {{vars.android_ndk_version}} {{vars.android_cmake_version}}" }
+android-sdk = { version = "{{vars.android_cmdline_tools_version}}", postinstall = "bash .mise/bin/sync-android-packages {{vars.java_version}} {{vars.android_ndk_version}} {{vars.android_cmake_version}}" }
 # The vfox plugin runs the current emsdk launcher before emsdk installs its bundled
 # Python. Use the project Python because Apple's version can be older than the
 # launcher's minimum; `depends` installs it before the environment below resolves it.

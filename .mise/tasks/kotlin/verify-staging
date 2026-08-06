@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # [MISE] description="Verify staged Kotlin Maven payloads."
-# [MISE] shell="python3"
+# [MISE] shell="python"
 
 import json
 import pathlib
