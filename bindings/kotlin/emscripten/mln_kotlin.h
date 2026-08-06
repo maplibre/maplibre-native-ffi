@@ -63,6 +63,15 @@ typedef struct mln_kotlin_record {
   void* payload;
 } mln_kotlin_record;
 
+/**
+ * Ends the program with status, for a host that has one -- a test runner.
+ *
+ * Drops the keepalive that leaves the binding's thread running and forces the
+ * exit, because a backend keepalive can outlive it. A host that never calls
+ * this keeps the thread parked, which is what a map wants.
+ */
+void mln_kotlin_exit(int status);
+
 /** Takes the oldest record, or returns false when the ring is empty. */
 bool mln_kotlin_take_record(mln_kotlin_record* out);
 
