@@ -7,10 +7,13 @@ function(mln_ffi_prepare_macos_angle out_var)
     JSON angle_sha256
     GET "${angle_manifest_json}" artifacts macos-arm64 sha256)
 
-  set(angle_root
-      "${CMAKE_CURRENT_BINARY_DIR}/angle/${angle_version}/macos-arm64")
+  # Outside any preset's build tree, because this is the loader a host brings
+  # rather than part of what a preset builds. Replacing a build tree with its
+  # packaged install leaves it in place, so a local run keeps the stand-in the
+  # package deliberately omits, and every preset shares one download.
+  set(angle_root "${PROJECT_SOURCE_DIR}/build/angle/macos-arm64")
   set(angle_marker "${angle_root}/.complete")
-  set(marker_value "${angle_sha256} install-name-rpath-v1")
+  set(marker_value "${angle_version} ${angle_sha256} install-name-rpath-v1")
   if(EXISTS "${angle_marker}")
     file(READ "${angle_marker}" current_marker)
   endif()
@@ -32,25 +35,29 @@ function(mln_ffi_prepare_macos_angle out_var)
     file(MAKE_DIRECTORY "${angle_extract_dir}")
     file(ARCHIVE_EXTRACT INPUT "${angle_archive}" DESTINATION
          "${angle_extract_dir}")
-    cmake_path(GET angle_root PARENT_PATH angle_parent)
-    file(MAKE_DIRECTORY "${angle_parent}")
-    file(RENAME "${angle_extract_dir}" "${angle_root}")
 
+    # Rewriting and signing happen before the directory takes its shared name,
+    # so what appears there is already complete.
     execute_process(
       COMMAND
-        install_name_tool -id @rpath/libEGL.dylib "${angle_root}/libEGL.dylib"
+        install_name_tool -id @rpath/libEGL.dylib
+        "${angle_extract_dir}/libEGL.dylib"
       COMMAND_ERROR_IS_FATAL ANY)
     execute_process(
       COMMAND
         install_name_tool -id @rpath/libGLESv2.dylib
-        "${angle_root}/libGLESv2.dylib"
+        "${angle_extract_dir}/libGLESv2.dylib"
       COMMAND_ERROR_IS_FATAL ANY)
     execute_process(
-      COMMAND codesign --force --sign - "${angle_root}/libEGL.dylib"
+      COMMAND codesign --force --sign - "${angle_extract_dir}/libEGL.dylib"
       COMMAND_ERROR_IS_FATAL ANY)
     execute_process(
-      COMMAND codesign --force --sign - "${angle_root}/libGLESv2.dylib"
+      COMMAND codesign --force --sign - "${angle_extract_dir}/libGLESv2.dylib"
       COMMAND_ERROR_IS_FATAL ANY)
+
+    cmake_path(GET angle_root PARENT_PATH angle_parent)
+    file(MAKE_DIRECTORY "${angle_parent}")
+    file(RENAME "${angle_extract_dir}" "${angle_root}")
     file(WRITE "${angle_marker}" "${marker_value}")
   endif()
 

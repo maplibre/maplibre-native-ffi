@@ -5,20 +5,70 @@
 #include <cstddef>
 
 #include <EGL/egl.h>
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
 #include <dlfcn.h>
+#endif
+#if defined(__APPLE__)
+#include <cstdint>
+#include <cstring>
+
+#include <mach-o/dyld.h>
 #endif
 
 namespace mln::core::opengl {
 
-#if defined(__linux__)
+#if defined(__APPLE__)
+// Opens the implementation the host already loaded, found by the name its file
+// goes by and opened at the path dyld resolved for it. dyld keys images by that
+// path, so this returns the host's image rather than a second copy: opening a
+// leaf name reaches only the dyld search paths, which a host installing its own
+// implementation has no reason to be on, and a process-wide symbol lookup
+// misses an image opened with RTLD_LOCAL, which is what ctypes and the
+// Objective-C bridges use. A second copy would mint handles the host's copy
+// does not own.
+//
+// The handle is never closed, so the image outlives a host that closes its own.
+inline auto open_loaded_client_library(const char* library) -> void* {
+  const auto count = _dyld_image_count();
+  for (auto index = std::uint32_t{}; index < count; ++index) {
+    const auto* path = _dyld_get_image_name(index);
+    if (path == nullptr) {
+      continue;
+    }
+    const auto* separator = std::strrchr(path, '/');
+    const auto* name = separator != nullptr ? separator + 1 : path;
+    if (std::strcmp(name, library) != 0) {
+      continue;
+    }
+    if (
+      auto* handle = dlopen(path, RTLD_LAZY | RTLD_LOCAL); handle != nullptr
+    ) {
+      return handle;
+    }
+  }
+  return nullptr;
+}
+#endif
+
+#if defined(__linux__) || defined(__APPLE__)
+// Linux binds a leaf soname to the copy already loaded, so it opens the client
+// libraries directly.
+inline auto open_egl_client_library(const char* library) -> void* {
+#if defined(__APPLE__)
+  if (auto* loaded = open_loaded_client_library(library); loaded != nullptr) {
+    return loaded;
+  }
+#endif
+  return dlopen(library, RTLD_LAZY | RTLD_LOCAL);
+}
+
 template <std::size_t N>
 inline auto open_egl_client_libraries(
   const std::array<const char*, N>& libraries
 ) -> std::array<void*, N> {
   auto handles = std::array<void*, N>{};
   for (auto index = std::size_t{}; index < libraries.size(); ++index) {
-    handles[index] = dlopen(libraries[index], RTLD_LAZY | RTLD_LOCAL);
+    handles[index] = open_egl_client_library(libraries[index]);
   }
   return handles;
 }
@@ -38,6 +88,20 @@ inline auto find_egl_client_symbol_in_handles(
   return nullptr;
 }
 
+#if defined(__APPLE__)
+inline auto gles_client_library_handles() -> const std::array<void*, 1>& {
+  static const auto handles =
+    open_egl_client_libraries(std::array<const char*, 1>{"libGLESv2.dylib"});
+  return handles;
+}
+
+// ANGLE implements GLES alone, and the desktop GL an Apple host reaches through
+// OpenGL.framework has no EGL binding, so EGL_OPENGL_API has nothing to open.
+inline auto gl_client_library_handles() -> const std::array<void*, 0>& {
+  static const auto handles = std::array<void*, 0>{};
+  return handles;
+}
+#else
 inline auto gles_client_library_handles() -> const std::array<void*, 2>& {
   static const auto handles = open_egl_client_libraries(
     std::array<const char*, 2>{"libGLESv2.so.2", "libGLESv2.so"}
@@ -53,6 +117,7 @@ inline auto gl_client_library_handles() -> const std::array<void*, 4>& {
   );
   return handles;
 }
+#endif
 
 inline auto get_egl_client_library_proc_address(const char* name, EGLenum api)
   -> void* {

@@ -117,6 +117,7 @@ endfunction()
 
 function(mln_ffi_install_c_api_library target)
   set(MLN_FFI_NATIVE_COMPONENT native)
+  set(MLN_FFI_LOADER_COMPONENT loader)
   mln_ffi_install_zig_libc()
   mln_ffi_install_licenses(${target} "${MLN_FFI_NATIVE_COMPONENT}")
 
@@ -200,6 +201,23 @@ function(mln_ffi_install_c_api_library target)
         COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
     endif()
   endforeach()
+  # A graphics loader is the host's to supply, so this component is excluded
+  # from a full installation and the package never sees it. It reaches the local
+  # install tree through the loader step in the build task, which puts the
+  # fixtures and examples in the position of a host that brought its own.
+  # Shipping one would repackage a private implementation, and every host that
+  # loaded its own would then run two: handles minted by one are opaque pointers
+  # the other does not own.
+  get_target_property(MLN_FFI_INSTALL_LOADER_FILES mln_ffi_render_dependencies
+                      MLN_FFI_INSTALL_LOADER_FILES)
+  if(MLN_FFI_INSTALL_LOADER_FILES
+     AND NOT MLN_FFI_INSTALL_LOADER_FILES MATCHES "-NOTFOUND$")
+    install(
+      FILES ${MLN_FFI_INSTALL_LOADER_FILES}
+      DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+      COMPONENT "${MLN_FFI_LOADER_COMPONENT}"
+      EXCLUDE_FROM_ALL)
+  endif()
   get_target_property(MLN_FFI_INSTALL_INCLUDE_DIRS mln_ffi_render_dependencies
                       MLN_FFI_INSTALL_INCLUDE_DIRS)
   if(MLN_FFI_INSTALL_INCLUDE_DIRS

@@ -262,7 +262,14 @@ sources = [
   "third_party/**/*",
 ]
 outputs = { auto = true }
-run = '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"'
+# The loader component holds the graphics implementation a host supplies for
+# itself, which the package deliberately leaves out. Installing it here is what
+# lets the fixtures and examples drive the API the way a host does; presets
+# whose loader comes from the platform or an SDK install nothing.
+run = [
+  '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"',
+  'cmake --install "$MISE_MONOREPO_ROOT/build/$usage_preset" --component loader',
+]
 
 [tasks.clean]
 description = "Remove one native preset build tree."

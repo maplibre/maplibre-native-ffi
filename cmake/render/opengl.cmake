@@ -3,9 +3,13 @@ function(mln_ffi_configure_render_dependencies target)
     if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR MLN_FFI_EGL_ROOT)
       include(render/egl)
       mln_ffi_import_egl()
-      target_link_libraries(
-        ${target}
-        INTERFACE MLN_FFI::EGL MLN_FFI::GLESv2 ${CMAKE_DL_LIBS})
+      # The loader belongs to whoever drives EGL: a host, or the test harness
+      # standing in for one. The library defines its own EGL entry points and
+      # resolves the client library at run time, so it takes the headers alone.
+      # Linking one here would stamp a build-host dependency into the shipped
+      # binary and pull a second implementation along with it wherever the
+      # artifact is repackaged.
+      target_link_libraries(${target} INTERFACE ${CMAKE_DL_LIBS})
       get_target_property(MLN_FFI_EGL_INCLUDE_DIRS MLN_FFI::EGL
                           INTERFACE_INCLUDE_DIRECTORIES)
       get_target_property(MLN_FFI_EGL_LIBRARY MLN_FFI::EGL IMPORTED_LOCATION)
@@ -13,17 +17,29 @@ function(mln_ffi_configure_render_dependencies target)
       get_filename_component(
         MLN_FFI_EGL_LIBRARY_DIR "${MLN_FFI_EGL_LIBRARY}"
         DIRECTORY)
+      target_include_directories(
+        ${target}
+        SYSTEM
+        INTERFACE "${MLN_FFI_EGL_INCLUDE_DIRS}")
       set_target_properties(
         ${target}
         PROPERTIES
           MLN_FFI_INCLUDE_DIRS "${MLN_FFI_EGL_INCLUDE_DIRS}"
           MLN_FFI_RUNTIME_DIRS "${MLN_FFI_EGL_LIBRARY_DIR}")
+      if(BUILD_TESTING)
+        set_property(
+          TARGET ${target}
+          PROPERTY MLN_FFI_TEST_LINK_LIBRARIES MLN_FFI::EGL MLN_FFI::GLESv2)
+      endif()
       if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        # An Apple host has no system EGL to build against, so the headers ship
+        # with the artifact. The implementation behind them does not: see
+        # MLN_FFI_INSTALL_LOADER_FILES in mln_ffi_install.cmake.
         mln_ffi_add_license(${target} "${MLN_FFI_EGL_ROOT}/LICENSE" "angle.txt")
         set_target_properties(
           ${target}
           PROPERTIES
-            MLN_FFI_INSTALL_LIBRARY_FILES
+            MLN_FFI_INSTALL_LOADER_FILES
             "${MLN_FFI_EGL_LIBRARY};${MLN_FFI_GLES_LIBRARY}"
             MLN_FFI_INSTALL_INCLUDE_DIRS
             "${MLN_FFI_EGL_INCLUDE_DIRS}/EGL;${MLN_FFI_EGL_INCLUDE_DIRS}/GLES2;${MLN_FFI_EGL_INCLUDE_DIRS}/GLES3;${MLN_FFI_EGL_INCLUDE_DIRS}/KHR")
@@ -37,9 +53,15 @@ function(mln_ffi_configure_render_dependencies target)
           "${MLN_FFI_EGL_LIBRARY}" "${MLN_FFI_GLES_LIBRARY}" ${CMAKE_DL_LIBS})
     else()
       find_package(OpenGL REQUIRED COMPONENTS EGL GLES3)
-      target_link_libraries(
+      # Headers only, for the same reason as the branch above. Nothing here has
+      # ever reached the shipped binary, but only because the GNU linker drops a
+      # library no undefined symbol needs; saying so outright is what keeps the
+      # invariant off a linker default.
+      target_link_libraries(${target} INTERFACE ${CMAKE_DL_LIBS})
+      target_include_directories(
         ${target}
-        INTERFACE OpenGL::EGL OpenGL::GLES3 ${CMAKE_DL_LIBS})
+        SYSTEM
+        INTERFACE "${OPENGL_EGL_INCLUDE_DIR}" "${OPENGL_GLES3_INCLUDE_DIR}")
       get_filename_component(
         MLN_FFI_EGL_LIBRARY_DIR "${OPENGL_egl_LIBRARY}"
         DIRECTORY)
@@ -49,6 +71,11 @@ function(mln_ffi_configure_render_dependencies target)
           MLN_FFI_INCLUDE_DIRS
           "${OPENGL_EGL_INCLUDE_DIR};${OPENGL_GLES3_INCLUDE_DIR}"
           MLN_FFI_RUNTIME_DIRS "${MLN_FFI_EGL_LIBRARY_DIR}")
+      if(BUILD_TESTING)
+        set_property(
+          TARGET ${target}
+          PROPERTY MLN_FFI_TEST_LINK_LIBRARIES OpenGL::EGL OpenGL::GLES3)
+      endif()
     endif()
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
     find_package(OpenGL REQUIRED)
@@ -92,14 +119,14 @@ function(mln_ffi_configure_renderer target)
         PRIVATE "${PROJECT_SOURCE_DIR}/third_party/egl_compat/include")
     endif()
     target_link_libraries(${target} PRIVATE MLN_FFI::RenderDependencies)
-    # Upstream's table binds each GL entry point to a linked loader. On Linux
-    # that is rewritten to resolve at run time so the artifacts carry no GL
-    # dependency of their own. Other EGL platforms keep the linked table: their
-    # loader comes from the SDK, and the run-time resolver only knows how to
-    # open a Linux client library.
+    # Upstream's table binds each GL entry point to a linked loader. Where the
+    # host supplies its own client library that is rewritten to resolve at run
+    # time, so the artifacts carry no GL dependency of their own. Android and
+    # OpenHarmony keep the linked table: their loader is part of the platform,
+    # at a fixed location every host on it already has.
     set(MLN_FFI_GL_FUNCTIONS_SOURCE
         ${MLN_FFI_SOURCE_DIR}/platform/linux/src/gl_functions.cpp)
-    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|Darwin)$")
       set(MLN_FFI_GL_FUNCTIONS_GENERATED
           ${CMAKE_CURRENT_BINARY_DIR}/generated/gl_functions.cpp)
       execute_process(
@@ -166,7 +193,7 @@ function(mln_ffi_configure_renderer target)
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
     list(APPEND MLN_FFI_OPENGL_SOURCES
          ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_context.cpp)
-    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|Darwin)$")
       # Supplies the EGL entry points, so nothing links an EGL loader.
       list(APPEND MLN_FFI_OPENGL_SOURCES
            ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_dispatch.cpp)
