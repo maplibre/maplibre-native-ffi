@@ -18,39 +18,15 @@
 #include <stdint.h>
 
 #include "maplibre_native_c/callback_adapter.h"
+#include "mln_kotlin.h"
 
 // Bounded, because an unbounded queue turns a logging burst into the page's
 // memory ceiling. A full ring drops its oldest record and counts the drop, so
 // Kotlin reports lost records rather than believing it saw them all.
 #define MLN_KOTLIN_RING_CAPACITY 1024
 
-enum mln_kotlin_record_kind {
-  MLN_KOTLIN_RECORD_LOG = 1,
-  MLN_KOTLIN_RECORD_LOG_RETIRED = 2,
-  MLN_KOTLIN_RECORD_RESOURCE_REQUEST = 3,
-  MLN_KOTLIN_RECORD_RESOURCE_PROVIDER_RETIRED = 4,
-  MLN_KOTLIN_RECORD_TILE_FETCH = 5,
-  MLN_KOTLIN_RECORD_TILE_CANCEL = 6,
-};
 
-typedef struct mln_kotlin_record {
-  /** One mln_kotlin_record_kind value, which selects what payload holds. */
-  uint32_t kind;
-  uint32_t tile_z;
-  uint32_t tile_x;
-  uint32_t tile_y;
-  /**
-   * The adapter record for MLN_KOTLIN_RECORD_LOG and
-   * MLN_KOTLIN_RECORD_RESOURCE_REQUEST, which Kotlin releases with
-   * mln_adapter_log_record_destroy() or
-   * mln_adapter_resource_provider_request_destroy(). The custom geometry
-   * callbacks' user_data for the two tile kinds, and null for a retirement.
-   */
-  void* payload;
-} mln_kotlin_record;
-
-// Kotlin reads these offsets from a hand-written layout, because this struct is
-// not a public header the offset generator sees.
+// Kotlin reads these offsets from a hand-written layout.
 _Static_assert(sizeof(mln_kotlin_record) == 20, "record layout changed");
 _Static_assert(offsetof(mln_kotlin_record, payload) == 16, "payload moved");
 

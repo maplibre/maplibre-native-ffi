@@ -18,6 +18,8 @@
 
 #include <GLES3/gl3.h>
 #include <emscripten.h>
+
+#include "mln_kotlin.h"
 #include <emscripten/html5.h>
 #include <emscripten/html5_webgl.h>
 #include <stdbool.h>
@@ -67,19 +69,6 @@ static bool mln_kotlin_bind(int32_t context) {
          ) == EMSCRIPTEN_RESULT_SUCCESS;
 }
 
-/**
- * Registers a private OffscreenCanvas on this thread under name.
- *
- * This is the canvas a host that reads frames back wants: it is never
- * displayed, and a WebGL2 context cannot exist without some canvas. A canvas
- * the page displays reaches this thread through -sOFFSCREENCANVASES_TO_PTHREAD
- * instead, and is already registered under its element id when Kotlin starts.
- *
- * The caller owns the registration and removes it with
- * mln_kotlin_webgl_canvas_destroy(). Returns false for a name of 64 bytes or
- * longer, which mln_kotlin_webgl_context_create() could not build a selector
- * for, and for an extent outside 1 to 16384 pixels.
- */
 EMSCRIPTEN_KEEPALIVE bool mln_kotlin_webgl_canvas_create(
   const char* name, uint32_t width, uint32_t height
 ) {
@@ -93,34 +82,12 @@ EMSCRIPTEN_KEEPALIVE bool mln_kotlin_webgl_canvas_create(
   return true;
 }
 
-/**
- * Removes a canvas registration this thread created.
- *
- * Call this after the context created against the canvas is destroyed. A canvas
- * that reached this thread through -sOFFSCREENCANVASES_TO_PTHREAD stays
- * registered for the thread's lifetime, because the page still displays that
- * element and the transfer cannot be repeated.
- */
 EMSCRIPTEN_KEEPALIVE void mln_kotlin_webgl_canvas_destroy(const char* name) {
   if (name != NULL) {
     mln_kotlin_canvas_unregister(name);
   }
 }
 
-/**
- * Sizes the drawing buffer of a registered canvas, or reports that the registry
- * holds no usable canvas under name.
- *
- * A surface session renders into the default framebuffer of its canvas, and
- * that framebuffer is only as large as the canvas. So a host that changes such
- * a session's extent changes this too, in two steps: this call, and then
- * mln_render_session_resize() or mln_opengl_surface_set_target() with the
- * matching extent. Neither implies the other.
- *
- * Resizing reallocates the drawing buffer and nothing else, so every texture,
- * buffer, and program the session built stays as it was. A texture session
- * draws into a framebuffer of its own and has no reason to call this.
- */
 EMSCRIPTEN_KEEPALIVE bool mln_kotlin_webgl_canvas_resize(
   const char* name, uint32_t width, uint32_t height
 ) {
@@ -130,22 +97,6 @@ EMSCRIPTEN_KEEPALIVE bool mln_kotlin_webgl_canvas_resize(
   return mln_kotlin_canvas_size(name, (int)width, (int)height) != 0;
 }
 
-/**
- * Creates a WebGL2 context against a registered canvas, or returns zero.
- *
- * The context belongs to the calling thread, which must be the thread that owns
- * the render session it is given to. Zero is what a failure reports and is also
- * the value mln_webgl_context_descriptor refuses, so a host that passes the
- * result on unchecked is rejected there rather than rendering into nothing.
- *
- * width and height size the canvas's drawing buffer, which for a surface
- * session is that session's physical extent and for a texture session only has
- * to be positive. A canvas with no registration under name, and an id of 64
- * bytes or longer, are both refused.
- *
- * The context is left current on this thread, which is what a host needs when
- * it issues its own GL calls right after creating one.
- */
 EMSCRIPTEN_KEEPALIVE int32_t mln_kotlin_webgl_context_create(
   const char* name, uint32_t width, uint32_t height
 ) {
@@ -206,15 +157,6 @@ EMSCRIPTEN_KEEPALIVE int32_t mln_kotlin_webgl_context_create(
   return (int32_t)context;
 }
 
-/**
- * Destroys a context on the thread that created it.
- *
- * Call this once every render target using the context is detached or
- * destroyed, because the C API borrows the handle for a target's lifetime.
- * Destroying a context releases every object made in it, including textures.
- * The canvas registration outlives the context: release it separately with
- * mln_kotlin_webgl_canvas_destroy().
- */
 EMSCRIPTEN_KEEPALIVE void mln_kotlin_webgl_context_destroy(int32_t context) {
   if (context > 0) {
     (void)emscripten_webgl_destroy_context(
@@ -223,17 +165,6 @@ EMSCRIPTEN_KEEPALIVE void mln_kotlin_webgl_context_destroy(int32_t context) {
   }
 }
 
-/**
- * Creates an RGBA8 texture in a context this thread owns, or returns zero.
- *
- * This is where a caller-owned target's texture comes from, and the name it
- * reports is what mln_opengl_borrowed_texture_descriptor.texture carries. Pass
- * the same context in the descriptor that names the texture, because the
- * session attaches the texture to a framebuffer of that context.
- *
- * The texture belongs to the caller. Nothing here tracks it, a render target
- * only borrows it, and mln_kotlin_webgl_texture_destroy() releases it.
- */
 EMSCRIPTEN_KEEPALIVE uint32_t mln_kotlin_webgl_texture_create(
   int32_t context, uint32_t width, uint32_t height
 ) {
@@ -269,13 +200,6 @@ EMSCRIPTEN_KEEPALIVE uint32_t mln_kotlin_webgl_texture_create(
   return texture;
 }
 
-/**
- * Destroys a texture in a context this thread owns.
- *
- * Call this once every render target that borrows the texture is detached or
- * destroyed, because a session whose target names a destroyed texture renders
- * into nothing. A handle naming a context that is already gone is ignored.
- */
 EMSCRIPTEN_KEEPALIVE void mln_kotlin_webgl_texture_destroy(
   int32_t context, uint32_t texture
 ) {
@@ -286,18 +210,6 @@ EMSCRIPTEN_KEEPALIVE void mln_kotlin_webgl_texture_destroy(
   glDeleteTextures(1, &name);
 }
 
-/**
- * Reads a rendered frame out of a context this thread owns, or returns false.
- *
- * texture names a two-dimensional texture of context, or is zero for the
- * default framebuffer a surface session renders into. out_pixels receives
- * width * height * 4 bytes of RGBA8, bottom row first, which is GL's order
- * rather than the top-down order mln_texture_read_premultiplied_rgba8() uses.
- *
- * Stalls the calling thread until the frame is done. On failure out_pixels is
- * unspecified rather than unwritten: a read that fails partway has already
- * written.
- */
 EMSCRIPTEN_KEEPALIVE bool mln_kotlin_webgl_read_pixels(
   int32_t context, uint32_t texture, uint32_t width, uint32_t height,
   uint8_t* out_pixels, size_t out_capacity
@@ -352,22 +264,6 @@ EMSCRIPTEN_KEEPALIVE bool mln_kotlin_webgl_read_pixels(
   return read;
 }
 
-/**
- * Blits a rendered texture onto the default framebuffer of its context.
- *
- * How a texture session's frame reaches a transferred page canvas without the
- * pixels leaving the GPU. A surface session needs none of this: it already
- * renders into that framebuffer.
- *
- * The browser composites the canvas when the task that drew into it ends, and
- * nothing here can force that sooner -- emscripten_webgl_commit_frame is a
- * no-op in this emsdk, and an implicit-swap context has no other flip to ask
- * for.
- *
- * MapLibre's GL backend leaves the scissor enabled between frames and a blit is
- * clipped by it, so the scissor is disabled and restored along with both
- * framebuffer bindings.
- */
 EMSCRIPTEN_KEEPALIVE bool mln_kotlin_webgl_present_texture(
   int32_t context, uint32_t texture, uint32_t width, uint32_t height
 ) {
