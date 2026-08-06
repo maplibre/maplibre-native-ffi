@@ -5,8 +5,9 @@ sidebar:
   order: 5
 ---
 
-This document outlines the intended versioning and release conventions. It does
-not document the current status.
+This document defines versioning and release tags. Kotlin uses these conventions
+for published releases. Other components adopt them when their release workflow
+is added.
 
 Tagged releases use a calendar-based version that retains one semantic
 compatibility boundary:
@@ -15,9 +16,9 @@ compatibility boundary:
 API_EPOCH.YYYYMM.REVISION
 ```
 
-Each release component has its own version. This combines the compatibility
-signal of [Semantic Versioning](https://semver.org/) with the temporal signal of
-[Calendar Versioning](https://calver.org/).
+Each release component has its own version. The format combines the
+compatibility signal of [Semantic Versioning](https://semver.org/) with the
+temporal signal of [Calendar Versioning](https://calver.org/).
 
 ## Version format
 
@@ -91,3 +92,10 @@ Release tags name the exact source commit and never move. Every artifact in a
 release family is built from that commit and carries the version from its tag.
 The Kotlin family follows the coordinate and finalization design in
 [Kotlin publishing](/maplibre-native-ffi/development/kotlin-publishing/).
+
+Pushing a Kotlin source tag starts its release. The publishing workflow accepts
+the latest tag when its revision follows every earlier tag in the same epoch and
+month, its month is the current UTC month, and its commit belongs to `main`. The
+exact commit must have a successful main CI run because the release reuses that
+run's native artifacts. The workflow repeats the tag and month checks before it
+publishes the complete Kotlin release family automatically.

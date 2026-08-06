@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# [MISE] description="Validate, merge, and publish Kotlin Maven repositories."
+# [MISE] tools={python="{{vars.python_version}}"}
+
+set -euo pipefail
+
+exec python3 "${MISE_MONOREPO_ROOT}/ci/kotlin_release.py" "$@"

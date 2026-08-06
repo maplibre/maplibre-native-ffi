@@ -1,9 +1,11 @@
-name: Snapshots
+name: Publishing
 
-# Publishing runs on its own daily schedule rather than after every CI run, and
-# each component publishes only when the inputs it consumes changed since its
-# last publish. `ci/snapshots.toml` declares those input scopes.
+# Snapshots run daily and use the input scopes in `ci/snapshots.toml`. An
+# immutable Kotlin source tag publishes that component as one stable release.
 on:
+  push:
+    tags:
+      - "bindings/kotlin/v*"
   schedule:
     - cron: "17 6 * * *"
   workflow_dispatch:
@@ -25,7 +27,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: snapshots
+  group: >-
+    publishing-${{ startsWith(github.ref, 'refs/tags/bindings/kotlin/v')
+    && github.ref || 'snapshots' }}
   cancel-in-progress: false
 
 jobs:
@@ -43,8 +47,10 @@ jobs:
       MISE_NO_HOOKS: "1"
     outputs:
       run_id: ${{ steps.source.outputs.run_id }}
-      sha: ${{ github.sha }}
+      sha: ${{ steps.source.outputs.sha }}
       ci_run_url: ${{ steps.source.outputs.ci_run_url }}
+      mode: ${{ steps.source.outputs.mode }}
+      kotlin_version: ${{ steps.source.outputs.kotlin_version }}
       snapshot_version: ${{ steps.version.outputs.value }}
       dotnet_snapshot_version: ${{ steps.version.outputs.dotnet }}
       publish_native: ${{ steps.plan.outputs.publish_native }}
@@ -53,9 +59,19 @@ jobs:
       publish_dotnet: ${{ steps.plan.outputs.publish_dotnet }}
       publish_docs: ${{ steps.plan.outputs.publish_docs }}
     steps:
-      # Publish this workflow's main commit after its CI run succeeds. A manual
-      # dispatch can overlap CI, so wait for that run instead of selecting an
-      # older successful commit.
+      # The snapshot gate needs history and state tags. A release additionally
+      # validates its source tag against the complete Kotlin tag history.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          cache: false
+          install_args: python
+      # Publish the exact commit that passed main CI. A dispatch or tag push can
+      # overlap CI, so wait for that run instead of selecting an older one.
       - name: Resolve the source CI run
         id: source
         env:
@@ -63,8 +79,24 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ "$GITHUB_REF" != refs/heads/main ]]; then
-            echo "snapshots publish only from main; dispatch this workflow on main" >&2
+          git fetch --quiet --force origin main 'refs/tags/*:refs/tags/*'
+          source_sha="$(git rev-parse 'HEAD^{commit}')"
+          if [[ "$GITHUB_REF" == refs/tags/bindings/kotlin/v* ]]; then
+            mode=kotlin-release
+            kotlin_version="$(
+              mise run --no-deps //:kotlin:prepare-release validate-tag "$GITHUB_REF_NAME"
+            )"
+          else
+            if [[ "$GITHUB_REF" != refs/heads/main ]]; then
+              echo "snapshots publish only from main; dispatch this workflow on main" >&2
+              exit 1
+            fi
+            mode=snapshot
+            kotlin_version=0.1.0-SNAPSHOT
+          fi
+
+          if ! git merge-base --is-ancestor "$source_sha" origin/main; then
+            echo "$source_sha is not an ancestor of main; refusing to publish" >&2
             exit 1
           fi
 
@@ -74,7 +106,7 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --workflow CI \
               --branch main \
-              --commit "$GITHUB_SHA" \
+              --commit "$source_sha" \
               --event push \
               --limit 1 \
               --json databaseId,url)"
@@ -89,7 +121,7 @@ jobs:
           done
 
           if [[ "$(jq 'length' <<<"$runs")" -eq 0 ]]; then
-            echo "no main CI run appeared for $GITHUB_SHA within five minutes" >&2
+            echo "no main CI run appeared for $source_sha within five minutes" >&2
             exit 1
           fi
 
@@ -104,37 +136,12 @@ jobs:
             "$run_id"
 
           {
+            echo "sha=$source_sha"
+            echo "mode=$mode"
+            echo "kotlin_version=$kotlin_version"
             echo "run_id=$run_id"
             echo "ci_run_url=$(jq -r '.url' <<<"$run")"
           } >> "$GITHUB_OUTPUT"
-      # The gate digests each component at this commit and at the one its state
-      # tag names, so it needs the history and tags behind both.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-      # A queued run can outlive a force-push that removes its commit from main.
-      # Publishing remains limited to commits that the current main contains.
-      - name: Verify the source commit remains on main
-        env:
-          SNAPSHOT_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-
-          git fetch --quiet origin main
-          if ! git merge-base --is-ancestor "$SNAPSHOT_SHA" origin/main; then
-            echo "$SNAPSHOT_SHA is not an ancestor of main; refusing to publish" >&2
-            exit 1
-          fi
-      # The gate reads Git history and the scope config, so it needs Python
-      # rather than the native toolchain the publish jobs use. `--no-deps` on
-      # the task keeps mise from preparing the submodule and package
-      # dependencies that only a build needs.
-      - uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
-        with:
-          cache: false
-          install_args: python
       # `all`, and every scheduled run, applies the gate. Naming one component
       # publishes it whether or not its inputs changed, since republishing an
       # unchanged component is the only reason to name one by hand.
@@ -142,16 +149,27 @@ jobs:
         id: plan
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          mise run --no-deps ci:snapshot-state plan
-          --components "${{ inputs.components || 'all' }}"
-          --force "${{ inputs.components != '' && inputs.components != 'all' }}"
+        run: |
+          if [[ "${{ steps.source.outputs.mode }}" == kotlin-release ]]; then
+            {
+              echo "publish_native=false"
+              echo "publish_kotlin=true"
+              echo "publish_python=false"
+              echo "publish_dotnet=false"
+              echo "publish_docs=false"
+            } >> "$GITHUB_OUTPUT"
+          else
+            mise run --no-deps ci:snapshot-state plan \
+              --components "${{ inputs.components || 'all' }}" \
+              --force "${{ inputs.components != '' && inputs.components != 'all' }}"
+          fi
       # Minutes, not just the date: a scheduled run and a manual one on the same
       # day would otherwise publish different bytes under one version, and
       # neither pip nor NuGet would see the second as an upgrade. One stamp for
       # both, so a snapshot names the same moment in either ecosystem.
       - name: Date the snapshot version
         id: version
+        if: ${{ steps.source.outputs.mode == 'snapshot' }}
         run: |
           stamp="$(date -u +%Y%m%d%H%M)"
           echo "value=0.1.0.dev$stamp" >> "$GITHUB_OUTPUT"
@@ -476,6 +494,7 @@ jobs:
             target: macos-arm64-metal
             native_pattern: native-package-*
     env:
+      KOTLIN_VERSION: ${{ needs.plan.outputs.kotlin_version }}
       SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -502,7 +521,9 @@ jobs:
           run-id: ${{ needs.plan.outputs.run_id }}
           pattern: native-package-linux-x64-*-${{ env.SNAPSHOT_SHA }}
           path: build/packages/native/maven-input
-      - run: mise run //:kotlin:publish-snapshot stage ${{ matrix.partition }}
+      - run: >-
+          mise run //:kotlin:publish-snapshot stage
+          ${{ matrix.partition }} "$KOTLIN_VERSION"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: kotlin-maven-staging-${{ matrix.partition }}-${{ env.SNAPSHOT_SHA }}
@@ -522,6 +543,7 @@ jobs:
       actions: read
       contents: read
     env:
+      KOTLIN_VERSION: ${{ needs.plan.outputs.kotlin_version }}
       SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -536,75 +558,29 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: kotlin-maven-staging-*-${{ env.SNAPSHOT_SHA }}
+          path: build/packages/kotlin/maven-staging-parts
+      - name: Merge Maven staging repositories
+        run: >-
+          mise run //:kotlin:prepare-release merge
+          build/packages/kotlin/maven-staging
+          build/packages/kotlin/maven-staging-parts/*
+      - run: >-
+          mise run //:kotlin:publish-snapshot verify
+          build/packages/kotlin/maven-staging "$KOTLIN_VERSION"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: kotlin-maven-verified-${{ env.SNAPSHOT_SHA }}
           path: build/packages/kotlin/maven-staging
-          merge-multiple: true
-      - run: mise run //:kotlin:publish-snapshot verify build/packages/kotlin/maven-staging
+          if-no-files-found: error
+          retention-days: 1
 
-  publish-kotlin-leaves:
-    name: Kotlin Maven leaf snapshots / ${{ matrix.partition }}
+  publish-kotlin-snapshot:
+    name: Kotlin Maven snapshot
     needs:
       - plan
       - verify-kotlin
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 240
-    environment:
-      name: maven-central
-      url: https://central.sonatype.com/repository/maven-snapshots/org/maplibre/nativeffi/
-    permissions:
-      actions: read
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - partition: linux
-            runner: ubuntu-latest
-            target: linux-x64-vulkan
-            native_pattern: native-package-android-*
-          - partition: apple
-            runner: macos-26
-            target: macos-arm64-metal
-            native_pattern: native-package-*
-    env:
-      SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
-      ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
-      ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-      ORG_GRADLE_PROJECT_signAllPublications: "true"
-      ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
-      ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ env.SNAPSHOT_SHA }}
-          persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
-        with:
-          target: ${{ matrix.target }}
-          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
-          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          github-token: ${{ github.token }}
-          run-id: ${{ needs.plan.outputs.run_id }}
-          pattern: ${{ matrix.native_pattern }}-${{ env.SNAPSHOT_SHA }}
-          path: build/packages/native/maven-input
-      # The Linux partition also publishes the linuxX64 KLIBs, which embed the
-      # Linux static archives rather than the Android ones.
-      - if: ${{ matrix.partition == 'linux' }}
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          github-token: ${{ github.token }}
-          run-id: ${{ needs.plan.outputs.run_id }}
-          pattern: native-package-linux-x64-*-${{ env.SNAPSHOT_SHA }}
-          path: build/packages/native/maven-input
-      - run: mise run //:kotlin:publish-snapshot publish-leaves ${{ matrix.partition }}
-
-  publish-kotlin-roots:
-    name: Kotlin Maven root snapshots
-    needs:
-      - plan
-      - publish-kotlin-leaves
-    runs-on: macos-26
+    if: ${{ needs.plan.outputs.mode == 'snapshot' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     environment:
       name: maven-central
@@ -613,29 +589,173 @@ jobs:
       actions: read
       contents: read
     env:
+      KOTLIN_VERSION: ${{ needs.plan.outputs.kotlin_version }}
+      MISE_NO_HOOKS: "1"
       SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
-      ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
-      ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-      ORG_GRADLE_PROJECT_signAllPublications: "true"
-      ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
-      ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.SNAPSHOT_SHA }}
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
         with:
-          target: macos-arm64-metal
-          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
-          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+          cache: false
+          install_args: python
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          github-token: ${{ github.token }}
-          run-id: ${{ needs.plan.outputs.run_id }}
-          pattern: native-package-*-metal-${{ env.SNAPSHOT_SHA }}
-          path: build/packages/native/maven-input
-      - run: mise run //:kotlin:publish-snapshot publish-roots apple
+          name: kotlin-maven-verified-${{ env.SNAPSHOT_SHA }}
+          path: build/packages/kotlin/maven-snapshot
+      - name: Sign the verified snapshot repository
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: >-
+          mise run --no-deps //:kotlin:prepare-release sign-snapshot
+          build/packages/kotlin/maven-snapshot "$KOTLIN_VERSION"
+      - name: Upload the verified snapshot repository
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: >-
+          mise run --no-deps //:kotlin:prepare-release upload-snapshot
+          build/packages/kotlin/maven-snapshot "$KOTLIN_VERSION"
+
+  release-kotlin:
+    name: Kotlin Maven Central release
+    needs:
+      - plan
+      - verify-kotlin
+    if: ${{ needs.plan.outputs.mode == 'kotlin-release' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment:
+      name: maven-central
+      url: https://central.sonatype.com/publishing/deployments
+    permissions:
+      actions: read
+      contents: read
+    env:
+      KOTLIN_VERSION: ${{ needs.plan.outputs.kotlin_version }}
+      MISE_NO_HOOKS: "1"
+      RELEASE_SHA: ${{ needs.plan.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          cache: false
+          install_args: python
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: kotlin-maven-verified-${{ env.RELEASE_SHA }}
+          path: build/packages/kotlin/maven-release
+      - name: Revalidate the release tag
+        run: |
+          set -euo pipefail
+
+          git fetch --quiet --force origin \
+            "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          tag_sha="$(git rev-parse "refs/tags/$GITHUB_REF_NAME^{commit}")"
+          if [[ "$tag_sha" != "$RELEASE_SHA" ]]; then
+            echo "$GITHUB_REF_NAME moved from $RELEASE_SHA to $tag_sha" >&2
+            exit 1
+          fi
+          mise run --no-deps //:kotlin:prepare-release check-month "$KOTLIN_VERSION"
+      - name: Check Maven Central immutability
+        run: |
+          set -euo pipefail
+
+          artifact="maplibre-native-ffi-${KOTLIN_VERSION}.pom"
+          url="https://repo1.maven.org/maven2/org/maplibre/nativeffi/maplibre-native-ffi/${KOTLIN_VERSION}/${artifact}"
+          http_code="$(curl --location --silent --show-error --output /dev/null \
+            --write-out '%{http_code}' "$url")"
+          case "$http_code" in
+            404) ;;
+            200)
+              echo "org.maplibre.nativeffi:maplibre-native-ffi:$KOTLIN_VERSION already exists" >&2
+              exit 1
+              ;;
+            *)
+              echo "Maven Central returned HTTP $http_code while checking $url" >&2
+              exit 1
+              ;;
+          esac
+      - name: Sign and bundle the release
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: >-
+          mise run --no-deps //:kotlin:prepare-release bundle
+          build/packages/kotlin/maven-release
+          "build/packages/kotlin/maplibre-native-ffi-${KOTLIN_VERSION}.zip"
+          "$KOTLIN_VERSION"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: kotlin-maven-central-${{ env.KOTLIN_VERSION }}
+          path: build/packages/kotlin/maplibre-native-ffi-${{ env.KOTLIN_VERSION }}.zip
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload and publish the Central deployment
+        id: central
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          authorization="$(
+            printf '%s:%s' "$MAVEN_CENTRAL_USERNAME" "$MAVEN_CENTRAL_PASSWORD" \
+              | base64 --wrap=0
+          )"
+          bundle="build/packages/kotlin/maplibre-native-ffi-${KOTLIN_VERSION}.zip"
+          deployment_id="$(curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer $authorization" \
+            --form "bundle=@${bundle};type=application/octet-stream" \
+            "https://central.sonatype.com/api/v1/publisher/upload?name=kotlin-${KOTLIN_VERSION}&publishingType=AUTOMATIC")"
+          if [[ ! "$deployment_id" =~ ^[0-9a-fA-F-]{36}$ ]]; then
+            echo "Central returned an invalid deployment id: $deployment_id" >&2
+            exit 1
+          fi
+          echo "deployment_id=$deployment_id" >> "$GITHUB_OUTPUT"
+
+          for attempt in {1..540}; do
+            status_json="$(curl --fail-with-body --silent --show-error \
+              --retry 3 --retry-all-errors \
+              --request POST \
+              --header "Authorization: Bearer $authorization" \
+              "https://central.sonatype.com/api/v1/publisher/status?id=${deployment_id}")"
+            deployment_state="$(jq -r '.deploymentState' <<<"$status_json")"
+            echo "Central deployment $deployment_id is $deployment_state"
+            case "$deployment_state" in
+              PUBLISHED)
+                {
+                  echo "### Kotlin $KOTLIN_VERSION"
+                  echo
+                  echo "Published Maven Central deployment \`$deployment_id\`."
+                } >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+                ;;
+              FAILED)
+                jq '.errors' <<<"$status_json" >&2
+                exit 1
+                ;;
+              PENDING | VALIDATING | VALIDATED | PUBLISHING) ;;
+              *)
+                echo "Central returned unknown deployment state $deployment_state" >&2
+                jq . <<<"$status_json" >&2
+                exit 1
+                ;;
+            esac
+            if (( attempt < 540 )); then
+              sleep 10
+            fi
+          done
+          echo "Central deployment $deployment_id did not finish within 90 minutes" >&2
+          exit 1
 
   publish:
     name: native package
@@ -716,11 +836,14 @@ jobs:
       - deploy-docs
       - dotnet-feed
       - python-index
-      - publish-kotlin-roots
+      - publish-kotlin-snapshot
       - publish
     # Only components that published get their state tag moved, so a failed or
     # skipped component is retried by the next run.
-    if: ${{ !cancelled() && needs.plan.result == 'success' }}
+    if: >-
+      ${{ !cancelled()
+      && needs.plan.result == 'success'
+      && needs.plan.outputs.mode == 'snapshot' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -741,7 +864,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           DOCS_RESULT: ${{ needs.deploy-docs.result }}
-          KOTLIN_RESULT: ${{ needs.publish-kotlin-roots.result }}
+          KOTLIN_RESULT: ${{ needs.publish-kotlin-snapshot.result }}
           NATIVE_RESULT: ${{ needs.publish.result }}
           PUBLISH_DOCS: ${{ needs.plan.outputs.publish_docs }}
           PYTHON_RESULT: ${{ needs.python-index.result }}
@@ -773,7 +896,7 @@ jobs:
           mise run --no-deps ci:snapshot-state record ${published[@]+"${published[@]}"}
 
   required:
-    name: snapshots-required
+    name: publishing-required
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # A skipped job is the gate doing its work, so only real failures are red.
@@ -788,8 +911,8 @@ jobs:
       - deploy-docs
       - stage-kotlin
       - verify-kotlin
-      - publish-kotlin-leaves
-      - publish-kotlin-roots
+      - publish-kotlin-snapshot
+      - release-kotlin
       - publish
       - record
     steps:
