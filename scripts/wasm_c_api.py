@@ -28,22 +28,13 @@ UMBRELLA = (
 
 DEFAULT_INCLUDE = REPO_ROOT / "include"
 DEFAULT_SOURCES = (
-    REPO_ROOT / "bindings" / "kotlin" / "src" / "wasmJsMain" / "kotlin",
-    REPO_ROOT / "bindings" / "kotlin" / "src" / "wasmJsTest" / "kotlin",
+    REPO_ROOT / "bindings/kotlin/src/wasmJsMain/kotlin",
+    REPO_ROOT / "bindings/kotlin/src/wasmJsTest/kotlin",
 )
 DEFAULT_GENERATED = (
     REPO_ROOT
-    / "bindings"
-    / "kotlin"
-    / "src"
-    / "wasmJsMain"
-    / "generated"
-    / "org"
-    / "maplibre"
-    / "nativeffi"
-    / "internal"
-    / "wasm"
-    / "generated"
+    / "bindings/kotlin/src/wasmJsMain/generated/org/maplibre/nativeffi"
+    / "internal/wasm/generated"
 )
 
 

@@ -41,9 +41,8 @@ if(NOT exports)
   message(FATAL_ERROR "no mln_ symbols found in ${MLN_FFI_ARCHIVE}")
 endif()
 
-# The allocator and the module's own runtime entry points are not MLN_API, but a
-# host calling this C API through a foreign-function interface cannot pass a
-# descriptor without them.
+# Names the module exports that are not MLN_API. The caller says why each is
+# here.
 if(DEFINED MLN_FFI_EXTRA_EXPORTS)
   foreach(extra IN LISTS MLN_FFI_EXTRA_EXPORTS)
     list(APPEND exports "${extra}")

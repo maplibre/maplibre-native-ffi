@@ -33,24 +33,22 @@ val androidTargets =
     providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS)
   )
 val checkedInJextractSources = layout.projectDirectory.dir("src/jvmMain/generated")
-// Struct offsets the browser binding writes descriptors at. Checked in like the jextract output,
-// and regenerated from the browser ABI manifest rather than hand-maintained.
+// Struct offsets the browser binding writes descriptors at, and the externals it calls the module
+// through. Checked in like the jextract output, and generated from the headers with the pinned
+// Emscripten clang rather than hand-maintained.
 val checkedInWasmLayoutSources = layout.projectDirectory.dir("src/wasmJsMain/generated")
 // The prelinked Emscripten module the browser binding drives, which the browser build leaves beside
-// its wasm and its ABI manifest. Named by a property the way the host native install is, because
-// the browser target has no install step to read it from.
+// its wasm. Named by a property the way the host native install is, because the browser target has
+// no install step to read it from.
 val browserModuleSourceDir =
   providers
     .gradleProperty("maplibre.browser.moduleDir")
     .map(rootProject::file)
     .orElse(rootProject.layout.buildDirectory.dir("browser-module-unconfigured").map { it.asFile })
 val browserModuleConfigured = providers.gradleProperty("maplibre.browser.moduleDir").isPresent
-// The module, its wasm, and its ABI manifest. They travel together or a host cannot check what it
-// loaded: the loader fetches the manifest beside the module before it instantiates anything, and
-// refuses a module that arrives without one.
-val browserModuleFiles =
-  listOf("maplibre_native_c.mjs", "maplibre_native_c.wasm", "maplibre_native_c-abi.json")
-// Where those three are collected. A directory of their own, so both the test harness and the
+// The module and its wasm, which the module resolves against its own URL.
+val browserModuleFiles = listOf("maplibre_native_c.mjs", "maplibre_native_c.wasm")
+// Where those two are collected. A directory of their own, so both the test harness and the
 // published archive carry the module and nothing else out of the browser build tree.
 val packagedBrowserModule = layout.buildDirectory.dir("wasmJsBrowserModule")
 // The third-party notices, which the install prefix keeps two levels above lib/browser.
@@ -62,16 +60,6 @@ val packagedBrowserModule = layout.buildDirectory.dir("wasmJsBrowserModule")
 val browserNoticeDir = browserModuleSourceDir.map {
   it.parentFile.parentFile.resolve("share/maplibre-native-c/licenses")
 }
-// The one browser test that stops the module's owner thread, and the property that selects it.
-//
-// Stopping is final: the thread every runtime lived on is gone, the canvases that went with it
-// cannot come back, and every later call is refused. So it cannot share a Karma page with any other
-// test, and the same test task runs either everything else or it alone. Two runs rather than one
-// task each, because a browser test task is created by the Kotlin plugin's target DSL and there is
-// no second one to configure.
-val browserFinalShutdownTests = "*ShutdownMaplibreFinalBrowserTest*"
-val browserFinalShutdownRun =
-  providers.gradleProperty("maplibre.browser.finalShutdown").map(String::toBoolean).orElse(false)
 val testBrowserPath =
   providers
     .environmentVariable("MLN_FFI_TEST_BROWSER")
@@ -91,9 +79,8 @@ kotlin {
   macosArm64()
 
   // The browser binding calls a prelinked Emscripten module through JavaScript rather than a
-  // shared library, and keeps the common synchronous API by parking a Kotlin stack on a promise.
-  // Both mechanisms are experimental in Kotlin 2.4, so the opt-ins are target-wide rather than
-  // repeated on every declaration that reaches native.
+  // shared library. The interop it does that through is experimental in Kotlin 2.4, so the opt-ins
+  // are target-wide rather than repeated on every declaration that reaches native.
   @OptIn(ExperimentalWasmDsl::class)
   wasmJs {
     browser {
@@ -104,15 +91,6 @@ kotlin {
         // what puts karma-chrome-launcher on the harness; karma.config.d then selects a launcher of
         // its own that carries the flags a container needs.
         useKarma { useChromeHeadless() }
-        // Selected here rather than left to the caller's `--tests`, so neither run can be spelled
-        // wrongly: the ordinary run is everything but the final shutdown, and the final-shutdown
-        // run is that test on a page of its own. Gradle fails a run whose include pattern matches
-        // nothing, so a renamed test breaks the task rather than quietly testing nothing.
-        if (browserFinalShutdownRun.get()) {
-          filter.includeTestsMatching(browserFinalShutdownTests)
-        } else {
-          filter.excludeTestsMatching(browserFinalShutdownTests)
-        }
       }
     }
     compilerOptions {
@@ -278,13 +256,12 @@ val packageBrowserModule =
     into(packagedBrowserModule)
   }
 
-// The same three files as one archive. Every other platform ships a library that a host loads
-// through its own foreign-function interface, and the runtime publications carry that library. A
-// browser host has no link step and no loader path, so what it consumes is the linked module
-// itself, served beside its page. That makes the module a classified artifact on the wasmJs
-// publication rather than a runtime of its own. The archive is flat because the binding resolves
-// the wasm and the manifest against the module's own URL, so unpacking it into the directory that
-// serves the page is the whole installation.
+// The same files as one archive. Every other platform ships a library that a host loads through its
+// own foreign-function interface, and the runtime publications carry that library. A browser host
+// has no link step and no loader path, so what it consumes is the linked module itself, served
+// beside its page. That makes the module a classified artifact on the wasmJs publication rather
+// than a runtime of its own. The archive is flat because the module resolves its wasm against its
+// own URL, so unpacking it into the directory that serves the page is the whole installation.
 val browserModuleArchive =
   tasks.register<Zip>("browserModuleArchive") {
     group = "build"
@@ -322,7 +299,7 @@ val browserModuleArchive =
 
 // The binding fetches the module at run time rather than linking it, so a consumer that resolves
 // the wasmJs variant alone has nothing to fetch. Attaching the archive here is what puts the module
-// under the same coordinates and the same version as the binding that checks its ABI digest.
+// under the same coordinates and the same version as the binding it was linked against.
 plugins.withId("maven-publish") {
   extensions.configure<PublishingExtension> {
     publications
@@ -347,7 +324,7 @@ tasks.named<KotlinJsTest>("wasmJsBrowserTest") {
     check(moduleConfigured) {
       "The wasmJs browser tests drive the prelinked Emscripten module. Build it with " +
         "`mise run build emscripten-wasm32-webgl` and name it with " +
-        "-Pmaplibre.browser.moduleDir=build/emscripten-wasm32-webgl/browser."
+        "-Pmaplibre.browser.moduleDir=build/emscripten-wasm32-webgl/install/lib/browser."
     }
   }
 }

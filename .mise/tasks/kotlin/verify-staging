@@ -388,15 +388,13 @@ def verify_native(root: pathlib.Path) -> None:
 BROWSER_MODULE_FILES = {
     "maplibre_native_c.mjs",
     "maplibre_native_c.wasm",
-    "maplibre_native_c-abi.json",
 }
 
 
 def verify_browser(root: pathlib.Path) -> None:
     """A browser host fetches the module rather than linking it, so the wasmJs
     publication carries it as a classified archive instead of taking it from a
-    runtime module. The binding reads the ABI manifest before it instantiates
-    anything, so an archive missing any of the three publishes a binding no page
+    runtime module. An archive missing either file publishes a binding no page
     can load."""
     archive = one(
         module_files(root, "maplibre-native-ffi-wasm-js", "-browser-module.zip"),
@@ -407,8 +405,6 @@ def verify_browser(root: pathlib.Path) -> None:
         missing = sorted(BROWSER_MODULE_FILES - names)
         if missing:
             raise SystemExit(f"{archive} is missing {missing}")
-        with zip_file.open("maplibre_native_c-abi.json") as stream:
-            json.load(stream)
         # The module is statically linked, so it redistributes MapLibre Native and every vendored
         # dependency inside the wasm. Shipping it without their notices is a licensing defect that
         # nothing about the archive makes visible, which is why it is checked before publication
