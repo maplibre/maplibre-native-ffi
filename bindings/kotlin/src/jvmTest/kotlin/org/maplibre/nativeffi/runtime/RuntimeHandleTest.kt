@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.runtime
 
+import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
@@ -197,6 +198,36 @@ class RuntimeHandleTest {
       } finally {
         map.close()
       }
+    }
+  }
+
+  @Test
+  fun localFileStyleLoadsFromCanonicalEncodedUri() {
+    val tempDirectory = Files.createTempDirectory("maplibre resources ké地図")
+    try {
+      val styleFile =
+        Files.createDirectories(tempDirectory.resolve("style sheets").resolve("スタイル"))
+          .resolve("style.json")
+      Files.writeString(styleFile, STYLE_JSON)
+
+      RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+        val map =
+          MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 64
+              height = 64
+            },
+          )
+        try {
+          map.setStyleUrl(styleFile.toUri().toASCIIString())
+          assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED))
+        } finally {
+          map.close()
+        }
+      }
+    } finally {
+      tempDirectory.toFile().deleteRecursively()
     }
   }
 

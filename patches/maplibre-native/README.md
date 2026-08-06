@@ -13,6 +13,11 @@ the browser WebGPU build needs `-sJSPI` instead. See
 `cmake/mln_ffi_emscripten.cmake` for why that matters. Upstream:
 [maplibre-native#4451](https://github.com/maplibre/maplibre-native/pull/4451).
 
+`0002-windows-local-file-urls.patch` removes the URI-only leading slash from
+canonical Windows drive paths and opens UTF-8 filenames through wide filesystem
+APIs. This lets the local file source load percent-encoded `file:///C:/...`
+resources whose paths contain spaces or non-ASCII characters.
+
 Drop a patch once the pin moves to a commit that carries it. Applying is
 idempotent, and the sync restores the files a patch touches before moving the
 submodule, so a pin bump and an edit to a patch both take effect on a worktree
