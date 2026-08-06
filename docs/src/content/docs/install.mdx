@@ -66,6 +66,11 @@ your page. It holds `maplibre_native_c.mjs` and `maplibre_native_c.wasm`. Your
 page imports the first, and that file resolves the second against its own URL,
 so both belong in one directory.
 
+Your own program belongs there too, built as a Kotlin wasmJs library
+distribution named `maplibre-native-kotlin.mjs`. The module resolves that name
+against its own URL when it starts your program, so a distribution served
+somewhere else is not found.
+
 Take the archive at the version you depend on. The binding checks the module's C
 ABI version as it loads, and a module built from different headers than the
 binding was generated from fails that check.
