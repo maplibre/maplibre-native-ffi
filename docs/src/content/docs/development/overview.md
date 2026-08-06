@@ -58,6 +58,12 @@ mise trust
 mise bootstrap --yes
 ```
 
+On Windows, skip mise's unused Unix-only managed-files phase:
+
+```powershell
+mise bootstrap --yes --skip files
+```
+
 Language-specific tools are declared by their binding, example, or docs project.
 Mise installs them automatically when a namespaced project task runs, so the
 initial bootstrap stays focused on tools used across the repository. The

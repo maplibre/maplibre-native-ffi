@@ -391,11 +391,13 @@ runs:
     - name: Bootstrap repository
       uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
       with:
-        # mise 2026.8.2 rejects managed system files on Windows ARM64 before
-        # platform filtering applies. Keep CI on the last proven release.
-        version: 2026.8.0
+        version: 2026.8.2
         cache: false
         bootstrap: true
+        # mise 2026.8.2 validates the Unix-only managed-files phase even when
+        # the repository declares no managed files. Skip that unused phase on
+        # Windows until mise handles an empty configuration there.
+        bootstrap_skip: ${{ runner.os == 'Windows' && 'files' || '' }}
 
     # `mise bootstrap` above installs the root config's tools; `--monorepo` adds
     # every `[monorepo].config_roots` entry, which is what the jobs run against.
