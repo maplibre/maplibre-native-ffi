@@ -22,9 +22,18 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 PUBLIC_PREFIX = "mln_"
 
 #: The adapter header sits outside the umbrella deliberately, so it is named.
+#: The shim header is not part of the C API at all: it declares what the browser
+#: module adds for this binding, and it is read here so those entry points are
+#: generated and export-checked like every other one rather than declared twice
+#: by hand with nothing comparing the two.
 UMBRELLA = (
-    '#include "maplibre_native_c.h"\n#include "maplibre_native_c/callback_adapter.h"\n'
+    '#include "maplibre_native_c.h"\n'
+    '#include "maplibre_native_c/callback_adapter.h"\n'
+    '#include "mln_kotlin.h"\n'
 )
+
+#: Where that shim header lives, added to the include path for the read above.
+SHIM_INCLUDE = REPO_ROOT / "bindings/kotlin/emscripten"
 
 DEFAULT_INCLUDE = REPO_ROOT / "include"
 DEFAULT_SOURCES = (
@@ -98,6 +107,8 @@ def run_clang(
             f"--sysroot={sysroot}",
             "-I",
             str(include),
+            "-I",
+            str(SHIM_INCLUDE),
             "-fsyntax-only",
             "-std=c23",
             "-x",
