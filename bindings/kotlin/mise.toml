@@ -8,6 +8,44 @@ description = "Regenerate the committed JVM FFM declarations with jextract."
 dir = "../.."
 run = "./gradlew :bindings:kotlin:generateJvmJextractBindings --rerun-tasks"
 
+[tasks.generate-wasm]
+description = "Regenerate the committed browser struct offsets and entry points."
+dir = "../.."
+# Both generators read the headers with the pinned Emscripten clang, which is
+# the compiler that lays out the module the binding calls, and take their paths
+# from $EMSDK.
+#
+# The generators write each declaration on one line, however long it runs.
+# Formatting them here is what makes the committed files the same text the
+# generators produce, so `mise run fix` has nothing left to rewrite and
+# check-wasm-generated has nothing to report.
+run = '''
+set -euo pipefail
+python3 scripts/generate-wasm-struct-layouts.py
+python3 scripts/generate-wasm-externs.py
+dprint fmt "bindings/kotlin/src/wasmJsMain/generated/**/*.kt"
+'''
+
+[tasks.check-wasm-generated]
+description = "Verify the committed browser struct offsets and entry points match the headers."
+depends = [":generate-wasm"]
+dir = "../.."
+# The export check compares the generated Kotlin against the module, and both
+# are built from the same headers, so a header change that nobody regenerated
+# for passes it. This is what catches that: it regenerates and reports any
+# difference, following the pattern the hygiene job uses for every other
+# generated file in the repository.
+run = "git diff --exit-code -- bindings/kotlin/src/wasmJsMain/generated/"
+
+[tasks.check-wasm-externs]
+description = "Verify each generated browser entry point matches the linked module."
+depends = [{ task = "//:build", args = ["emscripten-wasm32-webgl"] }]
+dir = "../.."
+# A C caller's every call is checked by the compiler; a browser binding calls by
+# name through JavaScript, so nothing checks it unless this runs. It reads the
+# module the suite is about to load, out of the same install prefix.
+run = "python3 scripts/check-browser-exports.py"
+
 [tasks.api]
 description = "Generate Dokka HTML API reference for the Kotlin binding."
 dir = "../.."
@@ -118,6 +156,20 @@ esac
 ./gradlew \
   -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
   ":bindings:kotlin:${kotlin_target}Test"
+'''
+
+[tasks.wasmJsTest]
+description = "Run the Kotlin browser binding tests in headless Chromium."
+depends = [{ task = "//:build", args = ["emscripten-wasm32-webgl"] }]
+dir = "../.."
+# The browser build installs the module under its prefix, beside its wasm, and that prefix is also
+# what the packaged browser artifact unpacks to. Pointing the tests there means they drive the same
+# layout a host downloads, and it keeps them working in CI, where the packaged artifact replaces the
+# build tree before this task runs.
+run = '''
+./gradlew \
+  -Pmaplibre.browser.moduleDir=build/emscripten-wasm32-webgl/install/lib/browser \
+  :bindings:kotlin:wasmJsBrowserSuite
 '''
 
 [tasks.iosBuild]

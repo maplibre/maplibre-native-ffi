@@ -73,6 +73,21 @@ internal class HandleStateCore(
     }
   }
 
+  /**
+   * Destroys this handle once, and runs [afterSuccess] for the bookkeeping the destroy released.
+   *
+   * A failing [destroy] leaves the handle live and closable again, because the C API refused and
+   * the native handle is still there. [afterSuccess] is the opposite: it runs after the handle has
+   * been marked closed, since the native handle is gone by then and a wrapper that still called
+   * itself live would offer calls that could only fail. A later `close` therefore returns without
+   * reaching it.
+   *
+   * So **[afterSuccess] gets one attempt**, and what it does not finish is not finished by anyone.
+   * A body of it that can fail -- releasing a callback registration, on a target where that waits
+   * for a body already inside it -- has to make sure that the accounting the rest of the binding
+   * depends on happens anyway, rather than leaving a parent retained by a handle that no longer
+   * exists.
+   */
   fun closeOnce(destroy: () -> Int, afterSuccess: () -> Unit = {}) {
     if (!releaseState.compareAndSet(STATE_LIVE, STATE_RELEASING)) {
       when (releaseState.load()) {

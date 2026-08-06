@@ -42,6 +42,52 @@ no additional TLS package.
 The other runtimes are `maplibre-native-ffi-runtime-opengl` and
 `maplibre-native-ffi-runtime-metal`.
 
+### In a browser
+
+The wasmJs target calls a prelinked WebAssembly module that the page fetches,
+rather than a library that a host loads through a foreign-function interface.
+That module is linked against WebGL already, so this target takes no runtime
+dependency for a backend. Depend on the binding, and take the module from the
+`browser-module` archive that the wasmJs artifact carries.
+
+```kotlin title="build.gradle.kts"
+val browserModule: Configuration by configurations.creating
+
+dependencies {
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi:0.1.0-SNAPSHOT")
+  browserModule(
+    "org.maplibre.nativeffi:maplibre-native-ffi-wasm-js:0.1.0-SNAPSHOT:browser-module@zip"
+  )
+}
+```
+
+Resolve that configuration and unpack the archive into the directory that serves
+your page. It holds `maplibre_native_c.mjs` and `maplibre_native_c.wasm`. Your
+page imports the first, and that file resolves the second against its own URL,
+so both belong in one directory.
+
+Your own program belongs there too, built as a Kotlin wasmJs library
+distribution named `maplibre-native-kotlin.mjs`. The module resolves that name
+against its own URL when it starts your program, so a distribution served
+somewhere else is not found.
+
+Take the archive at the version you depend on. The binding checks the module's C
+ABI version as it loads, and a module built from different headers than the
+binding was generated from fails that check.
+
+Serve every response cross-origin isolated, with
+`Cross-Origin-Opener-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp`. The module runs MapLibre on
+threads of its own. Those threads need `SharedArrayBuffer`, which a browser
+exposes only to a cross-origin isolated page, and the workers they run in
+inherit that state from the page that started them.
+
+Your page starts the module, and the module starts your Kotlin program on the
+thread it owns. [Render a map in a
+browser](/maplibre-native-ffi/guides/render-a-map-in-a-browser/) covers that
+boot, the WebGL context the binding creates there, and the canvas a page hands
+over.
+
 ## Rust
 
 Depend on the `maplibre-native-ffi` crate from Git and enable one backend feature.

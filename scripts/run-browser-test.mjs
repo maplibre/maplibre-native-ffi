@@ -1,10 +1,12 @@
 // Runs an emcc HTML page or JavaScript module in isolated headless Chromium.
 //
-// Usage: node scripts/run-browser-test.mjs <page.html|module.js>
+// Usage: node scripts/run-browser-test.mjs <page.html|module.js|module.mjs>
 //        [--timeout-seconds N] [--render-backend NAME] [--browser-arg FLAG]...
-//        [--module-arg ARG]...
+//        [--module-arg ARG]... [--page-canvas]
 //
-// Backend-specific browser flags live here for both C and Rust suites.
+// A `.js` module is hosted in a worker; a `.mjs` module is an ES module the
+// page imports and instantiates itself. Backend-specific browser flags live
+// here for the C, Rust, and Kotlin suites.
 
 import { spawn } from "node:child_process";
 import {
@@ -99,17 +101,19 @@ function findBrowser() {
 const [targetPath, ...rest] = process.argv.slice(2);
 if (!targetPath)
   fail(
-    "usage: run-browser-test.mjs <page.html|module.js> [--timeout-seconds N]",
+    "usage: run-browser-test.mjs <page.html|module.js|module.mjs> [--timeout-seconds N]",
   );
 if (!existsSync(targetPath)) fail(`test target does not exist: ${targetPath}`);
 
 let timeoutSeconds = 600;
+let pageCanvas = false;
 const extraBrowserArgs = [];
 const moduleArgs = [];
 for (let i = 0; i < rest.length; i += 1) {
   if (rest[i] === "--timeout-seconds") timeoutSeconds = Number(rest[i + 1]);
   if (rest[i] === "--browser-arg") extraBrowserArgs.push(rest[i + 1]);
   if (rest[i] === "--module-arg") moduleArgs.push(rest[i + 1]);
+  if (rest[i] === "--page-canvas") pageCanvas = true;
   if (rest[i] === "--render-backend") {
     const backend = rest[i + 1];
     if (!(backend in BACKEND_BROWSER_ARGS))
@@ -119,10 +123,43 @@ for (let i = 0; i < rest.length; i += 1) {
 }
 
 const root = path.dirname(path.resolve(targetPath));
-const pageName =
-  path.extname(targetPath) === ".html"
-    ? path.basename(targetPath)
-    : generateModulePage(path.basename(targetPath));
+
+// The HTML parser ends an inline script at the first `</script`, whatever the
+// JavaScript around it means, so a value carrying one has to reach the script
+// escaped. Test filters and libtest arguments arrive here from a command line.
+const embed = (value) => JSON.stringify(value).replaceAll("</", "<\\/");
+const escapeText = (value) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+
+// The page half of the result relay. Every generated page reports one payload,
+// and a page that fails before reaching the module reports the failure itself
+// rather than leaving the run to time out.
+const REPORTER_SCRIPT = `const report = (payload) =>
+  void fetch("/__result", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+window.addEventListener("error", (event) =>
+  report({ status: 70, output: "uncaught error: " + event.message }));
+window.addEventListener("unhandledrejection", (event) =>
+  report({ status: 70, output: "unhandled rejection: " + event.reason }));`;
+
+const pageName = selectPage(path.basename(targetPath));
+
+function selectPage(name) {
+  switch (path.extname(name)) {
+    case ".html":
+      return name;
+    case ".mjs":
+      return generateEsModulePage(name);
+    default:
+      return generateModulePage(name);
+  }
+}
 
 // Writes the page and worker a cargo test binary needs, which emcc does not
 // produce for a `.js` output.
@@ -132,15 +169,6 @@ const pageName =
 // a further pthread is the module's own business; see bindings/rust/mise.toml.
 function generateModulePage(moduleName) {
   const stem = moduleName.replace(/\.js$/, "");
-  // The HTML parser ends an inline script at the first `</script`, whatever the
-  // JavaScript around it means, so a value carrying one has to reach the script
-  // escaped. Test filters and libtest arguments arrive here from a command line.
-  const embed = (value) => JSON.stringify(value).replaceAll("</", "<\\/");
-  const escapeText = (value) =>
-    value
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;");
   const workerName = `${stem}.runner-worker.js`;
   const generatedPageName = `${stem}.runner.html`;
 
@@ -184,16 +212,7 @@ function generateModulePage(moduleName) {
   <head><meta charset="utf-8" /><title>${escapeText(stem)}</title></head>
   <body>
     <script>
-const report = (payload) =>
-  void fetch("/__result", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-window.addEventListener("error", (event) =>
-  report({ status: 70, output: "uncaught error: " + event.message }));
-window.addEventListener("unhandledrejection", (event) =>
-  report({ status: 70, output: "unhandled rejection: " + event.reason }));
+${REPORTER_SCRIPT}
 
 const worker = new Worker(${embed(workerName)});
 worker.onmessage = (event) => {
@@ -209,6 +228,75 @@ worker.postMessage({
   args: ${embed(moduleArgs)},
   env: { MLN_FFI_TEST_FIXTURE_ORIGIN: location.origin },
 });
+    </script>
+  </body>
+</html>
+`,
+  );
+  return generatedPageName;
+}
+
+// Writes the page an ES module linked with -sMODULARIZE -sEXPORT_ES6 needs.
+//
+// This one instantiates the module on the page's own main thread rather than in
+// a worker, because only a document holds a canvas the module can be given, and
+// Emscripten transfers one only as it creates the thread that will draw on it.
+// A module that keeps its main thread out of its own work -- one linked with
+// -sPROXY_TO_PTHREAD -- leaves the page's event loop free anyway.
+//
+// The status reaches the page through the module's own exit, because nothing
+// else crosses back from the thread the suite runs on.
+function generateEsModulePage(moduleName) {
+  const stem = moduleName.replace(/\.mjs$/, "");
+  const generatedPageName = `${stem}.runner.html`;
+  // A canvas the module can display on. It is handed over before the factory
+  // is called because Emscripten transfers a canvas only as it creates the
+  // thread that will draw on it, and instantiation is what creates that thread.
+  const canvasMarkup = pageCanvas
+    ? `<canvas id="maplibre" width="512" height="512"></canvas>`
+    : "";
+  const canvasOption = pageCanvas
+    ? `options.mlnPageCanvas =
+  document.getElementById("maplibre").transferControlToOffscreen();`
+    : "";
+
+  writeFileSync(
+    path.join(root, generatedPageName),
+    `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>${escapeText(stem)}</title>
+    <style>
+      body { margin: 0 }
+      canvas { display: block; width: 512px; height: 512px }
+    </style>
+  </head>
+  <body>
+    ${canvasMarkup}
+    <script type="module">
+${REPORTER_SCRIPT}
+
+const lines = [];
+const record = (text) => {
+  lines.push(text);
+  console.log(text);
+};
+
+const options = {
+  arguments: ${embed(moduleArgs)},
+  print: record,
+  printErr: record,
+  onExit: (status) => report({ status, output: lines.join("\\n") }),
+  onAbort: (reason) => {
+    record("aborted: " + reason);
+    report({ status: 70, output: lines.join("\\n") });
+  },
+};
+${canvasOption}
+
+const create = (await import(${embed("./" + moduleName)})).default;
+await create(options);
     </script>
   </body>
 </html>

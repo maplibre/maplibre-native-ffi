@@ -32,6 +32,20 @@ internal class CallbackGate(private val name: String, private val closeNative: (
     }
   }
 
+  /**
+   * Stops admitting callbacks and returns once the last body already inside has left.
+   *
+   * Waiting is what a retired callback owes its host: the host may dispose of whatever it gave the
+   * callback the moment this returns, and a body that resumed afterwards would use it. So the
+   * closer waits for the bodies it is not, on [yieldWhileClosing], which is a yield to the thread
+   * holding the count on a target with threads and a park on the browser, where the body holding it
+   * is a suspended stack.
+   *
+   * A closer that *is* inside this gate's callback is the one case that cannot wait, because the
+   * body it would wait for is the frame below it. It stops admitting and returns; the body releases
+   * the gate as it leaves, and [closeNative] runs there instead. That is what makes a callback that
+   * ends its own registration legal rather than a deadlock.
+   */
   override fun close() {
     val closingFromCallback = threadState.isInCallback()
     while (true) {

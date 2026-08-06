@@ -5,6 +5,12 @@ import pathlib
 import tomllib
 
 DESKTOP = {"linux", "macos", "windows"}
+# Platforms whose jobs run the binding suites declared in ci/workflow.toml. A
+# desktop job hands its build tree to every binding that targets the host.
+# Emscripten joins them because the browser bindings load the module that job
+# just linked, so their suites belong in the same job rather than in one of
+# their own.
+SUITE_PLATFORMS = DESKTOP | {"emscripten"}
 
 # Targets whose suite runs on an emulator instead of through ctest, so CMake
 # registers no test preset for them.
@@ -167,7 +173,7 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
                 f"mise run //bindings/dart:build:mobile {preset}",
             ]
         )
-    elif target_platform in DESKTOP or target_platform == "emscripten":
+    elif target_platform in SUITE_PLATFORMS:
         commands.extend(suite_commands(source, preset))
     return commands
 

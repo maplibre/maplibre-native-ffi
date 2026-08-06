@@ -167,9 +167,13 @@ MLN_API mln_status mln_vulkan_surface_attach(
  * on this thread. The session renders to descriptor->surface and presents
  * through the selected context provider. WGL
  * surfaces present with SwapBuffers(HDC), and EGL surfaces present with
- * eglSwapBuffers(EGLDisplay, EGLSurface). OpenGL context handles are borrowed
- * and must remain valid until detach or destroy. On success, *out_session
- * receives a handle the caller destroys with mln_render_session_destroy().
+ * eglSwapBuffers(EGLDisplay, EGLSurface). WebGL presents nothing: the session
+ * renders into the default framebuffer of the canvas its context is bound to,
+ * and the browser composites that canvas once the task that rendered ends, so
+ * a host that renders on a thread which never returns to its event loop draws
+ * frames nothing displays. OpenGL context handles are borrowed and must remain
+ * valid until detach or destroy. On success, *out_session receives a handle the
+ * caller destroys with mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -311,6 +315,10 @@ MLN_API mln_status mln_vulkan_surface_set_target(
  * session's context, or an EGLSurface from another display, is reported by the
  * next mln_render_session_render_update() as MLN_STATUS_NATIVE_ERROR rather
  * than by this function. The session stays destroyable in that state.
+ *
+ * A WebGL session has no surface to replace: descriptor->surface stays null
+ * and only the extent changes. Resizing the canvas drawing buffer is the
+ * host's, on the thread that owns the canvas.
  *
  * A lost OpenGL context requires destroying the session and attaching again.
  *

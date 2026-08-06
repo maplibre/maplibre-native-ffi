@@ -35,6 +35,7 @@ import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_descriptor_def
 import org.maplibre.nativeffi.internal.c.mln_vulkan_surface_descriptor
 import org.maplibre.nativeffi.internal.c.mln_vulkan_surface_descriptor_default
 import org.maplibre.nativeffi.internal.c.mln_wgl_context_descriptor
+import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.render.EglContextDescriptor
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalContextDescriptor
@@ -51,6 +52,7 @@ import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
+import org.maplibre.nativeffi.render.WebglContextDescriptor
 import org.maplibre.nativeffi.render.WglContextDescriptor
 
 /** Internal materializers and readers for render target descriptors and frames. */
@@ -233,6 +235,13 @@ internal object RenderStructs {
         native.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL
         fillEglContext(native.data.egl, context)
       }
+
+      // A WebGL handle indexes the browser module's context table, and a Kotlin/Native target has
+      // no such table, so the descriptor is well formed but names nothing that exists here.
+      is WebglContextDescriptor ->
+        throw Status.unsupported(
+          "A WebGL context can only be used by the browser binding, not by a Kotlin/Native target."
+        )
     }
   }
 

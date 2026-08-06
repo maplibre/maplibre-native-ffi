@@ -62,8 +62,8 @@ public actual object Maplibre {
   }
 
   /** Installs or replaces the process-global native log callback. */
-  public actual fun setLogCallback(callback: LogCallback) {
-    LogCallbackState.set(callback)
+  public actual fun setLogCallback(callback: LogCallback, consume: Boolean) {
+    LogCallbackState.set(callback, consume)
   }
 
   /** Clears the process-global native log callback. */

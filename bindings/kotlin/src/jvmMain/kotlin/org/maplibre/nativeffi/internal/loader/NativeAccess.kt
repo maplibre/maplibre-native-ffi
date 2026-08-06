@@ -178,6 +178,7 @@ import org.maplibre.nativeffi.render.VulkanContextDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureFrame
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
+import org.maplibre.nativeffi.render.WebglContextDescriptor
 import org.maplibre.nativeffi.render.WglContextDescriptor
 import org.maplibre.nativeffi.resource.ResourceErrorReason
 import org.maplibre.nativeffi.resource.ResourceKind
@@ -2786,6 +2787,12 @@ internal object NativeAccess {
         )
         fillEglContext(mln_opengl_context_descriptor.data.egl(data), context)
       }
+      // A WebGL handle indexes the browser module's context table, and a JVM host has no such
+      // table, so the descriptor is well formed but names nothing that exists here.
+      is WebglContextDescriptor ->
+        throw Status.unsupported(
+          "A WebGL context can only be used by the browser binding, not by the JVM binding."
+        )
     }
   }
 

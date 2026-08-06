@@ -163,13 +163,28 @@ set to a versioned directory and loads packaged dependencies before the C API
 library. Linux hosts still need the selected graphics loader and driver.
 Explicit native-library path configuration remains available as an override.
 
+### Browser
+
+The wasmJs target calls a prelinked WebAssembly module that the page fetches, so
+it loads no library and takes no runtime publication. The
+`maplibre-native-ffi-wasm-js` module carries that module as a `browser-module`
+archive holding `maplibre_native_c.mjs` and its wasm. The
+[install page](/maplibre-native-ffi/install/) covers how a host resolves and
+unpacks the archive.
+
+The Emscripten CMake preset links that module and installs it under
+`lib/browser`, and the browser native package carries the same prefix. The
+publication copies those two files out of that package, so a browser host and a
+Kotlin host receive the bytes that one CI job produced.
+
 ## Snapshot publication
 
 Snapshot versions end in `-SNAPSHOT` and publish from the exact commit that
-passed the main CI workflow. A Linux x64 runner builds the Android publications,
-reusing the matrix's CMake install archives to build only the JNI bridge and
-final AARs, while macOS runners build the JVM, macOS, and iOS publications. Each
-consumes native build artifacts produced by the platform and backend CI matrix.
+passed the main CI workflow. A Linux x64 runner builds the Android and browser
+publications, reusing the matrix's CMake install archives to build only the JNI
+bridge and final AARs, while macOS runners build the JVM, macOS, and iOS
+publications. Each consumes native build artifacts produced by the platform and
+backend CI matrix.
 
 A daily schedule drives publication rather than each push to `main`: the
 workflow picks the latest successful CI run on `main` and publishes from its
@@ -208,6 +223,7 @@ The initial snapshot workflow validates:
 - JNI library placement and Rustls helper presence in Android AARs;
 - Android runtime publications resolving without the Kotlin binding;
 - native resource presence in JVM classifier JARs;
+- prelinked module presence in the browser archive of the wasmJs publication;
 - Dokka-generated API pages in every API-bearing javadoc JAR;
 - published JVM consumption through the Compose and LWJGL examples;
 - published Android consumption through the Android map example.

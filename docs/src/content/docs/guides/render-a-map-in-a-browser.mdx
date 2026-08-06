@@ -1,0 +1,158 @@
+---
+title: Render a map in a browser
+description: Start the WebAssembly module from a page, run the binding on the thread the module owns, and put frames on a canvas.
+sidebar:
+  order: 18
+---
+
+The Kotlin wasmJs target runs MapLibre Native inside a WebAssembly module that a
+page fetches. The page instantiates the module, and the module starts your
+Kotlin program on a thread of its own. That thread may block, and it is the
+owner thread for everything the binding creates there, so the runtime, map, and
+render session are the ones every other Kotlin target presents: ordinary
+handles and synchronous calls.
+
+[Install](/maplibre-native-ffi/install/#in-a-browser) covers the module files and
+the response headers that serve them. This page starts where that one ends.
+
+## Start the module
+
+Build your program as a Kotlin wasmJs library distribution named
+`maplibre-native-kotlin.mjs`, served beside the module, and export
+`mlnKotlinMain`. The module imports that file into the thread it started and
+calls that function.
+
+```html title="index.html"
+<canvas id="map" width="800" height="600"></canvas>
+<script type="module">
+  import createModule from "./maplibre_native_c.mjs";
+  const canvas = document.getElementById("map").transferControlToOffscreen();
+  await createModule({ mlnPageCanvas: canvas });
+</script>
+```
+
+Page code and binding code share no stack, so a page callback records what it
+needs and your program reads that state on its next turn.
+
+Transfer the canvas before you instantiate, and pass it as `mlnPageCanvas`. A
+browser gives a canvas to a thread only as that thread is created, and the
+module creates its thread while it instantiates. A program that only renders to
+textures passes nothing.
+
+One canvas can be displayed. It belongs to the thread it was transferred to,
+and there is one such thread; offscreen canvases have no such limit.
+
+## Choose where a frame goes
+
+`WebglContext.createForCanvas` builds a context whose default framebuffer is a
+`<canvas>` element that the page displays. Use it for an on-screen map.
+`WebglContext.createOffscreen` builds a context against a private
+`OffscreenCanvas` that nothing displays. Use it for readback, where the host
+consumes the pixels itself.
+
+The context is the binding's to create on this target, because a WebGL context
+belongs to the agent that created it and the agent that renders is the module's
+thread. Every other platform takes a context that the host created with its own
+graphics API.
+
+A surface target renders into the context's canvas directly. A session-owned
+texture target and a caller-owned texture target render into a framebuffer of
+their own, and `presentTexture` blits the texture onto the canvas. Both paths
+keep the pixels on the GPU, and `readPixels` copies a frame into the module's
+heap for a host that encodes or compares images itself.
+[Attach a render target](/maplibre-native-ffi/guides/attach-a-render-target/)
+covers the three families in full.
+
+## Put a map on the page
+
+```kotlin title="MapApp.kt"
+private const val WIDTH = 800
+private const val HEIGHT = 600
+private const val POLL_MILLIS = 8L
+
+@JsExport
+fun mlnKotlinMain() {
+  Maplibre.loadNativeLibrary()
+  val runtime = RuntimeHandle.create(RuntimeOptions())
+  val map =
+    MapHandle.create(
+      runtime,
+      MapOptions().apply {
+        width = WIDTH
+        height = HEIGHT
+      },
+    )
+  val context = WebglContext.createForCanvas("map", WIDTH, HEIGHT)
+  val session =
+    map.attachOpenGLSurface(
+      OpenGLSurfaceDescriptor(
+        extent = RenderTargetExtent(WIDTH, HEIGHT, 1.0),
+        context = context.descriptor(),
+        // A WebGL context is bound to its canvas already, so this target names
+        // no drawable of its own.
+        surface = NativePointer.NULL,
+      )
+    )
+  map.setStyleUrl("https://demotiles.maplibre.org/style.json")
+```
+
+Each pass of the render loop pumps the runtime, drains its events, and asks the
+session to render.
+
+```kotlin title="MapApp.kt"
+  runtime.pump(POLL_MILLIS)
+  while (runtime.pollEvent() != null) {}
+  session.renderUpdate()
+```
+
+Schedule each pass on the thread's event loop, and return from the pass that
+drew. A browser composites a canvas when the task that drew into it ends, and
+that task is the turn of the event loop your program runs in, so a program that
+loops without returning draws frames that the page never shows. A host that
+reads frames back rather than presenting them is free to loop and block,
+because compositing stays out of its path.
+[Run the render loop](/maplibre-native-ffi/guides/run-the-render-loop/) covers
+when a frame is due, and
+[Handle events](/maplibre-native-ffi/guides/handle-events/) covers reading
+events.
+
+Sizing a surface target takes two calls, because the canvas's drawing buffer is
+what a frame lands in and the session's extent is what MapLibre lays a frame out
+for. Call `context.resizeCanvas(width, height)` and then
+`session.resize(width, height, scaleFactor)`.
+
+## Present a texture target
+
+A texture target renders into a framebuffer of its own, so the host moves the
+result onto the canvas. Attach one against the same context in place of the
+surface target above, and present each frame from inside the loop: acquire the
+frame, present the texture it names, and release the frame handle.
+
+```kotlin title="MapApp.kt"
+  if (session.renderUpdate()) {
+    session.acquireOpenGLOwnedTextureFrame().use { acquired ->
+      val frame = acquired.frame()
+      context.presentTexture(frame.texture(), frame.width(), frame.height())
+    }
+  }
+```
+
+A caller-owned texture target works the same way, with a texture that the host
+allocates. Create it with `context.createTexture`, name it in an
+`OpenGLBorrowedTextureDescriptor`, present it after each render, and release it
+with `context.destroyTexture` once no target uses it. Create that texture in
+this context: WebGL shares no objects between contexts, so a texture that the
+page made through `canvas.getContext("webgl2")` names nothing the session can
+attach.
+
+## Close in order
+
+Close the session, then the context, then the map, then the runtime. A context
+that a live render target borrows stays in use, and a runtime that still owns a
+map reports an invalid-state failure. Close on every path your program can take,
+with `use` or a `finally` block.
+
+Close every handle that a host opens, because this target has no finalization of
+any kind and a handle left open holds its native memory. The module itself lives
+as long as the agent that instantiated it, so leaving the page, or terminating a
+worker that hosts it, releases the rest.

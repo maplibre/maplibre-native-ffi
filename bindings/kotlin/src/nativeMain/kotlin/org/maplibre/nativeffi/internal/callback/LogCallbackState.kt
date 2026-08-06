@@ -15,7 +15,8 @@ import org.maplibre.nativeffi.log.LogSeverity
 
 /** Owns process-global logging callback state. */
 @OptIn(ExperimentalForeignApi::class)
-internal class LogCallbackState private constructor(private val callback: LogCallback) :
+internal class LogCallbackState
+private constructor(private val callback: LogCallback, private val consume: Boolean) :
   AutoCloseable {
   private val gate = CallbackGate("log callbacks")
 
@@ -29,7 +30,8 @@ internal class LogCallbackState private constructor(private val callback: LogCal
           code,
           MemoryUtil.copyCString(message),
         )
-      if (callback.log(record)) 1U else 0U
+      callback.log(record)
+      if (consume) 1U else 0U
     } catch (_: Throwable) {
       0U
     } finally {
@@ -46,20 +48,21 @@ internal class LogCallbackState private constructor(private val callback: LogCal
   internal companion object {
     private val registry = LogCallbackRegistry<LogCallbackState>()
 
-    fun set(callback: LogCallback) {
+    fun set(callback: LogCallback, consume: Boolean) {
       registry.current()?.checkCanClose()
-      registry.set(LogCallbackState(callback)) {
+      registry.set(LogCallbackState(callback, consume)) {
         mln_log_set_callback(staticCFunction(::logCallback), null)
       }
     }
 
     fun setForTesting(
       callback: LogCallback,
+      consume: Boolean,
       install: () -> Int,
       captureReplacement: (LogCallbackState) -> Unit,
     ) {
       registry.current()?.checkCanClose()
-      registry.set(LogCallbackState(callback).also(captureReplacement), install)
+      registry.set(LogCallbackState(callback, consume).also(captureReplacement), install)
     }
 
     fun clear() {

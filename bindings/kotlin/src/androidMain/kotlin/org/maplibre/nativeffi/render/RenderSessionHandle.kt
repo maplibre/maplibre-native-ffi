@@ -683,6 +683,12 @@ private fun setOpenGLContext(
         get_proc_address(pointerOrNull(context.getProcAddress))
       }
     }
+    // A WebGL handle indexes the browser module's context table, and an Android host has no such
+    // table, so the descriptor is well formed but names nothing that exists here.
+    is WebglContextDescriptor ->
+      throw Status.unsupported(
+        "A WebGL context can only be used by the browser binding, not by the Android binding."
+      )
   }
 }
 

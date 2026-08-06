@@ -528,6 +528,15 @@ Resource transform invocation follows this operation:
    callback boundary. If the public handler returns a recoverable host failure,
    convert the failure to the C callback's documented behavior.
 
+#### The browser
+
+Resource transform registration reports unsupported in the browser, where
+MapLibre raises the callback on worker threads. Each worker is a separate
+JavaScript agent, and a host callback belongs to the single agent that defined
+it. The browser binding exposes native rewrite rules instead: a rule matches a
+resource kind and a URL, exactly or as a glob, and the first matching rule
+supplies the replacement URL.
+
 ### HTTP header transforms
 
 Direct-callback bindings copy the resource kind and transformed URL into a
@@ -594,6 +603,10 @@ Resource provider invocation follows this operation:
 5. Defer inline request release until the callback returns handled ownership.
 6. Allow deferred or cross-thread completion when the C API allows it, without
    changing one-shot or release behavior.
+
+A binding that cannot answer the callback synchronously registers
+`mln_adapter_queued_resource_provider` instead, declaring at registration the
+routes it claims and completing each claimed request later.
 
 Provider registration is replaceable for a runtime's whole life. A binding keeps
 the registered callback state reachable until the C call that replaces or clears
@@ -766,6 +779,14 @@ Attach follows this operation:
 For host-owned backend resources, the binding does not release or synchronize
 those resources. The caller keeps them valid for the C API's documented borrow
 window.
+
+Where the host graphics API is the binding's own module, the binding supplies
+those resources instead. A browser host cannot create a WebGL context that a
+render target accepts: the handle in a WebGL context descriptor indexes the
+module's own table, and a context belongs to the agent that created it. The
+browser binding therefore exposes context creation, resize, texture creation and
+destruction, presentation, and readback as public API. Every other target leaves
+those to the host, which owns EGL, Metal, or Vulkan itself.
 
 The public handle exposes:
 
@@ -987,6 +1008,10 @@ When the binding routes provider requests through
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | BND-156 | A glob route claims every request URL its pattern matches, and a request URL the pattern leaves unmatched passes through to native loading.                                                |
 | BND-157 | A route comparing the requested URL claims a request for a configured URI-scheme alias, and a route comparing the resolved URL claims that same request by its tile-server-normalized URL. |
+
+BND-150 does not apply to that binding, because the queued provider decides
+handled ownership by route before the request reaches host code, leaving no
+callback return path to override.
 
 ### Rendering
 

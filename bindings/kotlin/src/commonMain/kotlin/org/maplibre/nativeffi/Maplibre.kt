@@ -31,8 +31,14 @@ public expect object Maplibre {
   /** Sets Maplibre Native's process-global network status. */
   public fun setNetworkStatus(status: NetworkStatus)
 
-  /** Installs or replaces the process-global native log callback. */
-  public fun setLogCallback(callback: LogCallback)
+  /**
+   * Installs or replaces the process-global native log callback.
+   *
+   * A consumed record does not reach MapLibre's platform logger. The decision is fixed here rather
+   * than taken per record, because native needs it on the thread that produced the record and a
+   * host is not always able to answer there.
+   */
+  public fun setLogCallback(callback: LogCallback, consume: Boolean = false)
 
   /** Clears the process-global native log callback. */
   public fun clearLogCallback()
