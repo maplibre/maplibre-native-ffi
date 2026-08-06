@@ -2,7 +2,7 @@
 title: Kotlin publishing
 description: Maven publication design for the Kotlin Multiplatform binding and its native runtimes.
 sidebar:
-  order: 5
+  order: 6
 ---
 
 The Kotlin Multiplatform binding publishes snapshot builds through Maven. Stable
