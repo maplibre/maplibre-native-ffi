@@ -103,9 +103,9 @@ def command_support(command: str) -> tuple[str, str] | None:
         return None
     if kind == "bindings" and name == "kotlin":
         project_id = {
-            "androidBuild": "bindings-kotlin-android",
-            "jvmTest": "bindings-kotlin-jvm",
-            "nativeTest": "bindings-kotlin-native",
+            "android-build": "bindings-kotlin-android",
+            "jvm-test": "bindings-kotlin-jvm",
+            "native-test": "bindings-kotlin-native",
         }.get(action)
         if project_id is None:
             return None
@@ -117,8 +117,8 @@ def command_support(command: str) -> tuple[str, str] | None:
         if action
         in {
             "test",
-            "jvmTest",
-            "nativeTest",
+            "jvm-test",
+            "native-test",
             "run",
             "test:android-emulator",
             "test:ios-simulator",

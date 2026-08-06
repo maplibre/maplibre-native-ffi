@@ -5,6 +5,8 @@ shell = '"C:/Program Files/Git/bin/bash.exe" -e -lc'
 
 [vars]
 host_native_preset = "windows-{{ arch() }}-vulkan"
+# The OpenGL-only examples (go-map) build against this preset instead.
+host_native_opengl_preset = "windows-{{ arch() }}-wgl"
 
 [env]
 # Mise tasks use non-interactive Git Bash on Windows. Source VsDevCmd before each

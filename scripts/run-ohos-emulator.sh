@@ -26,18 +26,15 @@ case "$(uname -s)" in
       cpu=(-cpu host)
     else
       echo "KVM is inaccessible; using QEMU software emulation." >&2
-      acceleration=(-accel tcg,thread=multi)
+      acceleration=(-accel "tcg,thread=multi")
       cpu=(-cpu max)
     fi
     ;;
   Darwin)
-    if [[ "$(uname -m)" == x86_64 ]]; then
-      acceleration=(-accel hvf)
-      cpu=(-cpu host)
-    else
-      acceleration=(-accel tcg,thread=multi)
-      cpu=(-cpu max)
-    fi
+    # The Oniro image is x86_64, which the hypervisor on Apple Silicon cannot
+    # accelerate, so macOS hosts always run it under TCG.
+    acceleration=(-accel "tcg,thread=multi")
+    cpu=(-cpu max)
     ;;
   *)
     echo "The OpenHarmony emulator supports Linux and macOS hosts." >&2

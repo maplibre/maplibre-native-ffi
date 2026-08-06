@@ -95,7 +95,7 @@ def suite_commands(source: dict[str, object], preset: str) -> list[str]:
 def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
     render_backend = "opengl" if backend(preset) == "egl" else backend(preset)
     arguments = f"{render_backend} {abi}"
-    commands = [f"mise run //bindings/kotlin:androidBuild {arguments} --prebuilt"]
+    commands = [f"mise run //bindings/kotlin:android-build {arguments} --prebuilt"]
     if preset in EMULATOR_TESTED:
         # Each emulator task cross-compiles the artifact the build task would,
         # so it stands in for that command.
@@ -150,7 +150,7 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
     elif target_platform == "ios":
         commands.extend(
             [
-                f"mise run //bindings/kotlin:iosBuild {preset}",
+                f"mise run //bindings/kotlin:ios-build {preset}",
                 "mise run //bindings/swift:build:ios",
                 "mise run //examples/swift-map:build:ios",
                 f"mise run //bindings/dart:build:mobile {preset}",
@@ -159,7 +159,7 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
     elif target_platform == "ios-simulator":
         commands.extend(
             [
-                f"mise run //bindings/kotlin:iosBuild {preset}",
+                f"mise run //bindings/kotlin:ios-build {preset}",
                 "mise run //bindings/swift:build:ios-simulator",
                 "mise run //bindings/zig:test:ios-simulator",
                 "bash scripts/run-ios-simulator-test.sh .build/ios-simulator/arm64-apple-ios-simulator/debug/MaplibreNativeFFIIOSSimulatorTests 120",

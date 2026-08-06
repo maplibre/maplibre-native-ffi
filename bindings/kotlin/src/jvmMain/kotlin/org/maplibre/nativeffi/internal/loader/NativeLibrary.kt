@@ -304,7 +304,6 @@ internal object NativeLibrary {
       osName.contains("windows") && arm64 -> "natives-windows-arm64"
       osName.contains("windows") -> "natives-windows-x64"
       osName.contains("mac") && arm64 -> "natives-macos-arm64"
-      osName.contains("mac") -> "natives-macos-x64"
       osName.contains("linux") && arm64 -> "natives-linux-arm64"
       osName.contains("linux") -> "natives-linux-x64"
       else ->

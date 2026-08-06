@@ -8,13 +8,14 @@ sidebar:
 Specification for interactive `*-map` example programs: small apps that exercise
 language bindings and render-target integrations through a focused map demo.
 
-The specification has three sections:
+The specification has four sections:
 
-1. [Shared baseline](#shared-baseline) — map, render-session, frame-loop, and
+1. [Mise tasks](#mise-tasks) — the build and run commands every example exposes.
+2. [Shared baseline](#shared-baseline) — map, render-session, frame-loop, and
    graphics contracts common to every profile.
-2. [Desktop profile](#desktop-profile) — windowed desktop hosts with CLI entry
+3. [Desktop profile](#desktop-profile) — windowed desktop hosts with CLI entry
    and keyboard/mouse input.
-3. [Mobile profile](#mobile-profile) — embedded view hosts with touch input.
+4. [Mobile profile](#mobile-profile) — embedded view hosts with touch input.
 
 Implement a desktop example by reading Shared baseline and Desktop profile.
 Implement a mobile example by reading Shared baseline and Mobile profile.
@@ -43,6 +44,28 @@ supported configured variants. Each native library artifact includes one render
 backend. A single run uses one graphics API, selected at build time
 (build-variant examples) or at startup from the loaded library (multi-context
 examples).
+
+---
+
+## Mise tasks
+
+Every example exposes the same task contract in its `mise.toml`:
+
+- `build [preset]` compiles the example against a native install prefix. The
+  preset defaults to `{{vars.host_native_preset}}`, and the task depends on
+  `//:build` for that preset.
+- `run [render-target] [--preset <preset>]` builds and launches the example. The
+  render target defaults to `owned-texture`, so
+  `mise run //examples/zig-map:run` works with no arguments, and a mode name
+  overrides it, as in `mise run //examples/zig-map:run borrowed-texture`.
+
+An example that supports only one render backend selects its own default preset:
+`go-map` drives OpenGL directly and defaults to
+`{{vars.host_native_opengl_preset}}`.
+
+The render-target argument is how a caller reaches the modes in
+[Render-target selection](#render-target-selection); the program's own CLI
+contract is unchanged.
 
 ---
 

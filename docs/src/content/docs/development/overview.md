@@ -141,7 +141,7 @@ mise run build
 mise run fix
 
 # Run examples
-mise run //examples/zig-map:run:owned-texture
+mise run //examples/zig-map:run
 
 # Build the documentation site
 mise run //docs:build

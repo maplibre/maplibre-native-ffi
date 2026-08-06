@@ -118,10 +118,10 @@ jobs:
       - run: mise run //examples/zig-readback:run linux-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:jvmTest linux-x64-egl
+      - run: mise run //bindings/kotlin:jvm-test linux-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:nativeTest linux-x64-egl
+      - run: mise run //bindings/kotlin:native-test linux-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/compose-map:build linux-x64-egl
@@ -216,10 +216,10 @@ jobs:
       - run: mise run //examples/zig-readback:run linux-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:jvmTest linux-x64-vulkan
+      - run: mise run //bindings/kotlin:jvm-test linux-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:nativeTest linux-x64-vulkan
+      - run: mise run //bindings/kotlin:native-test linux-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/compose-map:build linux-x64-vulkan
@@ -306,7 +306,7 @@ jobs:
       - run: mise run //examples/zig-readback:run linux-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:jvmTest linux-arm64-egl
+      - run: mise run //bindings/kotlin:jvm-test linux-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/compose-map:build linux-arm64-egl
@@ -395,7 +395,7 @@ jobs:
       - run: mise run //examples/zig-readback:run linux-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:jvmTest linux-arm64-vulkan
+      - run: mise run //bindings/kotlin:jvm-test linux-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/compose-map:build linux-arm64-vulkan
@@ -556,10 +556,10 @@ jobs:
       - run: mise run //examples/zig-readback:run macos-arm64-metal
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:jvmTest macos-arm64-metal
+      - run: mise run //bindings/kotlin:jvm-test macos-arm64-metal
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:nativeTest macos-arm64-metal
+      - run: mise run //bindings/kotlin:native-test macos-arm64-metal
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/compose-map:build macos-arm64-metal
@@ -644,10 +644,10 @@ jobs:
       - run: mise run //examples/zig-readback:run macos-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:jvmTest macos-arm64-vulkan
+      - run: mise run //bindings/kotlin:jvm-test macos-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:nativeTest macos-arm64-vulkan
+      - run: mise run //bindings/kotlin:native-test macos-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/compose-map:build macos-arm64-vulkan
@@ -726,10 +726,10 @@ jobs:
       - run: mise run //examples/zig-readback:run macos-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:jvmTest macos-arm64-egl
+      - run: mise run //bindings/kotlin:jvm-test macos-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:nativeTest macos-arm64-egl
+      - run: mise run //bindings/kotlin:native-test macos-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/compose-map:build macos-arm64-egl
@@ -794,7 +794,7 @@ jobs:
           mise run install-native-package
           ios-arm64-metal
           build/packages/native/dist/maplibre-native-c-ios-arm64-metal.tar.gz
-      - run: mise run //bindings/kotlin:iosBuild ios-arm64-metal
+      - run: mise run //bindings/kotlin:ios-build ios-arm64-metal
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/swift:build:ios
@@ -839,7 +839,7 @@ jobs:
           mise run install-native-package
           ios-simulator-arm64-metal
           build/packages/native/dist/maplibre-native-c-ios-simulator-arm64-metal.tar.gz
-      - run: mise run //bindings/kotlin:iosBuild ios-simulator-arm64-metal
+      - run: mise run //bindings/kotlin:ios-build ios-simulator-arm64-metal
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/swift:build:ios-simulator
@@ -888,7 +888,7 @@ jobs:
           mise run install-native-package
           android-arm64-egl
           build/packages/native/dist/maplibre-native-c-android-arm64-egl.tar.gz
-      - run: mise run //bindings/kotlin:androidBuild opengl arm64-v8a --prebuilt
+      - run: mise run //bindings/kotlin:android-build opengl arm64-v8a --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/go:build android-arm64-egl
@@ -936,7 +936,7 @@ jobs:
           mise run install-native-package
           android-arm64-vulkan
           build/packages/native/dist/maplibre-native-c-android-arm64-vulkan.tar.gz
-      - run: mise run //bindings/kotlin:androidBuild vulkan arm64-v8a --prebuilt
+      - run: mise run //bindings/kotlin:android-build vulkan arm64-v8a --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/go:build android-arm64-vulkan
@@ -981,7 +981,7 @@ jobs:
           mise run install-native-package
           android-x64-egl
           build/packages/native/dist/maplibre-native-c-android-x64-egl.tar.gz
-      - run: mise run //bindings/kotlin:androidBuild opengl x86_64 --prebuilt
+      - run: mise run //bindings/kotlin:android-build opengl x86_64 --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/go:test:android-emulator android-x64-egl
@@ -1029,7 +1029,7 @@ jobs:
           mise run install-native-package
           android-x64-vulkan
           build/packages/native/dist/maplibre-native-c-android-x64-vulkan.tar.gz
-      - run: mise run //bindings/kotlin:androidBuild vulkan x86_64 --prebuilt
+      - run: mise run //bindings/kotlin:android-build vulkan x86_64 --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/go:test:android-emulator android-x64-vulkan
@@ -1181,7 +1181,7 @@ jobs:
       - run: mise run //examples/zig-readback:run windows-x64-wgl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:jvmTest windows-x64-wgl
+      - run: mise run //bindings/kotlin:jvm-test windows-x64-wgl
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/compose-map:build windows-x64-wgl
@@ -1257,7 +1257,7 @@ jobs:
       - run: mise run //examples/zig-readback:run windows-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:jvmTest windows-x64-vulkan
+      - run: mise run //bindings/kotlin:jvm-test windows-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/compose-map:build windows-x64-vulkan
@@ -1323,7 +1323,7 @@ jobs:
       - run: mise run //examples/rust-map:check windows-arm64-wgl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:jvmTest windows-arm64-wgl
+      - run: mise run //bindings/kotlin:jvm-test windows-arm64-wgl
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/compose-map:build windows-arm64-wgl
@@ -1380,7 +1380,7 @@ jobs:
       - run: mise run //examples/rust-map:check windows-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:jvmTest windows-arm64-vulkan
+      - run: mise run //bindings/kotlin:jvm-test windows-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/compose-map:build windows-arm64-vulkan

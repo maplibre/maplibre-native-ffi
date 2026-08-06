@@ -80,6 +80,35 @@ Requirements:
 
 ---
 
+## Mise Tasks
+
+Every binding exposes the same task contract in its `mise.toml`, so a
+contributor moves between bindings without relearning commands.
+
+Requirements:
+
+- A binding MUST define `build`, `test`, and `api` tasks. `build` compiles the
+  binding against a native install prefix, `test` runs the binding's suite, and
+  `api` generates the HTML reference that `//docs:api` collects.
+- `build` and `test` MUST take an optional `[preset]` argument that defaults to
+  `{{vars.host_native_preset}}`, and MUST depend on `//:build` for that preset.
+  A binding that cannot serve a preset MUST fail with a message that names what
+  it supports.
+- Task names MUST be kebab-case. Platform suites extend the contract with a
+  colon suffix: `test:android-emulator`, `test:ohos-emulator`,
+  `test:ios-simulator`, `build:ios`, `build:ios-simulator`.
+- A task that runs a suite on an emulator MUST go through the shared runners in
+  `scripts/` (`run-android-emulator-test.sh`, `run-ohos-emulator-test.sh`),
+  which boot the emulator on demand.
+- Cross-compilation environment that more than one task needs MUST come from a
+  shared script, as `scripts/rust-cross-env.sh` provides for the Rust binding,
+  rather than from a copy in each task.
+- Task bodies stay small. Logic beyond a few commands belongs in a script under
+  `scripts/` or a file task under `.mise/tasks/`, where it reads as a program
+  rather than as a TOML string.
+
+---
+
 ## Native Artifact Acquisition
 
 A binding gets its C declarations from the checkout and its native library from

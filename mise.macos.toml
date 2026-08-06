@@ -1,5 +1,7 @@
 [vars]
 host_native_preset = "macos-arm64-metal"
+# The OpenGL-only examples (go-map) build against this preset instead.
+host_native_opengl_preset = "macos-arm64-egl"
 
 [bootstrap.packages]
 "brew:docker-buildx" = "latest"

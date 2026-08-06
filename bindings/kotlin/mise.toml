@@ -88,7 +88,7 @@ fi
   "${tasks[@]}"
 '''
 
-[tasks.jvmTest]
+[tasks."jvm-test"]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
@@ -98,7 +98,7 @@ run = '''
   :bindings:kotlin:jvmTest
 '''
 
-[tasks.nativeTest]
+[tasks."native-test"]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
@@ -107,7 +107,7 @@ case "$usage_preset" in
   linux-x64-*) kotlin_target=linuxX64 ;;
   macos-arm64-*) kotlin_target=macosArm64 ;;
   linux-arm64-*|windows-*)
-    echo "The Kotlin binding declares Kotlin/Native targets for Apple platforms and Linux x64, so preset $usage_preset has no Kotlin/Native tests to run. Use //bindings/kotlin:jvmTest here, and run this task on a Linux x64 or macOS host to cover nativeMain." >&2
+    echo "The Kotlin binding declares Kotlin/Native targets for Apple platforms and Linux x64, so preset $usage_preset has no Kotlin/Native tests to run. Use //bindings/kotlin:jvm-test here, and run this task on a Linux x64 or macOS host to cover nativeMain." >&2
     exit 2
     ;;
   *)
@@ -120,7 +120,7 @@ esac
   ":bindings:kotlin:${kotlin_target}Test"
 '''
 
-[tasks.iosBuild]
+[tasks."ios-build"]
 description = "Build the Kotlin binding and embedded Metal runtime for an iOS target."
 usage = '''
 arg "<preset>" {
@@ -141,7 +141,7 @@ esac
   ":bindings:kotlin-runtime-metal:${kotlin_target}Klib"
 '''
 
-[tasks.androidBuild]
+[tasks."android-build"]
 description = "Build the Kotlin Android binding."
 usage = '''
 arg "[backend]" default="opengl" {
@@ -164,7 +164,7 @@ fi
 ./gradlew "${gradle_args[@]}" :bindings:kotlin:androidBuild
 '''
 
-[tasks.compileAndroid]
+[tasks."compile-android"]
 description = "Type-check the Android binding without a native cross-compile."
 dir = "../.."
 run = "./gradlew :bindings:kotlin:compileAndroidMain"

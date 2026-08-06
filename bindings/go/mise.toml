@@ -136,21 +136,12 @@ export CXX="$ndk_bin/x86_64-linux-android24-clang++"
 go test -c -o "$test_dir/" ./...
 go vet ./...
 
-mise run //:android-emulator:boot
 shopt -s nullglob
-found_test=false
-for test_binary in "$test_dir"/*.test; do
-  found_test=true
-  bash "$MISE_MONOREPO_ROOT/scripts/run-android-emulator-test.sh" \
-    "$test_binary" \
-    "$native_install_dir/lib/libmaplibre-native-c.so" \
-    180 \
-    -test.v
-done
-if [[ "$found_test" != true ]]; then
-  echo "The Go build produced no Android test executables." >&2
-  exit 1
-fi
+test_binaries=("$test_dir"/*.test)
+"$MISE_MONOREPO_ROOT/scripts/run-android-emulator-test.sh" \
+  180 \
+  "$native_install_dir/lib/libmaplibre-native-c.so" \
+  -test.v -- ${test_binaries[@]+"${test_binaries[@]}"}
 '''
 
 [tasks."test:ohos-emulator"]
@@ -172,20 +163,11 @@ export CXX="$OHOS_SDK_NATIVE/llvm/bin/clang++ $target_flags"
 go test -c -o "$test_dir/" ./...
 go vet ./...
 
-mise run //:ohos-emulator:boot
 shopt -s nullglob
-found_test=false
-for test_binary in "$test_dir"/*.test; do
-  found_test=true
-  bash "$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator-test.sh" \
-    "$test_binary" \
-    "$native_install_dir/lib/libmaplibre-native-c.so" \
-    "$OHOS_SDK_NATIVE/llvm/lib/x86_64-linux-ohos/libc++_shared.so" \
-    180 \
-    -test.v
-done
-if [[ "$found_test" != true ]]; then
-  echo "The Go build produced no OpenHarmony test executables." >&2
-  exit 1
-fi
+test_binaries=("$test_dir"/*.test)
+"$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator-test.sh" \
+  180 \
+  "$native_install_dir/lib/libmaplibre-native-c.so" \
+  "$OHOS_SDK_NATIVE/llvm/lib/x86_64-linux-ohos/libc++_shared.so" \
+  -test.v -- ${test_binaries[@]+"${test_binaries[@]}"}
 '''

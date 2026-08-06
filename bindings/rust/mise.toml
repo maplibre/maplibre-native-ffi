@@ -8,71 +8,18 @@ export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
 
 # A host build lets cargo pick its own target and toolchain. Cross builds name
 # the target and point every tool that compiles or links at the platform SDK.
-if [[ "$usage_preset" == android-* ]]; then
-  case "$usage_preset" in
-    android-arm64-*)
-      cargo_target=aarch64-linux-android
-      compiler_prefix=aarch64-linux-android
-      ;;
-    android-x64-*)
-      cargo_target=x86_64-linux-android
-      compiler_prefix=x86_64-linux-android
-      ;;
-  esac
-  target_env="${cargo_target//-/_}"
-  target_env_upper="${target_env^^}"
-  ndk_bin="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
-  sysroot="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
-  export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=--target=$compiler_prefix --sysroot=$sysroot"
-  export "CC_$target_env=$ndk_bin/${compiler_prefix}24-clang"
-  export "CXX_$target_env=$ndk_bin/${compiler_prefix}24-clang++"
-  export "CARGO_TARGET_${target_env_upper}_LINKER=$ndk_bin/${compiler_prefix}24-clang"
+source "$MISE_MONOREPO_ROOT/scripts/rust-cross-env.sh" "$usage_preset"
+if [[ -n "$cargo_target" ]]; then
   exec cargo build \
     -p maplibre-native-ffi-sys \
     -p maplibre-native-ffi-core \
     -p maplibre-native-ffi \
     --target "$cargo_target"
 fi
-
-if [[ "$usage_preset" == ohos-* ]]; then
-  case "$usage_preset" in
-    ohos-arm64-*)
-      cargo_target=aarch64-unknown-linux-ohos
-      compiler_target=aarch64-linux-ohos
-      ;;
-    ohos-x64-*)
-      cargo_target=x86_64-unknown-linux-ohos
-      compiler_target=x86_64-linux-ohos
-      ;;
-  esac
-  sysroot="$OHOS_SDK_NATIVE/sysroot"
-  target_flags="--target=$compiler_target --sysroot=$sysroot"
-  target_env="${cargo_target//-/_}"
-  target_env_upper=$(printf '%s' "$target_env" | tr '[:lower:]' '[:upper:]')
-  export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=$target_flags -I$sysroot/usr/include/$compiler_target"
-  export "CC_$target_env=$OHOS_SDK_NATIVE/llvm/bin/clang $target_flags"
-  export "CXX_$target_env=$OHOS_SDK_NATIVE/llvm/bin/clang++ $target_flags"
-  export "CARGO_TARGET_${target_env_upper}_LINKER=$OHOS_SDK_NATIVE/llvm/bin/clang"
-  export RUSTFLAGS="-C link-arg=--target=$compiler_target -C link-arg=--sysroot=$sysroot -C link-arg=-fuse-ld=lld"
-  exec cargo build \
-    -p maplibre-native-ffi-sys \
-    -p maplibre-native-ffi-core \
-    -p maplibre-native-ffi \
-    --target "$cargo_target"
-fi
-
-cargo build \
+exec cargo build \
   -p maplibre-native-ffi-sys \
   -p maplibre-native-ffi-core \
   -p maplibre-native-ffi
-'''
-run_windows = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
-  cargo build \
-    -p maplibre-native-ffi-sys \
-    -p maplibre-native-ffi-core \
-    -p maplibre-native-ffi
 '''
 
 [tasks.test]
@@ -123,72 +70,7 @@ cargo clippy \
 description = "Run the Rust binding tests as a page in headless Chromium."
 usage = 'arg "[preset]" default="emscripten-wasm32-webgl"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
-dir = "../.."
-run = '''
-set -euo pipefail
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
-
-# Apply the installed core's link options to the final module.
-link_flags_file="$native_install_dir/share/maplibre-native-c/emscripten-link-flags.txt"
-if [[ ! -f "$link_flags_file" ]]; then
-  echo "missing $link_flags_file; run 'mise run build $usage_preset' first" >&2
-  exit 1
-fi
-
-# Proxy synchronous libtest onto a pthread through a C entry-point shim.
-proxy_main_object="$MISE_MONOREPO_ROOT/build/$usage_preset/rust-emscripten-proxy-main.o"
-mkdir -p "$(dirname "$proxy_main_object")"
-emcc -pthread -fwasm-exceptions -c \
-  "$MISE_MONOREPO_ROOT/bindings/rust/emscripten_proxy_main.c" \
-  -o "$proxy_main_object"
-
-# Browser test harness options.
-harness_flags=(
-  -sEXIT_RUNTIME=1
-  -sENVIRONMENT=web,worker
-  -sOFFSCREENCANVAS_SUPPORT=1
-  -sEXPORTED_RUNTIME_METHODS=ENV,GL
-  -sPROXY_TO_PTHREAD
-  # The fixtures create their own OffscreenCanvas.
-  "-sOFFSCREENCANVASES_TO_PTHREAD=''"
-  "$proxy_main_object"
-)
-
-# Build and link options must reach every crate in the graph.
-unit_separator=$'\x1f'
-rustflags=("-C" "target-feature=+atomics,+bulk-memory")
-while IFS= read -r flag; do
-  [[ -n "$flag" ]] || continue
-  rustflags+=("-C" "link-arg=$flag")
-done < "$link_flags_file"
-for flag in "${harness_flags[@]}"; do
-  rustflags+=("-C" "link-arg=$flag")
-done
-encoded=""
-for flag in "${rustflags[@]}"; do
-  encoded+="${encoded:+$unit_separator}$flag"
-done
-export CARGO_ENCODED_RUSTFLAGS="$encoded"
-
-# Shared memory requires an atomics-enabled standard library.
-export RUSTC_BOOTSTRAP=1
-export CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER="$MISE_MONOREPO_ROOT/scripts/run-browser-cargo-test.sh"
-cargo test \
-  -p maplibre-native-ffi-sys \
-  -p maplibre-native-ffi-core \
-  -p maplibre-native-ffi \
-  --target wasm32-unknown-emscripten \
-  -Zbuild-std=std,panic_abort \
-  -- --test-threads=1
-cargo clippy \
-  -p maplibre-native-ffi-sys \
-  -p maplibre-native-ffi-core \
-  -p maplibre-native-ffi \
-  --target wasm32-unknown-emscripten \
-  -Zbuild-std=std,panic_abort \
-  --all-targets -- -D warnings
-'''
+run = '"$MISE_MONOREPO_ROOT/scripts/test-rust-browser.sh" "$usage_preset"'
 
 [tasks."test:android-emulator"]
 description = "Run the Rust binding tests in the Android emulator."
@@ -203,16 +85,7 @@ run = '''
 set -euo pipefail
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
-cargo_target=x86_64-linux-android
-compiler_prefix=x86_64-linux-android
-target_env=x86_64_linux_android
-target_env_upper=X86_64_LINUX_ANDROID
-ndk_bin="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
-sysroot="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
-export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=--target=$compiler_prefix --sysroot=$sysroot"
-export "CC_$target_env=$ndk_bin/${compiler_prefix}24-clang"
-export "CXX_$target_env=$ndk_bin/${compiler_prefix}24-clang++"
-export "CARGO_TARGET_${target_env_upper}_LINKER=$ndk_bin/${compiler_prefix}24-clang"
+source "$MISE_MONOREPO_ROOT/scripts/rust-cross-env.sh" "$usage_preset"
 
 test_manifest=$(mktemp)
 trap 'find "$test_manifest" -delete' EXIT
@@ -222,19 +95,7 @@ cargo test --no-run \
   -p maplibre-native-ffi \
   --target "$cargo_target" \
   --message-format=json |
-  python3 -c '
-import json
-import sys
-
-for line in sys.stdin:
-    message = json.loads(line)
-    if (
-        message.get("reason") == "compiler-artifact"
-        and message.get("profile", {}).get("test")
-        and message.get("executable") is not None
-    ):
-        print(message["executable"])
-' \
+  "$MISE_MONOREPO_ROOT/scripts/cargo-test-executables.py" \
     > "$test_manifest"
 cargo clippy \
   -p maplibre-native-ffi-sys \
@@ -243,21 +104,11 @@ cargo clippy \
   --target "$cargo_target" \
   --all-targets -- -D warnings
 
-mise run //:android-emulator:boot
-found_test=false
-while IFS= read -r test_binary; do
-  [[ -n "$test_binary" ]] || continue
-  found_test=true
-  bash "$MISE_MONOREPO_ROOT/scripts/run-android-emulator-test.sh" \
-    "$test_binary" \
-    "$native_install_dir/lib/libmaplibre-native-c.so" \
-    180 \
-    --test-threads=1
-done < "$test_manifest"
-if [[ "$found_test" != true ]]; then
-  echo "The Rust build produced no Android test executables." >&2
-  exit 1
-fi
+mapfile -t test_binaries < <(grep . "$test_manifest" || true)
+"$MISE_MONOREPO_ROOT/scripts/run-android-emulator-test.sh" \
+  180 \
+  "$native_install_dir/lib/libmaplibre-native-c.so" \
+  --test-threads=1 -- ${test_binaries[@]+"${test_binaries[@]}"}
 '''
 
 [tasks."test:ohos-emulator"]
@@ -268,17 +119,7 @@ run = '''
 set -euo pipefail
 native_install_dir="$MISE_MONOREPO_ROOT/build/ohos-x64-egl/install"
 export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
-cargo_target=x86_64-unknown-linux-ohos
-compiler_target=x86_64-linux-ohos
-sysroot="$OHOS_SDK_NATIVE/sysroot"
-target_flags="--target=$compiler_target --sysroot=$sysroot"
-target_env=x86_64_unknown_linux_ohos
-target_env_upper=X86_64_UNKNOWN_LINUX_OHOS
-export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=$target_flags -I$sysroot/usr/include/$compiler_target"
-export "CC_$target_env=$OHOS_SDK_NATIVE/llvm/bin/clang $target_flags"
-export "CXX_$target_env=$OHOS_SDK_NATIVE/llvm/bin/clang++ $target_flags"
-export "CARGO_TARGET_${target_env_upper}_LINKER=$OHOS_SDK_NATIVE/llvm/bin/clang"
-export RUSTFLAGS="-C link-arg=--target=$compiler_target -C link-arg=--sysroot=$sysroot -C link-arg=-fuse-ld=lld"
+source "$MISE_MONOREPO_ROOT/scripts/rust-cross-env.sh" ohos-x64-egl
 
 test_manifest=$(mktemp)
 trap 'find "$test_manifest" -delete' EXIT
@@ -288,19 +129,7 @@ cargo test --no-run \
   -p maplibre-native-ffi \
   --target "$cargo_target" \
   --message-format=json |
-  python3 -c '
-import json
-import sys
-
-for line in sys.stdin:
-    message = json.loads(line)
-    if (
-        message.get("reason") == "compiler-artifact"
-        and message.get("profile", {}).get("test")
-        and message.get("executable") is not None
-    ):
-        print(message["executable"])
-' \
+  "$MISE_MONOREPO_ROOT/scripts/cargo-test-executables.py" \
     > "$test_manifest"
 cargo clippy \
   -p maplibre-native-ffi-sys \
@@ -309,22 +138,12 @@ cargo clippy \
   --target "$cargo_target" \
   --all-targets -- -D warnings
 
-mise run //:ohos-emulator:boot
-found_test=false
-while IFS= read -r test_binary; do
-  [[ -n "$test_binary" ]] || continue
-  found_test=true
-  bash "$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator-test.sh" \
-    "$test_binary" \
-    "$native_install_dir/lib/libmaplibre-native-c.so" \
-    "$OHOS_SDK_NATIVE/llvm/lib/x86_64-linux-ohos/libc++_shared.so" \
-    180 \
-    --test-threads=1
-done < "$test_manifest"
-if [[ "$found_test" != true ]]; then
-  echo "The Rust build produced no OpenHarmony test executables." >&2
-  exit 1
-fi
+mapfile -t test_binaries < <(grep . "$test_manifest" || true)
+"$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator-test.sh" \
+  180 \
+  "$native_install_dir/lib/libmaplibre-native-c.so" \
+  "$OHOS_SDK_NATIVE/llvm/lib/x86_64-linux-ohos/libc++_shared.so" \
+  --test-threads=1 -- ${test_binaries[@]+"${test_binaries[@]}"}
 '''
 
 [tasks."test:download"]
