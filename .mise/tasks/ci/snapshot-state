@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # [MISE] description="Hash snapshot component inputs and track what was published."
-# [MISE] shell="python3"
+# [MISE] shell="python"
 
 """Gate snapshot publishing on the inputs each component actually consumes.
 

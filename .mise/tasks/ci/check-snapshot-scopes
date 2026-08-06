@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # [MISE] description="Verify snapshot component scopes classify every tracked path."
-# [MISE] shell="python3"
+# [MISE] shell="python"
 
 import pathlib
 import sys
