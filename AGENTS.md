@@ -21,8 +21,11 @@ interop or the popular MapLibre Android/iOS SDKs.
 
 ```bash
 # Install/refresh system packages, shared tools, and repository hooks.
-# On Linux this uses sudo; --yes accepts package-manager prompts.
+# On Linux this uses sudo; --yes accepts package-manager prompts. Use this on
+# Linux and macOS:
 mise bootstrap --yes
+# On Windows, skip mise's unused Unix-only managed-files phase.
+mise bootstrap --yes --skip files
 
 # Project-specific tools install automatically with namespaced tasks.
 
