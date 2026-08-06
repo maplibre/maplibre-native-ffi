@@ -17,25 +17,30 @@ the response headers that serve them. This page starts where that one ends.
 
 ## Start the module
 
-Build your program as a Kotlin wasmJs library distribution and export its entry
-point. The page imports the module's factory, names your program, and awaits
-the result.
+Build your program as a Kotlin wasmJs library distribution named
+`maplibre-native-kotlin.mjs`, served beside the module, and export
+`mlnKotlinMain`. The module imports that file into the thread it started and
+calls that function.
 
 ```html title="index.html"
 <canvas id="map" width="800" height="600"></canvas>
 <script type="module">
   import createModule from "./maplibre_native_c.mjs";
-  await createModule({ mlnKotlinModule: "./map-app.mjs" });
+  const canvas = document.getElementById("map").transferControlToOffscreen();
+  await createModule({ mlnPageCanvas: canvas });
 </script>
 ```
 
-The module imports your program into that thread and calls its `main` export.
 Page code and binding code share no stack, so a page callback records what it
 needs and your program reads that state on its next turn.
 
-Put the canvas in the document before you instantiate the module. A browser
-transfers a canvas to a thread only as that thread is created, and the module
-creates its thread during instantiation.
+Transfer the canvas before you instantiate, and pass it as `mlnPageCanvas`. A
+browser gives a canvas to a thread only as that thread is created, and the
+module creates its thread while it instantiates. A program that only renders to
+textures passes nothing.
+
+One canvas can be displayed. It belongs to the thread it was transferred to,
+and there is one such thread; offscreen canvases have no such limit.
 
 ## Choose where a frame goes
 
@@ -66,7 +71,7 @@ private const val HEIGHT = 600
 private const val POLL_MILLIS = 8L
 
 @JsExport
-fun main() {
+fun mlnKotlinMain() {
   Maplibre.loadNativeLibrary()
   val runtime = RuntimeHandle.create(RuntimeOptions())
   val map =

@@ -8,16 +8,18 @@
 // is why an entry is registered either way. A host with no on-screen map
 // transfers nothing and gets the placeholder, and its texture sessions never
 // touch it.
-// The key is the selector as written in the transfer list, not the element id
-// it names: pthread_create looks the registry up before it parses the selector
-// (libpthread.js:723), so the two only agree when the hash is kept.
+// The name carries no "#", and both halves of the round trip need it that way:
+// pthread_create looks this registry up by the transfer list entry verbatim
+// (libpthread.js:723), while findCanvasEventTarget strips a leading "#" before
+// looking up the same registry (libhtml5.js:357). A hash satisfies the first
+// and breaks the second, which transfers the canvas and then cannot find it.
 Module["preRun"] ??= [];
 Module["preRun"].push(() => {
   const canvas = Module["mlnPageCanvas"] ?? new OffscreenCanvas(1, 1);
   canvas.id = "maplibre";
-  GL.offscreenCanvases["#maplibre"] = {
+  GL.offscreenCanvases["maplibre"] = {
     canvas,
     offscreenCanvas: canvas,
-    id: "#maplibre",
+    id: "maplibre",
   };
 });

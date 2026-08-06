@@ -110,7 +110,7 @@ function(mln_ffi_add_browser_module target api_target)
       # is the only moment a canvas can be transferred to it. The pre-js
       # registers one under this name either way, so a host with no on-screen
       # map does not fail thread creation on a selector matching nothing.
-      "-sOFFSCREENCANVASES_TO_PTHREAD=#maplibre"
+      "-sOFFSCREENCANVASES_TO_PTHREAD=maplibre"
       -sOFFSCREENCANVAS_SUPPORT=1
       -sWASM_BIGINT=1
       "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPU16,HEAPU32,HEAPF32,HEAPF64,GL,UTF8ToString,stringToUTF8,lengthBytesUTF8"
