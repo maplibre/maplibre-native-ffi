@@ -9,7 +9,7 @@
 // descriptor shape.
 //
 // The context here is on a private OffscreenCanvas this file constructs, which
-// is what src/c_api/tests/test_support.c and src/browser/webgl_context.c both
+// is what src/c_api/tests/test_support.c and the Kotlin binding's own shim both
 // do and for the same reason: a WebGL2 context cannot exist without a canvas,
 // and nothing about these families needs one the page displays. A surface
 // session presents by having the browser composite its canvas, and a canvas
@@ -19,8 +19,8 @@
 //
 // That read is also what a browser host does with either family, because
 // mln_texture_read_premultiplied_rgba8() covers session-owned textures alone.
-// See src/browser/webgl_host.c, which is the same code placed on a page host's
-// owner thread.
+// See bindings/kotlin/emscripten/mln_kotlin_webgl.c, which is the same code
+// placed on a binding's own render thread.
 
 #include "abi_tests.h"
 #include "test_support.h"

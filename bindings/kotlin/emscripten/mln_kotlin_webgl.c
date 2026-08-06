@@ -289,27 +289,14 @@ EMSCRIPTEN_KEEPALIVE void mln_kotlin_webgl_texture_destroy(
 /**
  * Reads a rendered frame out of a context this thread owns, or returns false.
  *
- * mln_texture_read_premultiplied_rgba8() covers session-owned texture targets
- * and refuses the other two families, because elsewhere a host reads its own
- * texture with its own graphics API. This is that read. texture names a
- * two-dimensional texture of context, or is zero for the default framebuffer of
- * the context's canvas, which is what a surface session renders into.
+ * texture names a two-dimensional texture of context, or is zero for the
+ * default framebuffer a surface session renders into. out_pixels receives
+ * width * height * 4 bytes of RGBA8, bottom row first, which is GL's order
+ * rather than the top-down order mln_texture_read_premultiplied_rgba8() uses.
  *
- * width and height are the region to read, measured from the target's origin,
- * and out_pixels receives width * height * 4 bytes of RGBA8 that out_capacity
- * has to cover. Row zero is the bottom row, because that is where GL's origin
- * is and nothing here flips the image. A host that wants the top-down rows that
- * ImageData and mln_texture_read_premultiplied_rgba8() use reverses them
- * itself.
- *
- * This is a synchronous read of the GPU that stalls the calling thread until
- * the frame is done. A host that only wants to show a frame draws with the
- * texture instead.
- *
- * Returns false when the context cannot be made current, when the extent does
- * not fit the capacity, when the texture cannot be attached to a framebuffer,
- * or when the read reported a GL error. out_pixels is then unspecified rather
- * than unwritten, because a read that fails partway has already written.
+ * Stalls the calling thread until the frame is done. On failure out_pixels is
+ * unspecified rather than unwritten: a read that fails partway has already
+ * written.
  */
 EMSCRIPTEN_KEEPALIVE bool mln_kotlin_webgl_read_pixels(
   int32_t context, uint32_t texture, uint32_t width, uint32_t height,
@@ -368,30 +355,18 @@ EMSCRIPTEN_KEEPALIVE bool mln_kotlin_webgl_read_pixels(
 /**
  * Blits a rendered texture onto the default framebuffer of its context.
  *
- * This is how a texture session's frame reaches the page. texture names a
- * two-dimensional texture of context, and width and height are its size in
- * device pixels. The destination is the canvas the context was created against,
- * so a context created for a canvas the page transferred puts the frame on the
- * page with the pixels never leaving the GPU. A surface session needs none of
- * this, because it already renders into that framebuffer.
+ * How a texture session's frame reaches a transferred page canvas without the
+ * pixels leaving the GPU. A surface session needs none of this: it already
+ * renders into that framebuffer.
  *
- * The browser composites the canvas when the task that drew into it ends, which
- * is what presents the frame. Nothing here forces that, and nothing can:
- * emscripten_webgl_commit_frame is a documented no-op in this emsdk, and an
- * implicit-swap context has no other flip to ask for.
+ * The browser composites the canvas when the task that drew into it ends, and
+ * nothing here can force that sooner -- emscripten_webgl_commit_frame is a
+ * no-op in this emsdk, and an implicit-swap context has no other flip to ask
+ * for.
  *
- * Rows are not reversed. srcY0 maps to dstY0, which puts the texture's
- * GL-origin row where a surface session's own frame lands in the same
- * framebuffer.
- *
- * A blit is clipped by the draw framebuffer's scissor rectangle, and MapLibre's
- * GL backend leaves the scissor enabled between frames, so the scissor is
- * disabled for the blit and put back afterwards along with both framebuffer
- * bindings.
- *
- * Returns false when the context cannot be made current, when the extent does
- * not fit, when the texture cannot be attached to a framebuffer, or when the
- * blit reported a GL error.
+ * MapLibre's GL backend leaves the scissor enabled between frames and a blit is
+ * clipped by it, so the scissor is disabled and restored along with both
+ * framebuffer bindings.
  */
 EMSCRIPTEN_KEEPALIVE bool mln_kotlin_webgl_present_texture(
   int32_t context, uint32_t texture, uint32_t width, uint32_t height
