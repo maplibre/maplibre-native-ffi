@@ -21,7 +21,9 @@ case "$1" in
     export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=--target=$cargo_target --sysroot=$ndk_prebuilt/sysroot"
     export "CC_$target_env=$ndk_prebuilt/bin/${cargo_target}24-clang"
     export "CXX_$target_env=$ndk_prebuilt/bin/${cargo_target}24-clang++"
-    export "CARGO_TARGET_${target_env^^}_LINKER=$ndk_prebuilt/bin/${cargo_target}24-clang"
+    # tr rather than ${var^^}: macOS tasks can run under Bash 3.2.
+    target_env_upper="$(printf '%s' "$target_env" | tr '[:lower:]' '[:upper:]')"
+    export "CARGO_TARGET_${target_env_upper}_LINKER=$ndk_prebuilt/bin/${cargo_target}24-clang"
     ;;
   ohos-*64-*)
     # The OHOS SDK clang target drops the `-unknown` vendor from the cargo target.
@@ -32,7 +34,8 @@ case "$1" in
     export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=$target_flags -I$sysroot/usr/include/$compiler_target"
     export "CC_$target_env=$OHOS_SDK_NATIVE/llvm/bin/clang $target_flags"
     export "CXX_$target_env=$OHOS_SDK_NATIVE/llvm/bin/clang++ $target_flags"
-    export "CARGO_TARGET_${target_env^^}_LINKER=$OHOS_SDK_NATIVE/llvm/bin/clang"
+    target_env_upper="$(printf '%s' "$target_env" | tr '[:lower:]' '[:upper:]')"
+    export "CARGO_TARGET_${target_env_upper}_LINKER=$OHOS_SDK_NATIVE/llvm/bin/clang"
     export RUSTFLAGS="-C link-arg=--target=$compiler_target -C link-arg=--sysroot=$sysroot -C link-arg=-fuse-ld=lld"
     ;;
 esac

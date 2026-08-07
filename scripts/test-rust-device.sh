@@ -40,7 +40,13 @@ cargo clippy \
   --target "$cargo_target" \
   --all-targets -- -D warnings
 
-mapfile -t test_binaries < <(grep . "$test_manifest" || true)
+# A while loop rather than mapfile: macOS tasks can run under Bash 3.2.
+test_binaries=()
+while IFS= read -r test_binary || [[ -n "$test_binary" ]]; do
+  if [[ -n "$test_binary" ]]; then
+    test_binaries+=("$test_binary")
+  fi
+done <"$test_manifest"
 if [[ "$preset" == android-* ]]; then
   exec "$MISE_MONOREPO_ROOT/scripts/run-android-emulator-test.sh" \
     180 \

@@ -37,10 +37,6 @@ for local_file in "$native_library" "${test_executables[@]}"; do
     exit 2
   fi
 done
-if [[ ! -x "$adb" ]]; then
-  echo "adb does not exist: $adb" >&2
-  exit 2
-fi
 if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then
   echo "Invalid timeout: $timeout_seconds" >&2
   exit 2
@@ -50,7 +46,10 @@ if [[ -n "$fixture_dir" && ! -d "$fixture_dir" ]]; then
   exit 2
 fi
 
-if ! "$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
+# platform-tools arrives with the first boot, so a missing adb means boot, not
+# failure.
+if [[ ! -x "$adb" ]] ||
+  ! "$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
   tr -d '\r' | grep -qx 1; then
   mise run //:android-emulator:boot
 fi
