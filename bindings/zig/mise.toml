@@ -17,8 +17,7 @@ timeout = "10m"
 run = "zig build --build-file ../../build.zig --fetch=needed"
 
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 run = '''
 zig build --build-file ../../build.zig \
   -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
@@ -26,9 +25,27 @@ zig build --build-file ../../build.zig \
 '''
 
 [tasks.test]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
+# The preset selects the runner: an iOS simulator preset spawns the suite on a
+# simulator, and host presets run in process.
 run = '''
+case "$usage_preset" in
+  ios-simulator-*)
+    native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+    mise run //:ios-simulator:boot
+    exec zig build test --build-file ../../build.zig \
+      -Dtarget=aarch64-ios-simulator \
+      -Dnative-install-dir="$native_install_dir" \
+      -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
+      -Dsystem-root="$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+      --libc "$native_install_dir/share/maplibre-native-c/zig-libc" \
+      --test-timeout 120s --summary all --verbose
+    ;;
+  ios-*)
+    echo "The Zig binding tests need a runnable target; test an ios-simulator preset instead of $usage_preset." >&2
+    exit 2
+    ;;
+esac
 zig build test --build-file ../../build.zig \
   -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
@@ -45,17 +62,4 @@ zig build test --build-file ../../build.zig \
   --test-timeout 30s \
   --summary all \
   --verbose
-'''
-
-[tasks."test:ios-simulator"]
-depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
-run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/ios-simulator-arm64-metal/install"
-zig build test --build-file ../../build.zig \
-  -Dtarget=aarch64-ios-simulator \
-  -Dnative-install-dir="$native_install_dir" \
-  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
-  -Dsystem-root="$(xcrun --sdk iphonesimulator --show-sdk-path)" \
-  --libc "$native_install_dir/share/maplibre-native-c/zig-libc" \
-  --test-timeout 120s --summary all --verbose
 '''

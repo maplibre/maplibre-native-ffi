@@ -9,8 +9,7 @@
 [tasks.api]
 description = "Generate DocC HTML API reference for the Swift binding."
 dir = "../.."
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
@@ -28,12 +27,24 @@ swift package --scratch-path ".build/$usage_preset" \
 
 [tasks.build]
 dir = "../.."
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
+case "$usage_preset" in
+  ios-arm64-metal)
+    exec swift build \
+      --product MaplibreNativeFFI \
+      --scratch-path .build/ios \
+      --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
+      --triple arm64-apple-ios14.3
+    ;;
+  ios-*)
+    echo "The Swift binding builds for an iOS device with ios-arm64-metal; simulator coverage comes from //bindings/swift:test." >&2
+    exit 2
+    ;;
+esac
 swift_args=(--scratch-path ".build/$usage_preset")
 swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
 swift build --target MaplibreNativeFFI "${swift_args[@]}"
@@ -41,48 +52,38 @@ swift build --target MaplibreNativeFFI "${swift_args[@]}"
 
 [tasks.test]
 dir = "../.."
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
+# The preset selects the runner: an iOS simulator preset builds the test bundle
+# and spawns it on a simulator, and host presets run in process.
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
+case "$usage_preset" in
+  ios-simulator-*)
+    swift build \
+      --product MaplibreNativeFFIIOSSimulatorTests \
+      --scratch-path .build/ios-simulator \
+      --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+      --triple arm64-apple-ios14.3-simulator \
+      -Xswiftc -enable-testing \
+      -Xlinker -rpath \
+      -Xlinker "$native_install_dir/lib" \
+      -Xlinker -rpath \
+      -Xlinker "$(xcode-select -p)/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks"
+    mise run //:ios-simulator:boot
+    exec "$MISE_MONOREPO_ROOT/scripts/run-ios-simulator-test.sh" \
+      .build/ios-simulator/arm64-apple-ios-simulator/debug/MaplibreNativeFFIIOSSimulatorTests \
+      120
+    ;;
+  ios-*)
+    echo "The Swift binding tests need a runnable target; test an ios-simulator preset instead of $usage_preset." >&2
+    exit 2
+    ;;
+esac
 swift test \
   --scratch-path ".build/$usage_preset" \
   -Xlinker -rpath \
   -Xlinker "$native_install_dir/lib"
 swift package describe --type json >/dev/null
-'''
-
-[tasks."build:ios-simulator"]
-dir = "../.."
-depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
-run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/ios-simulator-arm64-metal/install"
-sdk="$(xcrun --sdk iphonesimulator --show-sdk-path)"
-PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
-  swift build \
-    --product MaplibreNativeFFIIOSSimulatorTests \
-    --scratch-path .build/ios-simulator \
-    --sdk "$sdk" \
-    --triple arm64-apple-ios14.3-simulator \
-    -Xswiftc -enable-testing \
-    -Xlinker -rpath \
-    -Xlinker "$native_install_dir/lib" \
-    -Xlinker -rpath \
-    -Xlinker "$(xcode-select -p)/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks"
-'''
-
-[tasks."build:ios"]
-dir = "../.."
-depends = [{ task = "//:build", args = ["ios-arm64-metal"] }]
-run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/ios-arm64-metal/install"
-sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
-PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
-  swift build \
-    --product MaplibreNativeFFI \
-    --scratch-path .build/ios \
-    --sdk "$sdk" \
-    --triple arm64-apple-ios14.3
 '''

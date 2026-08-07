@@ -3,8 +3,7 @@
 # `--auditwheel repair` because maturin only defaults to repairing on Linux,
 # which would leave a macOS wheel pointing at the build machine's install tree.
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 run = '''
 # Wheel repair rewrites the extension's dependency names in place. Recompile it
 # so a previous wheel cannot feed those private names into the next repair.
@@ -16,8 +15,7 @@ MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" 
 [tasks._install-extension]
 description = "Build and install the Python extension for local tests."
 hide = true
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 run = '''
 # See `build`: repaired extension artifacts are outputs, never compiler inputs.
 cargo clean --package maplibre-native-ffi-python

@@ -90,43 +90,28 @@ def coverage_from_preset(preset: str, status: str) -> Coverage:
     )
 
 
-def command_support(command: str) -> tuple[str, str] | None:
-    if command.startswith("bash scripts/run-ios-simulator-test.sh "):
-        return "bindings-swift", "tested"
-
+def command_support(command: str) -> list[tuple[str, str]]:
     match = re.search(r"mise run //(bindings|examples)/([^: ]+):([^ ]+)", command)
     if match is None:
-        return None
+        return []
     kind, name, action = match.groups()
 
-    if kind == "bindings" and name == "swift" and action == "build:ios-simulator":
-        return None
     if kind == "bindings" and name == "kotlin":
-        project_id = {
-            "androidBuild": "bindings-kotlin-android",
-            "jvmTest": "bindings-kotlin-jvm",
-            "nativeTest": "bindings-kotlin-native",
-        }.get(action)
-        if project_id is None:
-            return None
-    else:
-        project_id = f"{kind}-{name}"
+        if action == "android-build":
+            return [("bindings-kotlin-android", "build-only")]
+        if action == "test":
+            # The test task runs the JVM suite on every host preset and adds
+            # the Kotlin/Native suite where the binding declares a target.
+            rows = [("bindings-kotlin-jvm", "tested")]
+            preset = command.rsplit(" ", 1)[-1]
+            if preset.startswith(("linux-x64-", "macos-arm64-")):
+                rows.append(("bindings-kotlin-native", "tested"))
+            return rows
+        return []
+    project_id = f"{kind}-{name}"
 
-    status = (
-        "tested"
-        if action
-        in {
-            "test",
-            "jvmTest",
-            "nativeTest",
-            "run",
-            "test:android-emulator",
-            "test:ios-simulator",
-            "test:ohos-emulator",
-        }
-        else "build-only"
-    )
-    return project_id, status
+    status = "tested" if action in {"test", "run"} else "build-only"
+    return [(project_id, status)]
 
 
 def project_label(project_id: str) -> str:
@@ -237,11 +222,8 @@ def support_matrix() -> dict[str, Any]:
     for preset in configured:
         commands = native_commands(preset, tested) + consumer_commands(source, preset)
         for command in commands:
-            support = command_support(command)
-            if support is None:
-                continue
-            project_id, status = support
-            projects[project_id].append(coverage_from_preset(preset, status))
+            for project_id, status in command_support(command):
+                projects[project_id].append(coverage_from_preset(preset, status))
 
     return {
         "statuses": [

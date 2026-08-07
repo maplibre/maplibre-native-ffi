@@ -124,10 +124,6 @@ done
 depends = ["api", "install", "generate-support-matrix", "check-snippets"]
 run = "pnpm run dev"
 
-[tasks.start]
-depends = ["api", "install", "generate-support-matrix", "check-snippets"]
-run = "pnpm run start"
-
 [tasks.build]
 depends = ["api", "install", "generate-support-matrix", "check-snippets"]
 run = "pnpm run build"

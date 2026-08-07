@@ -15,8 +15,7 @@ timeout = "10m"
 run = "zig build --fetch=needed"
 
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 run = '''
 zig build \
   -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
@@ -24,32 +23,18 @@ zig build \
 '''
 
 [tasks.run]
-depends = ["//:build"]
-usage = '''
-arg "[render-target]" default="owned-texture" {
-  choices "owned-texture" "borrowed-texture" "native-surface"
-}
-'''
+extends = "ffi:example-run"
 run = '''
 zig build run \
-  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/{{vars.host_native_preset}}/install" \
+  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
-  -- "{{ usage.render_target }}"
+  -- "$usage_render_target"
 '''
 run_windows = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/{{vars.host_native_preset}}/install"
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 zig build run \
   -Dnative-install-dir="$native_install_dir" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
-  -- "{{ usage.render_target }}"
+  -- "$usage_render_target"
 '''
-
-[tasks."run:owned-texture"]
-run = [{ task = "run", args = ["owned-texture"] }]
-
-[tasks."run:borrowed-texture"]
-run = [{ task = "run", args = ["borrowed-texture"] }]
-
-[tasks."run:native-surface"]
-run = [{ task = "run", args = ["native-surface"] }]

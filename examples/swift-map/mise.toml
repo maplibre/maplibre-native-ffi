@@ -7,8 +7,7 @@
 "github:xtool-org/xtool" = { version = "{{vars.xtool_version}}", os = ["linux"] }
 
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
@@ -19,26 +18,11 @@ swift build "${swift_args[@]}"
 '''
 
 [tasks.run]
-depends = [":build"]
-usage = '''
-arg "[render-target]" default="owned-texture" {
-  choices "owned-texture" "borrowed-texture" "native-surface"
-}
-'''
+extends = "ffi:example-run"
 run = '''
 source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
-exec ".build/{{vars.host_native_preset}}/debug/swift-map" \
-  "{{ usage.render_target }}"
+exec ".build/$usage_preset/debug/swift-map" "$usage_render_target"
 '''
-
-[tasks."run:owned-texture"]
-run = [{ task = "run", args = ["owned-texture"] }]
-
-[tasks."run:borrowed-texture"]
-run = [{ task = "run", args = ["borrowed-texture"] }]
-
-[tasks."run:native-surface"]
-run = [{ task = "run", args = ["native-surface"] }]
 
 [tasks."build:ios-simulator"]
 depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]

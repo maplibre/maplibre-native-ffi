@@ -45,7 +45,7 @@ mise run //bindings/rust:test
 mise run //examples/zig-readback:run
 
 # GUI map app — use a brief timeout or run in background
-mise run //examples/zig-map:run:owned-texture
+mise run //examples/zig-map:run
 
 # Build a different native target/backend
 mise run build linux-x64-egl
@@ -54,7 +54,7 @@ mise run build linux-x64-egl
 mise run package-native linux-x64-egl
 
 # Build the Android binding for one ABI/backend
-mise run //bindings/kotlin:androidBuild opengl x86_64
+mise run //bindings/kotlin:android-build opengl x86_64
 
 # Run formatters and linters on _all_ files (will stage affected files)
 mise run fix

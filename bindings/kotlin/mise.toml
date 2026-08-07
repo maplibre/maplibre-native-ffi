@@ -34,8 +34,7 @@ fi
 '''
 
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 dir = "../.."
 run = '''
 runtime_backend=
@@ -65,53 +64,50 @@ fi
 ./gradlew "${gradle_args[@]}" "${tasks[@]}"
 '''
 
+# One task per runtime, since a preset maps to more than one: the JVM suite
+# covers every host preset, and presets with a declared Kotlin/Native target
+# add its suite. `test` runs every runtime relevant to the preset.
 [tasks.test]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
-dir = "../.."
 run = '''
 case "$usage_preset" in
-  linux-x64-*) kotlin_target=linuxX64 ;;
-  macos-arm64-*) kotlin_target=macosArm64 ;;
-  linux-arm64-*|windows-*) kotlin_target= ;;
+  linux-x64-* | macos-arm64-*) runtimes=(jvm native) ;;
+  linux-arm64-* | windows-*) runtimes=(jvm) ;;
   *)
-    echo "Unsupported Kotlin test preset: $usage_preset" >&2
+    echo "The Kotlin binding tests host presets only, got: $usage_preset" >&2
     exit 2
     ;;
 esac
-tasks=(:bindings:kotlin:jvmTest)
-if [[ -n "$kotlin_target" ]]; then
-  tasks+=(":bindings:kotlin:${kotlin_target}Test")
-fi
-./gradlew \
-  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
-  "${tasks[@]}"
+for runtime in "${runtimes[@]}"; do
+  mise run "//bindings/kotlin:test:$runtime" "$usage_preset"
+done
 '''
 
-[tasks.jvmTest]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+[tasks."test:jvm"]
+extends = "ffi:preset"
 dir = "../.."
 run = '''
+case "$usage_preset" in
+  linux-* | macos-* | windows-*) ;;
+  *)
+    echo "The Kotlin/JVM suite tests host presets only, got: $usage_preset" >&2
+    exit 2
+    ;;
+esac
 ./gradlew \
   -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
   :bindings:kotlin:jvmTest
 '''
 
-[tasks.nativeTest]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+[tasks."test:native"]
+extends = "ffi:preset"
 dir = "../.."
 run = '''
 case "$usage_preset" in
   linux-x64-*) kotlin_target=linuxX64 ;;
   macos-arm64-*) kotlin_target=macosArm64 ;;
-  linux-arm64-*|windows-*)
-    echo "The Kotlin binding declares Kotlin/Native targets for Apple platforms and Linux x64, so preset $usage_preset has no Kotlin/Native tests to run. Use //bindings/kotlin:jvmTest here, and run this task on a Linux x64 or macOS host to cover nativeMain." >&2
-    exit 2
-    ;;
   *)
-    echo "Unsupported Kotlin/Native test preset: $usage_preset" >&2
+    echo "The Kotlin binding declares Kotlin/Native targets for Apple platforms and Linux x64, so preset $usage_preset has no Kotlin/Native tests to run." >&2
     exit 2
     ;;
 esac
@@ -120,7 +116,7 @@ esac
   ":bindings:kotlin:${kotlin_target}Test"
 '''
 
-[tasks.iosBuild]
+[tasks."ios-build"]
 description = "Build the Kotlin binding and embedded Metal runtime for an iOS target."
 usage = '''
 arg "<preset>" {
@@ -141,7 +137,7 @@ esac
   ":bindings:kotlin-runtime-metal:${kotlin_target}Klib"
 '''
 
-[tasks.androidBuild]
+[tasks."android-build"]
 description = "Build the Kotlin Android binding."
 usage = '''
 arg "[backend]" default="opengl" {
@@ -164,7 +160,7 @@ fi
 ./gradlew "${gradle_args[@]}" :bindings:kotlin:androidBuild
 '''
 
-[tasks.compileAndroid]
+[tasks."compile-android"]
 description = "Type-check the Android binding without a native cross-compile."
 dir = "../.."
 run = "./gradlew :bindings:kotlin:compileAndroidMain"

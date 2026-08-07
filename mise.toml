@@ -92,6 +92,7 @@ pnpm_version = "10.33.2"
 python_version = "3.14.4"
 rust_version = "1.95.0"
 sccache_version = "0.16.0"
+sdl3_version = "3.2"
 shellcheck_version = "0.11.0"
 swift_version = "6.3.1"
 swiftformat_version = "0.61.1"
@@ -220,10 +221,24 @@ postinstall = [
   "hk install --mise --quiet",
 ]
 
-[tasks.configure]
-description = "Configure a native CMake preset."
+# The standard task preambles. A binding or example task that builds or tests
+# against a native preset extends ffi:preset, which gives it the optional
+# preset argument and builds that preset first; the desktop examples' run tasks
+# extend ffi:example-run, which adds the render-target argument on top of the
+# example's own build. Shell dispatch stays in each task: `run` overrides a
+# template completely, and the shared parts of that dispatch live in scripts/.
+[task_templates."ffi:preset"]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-run = '.mise/bin/with-sccache-basedirs cmake --preset "$usage_preset"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+
+[task_templates."ffi:example-run"]
+usage = '''
+arg "[render-target]" default="owned-texture" {
+  choices "owned-texture" "borrowed-texture" "native-surface"
+}
+flag "--preset <preset>" default="{{vars.host_native_preset}}"
+'''
+depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 
 [tasks.build]
 description = "Configure, build, and install a native CMake preset."
@@ -282,7 +297,6 @@ elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-x64-* ]]; 
   # so the tile fixtures ctest would name by absolute source path are staged
   # into a directory the runner pushes to the device.
   platform=${usage_preset%%-*}
-  mise run "//:$platform-emulator:boot"
   fixture_source="$MISE_MONOREPO_ROOT/third_party/maplibre-native/test/fixtures"
   fixture_dir="$MISE_MONOREPO_ROOT/build/$platform-emulator/c-api-fixtures"
   while IFS= read -r -d '' fixture; do
@@ -292,21 +306,17 @@ elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-x64-* ]]; 
     install -m 644 "$fixture" "$destination"
   done < <(find "$fixture_source" -type f -name '*.mlt' -print0)
   export MLN_FFI_TEST_FIXTURE_DIR="$fixture_dir"
-  test_executable="$MISE_MONOREPO_ROOT/build/$usage_preset/mln_ffi_c_api_tests"
-  native_library="$MISE_MONOREPO_ROOT/build/$usage_preset/install/lib/libmaplibre-native-c.so"
   if [[ "$platform" == ohos ]]; then
-    bash "$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator-test.sh" \
-      "$test_executable" \
-      "$native_library" \
+    exec "$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator-test.sh" \
+      300 \
+      "$MISE_MONOREPO_ROOT/build/$usage_preset/install/lib/libmaplibre-native-c.so" \
       "$OHOS_SDK_NATIVE/llvm/lib/x86_64-linux-ohos/libc++_shared.so" \
-      300
-  else
-    bash "$MISE_MONOREPO_ROOT/scripts/run-android-emulator-test.sh" \
-      "$test_executable" \
-      "$native_library" \
-      300
+      -- "$MISE_MONOREPO_ROOT/build/$usage_preset/mln_ffi_c_api_tests"
   fi
-  exit
+  exec "$MISE_MONOREPO_ROOT/scripts/run-android-emulator-test.sh" \
+    300 \
+    "$MISE_MONOREPO_ROOT/build/$usage_preset/install/lib/libmaplibre-native-c.so" \
+    -- "$MISE_MONOREPO_ROOT/build/$usage_preset/mln_ffi_c_api_tests"
 fi
 ctest --preset "$usage_preset"
 '''
@@ -317,253 +327,19 @@ description = "Boot the Android emulator and wait until it is ready."
 # not part of what .mise/bin/sync-android-packages installs, so asking for a
 # boot is what accepts their licenses and pays for their download.
 tools = { "core:java" = "{{vars.java_version}}" }
-run = '''
-serial=emulator-5554
-avd_name=mln-ffi-x64
-image="{{vars.android_system_image}}"
-sdk_root="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}"
-state_dir="$MISE_MONOREPO_ROOT/build/android-emulator"
-pid_file="$state_dir/emulator.pid"
-log_file="$state_dir/emulator.log"
-# The AVD lives in the build tree rather than the user's ~/.android, so a
-# checkout owns the device it boots and removing the tree removes it.
-export ANDROID_AVD_HOME="$state_dir/avd"
-
-# adb arrives with platform-tools, which the package check below installs, so
-# an SDK that has never had it yet reaches that step rather than failing here.
-adb="$sdk_root/platform-tools/adb"
-if [[ -x "$adb" ]] &&
-  "$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
-  tr -d '\r' | grep -qx 1; then
-  echo "Android emulator is ready at $serial."
-  exit 0
-fi
-
-sdkmanager=
-for tools_dir in "$sdk_root"/cmdline-tools/latest/bin "$sdk_root"/cmdline-tools/*/bin; do
-  if [[ -x "$tools_dir/sdkmanager" ]]; then
-    sdkmanager="$tools_dir/sdkmanager"
-    avdmanager="$tools_dir/avdmanager"
-    break
-  fi
-done
-if [[ -z "$sdkmanager" ]]; then
-  echo "No sdkmanager under $sdk_root/cmdline-tools." >&2
-  exit 1
-fi
-
-# Each package with the directory that proves it is installed, so a rerun starts
-# no JVM and reaches no network.
-missing=()
-for entry in "platform-tools|platform-tools" "emulator|emulator" "$image|${image//;//}"; do
-  if [[ ! -d "$sdk_root/${entry#*|}" ]]; then
-    missing+=("${entry%%|*}")
-  fi
-done
-# A count test would spell `${` and `#` next to each other, which mise reads as
-# the start of a template comment.
-if [[ -n "${missing[*]}" ]]; then
-  echo "Installing Android SDK packages: ${missing[*]}"
-  # One `y` per license prompt, as a here-string rather than a pipe: `yes` would
-  # take a SIGPIPE when sdkmanager stops reading, and that becomes the
-  # pipeline's status.
-  accepts="$(printf 'y\n%.0s' "${missing[@]}")"
-  "$sdkmanager" --sdk_root="$sdk_root" --install "${missing[@]}" <<<"$accepts"
-fi
-
-mkdir -p "$ANDROID_AVD_HOME" "$state_dir"
-if [[ ! -d "$ANDROID_AVD_HOME/$avd_name.avd" ]]; then
-  # `no` declines the custom hardware profile prompt. Everything the suite
-  # depends on is a launch flag below rather than a stored device setting.
-  "$avdmanager" create avd --name "$avd_name" --package "$image" --device pixel_6 <<<"no"
-fi
-
-if [[ -f "$pid_file" ]]; then
-  pid=$(<"$pid_file")
-  if [[ "$pid" =~ ^[0-9]+$ ]] &&
-    kill -0 "$pid" 2>/dev/null &&
-    ps -p "$pid" -o args= | grep -q "$avd_name"; then
-    echo "Waiting for Android emulator process $pid."
-  else
-    rm -f "$pid_file"
-  fi
-fi
-
-if [[ ! -f "$pid_file" ]]; then
-  # SwiftShader draws the GLES and Vulkan targets in software, which is what a
-  # runner without a GPU has. The suite renders offscreen, so no window is
-  # needed and no snapshot is written: a run starts from the installed image.
-  launcher=(
-    "$sdk_root/emulator/emulator"
-    -avd "$avd_name"
-    -no-window
-    -no-audio
-    -no-boot-anim
-    -no-snapshot
-    -no-metrics
-    -gpu swiftshader
-    -memory 4096
-    -camera-back none
-    -camera-front none
-  )
-  if [[ -r /dev/kvm && -w /dev/kvm ]]; then
-    launcher+=(-accel on)
-  else
-    echo "KVM is inaccessible; using QEMU software emulation." >&2
-    launcher+=(-accel off)
-  fi
-  if command -v setsid >/dev/null 2>&1; then
-    nohup setsid "${launcher[@]}" </dev/null >"$log_file" 2>&1 &
-  else
-    nohup "${launcher[@]}" </dev/null >"$log_file" 2>&1 &
-  fi
-  pid=$!
-  printf '%s\n' "$pid" >"$pid_file"
-  echo "Started Android emulator process $pid."
-fi
-
-pid=$(<"$pid_file")
-for ((attempt = 0; attempt < 600; attempt++)); do
-  if ! kill -0 "$pid" 2>/dev/null; then
-    echo "Android emulator exited before it became ready." >&2
-    tail -100 "$log_file" >&2
-    rm -f "$pid_file"
-    exit 1
-  fi
-  if "$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
-    tr -d '\r' | grep -qx 1; then
-    echo "Android emulator is ready at $serial."
-    exit 0
-  fi
-  sleep 1
-done
-
-echo "Android emulator did not become ready within 600 seconds." >&2
-tail -100 "$log_file" >&2
-exit 1
-'''
+run = '"$MISE_MONOREPO_ROOT/scripts/boot-android-emulator.sh" "{{vars.android_system_image}}"'
 
 [tasks."android-emulator:stop"]
 description = "Stop the Android emulator started by mise."
-run = '''
-serial=emulator-5554
-state_dir="$MISE_MONOREPO_ROOT/build/android-emulator"
-pid_file="$state_dir/emulator.pid"
-adb="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}/platform-tools/adb"
-
-if [[ ! -f "$pid_file" ]]; then
-  echo "No mise-managed Android emulator is running."
-  exit 0
-fi
-
-# `emu kill` lets the guest shut down; the signals below are for an emulator
-# that no longer answers adb.
-if [[ -x "$adb" ]]; then
-  "$adb" -s "$serial" emu kill >/dev/null 2>&1 || true
-fi
-
-pid=$(<"$pid_file")
-if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
-  for ((attempt = 0; attempt < 30; attempt++)); do
-    kill -0 "$pid" 2>/dev/null || break
-    sleep 1
-  done
-  if kill -0 "$pid" 2>/dev/null; then
-    kill "$pid"
-    sleep 5
-  fi
-  if kill -0 "$pid" 2>/dev/null; then
-    kill -KILL "$pid"
-  fi
-fi
-rm -f "$pid_file"
-'''
+run = '"$MISE_MONOREPO_ROOT/scripts/stop-android-emulator.sh"'
 
 [tasks."ohos-emulator:boot"]
 description = "Boot the OpenHarmony emulator and wait until it is ready."
-run = '''
-connect_key=127.0.0.1:55555
-state_dir="$MISE_MONOREPO_ROOT/build/ohos-emulator"
-pid_file="$state_dir/qemu.pid"
-log_file="$state_dir/qemu.log"
-
-if hdc tconn "$connect_key" >/dev/null 2>&1 &&
-  hdc -t "$connect_key" shell echo ready 2>/dev/null | tr -d '\r' | grep -qx ready; then
-  echo "OpenHarmony emulator is ready at $connect_key."
-  exit 0
-fi
-
-mkdir -p "$state_dir"
-if [[ -f "$pid_file" ]]; then
-  pid=$(<"$pid_file")
-  if [[ "$pid" =~ ^[0-9]+$ ]] &&
-    kill -0 "$pid" 2>/dev/null &&
-    ps -p "$pid" -o args= | grep -q qemu-system-x86_64; then
-    echo "Waiting for OpenHarmony emulator process $pid."
-  else
-    rm -f "$pid_file"
-  fi
-fi
-
-if [[ ! -f "$pid_file" ]]; then
-  emulator_dir="$(mise where 'http:oniro-emulator@{{vars.ohos_sdk_version}}')/images"
-  launcher=("$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator.sh" "$emulator_dir")
-  if command -v setsid >/dev/null 2>&1; then
-    nohup setsid "${launcher[@]}" </dev/null >"$log_file" 2>&1 &
-  else
-    nohup "${launcher[@]}" </dev/null >"$log_file" 2>&1 &
-  fi
-  pid=$!
-  printf '%s\n' "$pid" >"$pid_file"
-  echo "Started OpenHarmony emulator process $pid."
-fi
-
-pid=$(<"$pid_file")
-for ((attempt = 0; attempt < 300; attempt++)); do
-  if ! kill -0 "$pid" 2>/dev/null; then
-    echo "OpenHarmony emulator exited before it became ready." >&2
-    tail -100 "$log_file" >&2
-    rm -f "$pid_file"
-    exit 1
-  fi
-  if hdc tconn "$connect_key" >/dev/null 2>&1 &&
-    hdc -t "$connect_key" shell echo ready 2>/dev/null | tr -d '\r' | grep -qx ready; then
-    echo "OpenHarmony emulator is ready at $connect_key."
-    exit 0
-  fi
-  sleep 1
-done
-
-echo "OpenHarmony emulator did not become ready within 300 seconds." >&2
-tail -100 "$log_file" >&2
-exit 1
-'''
+run = '"$MISE_MONOREPO_ROOT/scripts/boot-ohos-emulator.sh" "{{vars.ohos_sdk_version}}"'
 
 [tasks."ohos-emulator:stop"]
 description = "Stop the OpenHarmony emulator started by mise."
-run = '''
-pid_file="$MISE_MONOREPO_ROOT/build/ohos-emulator/qemu.pid"
-if [[ ! -f "$pid_file" ]]; then
-  echo "No mise-managed OpenHarmony emulator is running."
-  exit 0
-fi
-
-pid=$(<"$pid_file")
-if [[ "$pid" =~ ^[0-9]+$ ]] &&
-  kill -0 "$pid" 2>/dev/null &&
-  ps -p "$pid" -o args= | grep -q qemu-system-x86_64; then
-  kill "$pid"
-  for ((attempt = 0; attempt < 30; attempt++)); do
-    kill -0 "$pid" 2>/dev/null || break
-    sleep 1
-  done
-  if kill -0 "$pid" 2>/dev/null; then
-    kill -KILL "$pid"
-  fi
-fi
-rm -f "$pid_file"
-hdc tconn 127.0.0.1:55555 -remove >/dev/null 2>&1 || true
-'''
+run = '"$MISE_MONOREPO_ROOT/scripts/stop-ohos-emulator.sh"'
 
 [tasks.check]
 tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dart" = "{{vars.dart_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }

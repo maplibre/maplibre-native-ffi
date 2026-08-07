@@ -2087,7 +2087,7 @@ mod tests {
     fn resource_transform_rewrites_style_url_and_clear_restores_original_url() {
         let origin = std::env::var("MLN_FFI_TEST_FIXTURE_ORIGIN").expect(
             "MLN_FFI_TEST_FIXTURE_ORIGIN is unset; run the suite through \
-             `mise run //bindings/rust:test:browser`",
+             `mise run //bindings/rust:test emscripten-wasm32-webgl`",
         );
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let transform_url = format!("{origin}/__fixture/rewritten-style.json");

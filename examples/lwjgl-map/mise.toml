@@ -2,8 +2,7 @@
 "core:java" = "{{vars.java_version}}"
 
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 dir = "../.."
 run = '''
 ./gradlew \
@@ -12,25 +11,11 @@ run = '''
 '''
 
 [tasks.run]
-depends = ["//:build"]
+extends = "ffi:example-run"
 dir = "../.."
-usage = '''
-arg "[render-target]" default="owned-texture" {
-  choices "owned-texture" "borrowed-texture" "native-surface"
-}
-'''
 run = '''
 ./gradlew \
-  -PmaplibreNativeCInstallDir="build/{{vars.host_native_preset}}/install" \
+  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
   :examples:lwjgl-map:run \
-  --args="{{ usage.render_target }}"
+  --args="$usage_render_target"
 '''
-
-[tasks."run:owned-texture"]
-run = [{ task = "run", args = ["owned-texture"] }]
-
-[tasks."run:borrowed-texture"]
-run = [{ task = "run", args = ["borrowed-texture"] }]
-
-[tasks."run:native-surface"]
-run = [{ task = "run", args = ["native-surface"] }]

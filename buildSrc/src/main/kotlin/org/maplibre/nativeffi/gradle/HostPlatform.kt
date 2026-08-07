@@ -22,7 +22,6 @@ class HostPlatform private constructor(osName: String, arch: String) {
     get() =
       when {
         isMac && isArm64 -> "natives-macos-arm64"
-        isMac -> "natives-macos"
         isLinux && isArm64 -> "natives-linux-arm64"
         isLinux -> "natives-linux"
         isWindows && isArm64 -> "natives-windows-arm64"
@@ -34,7 +33,6 @@ class HostPlatform private constructor(osName: String, arch: String) {
     get() =
       when {
         isMac && isArm64 -> "natives-macos-arm64"
-        isMac -> "natives-macos-x64"
         isLinux && isArm64 -> "natives-linux-arm64"
         isLinux -> "natives-linux-x64"
         isWindows && isArm64 -> "natives-windows-arm64"
@@ -49,11 +47,6 @@ class HostPlatform private constructor(osName: String, arch: String) {
           JextractDistribution(
             "https://download.java.net/java/early_access/jextract/25/2/openjdk-25-jextract+2-4_macos-aarch64_bin.tar.gz",
             "3dd1dd1bde059d271739e2cc2290c64f93f85488c86c01e566c0e374eece798f",
-          )
-        isMac ->
-          JextractDistribution(
-            "https://download.java.net/java/early_access/jextract/25/2/openjdk-25-jextract+2-4_macos-x64_bin.tar.gz",
-            "6ae7a46e7e7b56f077ab72623c0a894a8d525d5b698c90785b97c241f95a99b1",
           )
         isLinux && isArm64 ->
           JextractDistribution(

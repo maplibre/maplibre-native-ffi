@@ -1,14 +1,18 @@
 [tools]
 "core:go" = "{{vars.go_version}}"
 "aqua:mvdan/gofumpt" = "{{vars.gofumpt_version}}"
-"conda:sdl3" = { version = "3.2", os = ["linux", "macos"] }
+"conda:sdl3" = { version = "{{vars.sdl3_version}}", os = ["linux", "macos"] }
 
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 run = '''
+# The example drives OpenGL directly; other backends are not yet implemented.
+if [[ "$usage_preset" != *-egl ]]; then
+  echo "go-map supports OpenGL (EGL) presets only, got: $usage_preset" >&2
+  exit 2
+fi
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-sdl_prefix="$(mise where conda:sdl3@3.2)"
+sdl_prefix="$(mise where "conda:sdl3@{{vars.sdl3_version}}")"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig:$sdl_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 export CGO_LDFLAGS="-Wl,-rpath,$native_install_dir/lib -Wl,-rpath,$sdl_prefix/lib ${CGO_LDFLAGS:-}"
 go build -o "$MISE_MONOREPO_ROOT/build/$usage_preset/go-map" .
@@ -24,31 +28,17 @@ if [[ -n "$unformatted" ]]; then
   exit 1
 fi
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-sdl_prefix="$(mise where conda:sdl3@3.2)"
+sdl_prefix="$(mise where "conda:sdl3@{{vars.sdl3_version}}")"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig:$sdl_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 go vet ./...
 '''
 
 [tasks.run]
-depends = [{ task = ":build", args = ["linux-{{ arch() }}-egl"] }]
-usage = '''
-arg "<render-target>" {
-  choices "owned-texture" "borrowed-texture" "native-surface"
-}
-'''
+extends = "ffi:example-run"
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/linux-{{ arch() }}-egl/install"
-sdl_prefix="$(mise where conda:sdl3@3.2)"
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+sdl_prefix="$(mise where "conda:sdl3@{{vars.sdl3_version}}")"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig:$sdl_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 export LD_LIBRARY_PATH="$native_install_dir/lib:$sdl_prefix/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
-go run . "{{ usage.render_target }}"
+go run . "$usage_render_target"
 '''
-
-[tasks."run:owned-texture"]
-run = [{ task = "run", args = ["owned-texture"] }]
-
-[tasks."run:borrowed-texture"]
-run = [{ task = "run", args = ["borrowed-texture"] }]
-
-[tasks."run:native-surface"]
-run = [{ task = "run", args = ["native-surface"] }]

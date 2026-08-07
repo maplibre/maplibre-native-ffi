@@ -80,6 +80,46 @@ Requirements:
 
 ---
 
+## Mise Tasks
+
+Every binding exposes the same task contract in its `mise.toml`, so a
+contributor moves between bindings without relearning commands.
+
+Requirements:
+
+- A binding MUST define `build`, `test`, and `api` tasks. `build` compiles the
+  binding against a native install prefix, `test` runs the binding's suite, and
+  `api` generates the HTML reference that `//docs:api` collects.
+- `build` and `test` MUST take an optional `[preset]` argument that defaults to
+  `{{vars.host_native_preset}}`, and MUST depend on `//:build` for that preset.
+  Both come from the root `ffi:preset` task template (`extends = "ffi:preset"`)
+  rather than from a restated copy.
+- The preset selects the platform, so `test` MUST select its runner from the
+  preset rather than exposing a task per platform. Host presets run the suite in
+  process, Android and OpenHarmony x64 presets cross-compile and push to an
+  emulator through the shared runners in `scripts/`
+  (`run-android-emulator-test.sh`, `run-ohos-emulator-test.sh`, which boot the
+  emulator on demand), iOS simulator presets build a test bundle and spawn it on
+  a simulator, and Emscripten presets run in headless Chromium.
+- A preset that a binding cannot build or run MUST fail with a message that
+  names what the binding supports. A device preset with no runner, such as
+  `android-arm64-*`, fails the same way and points at the x64 emulator presets.
+- Colon-suffixed tasks cover the axes that a preset does not encode: one
+  `test:<runtime>` task per runtime when a platform maps to more than one
+  (`test:jvm` and `test:native` for Kotlin; a JavaScript binding adds its
+  engines, such as `test:node` and `test:browser`), and acquisition paths such
+  as `test:download`. The plain `test` task runs every runtime relevant to the
+  preset, so it stays the one command that tests everything, and each runtime
+  task applies the same preset dispatch on its own.
+- Cross-compilation environment that more than one task needs MUST come from a
+  shared script, as `scripts/rust-cross-env.sh` and `scripts/go-cross-env.sh`
+  provide, rather than from a copy in each task.
+- Task bodies stay small. Logic beyond a few commands belongs in a script under
+  `scripts/` or a file task under `.mise/tasks/`, where it reads as a program
+  rather than as a TOML string.
+
+---
+
 ## Native Artifact Acquisition
 
 A binding gets its C declarations from the checkout and its native library from

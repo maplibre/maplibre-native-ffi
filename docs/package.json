@@ -5,10 +5,8 @@
   "scripts": {
     "generate-support-matrix": "python scripts/generate-support-matrix.py",
     "dev": "astro dev",
-    "start": "astro dev",
     "build": "astro build",
-    "preview": "astro preview",
-    "astro": "astro"
+    "preview": "astro preview"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.41.6",
