@@ -102,8 +102,13 @@ Requirements:
 - A preset that a binding cannot build or run MUST fail with a message that
   names what the binding supports. A device preset with no runner, such as
   `android-arm64-*`, fails the same way and points at the x64 emulator presets.
-- Colon-suffixed tasks cover the axes that a preset does not encode, such as the
-  snapshot acquisition path (`test:download`).
+- Colon-suffixed tasks cover the axes that a preset does not encode: one
+  `test:<runtime>` task per runtime when a platform maps to more than one
+  (`test:jvm` and `test:native` for Kotlin; a JavaScript binding adds its
+  engines, such as `test:node` and `test:browser`), and acquisition paths such
+  as `test:download`. The plain `test` task runs every runtime relevant to the
+  preset, so it stays the one command that tests everything, and each runtime
+  task applies the same preset dispatch on its own.
 - Cross-compilation environment that more than one task needs MUST come from a
   shared script, as `scripts/rust-cross-env.sh` and `scripts/go-cross-env.sh`
   provide, rather than from a copy in each task.
