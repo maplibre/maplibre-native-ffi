@@ -32,6 +32,7 @@ run = '''
 case "$usage_preset" in
   ios-simulator-*)
     native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+    mise run //:ios-simulator:boot
     exec zig build test --build-file ../../build.zig \
       -Dtarget=aarch64-ios-simulator \
       -Dnative-install-dir="$native_install_dir" \
