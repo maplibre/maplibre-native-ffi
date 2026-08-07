@@ -6,7 +6,11 @@ set -euo pipefail
 preset=${1:?usage: test-rust-device.sh <android|ohos preset>}
 
 case "$preset" in
-  android-x64-* | ohos-x64-*) ;;
+  android-x64-* | ohos-x64-egl) ;;
+  ohos-x64-*)
+    echo "The OpenHarmony emulator runs EGL only; check $preset with //bindings/rust:build and test ohos-x64-egl instead." >&2
+    exit 2
+    ;;
   android-* | ohos-*)
     echo "The emulators run x64 guests only; check $preset with //bindings/rust:build and run an x64 preset's tests instead." >&2
     exit 2
