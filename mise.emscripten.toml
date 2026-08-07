@@ -1,0 +1,10 @@
+# The Emscripten SDK, for `MISE_ENV=emscripten`. See the development overview.
+
+[tools]
+# The vfox plugin runs the current emsdk launcher before emsdk installs its bundled
+# Python. Use the project Python because Apple's version can be older than the
+# launcher's minimum; `depends` installs it before the environment below resolves it.
+emsdk = { version = "{{vars.emsdk_version}}", depends = ["python"] }
+
+[env]
+EMSDK_PYTHON = { value = "{{ tools.python.path }}/{% if os() == 'windows' %}python.exe{% else %}bin/python3{% endif %}", tools = true }

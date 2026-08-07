@@ -20,13 +20,6 @@
 "github:xtool-org/xtool" = { version = "{{vars.xtool_version}}", os = ["linux"] }
 # END generated tools
 
-[settings]
-# The image carries the tools a binding, example, or docs project declares. The
-# cross-compilation SDKs and emulator image that the root config pins are several
-# gigabytes together and would dominate it. A container that uses one installs it
-# by clearing that entry.
-disable_tools = ["android-sdk", "emsdk", "ohos-sdk", "http:oniro-emulator"]
-
 [oci]
 from = "ubuntu:24.04"
 tag = "maplibre-native-ffi-devcontainer:local"

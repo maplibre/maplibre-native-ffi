@@ -48,8 +48,8 @@ jobs:
       - name: Check generated and formatted files
         run: |
           git update-index -q --refresh
-          git diff --exit-code -- . ':(exclude)mise.lock'
-          git diff --cached --exit-code -- . ':(exclude)mise.lock'
+          git diff --exit-code -- . ':(exclude)mise*.lock'
+          git diff --cached --exit-code -- . ':(exclude)mise*.lock'
 
   docs:
     name: docs

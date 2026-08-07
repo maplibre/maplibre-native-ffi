@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Install the Android SDK packages the builds need, as the `android-sdk` tool's
-# post-install step.
+# Install the Android SDK packages the builds need, either as the `android-sdk`
+# tool's post-install step or, through `//:android-sdk-packages`, against an SDK
+# mise does not own.
 #
-# That tool installs the command-line tools alone, and the `android-*` CMake presets
-# resolve their toolchain file out of the NDK, so a freshly installed SDK cannot
-# build anything until this runs. Gradle can fetch most of these itself, but not for
+# The `android-*` CMake presets resolve their toolchain file out of the NDK, so an
+# SDK without it builds nothing. Gradle can fetch most of these itself, but not for
 # a plain `mise run build android-arm64-vulkan`.
 #
 # Installing a package accepts its license, which asking for an Android build is
-# taken as consent for. A contributor who would rather not have that happen disables
-# the tool and points ANDROID_HOME at an SDK of their own.
+# taken as consent for. A contributor who would rather not have that happen installs
+# the packages themselves.
 
 # The versions arrive as arguments because a tool's post-install step gets neither
 # the repository's environment nor its tools, only the paths of the tool it follows.
@@ -23,11 +23,35 @@ fi
 java_version="$1"
 ndk_version="$2"
 cmake_version="$3"
-sdk_root="${MISE_TOOL_INSTALL_PATH:?run this as the postinstall hook of the android-sdk tool}"
-sdkmanager="$sdk_root/cmdline-tools/${MISE_TOOL_VERSION:?}/bin/sdkmanager"
 
+# A post-install step names the SDK it follows; every other caller means the SDK the
+# builds resolve.
+sdk_root="${MISE_TOOL_INSTALL_PATH:-${ANDROID_HOME:-}}"
+if [[ -z "$sdk_root" ]]; then
+  echo "${0##*/}: set ANDROID_HOME to the SDK to install into" >&2
+  exit 1
+fi
+
+# mise installs the command-line tools under their version, while an SDK from
+# Android Studio or a CI image keeps them under `latest`, which sorts last.
+sdkmanager="$sdk_root/cmdline-tools/${MISE_TOOL_VERSION:-}/bin/sdkmanager"
+if [[ -z "${MISE_TOOL_VERSION:-}" ]]; then
+  sdkmanager=""
+  while IFS= read -r candidate; do
+    sdkmanager="$candidate"
+  done < <(find "$sdk_root/cmdline-tools" -mindepth 3 -maxdepth 3 -path '*/bin/sdkmanager' 2>/dev/null | sort)
+fi
+if [[ ! -x "$sdkmanager" ]]; then
+  echo "${0##*/}: no sdkmanager under $sdk_root/cmdline-tools" >&2
+  echo "Install the Android SDK command-line tools there, or let mise pin an SDK" >&2
+  echo "of its own with \`mise -E android install\`." >&2
+  exit 1
+fi
+
+# A post-install step runs from wherever mise invoked it.
+repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 compile_sdk="$(
-  sed -n 's/^android-compileSdk = "\([0-9][0-9]*\)"/\1/p' gradle/libs.versions.toml |
+  sed -n 's/^android-compileSdk = "\([0-9][0-9]*\)"/\1/p' "$repository_root/gradle/libs.versions.toml" |
     head -n1
 )"
 if [[ -z "$compile_sdk" ]]; then

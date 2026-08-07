@@ -67,6 +67,17 @@ Native targets and render backends are defined in `CMakePresets.json`. Gradle
 selects the Android presets when building platform packages; OpenHarmony and
 host workflows use the presets directly.
 
+The Android, Emscripten, and OpenHarmony SDKs are opt-in, each behind the mise
+configuration environment named after its presets. A build for one of those
+targets reads `ANDROID_HOME`, `EMSDK`, or `OHOS_SDK_NATIVE` from the
+environment. To use a pinned SDK instead, pass `-E` to the install and to every
+later command that builds for the target:
+
+```bash
+mise -E android install
+mise -E android run build android-arm64-vulkan
+```
+
 Formatters and linters run automatically on pre-commit; you usually don't need
 to run them manually.
 
