@@ -15,6 +15,7 @@ import tempfile
 import time
 import urllib.parse
 import zipfile
+from collections.abc import Callable
 
 GROUP_PATH = pathlib.PurePosixPath("org/maplibre/nativeffi")
 MODULES = set(
@@ -41,6 +42,7 @@ MAX_BUNDLE_BYTES = 1_000_000_000
 SNAPSHOT_USER_AGENT = (
     "maplibre-native-ffi-publisher/1 (+https://github.com/maplibre/maplibre-native-ffi)"
 )
+UPLOAD_PROGRESS_INTERVAL_SECONDS = 5.0
 
 
 def parse_tag(tag: str) -> tuple[tuple[int, int, int], str]:
@@ -384,16 +386,41 @@ def snapshot_upload_order(
     ]
 
 
+def format_upload_bytes(byte_count: int) -> str:
+    value = float(byte_count)
+    for unit in ("B", "KiB", "MiB", "GiB"):
+        if value < 1024 or unit == "GiB":
+            precision = 0 if unit == "B" else 1
+            return f"{value:.{precision}f} {unit}"
+        value /= 1024
+    raise AssertionError("upload byte formatter did not return")
+
+
+def format_upload_rate(byte_count: int, elapsed_seconds: float) -> str:
+    if elapsed_seconds <= 0:
+        return "n/a"
+    return f"{format_upload_bytes(round(byte_count / elapsed_seconds))}/s"
+
+
 def put_snapshot_file(
     connection: http.client.HTTPSConnection,
     repository: pathlib.Path,
     path: pathlib.Path,
     authorization: str,
+    progress: Callable[[int, int, float], None],
 ) -> http.client.HTTPSConnection:
     relative = path.relative_to(repository).as_posix()
     request_path = "/repository/maven-snapshots/" + urllib.parse.quote(relative)
     for attempt in range(1, 4):
+        if attempt > 1:
+            print(
+                f"retrying snapshot file {relative} (attempt {attempt}/3)",
+                flush=True,
+            )
         try:
+            attempt_started = time.monotonic()
+            next_progress_at = attempt_started + UPLOAD_PROGRESS_INTERVAL_SECONDS
+            sent_bytes = 0
             connection.putrequest("PUT", request_path)
             connection.putheader("Authorization", authorization)
             connection.putheader("User-Agent", SNAPSHOT_USER_AGENT)
@@ -403,6 +430,11 @@ def put_snapshot_file(
             with path.open("rb") as stream:
                 while chunk := stream.read(1024 * 1024):
                     connection.send(chunk)
+                    sent_bytes += len(chunk)
+                    now = time.monotonic()
+                    if now >= next_progress_at:
+                        progress(attempt, sent_bytes, now - attempt_started)
+                        next_progress_at = now + UPLOAD_PROGRESS_INTERVAL_SECONDS
             response = connection.getresponse()
             response_body = response.read()
             if 200 <= response.status < 300:
@@ -437,12 +469,77 @@ def upload_snapshot(repository: pathlib.Path, version: str) -> None:
     credentials = base64.b64encode(f"{username}:{password}".encode()).decode("ascii")
     authorization = f"Basic {credentials}"
     connection = http.client.HTTPSConnection("central.sonatype.com", timeout=120)
+    modules = snapshot_upload_order(repository, version)
+    total_files = sum(len(paths) for _, paths in modules)
+    total_bytes = sum(path.stat().st_size for _, paths in modules for path in paths)
+    uploaded_files = 0
+    uploaded_bytes = 0
+    upload_started = time.monotonic()
     try:
-        for module, paths in snapshot_upload_order(repository, version):
-            print(f"uploading snapshot module {module} ({len(paths)} files)")
+        print(
+            f"uploading snapshot repository ({total_files} files, "
+            f"{format_upload_bytes(total_bytes)})",
+            flush=True,
+        )
+        for module_index, (module, paths) in enumerate(modules, start=1):
+            module_bytes = sum(path.stat().st_size for path in paths)
+            print(
+                f"uploading snapshot module {module_index}/{len(modules)} {module} "
+                f"({len(paths)} files, {format_upload_bytes(module_bytes)})",
+                flush=True,
+            )
             for path in paths:
+                file_index = uploaded_files + 1
+                file_bytes = path.stat().st_size
+                relative = path.relative_to(repository).as_posix()
+                print(
+                    f"uploading snapshot file {file_index}/{total_files} {relative} "
+                    f"({format_upload_bytes(file_bytes)})",
+                    flush=True,
+                )
+                file_started = time.monotonic()
+
+                def report_progress(
+                    attempt: int,
+                    sent_bytes: int,
+                    elapsed_seconds: float,
+                    current_file_index: int = file_index,
+                    current_file_bytes: int = file_bytes,
+                ) -> None:
+                    percentage = (
+                        sent_bytes / current_file_bytes * 100
+                        if current_file_bytes
+                        else 100
+                    )
+                    print(
+                        f"snapshot file progress {current_file_index}/{total_files} "
+                        f"(attempt {attempt}/3): {format_upload_bytes(sent_bytes)}/"
+                        f"{format_upload_bytes(current_file_bytes)} "
+                        f"({percentage:.1f}%) at "
+                        f"{format_upload_rate(sent_bytes, elapsed_seconds)}",
+                        flush=True,
+                    )
+
                 connection = put_snapshot_file(
-                    connection, repository, path, authorization
+                    connection,
+                    repository,
+                    path,
+                    authorization,
+                    report_progress,
+                )
+                file_elapsed = time.monotonic() - file_started
+                uploaded_files += 1
+                uploaded_bytes += file_bytes
+                overall_elapsed = time.monotonic() - upload_started
+                overall_percentage = uploaded_bytes / total_bytes * 100
+                print(
+                    f"uploaded snapshot file {uploaded_files}/{total_files} in "
+                    f"{file_elapsed:.1f}s at "
+                    f"{format_upload_rate(file_bytes, file_elapsed)}; overall "
+                    f"{format_upload_bytes(uploaded_bytes)}/"
+                    f"{format_upload_bytes(total_bytes)} ({overall_percentage:.1f}%) at "
+                    f"{format_upload_rate(uploaded_bytes, overall_elapsed)}",
+                    flush=True,
                 )
     finally:
         connection.close()
