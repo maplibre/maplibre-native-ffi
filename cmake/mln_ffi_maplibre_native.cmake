@@ -55,6 +55,11 @@ function(mln_ffi_add_maplibre_native)
   endif()
 
   include("${MLN_FFI_SOURCE_DIR}/vendor/nunicode.cmake")
+  if(WIN32)
+    # nunicode marks its public functions for DLL export on Windows even when
+    # built as a static library. It is an implementation detail of the C API.
+    target_compile_definitions(mbgl-vendor-nunicode PRIVATE NU_EXPORT=)
+  endif()
   include("${MLN_FFI_SOURCE_DIR}/vendor/sqlite.cmake")
 
   set(MLN_FFI_SOURCE_DIR "${MLN_FFI_SOURCE_DIR}" PARENT_SCOPE)
