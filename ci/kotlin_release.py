@@ -38,6 +38,9 @@ TAG_PATTERN = re.compile(
 )
 CHECKSUM_SUFFIXES = (".md5", ".sha1", ".sha256", ".sha512")
 MAX_BUNDLE_BYTES = 1_000_000_000
+SNAPSHOT_USER_AGENT = (
+    "maplibre-native-ffi-publisher/1 (+https://github.com/maplibre/maplibre-native-ffi)"
+)
 
 
 def parse_tag(tag: str) -> tuple[tuple[int, int, int], str]:
@@ -393,6 +396,7 @@ def put_snapshot_file(
         try:
             connection.putrequest("PUT", request_path)
             connection.putheader("Authorization", authorization)
+            connection.putheader("User-Agent", SNAPSHOT_USER_AGENT)
             connection.putheader("Content-Type", "application/octet-stream")
             connection.putheader("Content-Length", str(path.stat().st_size))
             connection.endheaders()
