@@ -5,12 +5,6 @@ description: Add a language binding and its native library to a project.
 
 import { Aside } from "@astrojs/starlight/components";
 
-<Aside type="caution" title="Pre-1.0">
-  Kotlin tagged releases are immutable, but the API can change between
-  releases. The native library and bleeding-edge bindings are floating
-  snapshots that move with `main`.
-</Aside>
-
 Choose a render backend first. Use Metal for Apple platforms, OpenGL for
 emulators and virtual machines, and Vulkan for other platforms. Then choose a
 published binding or a bleeding-edge binding below.
@@ -88,8 +82,10 @@ The other runtimes are `maplibre-native-ffi-runtime-opengl` and
 
 ## Bleeding-edge bindings
 
-These bindings follow `main`. Package names, coordinates, and the C ABI can
-change between snapshots.
+<Aside type="caution" title="Prerelease only">
+  Each channel below is a floating snapshot that moves with `main`. Package
+  names, coordinates, and the C ABI can change between snapshots.
+</Aside>
 
 ### .NET
 
