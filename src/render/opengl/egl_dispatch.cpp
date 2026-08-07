@@ -2,9 +2,7 @@
   (defined(__linux__) || defined(__APPLE__))
 
 // The EGL entry points the library and its vendored sources call, defined here
-// so nothing links against an EGL loader; the loader is opened on first use.
-// These carry the names the EGL headers declare, so callers bind to them
-// without knowing they are stubs.
+// so nothing links against an EGL loader. The loader is opened on first use.
 
 #include <initializer_list>
 
@@ -23,8 +21,6 @@ auto egl_library() -> void* {
     const auto names = {"libEGL.so.1", "libEGL.so"};
 #endif
     for (const auto* name : names) {
-      // Resolves to the implementation the host loaded rather than to a second
-      // copy of it; see open_egl_client_library().
       if (
         auto* opened = mln::core::opengl::open_egl_client_library(name);
         opened != nullptr

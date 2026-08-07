@@ -8,9 +8,8 @@ function(mln_ffi_prepare_macos_angle out_var)
     GET "${angle_manifest_json}" artifacts macos-arm64 sha256)
 
   # Outside any preset's build tree, because this is the loader a host brings
-  # rather than part of what a preset builds. Replacing a build tree with its
-  # packaged install leaves it in place, so a local run keeps the stand-in the
-  # package deliberately omits, and every preset shares one download.
+  # rather than part of what a preset builds. Every preset then shares one
+  # download, and replacing a build tree with its packaged install keeps it.
   set(angle_root "${PROJECT_SOURCE_DIR}/build/angle/macos-arm64")
   set(angle_marker "${angle_root}/.complete")
   set(marker_value "${angle_version} ${angle_sha256} install-name-rpath-v1")
@@ -36,8 +35,8 @@ function(mln_ffi_prepare_macos_angle out_var)
     file(ARCHIVE_EXTRACT INPUT "${angle_archive}" DESTINATION
          "${angle_extract_dir}")
 
-    # Rewriting and signing happen before the directory takes its shared name,
-    # so what appears there is already complete.
+    # Rewriting and signing precede the rename, so the shared directory appears
+    # only once its contents are complete.
     execute_process(
       COMMAND
         install_name_tool -id @rpath/libEGL.dylib

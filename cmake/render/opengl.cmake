@@ -3,12 +3,9 @@ function(mln_ffi_configure_render_dependencies target)
     if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR MLN_FFI_EGL_ROOT)
       include(render/egl)
       mln_ffi_import_egl()
-      # The loader belongs to whoever drives EGL: a host, or the test harness
-      # standing in for one. The library defines its own EGL entry points and
-      # resolves the client library at run time, so it takes the headers alone.
-      # Linking one here would stamp a build-host dependency into the shipped
-      # binary and pull a second implementation along with it wherever the
-      # artifact is repackaged.
+      # Headers alone: the library defines its own EGL entry points and resolves
+      # the client library at run time, so the loader stays the host's to
+      # supply. The test harness links one below, standing in for a host.
       target_link_libraries(${target} INTERFACE ${CMAKE_DL_LIBS})
       get_target_property(MLN_FFI_EGL_INCLUDE_DIRS MLN_FFI::EGL
                           INTERFACE_INCLUDE_DIRECTORIES)
@@ -33,8 +30,7 @@ function(mln_ffi_configure_render_dependencies target)
       endif()
       if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         # An Apple host has no system EGL to build against, so the headers ship
-        # with the artifact. The implementation behind them does not: see
-        # MLN_FFI_INSTALL_LOADER_FILES in mln_ffi_install.cmake.
+        # with the artifact and the implementation behind them does not.
         mln_ffi_add_license(${target} "${MLN_FFI_EGL_ROOT}/LICENSE" "angle.txt")
         set_target_properties(
           ${target}
@@ -53,10 +49,9 @@ function(mln_ffi_configure_render_dependencies target)
           "${MLN_FFI_EGL_LIBRARY}" "${MLN_FFI_GLES_LIBRARY}" ${CMAKE_DL_LIBS})
     else()
       find_package(OpenGL REQUIRED COMPONENTS EGL GLES3)
-      # Headers only, for the same reason as the branch above. Nothing here has
-      # ever reached the shipped binary, but only because the GNU linker drops a
-      # library no undefined symbol needs; saying so outright is what keeps the
-      # invariant off a linker default.
+      # Headers only, for the same reason as the branch above. Linking these had
+      # reached no shipped binary either, but only because the GNU linker drops
+      # a library that no undefined symbol needs.
       target_link_libraries(${target} INTERFACE ${CMAKE_DL_LIBS})
       target_include_directories(
         ${target}
@@ -119,11 +114,9 @@ function(mln_ffi_configure_renderer target)
         PRIVATE "${PROJECT_SOURCE_DIR}/third_party/egl_compat/include")
     endif()
     target_link_libraries(${target} PRIVATE MLN_FFI::RenderDependencies)
-    # Upstream's table binds each GL entry point to a linked loader. Where the
-    # host supplies its own client library that is rewritten to resolve at run
-    # time, so the artifacts carry no GL dependency of their own. Android and
-    # OpenHarmony keep the linked table: their loader is part of the platform,
-    # at a fixed location every host on it already has.
+    # Upstream's table binds each GL entry point to a linked loader, rewritten
+    # here to resolve at run time. Android and OpenHarmony keep the linked
+    # table, because their loader is part of the platform at a fixed location.
     set(MLN_FFI_GL_FUNCTIONS_SOURCE
         ${MLN_FFI_SOURCE_DIR}/platform/linux/src/gl_functions.cpp)
     if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|Darwin)$")

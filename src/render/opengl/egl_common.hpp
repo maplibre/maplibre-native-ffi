@@ -18,16 +18,12 @@
 namespace mln::core::opengl {
 
 #if defined(__APPLE__)
-// Opens the implementation the host already loaded, found by the name its file
-// goes by and opened at the path dyld resolved for it. dyld keys images by that
-// path, so this returns the host's image rather than a second copy: opening a
-// leaf name reaches only the dyld search paths, which a host installing its own
-// implementation has no reason to be on, and a process-wide symbol lookup
-// misses an image opened with RTLD_LOCAL, which is what ctypes and the
-// Objective-C bridges use. A second copy would mint handles the host's copy
-// does not own.
-//
-// The handle is never closed, so the image outlives a host that closes its own.
+// Returns the image the host already loaded. dlopen resolves a leaf name
+// against the dyld search paths rather than against loaded images, so it can
+// open a second copy, and handles minted by one copy are opaque pointers the
+// other does not own. Reopening the path dyld resolved returns the image
+// itself, including one opened RTLD_LOCAL that a process-wide symbol lookup
+// would miss. The handle stays open, so the image outlives the host's own.
 inline auto open_loaded_client_library(const char* library) -> void* {
   const auto count = _dyld_image_count();
   for (auto index = std::uint32_t{}; index < count; ++index) {
@@ -51,8 +47,7 @@ inline auto open_loaded_client_library(const char* library) -> void* {
 #endif
 
 #if defined(__linux__) || defined(__APPLE__)
-// Linux binds a leaf soname to the copy already loaded, so it opens the client
-// libraries directly.
+// Linux binds a leaf soname to the image already loaded, so it needs no search.
 inline auto open_egl_client_library(const char* library) -> void* {
 #if defined(__APPLE__)
   if (auto* loaded = open_loaded_client_library(library); loaded != nullptr) {
@@ -95,8 +90,8 @@ inline auto gles_client_library_handles() -> const std::array<void*, 1>& {
   return handles;
 }
 
-// ANGLE implements GLES alone, and the desktop GL an Apple host reaches through
-// OpenGL.framework has no EGL binding, so EGL_OPENGL_API has nothing to open.
+// ANGLE implements GLES alone, and OpenGL.framework has no EGL binding, so
+// EGL_OPENGL_API has nothing to open.
 inline auto gl_client_library_handles() -> const std::array<void*, 0>& {
   static const auto handles = std::array<void*, 0>{};
   return handles;

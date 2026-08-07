@@ -12,12 +12,10 @@ loader, for one, has an absolute install name, and linking it is enough to
 stamp `/opt/homebrew/opt/...` into the result.
 
 A graphics loader is the host's to supply, and the library resolves one at run
-time rather than linking it. An artifact that names a loader anyway drags a
-private copy along wherever it is repackaged, and a host that loads its own then
-runs two: handles minted by one are opaque pointers the other does not own, so
-passing a surface or a context across that boundary is a crash. Android and
-OpenHarmony are the exception, where the loader is part of the platform at a
-fixed location every host on it already has.
+time rather than linking it. An artifact that names or carries a loader anyway
+runs a second copy alongside the host's, and handles minted by one are opaque
+pointers the other does not own. Android and OpenHarmony are the exception,
+where the loader is part of the platform at a fixed location.
 """
 
 from __future__ import annotations
@@ -49,6 +47,7 @@ ELF_SEARCH_PATH_ROOTS = ("$ORIGIN", "${ORIGIN}")
 MACHO_MAGICS = frozenset(
     {b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xca\xfe\xba\xbe", b"\xca\xfe\xba\xbf"}
 )
+PE_MAGIC = b"MZ"
 
 # A path may contain spaces, so it runs to the trailing offset field, which
 # otool always prints. Anything narrower drops the build-host paths that live
@@ -74,17 +73,12 @@ LOADER_NAMES = frozenset(
         "vulkan-1",
     }
 )
-# Frameworks under these roots are the platform's own graphics APIs, which every
-# host on it reaches at the same fixed path. Metal is one; so is the OpenGL
-# framework a macOS host may still drive.
+# Frameworks under these roots, Metal and OpenGL among them, are the platform's
+# own graphics APIs, which every host reaches at the same fixed path.
 PLATFORM_LIBRARY_PREFIXES = ("/System/Library/", "/usr/lib/")
 # The presets whose loader ships with the operating system rather than with a
 # host, and so is linked on purpose.
 PLATFORM_LOADER_PRESETS = ("android-", "ohos-")
-# A file the dynamic loader can open, by extension: `.so`, `.so.2`, `.dylib`,
-# `.dll`. Import libraries and static archives carry no dependencies of their
-# own, so they are not among them.
-SHARED_LIBRARY = re.compile(r"\.(so|dylib|dll)(\.\d+)*$")
 PACKAGED_LIBRARY_STEM = "maplibre-native-c"
 
 BUILD_HOST_PATH = "names a build-host path"
@@ -182,17 +176,35 @@ def elf_problems(binary: pathlib.Path, links_loader: bool) -> list[tuple[str, st
     return problems
 
 
-def binary_problems(binary: pathlib.Path, links_loader: bool) -> list[tuple[str, str]]:
+def image_format(binary: pathlib.Path) -> str | None:
+    """The executable format of a file, or None for one that does not load.
+
+    Static archives and import libraries answer None, and so do the AppleDouble
+    sidecars that an archive built on macOS carries beside each file.
+    """
     with binary.open("rb") as file:
         magic = file.read(4)
     if magic == b"\x7fELF":
-        return elf_problems(binary, links_loader)
-    # Mach-O, thin or universal. otool reads every slice of a universal binary,
-    # whose header is big-endian on disk. Windows PE imports name a DLL without
-    # a directory, so there is no build-host path for them to carry, and the one
-    # graphics library a WGL build imports is the system opengl32.dll.
+        return "elf"
     if magic in MACHO_MAGICS:
+        return "macho"
+    if magic.startswith(PE_MAGIC):
+        return "pe"
+    return None
+
+
+def binary_problems(
+    binary: pathlib.Path, image: str, links_loader: bool
+) -> list[tuple[str, str]]:
+    if image == "elf":
+        return elf_problems(binary, links_loader)
+    if image == "macho":
+        # otool reads every slice of a universal binary, whose header is
+        # big-endian on disk.
         return macho_problems(binary, links_loader)
+    # Windows PE imports name a DLL without a directory, so there is no
+    # build-host path for them to carry, and the one graphics library a WGL
+    # build imports is the system opengl32.dll.
     return []
 
 
@@ -210,11 +222,12 @@ def main() -> int:
         with tarfile.open(archive) as tar:
             tar.extractall(directory, filter="data")
         for binary in sorted(pathlib.Path(directory).rglob("*")):
-            if not binary.is_file() or binary.suffix in {".a", ".lib"}:
+            if not binary.is_file():
                 continue
-            if SHARED_LIBRARY.search(binary.name) and not binary.name.removeprefix(
-                "lib"
-            ).startswith(PACKAGED_LIBRARY_STEM):
+            image = image_format(binary)
+            if image is None:
+                continue
+            if not binary.name.removeprefix("lib").startswith(PACKAGED_LIBRARY_STEM):
                 relative = binary.relative_to(directory)
                 problems.append((binary.name, VENDORED_LOADER, str(relative)))
                 # What a library that does not belong here depends on says
@@ -222,7 +235,7 @@ def main() -> int:
                 continue
             problems.extend(
                 (binary.name, kind, detail)
-                for kind, detail in binary_problems(binary, links_loader)
+                for kind, detail in binary_problems(binary, image, links_loader)
             )
 
     if not problems:

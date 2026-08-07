@@ -50,11 +50,9 @@ fi
 mv "$package_root" "$install_dir"
 rm -rf "$staging_dir"
 
-# A package carries no graphics loader, because a host brings its own. The
-# fixtures and examples that run against this tree are that host, so the
-# stand-in the build downloaded goes back beside the library, which is where a
-# build from source leaves it. It lives outside the preset tree, so cleaning the
-# tree above kept it.
+# A package carries no graphics loader, so the fixtures and examples that run
+# against this tree supply one: the stand-in the build downloaded goes back
+# beside the library, where a build from source leaves it.
 loader_dir="$MISE_MONOREPO_ROOT/build/angle/macos-arm64"
 if [[ "$preset" == macos-*-egl && -d "$loader_dir" ]]; then
   cp "$loader_dir"/libEGL.dylib "$loader_dir"/libGLESv2.dylib "$install_dir/lib"

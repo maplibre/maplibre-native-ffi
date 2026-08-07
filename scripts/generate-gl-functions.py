@@ -5,11 +5,9 @@ Upstream defines `mbgl::platform::glFoo` as a function pointer initialized from
 the linked `::glFoo`, which is what makes the library depend on a GL loader at
 link time. Every initializer here becomes a stub that looks the entry point up
 through the client library on its first call, so the table costs nothing at link
-time and the shipped binaries carry no GL dependency from the build host.
-
-The lookup happens at the first call rather than in the initializer, because a
-shared library runs its initializers when it loads. A host that loads its client
-library after this one supplies the table either way.
+time and the shipped binaries carry no GL dependency from the build host. The
+lookup waits for that first call because a shared library runs its initializers
+as it loads, which can precede the host loading its client library.
 
 Generating this from the upstream file rather than checking a copy in keeps the
 two from drifting when upstream adds or removes an entry point.

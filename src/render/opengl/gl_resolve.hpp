@@ -9,9 +9,8 @@
 #include "render/opengl/egl_common.hpp"
 
 #if !defined(__linux__) && !defined(__APPLE__)
-// The resolver below reaches the GL client library through dlopen and returns
-// null without it, leaving the whole table null. Platforms without one link
-// their loader instead.
+// Without dlopen the resolver returns null for every entry point. Platforms
+// without one link their loader instead of generating this table.
 #error "the generated GL table needs a POSIX dynamic loader"
 #endif
 
@@ -21,12 +20,9 @@ inline auto gl_proc_address(const char* name) -> void* {
   return get_egl_client_library_proc_address(name, EGL_OPENGL_ES_API);
 }
 
-// Stands in for one entry of the generated table, which holds function pointers
-// that a shared library initializes as it loads. Forwarding through a stub
-// moves the lookup to the first call, so the client library that a host loads
-// after this one still fills the table. Every later call reaches the driver
-// through this stub, paying a call, the guard on the resolved pointer, and a
-// second indirect call, against a driver entry point that costs far more.
+// One entry of the generated table. A shared library runs the table's
+// initializers as it loads, which can precede the host loading its client
+// library, so each stub resolves its own entry point on the first call.
 template <typename Signature, const char* Name>
 struct gl_entry_point;
 
