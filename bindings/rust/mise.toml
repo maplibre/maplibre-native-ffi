@@ -26,7 +26,23 @@ exec cargo build \
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
+# The preset selects the runner: Android and OpenHarmony x64 presets push to an
+# emulator, Emscripten presets run as a page in headless Chromium, and host
+# presets run in process.
 run = '''
+case "$usage_preset" in
+  android-* | ohos-*)
+    exec "$MISE_MONOREPO_ROOT/scripts/test-rust-device.sh" "$usage_preset"
+    ;;
+  emscripten-*)
+    exec "$MISE_MONOREPO_ROOT/scripts/test-rust-browser.sh" "$usage_preset"
+    ;;
+  ios-*)
+    echo "The Rust binding has no iOS target; test a host, Android x64, OpenHarmony x64, or Emscripten preset." >&2
+    exit 2
+    ;;
+esac
+
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 # The sys crate's rpath covers only its own link targets, so the core and
 # umbrella test binaries need the library located at run time. Resolving it here
@@ -64,86 +80,6 @@ cargo clippy \
   -p maplibre-native-ffi-core \
   -p maplibre-native-ffi \
   --all-targets -- -D warnings
-'''
-
-[tasks."test:browser"]
-description = "Run the Rust binding tests as a page in headless Chromium."
-usage = 'arg "[preset]" default="emscripten-wasm32-webgl"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
-run = '"$MISE_MONOREPO_ROOT/scripts/test-rust-browser.sh" "$usage_preset"'
-
-[tasks."test:android-emulator"]
-description = "Run the Rust binding tests in the Android emulator."
-usage = '''
-arg "[preset]" default="android-x64-egl" {
-  choices "android-x64-egl" "android-x64-vulkan"
-}
-'''
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
-dir = "../.."
-run = '''
-set -euo pipefail
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
-source "$MISE_MONOREPO_ROOT/scripts/rust-cross-env.sh" "$usage_preset"
-
-test_manifest=$(mktemp)
-trap 'find "$test_manifest" -delete' EXIT
-cargo test --no-run \
-  -p maplibre-native-ffi-sys \
-  -p maplibre-native-ffi-core \
-  -p maplibre-native-ffi \
-  --target "$cargo_target" \
-  --message-format=json |
-  "$MISE_MONOREPO_ROOT/scripts/cargo-test-executables.py" \
-    > "$test_manifest"
-cargo clippy \
-  -p maplibre-native-ffi-sys \
-  -p maplibre-native-ffi-core \
-  -p maplibre-native-ffi \
-  --target "$cargo_target" \
-  --all-targets -- -D warnings
-
-mapfile -t test_binaries < <(grep . "$test_manifest" || true)
-"$MISE_MONOREPO_ROOT/scripts/run-android-emulator-test.sh" \
-  180 \
-  "$native_install_dir/lib/libmaplibre-native-c.so" \
-  --test-threads=1 -- ${test_binaries[@]+"${test_binaries[@]}"}
-'''
-
-[tasks."test:ohos-emulator"]
-description = "Run the Rust binding tests in the OpenHarmony emulator."
-depends = [{ task = "//:build", args = ["ohos-x64-egl"] }]
-dir = "../.."
-run = '''
-set -euo pipefail
-native_install_dir="$MISE_MONOREPO_ROOT/build/ohos-x64-egl/install"
-export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
-source "$MISE_MONOREPO_ROOT/scripts/rust-cross-env.sh" ohos-x64-egl
-
-test_manifest=$(mktemp)
-trap 'find "$test_manifest" -delete' EXIT
-cargo test --no-run \
-  -p maplibre-native-ffi-sys \
-  -p maplibre-native-ffi-core \
-  -p maplibre-native-ffi \
-  --target "$cargo_target" \
-  --message-format=json |
-  "$MISE_MONOREPO_ROOT/scripts/cargo-test-executables.py" \
-    > "$test_manifest"
-cargo clippy \
-  -p maplibre-native-ffi-sys \
-  -p maplibre-native-ffi-core \
-  -p maplibre-native-ffi \
-  --target "$cargo_target" \
-  --all-targets -- -D warnings
-
-mapfile -t test_binaries < <(grep . "$test_manifest" || true)
-"$MISE_MONOREPO_ROOT/scripts/run-ohos-emulator-test.sh" \
-  180 \
-  "$native_install_dir/lib/libmaplibre-native-c.so" \
-  "$OHOS_SDK_NATIVE/llvm/lib/x86_64-linux-ohos/libc++_shared.so" \
-  --test-threads=1 -- ${test_binaries[@]+"${test_binaries[@]}"}
 '''
 
 [tasks."test:download"]

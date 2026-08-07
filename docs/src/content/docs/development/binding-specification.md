@@ -92,17 +92,21 @@ Requirements:
   `api` generates the HTML reference that `//docs:api` collects.
 - `build` and `test` MUST take an optional `[preset]` argument that defaults to
   `{{vars.host_native_preset}}`, and MUST depend on `//:build` for that preset.
-  A binding that cannot serve a preset MUST fail with a message that names what
-  it supports.
-- Task names MUST be kebab-case. Platform suites extend the contract with a
-  colon suffix: `test:android-emulator`, `test:ohos-emulator`,
-  `test:ios-simulator`, `build:ios`, `build:ios-simulator`.
-- A task that runs a suite on an emulator MUST go through the shared runners in
-  `scripts/` (`run-android-emulator-test.sh`, `run-ohos-emulator-test.sh`),
-  which boot the emulator on demand.
+- The preset selects the platform, so `test` MUST select its runner from the
+  preset rather than exposing a task per platform. Host presets run the suite in
+  process, Android and OpenHarmony x64 presets cross-compile and push to an
+  emulator through the shared runners in `scripts/`
+  (`run-android-emulator-test.sh`, `run-ohos-emulator-test.sh`, which boot the
+  emulator on demand), iOS simulator presets build a test bundle and spawn it on
+  a simulator, and Emscripten presets run in headless Chromium.
+- A preset that a binding cannot build or run MUST fail with a message that
+  names what the binding supports. A device preset with no runner, such as
+  `android-arm64-*`, fails the same way and points at the x64 emulator presets.
+- Colon-suffixed tasks cover the axes that a preset does not encode, such as the
+  snapshot acquisition path (`test:download`).
 - Cross-compilation environment that more than one task needs MUST come from a
-  shared script, as `scripts/rust-cross-env.sh` provides for the Rust binding,
-  rather than from a copy in each task.
+  shared script, as `scripts/rust-cross-env.sh` and `scripts/go-cross-env.sh`
+  provide, rather than from a copy in each task.
 - Task bodies stay small. Logic beyond a few commands belongs in a script under
   `scripts/` or a file task under `.mise/tasks/`, where it reads as a program
   rather than as a TOML string.

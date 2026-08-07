@@ -69,55 +69,26 @@ fi
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
+# Host presets run the JVM suite; presets with a declared Kotlin/Native target
+# run its suite too. Android and iOS coverage comes from the android-build and
+# ios-build tasks.
 run = '''
 case "$usage_preset" in
-  linux-x64-*) kotlin_target=linuxX64 ;;
-  macos-arm64-*) kotlin_target=macosArm64 ;;
-  linux-arm64-*|windows-*) kotlin_target= ;;
+  linux-x64-*) targets=(jvmTest linuxX64Test) ;;
+  macos-arm64-*) targets=(jvmTest macosArm64Test) ;;
+  linux-arm64-* | windows-*) targets=(jvmTest) ;;
   *)
-    echo "Unsupported Kotlin test preset: $usage_preset" >&2
+    echo "The Kotlin binding tests host presets only, got: $usage_preset" >&2
     exit 2
     ;;
 esac
-tasks=(:bindings:kotlin:jvmTest)
-if [[ -n "$kotlin_target" ]]; then
-  tasks+=(":bindings:kotlin:${kotlin_target}Test")
-fi
+tasks=()
+for target in "${targets[@]}"; do
+  tasks+=(":bindings:kotlin:$target")
+done
 ./gradlew \
   -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
   "${tasks[@]}"
-'''
-
-[tasks."jvm-test"]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
-dir = "../.."
-run = '''
-./gradlew \
-  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
-  :bindings:kotlin:jvmTest
-'''
-
-[tasks."native-test"]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
-dir = "../.."
-run = '''
-case "$usage_preset" in
-  linux-x64-*) kotlin_target=linuxX64 ;;
-  macos-arm64-*) kotlin_target=macosArm64 ;;
-  linux-arm64-*|windows-*)
-    echo "The Kotlin binding declares Kotlin/Native targets for Apple platforms and Linux x64, so preset $usage_preset has no Kotlin/Native tests to run. Use //bindings/kotlin:jvm-test here, and run this task on a Linux x64 or macOS host to cover nativeMain." >&2
-    exit 2
-    ;;
-  *)
-    echo "Unsupported Kotlin/Native test preset: $usage_preset" >&2
-    exit 2
-    ;;
-esac
-./gradlew \
-  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
-  ":bindings:kotlin:${kotlin_target}Test"
 '''
 
 [tasks."ios-build"]

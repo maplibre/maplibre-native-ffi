@@ -97,12 +97,12 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
     arguments = f"{render_backend} {abi}"
     commands = [f"mise run //bindings/kotlin:android-build {arguments} --prebuilt"]
     if preset in EMULATOR_TESTED:
-        # Each emulator task cross-compiles the artifact the build task would,
-        # so it stands in for that command.
+        # Each device test task cross-compiles the artifact the build task
+        # would, so it stands in for that command.
         commands.extend(
             [
-                f"mise run //bindings/go:test:android-emulator {preset}",
-                f"mise run //bindings/rust:test:android-emulator {preset}",
+                f"mise run //bindings/go:test {preset}",
+                f"mise run //bindings/rust:test {preset}",
             ]
         )
     else:
@@ -124,8 +124,8 @@ def native_commands(preset: str, tested: set[str]) -> list[str]:
         if preset in EMULATOR_TESTED:
             return [
                 f"mise run test {preset}",
-                "mise run //bindings/rust:test:ohos-emulator",
-                "mise run //bindings/go:test:ohos-emulator",
+                f"mise run //bindings/rust:test {preset}",
+                f"mise run //bindings/go:test {preset}",
             ]
         # The emulator executes x64 EGL. Other OpenHarmony targets still prove
         # that each binding links against its backend-specific native artifact.
@@ -151,7 +151,7 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
         commands.extend(
             [
                 f"mise run //bindings/kotlin:ios-build {preset}",
-                "mise run //bindings/swift:build:ios",
+                f"mise run //bindings/swift:build {preset}",
                 "mise run //examples/swift-map:build:ios",
                 f"mise run //bindings/dart:build:mobile {preset}",
             ]
@@ -160,9 +160,8 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
         commands.extend(
             [
                 f"mise run //bindings/kotlin:ios-build {preset}",
-                "mise run //bindings/swift:build:ios-simulator",
-                "mise run //bindings/zig:test:ios-simulator",
-                "bash scripts/run-ios-simulator-test.sh .build/ios-simulator/arm64-apple-ios-simulator/debug/MaplibreNativeFFIIOSSimulatorTests 120",
+                f"mise run //bindings/swift:test {preset}",
+                f"mise run //bindings/zig:test {preset}",
                 "mise run //examples/swift-map:build:ios-simulator",
                 f"mise run //bindings/dart:build:mobile {preset}",
             ]

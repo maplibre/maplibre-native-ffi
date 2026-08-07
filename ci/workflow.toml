@@ -30,8 +30,7 @@ commands = [
 [[suites]]
 platforms = ["linux", "macos", "windows"]
 commands = [
-  { task = "//bindings/kotlin:jvm-test" },
-  { task = "//bindings/kotlin:native-test", platforms = ["linux", "macos"], exclude = ["linux-arm64-egl", "linux-arm64-vulkan"] },
+  { task = "//bindings/kotlin:test" },
   { task = "//examples/compose-map:build" },
   { task = "//examples/lwjgl-map:build" },
 ]
@@ -74,4 +73,4 @@ commands = [{ task = "//bindings/dart:build" }]
 # Run Rust browser tests against the Emscripten build.
 [[suites]]
 platforms = ["emscripten"]
-commands = [{ task = "//bindings/rust:test:browser" }]
+commands = [{ task = "//bindings/rust:test" }]
