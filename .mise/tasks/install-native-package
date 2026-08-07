@@ -24,6 +24,17 @@ staging_dir="$build_dir/.package-staging"
 package_root="$staging_dir/maplibre-native-c-$preset"
 install_dir="$build_dir/install"
 
+# A package carries no graphics loader, so the fixtures and examples that run
+# against this tree supply one. The tree already holds it, put there by the
+# loader component or by an earlier run of this task, so it is set aside here
+# and restored below rather than fetched from wherever the build found it.
+loader_stash=""
+if [[ "$preset" == macos-*-egl && -f "$install_dir/lib/libEGL.dylib" ]]; then
+  loader_stash="$(mktemp -d)"
+  cp "$install_dir/lib/libEGL.dylib" "$install_dir/lib/libGLESv2.dylib" \
+    "$loader_stash"
+fi
+
 mise run //:clean "$preset"
 mkdir -p "$staging_dir"
 (
@@ -49,4 +60,11 @@ fi
 
 mv "$package_root" "$install_dir"
 rm -rf "$staging_dir"
+
+if [[ -n "$loader_stash" ]]; then
+  mv "$loader_stash"/libEGL.dylib "$loader_stash"/libGLESv2.dylib \
+    "$install_dir/lib"
+  rmdir "$loader_stash"
+fi
+
 touch "$build_dir/.native-package-install"

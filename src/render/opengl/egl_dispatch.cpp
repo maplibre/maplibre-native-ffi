@@ -1,22 +1,29 @@
-#if defined(MLN_FFI_OPENGL_PROVIDER_EGL) && defined(__linux__)
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL) && \
+  (defined(__linux__) || defined(__APPLE__))
 
 // The EGL entry points the library and its vendored sources call, defined here
-// so nothing links against an EGL loader; the loader is opened on first use.
-// These carry the names the EGL headers declare, so callers bind to them
-// without knowing they are stubs.
+// so nothing links against an EGL loader. The loader is opened on first use.
 
 #include <initializer_list>
 
 #include <EGL/egl.h>
 #include <dlfcn.h>
 
+#include "render/opengl/egl_common.hpp"
+
 namespace {
 
 auto egl_library() -> void* {
   static auto* handle = [] {
-    for (const auto* name : {"libEGL.so.1", "libEGL.so"}) {
+#if defined(__APPLE__)
+    const auto names = {"libEGL.dylib"};
+#else
+    const auto names = {"libEGL.so.1", "libEGL.so"};
+#endif
+    for (const auto* name : names) {
       if (
-        auto* opened = dlopen(name, RTLD_LAZY | RTLD_LOCAL); opened != nullptr
+        auto* opened = mln::core::opengl::open_egl_client_library(name);
+        opened != nullptr
       ) {
         return opened;
       }

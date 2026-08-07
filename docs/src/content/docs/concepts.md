@@ -52,6 +52,17 @@ Render targets come in three kinds:
 Keeping render sessions separate from maps lets the host manage the graphics
 backend lifecycle independently.
 
+The host supplies the graphics implementation. A render target names a context
+and a surface that the host created, so the library binds its graphics entry
+points to the implementation already in the process rather than to a copy of its
+own. A process then holds a single implementation, and handles that it mints
+stay valid everywhere they are passed.
+
+Most platforms provide that implementation. Apple provides neither EGL nor
+Vulkan, so a macOS host loads an EGL implementation such as ANGLE for the OpenGL
+backend, or MoltenVK for the Vulkan backend. The macOS artifacts carry the
+headers to build against.
+
 The thread that attaches a render session becomes its owner thread for the
 session's lifetime. The attaching thread can differ from the map's owner thread.
 A host therefore attaches on the thread that owns its graphics context and draws

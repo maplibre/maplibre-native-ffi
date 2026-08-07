@@ -75,6 +75,26 @@ caller may need to reproduce. The distinction is document versus value, which is
 why `mln_map_copy_loaded_style_json()` hands back bytes while
 `mln_map_get_style_layer_json()` hands back a snapshot.
 
+## Graphics Loaders
+
+The shipped library links no graphics loader. It defines the EGL entry points it
+calls, and binds those and the GLES and Vulkan tables to the implementation that
+the host already loaded. Android and OpenHarmony are the exception, where the
+loader is part of the platform, at a fixed location every host on it already
+has.
+
+Two rules follow. A build links a loader into the test harness alone, which
+drives the graphics API the way a host does. An artifact carries the C API and
+nothing else that loads, so repackaging it copies no implementation along, and a
+host that loads its own still runs one: handles that one copy mints are opaque
+pointers another copy does not own.
+
+An artifact still carries the headers a host builds against, because Apple
+provides none for EGL or Vulkan. A local stand-in for the implementation reaches
+the install tree through the CMake `loader` component, which a full installation
+and the package both leave out. `mise run package-native` checks the two rules
+above on every preset.
+
 ## Handles
 
 Every MapLibre handle type is `typedef uint64_t`, an opaque id. Each id packs

@@ -34,7 +34,7 @@ if sys.platform == "darwin":
         library_path = Path(install_dir or "") / "lib" / f"lib{name}.dylib"
         if install_dir and library_path.is_file():
             return library_path
-        raise RuntimeError(f"missing packaged ANGLE runtime library {library_path}")
+        raise RuntimeError(f"missing local ANGLE runtime library {library_path}")
 
     ctypes.CDLL = _MacAngleCDLL  # type: ignore[assignment]
     ctypes.cdll._dlltype = _MacAngleCDLL  # type: ignore[attr-defined]
