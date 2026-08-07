@@ -1,0 +1,10 @@
+# The Android SDK, for `MISE_ENV=android`. See the development overview.
+
+[tools]
+# The tool installs the command-line tools alone, so the packages the builds need
+# are installed once the SDK is in place. `//:android-sdk-packages` installs the
+# same set into an SDK mise does not own.
+#
+# A post-install command runs through the platform shell, so name Git Bash on
+# Windows, which also keeps Windows from resolving its WSL launcher.
+android-sdk = { version = "{{vars.android_cmdline_tools_version}}", postinstall = '{% if os() == "windows" %}"C:/Program Files/Git/bin/bash.exe"{% else %}bash{% endif %} .mise/bin/sync-android-packages {{vars.java_version}} {{vars.android_ndk_version}} {{vars.android_cmake_version}}' }

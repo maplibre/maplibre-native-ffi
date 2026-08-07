@@ -69,32 +69,60 @@ Mise installs them automatically when a namespaced project task runs, so the
 initial bootstrap stays focused on tools used across the repository. The
 published devcontainer image bakes the complete tool union for fast startup.
 
-The bootstrap includes the Android, Emscripten, and OpenHarmony SDKs, because
-`mise.toml` pins them like every other tool. It also installs the Oniro emulator
-image that matches the OpenHarmony SDK. Each SDK exports the paths its CMake
-preset reads, so building for one of those targets needs no further setup.
+Run the headless Zig readback example:
 
-Together they are several gigabytes. To leave one out, name it in the
-Git-ignored `mise.local.toml` at the repository root:
-
-```toml
-[settings]
-disable_tools = ["android-sdk", "emsdk", "ohos-sdk", "http:oniro-emulator"]
+```bash
+mise run //examples/zig-readback:run
 ```
 
-To build against an SDK installed elsewhere on the machine, disable the tool and
-give the path mise would have set:
+The default host preset uses Metal on macOS and Vulkan on Linux and Windows.
+Pass another preset to select a different native target or backend:
 
-```toml
-[settings]
-disable_tools = ["android-sdk"]
-
-[env]
-ANDROID_HOME = "/home/you/Android/Sdk"
+```bash
+mise run build linux-x64-egl
 ```
 
-Mise loads `mise.local.toml` automatically. The Android package versions are
-`mise.toml` variables and may be overridden the same way.
+## Cross-Compilation SDKs
+
+The Android, Emscripten, and OpenHarmony targets each build against a
+cross-compilation SDK. Every one is several gigabytes, so mise installs them on
+request rather than during the bootstrap. Each build reads the SDK path from the
+environment, and a machine that already carries an SDK is ready as it stands:
+
+| Target         | Environment variable |
+| -------------- | -------------------- |
+| `android-*`    | `ANDROID_HOME`       |
+| `emscripten-*` | `EMSDK`              |
+| `ohos-*`       | `OHOS_SDK_NATIVE`    |
+
+To have mise pin one instead, install it under the configuration environment
+named after the presets it serves:
+
+```bash
+mise -E android install
+mise -E emscripten install
+mise -E ohos install
+```
+
+An environment selects a `mise.<name>.toml` at the repository root, and that
+file is where the SDK is declared. Later commands that build for the target take
+the same `-E`, and exporting the variable covers a whole shell:
+
+```bash
+export MISE_ENV=android,ohos
+```
+
+A build for a target whose SDK is missing reports both ways to supply it.
+
+An Android SDK that mise does not own still needs the pinned NDK and CMake
+packages, which the `android-*` presets name:
+
+```bash
+mise run android-sdk-packages
+```
+
+The Android package versions are `mise.toml` variables, and the Git-ignored
+`mise.local.toml` at the repository root overrides them.
 
 The Android emulator and its system image are Android SDK packages rather than
 mise tools. `//:android-emulator:boot` installs them into `ANDROID_HOME` the
@@ -112,19 +140,6 @@ mise run //:ohos-emulator:stop
 Both emulators take their hardware acceleration from KVM on Linux. A host whose
 user can read and write `/dev/kvm` boots one in a few minutes. Every other host
 runs the guest in software, where a boot takes an hour or more.
-
-Run the headless Zig readback example:
-
-```bash
-mise run //examples/zig-readback:run
-```
-
-The default host preset uses Metal on macOS and Vulkan on Linux and Windows.
-Pass another preset to select a different native target or backend:
-
-```bash
-mise run build linux-x64-egl
-```
 
 ## Compiler Cache
 
@@ -163,12 +178,12 @@ model. Xcode and Visual Studio are host toolchain inputs.
 and project-specific tools, installs system packages and Git hooks, and runs
 repository tasks. Root configuration owns tools used across the repository;
 bindings, examples, and docs declare additional tools in their own `mise.toml`
-files. Root configuration also pins the cross-compilation SDKs, which an
-environment that builds fewer targets narrows with `disable_tools`. CMake
-presets define native targets and render backends. CMake uses platform SDKs and
-system libraries where available, and acquires pinned native libraries that are
-not available from system package managers. Gradle selects CMake presets and
-packages Android applications.
+files. Root configuration also pins the cross-compilation SDKs, one per
+configuration environment, so an environment that builds fewer targets installs
+fewer SDKs. CMake presets define native targets and render backends. CMake uses
+platform SDKs and system libraries where available, and acquires pinned native
+libraries that are not available from system package managers. Gradle selects
+CMake presets and packages Android applications.
 
 Native installs and CPack archives carry the notices for redistributed
 dependencies under `share/maplibre-native-c/licenses`. CMake collects notice

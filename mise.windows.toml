@@ -6,11 +6,6 @@ shell = '"C:/Program Files/Git/bin/bash.exe" -e -lc'
 [vars]
 host_native_preset = "windows-{{ arch() }}-vulkan"
 
-[tools]
-# Tool post-install commands use cmd.exe instead of the task shell. Name Git
-# Bash directly so Windows does not resolve its WSL launcher.
-android-sdk = { version = "{{vars.android_cmdline_tools_version}}", postinstall = '"C:/Program Files/Git/bin/bash.exe" .mise/bin/sync-android-packages {{vars.java_version}} {{vars.android_ndk_version}} {{vars.android_cmake_version}}' }
-
 [env]
 # Mise tasks use non-interactive Git Bash on Windows. Source VsDevCmd before each
 # task because mise cannot activate Visual Studio's batch environment directly.

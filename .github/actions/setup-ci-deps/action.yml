@@ -60,43 +60,28 @@ runs:
         New-Item -Path $reporting -Force | Out-Null
         Set-ItemProperty -Path $reporting -Name DontShowUI -Value 1 -Type DWord
 
-    # The repository pins a cross-compilation SDK per non-host target, and every job
-    # installs the root tools, so each job keeps only the SDK its target builds with.
-    # Emulator jobs enable the Oniro image explicitly when they start running here.
-    # Android is disabled outright: the runner image ships an SDK and points
-    # ANDROID_HOME at it, which costs nothing to reuse. The Android emulator job
-    # installs its emulator and system image into that SDK when it boots.
-    - name: Scope the cross-compilation SDKs to the target (Unix)
+    # Each job asks for the SDK its target builds with, and every other job installs
+    # none. No Windows target cross-compiles, and Android is never asked for: the
+    # runner image ships an SDK and points ANDROID_HOME at it, which costs nothing to
+    # reuse. The Android emulator job installs its emulator and system image into
+    # that SDK when it boots.
+    #
+    # The Oniro emulator image ships with the OpenHarmony SDK, and only the suite
+    # that boots it needs the image, so the other ohos jobs subtract it.
+    - name: Select the cross-compilation SDK for the target
       if: runner.os != 'Windows'
       shell: bash
       env:
         TARGET: ${{ inputs.target }}
       run: |
         case "${TARGET}" in
-          emscripten-*) keep="emsdk" ;;
-          ohos-*) keep="ohos-sdk" ;;
-          *) keep="" ;;
+          emscripten-*) echo "MISE_ENV=emscripten" >> "$GITHUB_ENV" ;;
+          ohos-x64-egl) echo "MISE_ENV=ohos" >> "$GITHUB_ENV" ;;
+          ohos-*)
+            echo "MISE_ENV=ohos" >> "$GITHUB_ENV"
+            echo "MISE_DISABLE_TOOLS=http:oniro-emulator" >> "$GITHUB_ENV"
+            ;;
         esac
-        case "${TARGET}" in
-          ohos-x64-egl) keep_emulator="http:oniro-emulator" ;;
-          *) keep_emulator="" ;;
-        esac
-        disabled=()
-        for tool in android-sdk emsdk ohos-sdk http:oniro-emulator; do
-          if [[ "${tool}" != "${keep}" && "${tool}" != "${keep_emulator}" ]]; then
-            disabled+=("${tool}")
-          fi
-        done
-        printf 'MISE_DISABLE_TOOLS=%s\n' "$(IFS=,; echo "${disabled[*]}")" >> "$GITHUB_ENV"
-
-    # No Windows target cross-compiles, so every SDK is disabled here. Native
-    # PowerShell rather than Git Bash, which is x86_64 under Windows ARM64 emulation
-    # and can terminate with a native exception while spawning processes:
-    # https://github.com/actions/runner-images/issues/14052
-    - name: Scope the cross-compilation SDKs to the target (Windows)
-      if: runner.os == 'Windows'
-      shell: pwsh
-      run: '"MISE_DISABLE_TOOLS=android-sdk,emsdk,ohos-sdk,http:oniro-emulator" >> $env:GITHUB_ENV'
 
     # The gitlink SHA is what decides the checkout, so key on it directly. A
     # tag file can be left behind by a pin bump; the recorded commit cannot.
@@ -360,7 +345,7 @@ runs:
       run: |
         prefix="toolchains-v1-${{ runner.os }}-${{ runner.arch }}-${ImageOS:-unknown}"
         echo "prefix=${prefix}" >> "$GITHUB_OUTPUT"
-        echo "key=${prefix}-${{ hashFiles('mise.toml', 'mise.lock', 'mise.linux.toml', 'mise.macos.toml', 'mise.windows.toml', '.devcontainer/mise.toml', 'bindings/*/mise.toml', 'examples/*/mise.toml', 'docs/mise.toml') }}" >> "$GITHUB_OUTPUT"
+        echo "key=${prefix}-${{ hashFiles('mise.toml', 'mise.lock', 'mise.linux.toml', 'mise.macos.toml', 'mise.windows.toml', 'mise.android.toml', 'mise.android.lock', 'mise.emscripten.toml', 'mise.emscripten.lock', 'mise.ohos.toml', 'mise.ohos.lock', '.devcontainer/mise.toml', 'bindings/*/mise.toml', 'examples/*/mise.toml', 'docs/mise.toml') }}" >> "$GITHUB_OUTPUT"
 
     - name: Restore toolchains
       id: toolchains

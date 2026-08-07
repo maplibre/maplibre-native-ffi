@@ -1,0 +1,21 @@
+# The OpenHarmony SDK and the emulator image its test suite boots, for
+# `MISE_ENV=ohos`. See the development overview.
+
+[tools]
+# mise has no registry entry for the OpenHarmony SDK, so this resolves through the
+# plugin the hook below registers. Its unpacking step needs a POSIX shell, which is
+# why Windows is left out.
+ohos-sdk = { version = "{{vars.ohos_sdk_version}}", os = ["linux", "macos"] }
+# Oniro publishes its emulator image against the corresponding OpenHarmony
+# release. Keep both tools on the same version so their system ABI stays aligned.
+"http:oniro-emulator" = { version = "{{vars.ohos_sdk_version}}", url = "https://github.com/eclipse-oniro4openharmony/device_board_oniro/releases/download/v{{ version }}/oniro_emulator.zip", checksum = "sha256:a30e01f1b161e0fdcd91263f30f29cc92bfa49c1776d5ee2c46caefef055b2da", size = "1449068188", bin_path = ".", os = ["linux", "macos"] }
+
+[hooks]
+# The OpenHarmony SDK plugin lives in the repository, and mise resolves a plugin
+# from its own directory, so registering the link is what makes `ohos-sdk` install.
+# Linking is a symlink, and re-linking is how a checkout that moves stops being
+# stale. Moving the plugin to its own repository later replaces this with a
+# `[plugins]` entry naming its URL.
+preinstall = [
+  "mise plugins link --force ohos-sdk .mise/plugins/ohos-sdk",
+]

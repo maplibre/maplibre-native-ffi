@@ -7,10 +7,9 @@ min_version = "2026.7.15"
 
 [settings]
 lockfile = true
-# The large platform tools install when asked for, through `mise bootstrap` or
-# `mise install`, and never on the way to something else. Otherwise a lint task or a
-# Git hook pulls in gigabytes, and a machine that cannot install one of them cannot
-# run any task at all.
+# The cross-compilation SDKs install when asked for and never on the way to
+# something else. Otherwise a lint task or a Git hook pulls in gigabytes, and a
+# machine that cannot install one of them cannot run any task at all.
 auto_install_disable_tools = [
   "android-sdk",
   "emsdk",
@@ -136,33 +135,11 @@ swiftformat = { version = "{{vars.swiftformat_version}}", backend = "github:nick
 # binding declares its own wider platform set in bindings/zig/mise.toml.
 "core:zig" = { version = "{{vars.zig_version}}", os = ["linux"] }
 
-# Cross-compilation SDKs for the non-host targets. The CMake presets and the Rust
-# cross builds read what these export -- ANDROID_HOME, EMSDK, OHOS_SDK_NATIVE --
-# so declaring them here is what lets one `build <preset>` serve every target.
-#
-# Each is a multi-gigabyte download, and `disable_tools` is how an environment that
-# builds fewer targets keeps them out: .github/actions/setup-ci-deps narrows the set
-# to each job's target, the devcontainer image drops all three, and a contributor
-# does the same in mise.local.toml. See the development overview.
-#
-# The Android SDK tool installs the command-line tools alone, so the packages the
-# builds need are installed once the SDK is in place.
-android-sdk = { version = "{{vars.android_cmdline_tools_version}}", postinstall = "bash .mise/bin/sync-android-packages {{vars.java_version}} {{vars.android_ndk_version}} {{vars.android_cmake_version}}" }
-# The vfox plugin runs the current emsdk launcher before emsdk installs its bundled
-# Python. Use the project Python because Apple's version can be older than the
-# launcher's minimum; `depends` installs it before the environment below resolves it.
-emsdk = { version = "{{vars.emsdk_version}}", depends = ["python"] }
-# mise has no registry entry for the OpenHarmony SDK, so this resolves through the
-# plugin the hook below registers. Its unpacking step needs a POSIX shell, which is
-# why Windows is left out.
-ohos-sdk = { version = "{{vars.ohos_sdk_version}}", os = ["linux", "macos"] }
-# Oniro publishes its emulator image against the corresponding OpenHarmony
-# release. Keep both tools on the same version so their system ABI stays aligned.
-"http:oniro-emulator" = { version = "{{vars.ohos_sdk_version}}", url = "https://github.com/eclipse-oniro4openharmony/device_board_oniro/releases/download/v{{ version }}/oniro_emulator.zip", checksum = "sha256:a30e01f1b161e0fdcd91263f30f29cc92bfa49c1776d5ee2c46caefef055b2da", size = "1449068188", bin_path = ".", os = ["linux", "macos"] }
+# The cross-compilation SDKs are multi-gigabyte downloads, and a build reads one out
+# of the environment, so each is opt-in through a configuration environment of its
+# own: mise.android.toml, mise.emscripten.toml, and mise.ohos.toml.
 
 [env]
-EMSDK_PYTHON = { value = "{{ tools.python.path }}/{% if os() == 'windows' %}python.exe{% else %}bin/python3{% endif %}", tools = true }
-
 # The Android SDK packages the CMake presets and the Gradle builds resolve. They are
 # environment variables because Gradle reads them, and they come from `[vars]`
 # because the tool's post-install step takes them as arguments.
@@ -209,14 +186,6 @@ run = ".mise/bin/sync-rustls-platform-verifier"
 timeout = "2m"
 
 [hooks]
-# The OpenHarmony SDK plugin lives in the repository, and mise resolves a plugin
-# from its own directory, so registering the link is what makes `ohos-sdk` install.
-# Linking is a symlink, and re-linking is how a checkout that moves stops being
-# stale. Moving the plugin to its own repository later replaces this with a
-# `[plugins]` entry naming its URL.
-preinstall = [
-  "mise plugins link --force ohos-sdk .mise/plugins/ohos-sdk",
-]
 postinstall = [
   "hk install --mise --quiet",
 ]
@@ -267,9 +236,32 @@ outputs = { auto = true }
 # lets the fixtures and examples drive the API the way a host does; presets
 # whose loader comes from the platform or an SDK install nothing.
 run = [
+  { task = "//:check-cross-sdk", args = ["{{usage.preset}}"] },
   '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"',
   'cmake --install "$MISE_MONOREPO_ROOT/build/$usage_preset" --component loader',
 ]
+
+[tasks.check-cross-sdk]
+description = "Verify the SDK a cross-compilation preset builds against is available."
+hide = true
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+# A preset whose SDK is missing says how to get one rather than failing inside CMake
+# on a toolchain path with an empty prefix.
+run = '''
+case "$usage_preset" in
+  android-*) variable=ANDROID_HOME environment=android ;;
+  emscripten-*) variable=EMSDK environment=emscripten ;;
+  ohos-*) variable=OHOS_SDK_NATIVE environment=ohos ;;
+  *) exit 0 ;;
+esac
+
+if [[ -z "${!variable:-}" ]]; then
+  echo "error: $usage_preset builds against \$$variable, which is unset" >&2
+  echo "Point $variable at an SDK of your own, or install the pinned one with:" >&2
+  echo "  mise -E $environment install" >&2
+  exit 1
+fi
+'''
 
 [tasks.clean]
 description = "Remove one native preset build tree."
@@ -327,6 +319,12 @@ elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-x64-* ]]; 
 fi
 ctest --preset "$usage_preset"
 '''
+
+[tasks."android-sdk-packages"]
+description = "Install the pinned Android SDK packages into $ANDROID_HOME."
+# The `android-*` presets name the pinned NDK, so an SDK without it configures no
+# Android build.
+run = 'bash .mise/bin/sync-android-packages "{{vars.java_version}}" "{{vars.android_ndk_version}}" "{{vars.android_cmake_version}}"'
 
 [tasks."android-emulator:boot"]
 description = "Boot the Android emulator and wait until it is ready."
