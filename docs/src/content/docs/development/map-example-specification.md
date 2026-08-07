@@ -59,9 +59,9 @@ Every example exposes the same task contract in its `mise.toml`:
   `mise run //examples/zig-map:run` works with no arguments, and a mode name
   overrides it, as in `mise run //examples/zig-map:run borrowed-texture`.
 
-An example that supports only one render backend selects its own default preset:
-`go-map` drives OpenGL directly and defaults to
-`{{vars.host_native_opengl_preset}}`.
+An example that has not yet implemented every backend rejects an unsupported
+preset with an error that names what it supports: `go-map` drives OpenGL
+directly and accepts only `*-egl` presets.
 
 The render-target argument is how a caller reaches the modes in
 [Render-target selection](#render-target-selection); the program's own CLI

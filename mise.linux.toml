@@ -6,8 +6,6 @@ swift.platform = "ubuntu24.04"
 
 [vars]
 host_native_preset = "linux-{{ arch() }}-vulkan"
-# The OpenGL-only examples (go-map) build against this preset instead.
-host_native_opengl_preset = "linux-{{ arch() }}-egl"
 # Highest glibc release our published Linux natives may require. The zig
 # toolchain sets this from MLN_FFI_ZIG_GLIBC rather than from the build host,
 # so change it together with cmake/toolchains/zig-linux.cmake.

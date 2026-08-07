@@ -5,8 +5,6 @@ shell = '"C:/Program Files/Git/bin/bash.exe" -e -lc'
 
 [vars]
 host_native_preset = "windows-{{ arch() }}-vulkan"
-# The OpenGL-only examples (go-map) build against this preset instead.
-host_native_opengl_preset = "windows-{{ arch() }}-wgl"
 
 [tools]
 # Tool post-install commands use cmd.exe instead of the task shell. Name Git

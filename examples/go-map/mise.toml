@@ -3,12 +3,15 @@
 "aqua:mvdan/gofumpt" = "{{vars.gofumpt_version}}"
 "conda:sdl3" = { version = "{{vars.sdl3_version}}", os = ["linux", "macos"] }
 
-# The example drives OpenGL directly, so its preset defaults to the host's
-# OpenGL backend rather than {{vars.host_native_preset}}.
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_opengl_preset}}"'
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
+# The example drives OpenGL directly; other backends are not yet implemented.
+if [[ "$usage_preset" != *-egl ]]; then
+  echo "go-map supports OpenGL (EGL) presets only, got: $usage_preset" >&2
+  exit 2
+fi
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 sdl_prefix="$(mise where "conda:sdl3@{{vars.sdl3_version}}")"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig:$sdl_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
@@ -17,7 +20,7 @@ go build -o "$MISE_MONOREPO_ROOT/build/$usage_preset/go-map" .
 '''
 
 [tasks.check]
-usage = 'arg "[preset]" default="{{vars.host_native_opengl_preset}}"'
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 run = '''
 unformatted="$(gofumpt -l .)"
@@ -36,7 +39,7 @@ usage = '''
 arg "[render-target]" default="owned-texture" {
   choices "owned-texture" "borrowed-texture" "native-surface"
 }
-flag "--preset <preset>" default="{{vars.host_native_opengl_preset}}"
+flag "--preset <preset>" default="{{vars.host_native_preset}}"
 '''
 depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 run = '''
