@@ -2,8 +2,7 @@
 "core:java" = "{{vars.java_version}}"
 
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 dir = "../.."
 run = '''
 ./gradlew \
@@ -14,8 +13,7 @@ run = '''
 [tasks.run]
 # The example takes its bridge from the render backend the native library was
 # built with, so the preset picks the backend.
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 dir = "../.."
 run = '''
 ./gradlew \

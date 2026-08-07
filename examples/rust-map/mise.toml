@@ -1,6 +1,5 @@
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 dir = "../.."
 run = '''
 set -euo pipefail
@@ -19,13 +18,7 @@ MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" 
 '''
 
 [tasks.run]
-usage = '''
-arg "[render-target]" default="owned-texture" {
-  choices "owned-texture" "borrowed-texture" "native-surface"
-}
-flag "--preset <preset>" default="{{vars.host_native_preset}}"
-'''
-depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
+extends = "ffi:example-run"
 dir = "../.."
 run = '''
 set -euo pipefail

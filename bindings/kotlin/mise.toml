@@ -34,8 +34,7 @@ fi
 '''
 
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 dir = "../.."
 run = '''
 runtime_backend=
@@ -85,8 +84,7 @@ done
 '''
 
 [tasks."test:jvm"]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 dir = "../.."
 run = '''
 case "$usage_preset" in
@@ -102,8 +100,7 @@ esac
 '''
 
 [tasks."test:native"]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 dir = "../.."
 run = '''
 case "$usage_preset" in

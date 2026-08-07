@@ -1,6 +1,5 @@
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 dir = "../.."
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
@@ -23,8 +22,7 @@ exec cargo build \
 '''
 
 [tasks.test]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 dir = "../.."
 # The preset selects the runner: Android and OpenHarmony x64 presets push to an
 # emulator, Emscripten presets run as a page in headless Chromium, and host

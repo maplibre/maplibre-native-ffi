@@ -221,6 +221,25 @@ postinstall = [
   "hk install --mise --quiet",
 ]
 
+# The standard task preambles. A binding or example task that builds or tests
+# against a native preset extends ffi:preset, which gives it the optional
+# preset argument and builds that preset first; the desktop examples' run tasks
+# extend ffi:example-run, which adds the render-target argument on top of the
+# example's own build. Shell dispatch stays in each task: `run` overrides a
+# template completely, and the shared parts of that dispatch live in scripts/.
+[task_templates."ffi:preset"]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+
+[task_templates."ffi:example-run"]
+usage = '''
+arg "[render-target]" default="owned-texture" {
+  choices "owned-texture" "borrowed-texture" "native-surface"
+}
+flag "--preset <preset>" default="{{vars.host_native_preset}}"
+'''
+depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
+
 [tasks.build]
 description = "Configure, build, and install a native CMake preset."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'

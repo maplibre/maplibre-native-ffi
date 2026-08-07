@@ -17,8 +17,7 @@ timeout = "10m"
 run = "zig build --build-file ../../build.zig --fetch=needed"
 
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 run = '''
 zig build --build-file ../../build.zig \
   -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
@@ -26,8 +25,7 @@ zig build --build-file ../../build.zig \
 '''
 
 [tasks.test]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 # The preset selects the runner: an iOS simulator preset spawns the suite on a
 # simulator, and host presets run in process.
 run = '''

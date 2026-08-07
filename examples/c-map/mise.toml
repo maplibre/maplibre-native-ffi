@@ -2,8 +2,7 @@
 "conda:sdl3" = { version = "{{vars.sdl3_version}}", os = ["linux", "macos"] }
 
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 sdl_prefix="$(mise where "conda:sdl3@{{vars.sdl3_version}}")"
@@ -15,13 +14,7 @@ cmake --build "$MISE_MONOREPO_ROOT/build/$usage_preset/c-map"
 '''
 
 [tasks.run]
-usage = '''
-arg "[render-target]" default="owned-texture" {
-  choices "owned-texture" "borrowed-texture" "native-surface"
-}
-flag "--preset <preset>" default="{{vars.host_native_preset}}"
-'''
-depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
+extends = "ffi:example-run"
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 sdl_prefix="$(mise where "conda:sdl3@{{vars.sdl3_version}}")"

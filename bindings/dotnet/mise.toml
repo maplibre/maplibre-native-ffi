@@ -30,8 +30,7 @@ mkdir -p build
 '''
 
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 # Visual Studio exports Platform=x64 on Windows; the .NET solution uses Any CPU.
 dir = "../.."
 run = '''
@@ -42,8 +41,7 @@ MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
 '''
 
 [tasks.test]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 dir = "../.."
 run = '''
 MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \

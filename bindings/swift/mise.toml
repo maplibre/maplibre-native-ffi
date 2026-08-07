@@ -9,8 +9,7 @@
 [tasks.api]
 description = "Generate DocC HTML API reference for the Swift binding."
 dir = "../.."
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
@@ -28,8 +27,7 @@ swift package --scratch-path ".build/$usage_preset" \
 
 [tasks.build]
 dir = "../.."
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
@@ -54,8 +52,7 @@ swift build --target MaplibreNativeFFI "${swift_args[@]}"
 
 [tasks.test]
 dir = "../.."
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 # The preset selects the runner: an iOS simulator preset builds the test bundle
 # and spawns it on a simulator, and host presets run in process.
 run = '''

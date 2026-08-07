@@ -19,8 +19,7 @@ run = "gofumpt -w"
 
 [tasks.api]
 description = "Generate doc2go HTML API reference for the Go binding."
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 run = '''
 rm -rf build/doc2go
 mkdir -p build
@@ -47,8 +46,7 @@ PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CO
 '''
 
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
@@ -69,8 +67,7 @@ PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CO
 '''
 
 [tasks.test]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+extends = "ffi:preset"
 # The preset selects the runner: Android and OpenHarmony x64 presets push to an
 # emulator, and host presets run in process.
 run = '''
