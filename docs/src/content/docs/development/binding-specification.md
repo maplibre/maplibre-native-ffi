@@ -92,6 +92,8 @@ Requirements:
   `api` generates the HTML reference that `//docs:api` collects.
 - `build` and `test` MUST take an optional `[preset]` argument that defaults to
   `{{vars.host_native_preset}}`, and MUST depend on `//:build` for that preset.
+  Both come from the root `ffi:preset` task template (`extends = "ffi:preset"`)
+  rather than from a restated copy.
 - The preset selects the platform, so `test` MUST select its runner from the
   preset rather than exposing a task per platform. Host presets run the suite in
   process, Android and OpenHarmony x64 presets cross-compile and push to an

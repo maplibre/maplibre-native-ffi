@@ -53,11 +53,13 @@ Every example exposes the same task contract in its `mise.toml`:
 
 - `build [preset]` compiles the example against a native install prefix. The
   preset defaults to `{{vars.host_native_preset}}`, and the task depends on
-  `//:build` for that preset.
-- `run [render-target] [--preset <preset>]` builds and launches the example. The
-  render target defaults to `owned-texture`, so
-  `mise run //examples/zig-map:run` works with no arguments, and a mode name
-  overrides it, as in `mise run //examples/zig-map:run borrowed-texture`.
+  `//:build` for that preset. Both come from the root `ffi:preset` task
+  template.
+- `run [render-target] [--preset <preset>]` builds and launches the example by
+  extending the root `ffi:example-run` task template. The render target defaults
+  to `owned-texture`, so `mise run //examples/zig-map:run` works with no
+  arguments, and a mode name overrides it, as in
+  `mise run //examples/zig-map:run borrowed-texture`.
 
 An example that has not yet implemented every backend rejects an unsupported
 preset with an error that names what it supports: `go-map` drives OpenGL
