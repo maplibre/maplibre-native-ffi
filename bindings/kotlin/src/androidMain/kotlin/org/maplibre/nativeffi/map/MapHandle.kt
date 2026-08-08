@@ -2820,15 +2820,17 @@ private class CanonicalTileIdScope(value: CanonicalTileId) : AutoCloseable {
 private class CustomGeometrySourceState(private val options: CustomGeometrySourceOptions) :
   AutoCloseable {
   private val gate = CallbackGate("custom geometry callbacks", ::closeNative)
+  // JavaCPP passes null for a null void* and drops the upcall if the Kotlin
+  // override rejects it, so every parameter stays nullable.
   private val fetchTile =
     object : MaplibreNativeC.mln_custom_geometry_source_tile_callback() {
-      override fun call(userData: Pointer, tileId: MaplibreNativeC.mln_canonical_tile_id) {
+      override fun call(userData: Pointer?, tileId: MaplibreNativeC.mln_canonical_tile_id?) {
         fetchTile(tileId)
       }
     }
   private val cancelTile =
     object : MaplibreNativeC.mln_custom_geometry_source_tile_callback() {
-      override fun call(userData: Pointer, tileId: MaplibreNativeC.mln_canonical_tile_id) {
+      override fun call(userData: Pointer?, tileId: MaplibreNativeC.mln_canonical_tile_id?) {
         cancelTile(tileId)
       }
     }
@@ -2875,7 +2877,8 @@ private class CustomGeometrySourceState(private val options: CustomGeometrySourc
     gate.close()
   }
 
-  private fun fetchTile(tileId: MaplibreNativeC.mln_canonical_tile_id) {
+  private fun fetchTile(tileId: MaplibreNativeC.mln_canonical_tile_id?) {
+    if (tileId == null) return
     val lease = gate.enter() ?: return
     try {
       options.callback.fetchTile(canonicalTileId(tileId))
@@ -2886,7 +2889,8 @@ private class CustomGeometrySourceState(private val options: CustomGeometrySourc
     }
   }
 
-  private fun cancelTile(tileId: MaplibreNativeC.mln_canonical_tile_id) {
+  private fun cancelTile(tileId: MaplibreNativeC.mln_canonical_tile_id?) {
+    if (tileId == null) return
     val lease = gate.enter() ?: return
     try {
       options.callback.cancelTile(canonicalTileId(tileId))
