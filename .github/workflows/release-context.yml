@@ -1,0 +1,96 @@
+name: Release context
+
+on:
+  workflow_call:
+    inputs:
+      family:
+        description: Release family named by the caller
+        required: true
+        type: string
+    outputs:
+      ci_run_url:
+        description: URL of the successful main CI run
+        value: ${{ jobs.resolve.outputs.ci_run_url }}
+      previous_tag:
+        description: Previous tag in the release family
+        value: ${{ jobs.resolve.outputs.previous_tag }}
+      run_id:
+        description: Successful main CI run that produced the artifacts
+        value: ${{ jobs.resolve.outputs.run_id }}
+      sha:
+        description: Commit named by the release tag
+        value: ${{ jobs.resolve.outputs.sha }}
+      version:
+        description: Version parsed from the release tag
+        value: ${{ jobs.resolve.outputs.version }}
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    name: Resolve release context
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+    env:
+      MISE_NO_HOOKS: "1"
+    outputs:
+      ci_run_url: ${{ steps.context.outputs.ci_run_url }}
+      previous_tag: ${{ steps.context.outputs.previous_tag }}
+      run_id: ${{ steps.context.outputs.run_id }}
+      sha: ${{ steps.context.outputs.sha }}
+      version: ${{ steps.context.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          cache: false
+          install_args: python
+      # A tag push can overlap main CI. Wait for the run on the tagged commit
+      # instead of selecting an older successful commit.
+      - name: Resolve the tag and source CI run
+        id: context
+        env:
+          EXPECTED_FAMILY: ${{ inputs.family }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
+            echo "release workflows require a tag ref, got $GITHUB_REF" >&2
+            exit 1
+          fi
+
+          git fetch --quiet --force origin main 'refs/tags/*:refs/tags/*'
+          source_sha="$(git rev-parse 'HEAD^{commit}')"
+          release_context="$(
+            mise run --no-deps ci:release-version "$GITHUB_REF_NAME"
+          )"
+          family="$(jq -r '.family' <<<"$release_context")"
+          if [[ "$family" != "$EXPECTED_FAMILY" ]]; then
+            echo "$GITHUB_REF_NAME belongs to $family, expected $EXPECTED_FAMILY" >&2
+            exit 1
+          fi
+
+          if ! git merge-base --is-ancestor "$source_sha" origin/main; then
+            echo "$source_sha is not an ancestor of main; refusing to publish" >&2
+            exit 1
+          fi
+
+          run="$(mise run --no-deps ci:resolve-publish-run "$source_sha")"
+
+          {
+            echo "ci_run_url=$(jq -r '.url' <<<"$run")"
+            echo "previous_tag=$(jq -r '.previousTag' <<<"$release_context")"
+            echo "run_id=$(jq -r '.run_id' <<<"$run")"
+            echo "sha=$source_sha"
+            echo "version=$(jq -r '.version' <<<"$release_context")"
+          } >> "$GITHUB_OUTPUT"

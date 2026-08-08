@@ -39,10 +39,15 @@ shared = [
   ".miserc.toml",
   ".mise/**",
   ".config/**",
-  # The CI definitions that shape every published artifact.
+  # The CI definitions that shape every snapshot artifact.
   ".github/workflows/**",
+  "!.github/workflows/*-release.yml",
+  "!.github/workflows/*-publish.yml",
+  "!.github/workflows/release-context.yml",
   ".github/actions/**",
   "ci/**",
+  "!ci/*release.py",
+  "!ci/tests/**",
   ".gitattributes",
 
   # Binding sources, docs sources, and the ecosystem roots their builds run
@@ -96,6 +101,10 @@ shared = [
 # every input.
 [components.native]
 description = "Native CPack tarballs on the floating GitHub prerelease."
+paths = [
+  ".github/workflows/native-publish.yml",
+  "ci/native_package_release.py",
+]
 
 [components.kotlin]
 description = "Kotlin Multiplatform modules on Maven Central snapshots."
@@ -104,6 +113,10 @@ paths = [
   "bindings/kotlin/**",
   "bindings/kotlin-runtime-*/**",
   "bindings/rustls-platform-verifier-android/**",
+  "!.github/workflows/native-publish.yml",
+  "!ci/native_package_release.py",
+  ".github/workflows/kotlin-publish.yml",
+  "ci/kotlin_release.py",
   # Gradle assembles every publication.
   "buildSrc/**",
   "gradle/**",
@@ -119,6 +132,8 @@ description = "Backend-specific Python wheels on the GitHub Pages package index.
 depends = ["native"]
 paths = [
   "bindings/python/**",
+  "!.github/workflows/native-publish.yml",
+  "!ci/native_package_release.py",
   # The extension reuses the Rust binding's low-level ownership and FFI layers.
   "bindings/rust/**",
   "pyproject.toml",
@@ -130,6 +145,8 @@ description = "Backend-specific .NET packages on the GitHub Pages NuGet feed."
 depends = ["native"]
 paths = [
   "bindings/dotnet/**",
+  "!.github/workflows/native-publish.yml",
+  "!ci/native_package_release.py",
   "Directory.Packages.props",
   "Maplibre.NativeFfi.slnx",
   ".config/dotnet-tools.json",
@@ -141,6 +158,8 @@ depends = ["kotlin", "python", "dotnet"]
 # The site embeds an API reference generated from every binding, so it takes the
 # binding sources along with the ecosystem roots each doc tool builds through.
 paths = [
+  "!.github/workflows/kotlin-publish.yml",
+  "!ci/kotlin_release.py",
   "bindings/dart/**",
   "bindings/go/**",
   "bindings/swift/**",

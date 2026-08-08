@@ -367,3 +367,23 @@ hk fix --all
 [tasks.actions-up]
 description = "Update and pin GitHub Actions steps."
 run = "pnpm dlx actions-up"
+
+[tasks."ci:prepare-native-package"]
+description = "Prepare native package snapshot or tagged release assets."
+run = 'python3 ci/native_package_release.py "$@"'
+
+[tasks."ci:prepare-python-snapshot"]
+description = "Relabel a backend wheel or generate the Python snapshot index."
+run = 'python3 ci/python_snapshot.py "$@"'
+
+[tasks."ci:release-version"]
+description = "Validate calendar release versions and source tags."
+run = 'python3 ci/release_version.py "$@"'
+
+[tasks."ci:test-release-tools"]
+description = "Test release version and native package tooling."
+run = 'PYTHONPATH="$MISE_MONOREPO_ROOT/ci${PYTHONPATH:+:$PYTHONPATH}" python3 -m unittest discover -s ci/tests -p "test_*.py"'
+
+[tasks."kotlin:prepare-release"]
+description = "Merge, sign, and publish Kotlin Maven repositories."
+run = 'python3 ci/kotlin_release.py "$@"'
