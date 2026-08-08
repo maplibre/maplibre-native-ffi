@@ -56,7 +56,7 @@ fi
 # The runtime KLIB embeds the backend-specific static archive, so it only
 # builds for a preset whose backend has a matching runtime publication.
 if [[ -n "$runtime_backend" ]]; then
-  tasks+=(":bindings:kotlin-runtime-${runtime_backend}:${kotlin_target}Klib")
+  tasks+=(":bindings:kotlin:runtimes:${runtime_backend}:${kotlin_target}Klib")
   gradle_args+=(
     "-Pmaplibre.runtime.${runtime_backend}.${kotlin_target}.installDir=build/$usage_preset/install"
   )
@@ -134,7 +134,7 @@ esac
   -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
   -Pmaplibre.runtime.metal.$kotlin_target.installDir="build/$usage_preset/install" \
   ":bindings:kotlin:${kotlin_target}Klib" \
-  ":bindings:kotlin-runtime-metal:${kotlin_target}Klib"
+  ":bindings:kotlin:runtimes:metal:${kotlin_target}Klib"
 '''
 
 [tasks."android-build"]

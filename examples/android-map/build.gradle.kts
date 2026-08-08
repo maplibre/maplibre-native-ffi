@@ -68,7 +68,7 @@ dependencies {
     )
   } else {
     implementation(project(":bindings:kotlin"))
-    implementation(project(":bindings:kotlin-runtime-$androidBackend"))
+    implementation(project(":bindings:kotlin:runtimes:$androidBackend"))
   }
 }
 

@@ -103,7 +103,7 @@ publish_linux_leaves() {
     "${common[@]}"
 
   publish_tasks \
-    :bindings:kotlin-runtime-opengl \
+    :bindings:kotlin:runtimes:opengl \
     "$repository" \
     Android -- \
     "$@" \
@@ -111,7 +111,7 @@ publish_linux_leaves() {
     -Pmaplibre.android.backend=opengl
 
   publish_tasks \
-    :bindings:kotlin-runtime-vulkan \
+    :bindings:kotlin:runtimes:vulkan \
     "$repository" \
     Android -- \
     "$@" \
@@ -125,14 +125,14 @@ publish_linux_leaves() {
     "$@"
 
   publish_tasks \
-    :bindings:kotlin-runtime-opengl \
+    :bindings:kotlin:runtimes:opengl \
     "$repository" \
     LinuxX64 -- \
     "$@" \
     -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-x64-egl"
 
   publish_tasks \
-    :bindings:kotlin-runtime-vulkan \
+    :bindings:kotlin:runtimes:vulkan \
     "$repository" \
     LinuxX64 -- \
     "$@" \
@@ -170,21 +170,21 @@ publish_apple_leaves() {
     "$@"
 
   publish_tasks \
-    :bindings:kotlin-runtime-opengl \
+    :bindings:kotlin:runtimes:opengl \
     "$repository" \
     Jvm -- \
     "$@" \
     "${opengl[@]}"
 
   publish_tasks \
-    :bindings:kotlin-runtime-vulkan \
+    :bindings:kotlin:runtimes:vulkan \
     "$repository" \
     Jvm -- \
     "$@" \
     "${vulkan[@]}"
 
   publish_tasks \
-    :bindings:kotlin-runtime-metal \
+    :bindings:kotlin:runtimes:metal \
     "$repository" \
     Jvm MacosArm64 IosArm64 IosSimulatorArm64 -- \
     "$@" \
@@ -207,19 +207,19 @@ publish_apple_roots() {
     "$@"
 
   publish_tasks \
-    :bindings:kotlin-runtime-opengl \
+    :bindings:kotlin:runtimes:opengl \
     "$repository" \
     KotlinMultiplatform -- \
     "$@"
 
   publish_tasks \
-    :bindings:kotlin-runtime-vulkan \
+    :bindings:kotlin:runtimes:vulkan \
     "$repository" \
     KotlinMultiplatform -- \
     "$@"
 
   publish_tasks \
-    :bindings:kotlin-runtime-metal \
+    :bindings:kotlin:runtimes:metal \
     "$repository" \
     KotlinMultiplatform -- \
     "$@" \

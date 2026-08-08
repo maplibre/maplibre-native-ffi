@@ -339,7 +339,7 @@ apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
 
 val maplibreNativeC = extensions.getByType<MaplibreNativeCArtifact>()
 val runtimeInteropDirectory =
-  rootProject.layout.projectDirectory.dir("bindings/kotlin-runtime-common")
+  rootProject.layout.projectDirectory.dir("bindings/kotlin/runtimes/common")
 val configuredNativeTargets = nativeTargets(backend, targetFamily)
 val configuredJvmTargetPlatforms =
   if (targetFamily == MaplibreRuntimeTargetFamily.APPLE) {
@@ -350,7 +350,7 @@ val configuredJvmTargetPlatforms =
 
 extensions.configure<KotlinMultiplatformExtension> {
   sourceSets.getByName("commonMain") {
-    kotlin.srcDir(rootProject.file("bindings/kotlin-runtime-common/src/commonMain/kotlin"))
+    kotlin.srcDir(rootProject.file("bindings/kotlin/runtimes/common/src/commonMain/kotlin"))
   }
 
   targets.withType<KotlinNativeTarget>().configureEach {
