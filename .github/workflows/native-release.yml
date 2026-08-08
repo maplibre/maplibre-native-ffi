@@ -17,6 +17,7 @@ jobs:
     name: Source
     permissions:
       actions: read
+      checks: read
       contents: read
     uses: ./.github/workflows/release-context.yml
     with:

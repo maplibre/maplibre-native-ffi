@@ -34,6 +34,7 @@ jobs:
     timeout-minutes: 240
     permissions:
       actions: read
+      checks: read
       contents: read
     env:
       MISE_NO_HOOKS: "1"
