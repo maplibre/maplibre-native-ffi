@@ -69,10 +69,18 @@ jobs:
         run: |
           set -euo pipefail
 
-          if draft="$(gh release view "$PUBLISH_TAG" --json isDraft --jq .isDraft 2>/dev/null)" &&
-            [[ "$draft" == false ]]; then
-            echo "GitHub release $PUBLISH_TAG is already published" >&2
-            exit 1
+          status=0
+          output="$(
+            gh release view "$PUBLISH_TAG" --json isDraft --jq .isDraft 2>&1
+          )" || status=$?
+          if [[ "$status" -eq 0 ]]; then
+            if [[ "$output" == false ]]; then
+              echo "GitHub release $PUBLISH_TAG is already published" >&2
+              exit 1
+            fi
+          elif [[ "$output" != "release not found" ]]; then
+            printf '%s\n' "$output" >&2
+            exit "$status"
           fi
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
