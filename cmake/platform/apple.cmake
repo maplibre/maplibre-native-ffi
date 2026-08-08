@@ -23,11 +23,18 @@ function(mln_ffi_configure_apple_toolchain_defaults)
 endfunction()
 
 function(mln_ffi_configure_platform_dependencies target)
+  # `c++` is named rather than bundled: Apple ships libc++ as a system library
+  # with a stable ABI, so the archive can leave it to the platform.
   target_link_libraries(
     ${target}
     INTERFACE
-      "-framework CoreFoundation" "-framework CoreGraphics"
-      "-framework CoreText" "-framework Foundation" "-framework ImageIO" z)
+      "-framework CoreFoundation"
+      "-framework CoreGraphics"
+      "-framework CoreText"
+      "-framework Foundation"
+      "-framework ImageIO"
+      z
+      c++)
   set_target_properties(
     ${target}
     PROPERTIES

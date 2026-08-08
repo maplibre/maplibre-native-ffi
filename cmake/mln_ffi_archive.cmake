@@ -12,6 +12,56 @@
 #   MLN_FFI_ARCHIVE_KEEP_GLOBAL     symbol pattern that stays externally
 #                                   visible; everything else becomes internal
 
+# Bundles a clang SDK's C++ runtime into the archive and hides everything but
+# the C API, the way cmake/platform/linux.cmake does for its own toolchain. The
+# Android and OpenHarmony SDKs leave libc++ to the application rather than
+# shipping a system copy with a stable ABI, so an archive without it would make
+# every consumer supply a matching one. Apple and MSVC do ship one, and name it
+# instead.
+#
+# These SDKs pass the runtime with `-l` rather than by path, so a link probe
+# like the Linux one finds nothing to match; ask the compiler where each
+# resolves instead. The compilers are not target-prefixed, so the query answers
+# for the host unless it is told which target it is for.
+function(mln_ffi_bundle_clang_cxx_runtime target notice)
+  set(MLN_FFI_QUERY_FLAGS "")
+  if(CMAKE_CXX_COMPILER_TARGET)
+    list(APPEND MLN_FFI_QUERY_FLAGS "--target=${CMAKE_CXX_COMPILER_TARGET}")
+  endif()
+  if(CMAKE_SYSROOT)
+    list(APPEND MLN_FFI_QUERY_FLAGS "--sysroot=${CMAKE_SYSROOT}")
+  endif()
+
+  set(MLN_FFI_RUNTIME_ARCHIVES "")
+  foreach(component libc++_static.a libc++abi.a libunwind.a)
+    execute_process(
+      COMMAND
+        "${CMAKE_CXX_COMPILER}" ${MLN_FFI_QUERY_FLAGS}
+        "--print-file-name=${component}"
+      OUTPUT_VARIABLE MLN_FFI_ARCHIVE OUTPUT_STRIP_TRAILING_WHITESPACE
+      RESULT_VARIABLE MLN_FFI_ARCHIVE_RESULT)
+    if(NOT MLN_FFI_ARCHIVE_RESULT EQUAL 0
+       OR NOT EXISTS "${MLN_FFI_ARCHIVE}")
+      message(FATAL_ERROR "The SDK resolved no ${component} to bundle")
+    endif()
+    list(APPEND MLN_FFI_RUNTIME_ARCHIVES "${MLN_FFI_ARCHIVE}")
+  endforeach()
+
+  # The runtime is redistributed inside the artifact, so its notice ships too.
+  mln_ffi_add_license(${target} "${notice}" "cxx-runtime.txt")
+  set_target_properties(
+    ${target}
+    PROPERTIES
+      MLN_FFI_ARCHIVE_BUNDLED_RUNTIME
+      "${MLN_FFI_RUNTIME_ARCHIVES}"
+      MLN_FFI_ARCHIVE_KEEP_GLOBAL
+      "mln_*;__mln_personality_v0"
+      # The second rename is the compiler-generated reference to the first and
+      # has to move with it.
+      MLN_FFI_ARCHIVE_RENAME_SYMBOLS
+      "__gxx_personality_v0=__mln_personality_v0;DW.ref.__gxx_personality_v0=DW.ref.__mln_personality_v0")
+endfunction()
+
 set(MLN_FFI_MAPLIBRE_STATIC_ARCHIVE_DEPENDENCIES
     mbgl-core
     mbgl-freetype
