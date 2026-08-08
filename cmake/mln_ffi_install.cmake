@@ -50,6 +50,81 @@ function(mln_ffi_install_zig_libc)
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
 endfunction()
 
+# The name a linker takes for a dependency a find module answered with. A full
+# path cannot travel, because the artifact reaches machines that have neither
+# that path nor that SDK.
+function(mln_ffi_link_name out_var entry)
+  set(MLN_FFI_NAME "${entry}")
+  if(MLN_FFI_NAME MATCHES "[/\\]")
+    get_filename_component(MLN_FFI_NAME "${MLN_FFI_NAME}" NAME)
+    string(REGEX REPLACE "^lib" "" MLN_FFI_NAME "${MLN_FFI_NAME}")
+    string(REGEX REPLACE "\\.(so(\\.[0-9.]+)?|a|dylib|tbd)$" "" MLN_FFI_NAME
+           "${MLN_FFI_NAME}")
+  endif()
+  string(REGEX REPLACE "\\.lib$" "" MLN_FFI_NAME "${MLN_FFI_NAME}")
+  set(${out_var} "${MLN_FFI_NAME}" PARENT_SCOPE)
+endfunction()
+
+# The system libraries a consumer supplies alongside the complete static
+# archive. A target the project builds is already inside the archive, but its
+# own system dependencies are not, so its interface is still walked; an imported
+# target stands for a system library, and resolves to whatever it names.
+function(mln_ffi_static_link_metadata libraries_var frameworks_var)
+  set(MLN_FFI_PENDING "")
+  foreach(dependencies mln_ffi_platform_dependencies mln_ffi_render_dependencies)
+    get_target_property(MLN_FFI_ENTRIES ${dependencies} INTERFACE_LINK_LIBRARIES)
+    if(MLN_FFI_ENTRIES AND NOT MLN_FFI_ENTRIES MATCHES "-NOTFOUND$")
+      list(APPEND MLN_FFI_PENDING ${MLN_FFI_ENTRIES})
+    endif()
+  endforeach()
+
+  set(MLN_FFI_STATIC_LIBRARIES "")
+  set(MLN_FFI_STATIC_FRAMEWORKS "")
+  set(MLN_FFI_SEEN "")
+  while(MLN_FFI_PENDING)
+    list(POP_FRONT MLN_FFI_PENDING MLN_FFI_ENTRY)
+    if("${MLN_FFI_ENTRY}" IN_LIST MLN_FFI_SEEN)
+      continue()
+    endif()
+    list(APPEND MLN_FFI_SEEN "${MLN_FFI_ENTRY}")
+    if(TARGET ${MLN_FFI_ENTRY})
+      # IMPORTED_LIBNAME carries the name an interface-only imported target
+      # stands for, which is how FindOpenGL spells opengl32 on Windows.
+      foreach(property IMPORTED_LOCATION IMPORTED_LIBNAME
+              INTERFACE_LINK_LIBRARIES)
+        get_target_property(MLN_FFI_VALUE ${MLN_FFI_ENTRY} ${property})
+        if(MLN_FFI_VALUE AND NOT MLN_FFI_VALUE MATCHES "-NOTFOUND$")
+          list(APPEND MLN_FFI_PENDING ${MLN_FFI_VALUE})
+        endif()
+      endforeach()
+    elseif(MLN_FFI_ENTRY MATCHES "^-framework +(.+)$")
+      list(APPEND MLN_FFI_STATIC_FRAMEWORKS "${CMAKE_MATCH_1}")
+    elseif(MLN_FFI_ENTRY MATCHES "^\\$<LINK_ONLY:(.+)>$")
+      # How a static library carries its private system dependencies, which is
+      # where libuv keeps the Windows ones.
+      list(APPEND MLN_FFI_PENDING "${CMAKE_MATCH_1}")
+    elseif(MLN_FFI_ENTRY MATCHES "^[-$]")
+      continue()
+    else()
+      mln_ffi_link_name(MLN_FFI_ENTRY_NAME "${MLN_FFI_ENTRY}")
+      list(APPEND MLN_FFI_STATIC_LIBRARIES "${MLN_FFI_ENTRY_NAME}")
+    endif()
+  endwhile()
+  list(REMOVE_DUPLICATES MLN_FFI_STATIC_LIBRARIES)
+  list(REMOVE_DUPLICATES MLN_FFI_STATIC_FRAMEWORKS)
+  set(${libraries_var} ${MLN_FFI_STATIC_LIBRARIES} PARENT_SCOPE)
+  set(${frameworks_var} ${MLN_FFI_STATIC_FRAMEWORKS} PARENT_SCOPE)
+endfunction()
+
+function(mln_ffi_json_string_array out_var)
+  set(MLN_FFI_QUOTED "")
+  foreach(MLN_FFI_ITEM IN LISTS ARGN)
+    list(APPEND MLN_FFI_QUOTED "\"${MLN_FFI_ITEM}\"")
+  endforeach()
+  list(JOIN MLN_FFI_QUOTED ", " MLN_FFI_JOINED)
+  set(${out_var} "${MLN_FFI_JOINED}" PARENT_SCOPE)
+endfunction()
+
 function(mln_ffi_install_c_api_complete_static_archive target)
   get_target_property(MLN_FFI_INSTALL_ARCHIVE ${target} MLN_FFI_INSTALL_ARCHIVE)
   if(NOT MLN_FFI_INSTALL_ARCHIVE)
@@ -146,6 +221,12 @@ function(mln_ffi_install_c_api_library target)
                       MLN_FFI_TARGET_PLATFORM)
   mln_ffi_resolve_git_sha()
   mln_ffi_install_emscripten_options()
+  mln_ffi_static_link_metadata(MLN_FFI_STATIC_LINK_LIBRARIES
+                               MLN_FFI_STATIC_LINK_FRAMEWORKS)
+  mln_ffi_json_string_array(MLN_FFI_STATIC_LINK_LIBRARIES_JSON
+                            ${MLN_FFI_STATIC_LINK_LIBRARIES})
+  mln_ffi_json_string_array(MLN_FFI_STATIC_LINK_FRAMEWORKS_JSON
+                            ${MLN_FFI_STATIC_LINK_FRAMEWORKS})
 
   set(pc_file "${CMAKE_CURRENT_BINARY_DIR}/maplibre-native-c.pc")
   set(artifact_file

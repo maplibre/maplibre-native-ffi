@@ -1,5 +1,6 @@
 function(mln_ffi_configure_platform_dependencies target)
   target_link_libraries(${target} INTERFACE android atomic z)
+  mln_ffi_bundle_clang_cxx_runtime(${target} "${CMAKE_ANDROID_NDK}/NOTICE")
   # The emulator this repository boots runs x86_64 with SwiftShader drivers for
   # both render backends, so every x86_64 configuration can execute its suite.
   if(ANDROID_ABI STREQUAL "x86_64")
