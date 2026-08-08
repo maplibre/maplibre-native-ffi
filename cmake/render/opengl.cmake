@@ -29,15 +29,17 @@ function(mln_ffi_configure_render_dependencies target)
           PROPERTY MLN_FFI_TEST_LINK_LIBRARIES MLN_FFI::EGL MLN_FFI::GLESv2)
       endif()
       if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-        # An Apple host has no system EGL to build against, so the headers ship
-        # with the artifact and the implementation behind them does not.
+        # An Apple host has no system EGL, so both the implementation and the
+        # headers to build against come from the ANGLE distribution the host
+        # brings. The local stand-in installs the two together through the
+        # loader component, which the artifact leaves out.
         mln_ffi_add_license(${target} "${MLN_FFI_EGL_ROOT}/LICENSE" "angle.txt")
         set_target_properties(
           ${target}
           PROPERTIES
             MLN_FFI_INSTALL_LOADER_FILES
             "${MLN_FFI_EGL_LIBRARY};${MLN_FFI_GLES_LIBRARY}"
-            MLN_FFI_INSTALL_INCLUDE_DIRS
+            MLN_FFI_INSTALL_LOADER_INCLUDE_DIRS
             "${MLN_FFI_EGL_INCLUDE_DIRS}/EGL;${MLN_FFI_EGL_INCLUDE_DIRS}/GLES2;${MLN_FFI_EGL_INCLUDE_DIRS}/GLES3;${MLN_FFI_EGL_INCLUDE_DIRS}/KHR")
       endif()
     elseif(CMAKE_SYSTEM_NAME MATCHES "^(Android|OHOS)$")

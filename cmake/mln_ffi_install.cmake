@@ -201,9 +201,11 @@ function(mln_ffi_install_c_api_library target)
         COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
     endif()
   endforeach()
-  # A graphics loader is the host's to supply, so a full installation and the
-  # package both leave this component out. The build task installs it separately
-  # for the fixtures and examples, which stand in for a host that brought one.
+  # A graphics implementation is the host's to supply, so a full installation
+  # and the package both leave this component out. The build task installs it
+  # separately for the fixtures and examples, which stand in for a host that
+  # brought one. The headers a caller builds the implementation's descriptors
+  # against belong to that implementation, and travel with it.
   get_target_property(MLN_FFI_INSTALL_LOADER_FILES mln_ffi_render_dependencies
                       MLN_FFI_INSTALL_LOADER_FILES)
   if(MLN_FFI_INSTALL_LOADER_FILES
@@ -214,13 +216,15 @@ function(mln_ffi_install_c_api_library target)
       COMPONENT "${MLN_FFI_LOADER_COMPONENT}"
       EXCLUDE_FROM_ALL)
   endif()
-  get_target_property(MLN_FFI_INSTALL_INCLUDE_DIRS mln_ffi_render_dependencies
-                      MLN_FFI_INSTALL_INCLUDE_DIRS)
-  if(MLN_FFI_INSTALL_INCLUDE_DIRS
-     AND NOT MLN_FFI_INSTALL_INCLUDE_DIRS MATCHES "-NOTFOUND$")
+  get_target_property(
+    MLN_FFI_INSTALL_LOADER_INCLUDE_DIRS mln_ffi_render_dependencies
+    MLN_FFI_INSTALL_LOADER_INCLUDE_DIRS)
+  if(MLN_FFI_INSTALL_LOADER_INCLUDE_DIRS
+     AND NOT MLN_FFI_INSTALL_LOADER_INCLUDE_DIRS MATCHES "-NOTFOUND$")
     install(
-      DIRECTORY ${MLN_FFI_INSTALL_INCLUDE_DIRS}
+      DIRECTORY ${MLN_FFI_INSTALL_LOADER_INCLUDE_DIRS}
       DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-      COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+      COMPONENT "${MLN_FFI_LOADER_COMPONENT}"
+      EXCLUDE_FROM_ALL)
   endif()
 endfunction()
