@@ -236,9 +236,9 @@ mod download {
     const APPLE_MOBILE: &[(&str, &str)] = &[("metal", "metal")];
 
     /// The presets `.github/workflows/publish-snapshots.yml` publishes a shared
-    /// library for. OpenHarmony, musl, and windows-gnu ship no archive. Device
-    /// iOS ships only a static archive, which needs Apple framework link
-    /// metadata this does not emit.
+    /// library for. musl and windows-gnu ship no archive. Device iOS ships only
+    /// a static archive, which needs Apple framework link metadata this does
+    /// not emit.
     const PLATFORM_TARGETS: &[PlatformTarget] = &[
         PlatformTarget {
             os: "linux",
@@ -293,6 +293,22 @@ mod download {
             arch: "x86_64",
             env: "",
             platform: "android-x64",
+            default_backend: "opengl",
+            backends: OPENGL_EGL,
+        },
+        PlatformTarget {
+            os: "linux",
+            arch: "aarch64",
+            env: "ohos",
+            platform: "ohos-arm64",
+            default_backend: "opengl",
+            backends: OPENGL_EGL,
+        },
+        PlatformTarget {
+            os: "linux",
+            arch: "x86_64",
+            env: "ohos",
+            platform: "ohos-x64",
             default_backend: "opengl",
             backends: OPENGL_EGL,
         },
