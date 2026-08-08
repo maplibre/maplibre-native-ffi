@@ -24,15 +24,20 @@ staging_dir="$build_dir/.package-staging"
 package_root="$staging_dir/maplibre-native-c-$preset"
 install_dir="$build_dir/install"
 
-# A package carries no graphics loader, so the fixtures and examples that run
-# against this tree supply one. The tree already holds it, put there by the
-# loader component or by an earlier run of this task, so it is set aside here
-# and restored below rather than fetched from wherever the build found it.
+# A package carries no graphics implementation, neither the loader nor the
+# headers to build against, so the fixtures and examples that run against this
+# tree supply one. The tree already holds it, put there by the loader component
+# or by an earlier run of this task, so it is set aside here and restored below
+# rather than fetched from wherever the build found it.
 loader_stash=""
 if [[ "$preset" == macos-*-egl && -f "$install_dir/lib/libEGL.dylib" ]]; then
   loader_stash="$(mktemp -d)"
+  mkdir -p "$loader_stash/lib" "$loader_stash/include"
   cp "$install_dir/lib/libEGL.dylib" "$install_dir/lib/libGLESv2.dylib" \
-    "$loader_stash"
+    "$loader_stash/lib"
+  cp -R "$install_dir/include/EGL" "$install_dir/include/GLES2" \
+    "$install_dir/include/GLES3" "$install_dir/include/KHR" \
+    "$loader_stash/include"
 fi
 
 mise run //:clean "$preset"
@@ -62,9 +67,12 @@ mv "$package_root" "$install_dir"
 rm -rf "$staging_dir"
 
 if [[ -n "$loader_stash" ]]; then
-  mv "$loader_stash"/libEGL.dylib "$loader_stash"/libGLESv2.dylib \
+  mv "$loader_stash"/lib/libEGL.dylib "$loader_stash"/lib/libGLESv2.dylib \
     "$install_dir/lib"
-  rmdir "$loader_stash"
+  mv "$loader_stash"/include/EGL "$loader_stash"/include/GLES2 \
+    "$loader_stash"/include/GLES3 "$loader_stash"/include/KHR \
+    "$install_dir/include"
+  rm -rf "$loader_stash"
 fi
 
 touch "$build_dir/.native-package-install"

@@ -83,16 +83,17 @@ the host already loaded. Android and OpenHarmony are the exception, where the
 loader is part of the platform, at a fixed location every host on it already
 has.
 
-Two rules follow. A build links a loader into the test harness alone, which
+Three rules follow. A build links a loader into the test harness alone, which
 drives the graphics API the way a host does. An artifact carries the C API and
 nothing else that loads, so repackaging it copies no implementation along, and a
 host that loads its own still runs one: handles that one copy mints are opaque
-pointers another copy does not own.
+pointers another copy does not own. An artifact carries the C API's own headers
+alone, because the headers that a host builds surface descriptors against arrive
+with the implementation that it loads.
 
-An artifact still carries the headers a host builds against, because Apple
-provides none for EGL or Vulkan. A local stand-in for the implementation reaches
-the install tree through the CMake `loader` component, which a full installation
-and the package both leave out. `mise run package-native` checks the two rules
+A local stand-in for the implementation, its headers included, reaches the
+install tree through the CMake `loader` component, which a full installation and
+the package both leave out. `mise run package-native` checks the three rules
 above on every preset.
 
 ## Handles

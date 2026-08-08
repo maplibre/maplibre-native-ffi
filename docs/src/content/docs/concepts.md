@@ -60,7 +60,7 @@ stay valid everywhere they are passed.
 
 Most platforms provide that implementation. Apple provides neither EGL nor
 Vulkan, so a macOS host loads an EGL implementation such as ANGLE for the OpenGL
-backend, or MoltenVK for the Vulkan backend. The macOS artifacts carry the
+backend, or MoltenVK for the Vulkan backend. That implementation brings the
 headers to build against.
 
 The thread that attaches a render session becomes its owner thread for the
