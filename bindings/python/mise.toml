@@ -19,8 +19,12 @@ extends = "ffi:preset"
 run = '''
 # See `build`: repaired extension artifacts are outputs, never compiler inputs.
 cargo clean --package maplibre-native-ffi-python
+# Skip the repair: it vendors the native library through patchelf, and a local
+# install reaches the build prefix through the extension's rpath already.
+# Clear the wheel directory so `--find-links` cannot resolve a stale build.
+rm -rf dist
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
-  uv run --project . --no-sync maturin build --out dist
+  uv run --project . --no-sync maturin build --out dist --auditwheel skip
 uv pip install --python "$MISE_MONOREPO_ROOT/.venv" --reinstall --no-index --find-links dist \
   "maplibre-native-ffi==0.0.0"
 '''
