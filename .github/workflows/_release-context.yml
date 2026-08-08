@@ -1,4 +1,4 @@
-name: Release context
+name: "↳ Release context"
 
 on:
   workflow_call:

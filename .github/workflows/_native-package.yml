@@ -1,4 +1,4 @@
-name: Native publish
+name: "↳ Native package"
 
 on:
   workflow_call:

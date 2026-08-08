@@ -1,4 +1,4 @@
-name: Native release
+name: Publish native release
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
       actions: read
       checks: read
       contents: read
-    uses: ./.github/workflows/release-context.yml
+    uses: ./.github/workflows/_release-context.yml
     with:
       family: core
 
@@ -30,7 +30,7 @@ jobs:
     permissions:
       actions: read
       contents: write
-    uses: ./.github/workflows/native-publish.yml
+    uses: ./.github/workflows/_native-package.yml
     with:
       ci_run_url: ${{ needs.source.outputs.ci_run_url }}
       previous_tag: ${{ needs.source.outputs.previous_tag }}

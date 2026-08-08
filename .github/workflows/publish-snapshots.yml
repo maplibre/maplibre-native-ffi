@@ -1,4 +1,6 @@
-name: Publishing
+name: Publish snapshots
+# A scheduled run has no inputs, so it names the full gated set it publishes.
+run-name: Snapshots · ${{ inputs.components || 'all' }}
 on:
   schedule:
     - cron: "17 6 * * *"
@@ -383,7 +385,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-    uses: ./.github/workflows/kotlin-publish.yml
+    uses: ./.github/workflows/_kotlin-maven.yml
     with:
       run_id: ${{ needs.plan.outputs.run_id }}
       sha: ${{ needs.plan.outputs.sha }}
@@ -398,7 +400,7 @@ jobs:
     permissions:
       actions: read
       contents: write
-    uses: ./.github/workflows/native-publish.yml
+    uses: ./.github/workflows/_native-package.yml
     with:
       ci_run_url: ${{ needs.plan.outputs.ci_run_url }}
       run_id: ${{ needs.plan.outputs.run_id }}

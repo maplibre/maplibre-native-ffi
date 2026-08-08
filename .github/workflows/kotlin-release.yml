@@ -1,4 +1,4 @@
-name: Kotlin release
+name: Publish Kotlin release
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
       actions: read
       checks: read
       contents: read
-    uses: ./.github/workflows/release-context.yml
+    uses: ./.github/workflows/_release-context.yml
     with:
       family: kotlin
 
@@ -30,7 +30,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-    uses: ./.github/workflows/kotlin-publish.yml
+    uses: ./.github/workflows/_kotlin-maven.yml
     with:
       release: true
       run_id: ${{ needs.source.outputs.run_id }}
