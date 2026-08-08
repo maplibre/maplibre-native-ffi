@@ -12,11 +12,11 @@ include(":bindings:rustls-platform-verifier-android")
 
 include(":bindings:kotlin")
 
-include(":bindings:kotlin-runtime-metal")
+include(":bindings:kotlin:runtimes:metal")
 
-include(":bindings:kotlin-runtime-opengl")
+include(":bindings:kotlin:runtimes:opengl")
 
-include(":bindings:kotlin-runtime-vulkan")
+include(":bindings:kotlin:runtimes:vulkan")
 
 if (androidSdkDir() != null) {
   include(":examples:android-map")

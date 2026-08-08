@@ -111,7 +111,6 @@ description = "Kotlin Multiplatform modules on Maven Central snapshots."
 depends = ["native"]
 paths = [
   "bindings/kotlin/**",
-  "bindings/kotlin-runtime-*/**",
   "bindings/rustls-platform-verifier-android/**",
   "!.github/workflows/_native-package.yml",
   "!ci/native_package_release.py",

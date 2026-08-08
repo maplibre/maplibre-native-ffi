@@ -204,6 +204,6 @@ tasks.register("androidBuild") {
     "packageAndroidNativeLibraries",
     "assembleAndroidMain",
     checkAndroidApiFloor,
-    ":bindings:kotlin-runtime-$androidBackend:assembleAndroidMain",
+    ":bindings:kotlin:runtimes:$androidBackend:assembleAndroidMain",
   )
 }
