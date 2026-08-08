@@ -50,30 +50,62 @@ function(mln_ffi_install_zig_libc)
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
 endfunction()
 
+# The name a linker takes for a dependency a find module answered with. A full
+# path cannot travel, because the artifact reaches machines that have neither
+# that path nor that SDK.
+function(mln_ffi_link_name out_var entry)
+  set(MLN_FFI_NAME "${entry}")
+  if(MLN_FFI_NAME MATCHES "[/\\]")
+    get_filename_component(MLN_FFI_NAME "${MLN_FFI_NAME}" NAME)
+    string(REGEX REPLACE "^lib" "" MLN_FFI_NAME "${MLN_FFI_NAME}")
+    string(REGEX REPLACE "\\.(so(\\.[0-9.]+)?|a|dylib|tbd)$" "" MLN_FFI_NAME
+           "${MLN_FFI_NAME}")
+  endif()
+  string(REGEX REPLACE "\\.lib$" "" MLN_FFI_NAME "${MLN_FFI_NAME}")
+  set(${out_var} "${MLN_FFI_NAME}" PARENT_SCOPE)
+endfunction()
+
 # The system libraries a consumer supplies alongside the complete static
-# archive. Everything the archive merges in is a CMake target by this point, so
-# the plain names and `-framework` entries left in the dependency interfaces are
-# exactly what stays external.
+# archive. A target the project builds is already inside the archive; an
+# imported one stands for a system library, so it resolves to whatever it names.
 function(mln_ffi_static_link_metadata libraries_var frameworks_var)
-  set(MLN_FFI_STATIC_LIBRARIES "")
-  set(MLN_FFI_STATIC_FRAMEWORKS "")
+  set(MLN_FFI_PENDING "")
   foreach(dependencies mln_ffi_platform_dependencies mln_ffi_render_dependencies)
     get_target_property(MLN_FFI_ENTRIES ${dependencies} INTERFACE_LINK_LIBRARIES)
-    if(NOT MLN_FFI_ENTRIES OR MLN_FFI_ENTRIES MATCHES "-NOTFOUND$")
+    if(MLN_FFI_ENTRIES AND NOT MLN_FFI_ENTRIES MATCHES "-NOTFOUND$")
+      list(APPEND MLN_FFI_PENDING ${MLN_FFI_ENTRIES})
+    endif()
+  endforeach()
+
+  set(MLN_FFI_STATIC_LIBRARIES "")
+  set(MLN_FFI_STATIC_FRAMEWORKS "")
+  set(MLN_FFI_SEEN "")
+  while(MLN_FFI_PENDING)
+    list(POP_FRONT MLN_FFI_PENDING MLN_FFI_ENTRY)
+    if("${MLN_FFI_ENTRY}" IN_LIST MLN_FFI_SEEN)
       continue()
     endif()
-    foreach(MLN_FFI_ENTRY IN LISTS MLN_FFI_ENTRIES)
-      if(TARGET ${MLN_FFI_ENTRY})
+    list(APPEND MLN_FFI_SEEN "${MLN_FFI_ENTRY}")
+    if(TARGET ${MLN_FFI_ENTRY})
+      get_target_property(MLN_FFI_IMPORTED ${MLN_FFI_ENTRY} IMPORTED)
+      if(NOT MLN_FFI_IMPORTED)
         continue()
-      elseif(MLN_FFI_ENTRY MATCHES "^-framework +(.+)$")
-        list(APPEND MLN_FFI_STATIC_FRAMEWORKS "${CMAKE_MATCH_1}")
-      elseif(MLN_FFI_ENTRY MATCHES "^[-$]")
-        continue()
-      else()
-        list(APPEND MLN_FFI_STATIC_LIBRARIES "${MLN_FFI_ENTRY}")
       endif()
-    endforeach()
-  endforeach()
+      foreach(property IMPORTED_LOCATION INTERFACE_LINK_LIBRARIES)
+        get_target_property(MLN_FFI_VALUE ${MLN_FFI_ENTRY} ${property})
+        if(MLN_FFI_VALUE AND NOT MLN_FFI_VALUE MATCHES "-NOTFOUND$")
+          list(APPEND MLN_FFI_PENDING ${MLN_FFI_VALUE})
+        endif()
+      endforeach()
+    elseif(MLN_FFI_ENTRY MATCHES "^-framework +(.+)$")
+      list(APPEND MLN_FFI_STATIC_FRAMEWORKS "${CMAKE_MATCH_1}")
+    elseif(MLN_FFI_ENTRY MATCHES "^[-$]")
+      continue()
+    else()
+      mln_ffi_link_name(MLN_FFI_ENTRY_NAME "${MLN_FFI_ENTRY}")
+      list(APPEND MLN_FFI_STATIC_LIBRARIES "${MLN_FFI_ENTRY_NAME}")
+    endif()
+  endwhile()
   list(REMOVE_DUPLICATES MLN_FFI_STATIC_LIBRARIES)
   list(REMOVE_DUPLICATES MLN_FFI_STATIC_FRAMEWORKS)
   set(${libraries_var} ${MLN_FFI_STATIC_LIBRARIES} PARENT_SCOPE)
@@ -208,6 +240,17 @@ function(mln_ffi_install_c_api_library target)
   mln_ffi_static_archive_link_name(MLN_FFI_STATIC_ARCHIVE_NAME ${target})
   mln_ffi_static_link_metadata(MLN_FFI_STATIC_LINK_LIBRARIES
                                MLN_FFI_STATIC_LINK_FRAMEWORKS)
+  # Archives installed beside the primary one, which the platform declares only
+  # where it builds them; Apple has its own HTTP stack and so has none.
+  get_target_property(
+    MLN_FFI_STATIC_COMPANION_ARCHIVES mln_ffi_platform_dependencies
+    MLN_FFI_STATIC_COMPANION_ARCHIVES)
+  if(NOT MLN_FFI_STATIC_COMPANION_ARCHIVES
+     OR MLN_FFI_STATIC_COMPANION_ARCHIVES MATCHES "-NOTFOUND$")
+    set(MLN_FFI_STATIC_COMPANION_ARCHIVES "")
+  endif()
+  mln_ffi_json_string_array(MLN_FFI_STATIC_COMPANION_ARCHIVES_JSON
+                            ${MLN_FFI_STATIC_COMPANION_ARCHIVES})
   mln_ffi_json_string_array(MLN_FFI_STATIC_LINK_LIBRARIES_JSON
                             ${MLN_FFI_STATIC_LINK_LIBRARIES})
   mln_ffi_json_string_array(MLN_FFI_STATIC_LINK_FRAMEWORKS_JSON

@@ -12,9 +12,6 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
 const LIBRARY_NAME: &str = "maplibre-native-c";
-/// The Rust platform layer the C archive calls into. The shared library carried
-/// it privately; a static consumer supplies it. Emscripten takes it from Cargo.
-const PLATFORM_LIBRARY_NAME: &str = "mln_ffi_platform";
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-env-changed=MAPLIBRE_NATIVE_C_INSTALL_DIR");
@@ -38,11 +35,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         "cargo:rustc-link-lib=static={}",
         static_archive_name(&descriptor)
     );
-    if target_os != "emscripten" {
-        println!("cargo:rustc-link-lib=static={PLATFORM_LIBRARY_NAME}");
-    }
     if let Some(descriptor) = &descriptor {
         println!("cargo:render-backend={}", descriptor.render_backend());
+        // Archives installed beside the primary one, such as the Rust platform
+        // layer the C archive calls into. Emscripten takes that one from Cargo.
+        if target_os != "emscripten" {
+            for archive in descriptor.static_companion_archives() {
+                println!("cargo:rustc-link-lib=static={archive}");
+            }
+        }
         // The archive merges in every dependency it can. What is left is the
         // platform and render backend's system libraries, which CMake records.
         for library in descriptor.static_link_libraries() {
@@ -344,6 +345,8 @@ mod download {
         #[serde(default)]
         static_archive_name: String,
         #[serde(default)]
+        static_companion_archives: Vec<String>,
+        #[serde(default)]
         static_link_libraries: Vec<String>,
         #[serde(default)]
         static_link_frameworks: Vec<String>,
@@ -627,6 +630,10 @@ mod download {
 
         pub(super) fn static_archive_name(&self) -> &str {
             &self.static_archive_name
+        }
+
+        pub(super) fn static_companion_archives(&self) -> &[String] {
+            &self.static_companion_archives
         }
 
         pub(super) fn static_link_libraries(&self) -> &[String] {

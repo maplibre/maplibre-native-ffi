@@ -207,6 +207,10 @@ function(mln_ffi_link_rust_platform target)
     TARGET mln_ffi_platform_dependencies
     APPEND_STRING
     PROPERTY MLN_FFI_PKG_CONFIG_ARCHIVES " -lmln_ffi_platform")
+  set_property(
+    TARGET mln_ffi_platform_dependencies
+    APPEND
+    PROPERTY MLN_FFI_STATIC_COMPANION_ARCHIVES "mln_ffi_platform")
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(${target} PRIVATE dl m)
   endif()
