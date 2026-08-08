@@ -1,4 +1,5 @@
-# Input scopes for the components published by .github/workflows/publishing.yml.
+# Input scopes for the components published by
+# .github/workflows/publish-snapshots.yml.
 # The workflow hashes each component's inputs and skips the component when that
 # hash matches the commit it last published from.
 #
@@ -42,8 +43,7 @@ shared = [
   # The CI definitions that shape every snapshot artifact.
   ".github/workflows/**",
   "!.github/workflows/*-release.yml",
-  "!.github/workflows/*-publish.yml",
-  "!.github/workflows/release-context.yml",
+  "!.github/workflows/_*.yml",
   ".github/actions/**",
   "ci/**",
   "!ci/*release.py",
@@ -102,7 +102,7 @@ shared = [
 [components.native]
 description = "Native CPack tarballs on the floating GitHub prerelease."
 paths = [
-  ".github/workflows/native-publish.yml",
+  ".github/workflows/_native-package.yml",
   "ci/native_package_release.py",
 ]
 
@@ -113,9 +113,9 @@ paths = [
   "bindings/kotlin/**",
   "bindings/kotlin-runtime-*/**",
   "bindings/rustls-platform-verifier-android/**",
-  "!.github/workflows/native-publish.yml",
+  "!.github/workflows/_native-package.yml",
   "!ci/native_package_release.py",
-  ".github/workflows/kotlin-publish.yml",
+  ".github/workflows/_kotlin-maven.yml",
   "ci/kotlin_release.py",
   # Gradle assembles every publication.
   "buildSrc/**",
@@ -132,7 +132,7 @@ description = "Backend-specific Python wheels on the GitHub Pages package index.
 depends = ["native"]
 paths = [
   "bindings/python/**",
-  "!.github/workflows/native-publish.yml",
+  "!.github/workflows/_native-package.yml",
   "!ci/native_package_release.py",
   # The extension reuses the Rust binding's low-level ownership and FFI layers.
   "bindings/rust/**",
@@ -145,7 +145,7 @@ description = "Backend-specific .NET packages on the GitHub Pages NuGet feed."
 depends = ["native"]
 paths = [
   "bindings/dotnet/**",
-  "!.github/workflows/native-publish.yml",
+  "!.github/workflows/_native-package.yml",
   "!ci/native_package_release.py",
   "Directory.Packages.props",
   "Maplibre.NativeFfi.slnx",
@@ -158,7 +158,7 @@ depends = ["kotlin", "python", "dotnet"]
 # The site embeds an API reference generated from every binding, so it takes the
 # binding sources along with the ecosystem roots each doc tool builds through.
 paths = [
-  "!.github/workflows/kotlin-publish.yml",
+  "!.github/workflows/_kotlin-maven.yml",
   "!ci/kotlin_release.py",
   "bindings/dart/**",
   "bindings/go/**",

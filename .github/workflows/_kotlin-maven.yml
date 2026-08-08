@@ -1,4 +1,4 @@
-name: Kotlin publish
+name: "↳ Kotlin Maven"
 
 on:
   workflow_call:
