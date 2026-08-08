@@ -114,9 +114,11 @@ function(mln_ffi_configure_platform_dependencies target)
     ${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE-extra"
     "libuv-extra.txt")
 
+  # `m` is here rather than private to the C API target so that it reaches a
+  # static consumer, which links the archive without that target's own line.
   target_link_libraries(
     ${target}
-    INTERFACE Threads::Threads zlibstatic uv_a ${CMAKE_DL_LIBS})
+    INTERFACE Threads::Threads zlibstatic uv_a m ${CMAKE_DL_LIBS})
   set_target_properties(
     ${target}
     PROPERTIES

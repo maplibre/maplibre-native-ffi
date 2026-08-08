@@ -31,19 +31,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed={}", descriptor_path.display());
     let descriptor = download::read_descriptor(&install_dir).ok();
 
-    println!(
-        "cargo:rustc-link-lib=static={}",
-        static_archive_name(&descriptor)
-    );
+    for archive in static_archives(&link_dir, &target_os)? {
+        println!("cargo:rustc-link-lib=static={archive}");
+    }
     if let Some(descriptor) = &descriptor {
         println!("cargo:render-backend={}", descriptor.render_backend());
-        // Archives installed beside the primary one, such as the Rust platform
-        // layer the C archive calls into. Emscripten takes that one from Cargo.
-        if target_os != "emscripten" {
-            for archive in descriptor.static_companion_archives() {
-                println!("cargo:rustc-link-lib=static={archive}");
-            }
-        }
         // The archive merges in every dependency it can. What is left is the
         // platform and render backend's system libraries, which CMake records.
         for library in descriptor.static_link_libraries() {
@@ -121,14 +113,57 @@ fn native_install_dir() -> Result<PathBuf, Box<dyn Error>> {
     download::install_prefix(backend)
 }
 
-/// Most formats name the archive after the C API library and let the extension
-/// separate it from the shared library. COFF cannot, so the artifact says.
-fn static_archive_name(descriptor: &Option<download::ArtifactDescriptor>) -> &str {
-    descriptor
-        .as_ref()
-        .map(|descriptor| descriptor.static_archive_name())
-        .filter(|name| !name.is_empty())
-        .unwrap_or(LIBRARY_NAME)
+/// The complete static archive, then whatever ships beside it, such as the Rust
+/// platform layer the C archive calls into. The prefix is read rather than the
+/// descriptor, so a prefix built before this linking existed still resolves.
+///
+/// Every format but COFF lets the file extension separate the archive from the
+/// shared library. COFF cannot, because the shared build's import library
+/// already holds that name, so there the archive carries a `-static` suffix and
+/// the import library is the one to leave out.
+fn static_archives(link_dir: &Path, target_os: &str) -> Result<Vec<String>, Box<dyn Error>> {
+    let windows = target_os == "windows";
+    let (extension, prefix) = if windows { ("lib", "") } else { ("a", "lib") };
+    let primary = if windows {
+        format!("{LIBRARY_NAME}-static")
+    } else {
+        LIBRARY_NAME.to_owned()
+    };
+
+    let mut companions: Vec<String> = fs::read_dir(link_dir)?
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            if path.extension()? != extension {
+                return None;
+            }
+            let name = path.file_stem()?.to_str()?.strip_prefix(prefix)?.to_owned();
+            // On COFF this is the shared library's import library, which would
+            // put the consumer back on the DLL.
+            (name != primary && !(windows && name == LIBRARY_NAME)).then_some(name)
+        })
+        .collect();
+    companions.sort();
+
+    if !link_dir
+        .join(format!("{prefix}{primary}.{extension}"))
+        .is_file()
+    {
+        return Err(format!(
+            "missing the complete static archive {prefix}{primary}.{extension} in {}; \
+             the prefix predates static linking or was built without one",
+            link_dir.display()
+        )
+        .into());
+    }
+
+    // The archive references the companions, so it comes first. Emscripten
+    // takes the platform layer from Cargo, so linking a copy here would collide.
+    let mut archives = vec![primary];
+    if target_os != "emscripten" {
+        archives.extend(companions);
+    }
+    Ok(archives)
 }
 
 fn native_library_dir(install_dir: &Path) -> PathBuf {
@@ -342,10 +377,6 @@ mod download {
         render_backend: String,
         target_platform: String,
         /// Absent from archives published before the fields were added.
-        #[serde(default)]
-        static_archive_name: String,
-        #[serde(default)]
-        static_companion_archives: Vec<String>,
         #[serde(default)]
         static_link_libraries: Vec<String>,
         #[serde(default)]
@@ -626,14 +657,6 @@ mod download {
     impl ArtifactDescriptor {
         pub(super) fn render_backend(&self) -> &str {
             &self.render_backend
-        }
-
-        pub(super) fn static_archive_name(&self) -> &str {
-            &self.static_archive_name
-        }
-
-        pub(super) fn static_companion_archives(&self) -> &[String] {
-            &self.static_companion_archives
         }
 
         pub(super) fn static_link_libraries(&self) -> &[String] {

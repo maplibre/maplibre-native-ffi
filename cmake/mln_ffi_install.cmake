@@ -66,8 +66,9 @@ function(mln_ffi_link_name out_var entry)
 endfunction()
 
 # The system libraries a consumer supplies alongside the complete static
-# archive. A target the project builds is already inside the archive; an
-# imported one stands for a system library, so it resolves to whatever it names.
+# archive. A target the project builds is already inside the archive, but its
+# own system dependencies are not, so its interface is still walked; an imported
+# target stands for a system library, and resolves to whatever it names.
 function(mln_ffi_static_link_metadata libraries_var frameworks_var)
   set(MLN_FFI_PENDING "")
   foreach(dependencies mln_ffi_platform_dependencies mln_ffi_render_dependencies)
@@ -87,11 +88,10 @@ function(mln_ffi_static_link_metadata libraries_var frameworks_var)
     endif()
     list(APPEND MLN_FFI_SEEN "${MLN_FFI_ENTRY}")
     if(TARGET ${MLN_FFI_ENTRY})
-      get_target_property(MLN_FFI_IMPORTED ${MLN_FFI_ENTRY} IMPORTED)
-      if(NOT MLN_FFI_IMPORTED)
-        continue()
-      endif()
-      foreach(property IMPORTED_LOCATION INTERFACE_LINK_LIBRARIES)
+      # IMPORTED_LIBNAME carries the name an interface-only imported target
+      # stands for, which is how FindOpenGL spells opengl32 on Windows.
+      foreach(property IMPORTED_LOCATION IMPORTED_LIBNAME
+              INTERFACE_LINK_LIBRARIES)
         get_target_property(MLN_FFI_VALUE ${MLN_FFI_ENTRY} ${property})
         if(MLN_FFI_VALUE AND NOT MLN_FFI_VALUE MATCHES "-NOTFOUND$")
           list(APPEND MLN_FFI_PENDING ${MLN_FFI_VALUE})
@@ -99,6 +99,10 @@ function(mln_ffi_static_link_metadata libraries_var frameworks_var)
       endforeach()
     elseif(MLN_FFI_ENTRY MATCHES "^-framework +(.+)$")
       list(APPEND MLN_FFI_STATIC_FRAMEWORKS "${CMAKE_MATCH_1}")
+    elseif(MLN_FFI_ENTRY MATCHES "^\\$<LINK_ONLY:(.+)>$")
+      # How a static library carries its private system dependencies, which is
+      # where libuv keeps the Windows ones.
+      list(APPEND MLN_FFI_PENDING "${CMAKE_MATCH_1}")
     elseif(MLN_FFI_ENTRY MATCHES "^[-$]")
       continue()
     else()
@@ -110,26 +114,6 @@ function(mln_ffi_static_link_metadata libraries_var frameworks_var)
   list(REMOVE_DUPLICATES MLN_FFI_STATIC_FRAMEWORKS)
   set(${libraries_var} ${MLN_FFI_STATIC_LIBRARIES} PARENT_SCOPE)
   set(${frameworks_var} ${MLN_FFI_STATIC_FRAMEWORKS} PARENT_SCOPE)
-endfunction()
-
-# The name a consumer passes to its linker for the complete static archive.
-# Every format but COFF names the archive after the C API library and lets the
-# extension separate it from the shared library; COFF cannot, because the shared
-# build's import library already holds that name.
-function(mln_ffi_static_archive_link_name out_var target)
-  set(MLN_FFI_ARCHIVE_TARGET ${target})
-  if(TARGET ${target}_static)
-    set(MLN_FFI_ARCHIVE_TARGET ${target}_static)
-  endif()
-  get_target_property(MLN_FFI_ARCHIVE_PATH ${MLN_FFI_ARCHIVE_TARGET}
-                      MLN_FFI_INSTALL_ARCHIVE)
-  if(NOT MLN_FFI_ARCHIVE_PATH OR MLN_FFI_ARCHIVE_PATH MATCHES "-NOTFOUND$")
-    set(${out_var} "" PARENT_SCOPE)
-    return()
-  endif()
-  get_filename_component(MLN_FFI_ARCHIVE_NAME "${MLN_FFI_ARCHIVE_PATH}" NAME_WE)
-  string(REGEX REPLACE "^lib" "" MLN_FFI_ARCHIVE_NAME "${MLN_FFI_ARCHIVE_NAME}")
-  set(${out_var} "${MLN_FFI_ARCHIVE_NAME}" PARENT_SCOPE)
 endfunction()
 
 function(mln_ffi_json_string_array out_var)
@@ -237,20 +221,8 @@ function(mln_ffi_install_c_api_library target)
                       MLN_FFI_TARGET_PLATFORM)
   mln_ffi_resolve_git_sha()
   mln_ffi_install_emscripten_options()
-  mln_ffi_static_archive_link_name(MLN_FFI_STATIC_ARCHIVE_NAME ${target})
   mln_ffi_static_link_metadata(MLN_FFI_STATIC_LINK_LIBRARIES
                                MLN_FFI_STATIC_LINK_FRAMEWORKS)
-  # Archives installed beside the primary one, which the platform declares only
-  # where it builds them; Apple has its own HTTP stack and so has none.
-  get_target_property(
-    MLN_FFI_STATIC_COMPANION_ARCHIVES mln_ffi_platform_dependencies
-    MLN_FFI_STATIC_COMPANION_ARCHIVES)
-  if(NOT MLN_FFI_STATIC_COMPANION_ARCHIVES
-     OR MLN_FFI_STATIC_COMPANION_ARCHIVES MATCHES "-NOTFOUND$")
-    set(MLN_FFI_STATIC_COMPANION_ARCHIVES "")
-  endif()
-  mln_ffi_json_string_array(MLN_FFI_STATIC_COMPANION_ARCHIVES_JSON
-                            ${MLN_FFI_STATIC_COMPANION_ARCHIVES})
   mln_ffi_json_string_array(MLN_FFI_STATIC_LINK_LIBRARIES_JSON
                             ${MLN_FFI_STATIC_LINK_LIBRARIES})
   mln_ffi_json_string_array(MLN_FFI_STATIC_LINK_FRAMEWORKS_JSON
