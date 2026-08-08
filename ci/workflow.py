@@ -118,21 +118,18 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
     return commands
 
 
+def ohos_commands(preset: str) -> list[str]:
+    # The emulator executes x64 EGL. Other OpenHarmony targets still prove that
+    # each binding links against its backend-specific native artifact.
+    action = "test" if preset in EMULATOR_TESTED else "build"
+    return [
+        f"mise run //bindings/rust:{action} {preset}",
+        f"mise run //bindings/go:{action} {preset}",
+    ]
+
+
 def native_commands(preset: str, tested: set[str]) -> list[str]:
     target_platform = platform(preset)
-    if target_platform == "ohos":
-        if preset in EMULATOR_TESTED:
-            return [
-                f"mise run test {preset}",
-                f"mise run //bindings/rust:test {preset}",
-                f"mise run //bindings/go:test {preset}",
-            ]
-        # The emulator executes x64 EGL. Other OpenHarmony targets still prove
-        # that each binding links against its backend-specific native artifact.
-        return [
-            f"mise run //bindings/rust:build {preset}",
-            f"mise run //bindings/go:build {preset}",
-        ]
     commands = [
         f"mise run {'test' if runtime_tested(preset, tested) else 'build'} {preset}"
     ]
@@ -147,6 +144,8 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
     if target_platform == "android":
         abi = "arm64-v8a" if architecture(preset) == "arm64" else "x86_64"
         commands.extend(android_commands(preset, abi, backend(preset) == "egl"))
+    elif target_platform == "ohos":
+        commands.extend(ohos_commands(preset))
     elif target_platform == "ios":
         commands.extend(
             [

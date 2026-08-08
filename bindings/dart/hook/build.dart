@@ -187,7 +187,9 @@ const Map<String, String> _appleDesktop = {
 const Map<String, String> _appleMobile = {'metal': 'metal'};
 
 /// The presets the snapshot release publishes a shared library for, keyed by
-/// the target they serve. The OpenHarmony presets ship no archive.
+/// the target they serve. The release also carries OpenHarmony archives, which
+/// this table leaves out because `OS` defines no OpenHarmony value for a build
+/// to arrive with.
 const Map<String, ({String defaultBackend, Map<String, String> backends})>
 _platformTargets = {
   'linux-x64': (defaultBackend: 'vulkan', backends: _openglEgl),

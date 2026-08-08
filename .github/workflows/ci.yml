@@ -1052,8 +1052,26 @@ jobs:
           gradle: false
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run build ohos-arm64-egl
+      - name: Archive native artifact
+        run: mise run archive-native ohos-arm64-egl
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          ohos-arm64-egl
+          build/packages/native/dist/maplibre-native-c-ohos-arm64-egl.tar.gz
       - run: mise run //bindings/rust:build ohos-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/go:build ohos-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-ohos-arm64-egl-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-ohos-arm64-egl.tar.gz
+          if-no-files-found: error
 
   target-ohos-arm64-vulkan:
     name: target / ohos-arm64-vulkan
@@ -1074,8 +1092,26 @@ jobs:
           gradle: false
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run build ohos-arm64-vulkan
+      - name: Archive native artifact
+        run: mise run archive-native ohos-arm64-vulkan
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          ohos-arm64-vulkan
+          build/packages/native/dist/maplibre-native-c-ohos-arm64-vulkan.tar.gz
       - run: mise run //bindings/rust:build ohos-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/go:build ohos-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-ohos-arm64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-ohos-arm64-vulkan.tar.gz
+          if-no-files-found: error
 
   target-ohos-x64-egl:
     name: target / ohos-x64-egl
@@ -1097,8 +1133,25 @@ jobs:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test ohos-x64-egl
+      - name: Archive native artifact
+        run: mise run archive-native ohos-x64-egl
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          ohos-x64-egl
+          build/packages/native/dist/maplibre-native-c-ohos-x64-egl.tar.gz
       - run: mise run //bindings/rust:test ohos-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/go:test ohos-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-ohos-x64-egl-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-ohos-x64-egl.tar.gz
+          if-no-files-found: error
 
   target-ohos-x64-vulkan:
     name: target / ohos-x64-vulkan
@@ -1119,8 +1172,26 @@ jobs:
           gradle: false
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run build ohos-x64-vulkan
+      - name: Archive native artifact
+        run: mise run archive-native ohos-x64-vulkan
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          ohos-x64-vulkan
+          build/packages/native/dist/maplibre-native-c-ohos-x64-vulkan.tar.gz
       - run: mise run //bindings/rust:build ohos-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/go:build ohos-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-ohos-x64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-ohos-x64-vulkan.tar.gz
+          if-no-files-found: error
 
   target-windows-x64-wgl:
     name: target / windows-x64-wgl
