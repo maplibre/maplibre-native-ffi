@@ -19,10 +19,6 @@ dependencies = []
 dev = [
   "maturin>=1.13,<2 ; sys_platform != 'linux'",
   "maturin>=1.14.1,<2 ; sys_platform == 'linux'",
-  # Wheel repair shells out to patchelf, and maturin's extra sets no floor. 0.17
-  # rewrites the vendored library into a layout recent loaders reject; the fixes
-  # landed in 0.18, which PyPI has yanked.
-  "patchelf>=0.19 ; sys_platform == 'linux'",
   "pyobjc-framework-metal>=12,<13 ; sys_platform == 'darwin'",
   "pyobjc-framework-quartz>=12,<13 ; sys_platform == 'darwin'",
   "pyopengl>=3.1.10,<4",

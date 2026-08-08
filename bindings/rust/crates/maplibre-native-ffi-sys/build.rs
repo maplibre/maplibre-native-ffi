@@ -12,37 +12,45 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
 const LIBRARY_NAME: &str = "maplibre-native-c";
+/// The Rust platform layer the C archive calls into. The shared library carried
+/// it privately; a static consumer supplies it. Emscripten takes it from Cargo.
+const PLATFORM_LIBRARY_NAME: &str = "mln_ffi_platform";
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-env-changed=MAPLIBRE_NATIVE_C_INSTALL_DIR");
-    println!("cargo:rerun-if-env-changed=CARGO_CFG_TARGET_FAMILY");
     println!("cargo:rerun-if-env-changed=CARGO_CFG_TARGET_OS");
     let install_dir = native_install_dir()?;
     let include_dir = install_dir.join("include");
     let link_dir = native_library_dir(&install_dir);
     let target_os = env::var("CARGO_CFG_TARGET_OS")?;
-    let target_family = env::var("CARGO_CFG_TARGET_FAMILY")?;
-    let runtime_dir = native_runtime_dir(&install_dir, &target_os);
     let header = include_dir.join("maplibre_native_c.h");
 
     require_dir(&include_dir, "native include directory")?;
     require_dir(&link_dir, "native link directory")?;
-    require_dir(&runtime_dir, "native runtime library directory")?;
 
     println!("cargo:rustc-link-search=native={}", link_dir.display());
-    println!("cargo:rustc-link-lib={LIBRARY_NAME}");
     print_rerun_if_changed(&link_dir);
-    let descriptor = install_dir.join("share/maplibre-native-c/artifact.json");
-    println!("cargo:rerun-if-changed={}", descriptor.display());
-    if target_os != "emscripten" && target_family.split(',').any(|family| family == "unix") {
-        println!("cargo:rustc-link-arg=-Wl,-rpath,{}", runtime_dir.display());
+    let descriptor_path = install_dir.join("share/maplibre-native-c/artifact.json");
+    println!("cargo:rerun-if-changed={}", descriptor_path.display());
+    let descriptor = download::read_descriptor(&install_dir).ok();
+
+    println!(
+        "cargo:rustc-link-lib=static={}",
+        static_archive_name(&descriptor)
+    );
+    if target_os != "emscripten" {
+        println!("cargo:rustc-link-lib=static={PLATFORM_LIBRARY_NAME}");
     }
-    // Windows has no rpath, so a dependent has to place the DLL itself. The
-    // `links` key turns this into DEP_MAPLIBRE_NATIVE_C_RUNTIME_DIR for the
-    // crates that need it.
-    println!("cargo:runtime-dir={}", runtime_dir.display());
-    if let Ok(descriptor) = download::read_descriptor(&install_dir) {
+    if let Some(descriptor) = &descriptor {
         println!("cargo:render-backend={}", descriptor.render_backend());
+        // The archive merges in every dependency it can. What is left is the
+        // platform and render backend's system libraries, which CMake records.
+        for library in descriptor.static_link_libraries() {
+            println!("cargo:rustc-link-lib={library}");
+        }
+        for framework in descriptor.static_link_frameworks() {
+            println!("cargo:rustc-link-lib=framework={framework}");
+        }
     }
     println!("cargo:rerun-if-env-changed=EMSDK");
     println!("cargo:rerun-if-env-changed=LIBCLANG_PATH");
@@ -112,12 +120,14 @@ fn native_install_dir() -> Result<PathBuf, Box<dyn Error>> {
     download::install_prefix(backend)
 }
 
-fn native_runtime_dir(install_dir: &Path, target_os: &str) -> PathBuf {
-    if target_os == "windows" {
-        install_dir.join("bin")
-    } else {
-        native_library_dir(install_dir)
-    }
+/// Most formats name the archive after the C API library and let the extension
+/// separate it from the shared library. COFF cannot, so the artifact says.
+fn static_archive_name(descriptor: &Option<download::ArtifactDescriptor>) -> &str {
+    descriptor
+        .as_ref()
+        .map(|descriptor| descriptor.static_archive_name())
+        .filter(|name| !name.is_empty())
+        .unwrap_or(LIBRARY_NAME)
 }
 
 fn native_library_dir(install_dir: &Path) -> PathBuf {
@@ -330,6 +340,13 @@ mod download {
         git_sha: Option<String>,
         render_backend: String,
         target_platform: String,
+        /// Absent from archives published before the fields were added.
+        #[serde(default)]
+        static_archive_name: String,
+        #[serde(default)]
+        static_link_libraries: Vec<String>,
+        #[serde(default)]
+        static_link_frameworks: Vec<String>,
     }
 
     pub(super) fn install_prefix(backend: Option<&'static str>) -> Result<PathBuf, Box<dyn Error>> {
@@ -606,6 +623,18 @@ mod download {
     impl ArtifactDescriptor {
         pub(super) fn render_backend(&self) -> &str {
             &self.render_backend
+        }
+
+        pub(super) fn static_archive_name(&self) -> &str {
+            &self.static_archive_name
+        }
+
+        pub(super) fn static_link_libraries(&self) -> &[String] {
+            &self.static_link_libraries
+        }
+
+        pub(super) fn static_link_frameworks(&self) -> &[String] {
+            &self.static_link_frameworks
         }
     }
 

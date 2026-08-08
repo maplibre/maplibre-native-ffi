@@ -3,5 +3,8 @@
   "version": "@PROJECT_VERSION@",
   "renderBackend": "@MLN_FFI_RENDER_BACKEND@",
   "targetPlatform": "@MLN_FFI_TARGET_PLATFORM@",
-  "zigTarget": "@MLN_FFI_ZIG_TARGET@"
+  "zigTarget": "@MLN_FFI_ZIG_TARGET@",
+  "staticArchiveName": "@MLN_FFI_STATIC_ARCHIVE_NAME@",
+  "staticLinkLibraries": [@MLN_FFI_STATIC_LINK_LIBRARIES_JSON@],
+  "staticLinkFrameworks": [@MLN_FFI_STATIC_LINK_FRAMEWORKS_JSON@]
 }

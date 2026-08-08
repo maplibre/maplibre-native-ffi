@@ -1,16 +1,14 @@
-# Produces the distributable wheel, so it optimizes and vendors: `--release`
-# because the native library it wraps is built Release too, and an explicit
-# `--auditwheel repair` because maturin only defaults to repairing on Linux,
-# which would leave a macOS wheel pointing at the build machine's install tree.
+# The extension embeds the native archive, so a wheel carries one binary and
+# needs no repair. On Linux the link goes through zig: the archive is built
+# against the glibc in cmake/toolchains/zig-linux.cmake, and the host's linker
+# would bind its libm references to the build machine's glibc instead.
 [tasks.build]
 extends = "ffi:preset"
 run = '''
-# Wheel repair rewrites the extension's dependency names in place. Recompile it
-# so a previous wheel cannot feed those private names into the next repair.
-# `cargo clean` is per-profile, so it takes the profile maturin builds.
-cargo clean --release --package maplibre-native-ffi-python
+maturin_flags=()
+if [ "$(uname -s)" = Linux ]; then maturin_flags=(--zig); fi
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
-  uv run --project . --no-sync maturin build --release --auditwheel repair
+  uv run --project . --no-sync maturin build --release "${maturin_flags[@]}"
 '''
 
 [tasks._install-extension]
@@ -18,13 +16,12 @@ description = "Build and install the Python extension for local tests."
 hide = true
 extends = "ffi:preset"
 run = '''
-# See `build`: repaired extension artifacts are outputs, never compiler inputs.
-cargo clean --package maplibre-native-ffi-python
 # Clear the wheel directory so `--find-links` cannot resolve a stale build.
 rm -rf dist
-# Repair, as maturin defaults to on Linux, so the suites load the vendored library.
+maturin_flags=()
+if [ "$(uname -s)" = Linux ]; then maturin_flags=(--zig); fi
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
-  uv run --project . --no-sync maturin build --out dist
+  uv run --project . --no-sync maturin build --out dist "${maturin_flags[@]}"
 uv pip install --python "$MISE_MONOREPO_ROOT/.venv" --reinstall --no-index --find-links dist \
   "maplibre-native-ffi==0.0.0"
 '''

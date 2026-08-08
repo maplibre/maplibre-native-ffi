@@ -50,6 +50,65 @@ function(mln_ffi_install_zig_libc)
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
 endfunction()
 
+# The system libraries a consumer supplies alongside the complete static
+# archive. Everything the archive merges in is a CMake target by this point, so
+# the plain names and `-framework` entries left in the dependency interfaces are
+# exactly what stays external.
+function(mln_ffi_static_link_metadata libraries_var frameworks_var)
+  set(MLN_FFI_STATIC_LIBRARIES "")
+  set(MLN_FFI_STATIC_FRAMEWORKS "")
+  foreach(dependencies mln_ffi_platform_dependencies mln_ffi_render_dependencies)
+    get_target_property(MLN_FFI_ENTRIES ${dependencies} INTERFACE_LINK_LIBRARIES)
+    if(NOT MLN_FFI_ENTRIES OR MLN_FFI_ENTRIES MATCHES "-NOTFOUND$")
+      continue()
+    endif()
+    foreach(MLN_FFI_ENTRY IN LISTS MLN_FFI_ENTRIES)
+      if(TARGET ${MLN_FFI_ENTRY})
+        continue()
+      elseif(MLN_FFI_ENTRY MATCHES "^-framework +(.+)$")
+        list(APPEND MLN_FFI_STATIC_FRAMEWORKS "${CMAKE_MATCH_1}")
+      elseif(MLN_FFI_ENTRY MATCHES "^[-$]")
+        continue()
+      else()
+        list(APPEND MLN_FFI_STATIC_LIBRARIES "${MLN_FFI_ENTRY}")
+      endif()
+    endforeach()
+  endforeach()
+  list(REMOVE_DUPLICATES MLN_FFI_STATIC_LIBRARIES)
+  list(REMOVE_DUPLICATES MLN_FFI_STATIC_FRAMEWORKS)
+  set(${libraries_var} ${MLN_FFI_STATIC_LIBRARIES} PARENT_SCOPE)
+  set(${frameworks_var} ${MLN_FFI_STATIC_FRAMEWORKS} PARENT_SCOPE)
+endfunction()
+
+# The name a consumer passes to its linker for the complete static archive.
+# Every format but COFF names the archive after the C API library and lets the
+# extension separate it from the shared library; COFF cannot, because the shared
+# build's import library already holds that name.
+function(mln_ffi_static_archive_link_name out_var target)
+  set(MLN_FFI_ARCHIVE_TARGET ${target})
+  if(TARGET ${target}_static)
+    set(MLN_FFI_ARCHIVE_TARGET ${target}_static)
+  endif()
+  get_target_property(MLN_FFI_ARCHIVE_PATH ${MLN_FFI_ARCHIVE_TARGET}
+                      MLN_FFI_INSTALL_ARCHIVE)
+  if(NOT MLN_FFI_ARCHIVE_PATH OR MLN_FFI_ARCHIVE_PATH MATCHES "-NOTFOUND$")
+    set(${out_var} "" PARENT_SCOPE)
+    return()
+  endif()
+  get_filename_component(MLN_FFI_ARCHIVE_NAME "${MLN_FFI_ARCHIVE_PATH}" NAME_WE)
+  string(REGEX REPLACE "^lib" "" MLN_FFI_ARCHIVE_NAME "${MLN_FFI_ARCHIVE_NAME}")
+  set(${out_var} "${MLN_FFI_ARCHIVE_NAME}" PARENT_SCOPE)
+endfunction()
+
+function(mln_ffi_json_string_array out_var)
+  set(MLN_FFI_QUOTED "")
+  foreach(MLN_FFI_ITEM IN LISTS ARGN)
+    list(APPEND MLN_FFI_QUOTED "\"${MLN_FFI_ITEM}\"")
+  endforeach()
+  list(JOIN MLN_FFI_QUOTED ", " MLN_FFI_JOINED)
+  set(${out_var} "${MLN_FFI_JOINED}" PARENT_SCOPE)
+endfunction()
+
 function(mln_ffi_install_c_api_complete_static_archive target)
   get_target_property(MLN_FFI_INSTALL_ARCHIVE ${target} MLN_FFI_INSTALL_ARCHIVE)
   if(NOT MLN_FFI_INSTALL_ARCHIVE)
@@ -146,6 +205,13 @@ function(mln_ffi_install_c_api_library target)
                       MLN_FFI_TARGET_PLATFORM)
   mln_ffi_resolve_git_sha()
   mln_ffi_install_emscripten_options()
+  mln_ffi_static_archive_link_name(MLN_FFI_STATIC_ARCHIVE_NAME ${target})
+  mln_ffi_static_link_metadata(MLN_FFI_STATIC_LINK_LIBRARIES
+                               MLN_FFI_STATIC_LINK_FRAMEWORKS)
+  mln_ffi_json_string_array(MLN_FFI_STATIC_LINK_LIBRARIES_JSON
+                            ${MLN_FFI_STATIC_LINK_LIBRARIES})
+  mln_ffi_json_string_array(MLN_FFI_STATIC_LINK_FRAMEWORKS_JSON
+                            ${MLN_FFI_STATIC_LINK_FRAMEWORKS})
 
   set(pc_file "${CMAKE_CURRENT_BINARY_DIR}/maplibre-native-c.pc")
   set(artifact_file

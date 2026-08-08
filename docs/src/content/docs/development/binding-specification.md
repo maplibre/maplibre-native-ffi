@@ -176,6 +176,14 @@ Requirements for a binding that acquires the library:
   lags the checkout by design, so the commits themselves are not the signal; the
   headers are. `artifact.json` records `gitSha` for the warning to cite, and a
   binding MUST tolerate its absence.
+- A binding that links the native library at build time SHOULD link the complete
+  static archive rather than the shared library, so its artifact carries no
+  runtime search path and needs no repackaging step. The archive merges in every
+  dependency it can; what stays external is the platform and render backend's
+  system libraries, which `artifact.json` records as `staticLinkLibraries` and
+  `staticLinkFrameworks`. A binding MUST tolerate their absence. Bindings that
+  load the library at run time, such as Kotlin and Dart, keep using the shared
+  library.
 
 ---
 
