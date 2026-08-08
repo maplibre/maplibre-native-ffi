@@ -5,57 +5,51 @@ description: Add a language binding and its native library to a project.
 
 import { Aside } from "@astrojs/starlight/components";
 
-Choose a render backend first. Use Metal for Apple platforms, OpenGL for
-emulators and virtual machines, and Vulkan for other platforms. Then choose a
-published binding or a bleeding-edge binding below.
+export const SnapshotOnly = () => (
+  <Aside type="caution" title="Snapshot only">
+    This binding has no tagged release yet, and a snapshot floats with `main`, so
+    package names, coordinates, and the C ABI change between snapshots. Releases
+    begin when there is a known use case, so file a GitHub issue to request one.
+  </Aside>
+);
 
-## Native library
+Choose a render backend first. Prefer Metal for Apple platforms, OpenGL for
+emulators and virtual machines, and Vulkan for other platforms. Then install the
+C library, a binding for your language, or both. Each section covers its tagged
+releases, where they exist, and its snapshot channel.
+
+## C library
 
 Download `maplibre-native-c-<preset>.tar.gz` for the target from the
-[latest snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot)
-and unpack it. The archive root is the install prefix.
+[latest release](https://github.com/maplibre/maplibre-native-ffi/releases/latest)
+and unpack it. The archive root is the install prefix. The
+[snapshot release](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot)
+carries the same assets built from `main` under a fixed tag, so its download
+URLs stay stable.
 
-A preset is spelled `<platform>-<arch>-<backend>`, as in `macos-arm64-metal` or
-`linux-x64-vulkan`. OpenGL presets name their context provider in place of the
-backend: `wgl` on Windows and `egl` elsewhere.
+A preset name has the form `<platform>-<arch>-<backend>`, as in
+`macos-arm64-metal` or `linux-x64-vulkan`. OpenGL presets name their context
+provider in place of the backend: `egl`, `wgl`, or `webgl`.
+[Platforms](#platforms) gives the provider for each platform.
 
 On Windows, add `<prefix>/bin` to `PATH` or copy `maplibre-native-c.dll` beside
 your executable, because a prefix carries no loader path there. Linux and macOS
 builds record an rpath into the prefix that they built against.
 
-To build a prefix yourself, install [mise](https://mise.jdx.dev/) and prepare
-the toolchain as the
-[development overview](/maplibre-native-ffi/development/overview/) describes:
-
-```bash frame="terminal"
-mise bootstrap
-mise run build macos-arm64-metal  # prefix at build/macos-arm64-metal/install
-```
-
-### Use the C API
-
-Export `PKG_CONFIG_PATH` and build against `maplibre-native-c`:
+Export `PKG_CONFIG_PATH` to build against the prefix:
 
 ```bash frame="terminal"
 export PKG_CONFIG_PATH=<prefix>/share/pkgconfig
 cc -std=c23 main.c $(pkg-config --cflags --libs maplibre-native-c) -o main
 ```
 
-### Initialize Android
+To build a prefix yourself, see the
+[development overview](/maplibre-native-ffi/development/overview/).
 
-Depend on a Kotlin runtime AAR. It contains the native library for every ABI and
-the platform TLS component that Android HTTPS requests require.
+## Bindings
 
-```kotlin title="build.gradle.kts"
-implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:0.202608.0")
-```
-
-Then call `mln_android_init` once before creating a runtime, passing a `JNIEnv*`
-and an `android.content.Context`. Android HTTPS requests validate against the
-app's trust policy from that point on. Any thread attached to the JVM may make
-the call.
-
-## Published bindings
+Each binding wraps the C library in one language. Most carry or download the C
+library, and the sections that need an installed prefix say so.
 
 ### Kotlin
 
@@ -73,21 +67,36 @@ dependencies {
 }
 ```
 
+Take one runtime module:
+
+- `org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl`
+- `org.maplibre.nativeffi:maplibre-native-ffi-runtime-metal`
+- `org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan`
+
 On Android, call `MaplibreAndroid.initialize(context)` before you create a
-runtime. The runtime AAR includes the platform TLS component. A Kotlin app needs
-no additional TLS package.
+runtime, as [Android](#android) describes.
 
-The other runtimes are `maplibre-native-ffi-runtime-opengl` and
-`maplibre-native-ffi-runtime-metal`.
+For the snapshot channel, add the Maven snapshot repository and take the
+snapshot version of both modules. The runtime modules and Android
+initialization match the release.
 
-## Bleeding-edge bindings
+```kotlin title="build.gradle.kts"
+repositories {
+  maven("https://central.sonatype.com/repository/maven-snapshots/") {
+    content { includeGroup("org.maplibre.nativeffi") }
+  }
+  mavenCentral()
+}
 
-<Aside type="caution" title="Prerelease only">
-  Each channel below is a floating snapshot that moves with `main`. Package
-  names, coordinates, and the C ABI can change between snapshots.
-</Aside>
+dependencies {
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi:0.1.0-SNAPSHOT")
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:0.1.0-SNAPSHOT")
+}
+```
 
 ### .NET
+
+<SnapshotOnly />
 
 Add the snapshot feed, then the binding and the runtime for your backend.
 
@@ -106,10 +115,15 @@ Add the snapshot feed, then the binding and the runtime for your backend.
 </ItemGroup>
 ```
 
-The other runtime packages are `Maplibre.NativeFfi.Runtime.OpenGL` and
-`Maplibre.NativeFfi.Runtime.Metal`.
+Take one runtime package:
+
+- `Maplibre.NativeFfi.Runtime.OpenGL`
+- `Maplibre.NativeFfi.Runtime.Metal`
+- `Maplibre.NativeFfi.Runtime.Vulkan`
 
 ### Dart
+
+<SnapshotOnly />
 
 Depend on the package from Git. The build hook downloads a native artifact for
 your target when you build.
@@ -132,6 +146,8 @@ hooks:
       backend: vulkan
 ```
 
+The backends are `opengl`, `metal`, and `vulkan`.
+
 Write an install prefix into `.dart_tool/maplibre_native_install_dir` to use
 your own build instead. A pinned Git revision keeps the Dart code fixed, and the
 hook still resolves the current snapshot for a build that has no artifact
@@ -139,34 +155,18 @@ cached. Point the hook at your own prefix when you need a fixed native library.
 
 ### Go
 
+<SnapshotOnly />
+
 ```bash frame="terminal"
 go get github.com/maplibre/maplibre-native-ffi/bindings/go@main
 ```
 
-Install the [native library](#native-library), then export `PKG_CONFIG_PATH`
+Install the [C library](#c-library), then export `PKG_CONFIG_PATH`
 before you build. cgo reads it.
 
-### Kotlin
-
-Add the Maven snapshot repository, the binding, and the runtime for your
-backend. The runtime modules and Android initialization match the published
-binding.
-
-```kotlin title="build.gradle.kts"
-repositories {
-  maven("https://central.sonatype.com/repository/maven-snapshots/") {
-    content { includeGroup("org.maplibre.nativeffi") }
-  }
-  mavenCentral()
-}
-
-dependencies {
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi:0.1.0-SNAPSHOT")
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:0.1.0-SNAPSHOT")
-}
-```
-
 ### Python
+
+<SnapshotOnly />
 
 Depend on the distribution for your backend and resolve it from the snapshot
 index. The wheels contain the native library.
@@ -187,10 +187,15 @@ maplibre-native-ffi-vulkan = { index = "maplibre-snapshots" }
 This index configuration uses uv. The explicit index limits snapshot resolution
 to this package; all other dependencies continue to resolve from PyPI.
 
-The other distributions are `maplibre-native-ffi-opengl` and
-`maplibre-native-ffi-metal`.
+Take one distribution:
+
+- `maplibre-native-ffi-opengl`
+- `maplibre-native-ffi-metal`
+- `maplibre-native-ffi-vulkan`
 
 ### Rust
+
+<SnapshotOnly />
 
 Depend on the `maplibre-native-ffi` crate from Git and enable one backend
 feature. The build script downloads the matching native artifact.
@@ -200,12 +205,14 @@ feature. The build script downloads the matching native artifact.
 maplibre-native-ffi = { git = "https://github.com/maplibre/maplibre-native-ffi", features = ["vulkan"] }
 ```
 
-The other features are `opengl`, `metal`, and `webgpu`.
+Enable one backend feature: `opengl`, `metal`, `vulkan`, or `webgpu`.
 
 Set `MAPLIBRE_NATIVE_C_INSTALL_DIR` to an install prefix to use your own build
 instead.
 
 ### Swift
+
+<SnapshotOnly />
 
 The package manifest at the repository root defines the Swift package.
 
@@ -213,22 +220,76 @@ The package manifest at the repository root defines the Swift package.
 .package(url: "https://github.com/maplibre/maplibre-native-ffi", branch: "main")
 ```
 
-Depend on the `MaplibreNativeFFI` product. SwiftPM takes the package identity from
-the repository name rather than from the manifest, so name it as
+Depend on the `MaplibreNativeFFI` product. SwiftPM takes the package identity
+from the repository name rather than from the manifest, so name it as
 `maplibre-native-ffi`.
 
 ```swift title="Package.swift"
 .product(name: "MaplibreNativeFFI", package: "maplibre-native-ffi")
 ```
 
-Install the [native library](#native-library), then export `PKG_CONFIG_PATH`
+Install the [C library](#c-library), then export `PKG_CONFIG_PATH`
 before you build.
 
 ### Zig
+
+<SnapshotOnly />
 
 ```bash frame="terminal"
 zig fetch --save git+https://github.com/maplibre/maplibre-native-ffi
 ```
 
-Install the [native library](#native-library), then pass
+Install the [C library](#c-library), then pass
 `-Dnative-install-dir=<prefix>` when you build.
+
+## Platforms
+
+### Linux
+
+Linux runs the Vulkan and OpenGL backends, with EGL as the OpenGL context
+provider.
+
+### macOS
+
+macOS runs the Metal, Vulkan, and OpenGL backends, with EGL as the OpenGL
+context provider. Apple provides neither Vulkan
+nor EGL, so a host that chooses one of those backends loads
+[MoltenVK](https://github.com/KhronosGroup/MoltenVK) or
+[ANGLE](https://chromium.googlesource.com/angle/angle) itself.
+
+### Windows
+
+Windows runs the Vulkan and OpenGL backends, with WGL as the OpenGL context
+provider.
+
+### Android
+
+Android runs the Vulkan and OpenGL backends, with EGL as the OpenGL context
+provider.
+
+An Android app depends on a Kotlin runtime AAR whichever binding it uses. The
+AAR carries the native library for every ABI and the platform TLS component that
+Android HTTPS requests require.
+
+```kotlin title="build.gradle.kts"
+implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:0.202608.0")
+```
+
+Initialize the platform once before you create a runtime, passing an
+`android.content.Context`. Every binding exposes this call under its own name.
+Android HTTPS requests validate against the app's trust policy from that point
+on.
+
+### iOS
+
+iOS runs the Metal backend, on the device and in the simulator.
+
+### OpenHarmony
+
+OpenHarmony runs the Vulkan and OpenGL backends, with EGL as the OpenGL context
+provider.
+
+### Web
+
+Emscripten runs the WebGPU and OpenGL backends, with WebGL as the OpenGL context
+provider.
