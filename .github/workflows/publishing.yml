@@ -617,7 +617,7 @@ jobs:
     timeout-minutes: 120
     environment:
       name: maven-central
-      url: https://central.sonatype.com/publishing/deployments
+      url: https://central.sonatype.com/artifact/org.maplibre.nativeffi/maplibre-native-ffi/${{ needs.plan.outputs.kotlin_version }}
     permissions:
       actions: read
       contents: read

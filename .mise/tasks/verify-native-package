@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# [MISE] description="Reject build-host paths and vendored loaders in a packaged native artifact."
+# [MISE] description="Reject private exports, build-host paths, and vendored loaders in a native package."
 # [MISE] shell="python"
 # USAGE arg "<preset>" help="Native CMake preset"
 
@@ -56,6 +56,7 @@ MACHO_NAME = re.compile(r"^\s*name (?P<name>.+) \(offset \d+\)$")
 MACHO_PATH = re.compile(r"^\s*path (?P<path>.+) \(offset \d+\)$")
 MACHO_COMMAND = re.compile(r"^\s*cmd (?P<command>LC_\w+)$")
 ELF_ENTRY = re.compile(r"^\s*0x[0-9a-f]+\s+\((?P<tag>\w+)\)\s+.*\[(?P<value>[^\]]*)\]")
+PE_EXPORT = re.compile(r"^\s*Name: (?P<name>\S+)$")
 
 # The name a loader goes by, without the `lib` prefix, the version, and the
 # extension: `libGLESv2.so.2`, `libvulkan.1.dylib`, and `@rpath/libEGL.dylib`
@@ -82,6 +83,7 @@ PLATFORM_LOADER_PRESETS = ("android-", "ohos-")
 PACKAGED_LIBRARY_STEM = "maplibre-native-c"
 
 BUILD_HOST_PATH = "names a build-host path"
+PRIVATE_EXPORT = "exports a private symbol"
 LINKED_LOADER = "links a graphics loader"
 VENDORED_LOADER = "carries a library that is not the C API"
 REMEDIES = {
@@ -89,6 +91,10 @@ REMEDIES = {
         "The package only loads on hosts that reproduce the paths above. "
         "Resolve the dependency at runtime, or give it a relocatable install "
         "name and ship it in the package."
+    ),
+    PRIVATE_EXPORT: (
+        "Only the stable C API belongs in the dynamic symbol table. Hide the "
+        "dependency symbol above or add a public mln_* entry point instead."
     ),
     LINKED_LOADER: (
         "The package pulls a graphics loader along wherever it is repackaged, "
@@ -176,6 +182,16 @@ def elf_problems(binary: pathlib.Path, links_loader: bool) -> list[tuple[str, st
     return problems
 
 
+def pe_problems(binary: pathlib.Path) -> list[tuple[str, str]]:
+    """Exports from a Windows library's PE export directory."""
+    exports = (
+        match.group("name")
+        for line in run(["llvm-readobj", "--coff-exports", str(binary)]).splitlines()
+        if (match := PE_EXPORT.match(line))
+    )
+    return [(PRIVATE_EXPORT, name) for name in exports if not name.startswith("mln_")]
+
+
 def image_format(binary: pathlib.Path) -> str | None:
     """The executable format of a file, or None for one that does not load.
 
@@ -204,8 +220,9 @@ def binary_problems(
         return macho_problems(binary, links_loader)
     # Windows PE imports name a DLL without a directory, so there is no
     # build-host path for them to carry, and the one graphics library a WGL
-    # build imports is the system opengl32.dll.
-    return []
+    # build imports is the system opengl32.dll. Its exports still need to stay
+    # within the public C API.
+    return pe_problems(binary)
 
 
 def main() -> int:
