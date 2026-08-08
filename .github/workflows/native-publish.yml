@@ -1,0 +1,214 @@
+name: Native publish
+
+on:
+  workflow_call:
+    inputs:
+      ci_run_url:
+        description: URL of the successful main CI run
+        required: true
+        type: string
+      previous_tag:
+        description: Previous tag used to generate release notes
+        default: ""
+        required: false
+        type: string
+      release:
+        description: Publish an immutable tagged release
+        default: false
+        required: false
+        type: boolean
+      run_id:
+        description: CI run that produced the native packages
+        required: true
+        type: string
+      sha:
+        description: Source commit and artifact suffix
+        required: true
+        type: string
+      tag:
+        description: GitHub release tag
+        required: true
+        type: string
+      version:
+        description: Version written into the native packages
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Native package
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      actions: read
+      contents: write
+    env:
+      CI_RUN_URL: ${{ inputs.ci_run_url }}
+      MISE_NO_HOOKS: "1"
+      PUBLISH_CHANNEL: ${{ inputs.release && 'release' || 'snapshot' }}
+      PUBLISH_SHA: ${{ inputs.sha }}
+      PUBLISH_TAG: ${{ inputs.tag }}
+      PUBLISH_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.PUBLISH_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          cache: false
+          install_args: python
+      - name: Refuse an existing published release
+        if: ${{ inputs.release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if draft="$(gh release view "$PUBLISH_TAG" --json isDraft --jq .isDraft 2>/dev/null)" &&
+            [[ "$draft" == false ]]; then
+            echo "GitHub release $PUBLISH_TAG is already published" >&2
+            exit 1
+          fi
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+          pattern: native-package-*-${{ env.PUBLISH_SHA }}
+          path: build/packages/native/release
+          merge-multiple: true
+      - name: Prepare assets
+        run: >-
+          mise run --no-deps ci:prepare-native-package "$PUBLISH_CHANNEL"
+          build/packages/native/release "$PUBLISH_VERSION"
+      - name: Move the snapshot tag
+        if: ${{ !inputs.release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${PUBLISH_TAG}" >/dev/null 2>&1; then
+            gh api \
+              --method PATCH \
+              "repos/${GITHUB_REPOSITORY}/git/refs/tags/${PUBLISH_TAG}" \
+              -f sha="$PUBLISH_SHA" \
+              -F force=true >/dev/null
+          else
+            gh api \
+              --method POST \
+              "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/tags/${PUBLISH_TAG}" \
+              -f sha="$PUBLISH_SHA" >/dev/null
+          fi
+      # A tagged release remains a draft until every uploaded asset is verified.
+      - name: Upload the release assets
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          tag_name: ${{ inputs.tag }}
+          target_commitish: ${{ inputs.sha }}
+          name: ${{ inputs.release && format('Native package {0}', inputs.version) || 'Native package snapshot' }}
+          body_path: build/packages/native/release/RELEASE_NOTES.md
+          draft: ${{ inputs.release }}
+          prerelease: ${{ !inputs.release }}
+          make_latest: false
+          generate_release_notes: ${{ inputs.release && inputs.previous_tag != '' }}
+          previous_tag: ${{ inputs.previous_tag }}
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          files: |
+            build/packages/native/release/*.tar.gz
+            build/packages/native/release/SHA256SUMS
+      - name: Remove stale snapshot assets
+        if: ${{ !inputs.release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          release="$(gh release view "$PUBLISH_TAG" --json assets)"
+          while IFS= read -r name; do
+            if [[ ! -f "build/packages/native/release/$name" ]]; then
+              gh release delete-asset "$PUBLISH_TAG" "$name" --yes
+            fi
+          done < <(jq -r '.assets[].name' <<<"$release")
+      - name: Verify the release assets
+        env:
+          EXPECTED_DRAFT: ${{ inputs.release }}
+          EXPECTED_PRERELEASE: ${{ !inputs.release }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          release="$(
+            gh release view "$PUBLISH_TAG" \
+              --json assets,isDraft,isPrerelease,tagName
+          )"
+          jq -e \
+            --arg tag "$PUBLISH_TAG" \
+            --argjson draft "$EXPECTED_DRAFT" \
+            --argjson prerelease "$EXPECTED_PRERELEASE" \
+            '.isDraft == $draft and .isPrerelease == $prerelease and
+             .tagName == $tag' \
+            <<<"$release" >/dev/null
+
+          assets=(build/packages/native/release/*.tar.gz)
+          assets+=(build/packages/native/release/SHA256SUMS)
+          expected="$(printf '%s\n' "${assets[@]##*/}" | sort | jq -R . | jq -c -s .)"
+          actual="$(jq -c '[.assets[].name] | sort' <<<"$release")"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "release assets do not match the prepared native package set" >&2
+            jq -n --argjson expected "$expected" --argjson actual "$actual" \
+              '{expected: $expected, actual: $actual}' >&2
+            exit 1
+          fi
+
+          for asset in "${assets[@]}"; do
+            name="${asset##*/}"
+            local_digest="sha256:$(sha256sum "$asset" | cut -d ' ' -f 1)"
+            remote_digest="$(
+              jq -r --arg name "$name" \
+                '.assets[] | select(.name == $name) | .digest' <<<"$release"
+            )"
+            if [[ "$local_digest" != "$remote_digest" ]]; then
+              echo "$name has remote digest $remote_digest; expected $local_digest" >&2
+              exit 1
+            fi
+          done
+      - name: Verify the tag
+        run: |
+          set -euo pipefail
+
+          git fetch --quiet --force origin \
+            "refs/tags/$PUBLISH_TAG:refs/tags/$PUBLISH_TAG"
+          tag_sha="$(git rev-parse "refs/tags/$PUBLISH_TAG^{commit}")"
+          if [[ "$tag_sha" != "$PUBLISH_SHA" ]]; then
+            echo "$PUBLISH_TAG points to $tag_sha; expected $PUBLISH_SHA" >&2
+            exit 1
+          fi
+          if [[ "$PUBLISH_CHANNEL" == release ]]; then
+            context="$(mise run --no-deps ci:release-version "$PUBLISH_TAG")"
+            if [[ "$(jq -r '.version' <<<"$context")" != "$PUBLISH_VERSION" ]]; then
+              echo "$PUBLISH_TAG no longer names version $PUBLISH_VERSION" >&2
+              exit 1
+            fi
+          fi
+      - name: Publish the verified tagged release
+        if: ${{ inputs.release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          gh release edit "$PUBLISH_TAG" --draft=false --latest=false
+          release="$(gh release view "$PUBLISH_TAG" --json isDraft,isPrerelease,url)"
+          jq -e '(.isDraft | not) and (.isPrerelease | not)' <<<"$release" >/dev/null
+          {
+            echo "### Native package $PUBLISH_VERSION"
+            echo
+            echo "Published $(jq -r '.url' <<<"$release")."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,38 @@
+name: Kotlin release
+
+on:
+  push:
+    tags:
+      - "bindings/kotlin/v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kotlin-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source:
+    name: Source
+    permissions:
+      actions: read
+      contents: read
+    uses: ./.github/workflows/release-context.yml
+    with:
+      family: kotlin
+
+  publish:
+    name: Publish
+    needs:
+      - source
+    permissions:
+      actions: read
+      contents: read
+    uses: ./.github/workflows/kotlin-publish.yml
+    with:
+      release: true
+      run_id: ${{ needs.source.outputs.run_id }}
+      sha: ${{ needs.source.outputs.sha }}
+      version: ${{ needs.source.outputs.version }}
+    secrets: inherit

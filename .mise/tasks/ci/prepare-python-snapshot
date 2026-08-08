@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-#MISE description="Relabel a backend wheel or generate the Python snapshot index."
-#MISE shell="bash"
-#USAGE arg "<command>" help="relabel, index, or mirror"
-#USAGE arg "<arguments>..." help="Arguments passed to ci/python_snapshot.py"
-set -euo pipefail
-
-read -r -a arguments <<< "${usage_arguments-}"
-exec python ci/python_snapshot.py "${usage_command?}" "${arguments[@]}"

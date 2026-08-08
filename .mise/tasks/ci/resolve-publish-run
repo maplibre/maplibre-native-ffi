@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# [MISE] description="Wait for the successful main CI run for a commit."
+# [MISE] shell="bash"
+
+set -euo pipefail
+
+if [[ "$#" -ne 1 ]]; then
+  echo "usage: $(basename "$0") <commit>" >&2
+  exit 2
+fi
+
+runs='[]'
+for attempt in {1..30}; do
+  runs="$(gh run list \
+    --repo "$GITHUB_REPOSITORY" \
+    --workflow ci.yml \
+    --branch main \
+    --commit "$1" \
+    --event push \
+    --limit 1 \
+    --json databaseId,url)"
+  if jq -e 'length > 0' <<<"$runs" >/dev/null; then
+    break
+  fi
+  if ((attempt < 30)); then
+    sleep 10
+  fi
+done
+
+if [[ "$(jq 'length' <<<"$runs")" -eq 0 ]]; then
+  echo "no main CI run appeared for $1 within five minutes" >&2
+  exit 1
+fi
+
+run="$(jq '.[0]' <<<"$runs")"
+run_id="$(jq -r '.databaseId' <<<"$run")"
+echo "waiting for CI run $run_id to succeed" >&2
+gh run watch \
+  --repo "$GITHUB_REPOSITORY" \
+  --compact \
+  --exit-status \
+  --interval 30 \
+  "$run_id" >&2
+
+jq -cn \
+  --arg run_id "$run_id" \
+  --arg url "$(jq -r '.url' <<<"$run")" \
+  '{run_id: $run_id, url: $url}'

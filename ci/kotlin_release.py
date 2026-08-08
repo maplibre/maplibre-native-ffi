@@ -2,13 +2,11 @@
 
 import argparse
 import base64
-import datetime
 import hashlib
 import http.client
 import json
 import os
 import pathlib
-import re
 import shutil
 import subprocess
 import tempfile
@@ -16,6 +14,8 @@ import time
 import urllib.parse
 import zipfile
 from collections.abc import Callable
+
+from release_version import require_current_month
 
 GROUP_PATH = pathlib.PurePosixPath("org/maplibre/nativeffi")
 MODULES = set(
@@ -32,73 +32,12 @@ ROOT_MODULES = {
     "maplibre-native-ffi-runtime-vulkan",
 }
 
-TAG_PATTERN = re.compile(
-    r"^bindings/kotlin/v(?P<epoch>0|[1-9][0-9]*)\."
-    r"(?P<year>[0-9]{4})(?P<month>0[1-9]|1[0-2])\."
-    r"(?P<revision>0|[1-9][0-9]*)$"
-)
 CHECKSUM_SUFFIXES = (".md5", ".sha1", ".sha256", ".sha512")
 MAX_BUNDLE_BYTES = 1_000_000_000
 SNAPSHOT_USER_AGENT = (
     "maplibre-native-ffi-publisher/1 (+https://github.com/maplibre/maplibre-native-ffi)"
 )
 UPLOAD_PROGRESS_INTERVAL_SECONDS = 5.0
-
-
-def parse_tag(tag: str) -> tuple[tuple[int, int, int], str]:
-    match = TAG_PATTERN.fullmatch(tag)
-    if match is None:
-        raise SystemExit(
-            f"invalid Kotlin release tag {tag!r}; expected "
-            "bindings/kotlin/vAPI_EPOCH.YYYYMM.REVISION"
-        )
-    version = tag.removeprefix("bindings/kotlin/v")
-    fields = (
-        int(match.group("epoch")),
-        int(match.group("year") + match.group("month")),
-        int(match.group("revision")),
-    )
-    return fields, version
-
-
-def require_current_month(version: str) -> None:
-    fields, parsed_version = parse_tag(f"bindings/kotlin/v{version}")
-    current_month = int(datetime.datetime.now(datetime.UTC).strftime("%Y%m"))
-    if fields[1] != current_month:
-        raise SystemExit(
-            f"Kotlin release {parsed_version} names month {fields[1]}; "
-            f"the current UTC month is {current_month}"
-        )
-
-
-def validate_tag(tag: str) -> str:
-    current, version = parse_tag(tag)
-    require_current_month(version)
-    result = subprocess.run(
-        ["git", "tag", "--list", "bindings/kotlin/v*"],
-        check=True,
-        stdout=subprocess.PIPE,
-        text=True,
-    )
-    tags = [line for line in result.stdout.splitlines() if line]
-    parsed = {candidate: parse_tag(candidate)[0] for candidate in tags}
-    if tag not in parsed:
-        raise SystemExit(f"Kotlin release tag {tag} is not present in the checkout")
-    if current != max(parsed.values()):
-        latest = max(parsed, key=lambda candidate: parsed[candidate])
-        raise SystemExit(f"{tag} is not newer than existing Kotlin tag {latest}")
-
-    epoch, month, revision = current
-    revisions = sorted(
-        fields[2] for fields in parsed.values() if fields[:2] == (epoch, month)
-    )
-    expected_revisions = list(range(revision + 1))
-    if revisions != expected_revisions:
-        raise SystemExit(
-            f"Kotlin release revisions for {epoch}.{month} are {revisions}; "
-            f"expected {expected_revisions}"
-        )
-    return version
 
 
 def repository_files(root: pathlib.Path) -> list[pathlib.Path]:
@@ -549,12 +488,6 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="operation", required=True)
 
-    validate_tag_parser = subparsers.add_parser("validate-tag")
-    validate_tag_parser.add_argument("tag")
-
-    check_month_parser = subparsers.add_parser("check-month")
-    check_month_parser.add_argument("version")
-
     merge_parser = subparsers.add_parser("merge")
     merge_parser.add_argument("output", type=pathlib.Path)
     merge_parser.add_argument("inputs", type=pathlib.Path, nargs="+")
@@ -573,11 +506,7 @@ def main() -> int:
     upload_snapshot_parser.add_argument("version")
 
     args = parser.parse_args()
-    if args.operation == "validate-tag":
-        print(validate_tag(args.tag))
-    elif args.operation == "check-month":
-        require_current_month(args.version)
-    elif args.operation == "merge":
+    if args.operation == "merge":
         merge_repositories(args.output, args.inputs)
     elif args.operation == "bundle":
         create_bundle(args.repository, args.output, args.version)

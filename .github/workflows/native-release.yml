@@ -1,0 +1,40 @@
+name: Native release
+
+on:
+  push:
+    tags:
+      - "core/v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source:
+    name: Source
+    permissions:
+      actions: read
+      contents: read
+    uses: ./.github/workflows/release-context.yml
+    with:
+      family: core
+
+  publish:
+    name: Publish
+    needs:
+      - source
+    permissions:
+      actions: read
+      contents: write
+    uses: ./.github/workflows/native-publish.yml
+    with:
+      ci_run_url: ${{ needs.source.outputs.ci_run_url }}
+      previous_tag: ${{ needs.source.outputs.previous_tag }}
+      release: true
+      run_id: ${{ needs.source.outputs.run_id }}
+      sha: ${{ needs.source.outputs.sha }}
+      tag: ${{ github.ref_name }}
+      version: ${{ needs.source.outputs.version }}

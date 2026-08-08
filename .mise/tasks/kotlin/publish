@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# [MISE] description="Stage and verify Kotlin Multiplatform Maven artifacts."
+# [MISE] description="Stage and verify Kotlin Maven artifacts."
 # [MISE] shell="bash"
 # [MISE] tools={java="{{vars.java_version}}"}
 
