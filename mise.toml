@@ -335,7 +335,11 @@ arg "[abi]" default="x86_64" {
 # not part of what .mise/bin/sync-android-packages installs, so asking for a
 # boot is what accepts their licenses and pays for their download.
 tools = { "core:java" = "{{vars.java_version}}" }
-run = '"$MISE_MONOREPO_ROOT/scripts/boot-android-emulator.sh" "system-images;android-{{vars.android_system_image_api}};default;$usage_abi"'
+run = '''
+"$MISE_MONOREPO_ROOT/scripts/boot-android-emulator.sh" \
+  "{{vars.android_system_image_api}}" \
+  "$usage_abi"
+'''
 
 [tasks."android-emulator:stop"]
 description = "Stop the Android emulator started by mise."

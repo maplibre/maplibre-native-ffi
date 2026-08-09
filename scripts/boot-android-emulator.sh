@@ -5,8 +5,8 @@
 # run, which is also when their licenses are accepted.
 set -euo pipefail
 
-image=${1:?usage: boot-android-emulator.sh <system-image>}
-image_arch=${image##*;}
+api=${1:?usage: boot-android-emulator.sh <api> <abi>}
+image_arch=${2:?usage: boot-android-emulator.sh <api> <abi>}
 case "$image_arch" in
   arm64-v8a | x86_64) ;;
   *)
@@ -14,6 +14,7 @@ case "$image_arch" in
     exit 2
     ;;
 esac
+image="system-images;android-$api;default;$image_arch"
 serial=emulator-5554
 avd_name="mln-ffi-${image_arch//_/-}"
 sdk_root="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}"
