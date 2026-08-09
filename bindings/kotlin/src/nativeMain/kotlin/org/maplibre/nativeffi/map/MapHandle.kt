@@ -454,9 +454,8 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
             outType.ptr,
             outFound.ptr,
           )
-        if (status != org.maplibre.nativeffi.error.MaplibreStatus.OK.nativeCode || !outFound.value)
-          null
-        else SourceType.fromNative(outType.value)
+        if (status != org.maplibre.nativeffi.error.MaplibreStatus.OK.nativeCode) null
+        else outFound.value && SourceType.fromNative(outType.value) == SourceType.CUSTOM_VECTOR
       }
     }
   }

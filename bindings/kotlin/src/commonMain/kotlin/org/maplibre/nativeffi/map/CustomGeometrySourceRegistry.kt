@@ -1,7 +1,5 @@
 package org.maplibre.nativeffi.map
 
-import org.maplibre.nativeffi.style.SourceType
-
 /** Owns callback state for custom geometry sources attached to one map. */
 internal class CustomGeometrySourceRegistry<T : AutoCloseable>(private val release: (T) -> Unit) {
   private val states = mutableMapOf<String, T>()
@@ -28,11 +26,11 @@ internal class CustomGeometrySourceRegistry<T : AutoCloseable>(private val relea
     states.clear()
   }
 
-  fun releaseDetached(sourceType: (String) -> SourceType?) {
+  fun releaseDetached(isAttachedCustomSource: (String) -> Boolean?) {
     val iterator = states.iterator()
     while (iterator.hasNext()) {
       val entry = iterator.next()
-      if (sourceType(entry.key) != SourceType.CUSTOM_VECTOR) {
+      if (isAttachedCustomSource(entry.key) == false) {
         release(entry.value)
         iterator.remove()
       }

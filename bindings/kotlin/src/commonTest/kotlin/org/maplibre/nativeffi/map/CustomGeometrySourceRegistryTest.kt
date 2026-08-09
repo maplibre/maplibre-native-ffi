@@ -3,7 +3,6 @@ package org.maplibre.nativeffi.map
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import org.maplibre.nativeffi.style.SourceType
 
 class CustomGeometrySourceRegistryTest {
   @Test
@@ -27,9 +26,7 @@ class CustomGeometrySourceRegistryTest {
     registry.install("attached", State("attached")) {}
     registry.install("detached", State("detached")) {}
 
-    registry.releaseDetached { sourceId ->
-      if (sourceId == "attached") SourceType.CUSTOM_VECTOR else null
-    }
+    registry.releaseDetached { sourceId -> sourceId == "attached" }
 
     assertEquals(1, registry.size)
     assertEquals(listOf("detached"), released)
@@ -43,10 +40,22 @@ class CustomGeometrySourceRegistryTest {
     registry.clear()
     registry.install("source", State("new")) {}
 
-    registry.releaseDetached { SourceType.CUSTOM_VECTOR }
+    registry.releaseDetached { true }
 
     assertEquals(1, registry.size)
     assertEquals(listOf("old"), released)
+  }
+
+  @Test
+  fun failedAttachmentQueryPreservesCallbackState() {
+    val released = mutableListOf<String>()
+    val registry = registry(released)
+    registry.install("source", State("existing")) {}
+
+    registry.releaseDetached { null }
+
+    assertEquals(1, registry.size)
+    assertEquals(emptyList(), released)
   }
 
   private fun registry(released: MutableList<String>): CustomGeometrySourceRegistry<State> =

@@ -818,7 +818,9 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     core.retainChild(childTypeName)
 
   internal fun releaseDetachedCustomGeometrySources() {
-    customGeometrySources.releaseDetached(::styleSourceType)
+    customGeometrySources.releaseDetached { sourceId ->
+      styleSourceType(sourceId) == SourceType.CUSTOM_VECTOR
+    }
   }
 
   private fun requireLiveHandle(): NativeMap {
