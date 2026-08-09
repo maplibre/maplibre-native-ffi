@@ -16,6 +16,7 @@ import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.camera.UnitBezier
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
+import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.FeatureIdentifier
@@ -2967,7 +2968,7 @@ internal object NativeAccess {
       mln_texture_image_info.width(segment),
       mln_texture_image_info.height(segment),
       mln_texture_image_info.stride(segment),
-      mln_texture_image_info.byte_length(segment),
+      checkedLong(mln_texture_image_info.byte_length(segment), "texture image byte length"),
     )
 
   private fun nativePointer(pointer: NativePointer): MemorySegment =
@@ -4580,11 +4581,20 @@ internal object NativeAccess {
       segment.get(ValueLayout.JAVA_INT, STYLE_IMAGE_INFO_WIDTH_OFFSET),
       segment.get(ValueLayout.JAVA_INT, STYLE_IMAGE_INFO_HEIGHT_OFFSET),
       segment.get(ValueLayout.JAVA_INT, STYLE_IMAGE_INFO_STRIDE_OFFSET),
-      segment.get(ValueLayout.JAVA_LONG, STYLE_IMAGE_INFO_BYTE_LENGTH_OFFSET),
+      checkedLong(
+        segment.get(ValueLayout.JAVA_LONG, STYLE_IMAGE_INFO_BYTE_LENGTH_OFFSET),
+        "style image byte length",
+      ),
       segment.get(ValueLayout.JAVA_FLOAT, STYLE_IMAGE_INFO_PIXEL_RATIO_OFFSET),
       segment.get(ValueLayout.JAVA_BOOLEAN, STYLE_IMAGE_INFO_SDF_OFFSET),
-      segment.get(ValueLayout.JAVA_LONG, STYLE_IMAGE_INFO_STRETCH_X_COUNT_OFFSET),
-      segment.get(ValueLayout.JAVA_LONG, STYLE_IMAGE_INFO_STRETCH_Y_COUNT_OFFSET),
+      checkedLong(
+        segment.get(ValueLayout.JAVA_LONG, STYLE_IMAGE_INFO_STRETCH_X_COUNT_OFFSET),
+        "style image stretch X count",
+      ),
+      checkedLong(
+        segment.get(ValueLayout.JAVA_LONG, STYLE_IMAGE_INFO_STRETCH_Y_COUNT_OFFSET),
+        "style image stretch Y count",
+      ),
       if (segment.get(ValueLayout.JAVA_BOOLEAN, STYLE_IMAGE_INFO_HAS_CONTENT_OFFSET)) {
         val content = segment.asSlice(STYLE_IMAGE_INFO_CONTENT_OFFSET, mln_image_content.sizeof())
         ImageContent(
@@ -4711,10 +4721,27 @@ internal object NativeAccess {
   }
 
   private fun featureQueryResult(result: NativeFeatureQueryResult): List<QueriedFeature> =
+    featureQueryResult(
+      result,
+      counter = { handle, outCount ->
+        featureQueryResultCountFunction().invokeNative(handle, outCount) as Int
+      },
+      getter = { handle, index, outFeature ->
+        featureQueryResultGetFunction().invokeNative(handle, index, outFeature) as Int
+      },
+      destroyer = { handle -> featureQueryResultDestroyFunction().invokeNative(handle) },
+    )
+
+  private fun featureQueryResult(
+    result: NativeFeatureQueryResult,
+    counter: (NativeFeatureQueryResult, MemorySegment) -> Int,
+    getter: (NativeFeatureQueryResult, Long, MemorySegment) -> Int,
+    destroyer: (NativeFeatureQueryResult) -> Unit,
+  ): List<QueriedFeature> =
     try {
       Arena.ofConfined().use { arena ->
         val outCount = arena.allocate(ValueLayout.JAVA_LONG)
-        Status.check(featureQueryResultCountFunction().invokeNative(result, outCount) as Int)
+        Status.check(counter(result, outCount))
         val count = checkedInt(outCount.get(ValueLayout.JAVA_LONG, 0))
         List(count) { index ->
           val outFeature = arena.allocate(QUERIED_FEATURE_SIZE)
@@ -4723,14 +4750,12 @@ internal object NativeAccess {
             QUERIED_FEATURE_SIZE_OFFSET,
             QUERIED_FEATURE_SIZE.toInt(),
           )
-          Status.check(
-            featureQueryResultGetFunction().invokeNative(result, index.toLong(), outFeature) as Int
-          )
+          Status.check(getter(result, index.toLong(), outFeature))
           queriedFeature(outFeature)
         }
       }
     } finally {
-      featureQueryResultDestroyFunction().invokeNative(result)
+      destroyer(result)
     }
 
   private fun queriedFeature(segment: MemorySegment): QueriedFeature {
@@ -5024,6 +5049,11 @@ internal object NativeAccess {
     require(value <= Int.MAX_VALUE) { "native count exceeds Int.MAX_VALUE" }
     require(value >= 0L) { "native count must be non-negative" }
     return value.toInt()
+  }
+
+  private fun checkedLong(value: Long, name: String): Long {
+    require(value >= 0L) { "$name exceeds Long.MAX_VALUE" }
+    return value
   }
 
   private fun stringView(segment: MemorySegment): String =
@@ -5348,10 +5378,27 @@ internal object NativeAccess {
     }
 
   private fun offlineRegionList(list: NativeOfflineRegionList): List<OfflineRegionInfo> =
+    offlineRegionList(
+      list,
+      counter = { handle, outCount ->
+        offlineRegionListCountFunction().invokeNative(handle, outCount) as Int
+      },
+      getter = { handle, index, outInfo ->
+        offlineRegionListGetFunction().invokeNative(handle, index, outInfo) as Int
+      },
+      destroyer = { handle -> offlineRegionListDestroyFunction().invokeNative(handle) },
+    )
+
+  private fun offlineRegionList(
+    list: NativeOfflineRegionList,
+    counter: (NativeOfflineRegionList, MemorySegment) -> Int,
+    getter: (NativeOfflineRegionList, Long, MemorySegment) -> Int,
+    destroyer: (NativeOfflineRegionList) -> Unit,
+  ): List<OfflineRegionInfo> =
     try {
       Arena.ofConfined().use { arena ->
         val outCount = arena.allocate(ValueLayout.JAVA_LONG)
-        Status.check(offlineRegionListCountFunction().invokeNative(list, outCount) as Int)
+        Status.check(counter(list, outCount))
         val count = Math.toIntExact(outCount.get(ValueLayout.JAVA_LONG, 0))
         List(count) { index ->
           val info = arena.allocate(OFFLINE_REGION_INFO_SIZE)
@@ -5360,14 +5407,12 @@ internal object NativeAccess {
             OFFLINE_REGION_INFO_SIZE_OFFSET,
             OFFLINE_REGION_INFO_SIZE.toInt(),
           )
-          Status.check(
-            offlineRegionListGetFunction().invokeNative(list, index.toLong(), info) as Int
-          )
+          Status.check(getter(list, index.toLong(), info))
           offlineRegionInfo(info)
         }
       }
     } finally {
-      offlineRegionListDestroyFunction().invokeNative(list)
+      destroyer(list)
     }
 
   private fun styleIdList(list: NativeStyleIdList): List<String> =
@@ -5406,21 +5451,36 @@ internal object NativeAccess {
   }
 
   private fun styleStringList(list: NativeStyleStringList): List<String> =
+    styleStringList(
+      list,
+      counter = { handle, outCount ->
+        styleStringListCountFunction().invokeNative(handle, outCount) as Int
+      },
+      getter = { handle, index, outValue ->
+        styleStringListGetFunction().invokeNative(handle, index, outValue) as Int
+      },
+      destroyer = { handle -> styleStringListDestroyFunction().invokeNative(handle) },
+    )
+
+  private fun styleStringList(
+    list: NativeStyleStringList,
+    counter: (NativeStyleStringList, MemorySegment) -> Int,
+    getter: (NativeStyleStringList, Long, MemorySegment) -> Int,
+    destroyer: (NativeStyleStringList) -> Unit,
+  ): List<String> =
     try {
       Arena.ofConfined().use { arena ->
         val outCount = arena.allocate(ValueLayout.JAVA_LONG)
-        Status.check(styleStringListCountFunction().invokeNative(list, outCount) as Int)
+        Status.check(counter(list, outCount))
         val count = Math.toIntExact(outCount.get(ValueLayout.JAVA_LONG, 0))
         List(count) { index ->
           val outValue = arena.allocate(STRING_VIEW_SIZE)
-          Status.check(
-            styleStringListGetFunction().invokeNative(list, index.toLong(), outValue) as Int
-          )
+          Status.check(getter(list, index.toLong(), outValue))
           stringView(outValue)
         }
       }
     } finally {
-      styleStringListDestroyFunction().invokeNative(list)
+      destroyer(list)
     }
 
   private fun copyStyleSourceAttribution(
@@ -6476,6 +6536,327 @@ internal object NativeAccess {
     mln_offline_region_info.`metadata$offset`()
   private val OFFLINE_REGION_INFO_METADATA_SIZE_OFFSET: Long =
     mln_offline_region_info.`metadata_size$offset`()
+
+  /** Test seam for the handwritten JVM FFM materializers and readers. */
+  internal object JvmStructs {
+    fun stringViewRoundTrip(value: String): String =
+      Arena.ofConfined().use { arena -> stringView(stringView(arena, value)) }
+
+    fun cameraOptionsRoundTrip(value: CameraOptions): Pair<Int, CameraOptions> =
+      Arena.ofConfined().use { arena ->
+        val native = cameraOptions(arena, value)
+        mln_camera_options.fields(native) to cameraOptions(native)
+      }
+
+    fun animationOptionsSnapshot(value: AnimationOptions): AnimationOptionsSnapshot =
+      Arena.ofConfined().use { arena ->
+        val native = animationOptions(arena, value)
+        AnimationOptionsSnapshot(
+          mln_animation_options.fields(native),
+          mln_animation_options.duration_ms(native),
+          mln_animation_options.velocity(native),
+          mln_animation_options.transition_id(native),
+        )
+      }
+
+    fun viewportOptionsRoundTrip(value: ViewportOptions): ViewportOptions =
+      Arena.ofConfined().use { arena -> readViewportOptions(viewportOptions(arena, value)) }
+
+    fun tileOptionsRoundTrip(value: TileOptions): TileOptions =
+      Arena.ofConfined().use { arena -> readTileOptions(tileOptions(arena, value)) }
+
+    fun projectionModeOptionsRoundTrip(value: ProjectionModeOptions): ProjectionModeOptions =
+      Arena.ofConfined().use { arena -> projectionModeOptions(projectionModeOptions(arena, value)) }
+
+    fun jsonRoundTrip(value: JsonValue): JsonValue =
+      Arena.ofConfined().use { arena -> readJson(jsonValue(arena, value), 0) }
+
+    fun geometryRoundTrip(value: Geometry): Geometry =
+      Arena.ofConfined().use { arena -> geometry(geometry(arena, value, 0)) }
+
+    fun featureRoundTrip(value: Feature): Feature =
+      Arena.ofConfined().use { arena -> feature(feature(arena, value, 0)) }
+
+    fun geoJsonType(value: GeoJson): Int =
+      Arena.ofConfined().use { arena ->
+        geoJson(arena, value).get(ValueLayout.JAVA_INT, GEOJSON_TYPE_OFFSET)
+      }
+
+    fun renderedQueryGeometryType(value: RenderedQueryGeometry): Int =
+      Arena.ofConfined().use { arena ->
+        val native = renderedQueryGeometry(arena, value)
+        native.get(ValueLayout.JAVA_INT, RENDERED_QUERY_GEOMETRY_TYPE_OFFSET)
+      }
+
+    fun offlineRegionDefinitionRoundTrip(value: OfflineRegionDefinition): OfflineRegionDefinition =
+      Arena.ofConfined().use { arena ->
+        offlineRegionDefinition(offlineRegionDefinition(value, arena))
+      }
+
+    fun offlineRegionInfoSnapshot(
+      id: Long,
+      definition: OfflineRegionDefinition,
+      metadata: ByteArray,
+    ): OfflineRegionInfo =
+      Arena.ofConfined().use { arena ->
+        val native = arena.allocate(OFFLINE_REGION_INFO_SIZE)
+        native.set(
+          ValueLayout.JAVA_INT,
+          OFFLINE_REGION_INFO_SIZE_OFFSET,
+          OFFLINE_REGION_INFO_SIZE.toInt(),
+        )
+        native.set(ValueLayout.JAVA_LONG, OFFLINE_REGION_INFO_ID_OFFSET, id)
+        native
+          .asSlice(OFFLINE_REGION_INFO_DEFINITION_OFFSET, OFFLINE_REGION_DEFINITION_SIZE)
+          .copyFrom(offlineRegionDefinition(definition, arena))
+        val copiedMetadata =
+          if (metadata.isEmpty()) MemorySegment.NULL
+          else
+            arena.allocate(metadata.size.toLong()).also {
+              MemorySegment.copy(metadata, 0, it, ValueLayout.JAVA_BYTE, 0, metadata.size)
+            }
+        native.set(ValueLayout.ADDRESS, OFFLINE_REGION_INFO_METADATA_OFFSET, copiedMetadata)
+        native.set(
+          ValueLayout.JAVA_LONG,
+          OFFLINE_REGION_INFO_METADATA_SIZE_OFFSET,
+          metadata.size.toLong(),
+        )
+        offlineRegionInfo(native)
+      }
+
+    fun styleImageOptionsSnapshot(value: StyleImageOptions): StyleImageOptionsSnapshot =
+      Arena.ofConfined().use { arena ->
+        val native = styleImageOptions(arena, value)
+        StyleImageOptionsSnapshot(
+          native.get(ValueLayout.JAVA_INT, STYLE_IMAGE_OPTIONS_FIELDS_OFFSET),
+          native.get(ValueLayout.JAVA_FLOAT, STYLE_IMAGE_OPTIONS_PIXEL_RATIO_OFFSET),
+          native.get(ValueLayout.JAVA_BOOLEAN, STYLE_IMAGE_OPTIONS_SDF_OFFSET),
+        )
+      }
+
+    fun textureImageInfoSnapshot(
+      width: Int,
+      height: Int,
+      stride: Int,
+      byteLength: Long,
+    ): TextureImageInfo =
+      Arena.ofConfined().use { arena ->
+        val native = textureImageInfo(arena)
+        mln_texture_image_info.width(native, width)
+        mln_texture_image_info.height(native, height)
+        mln_texture_image_info.stride(native, stride)
+        mln_texture_image_info.byte_length(native, byteLength)
+        readTextureImageInfo(native)
+      }
+
+    fun styleImageInfoSnapshot(byteLength: Long): StyleImageInfo =
+      Arena.ofConfined().use { arena ->
+        val native = styleImageInfoDefault(arena)
+        native.set(ValueLayout.JAVA_INT, STYLE_IMAGE_INFO_WIDTH_OFFSET, 2)
+        native.set(ValueLayout.JAVA_INT, STYLE_IMAGE_INFO_HEIGHT_OFFSET, 3)
+        native.set(ValueLayout.JAVA_INT, STYLE_IMAGE_INFO_STRIDE_OFFSET, 8)
+        native.set(ValueLayout.JAVA_LONG, STYLE_IMAGE_INFO_BYTE_LENGTH_OFFSET, byteLength)
+        styleImageInfo(native)
+      }
+
+    fun sourceInfoSnapshot(type: Int, volatileSource: Boolean): SourceInfo =
+      Arena.ofConfined().use { arena ->
+        val native = arena.allocate(STYLE_SOURCE_INFO_SIZE)
+        native.set(ValueLayout.JAVA_INT, STYLE_SOURCE_INFO_TYPE_OFFSET, type)
+        native.set(ValueLayout.JAVA_BOOLEAN, STYLE_SOURCE_INFO_IS_VOLATILE_OFFSET, volatileSource)
+        SourceInfo(
+          SourceType.fromNative(native.get(ValueLayout.JAVA_INT, STYLE_SOURCE_INFO_TYPE_OFFSET)),
+          native.get(ValueLayout.JAVA_BOOLEAN, STYLE_SOURCE_INFO_IS_VOLATILE_OFFSET),
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+        )
+      }
+
+    fun unknownRuntimePayload(type: Int, bytes: ByteArray): RuntimeEventPayload =
+      Arena.ofConfined().use { arena ->
+        val payload =
+          if (bytes.isEmpty()) MemorySegment.NULL
+          else
+            arena.allocate(bytes.size.toLong()).also {
+              MemorySegment.copy(bytes, 0, it, ValueLayout.JAVA_BYTE, 0, bytes.size)
+            }
+        runtimeEventPayload(type, payload, bytes.size.toLong())
+      }
+
+    fun featureQueryCleanupAfterCopyFailure(): Int {
+      var destroys = 0
+      try {
+        featureQueryResult(
+          NativeFeatureQueryResult(1L),
+          counter = { _, outCount ->
+            outCount.set(ValueLayout.JAVA_LONG, 0, 1L)
+            MaplibreStatus.OK.nativeCode
+          },
+          getter = { _, _, outFeature ->
+            val feature = outFeature.asSlice(QUERIED_FEATURE_FEATURE_OFFSET, FEATURE_SIZE)
+            feature.set(
+              ValueLayout.JAVA_LONG,
+              FEATURE_PROPERTY_COUNT_OFFSET,
+              Int.MAX_VALUE.toLong() + 1,
+            )
+            MaplibreStatus.OK.nativeCode
+          },
+          destroyer = { destroys++ },
+        )
+      } catch (_: IllegalArgumentException) {
+        return destroys
+      }
+      error("feature conversion unexpectedly succeeded")
+    }
+
+    fun offlineRegionListCleanupAfterCopyFailure(): Int {
+      var destroys = 0
+      try {
+        offlineRegionList(
+          NativeOfflineRegionList(1L),
+          counter = { _, outCount ->
+            outCount.set(ValueLayout.JAVA_LONG, 0, Long.MAX_VALUE)
+            MaplibreStatus.OK.nativeCode
+          },
+          getter = { _, _, _ -> MaplibreStatus.OK.nativeCode },
+          destroyer = { destroys++ },
+        )
+      } catch (_: ArithmeticException) {
+        return destroys
+      }
+      error("offline list conversion unexpectedly succeeded")
+    }
+
+    fun styleStringListCleanupAfterCopyFailure(): Int {
+      var destroys = 0
+      try {
+        styleStringList(
+          NativeStyleStringList(1L),
+          counter = { _, outCount ->
+            outCount.set(ValueLayout.JAVA_LONG, 0, Long.MAX_VALUE)
+            MaplibreStatus.OK.nativeCode
+          },
+          getter = { _, _, _ -> MaplibreStatus.OK.nativeCode },
+          destroyer = { destroys++ },
+        )
+      } catch (_: ArithmeticException) {
+        return destroys
+      }
+      error("style list conversion unexpectedly succeeded")
+    }
+
+    fun mapOptionsSnapshot(value: MapOptions): MapOptionsSnapshot =
+      Arena.ofConfined().use { arena ->
+        val native = mapOptions(value, arena)
+        MapOptionsSnapshot(
+          mln_map_options.width(native),
+          mln_map_options.height(native),
+          mln_map_options.scale_factor(native),
+          mln_map_options.map_mode(native),
+          mln_map_options.fast_pfor_enabled(native),
+        )
+      }
+
+    fun metalSnapshot(value: MetalBorrowedTextureDescriptor): RenderDescriptorSnapshot =
+      Arena.ofConfined().use { arena ->
+        val native = metalBorrowedTextureDescriptor(value)(arena)
+        val extent = mln_metal_borrowed_texture_descriptor.extent(native)
+        RenderDescriptorSnapshot(
+          mln_render_target_extent.width(extent),
+          mln_render_target_extent.height(extent),
+          mln_render_target_extent.scale_factor(extent),
+          mln_metal_borrowed_texture_descriptor.texture(native).address(),
+          0L,
+          0,
+        )
+      }
+
+    fun vulkanSnapshot(value: VulkanBorrowedTextureDescriptor): RenderDescriptorSnapshot =
+      Arena.ofConfined().use { arena ->
+        val native = vulkanBorrowedTextureDescriptor(value)(arena)
+        val extent = mln_vulkan_borrowed_texture_descriptor.extent(native)
+        RenderDescriptorSnapshot(
+          mln_render_target_extent.width(extent),
+          mln_render_target_extent.height(extent),
+          mln_render_target_extent.scale_factor(extent),
+          mln_vulkan_borrowed_texture_descriptor.image(native).address(),
+          mln_vulkan_borrowed_texture_descriptor.image_view(native).address(),
+          mln_vulkan_borrowed_texture_descriptor.final_layout(native),
+        )
+      }
+
+    fun openGlSnapshot(value: OpenGLBorrowedTextureDescriptor): RenderDescriptorSnapshot =
+      Arena.ofConfined().use { arena ->
+        val native = openglBorrowedTextureDescriptor(value)(arena)
+        val extent = mln_opengl_borrowed_texture_descriptor.extent(native)
+        val context = mln_opengl_borrowed_texture_descriptor.context(native)
+        val data = mln_opengl_context_descriptor.data(context)
+        val egl = mln_opengl_context_descriptor.data.egl(data)
+        RenderDescriptorSnapshot(
+          mln_render_target_extent.width(extent),
+          mln_render_target_extent.height(extent),
+          mln_render_target_extent.scale_factor(extent),
+          mln_opengl_borrowed_texture_descriptor.texture(native).toLong(),
+          mln_egl_context_descriptor.display(egl).address(),
+          mln_opengl_borrowed_texture_descriptor.target(native),
+        )
+      }
+
+    fun resourceResponseSnapshot(value: ResourceResponse): ResourceResponseSnapshot =
+      Arena.ofConfined().use { arena ->
+        val native = resourceResponse(value, arena)
+        ResourceResponseSnapshot(
+          native.get(ValueLayout.JAVA_INT, RESOURCE_RESPONSE_STATUS_OFFSET),
+          copyBytes(
+            native.get(ValueLayout.ADDRESS, RESOURCE_RESPONSE_BYTES_OFFSET),
+            native.get(ValueLayout.JAVA_LONG, RESOURCE_RESPONSE_BYTE_COUNT_OFFSET),
+          ),
+          native.get(ValueLayout.JAVA_BOOLEAN, RESOURCE_RESPONSE_MUST_REVALIDATE_OFFSET),
+          native.get(ValueLayout.JAVA_BOOLEAN, RESOURCE_RESPONSE_HAS_MODIFIED_OFFSET),
+          native.get(ValueLayout.JAVA_BOOLEAN, RESOURCE_RESPONSE_HAS_EXPIRES_OFFSET),
+          native.get(ValueLayout.JAVA_BOOLEAN, RESOURCE_RESPONSE_HAS_RETRY_AFTER_OFFSET),
+        )
+      }
+
+    data class StyleImageOptionsSnapshot(val fields: Int, val pixelRatio: Float, val sdf: Boolean)
+
+    data class AnimationOptionsSnapshot(
+      val fields: Int,
+      val durationMs: Double,
+      val velocity: Double,
+      val transitionId: Long,
+    )
+
+    data class MapOptionsSnapshot(
+      val width: Int,
+      val height: Int,
+      val scaleFactor: Double,
+      val mapMode: Int,
+      val fastPforEnabled: Boolean,
+    )
+
+    data class ResourceResponseSnapshot(
+      val status: Int,
+      val bytes: ByteArray,
+      val mustRevalidate: Boolean,
+      val hasModified: Boolean,
+      val hasExpires: Boolean,
+      val hasRetryAfter: Boolean,
+    )
+
+    data class RenderDescriptorSnapshot(
+      val width: Int,
+      val height: Int,
+      val scaleFactor: Double,
+      val firstPointer: Long,
+      val secondPointer: Long,
+      val extra: Int,
+    )
+  }
 
   internal data class NativeRuntimeEvent(
     val type: Int,

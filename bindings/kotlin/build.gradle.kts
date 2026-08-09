@@ -53,6 +53,11 @@ kotlin {
     minSdk = libs.versions.android.minSdk.get().toInt()
 
     withJava()
+    withDeviceTestBuilder { sourceSetTreeName = "test" }
+      .configure {
+        instrumentationRunner = "org.maplibre.nativeffi.MaplibreTestRunner"
+        execution = "HOST"
+      }
 
     optimization {
       consumerKeepRules.file(
@@ -91,6 +96,14 @@ kotlin {
 
   sourceSets {
     androidMain { dependencies { implementation(libs.javacpp) } }
+
+    named("androidDeviceTest") {
+      dependencies {
+        implementation(kotlin("test"))
+        implementation(libs.androidx.test.runner)
+        implementation(project(":bindings:kotlin:runtimes:$androidBackend"))
+      }
+    }
 
     commonTest.dependencies { implementation(kotlin("test")) }
   }

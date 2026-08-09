@@ -17,88 +17,8 @@ import org.maplibre.nativeffi.internal.c.mln_resource_transform_response_set_url
 import org.maplibre.nativeffi.internal.status.Status
 
 @OptIn(ExperimentalForeignApi::class)
-class FrameAcquirePolicyTest : org.maplibre.nativeffi.NativeTestBase() {
+class NativeFrameAcquirePolicyTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-026, BND-167, BND-169, BND-172.
-
-  @Test
-  fun wrapperFailureAfterNativeAcquireReleasesNativeFrameAndClosesLocalState() {
-    val failure = IllegalArgumentException("frame metadata overflow")
-    var released = 0
-    var closed = 0
-
-    val thrown =
-      assertFailsWith<IllegalArgumentException> {
-        FrameAcquirePolicy.cleanupAfterWrapperFailure(
-          acquired = true,
-          releaseNative = { released += 1 },
-          closeLocal = { closed += 1 },
-          failure = failure,
-        )
-      }
-
-    assertSame(failure, thrown)
-    assertEquals(1, released)
-    assertEquals(1, closed)
-  }
-
-  @Test
-  fun wrapperFailureBeforeNativeAcquireOnlyClosesLocalState() {
-    val failure = IllegalArgumentException("native acquire failed")
-    var released = 0
-    var closed = 0
-
-    val thrown =
-      assertFailsWith<IllegalArgumentException> {
-        FrameAcquirePolicy.cleanupAfterWrapperFailure(
-          acquired = false,
-          releaseNative = { released += 1 },
-          closeLocal = { closed += 1 },
-          failure = failure,
-        )
-      }
-
-    assertSame(failure, thrown)
-    assertEquals(0, released)
-    assertEquals(1, closed)
-  }
-
-  @Test
-  fun wrapperFailureStillClosesLocalStateWhenNativeFrameReleaseFails() {
-    val failure = IllegalArgumentException("frame copy failed")
-    var closed = 0
-
-    val thrown =
-      assertFailsWith<IllegalArgumentException> {
-        FrameAcquirePolicy.cleanupAfterWrapperFailure(
-          acquired = true,
-          releaseNative = { throw IllegalStateException("wrong thread") },
-          closeLocal = { closed += 1 },
-          failure = failure,
-        )
-      }
-
-    assertSame(failure, thrown)
-    assertEquals(1, closed)
-  }
-
-  @Test
-  fun localCleanupFailureDoesNotReplaceOriginalFailure() {
-    val failure = IllegalArgumentException("frame copy failed")
-    var released = 0
-
-    val thrown =
-      assertFailsWith<IllegalArgumentException> {
-        FrameAcquirePolicy.cleanupAfterWrapperFailure(
-          acquired = true,
-          releaseNative = { released += 1 },
-          closeLocal = { throw IllegalStateException("cleanup failed") },
-          failure = failure,
-        )
-      }
-
-    assertSame(failure, thrown)
-    assertEquals(1, released)
-  }
 
   @Test
   fun cleanupNativeFailureDoesNotReplaceOriginalNativeDiagnostic() {

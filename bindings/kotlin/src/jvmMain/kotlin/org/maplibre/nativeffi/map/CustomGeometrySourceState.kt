@@ -23,9 +23,13 @@ internal class CustomGeometrySourceState(private val options: CustomGeometrySour
 
   @Suppress("UNUSED_PARAMETER")
   private fun fetchTile(userData: MemorySegment, tileId: MemorySegment) {
+    fetchTileForTesting(NativeAccess.canonicalTileId(tileId))
+  }
+
+  internal fun fetchTileForTesting(tileId: org.maplibre.nativeffi.geo.CanonicalTileId) {
     val lease = gate.enter() ?: return
     try {
-      options.callback.fetchTile(NativeAccess.canonicalTileId(tileId))
+      options.callback.fetchTile(tileId)
     } catch (_: Throwable) {
       // Native callbacks must not unwind through the C ABI.
     } finally {
@@ -48,6 +52,8 @@ internal class CustomGeometrySourceState(private val options: CustomGeometrySour
   override fun close() {
     gate.close()
   }
+
+  internal fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
 
   private fun upcall(methodName: String): MemorySegment {
     val method =

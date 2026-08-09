@@ -73,7 +73,8 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     HandleLeakCleaner.register(this, core.leakReport)
   }
 
-  private val customGeometrySources = mutableMapOf<String, CustomGeometrySourceState>()
+  private val customGeometrySources =
+    CustomGeometrySourceRegistry<CustomGeometrySourceState>(::releaseCallbackRoot)
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
@@ -317,7 +318,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
   ) {
     NativeAccess.ensureLoaded()
     val sourceState = CustomGeometrySourceState(options)
-    try {
+    customGeometrySources.install(sourceId, sourceState) {
       StringViewScope(sourceId).use { nativeSourceId ->
         Status.check(
           MaplibreNativeC.mln_map_add_custom_geometry_source(
@@ -328,10 +329,6 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
         )
       }
       HandleLeakCleaner.retainNativeCallbackRoot(sourceState)
-      releaseCallbackRoot(customGeometrySources.put(sourceId, sourceState))
-    } catch (error: Throwable) {
-      closeQuietly(sourceState)
-      throw error
     }
   }
 
@@ -1688,14 +1685,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     core.retainChild(childTypeName)
 
   internal fun releaseDetachedCustomGeometrySources() {
-    val iterator = customGeometrySources.iterator()
-    while (iterator.hasNext()) {
-      val entry = iterator.next()
-      if (styleSourceType(entry.key) != SourceType.CUSTOM_VECTOR) {
-        releaseCallbackRoot(entry.value)
-        iterator.remove()
-      }
-    }
+    customGeometrySources.releaseDetached(::styleSourceType)
   }
 
   private fun addTileSourceUrl(
@@ -1793,11 +1783,10 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
   }
 
   private fun closeCustomGeometrySource(sourceId: String) {
-    releaseCallbackRoot(customGeometrySources.remove(sourceId))
+    customGeometrySources.remove(sourceId)
   }
 
   private fun clearCustomGeometrySources() {
-    customGeometrySources.values.forEach(::releaseCallbackRoot)
     customGeometrySources.clear()
   }
 }
@@ -1851,18 +1840,31 @@ private fun styleIdList(list: Long): List<String> =
   }
 
 private fun styleStringList(list: Long): List<String> =
+  styleStringList(
+    list,
+    counter = MaplibreNativeC::mln_style_string_list_count,
+    getter = MaplibreNativeC::mln_style_string_list_get,
+    destroyer = MaplibreNativeC::mln_style_string_list_destroy,
+  )
+
+private fun styleStringList(
+  list: Long,
+  counter: (Long, SizeTPointer) -> Int,
+  getter: (Long, Long, MaplibreNativeC.mln_string_view) -> Int,
+  destroyer: (Long) -> Unit,
+): List<String> =
   try {
     SizeTPointer(1).use { outCount ->
-      Status.check(MaplibreNativeC.mln_style_string_list_count(list, outCount))
+      Status.check(counter(list, outCount))
       List(Math.toIntExact(outCount.get())) { index ->
         MaplibreNativeC.mln_string_view().use { outValue ->
-          Status.check(MaplibreNativeC.mln_style_string_list_get(list, index.toLong(), outValue))
+          Status.check(getter(list, index.toLong(), outValue))
           stringView(outValue)
         }
       }
     }
   } finally {
-    MaplibreNativeC.mln_style_string_list_destroy(list)
+    destroyer(list)
   }
 
 /**
@@ -2045,11 +2047,11 @@ private fun styleImageInfo(info: MaplibreNativeC.mln_style_image_info): StyleIma
     info.width(),
     info.height(),
     info.stride(),
-    info.byte_length(),
+    checkedSizeT(info.byte_length(), "style image byte length"),
     info.pixel_ratio(),
     info.sdf(),
-    info.stretch_x_count(),
-    info.stretch_y_count(),
+    checkedSizeT(info.stretch_x_count(), "style image stretch X count"),
+    checkedSizeT(info.stretch_y_count(), "style image stretch Y count"),
     if (info.has_content()) {
       val content = info.content()
       ImageContent(content.left(), content.top(), content.right(), content.bottom())
@@ -2057,6 +2059,11 @@ private fun styleImageInfo(info: MaplibreNativeC.mln_style_image_info): StyleIma
     if (info.has_text_fit_width()) StyleImageTextFit.fromNative(info.text_fit_width()) else null,
     if (info.has_text_fit_height()) StyleImageTextFit.fromNative(info.text_fit_height()) else null,
   )
+
+private fun checkedSizeT(value: Long, name: String): Long {
+  require(value >= 0L) { "$name exceeds Long.MAX_VALUE" }
+  return value
+}
 
 private fun debugOptionMask(options: Set<DebugOption>): Int =
   options.fold(0) { acc, option -> acc or option.nativeMask }
@@ -2817,7 +2824,7 @@ private class CanonicalTileIdScope(value: CanonicalTileId) : AutoCloseable {
   }
 }
 
-private class CustomGeometrySourceState(private val options: CustomGeometrySourceOptions) :
+internal class CustomGeometrySourceState(private val options: CustomGeometrySourceOptions) :
   AutoCloseable {
   private val gate = CallbackGate("custom geometry callbacks", ::closeNative)
   // JavaCPP passes null for a null void* and drops the upcall if the Kotlin
@@ -2877,16 +2884,22 @@ private class CustomGeometrySourceState(private val options: CustomGeometrySourc
     gate.close()
   }
 
-  private fun fetchTile(tileId: MaplibreNativeC.mln_canonical_tile_id?) {
-    if (tileId == null) return
+  internal fun fetchTileForTesting(tileId: CanonicalTileId) {
     val lease = gate.enter() ?: return
     try {
-      options.callback.fetchTile(canonicalTileId(tileId))
+      options.callback.fetchTile(tileId)
     } catch (_: Throwable) {
       // Native callbacks must not unwind through the C ABI.
     } finally {
       lease.close()
     }
+  }
+
+  internal fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
+
+  private fun fetchTile(tileId: MaplibreNativeC.mln_canonical_tile_id?) {
+    if (tileId == null) return
+    fetchTileForTesting(canonicalTileId(tileId))
   }
 
   private fun cancelTile(tileId: MaplibreNativeC.mln_canonical_tile_id?) {
@@ -3305,4 +3318,109 @@ private class AddressPointer(address: Long) : Pointer(null as Pointer?) {
   init {
     this.address = address
   }
+}
+
+/** Direct test seam for the JavaCPP map and style descriptor adapter. */
+internal object JavaCppMapStructs {
+  fun stringViewRoundTrip(value: String): String =
+    StringViewScope(value).use { stringView(it.view) }
+
+  fun cameraOptionsRoundTrip(value: CameraOptions): Pair<Int, CameraOptions> =
+    CameraOptionsScope(value).use { it.options.fields() to cameraOptions(it.options) }
+
+  fun animationOptionsSnapshot(value: AnimationOptions): AnimationOptionsSnapshot =
+    AnimationOptionsScope(value).use {
+      val options = requireNotNull(it.options)
+      AnimationOptionsSnapshot(
+        options.fields(),
+        options.duration_ms(),
+        options.velocity(),
+        options.transition_id(),
+      )
+    }
+
+  fun viewportOptionsRoundTrip(value: ViewportOptions): ViewportOptions =
+    ViewportOptionsScope(value).use { viewportOptions(it.options) }
+
+  fun tileOptionsRoundTrip(value: TileOptions): TileOptions =
+    TileOptionsScope(value).use { tileOptions(it.options) }
+
+  fun projectionModeOptionsRoundTrip(value: ProjectionModeOptions): ProjectionModeOptions =
+    ProjectionModeOptionsScope(value).use { projectionModeOptions(it.mode) }
+
+  fun jsonRoundTrip(value: JsonValue): JsonValue = JsonScope(value).use { jsonValue(it.value) }
+
+  fun geoJsonType(value: GeoJson): Int = GeoJsonScope(value).use { it.value.type() }
+
+  fun styleImageOptionsSnapshot(value: StyleImageOptions): StyleImageOptionsSnapshot =
+    StyleImageOptionsScope(value).use {
+      StyleImageOptionsSnapshot(it.options.fields(), it.options.pixel_ratio(), it.options.sdf())
+    }
+
+  fun styleImageInfoSnapshot(byteLength: Long): StyleImageInfo =
+    MaplibreNativeC.mln_style_image_info().use {
+      it.width(2).height(3).stride(8).byte_length(byteLength).pixel_ratio(2.0f).sdf(true)
+      styleImageInfo(it)
+    }
+
+  fun sourceInfoSnapshot(type: Int, volatileSource: Boolean): SourceInfo =
+    MaplibreNativeC.mln_style_source_info().use {
+      it.type(type).is_volatile(volatileSource)
+      SourceInfo(
+        SourceType.fromNative(it.type()),
+        it.is_volatile(),
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+      )
+    }
+
+  fun styleStringListCleanupAfterCopyFailure(): Int {
+    var destroys = 0
+    try {
+      styleStringList(
+        1L,
+        counter = { _, outCount ->
+          outCount.put(Long.MAX_VALUE)
+          org.maplibre.nativeffi.error.MaplibreStatus.OK.nativeCode
+        },
+        getter = { _, _, _ -> org.maplibre.nativeffi.error.MaplibreStatus.OK.nativeCode },
+        destroyer = { destroys++ },
+      )
+    } catch (_: ArithmeticException) {
+      return destroys
+    }
+    error("style list conversion unexpectedly succeeded")
+  }
+
+  fun mapOptionsSnapshot(value: MapOptions): MapOptionsSnapshot =
+    MapOptionsScope(value).use {
+      MapOptionsSnapshot(
+        it.options.width(),
+        it.options.height(),
+        it.options.scale_factor(),
+        it.options.map_mode(),
+        it.options.fast_pfor_enabled(),
+      )
+    }
+
+  data class StyleImageOptionsSnapshot(val fields: Int, val pixelRatio: Float, val sdf: Boolean)
+
+  data class AnimationOptionsSnapshot(
+    val fields: Int,
+    val durationMs: Double,
+    val velocity: Double,
+    val transitionId: Long,
+  )
+
+  data class MapOptionsSnapshot(
+    val width: Int,
+    val height: Int,
+    val scaleFactor: Double,
+    val mapMode: Int,
+    val fastPforEnabled: Boolean,
+  )
 }

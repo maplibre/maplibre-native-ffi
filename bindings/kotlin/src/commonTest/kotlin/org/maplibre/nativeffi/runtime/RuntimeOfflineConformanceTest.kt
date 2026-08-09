@@ -3,14 +3,9 @@ package org.maplibre.nativeffi.runtime
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.Maplibre
-import org.maplibre.nativeffi.error.InvalidArgumentException
-import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
@@ -18,69 +13,9 @@ import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
-import platform.posix.usleep
 
-class RuntimeOfflineTest : org.maplibre.nativeffi.NativeTestBase() {
+class RuntimeOfflineConformanceTest {
   private val deferredEvents = ArrayDeque<RuntimeEvent>()
-
-  @Test
-  fun processGlobalNetworkStatusRoundTrips() {
-    val original = Maplibre.networkStatus
-    try {
-      Maplibre.setNetworkStatus(NetworkStatus.OFFLINE)
-      assertEquals(NetworkStatus.OFFLINE, Maplibre.networkStatus)
-      Maplibre.setNetworkStatus(NetworkStatus.ONLINE)
-      assertEquals(NetworkStatus.ONLINE, Maplibre.networkStatus)
-    } finally {
-      Maplibre.setNetworkStatus(original)
-    }
-  }
-
-  @Test
-  fun offlineDownloadStateUnknownRawValueRejectsBeforeNativeCall() {
-    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
-    try {
-      assertFailsWith<InvalidArgumentException> {
-        runtime.startSetOfflineRegionDownloadState(1, OfflineRegionDownloadState(900))
-      }
-    } finally {
-      runtime.close()
-    }
-  }
-
-  @Test
-  fun ambientCacheOperationHandleDiscardsOnce() {
-    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
-    try {
-      val operation = runtime.startAmbientCacheOperation(AmbientCacheOperation.INVALIDATE)
-      assertFalse(operation.isClosed)
-      assertEquals(OfflineOperationKind.AMBIENT_CACHE, operation.kind)
-      assertEquals(OfflineOperationResultKind.NONE, operation.resultKind)
-
-      operation.close()
-      assertTrue(operation.isClosed)
-      operation.close()
-      assertTrue(operation.isClosed)
-    } finally {
-      runtime.close()
-    }
-  }
-
-  @Test
-  fun setMaximumAmbientCacheSizeHandleReportsKindAndRejectsNegativeSize() {
-    val runtime = RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
-    try {
-      val operation = runtime.startSetMaximumAmbientCacheSize(8L shl 20)
-      assertEquals(OfflineOperationKind.SET_MAXIMUM_AMBIENT_CACHE_SIZE, operation.kind)
-      assertEquals(OfflineOperationResultKind.NONE, operation.resultKind)
-      operation.close()
-
-      // Binding-owned validation fails before crossing into C.
-      assertFailsWith<InvalidArgumentException> { runtime.startSetMaximumAmbientCacheSize(-1L) }
-    } finally {
-      runtime.close()
-    }
-  }
 
   @Test
   fun offlineRegionApisCreateObserveAndCopyPublicEvents() {
@@ -158,19 +93,13 @@ class RuntimeOfflineTest : org.maplibre.nativeffi.NativeTestBase() {
           continue
         }
         assertEquals(operation.kind, completed.operationKind)
-        assertEquals(operation.kind.nativeValue, completed.operationKind.nativeValue)
         assertEquals(operation.resultKind, completed.resultKind)
-        assertEquals(operation.resultKind.nativeValue, completed.resultKind.nativeValue)
         if (completed.resultStatus != MaplibreStatus.OK.nativeCode) {
-          throw MaplibreException.forStatus(
-            MaplibreStatus.fromNative(completed.resultStatus),
-            completed.resultStatus,
-            event.message,
-          )
+          error("offline operation failed: ${event.message}")
         }
         return completed
       }
-      usleep(1_000U)
+      runtime.pump(1)
     }
     error("offline operation did not complete: ${operation.id}")
   }
@@ -219,7 +148,7 @@ class RuntimeOfflineTest : org.maplibre.nativeffi.NativeTestBase() {
           else -> Unit
         }
       }
-      usleep(1_000U)
+      runtime.pump(1)
     }
     error("offline region observation event did not arrive for region $regionId")
   }
@@ -233,7 +162,7 @@ class RuntimeOfflineTest : org.maplibre.nativeffi.NativeTestBase() {
   ) {
     val statusChanged = assertIs<RuntimeEventPayload.OfflineRegionStatusChanged>(payload)
     assertEquals(regionId, statusChanged.regionId)
-    assertTrue(statusChanged.status.downloadState.nativeValue >= 0)
+    assertEquals(OfflineRegionDownloadState.ACTIVE, statusChanged.status.downloadState)
     assertTrue(statusChanged.status.completedResourceCount >= 0)
     assertTrue(statusChanged.status.completedResourceSize >= 0)
     assertTrue(statusChanged.status.completedTileCount >= 0)

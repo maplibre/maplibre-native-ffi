@@ -825,7 +825,7 @@ jobs:
           mise run install-native-package
           ios-simulator-arm64-metal
           build/packages/native/dist/maplibre-native-c-ios-simulator-arm64-metal.tar.gz
-      - run: mise run //bindings/kotlin:ios-build ios-simulator-arm64-metal
+      - run: mise run //bindings/kotlin:test ios-simulator-arm64-metal
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/swift:test ios-simulator-arm64-metal
@@ -966,7 +966,7 @@ jobs:
           mise run install-native-package
           android-x64-egl
           build/packages/native/dist/maplibre-native-c-android-x64-egl.tar.gz
-      - run: mise run //bindings/kotlin:android-build opengl x86_64 --prebuilt
+      - run: mise run //bindings/kotlin:test android-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/go:test android-x64-egl
@@ -1014,7 +1014,7 @@ jobs:
           mise run install-native-package
           android-x64-vulkan
           build/packages/native/dist/maplibre-native-c-android-x64-vulkan.tar.gz
-      - run: mise run //bindings/kotlin:android-build vulkan x86_64 --prebuilt
+      - run: mise run //bindings/kotlin:test android-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/go:test android-x64-vulkan

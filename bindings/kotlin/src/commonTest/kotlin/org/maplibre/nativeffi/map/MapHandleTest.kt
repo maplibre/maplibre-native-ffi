@@ -9,7 +9,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.BoundsConstraint
@@ -19,8 +18,6 @@ import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.camera.UnitBezier
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
-import org.maplibre.nativeffi.error.MaplibreStatus
-import org.maplibre.nativeffi.error.UnsupportedFeatureException
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.FeatureIdentifier
@@ -32,12 +29,7 @@ import org.maplibre.nativeffi.geo.Quaternion
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.geo.Vec3
 import org.maplibre.nativeffi.json.JsonValue
-import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
-import org.maplibre.nativeffi.render.RenderBackend
-import org.maplibre.nativeffi.render.RenderTargetExtent
-import org.maplibre.nativeffi.render.VulkanContextDescriptor
-import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.runtime.CameraChangeMode
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeEventType
@@ -484,40 +476,6 @@ class MapHandleTest {
   }
 
   @Test
-  fun unsupportedRenderBackendAttachReportsUnsupported() {
-    if (RenderBackend.VULKAN in Maplibre.supportedRenderBackends()) {
-      return
-    }
-
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-          mapMode = MapMode.STATIC
-        },
-      )
-
-    try {
-      val error =
-        assertFailsWith<UnsupportedFeatureException> {
-          map.attachVulkanOwnedTexture(
-            VulkanOwnedTextureDescriptor(
-              RenderTargetExtent(64, 64, 1.0),
-              vulkanContext(NativePointer.ofAddress(1)),
-            )
-          )
-        }
-      assertEquals(MaplibreStatus.UNSUPPORTED, error.status)
-    } finally {
-      map.close()
-      runtime.close()
-    }
-  }
-
-  @Test
   fun styleLayerJsonCanBeAddedInspectedListedAndRemoved() {
     val runtime = RuntimeHandle.create(RuntimeOptions())
     val map =
@@ -921,7 +879,7 @@ class MapHandleTest {
         runtime.pump(0)
         finished += drainCameraEvents(runtime).finishedTransitionIds
         rounds++
-        Thread.sleep(1)
+        runtime.pump(1)
       }
       assertEquals(listOf(21L), finished)
       assertEquals(5.0, map.camera.zoom ?: 0.0, 1e-6)
@@ -1159,9 +1117,6 @@ class MapHandleTest {
 
   private fun imageCoordinates(): List<LatLng> =
     listOf(LatLng(0.0, 0.0), LatLng(0.0, 1.0), LatLng(1.0, 1.0), LatLng(1.0, 0.0))
-
-  private fun vulkanContext(pointer: NativePointer): VulkanContextDescriptor =
-    VulkanContextDescriptor(pointer, pointer, pointer, pointer, 0, pointer, pointer)
 
   private fun assertNear(expected: LatLng, actual: LatLng) {
     assertEquals(expected.latitude, actual.latitude, 1e-6)

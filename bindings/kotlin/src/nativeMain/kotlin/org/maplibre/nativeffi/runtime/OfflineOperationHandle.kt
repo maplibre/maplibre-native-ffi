@@ -1,78 +1,52 @@
 package org.maplibre.nativeffi.runtime
 
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.ref.Cleaner
 import kotlin.native.ref.createCleaner
-import org.maplibre.nativeffi.error.InvalidStateException
-import org.maplibre.nativeffi.error.MaplibreStatus
-import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 
-@OptIn(ExperimentalAtomicApi::class, ExperimentalNativeApi::class)
+@OptIn(ExperimentalNativeApi::class)
 public actual class OfflineOperationHandle<T>
 internal constructor(
   private val runtime: RuntimeHandle,
-  private val nativeId: ULong,
-  public actual val kind: OfflineOperationKind,
-  public actual val resultKind: OfflineOperationResultKind,
+  nativeId: ULong,
+  kind: OfflineOperationKind,
+  resultKind: OfflineOperationResultKind,
 ) : AutoCloseable {
-  /** Native `uint64_t` operation id preserved as a [Long] bit pattern. */
-  public actual val id: Long = uint64BitsToLong(nativeId)
-  private val runtimeRetention: HandleStateCore.ChildRetention =
-    runtime.retainChild("OfflineOperationHandle")
-  private val leakReport = OfflineOperationLeakReport(id, kind, resultKind)
-  @Suppress("unused") private val cleaner: Cleaner = createCleaner(leakReport) { it.report() }
-  private var closed = false
+  private val runtimeRetention = runtime.retainChild("OfflineOperationHandle")
+  private val core =
+    OfflineOperationHandleCore(
+      runtime,
+      nativeId.toLong(),
+      kind,
+      resultKind,
+      runtimeRetention::close,
+    )
+  @Suppress("unused") private val cleaner: Cleaner = createCleaner(core.leakReport) { it.report() }
 
-  init {
-    require(nativeId != 0UL) { "offline operation id must not be zero" }
-  }
+  public actual val id: Long
+    get() = core.id
+
+  public actual val kind: OfflineOperationKind
+    get() = core.kind
+
+  public actual val resultKind: OfflineOperationResultKind
+    get() = core.resultKind
 
   public actual val isClosed: Boolean
-    get() = closed
+    get() = core.isClosed
 
-  internal fun requireLive(expectedRuntime: RuntimeHandle): ULong {
-    if (closed) {
-      throw InvalidStateException(
-        MaplibreStatus.INVALID_STATE.nativeCode,
-        "OfflineOperationHandle is already closed",
-      )
-    }
-    if (runtime !== expectedRuntime) {
-      throw InvalidStateException(
-        MaplibreStatus.INVALID_STATE.nativeCode,
-        "OfflineOperationHandle belongs to a different RuntimeHandle",
-      )
-    }
-    return nativeId
-  }
+  internal fun requireLive(expectedRuntime: RuntimeHandle): ULong =
+    core.requireLive(expectedRuntime).toULong()
 
   internal fun requireLive(
     expectedRuntime: RuntimeHandle,
     expectedKind: OfflineOperationKind,
     expectedResultKind: OfflineOperationResultKind,
-  ): ULong {
-    val operationId = requireLive(expectedRuntime)
-    if (kind != expectedKind || resultKind != expectedResultKind) {
-      throw InvalidStateException(
-        MaplibreStatus.INVALID_STATE.nativeCode,
-        "OfflineOperationHandle has kind $kind/$resultKind, expected $expectedKind/$expectedResultKind",
-      )
-    }
-    return operationId
-  }
+  ): ULong = core.requireLive(expectedRuntime, expectedKind, expectedResultKind).toULong()
 
-  internal fun markConsumed() {
-    if (closed) return
-    closed = true
-    leakReport.markClosed()
-    runtimeRetention.close()
-  }
+  internal fun markConsumed() = core.markConsumed()
 
   public actual override fun close() {
-    if (closed) return
-    runtime.discardOfflineOperation(this)
+    if (!isClosed) runtime.discardOfflineOperation(this)
   }
-
-  private fun uint64BitsToLong(value: ULong): Long = value.toLong()
 }

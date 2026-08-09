@@ -1,71 +1,46 @@
 package org.maplibre.nativeffi.runtime
 
-import org.maplibre.nativeffi.error.InvalidStateException
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
-import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 
 /** Owner-thread offline database operation backed by the Android JNI bridge. */
 public actual class OfflineOperationHandle<T>
 internal constructor(
   private val runtime: RuntimeHandle,
-  public actual val id: Long,
-  public actual val kind: OfflineOperationKind,
-  public actual val resultKind: OfflineOperationResultKind,
+  id: Long,
+  kind: OfflineOperationKind,
+  resultKind: OfflineOperationResultKind,
 ) : AutoCloseable {
-  private val runtimeRetention: HandleStateCore.ChildRetention =
-    runtime.retainChild("OfflineOperationHandle")
-  private val leakReport = OfflineOperationLeakReport(id, kind, resultKind)
-  private var closed = false
+  private val runtimeRetention = runtime.retainChild("OfflineOperationHandle")
+  private val core =
+    OfflineOperationHandleCore(runtime, id, kind, resultKind, runtimeRetention::close)
 
   init {
-    require(id != 0L) { "offline operation id must not be zero" }
-    HandleLeakCleaner.registerOfflineOperation(this, leakReport)
+    HandleLeakCleaner.registerOfflineOperation(this, core.leakReport)
   }
+
+  public actual val id: Long
+    get() = core.id
+
+  public actual val kind: OfflineOperationKind
+    get() = core.kind
+
+  public actual val resultKind: OfflineOperationResultKind
+    get() = core.resultKind
 
   public actual val isClosed: Boolean
-    get() = closed
+    get() = core.isClosed
 
-  internal fun requireLive(expectedRuntime: RuntimeHandle): Long {
-    if (closed) {
-      throw InvalidStateException(
-        MaplibreStatus.INVALID_STATE.nativeCode,
-        "OfflineOperationHandle is already closed",
-      )
-    }
-    if (runtime !== expectedRuntime) {
-      throw InvalidStateException(
-        MaplibreStatus.INVALID_STATE.nativeCode,
-        "OfflineOperationHandle belongs to a different RuntimeHandle",
-      )
-    }
-    return id
-  }
+  internal fun requireLive(expectedRuntime: RuntimeHandle): Long = core.requireLive(expectedRuntime)
 
   internal fun requireLive(
     expectedRuntime: RuntimeHandle,
     expectedKind: OfflineOperationKind,
     expectedResultKind: OfflineOperationResultKind,
-  ): Long {
-    val operationId = requireLive(expectedRuntime)
-    if (kind != expectedKind || resultKind != expectedResultKind) {
-      throw InvalidStateException(
-        MaplibreStatus.INVALID_STATE.nativeCode,
-        "OfflineOperationHandle has kind $kind/$resultKind, expected $expectedKind/$expectedResultKind",
-      )
-    }
-    return operationId
-  }
+  ): Long = core.requireLive(expectedRuntime, expectedKind, expectedResultKind)
 
-  internal fun markConsumed() {
-    if (closed) return
-    closed = true
-    leakReport.markClosed()
-    runtimeRetention.close()
-  }
+  internal fun markConsumed() = core.markConsumed()
 
   public actual override fun close() {
-    if (closed) return
-    runtime.discardOfflineOperation(this)
+    if (!isClosed) runtime.discardOfflineOperation(this)
   }
 }

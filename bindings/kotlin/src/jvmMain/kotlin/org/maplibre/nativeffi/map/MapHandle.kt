@@ -52,7 +52,8 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     HandleLeakCleaner.register(this, core.leakReport)
   }
 
-  private val customGeometrySources = mutableMapOf<String, CustomGeometrySourceState>()
+  private val customGeometrySources =
+    CustomGeometrySourceRegistry<CustomGeometrySourceState>(::releaseCallbackRoot)
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
@@ -146,13 +147,9 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   ) {
     NativeAccess.ensureLoaded()
     val sourceState = CustomGeometrySourceState(options)
-    try {
+    customGeometrySources.install(sourceId, sourceState) {
       NativeAccess.addCustomGeometrySource(requireLiveHandle(), sourceId, sourceState.descriptor())
       HandleLeakCleaner.retainNativeCallbackRoot(sourceState)
-      releaseCallbackRoot(customGeometrySources.put(sourceId, sourceState))
-    } catch (error: Throwable) {
-      closeQuietly(sourceState)
-      throw error
     }
   }
 
@@ -821,14 +818,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     core.retainChild(childTypeName)
 
   internal fun releaseDetachedCustomGeometrySources() {
-    val iterator = customGeometrySources.iterator()
-    while (iterator.hasNext()) {
-      val entry = iterator.next()
-      if (styleSourceType(entry.key) != SourceType.CUSTOM_VECTOR) {
-        releaseCallbackRoot(entry.value)
-        iterator.remove()
-      }
-    }
+    customGeometrySources.releaseDetached(::styleSourceType)
   }
 
   private fun requireLiveHandle(): NativeMap {
@@ -837,11 +827,10 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   }
 
   private fun closeCustomGeometrySource(sourceId: String) {
-    releaseCallbackRoot(customGeometrySources.remove(sourceId))
+    customGeometrySources.remove(sourceId)
   }
 
   private fun clearCustomGeometrySources() {
-    customGeometrySources.values.forEach(::releaseCallbackRoot)
     customGeometrySources.clear()
   }
 }

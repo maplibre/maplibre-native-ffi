@@ -64,17 +64,23 @@ fi
 ./gradlew "${gradle_args[@]}" "${tasks[@]}"
 '''
 
-# One task per runtime, since a preset maps to more than one: the JVM suite
-# covers every host preset, and presets with a declared Kotlin/Native target
-# add its suite. `test` runs every runtime relevant to the preset.
 [tasks.test]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+extends = "ffi:preset"
+dir = "../.."
 run = '''
 case "$usage_preset" in
   linux-x64-* | macos-arm64-*) runtimes=(jvm native) ;;
   linux-arm64-* | windows-*) runtimes=(jvm) ;;
+  android-*)
+    exec "$MISE_MONOREPO_ROOT/scripts/test-kotlin-android-device.sh" "$usage_preset"
+    ;;
+  ios-simulator-arm64-metal) runtimes=(native) ;;
+  ios-arm64-metal)
+    echo "The Kotlin iOS tests need a runnable target; test ios-simulator-arm64-metal instead of $usage_preset." >&2
+    exit 2
+    ;;
   *)
-    echo "The Kotlin binding tests host presets only, got: $usage_preset" >&2
+    echo "Unsupported Kotlin test preset: $usage_preset" >&2
     exit 2
     ;;
 esac
@@ -103,17 +109,33 @@ esac
 extends = "ffi:preset"
 dir = "../.."
 run = '''
+gradle_args=()
+gradle_tasks=()
 case "$usage_preset" in
   linux-x64-*) kotlin_target=linuxX64 ;;
   macos-arm64-*) kotlin_target=macosArm64 ;;
+  ios-simulator-arm64-metal)
+    kotlin_target=iosSimulatorArm64
+    gradle_args+=(
+      "-Pmaplibre.runtime.metal.$kotlin_target.installDir=build/$usage_preset/install"
+    )
+    gradle_tasks+=(":bindings:kotlin:runtimes:metal:${kotlin_target}Klib")
+    mise run //:ios-simulator:boot
+    ;;
+  ios-arm64-metal)
+    echo "The Kotlin iOS tests need a runnable target; test ios-simulator-arm64-metal instead of $usage_preset." >&2
+    exit 2
+    ;;
   *)
-    echo "The Kotlin binding declares Kotlin/Native targets for Apple platforms and Linux x64, so preset $usage_preset has no Kotlin/Native tests to run." >&2
+    echo "The Kotlin binding has no runnable Kotlin/Native tests for preset $usage_preset." >&2
     exit 2
     ;;
 esac
+gradle_args+=("-PmaplibreNativeCInstallDir=build/$usage_preset/install")
+gradle_tasks+=(":bindings:kotlin:${kotlin_target}Test")
 ./gradlew \
-  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
-  ":bindings:kotlin:${kotlin_target}Test"
+  "${gradle_args[@]}" \
+  "${gradle_tasks[@]}"
 '''
 
 [tasks."ios-build"]

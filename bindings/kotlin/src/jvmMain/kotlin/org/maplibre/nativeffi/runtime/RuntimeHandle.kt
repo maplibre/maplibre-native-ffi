@@ -409,6 +409,16 @@ public actual class RuntimeHandle private constructor(private val handle: Native
     liveMaps.remove(map.nativeHandleId())
   }
 
+  internal fun copyEventForTesting(
+    type: Int,
+    sourceType: Int,
+    sourceId: Long,
+    code: Int,
+    payload: RuntimeEventPayload,
+    message: String,
+  ): RuntimeEvent =
+    NativeRuntimeEvent(type, sourceType, sourceId, code, payload, message).toRuntimeEvent()
+
   private fun requireLiveHandle(): NativeRuntime {
     core.requireLive()
     return handle

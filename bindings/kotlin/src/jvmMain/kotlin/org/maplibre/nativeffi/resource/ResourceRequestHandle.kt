@@ -8,8 +8,15 @@ import org.maplibre.nativeffi.internal.status.Status
 
 /** Owned JVM FFM handle for a resource provider request. */
 public actual class ResourceRequestHandle
-internal constructor(private val handle: NativeResourceRequest) : AutoCloseable {
-  private val core = ResourceRequestHandleCore(ReleaseNativeRequest(handle))
+internal constructor(
+  private val handle: NativeResourceRequest,
+  private val completer: (NativeResourceRequest, ResourceResponse) -> Int =
+    NativeAccess::completeResourceRequest,
+  private val cancellationChecker: (NativeResourceRequest) -> Boolean =
+    NativeAccess::isResourceRequestCancelled,
+  releaser: (NativeResourceRequest) -> Unit = NativeAccess::releaseResourceRequest,
+) : AutoCloseable {
+  private val core = ResourceRequestHandleCore { releaser(handle) }
 
   init {
     UnreachableActions.register(this, CloseWhenUnreachableAction(core))
@@ -20,8 +27,7 @@ internal constructor(private val handle: NativeResourceRequest) : AutoCloseable 
     val operation = core.beginComplete()
     var reachedNative = false
     try {
-      val nativeStatus =
-        NativeAccess.completeResourceRequest(handle, response).also { reachedNative = true }
+      val nativeStatus = completer(handle, response).also { reachedNative = true }
       val nativeFailure =
         if (nativeStatus == MaplibreStatus.OK.nativeCode) null else Status.exception(nativeStatus)
       operation.markCompleted()
@@ -40,7 +46,7 @@ internal constructor(private val handle: NativeResourceRequest) : AutoCloseable 
 
   public actual fun isCancelled(): Boolean {
     NativeAccess.ensureLoaded()
-    return core.withLiveHandle { NativeAccess.isResourceRequestCancelled(handle) }
+    return core.withLiveHandle { cancellationChecker(handle) }
   }
 
   public actual override fun close() {
@@ -63,13 +69,6 @@ internal constructor(private val handle: NativeResourceRequest) : AutoCloseable 
   private class CloseWhenUnreachableAction(private val core: ResourceRequestHandleCore) : Runnable {
     override fun run() {
       core.close()
-    }
-  }
-
-  /** Native release that holds the handle segment alone, keeping the wrapper collectable. */
-  private class ReleaseNativeRequest(private val handle: NativeResourceRequest) : () -> Unit {
-    override fun invoke() {
-      NativeAccess.releaseResourceRequest(handle)
     }
   }
 

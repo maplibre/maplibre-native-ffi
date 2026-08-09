@@ -6,10 +6,19 @@
 set -euo pipefail
 
 image=${1:?usage: boot-android-emulator.sh <system-image>}
+image_arch=${image##*;}
+case "$image_arch" in
+  arm64-v8a | x86_64) ;;
+  *)
+    echo "Unsupported Android emulator image architecture: $image_arch" >&2
+    exit 2
+    ;;
+esac
 serial=emulator-5554
-avd_name=mln-ffi-x64
+avd_name="mln-ffi-${image_arch//_/-}"
 sdk_root="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}"
-state_dir="$MISE_MONOREPO_ROOT/build/android-emulator"
+state_root="$MISE_MONOREPO_ROOT/build/android-emulator"
+state_dir="$state_root/$image_arch"
 pid_file="$state_dir/emulator.pid"
 log_file="$state_dir/emulator.log"
 # The AVD lives in the build tree rather than the user's ~/.android, so a
@@ -19,11 +28,18 @@ export ANDROID_AVD_HOME="$state_dir/avd"
 # adb arrives with platform-tools, which the package check below installs, so
 # an SDK that has never had it yet reaches that step rather than failing here.
 adb="$sdk_root/platform-tools/adb"
-if [[ -x "$adb" ]] &&
-  "$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
-  tr -d '\r' | grep -qx 1; then
-  echo "Android emulator is ready at $serial."
-  exit 0
+if [[ -x "$adb" ]]; then
+  running_avd=$("$adb" -s "$serial" emu avd name 2>/dev/null | sed -n '1s/\r$//p')
+  if [[ "$running_avd" == "$avd_name" ]] &&
+    "$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
+    tr -d '\r' | grep -qx 1; then
+    echo "Android emulator is ready at $serial."
+    exit 0
+  fi
+  if [[ -n "$running_avd" && "$running_avd" != "$avd_name" ]]; then
+    echo "Android emulator $running_avd already owns $serial; stop it before booting $avd_name." >&2
+    exit 2
+  fi
 fi
 
 sdkmanager=
@@ -74,6 +90,22 @@ if [[ -f "$pid_file" ]]; then
   fi
 fi
 
+# One emulator owns the fixed adb serial. Stop a running AVD before switching
+# architectures so that a test never installs an artifact into the wrong guest.
+shopt -s nullglob
+other_pid_files=("$state_root"/emulator.pid "$state_root"/*/emulator.pid)
+for other_pid_file in "${other_pid_files[@]}"; do
+  [[ -f "$other_pid_file" ]] || continue
+  [[ "$other_pid_file" == "$pid_file" ]] && continue
+  other_pid=$(<"$other_pid_file")
+  if [[ "$other_pid" =~ ^[0-9]+$ ]] && kill -0 "$other_pid" 2>/dev/null; then
+    echo "Another mise-managed Android emulator is running; stop it before booting $avd_name." >&2
+    exit 2
+  fi
+  rm -f "$other_pid_file"
+done
+shopt -u nullglob
+
 if [[ ! -f "$pid_file" ]]; then
   # SwiftShader draws the GLES and Vulkan targets in software, which is what a
   # runner without a GPU has. The suite renders offscreen, so no window is
@@ -91,12 +123,18 @@ if [[ ! -f "$pid_file" ]]; then
     -camera-back none
     -camera-front none
   )
-  if [[ -r /dev/kvm && -w /dev/kvm ]]; then
-    launcher+=(-accel on)
-  else
-    echo "KVM is inaccessible; using QEMU software emulation." >&2
-    launcher+=(-accel off)
-  fi
+  case "$(uname -s)" in
+    Darwin | CYGWIN* | MINGW* | MSYS*) launcher+=(-accel on) ;;
+    Linux)
+      if [[ -r /dev/kvm && -w /dev/kvm ]]; then
+        launcher+=(-accel on)
+      else
+        echo "KVM is inaccessible; using QEMU software emulation." >&2
+        launcher+=(-accel off)
+      fi
+      ;;
+    *) launcher+=(-accel off) ;;
+  esac
   if command -v setsid >/dev/null 2>&1; then
     nohup setsid "${launcher[@]}" </dev/null >"$log_file" 2>&1 &
   else
