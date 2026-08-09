@@ -30,7 +30,8 @@ export ANDROID_AVD_HOME="$state_dir/avd"
 # an SDK that has never had it yet reaches that step rather than failing here.
 adb="$sdk_root/platform-tools/adb"
 if [[ -x "$adb" ]]; then
-  running_avd=$("$adb" -s "$serial" emu avd name 2>/dev/null | sed -n '1s/\r$//p')
+  running_avd=$("$adb" -s "$serial" emu avd name 2>/dev/null | sed -n '1s/\r$//p') ||
+    running_avd=
   if [[ "$running_avd" == "$avd_name" ]] &&
     "$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
     tr -d '\r' | grep -qx 1; then
