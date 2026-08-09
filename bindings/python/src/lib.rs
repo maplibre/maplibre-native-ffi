@@ -7,9 +7,8 @@ use maplibre_native_ffi_core::{
 };
 use maplibre_native_ffi_sys as sys;
 use pyo3::buffer::PyBuffer;
-use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyBool, PyBytes, PyDict, PyList, PyTuple};
+use pyo3::types::{PyAny, PyBytes, PyDict, PyList};
 use std::collections::{HashMap, VecDeque};
 use std::ffi::{c_char, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -535,8 +534,8 @@ impl MapHandle {
         raster_dem_encoding: Option<u32>,
         add: unsafe extern "C" fn(
             sys::mln_map,
-            sys::mln_string_view,
-            sys::mln_string_view,
+            sys::mln_buffer_view,
+            sys::mln_buffer_view,
             *const sys::mln_style_tile_source_options,
         ) -> sys::mln_status,
     ) -> PyResult<()> {
@@ -576,8 +575,8 @@ impl MapHandle {
         raster_dem_encoding: Option<u32>,
         add: unsafe extern "C" fn(
             sys::mln_map,
-            sys::mln_string_view,
-            *const sys::mln_string_view,
+            sys::mln_buffer_view,
+            *const sys::mln_buffer_view,
             usize,
             *const sys::mln_style_tile_source_options,
         ) -> sys::mln_status,
@@ -614,7 +613,7 @@ impl MapHandle {
         value: String,
         call: unsafe extern "C" fn(
             sys::mln_map,
-            sys::mln_string_view,
+            sys::mln_buffer_view,
             *mut bool,
         ) -> sys::mln_status,
     ) -> PyResult<bool> {
@@ -1626,23 +1625,23 @@ impl MapHandle {
         Ok(())
     }
 
-    fn set_style_json(&self, json: String) -> PyResult<()> {
+    fn set_style_json(&self, json: &Bound<'_, PyBytes>) -> PyResult<()> {
         let state = self.state();
-        let json = maplibre_core::string::c_string(&json).map_err(map_error)?;
+        let json = maplibre_core::string::buffer_view(json.as_bytes());
         // SAFETY: The C API validates that the pointer is a live map handle.
         // json is a null-terminated C string whose storage lives for this call.
-        maplibre_core::check(unsafe { sys::mln_map_set_style_json(state.handle(), json.as_ptr()) })
+        maplibre_core::check(unsafe { sys::mln_map_set_style_json(state.handle(), json) })
             .map_err(map_error)?;
         self.clear_custom_geometry_sources();
         Ok(())
     }
 
-    fn copy_loaded_style_json(&self) -> PyResult<String> {
+    fn copy_loaded_style_json(&self, py: Python<'_>) -> PyResult<Py<PyBytes>> {
         let state = self.state();
         // SAFETY: The C API validates the map pointer and each buffer and out
         // pointer it is given.
         unsafe {
-            copy_text(|text, capacity, out_size| {
+            copy_bytes(py, |text, capacity, out_size| {
                 sys::mln_map_copy_loaded_style_json(state.handle(), text, capacity, out_size)
             })
         }
@@ -1830,21 +1829,19 @@ impl MapHandle {
     fn camera_for_geometry(
         &self,
         py: Python<'_>,
-        geometry: &Bound<'_, PyAny>,
+        geometry: &Bound<'_, PyBytes>,
         fit_padding: Option<(f64, f64, f64, f64)>,
         fit_bearing: Option<f64>,
         fit_pitch: Option<f64>,
     ) -> PyResult<Py<PyAny>> {
         let state = self.state();
-        let geometry = geometry_from_wire(geometry)?;
-        let geometry =
-            maplibre_core::geometry::geometry_try_to_native(&geometry).map_err(map_error)?;
+        let geometry = maplibre_core::string::buffer_view(geometry.as_bytes());
         let fit = camera_fit_options_from_parts(fit_padding, fit_bearing, fit_pitch);
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut camera = unsafe { sys::mln_camera_options_default() };
         // SAFETY: The C API validates the map pointer, geometry, fit options, and output pointer.
         maplibre_core::check(unsafe {
-            sys::mln_map_camera_for_geometry(state.handle(), geometry.as_ptr(), &fit, &mut camera)
+            sys::mln_map_camera_for_geometry(state.handle(), geometry, &fit, &mut camera)
         })
         .map_err(map_error)?;
         camera_options_to_py(py, &camera)
@@ -2205,20 +2202,14 @@ impl MapHandle {
     fn add_style_source_json(
         &self,
         source_id: String,
-        source_json: &Bound<'_, PyAny>,
+        source_json: &Bound<'_, PyBytes>,
     ) -> PyResult<()> {
         let state = self.state();
         let source_id = maplibre_core::string::string_view(&source_id);
-        let source_json = json_value_from_py(source_json)?;
-        let source_json =
-            maplibre_core::json::json_value_try_to_native(&source_json).map_err(map_error)?;
-        // SAFETY: The C API validates the map pointer, source ID, and JSON descriptor.
+        let source_json = maplibre_core::string::buffer_view(source_json.as_bytes());
+        // SAFETY: The C API validates the map pointer, source ID, and JSON buffer view.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_style_source_json(
-                state.handle(),
-                source_id.raw(),
-                source_json.as_ptr(),
-            )
+            sys::mln_map_add_style_source_json(state.handle(), source_id.raw(), source_json)
         })
         .map_err(map_error)
     }
@@ -2232,7 +2223,7 @@ impl MapHandle {
         max_zoom: Option<f64>,
         tolerance: Option<f64>,
         cluster_max_zoom: Option<f64>,
-        cluster_properties: Option<Bound<'_, PyAny>>,
+        cluster_properties: Option<Bound<'_, PyBytes>>,
         tile_size: Option<u32>,
         buffer: Option<u32>,
         cluster_radius: Option<u32>,
@@ -2276,12 +2267,12 @@ impl MapHandle {
     fn add_geojson_source_data(
         &self,
         source_id: String,
-        data: &Bound<'_, PyAny>,
+        data: &Bound<'_, PyBytes>,
         min_zoom: Option<f64>,
         max_zoom: Option<f64>,
         tolerance: Option<f64>,
         cluster_max_zoom: Option<f64>,
-        cluster_properties: Option<Bound<'_, PyAny>>,
+        cluster_properties: Option<Bound<'_, PyBytes>>,
         tile_size: Option<u32>,
         buffer: Option<u32>,
         cluster_radius: Option<u32>,
@@ -2292,8 +2283,7 @@ impl MapHandle {
     ) -> PyResult<()> {
         let state = self.state();
         let source_id = maplibre_core::string::string_view(&source_id);
-        let data = geojson_from_wire(data)?;
-        let data = maplibre_core::geojson::geojson_try_to_native(&data).map_err(map_error)?;
+        let data = maplibre_core::string::buffer_view(data.as_bytes());
         let options = geojson_source_options_from_parts(
             min_zoom,
             max_zoom,
@@ -2310,12 +2300,12 @@ impl MapHandle {
         )?;
         let options =
             maplibre_core::style::geojson_source_options_to_native(&options).map_err(map_error)?;
-        // SAFETY: The C API validates the map pointer, source ID, GeoJSON descriptor, and options.
+        // SAFETY: The C API validates the map pointer, source ID, GeoJSON buffer view, and options.
         maplibre_core::check(unsafe {
             sys::mln_map_add_geojson_source_data(
                 state.handle(),
                 source_id.raw(),
-                data.as_ptr(),
+                data,
                 options.as_ptr(),
             )
         })
@@ -2333,14 +2323,17 @@ impl MapHandle {
         .map_err(map_error)
     }
 
-    fn set_geojson_source_data(&self, source_id: String, data: &Bound<'_, PyAny>) -> PyResult<()> {
+    fn set_geojson_source_data(
+        &self,
+        source_id: String,
+        data: &Bound<'_, PyBytes>,
+    ) -> PyResult<()> {
         let state = self.state();
         let source_id = maplibre_core::string::string_view(&source_id);
-        let data = geojson_from_wire(data)?;
-        let data = maplibre_core::geojson::geojson_try_to_native(&data).map_err(map_error)?;
-        // SAFETY: The C API validates the map pointer, source ID, and GeoJSON descriptor.
+        let data = maplibre_core::string::buffer_view(data.as_bytes());
+        // SAFETY: The C API validates the map pointer, source ID, and GeoJSON buffer view.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_geojson_source_data(state.handle(), source_id.raw(), data.as_ptr())
+            sys::mln_map_set_geojson_source_data(state.handle(), source_id.raw(), data)
         })
         .map_err(map_error)
     }
@@ -2817,20 +2810,16 @@ impl MapHandle {
 
     fn add_style_layer_json(
         &self,
-        layer_json: &Bound<'_, PyAny>,
+        layer_json: &Bound<'_, PyBytes>,
         before_layer_id: Option<String>,
     ) -> PyResult<()> {
         let state = self.state();
-        let layer_json = native_json_from_py(layer_json)?;
+        let layer_json = maplibre_core::string::buffer_view(layer_json.as_bytes());
         let before_layer_id = before_layer_id.unwrap_or_default();
         let before_layer_id = maplibre_core::string::string_view(&before_layer_id);
-        // SAFETY: The C API validates the map pointer, JSON descriptor, and before-layer ID.
+        // SAFETY: The C API validates the map pointer, JSON buffer view, and before-layer ID.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_style_layer_json(
-                state.handle(),
-                layer_json.as_ptr(),
-                before_layer_id.raw(),
-            )
+            sys::mln_map_add_style_layer_json(state.handle(), layer_json, before_layer_id.raw())
         })
         .map_err(map_error)
     }
@@ -2839,10 +2828,10 @@ impl MapHandle {
         &self,
         py: Python<'_>,
         layer_id: String,
-    ) -> PyResult<Option<Py<PyAny>>> {
+    ) -> PyResult<Option<Py<PyBytes>>> {
         let state = self.state();
         let layer_id = maplibre_core::string::string_view(&layer_id);
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
         let mut found = false;
         // SAFETY: The C API validates the map pointer, layer ID, out pointer, and found pointer.
         maplibre_core::check(unsafe {
@@ -2857,15 +2846,15 @@ impl MapHandle {
         if !found {
             return Ok(None);
         }
-        json_snapshot_to_py(py, out.get())
+        owned_buffer_to_py(py, out.get()).map(Some)
     }
 
-    fn set_style_light_json(&self, light_json: &Bound<'_, PyAny>) -> PyResult<()> {
+    fn set_style_light_json(&self, light_json: &Bound<'_, PyBytes>) -> PyResult<()> {
         let state = self.state();
-        let light_json = native_json_from_py(light_json)?;
-        // SAFETY: The C API validates the map pointer and JSON descriptor.
+        let light_json = maplibre_core::string::buffer_view(light_json.as_bytes());
+        // SAFETY: The C API validates the map pointer and JSON buffer view.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_style_light_json(state.handle(), light_json.as_ptr())
+            sys::mln_map_set_style_light_json(state.handle(), light_json)
         })
         .map_err(map_error)
     }
@@ -2873,18 +2862,14 @@ impl MapHandle {
     fn set_style_light_property(
         &self,
         property_name: String,
-        value: &Bound<'_, PyAny>,
+        value: &Bound<'_, PyBytes>,
     ) -> PyResult<()> {
         let state = self.state();
         let property_name = maplibre_core::string::string_view(&property_name);
-        let value = native_json_from_py(value)?;
-        // SAFETY: The C API validates the map pointer, property name, and JSON descriptor.
+        let value = maplibre_core::string::buffer_view(value.as_bytes());
+        // SAFETY: The C API validates the map pointer, property name, and JSON buffer view.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_style_light_property(
-                state.handle(),
-                property_name.raw(),
-                value.as_ptr(),
-            )
+            sys::mln_map_set_style_light_property(state.handle(), property_name.raw(), value)
         })
         .map_err(map_error)
     }
@@ -2893,10 +2878,10 @@ impl MapHandle {
         &self,
         py: Python<'_>,
         property_name: String,
-    ) -> PyResult<Option<Py<PyAny>>> {
+    ) -> PyResult<Option<Py<PyBytes>>> {
         let state = self.state();
         let property_name = maplibre_core::string::string_view(&property_name);
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
         // SAFETY: The C API validates the map pointer, property name, and out pointer.
         maplibre_core::check(unsafe {
             sys::mln_map_get_style_light_property(
@@ -2906,7 +2891,9 @@ impl MapHandle {
             )
         })
         .map_err(map_error)?;
-        json_snapshot_to_py(py, out.get())
+        out.into_option()
+            .map(|buffer| owned_buffer_to_py(py, buffer))
+            .transpose()
     }
 
     fn set_style_transition_options(
@@ -2951,19 +2938,19 @@ impl MapHandle {
         &self,
         layer_id: String,
         property_name: String,
-        value: &Bound<'_, PyAny>,
+        value: &Bound<'_, PyBytes>,
     ) -> PyResult<()> {
         let state = self.state();
         let layer_id = maplibre_core::string::string_view(&layer_id);
         let property_name = maplibre_core::string::string_view(&property_name);
-        let value = native_json_from_py(value)?;
-        // SAFETY: The C API validates the map pointer, layer/property names, and JSON descriptor.
+        let value = maplibre_core::string::buffer_view(value.as_bytes());
+        // SAFETY: The C API validates the map pointer, layer/property names, and JSON buffer view.
         maplibre_core::check(unsafe {
             sys::mln_map_set_layer_property(
                 state.handle(),
                 layer_id.raw(),
                 property_name.raw(),
-                value.as_ptr(),
+                value,
             )
         })
         .map_err(map_error)
@@ -2974,11 +2961,11 @@ impl MapHandle {
         py: Python<'_>,
         layer_id: String,
         property_name: String,
-    ) -> PyResult<Option<Py<PyAny>>> {
+    ) -> PyResult<Option<Py<PyBytes>>> {
         let state = self.state();
         let layer_id = maplibre_core::string::string_view(&layer_id);
         let property_name = maplibre_core::string::string_view(&property_name);
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
         // SAFETY: The C API validates the map pointer, layer/property names, and out pointer.
         maplibre_core::check(unsafe {
             sys::mln_map_get_layer_property(
@@ -2989,7 +2976,9 @@ impl MapHandle {
             )
         })
         .map_err(map_error)?;
-        json_snapshot_to_py(py, out.get())
+        out.into_option()
+            .map(|buffer| owned_buffer_to_py(py, buffer))
+            .transpose()
     }
 
     fn set_layer_source_layer(&self, layer_id: String, source_layer: String) -> PyResult<()> {
@@ -3119,37 +3108,34 @@ impl MapHandle {
     fn set_layer_filter(
         &self,
         layer_id: String,
-        filter: Option<&Bound<'_, PyAny>>,
+        filter: Option<&Bound<'_, PyBytes>>,
     ) -> PyResult<()> {
         let state = self.state();
         let layer_id = maplibre_core::string::string_view(&layer_id);
-        let filter = filter.map(json_value_from_py).transpose()?;
-        let filter = filter
-            .as_ref()
-            .map(maplibre_core::json::json_value_try_to_native)
-            .transpose()
-            .map_err(map_error)?;
-        // SAFETY: The C API validates the map pointer, layer ID, and optional JSON descriptor.
+        let filter = filter.map(|value| maplibre_core::string::buffer_view(value.as_bytes()));
+        // SAFETY: The C API validates the map pointer, layer ID, and optional JSON buffer view.
         maplibre_core::check(unsafe {
             sys::mln_map_set_layer_filter(
                 state.handle(),
                 layer_id.raw(),
-                optional_ref_ptr(filter.as_ref().map(|filter| filter.as_ref())),
+                optional_ref_ptr(filter.as_ref()),
             )
         })
         .map_err(map_error)
     }
 
-    fn get_layer_filter(&self, py: Python<'_>, layer_id: String) -> PyResult<Option<Py<PyAny>>> {
+    fn get_layer_filter(&self, py: Python<'_>, layer_id: String) -> PyResult<Option<Py<PyBytes>>> {
         let state = self.state();
         let layer_id = maplibre_core::string::string_view(&layer_id);
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
         // SAFETY: The C API validates the map pointer, layer ID, and out pointer.
         maplibre_core::check(unsafe {
             sys::mln_map_get_layer_filter(state.handle(), layer_id.raw(), out.as_mut_ptr())
         })
         .map_err(map_error)?;
-        json_snapshot_to_py(py, out.get())
+        out.into_option()
+            .map(|buffer| owned_buffer_to_py(py, buffer))
+            .transpose()
     }
 
     fn remove_style_layer(&self, layer_id: String) -> PyResult<bool> {
@@ -3163,7 +3149,7 @@ impl MapHandle {
     fn get_style_layer_type(&self, layer_id: String) -> PyResult<Option<String>> {
         let state = self.state();
         let layer_id = maplibre_core::string::string_view(&layer_id);
-        let mut layer_type = sys::mln_string_view {
+        let mut layer_type = sys::mln_buffer_view {
             data: ptr::null(),
             size: 0,
         };
@@ -3574,19 +3560,18 @@ impl MapHandle {
         z: u32,
         x: u32,
         y: u32,
-        data: &Bound<'_, PyAny>,
+        data: &Bound<'_, PyBytes>,
     ) -> PyResult<()> {
         let state = self.state();
         let source_id = maplibre_core::string::string_view(&source_id);
-        let data = geojson_from_wire(data)?;
-        let data = maplibre_core::geojson::geojson_try_to_native(&data).map_err(map_error)?;
-        // SAFETY: The C API validates the map pointer, source ID, tile ID, and GeoJSON descriptor.
+        let data = maplibre_core::string::buffer_view(data.as_bytes());
+        // SAFETY: The C API validates the map pointer, source ID, tile ID, and GeoJSON buffer view.
         maplibre_core::check(unsafe {
             sys::mln_map_set_custom_geometry_source_tile_data(
                 state.handle(),
                 source_id.raw(),
                 sys::mln_canonical_tile_id { z, x, y },
-                data.as_ptr(),
+                data,
             )
         })
         .map_err(map_error)
@@ -3719,17 +3704,15 @@ impl MapProjectionHandle {
 
     fn set_visible_geometry(
         &self,
-        geometry: &Bound<'_, PyAny>,
+        geometry: &Bound<'_, PyBytes>,
         padding: (f64, f64, f64, f64),
     ) -> PyResult<()> {
         let state = self.state();
-        let geometry = geometry_from_wire(geometry)?;
-        let geometry =
-            maplibre_core::geometry::geometry_try_to_native(&geometry).map_err(map_error)?;
+        let geometry = maplibre_core::string::buffer_view(geometry.as_bytes());
         let padding = edge_insets_from_tuple(padding);
-        // SAFETY: The C API validates the projection pointer, geometry descriptor, and padding.
+        // SAFETY: The C API validates the projection pointer, geometry buffer view, and padding.
         maplibre_core::check(unsafe {
-            sys::mln_map_projection_set_visible_geometry(state.handle(), geometry.as_ptr(), padding)
+            sys::mln_map_projection_set_visible_geometry(state.handle(), geometry, padding)
         })
         .map_err(map_error)
     }
@@ -4130,8 +4113,8 @@ impl RenderSessionHandle {
         py: Python<'_>,
         geometry: &Bound<'_, PyAny>,
         layer_ids: Option<Vec<String>>,
-        filter: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
+        filter: Option<&Bound<'_, PyBytes>>,
+    ) -> PyResult<Py<PyBytes>> {
         let state = self
             .state
             .lock()
@@ -4139,19 +4122,16 @@ impl RenderSessionHandle {
         state.ensure_no_frame_acquired()?;
         let geometry = rendered_query_geometry_from_wire(geometry)?;
         let geometry = maplibre_core::query::rendered_query_geometry_to_native(&geometry);
-        let filter = (!filter.is_none())
-            .then(|| json_value_from_py(filter))
-            .transpose()?;
         let mut options = maplibre_core::RenderedFeatureQueryOptions::default();
         if let Some(layer_ids) = layer_ids {
             options.layer_ids = Some(layer_ids);
         }
         if let Some(filter) = filter {
-            options.filter = Some(filter);
+            options.filter = Some(filter.as_bytes().to_vec());
         }
         let options = maplibre_core::query::rendered_feature_query_options_to_native(&options)
             .map_err(map_error)?;
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_feature_query_result>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
         // SAFETY: The C API validates the render-session pointer, query geometry/options, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_render_session_query_rendered_features(
@@ -4162,13 +4142,7 @@ impl RenderSessionHandle {
             )
         })
         .map_err(map_error)?;
-        let native = out
-            .into_live("mln_feature_query_result")
-            .map_err(map_error)?;
-        // SAFETY: native is an owned feature-query result returned by the C API.
-        let features = unsafe { maplibre_core::query::copy_feature_query_result(native) }
-            .map_err(map_error)?;
-        queried_features_to_py(py, &features)
+        owned_buffer_to_py(py, out.get())
     }
 
     fn query_source_features(
@@ -4176,27 +4150,24 @@ impl RenderSessionHandle {
         py: Python<'_>,
         source_id: String,
         source_layer_ids: Option<Vec<String>>,
-        filter: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
+        filter: Option<&Bound<'_, PyBytes>>,
+    ) -> PyResult<Py<PyBytes>> {
         let state = self
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.ensure_no_frame_acquired()?;
         let source_id = maplibre_core::string::string_view(&source_id);
-        let filter = (!filter.is_none())
-            .then(|| json_value_from_py(filter))
-            .transpose()?;
         let mut options = maplibre_core::SourceFeatureQueryOptions::default();
         if let Some(source_layer_ids) = source_layer_ids {
             options.source_layer_ids = Some(source_layer_ids);
         }
         if let Some(filter) = filter {
-            options.filter = Some(filter);
+            options.filter = Some(filter.as_bytes().to_vec());
         }
         let options = maplibre_core::query::source_feature_query_options_to_native(&options)
             .map_err(map_error)?;
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_feature_query_result>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
         // SAFETY: The C API validates the render-session pointer, source ID, query options, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_render_session_query_source_features(
@@ -4207,53 +4178,36 @@ impl RenderSessionHandle {
             )
         })
         .map_err(map_error)?;
-        let native = out
-            .into_live("mln_feature_query_result")
-            .map_err(map_error)?;
-        // SAFETY: native is an owned feature-query result returned by the C API.
-        let features = unsafe { maplibre_core::query::copy_feature_query_result(native) }
-            .map_err(map_error)?;
-        queried_features_to_py(py, &features)
+        owned_buffer_to_py(py, out.get())
     }
 
     fn query_feature_extensions(
         &self,
         py: Python<'_>,
         source_id: String,
-        feature: &Bound<'_, PyAny>,
+        feature: &Bound<'_, PyBytes>,
         extension: String,
         extension_field: String,
-        arguments: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
+        arguments: Option<&Bound<'_, PyBytes>>,
+    ) -> PyResult<Py<PyBytes>> {
         let state = self
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.ensure_no_frame_acquired()?;
         let source_id = maplibre_core::string::string_view(&source_id);
-        let feature = feature_from_wire(feature)?;
-        let feature =
-            maplibre_core::geojson::feature_try_to_native(&feature, 0).map_err(map_error)?;
+        let feature = maplibre_core::string::buffer_view(feature.as_bytes());
         let extension = maplibre_core::string::string_view(&extension);
         let extension_field = maplibre_core::string::string_view(&extension_field);
-        let arguments = (!arguments.is_none())
-            .then(|| json_value_from_py(arguments))
-            .transpose()?;
-        let arguments = arguments
-            .as_ref()
-            .map(maplibre_core::json::json_value_try_to_native)
-            .transpose()
-            .map_err(map_error)?;
-        let arguments_ptr = arguments
-            .as_ref()
-            .map_or(ptr::null(), |value| value.as_ptr());
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_feature_extension_result>::new();
+        let arguments = arguments.map(|value| maplibre_core::string::buffer_view(value.as_bytes()));
+        let arguments_ptr = optional_ref_ptr(arguments.as_ref());
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
         // SAFETY: The C API validates the render-session pointer, feature, strings, arguments, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_render_session_query_feature_extensions(
                 state.native(),
                 source_id.raw(),
-                feature.as_ptr(),
+                feature,
                 extension.raw(),
                 extension_field.raw(),
                 arguments_ptr,
@@ -4261,13 +4215,7 @@ impl RenderSessionHandle {
             )
         })
         .map_err(map_error)?;
-        let native = out
-            .into_live("mln_feature_extension_result")
-            .map_err(map_error)?;
-        // SAFETY: native is an owned feature-extension result returned by the C API.
-        let result = unsafe { maplibre_core::query::copy_feature_extension_result(native) }
-            .map_err(map_error)?;
-        feature_extension_result_to_py(py, &result)
+        owned_buffer_to_py(py, out.get())
     }
 
     fn set_feature_state(
@@ -4276,7 +4224,7 @@ impl RenderSessionHandle {
         source_layer_id: Option<String>,
         feature_id: Option<String>,
         state_key: Option<String>,
-        state_value: &Bound<'_, PyAny>,
+        state_value: &Bound<'_, PyBytes>,
     ) -> PyResult<()> {
         let state = self
             .state
@@ -4286,15 +4234,13 @@ impl RenderSessionHandle {
         let selector =
             feature_state_selector_from_parts(source_id, source_layer_id, feature_id, state_key)?;
         let selector = maplibre_core::query::feature_state_selector_to_native(&selector);
-        let state_value = json_value_from_py(state_value)?;
-        let state_value =
-            maplibre_core::json::json_value_try_to_native(&state_value).map_err(map_error)?;
+        let state_value = maplibre_core::string::buffer_view(state_value.as_bytes());
         // SAFETY: The C API validates the render-session pointer, selector, and JSON state.
         maplibre_core::check(unsafe {
             sys::mln_render_session_set_feature_state(
                 state.native(),
                 selector.as_ptr(),
-                state_value.as_ptr(),
+                state_value,
             )
         })
         .map_err(map_error)
@@ -4307,7 +4253,7 @@ impl RenderSessionHandle {
         source_layer_id: Option<String>,
         feature_id: Option<String>,
         state_key: Option<String>,
-    ) -> PyResult<Py<PyAny>> {
+    ) -> PyResult<Py<PyBytes>> {
         let state = self
             .state
             .lock()
@@ -4316,7 +4262,7 @@ impl RenderSessionHandle {
         let selector =
             feature_state_selector_from_parts(source_id, source_layer_id, feature_id, state_key)?;
         let selector = maplibre_core::query::feature_state_selector_to_native(&selector);
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
         // SAFETY: The C API validates the render-session pointer, selector, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_render_session_get_feature_state(
@@ -4326,12 +4272,7 @@ impl RenderSessionHandle {
             )
         })
         .map_err(map_error)?;
-        let snapshot = out.get();
-        // SAFETY: snapshot, when live, is an owned native JSON snapshot returned by the C API.
-        let value =
-            unsafe { maplibre_core::json::copy_json_snapshot(snapshot) }.map_err(map_error)?;
-        let value = value.unwrap_or_else(|| maplibre_core::json::JsonValue::Object(Vec::new()));
-        json_value_to_py(py, &value)
+        owned_buffer_to_py(py, out.get())
     }
 
     fn remove_feature_state(
@@ -5274,20 +5215,6 @@ fn optional_ref_ptr<T>(value: Option<&T>) -> *const T {
     value.map_or(ptr::null(), |value| value as *const T)
 }
 
-fn native_json_from_py(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::json::NativeJsonValue> {
-    let value = json_value_from_py(raw)?;
-    maplibre_core::json::json_value_try_to_native(&value).map_err(map_error)
-}
-
-fn json_snapshot_to_py(
-    py: Python<'_>,
-    snapshot: sys::mln_json_snapshot,
-) -> PyResult<Option<Py<PyAny>>> {
-    // SAFETY: snapshot, when live, is an owned native JSON snapshot returned by the C API.
-    let value = unsafe { maplibre_core::json::copy_json_snapshot(snapshot) }.map_err(map_error)?;
-    value.map(|value| json_value_to_py(py, &value)).transpose()
-}
-
 fn screen_point_from_tuple((x, y): (f64, f64)) -> sys::mln_screen_point {
     sys::mln_screen_point { x, y }
 }
@@ -5451,7 +5378,7 @@ fn geojson_source_options_from_parts(
     max_zoom: Option<f64>,
     tolerance: Option<f64>,
     cluster_max_zoom: Option<f64>,
-    cluster_properties: Option<Bound<'_, PyAny>>,
+    cluster_properties: Option<Bound<'_, PyBytes>>,
     tile_size: Option<u32>,
     buffer: Option<u32>,
     cluster_radius: Option<u32>,
@@ -5474,7 +5401,7 @@ fn geojson_source_options_from_parts(
         options.cluster_max_zoom = Some(cluster_max_zoom);
     }
     if let Some(cluster_properties) = cluster_properties {
-        options.cluster_properties = Some(json_value_from_py(&cluster_properties)?);
+        options.cluster_properties = Some(cluster_properties.as_bytes().to_vec());
     }
     if let Some(tile_size) = tile_size {
         options.tile_size = Some(tile_size);
@@ -5907,7 +5834,7 @@ fn offline_region_definition_to_py(
         } => {
             dict.set_item("type", "geometry")?;
             dict.set_item("style_url", style_url)?;
-            dict.set_item("geometry", geometry_to_py(py, geometry)?)?;
+            dict.set_item("geometry", PyBytes::new(py, geometry))?;
             dict.set_item("min_zoom", *min_zoom)?;
             dict.set_item("max_zoom", *max_zoom)?;
             dict.set_item("pixel_ratio", *pixel_ratio)?;
@@ -5940,7 +5867,11 @@ fn offline_region_definition_from_wire(
         "OfflineGeometryRegionDefinition" => {
             Ok(maplibre_core::OfflineRegionDefinition::GeometryRegion {
                 style_url: raw.getattr("style_url")?.extract()?,
-                geometry: geometry_from_wire(&raw.getattr("geometry")?)?,
+                geometry: raw
+                    .getattr("geometry")?
+                    .cast::<PyBytes>()?
+                    .as_bytes()
+                    .to_vec(),
                 min_zoom: raw.getattr("min_zoom")?.extract()?,
                 max_zoom: raw.getattr("max_zoom")?.extract()?,
                 pixel_ratio: raw.getattr("pixel_ratio")?.extract()?,
@@ -5972,7 +5903,10 @@ fn offline_region_definition_wire_dict_from_py(
         }),
         "geometry" => Ok(maplibre_core::OfflineRegionDefinition::GeometryRegion {
             style_url,
-            geometry: geometry_from_wire(&required_dict_item(dict, "geometry")?)?,
+            geometry: required_dict_item(dict, "geometry")?
+                .cast::<PyBytes>()?
+                .as_bytes()
+                .to_vec(),
             min_zoom,
             max_zoom,
             pixel_ratio,
@@ -5994,6 +5928,16 @@ fn lat_lng_bounds_core_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_co
     Ok(maplibre_core::LatLngBounds::new(
         lat_lng_from_wire(&raw.getattr("southwest")?)?,
         lat_lng_from_wire(&raw.getattr("northeast")?)?,
+    ))
+}
+
+fn lat_lng_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::LatLng> {
+    if let Ok((latitude, longitude)) = raw.extract::<(f64, f64)>() {
+        return Ok(maplibre_core::LatLng::new(latitude, longitude));
+    }
+    Ok(maplibre_core::LatLng::new(
+        raw.getattr("latitude")?.extract()?,
+        raw.getattr("longitude")?.extract()?,
     ))
 }
 
@@ -6032,688 +5976,9 @@ fn screen_point_core_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core
     Ok(maplibre_core::ScreenPoint::new(x, y))
 }
 
-fn geojson_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::GeoJson> {
-    let type_name = raw.get_type().name()?;
-    match type_name.to_str()? {
-        "GeometryGeoJson" => Ok(maplibre_core::GeoJson::Geometry(geometry_from_wire(
-            &raw.getattr("geometry")?,
-        )?)),
-        "FeatureGeoJson" => Ok(maplibre_core::GeoJson::Feature(feature_from_wire(
-            &raw.getattr("feature")?,
-        )?)),
-        "FeatureCollection" => Ok(maplibre_core::GeoJson::FeatureCollection(features_from_py(
-            &raw.getattr("features")?,
-        )?)),
-        _ => geojson_wire_dict_from_py(raw),
-    }
-}
-
-fn geojson_wire_dict_from_py(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::GeoJson> {
-    let dict = raw.cast::<PyDict>()?;
-    let kind: String = required_dict_item(dict, "type")?.extract()?;
-    match kind.as_str() {
-        "geometry" => Ok(maplibre_core::GeoJson::Geometry(geometry_from_wire(
-            &required_dict_item(dict, "geometry")?,
-        )?)),
-        "feature" => Ok(maplibre_core::GeoJson::Feature(feature_from_wire(
-            &required_dict_item(dict, "feature")?,
-        )?)),
-        "feature_collection" => Ok(maplibre_core::GeoJson::FeatureCollection(features_from_py(
-            &required_dict_item(dict, "features")?,
-        )?)),
-        _ => Err(invalid_argument_error(format!(
-            "unsupported GeoJSON value: {kind}"
-        ))),
-    }
-}
-
-fn features_from_py(raw: &Bound<'_, PyAny>) -> PyResult<Vec<maplibre_core::Feature>> {
-    if let Ok(features) = raw.cast::<PyList>() {
-        features_from_sequence(features.iter(), features.len())
-    } else if let Ok(features) = raw.cast::<PyTuple>() {
-        features_from_sequence(features.iter(), features.len())
-    } else {
-        Err(invalid_argument_error(
-            "GeoJSON features must be a sequence",
-        ))
-    }
-}
-
-fn features_from_sequence<'py>(
-    features: impl Iterator<Item = Bound<'py, PyAny>>,
-    len: usize,
-) -> PyResult<Vec<maplibre_core::Feature>> {
-    let mut copied = Vec::with_capacity(len);
-    for feature in features {
-        copied.push(feature_from_wire(&feature)?);
-    }
-    Ok(copied)
-}
-
-fn feature_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::Feature> {
-    let type_name = raw.get_type().name()?;
-    let (geometry_raw, properties_raw, identifier_raw) = if type_name.to_str()? == "Feature" {
-        (
-            raw.getattr("geometry")?,
-            raw.getattr("properties")?,
-            raw.getattr("identifier")?,
-        )
-    } else {
-        let dict = raw.cast::<PyDict>()?;
-        (
-            required_dict_item(dict, "geometry")?,
-            required_dict_item(dict, "properties")?,
-            required_dict_item(dict, "identifier")?,
-        )
-    };
-    let geometry = geometry_from_wire(&geometry_raw)?;
-    let properties = json_members_from_py(&properties_raw)?;
-    let identifier = feature_identifier_from_wire(&identifier_raw)?;
-    let mut feature = maplibre_core::Feature::new(geometry, properties);
-    feature.identifier = identifier;
-    Ok(feature)
-}
-
-fn json_members_from_py(raw: &Bound<'_, PyAny>) -> PyResult<Vec<maplibre_core::JsonMember>> {
-    if let Ok(members) = raw.cast::<PyList>() {
-        json_members_from_sequence(members.iter(), members.len())
-    } else if let Ok(members) = raw.cast::<PyTuple>() {
-        json_members_from_sequence(members.iter(), members.len())
-    } else {
-        Err(invalid_argument_error(
-            "feature properties must be a sequence",
-        ))
-    }
-}
-
-fn json_members_from_sequence<'py>(
-    members: impl Iterator<Item = Bound<'py, PyAny>>,
-    len: usize,
-) -> PyResult<Vec<maplibre_core::JsonMember>> {
-    let mut copied = Vec::with_capacity(len);
-    for member in members {
-        let key: String = member
-            .getattr("key")
-            .or_else(|_| member.get_item(0))?
-            .extract()?;
-        let value = member.getattr("value").or_else(|_| member.get_item(1))?;
-        copied.push(maplibre_core::JsonMember::new(
-            key,
-            json_value_from_py(&value)?,
-        ));
-    }
-    Ok(copied)
-}
-
-fn feature_identifier_from_wire(
-    raw: &Bound<'_, PyAny>,
-) -> PyResult<maplibre_core::FeatureIdentifier> {
-    if raw.is_none() {
-        return Ok(maplibre_core::FeatureIdentifier::Null);
-    }
-    let type_name = raw.get_type().name()?;
-    match type_name.to_str()? {
-        "FeatureIdentifierUInt" => Ok(maplibre_core::FeatureIdentifier::UInt(
-            raw.getattr("value")?.extract()?,
-        )),
-        "FeatureIdentifierInt" => Ok(maplibre_core::FeatureIdentifier::Int(
-            raw.getattr("value")?.extract()?,
-        )),
-        "FeatureIdentifierDouble" => Ok(maplibre_core::FeatureIdentifier::Double(
-            raw.getattr("value")?.extract()?,
-        )),
-        "FeatureIdentifierString" => Ok(maplibre_core::FeatureIdentifier::String(
-            raw.getattr("value")?.extract()?,
-        )),
-        _ => feature_identifier_wire_dict_from_py(raw),
-    }
-}
-
-fn feature_identifier_wire_dict_from_py(
-    raw: &Bound<'_, PyAny>,
-) -> PyResult<maplibre_core::FeatureIdentifier> {
-    let dict = raw.cast::<PyDict>()?;
-    let kind: String = required_dict_item(dict, "type")?.extract()?;
-    match kind.as_str() {
-        "null" => Ok(maplibre_core::FeatureIdentifier::Null),
-        "uint" => Ok(maplibre_core::FeatureIdentifier::UInt(
-            required_dict_item(dict, "value")?.extract()?,
-        )),
-        "int" => Ok(maplibre_core::FeatureIdentifier::Int(
-            required_dict_item(dict, "value")?.extract()?,
-        )),
-        "double" => Ok(maplibre_core::FeatureIdentifier::Double(
-            required_dict_item(dict, "value")?.extract()?,
-        )),
-        "string" => Ok(maplibre_core::FeatureIdentifier::String(
-            required_dict_item(dict, "value")?.extract()?,
-        )),
-        _ => Err(invalid_argument_error(format!(
-            "unsupported feature identifier: {kind}"
-        ))),
-    }
-}
-
-fn geometry_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::Geometry> {
-    let type_name = raw.get_type().name()?;
-    match type_name.to_str()? {
-        "EmptyGeometry" => Ok(maplibre_core::Geometry::Empty),
-        "Point" => Ok(maplibre_core::Geometry::Point(lat_lng_from_wire(
-            &raw.getattr("coordinate")?,
-        )?)),
-        "LineString" => Ok(maplibre_core::Geometry::LineString(lat_lng_list_from_wire(
-            &raw.getattr("coordinates")?,
-        )?)),
-        "Polygon" => Ok(maplibre_core::Geometry::Polygon(lat_lng_rings_from_wire(
-            &raw.getattr("rings")?,
-        )?)),
-        "MultiPoint" => Ok(maplibre_core::Geometry::MultiPoint(lat_lng_list_from_wire(
-            &raw.getattr("coordinates")?,
-        )?)),
-        "MultiLineString" => Ok(maplibre_core::Geometry::MultiLineString(
-            lat_lng_rings_from_wire(&raw.getattr("lines")?)?,
-        )),
-        "MultiPolygon" => Ok(maplibre_core::Geometry::MultiPolygon(
-            lat_lng_polygons_from_wire(&raw.getattr("polygons")?)?,
-        )),
-        "GeometryCollection" => Ok(maplibre_core::Geometry::GeometryCollection(
-            geometries_from_py(&raw.getattr("geometries")?)?,
-        )),
-        _ => geometry_wire_dict_from_py(raw),
-    }
-}
-
-fn geometry_wire_dict_from_py(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::Geometry> {
-    let dict = raw.cast::<PyDict>()?;
-    let kind: String = required_dict_item(dict, "type")?.extract()?;
-    match kind.as_str() {
-        "empty" => Ok(maplibre_core::Geometry::Empty),
-        "point" => Ok(maplibre_core::Geometry::Point(lat_lng_from_wire(
-            &required_dict_item(dict, "coordinate")?,
-        )?)),
-        "line_string" => Ok(maplibre_core::Geometry::LineString(lat_lng_list_from_wire(
-            &required_dict_item(dict, "coordinates")?,
-        )?)),
-        "polygon" => Ok(maplibre_core::Geometry::Polygon(lat_lng_rings_from_wire(
-            &required_dict_item(dict, "rings")?,
-        )?)),
-        "multi_point" => Ok(maplibre_core::Geometry::MultiPoint(lat_lng_list_from_wire(
-            &required_dict_item(dict, "coordinates")?,
-        )?)),
-        "multi_line_string" => Ok(maplibre_core::Geometry::MultiLineString(
-            lat_lng_rings_from_wire(&required_dict_item(dict, "lines")?)?,
-        )),
-        "multi_polygon" => Ok(maplibre_core::Geometry::MultiPolygon(
-            lat_lng_polygons_from_wire(&required_dict_item(dict, "polygons")?)?,
-        )),
-        "geometry_collection" => Ok(maplibre_core::Geometry::GeometryCollection(
-            geometries_from_py(&required_dict_item(dict, "geometries")?)?,
-        )),
-        _ => Err(invalid_argument_error(format!(
-            "unsupported geometry value: {kind}"
-        ))),
-    }
-}
-
-fn geometries_from_py(raw: &Bound<'_, PyAny>) -> PyResult<Vec<maplibre_core::Geometry>> {
-    if let Ok(geometries) = raw.cast::<PyList>() {
-        geometries_from_sequence(geometries.iter(), geometries.len())
-    } else if let Ok(geometries) = raw.cast::<PyTuple>() {
-        geometries_from_sequence(geometries.iter(), geometries.len())
-    } else {
-        Err(invalid_argument_error("geometries must be a sequence"))
-    }
-}
-
-fn geometries_from_sequence<'py>(
-    geometries: impl Iterator<Item = Bound<'py, PyAny>>,
-    len: usize,
-) -> PyResult<Vec<maplibre_core::Geometry>> {
-    let mut copied = Vec::with_capacity(len);
-    for geometry in geometries {
-        copied.push(geometry_from_wire(&geometry)?);
-    }
-    Ok(copied)
-}
-
-fn lat_lng_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::LatLng> {
-    if let Ok((latitude, longitude)) = raw.extract::<(f64, f64)>() {
-        return Ok(maplibre_core::LatLng::new(latitude, longitude));
-    }
-    Ok(maplibre_core::LatLng::new(
-        raw.getattr("latitude")?.extract()?,
-        raw.getattr("longitude")?.extract()?,
-    ))
-}
-
-fn lat_lng_list_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<Vec<maplibre_core::LatLng>> {
-    if let Ok(coordinates) = raw.cast::<PyList>() {
-        lat_lng_list_from_sequence(coordinates.iter(), coordinates.len())
-    } else if let Ok(coordinates) = raw.cast::<PyTuple>() {
-        lat_lng_list_from_sequence(coordinates.iter(), coordinates.len())
-    } else {
-        Err(invalid_argument_error("coordinates must be a sequence"))
-    }
-}
-
-fn lat_lng_list_from_sequence<'py>(
-    coordinates: impl Iterator<Item = Bound<'py, PyAny>>,
-    len: usize,
-) -> PyResult<Vec<maplibre_core::LatLng>> {
-    let mut copied = Vec::with_capacity(len);
-    for coordinate in coordinates {
-        copied.push(lat_lng_from_wire(&coordinate)?);
-    }
-    Ok(copied)
-}
-
-fn lat_lng_rings_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<Vec<Vec<maplibre_core::LatLng>>> {
-    if let Ok(rings) = raw.cast::<PyList>() {
-        lat_lng_rings_from_sequence(rings.iter(), rings.len())
-    } else if let Ok(rings) = raw.cast::<PyTuple>() {
-        lat_lng_rings_from_sequence(rings.iter(), rings.len())
-    } else {
-        Err(invalid_argument_error(
-            "coordinate rings must be a sequence",
-        ))
-    }
-}
-
-fn lat_lng_rings_from_sequence<'py>(
-    rings: impl Iterator<Item = Bound<'py, PyAny>>,
-    len: usize,
-) -> PyResult<Vec<Vec<maplibre_core::LatLng>>> {
-    let mut copied = Vec::with_capacity(len);
-    for ring in rings {
-        copied.push(lat_lng_list_from_wire(&ring)?);
-    }
-    Ok(copied)
-}
-
-fn lat_lng_polygons_from_wire(
-    raw: &Bound<'_, PyAny>,
-) -> PyResult<Vec<Vec<Vec<maplibre_core::LatLng>>>> {
-    if let Ok(polygons) = raw.cast::<PyList>() {
-        lat_lng_polygons_from_sequence(polygons.iter(), polygons.len())
-    } else if let Ok(polygons) = raw.cast::<PyTuple>() {
-        lat_lng_polygons_from_sequence(polygons.iter(), polygons.len())
-    } else {
-        Err(invalid_argument_error(
-            "coordinate polygons must be a sequence",
-        ))
-    }
-}
-
-fn lat_lng_polygons_from_sequence<'py>(
-    polygons: impl Iterator<Item = Bound<'py, PyAny>>,
-    len: usize,
-) -> PyResult<Vec<Vec<Vec<maplibre_core::LatLng>>>> {
-    let mut copied = Vec::with_capacity(len);
-    for polygon in polygons {
-        copied.push(lat_lng_rings_from_wire(&polygon)?);
-    }
-    Ok(copied)
-}
-
-fn json_value_from_py(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::JsonValue> {
-    if raw.is_none() {
-        return Ok(maplibre_core::JsonValue::Null);
-    }
-    if let Ok(value) = raw.extract::<bool>() {
-        return Ok(maplibre_core::JsonValue::Bool(value));
-    }
-    if let Ok(value) = raw.extract::<String>() {
-        return Ok(maplibre_core::JsonValue::String(value));
-    }
-
-    let type_name = raw.get_type().name()?;
-    match type_name.to_str()? {
-        "JsonUInt" => {
-            return Ok(maplibre_core::JsonValue::UInt(
-                raw.getattr("value")?.extract()?,
-            ));
-        }
-        "JsonInt" => {
-            return Ok(maplibre_core::JsonValue::Int(
-                raw.getattr("value")?.extract()?,
-            ));
-        }
-        "JsonDouble" => {
-            return Ok(maplibre_core::JsonValue::Double(
-                raw.getattr("value")?.extract()?,
-            ));
-        }
-        "JsonArray" => return json_array_from_py(&raw.getattr("values")?),
-        "JsonObject" => return json_object_members_from_py(&raw.getattr("members")?),
-        _ => {}
-    }
-
-    Err(PyTypeError::new_err(format!(
-        "unsupported JSON value: {type_name}"
-    )))
-}
-
-fn json_array_from_py(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::JsonValue> {
-    if let Ok(values) = raw.cast::<PyList>() {
-        json_array_from_sequence(values.iter(), values.len())
-    } else if let Ok(values) = raw.cast::<PyTuple>() {
-        json_array_from_sequence(values.iter(), values.len())
-    } else {
-        Err(invalid_argument_error(
-            "JSON array values must be a sequence",
-        ))
-    }
-}
-
-fn json_array_from_sequence<'py>(
-    values: impl Iterator<Item = Bound<'py, PyAny>>,
-    len: usize,
-) -> PyResult<maplibre_core::JsonValue> {
-    let mut copied = Vec::with_capacity(len);
-    for value in values {
-        copied.push(json_value_from_py(&value)?);
-    }
-    Ok(maplibre_core::JsonValue::Array(copied))
-}
-
-fn json_object_members_from_py(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::JsonValue> {
-    if let Ok(members) = raw.cast::<PyList>() {
-        json_object_members_from_sequence(members.iter(), members.len())
-    } else if let Ok(members) = raw.cast::<PyTuple>() {
-        json_object_members_from_sequence(members.iter(), members.len())
-    } else {
-        Err(invalid_argument_error(
-            "JSON object members must be a sequence",
-        ))
-    }
-}
-
-fn json_object_members_from_sequence<'py>(
-    members: impl Iterator<Item = Bound<'py, PyAny>>,
-    len: usize,
-) -> PyResult<maplibre_core::JsonValue> {
-    let mut copied = Vec::with_capacity(len);
-    for member in members {
-        let key: String = member
-            .getattr("key")
-            .or_else(|_| member.get_item(0))?
-            .extract()?;
-        let value = member.getattr("value").or_else(|_| member.get_item(1))?;
-        copied.push(maplibre_core::JsonMember::new(
-            key,
-            json_value_from_py(&value)?,
-        ));
-    }
-    Ok(maplibre_core::JsonValue::Object(copied))
-}
-
 fn required_dict_item<'py>(dict: &Bound<'py, PyDict>, key: &str) -> PyResult<Bound<'py, PyAny>> {
     dict.get_item(key)?
-        .ok_or_else(|| invalid_argument_error(format!("JSON value missing {key}")))
-}
-
-fn json_value_to_py(py: Python<'_>, value: &maplibre_core::JsonValue) -> PyResult<Py<PyAny>> {
-    let json = py.import("maplibre_native_ffi.json")?;
-    match value {
-        maplibre_core::JsonValue::Null => Ok(py.None()),
-        maplibre_core::JsonValue::Bool(value) => {
-            Ok(PyBool::new(py, *value).to_owned().into_any().unbind())
-        }
-        maplibre_core::JsonValue::String(value) => Ok(value.into_pyobject(py)?.into_any().unbind()),
-        maplibre_core::JsonValue::UInt(value) => Ok(json
-            .getattr("JsonUInt")?
-            .call1((*value,))?
-            .into_any()
-            .unbind()),
-        maplibre_core::JsonValue::Int(value) => Ok(json
-            .getattr("JsonInt")?
-            .call1((*value,))?
-            .into_any()
-            .unbind()),
-        maplibre_core::JsonValue::Double(value) => Ok(json
-            .getattr("JsonDouble")?
-            .call1((*value,))?
-            .into_any()
-            .unbind()),
-        maplibre_core::JsonValue::Array(values) => {
-            let values = values
-                .iter()
-                .map(|value| json_value_to_py(py, value))
-                .collect::<PyResult<Vec<_>>>()?;
-            Ok(json
-                .getattr("JsonArray")?
-                .call1((PyTuple::new(py, values)?,))?
-                .into_any()
-                .unbind())
-        }
-        maplibre_core::JsonValue::Object(members) => {
-            let members = members
-                .iter()
-                .map(|member| {
-                    Ok(json
-                        .getattr("JsonMember")?
-                        .call1((&member.key, json_value_to_py(py, &member.value)?))?
-                        .into_any()
-                        .unbind())
-                })
-                .collect::<PyResult<Vec<_>>>()?;
-            Ok(json
-                .getattr("JsonObject")?
-                .call1((PyTuple::new(py, members)?,))?
-                .into_any()
-                .unbind())
-        }
-        _ => Err(invalid_argument_error(
-            "unsupported unknown JSON value variant",
-        )),
-    }
-}
-
-fn queried_features_to_py(
-    py: Python<'_>,
-    features: &[maplibre_core::query::QueriedFeature],
-) -> PyResult<Py<PyAny>> {
-    let list = PyList::empty(py);
-    for feature in features {
-        list.append(queried_feature_to_py(py, feature)?)?;
-    }
-    Ok(list.into_any().unbind())
-}
-
-fn queried_feature_to_py(
-    py: Python<'_>,
-    feature: &maplibre_core::query::QueriedFeature,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("feature", feature_to_py(py, &feature.feature)?)?;
-    dict.set_item("source_id", feature.source_id.as_deref())?;
-    dict.set_item("source_layer_id", feature.source_layer_id.as_deref())?;
-    dict.set_item(
-        "state",
-        feature
-            .state
-            .as_ref()
-            .map(|state| json_value_to_py(py, state))
-            .transpose()?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn feature_extension_result_to_py(
-    py: Python<'_>,
-    result: &maplibre_core::query::FeatureExtensionResult,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    match result {
-        maplibre_core::query::FeatureExtensionResult::Value(value) => {
-            dict.set_item("type", sys::MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE)?;
-            dict.set_item("value", json_value_to_py(py, value)?)?;
-        }
-        maplibre_core::query::FeatureExtensionResult::FeatureCollection(features) => {
-            dict.set_item(
-                "type",
-                sys::MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION,
-            )?;
-            let list = PyList::empty(py);
-            for feature in features {
-                list.append(feature_to_py(py, feature)?)?;
-            }
-            dict.set_item("feature_collection", list)?;
-        }
-        maplibre_core::query::FeatureExtensionResult::Unknown(raw) => {
-            dict.set_item("type", *raw)?;
-        }
-        _ => {
-            dict.set_item("type", 0)?;
-        }
-    }
-    Ok(dict.into_any().unbind())
-}
-
-fn feature_to_py(py: Python<'_>, feature: &maplibre_core::Feature) -> PyResult<Py<PyAny>> {
-    let geo = py.import("maplibre_native_ffi.geo")?;
-    let json = py.import("maplibre_native_ffi.json")?;
-    let properties = feature
-        .properties
-        .iter()
-        .map(|property| {
-            Ok(json
-                .getattr("JsonMember")?
-                .call1((&property.key, json_value_to_py(py, &property.value)?))?
-                .into_any()
-                .unbind())
-        })
-        .collect::<PyResult<Vec<_>>>()?;
-    Ok(geo
-        .getattr("Feature")?
-        .call1((
-            geometry_to_py(py, &feature.geometry)?,
-            PyTuple::new(py, properties)?,
-            feature_identifier_to_py(py, &feature.identifier)?,
-        ))?
-        .into_any()
-        .unbind())
-}
-
-fn feature_identifier_to_py(
-    py: Python<'_>,
-    identifier: &maplibre_core::FeatureIdentifier,
-) -> PyResult<Py<PyAny>> {
-    let geo = py.import("maplibre_native_ffi.geo")?;
-    match identifier {
-        maplibre_core::FeatureIdentifier::Null => Ok(py.None()),
-        maplibre_core::FeatureIdentifier::UInt(value) => Ok(geo
-            .getattr("FeatureIdentifierUInt")?
-            .call1((*value,))?
-            .into_any()
-            .unbind()),
-        maplibre_core::FeatureIdentifier::Int(value) => Ok(geo
-            .getattr("FeatureIdentifierInt")?
-            .call1((*value,))?
-            .into_any()
-            .unbind()),
-        maplibre_core::FeatureIdentifier::Double(value) => Ok(geo
-            .getattr("FeatureIdentifierDouble")?
-            .call1((*value,))?
-            .into_any()
-            .unbind()),
-        maplibre_core::FeatureIdentifier::String(value) => Ok(geo
-            .getattr("FeatureIdentifierString")?
-            .call1((value,))?
-            .into_any()
-            .unbind()),
-        _ => Ok(py.None()),
-    }
-}
-
-fn geometry_to_py(py: Python<'_>, geometry: &maplibre_core::Geometry) -> PyResult<Py<PyAny>> {
-    let geo = py.import("maplibre_native_ffi.geo")?;
-    match geometry {
-        maplibre_core::Geometry::Empty => {
-            Ok(geo.getattr("EmptyGeometry")?.call0()?.into_any().unbind())
-        }
-        maplibre_core::Geometry::Point(coordinate) => Ok(geo
-            .getattr("Point")?
-            .call1((geo_lat_lng_to_py(py, coordinate)?,))?
-            .into_any()
-            .unbind()),
-        maplibre_core::Geometry::LineString(coordinates) => Ok(geo
-            .getattr("LineString")?
-            .call1((geo_lat_lng_tuple_to_py(py, coordinates)?,))?
-            .into_any()
-            .unbind()),
-        maplibre_core::Geometry::Polygon(rings) => Ok(geo
-            .getattr("Polygon")?
-            .call1((geo_lat_lng_rings_to_py(py, rings)?,))?
-            .into_any()
-            .unbind()),
-        maplibre_core::Geometry::MultiPoint(coordinates) => Ok(geo
-            .getattr("MultiPoint")?
-            .call1((geo_lat_lng_tuple_to_py(py, coordinates)?,))?
-            .into_any()
-            .unbind()),
-        maplibre_core::Geometry::MultiLineString(lines) => Ok(geo
-            .getattr("MultiLineString")?
-            .call1((geo_lat_lng_rings_to_py(py, lines)?,))?
-            .into_any()
-            .unbind()),
-        maplibre_core::Geometry::MultiPolygon(polygons) => {
-            let polygons = polygons
-                .iter()
-                .map(|polygon| geo_lat_lng_rings_to_py(py, polygon))
-                .collect::<PyResult<Vec<_>>>()?;
-            Ok(geo
-                .getattr("MultiPolygon")?
-                .call1((PyTuple::new(py, polygons)?,))?
-                .into_any()
-                .unbind())
-        }
-        maplibre_core::Geometry::GeometryCollection(geometries) => {
-            let geometries = geometries
-                .iter()
-                .map(|geometry| geometry_to_py(py, geometry))
-                .collect::<PyResult<Vec<_>>>()?;
-            Ok(geo
-                .getattr("GeometryCollection")?
-                .call1((PyTuple::new(py, geometries)?,))?
-                .into_any()
-                .unbind())
-        }
-        _ => Err(invalid_argument_error(
-            "unsupported unknown geometry variant",
-        )),
-    }
-}
-
-fn geo_lat_lng_to_py(py: Python<'_>, coordinate: &maplibre_core::LatLng) -> PyResult<Py<PyAny>> {
-    Ok(py
-        .import("maplibre_native_ffi.geo")?
-        .getattr("LatLng")?
-        .call1((coordinate.latitude, coordinate.longitude))?
-        .into_any()
-        .unbind())
-}
-
-fn geo_lat_lng_tuple_to_py(
-    py: Python<'_>,
-    coordinates: &[maplibre_core::LatLng],
-) -> PyResult<Py<PyAny>> {
-    let coordinates = coordinates
-        .iter()
-        .map(|coordinate| geo_lat_lng_to_py(py, coordinate))
-        .collect::<PyResult<Vec<_>>>()?;
-    Ok(PyTuple::new(py, coordinates)?.into_any().unbind())
-}
-
-fn geo_lat_lng_rings_to_py(
-    py: Python<'_>,
-    rings: &[Vec<maplibre_core::LatLng>],
-) -> PyResult<Py<PyAny>> {
-    let rings = rings
-        .iter()
-        .map(|ring| geo_lat_lng_tuple_to_py(py, ring))
-        .collect::<PyResult<Vec<_>>>()?;
-    Ok(PyTuple::new(py, rings)?.into_any().unbind())
+        .ok_or_else(|| invalid_argument_error(format!("missing required field: {key}")))
 }
 
 fn lat_lng_core_to_py(py: Python<'_>, coordinate: &maplibre_core::LatLng) -> PyResult<Py<PyAny>> {
@@ -7958,6 +7223,34 @@ unsafe fn copy_text(
     bytes.truncate(copied.min(bytes.len()));
     String::from_utf8(bytes)
         .map_err(|error| invalid_argument_error(format!("native text is not UTF-8: {error}")))
+}
+
+unsafe fn copy_bytes(
+    py: Python<'_>,
+    copy: impl Fn(*mut u8, usize, *mut usize) -> sys::mln_status,
+) -> PyResult<Py<PyBytes>> {
+    let mut required = 0;
+    maplibre_core::check(copy(ptr::null_mut(), 0, &mut required)).map_err(map_error)?;
+    let mut bytes = vec![0u8; required];
+    let mut copied = 0;
+    maplibre_core::check(copy(
+        if bytes.is_empty() {
+            ptr::null_mut()
+        } else {
+            bytes.as_mut_ptr()
+        },
+        bytes.len(),
+        &mut copied,
+    ))
+    .map_err(map_error)?;
+    bytes.truncate(copied.min(bytes.len()));
+    Ok(PyBytes::new(py, &bytes).unbind())
+}
+
+fn owned_buffer_to_py(py: Python<'_>, buffer: sys::mln_buffer) -> PyResult<Py<PyBytes>> {
+    // SAFETY: The buffer is an owned handle returned by the C API.
+    let bytes = unsafe { maplibre_core::string::copy_owned_buffer(buffer) }.map_err(map_error)?;
+    Ok(PyBytes::new(py, &bytes).unbind())
 }
 
 /// Creates a runtime handle on the current thread.

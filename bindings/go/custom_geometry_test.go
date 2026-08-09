@@ -27,7 +27,7 @@ func TestCustomGeometrySourceDescriptors(t *testing.T) {
 		}
 	}()
 
-	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	minZoom := 0.0
@@ -56,7 +56,7 @@ func TestCustomGeometrySourceDescriptors(t *testing.T) {
 		t.Fatalf("callbacks invoked during registration: fetches=%d cancels=%d", fetches, cancels)
 	}
 	tileID := CanonicalTileID{Z: 0, X: 0, Y: 0}
-	if err := m.SetCustomGeometrySourceTileData("custom", tileID, GeoJSONFeatureCollection(nil)); err != nil {
+	if err := m.SetCustomGeometrySourceTileData("custom", tileID, []byte(`{"type":"FeatureCollection","features":[]}`)); err != nil {
 		t.Fatalf("SetCustomGeometrySourceTileData(): %v", err)
 	}
 	if err := m.InvalidateCustomGeometrySourceTile("custom", tileID); err != nil {
@@ -129,7 +129,7 @@ func TestCustomGeometrySourceStateReleasesAfterStyleURLReplacement(t *testing.T)
 		}
 	}()
 
-	if err := m.SetStyleJSON(emptyStyle); err != nil {
+	if err := m.SetStyleJSON([]byte(emptyStyle)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	drainRuntimeEvents(t, runtime)

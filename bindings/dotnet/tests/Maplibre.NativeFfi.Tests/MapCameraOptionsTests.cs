@@ -77,7 +77,7 @@ public sealed class MapCameraOptionsTests
         var boundsCamera = map.CameraForLatLngBounds(bounds, fit);
         var coordinatesCamera = map.CameraForLatLngs([bounds.Southwest, bounds.Northeast], fit);
         var geometryCamera = map.CameraForGeometry(
-            new Geometry.LineString([bounds.Southwest, bounds.Northeast]),
+            """{"type":"LineString","coordinates":[[-20,-10],[20,10]]}"""u8.ToArray(),
             fit
         );
 
@@ -242,7 +242,7 @@ public sealed class MapCameraOptionsTests
             new EdgeInsets(1, 2, 3, 4)
         );
         projection.SetVisibleGeometry(
-            new Geometry.LineString([new LatLng(-10, -20), new LatLng(10, 20)]),
+            """{"type":"LineString","coordinates":[[-20,-10],[20,10]]}"""u8.ToArray(),
             new EdgeInsets(1, 2, 3, 4)
         );
 

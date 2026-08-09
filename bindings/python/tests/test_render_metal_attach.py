@@ -162,7 +162,7 @@ def test_metal_surface_attach_reports_public_render_session_shape() -> None:
         try:
             _assert_public_session_shape(session)
 
-            map_handle.set_style_json(EMPTY_STYLE_JSON)
+            map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
             render_until_update(runtime, session)
         finally:
             session.close()
@@ -185,7 +185,7 @@ def test_metal_borrowed_texture_attach_reports_public_render_session_shape() -> 
             try:
                 _assert_public_session_shape(session)
 
-                map_handle.set_style_json(EMPTY_STYLE_JSON)
+                map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
                 render_until_update(runtime, session)
 
                 with pytest.raises(mln.UnsupportedFeatureError) as raised:
@@ -243,7 +243,7 @@ def test_metal_borrowed_texture_set_target_renders_into_the_replacement() -> Non
         ):
             session = map_handle.attach_metal_borrowed_texture(descriptor)
             try:
-                map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON)
+                map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON.encode())
                 render_until(
                     runtime,
                     session,
@@ -298,7 +298,7 @@ def test_metal_surface_set_target_presents_through_a_new_surface() -> None:
     ):
         session = map_handle.attach_metal_surface(surface.descriptor())
         try:
-            map_handle.set_style_json(EMPTY_STYLE_JSON)
+            map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
             render_until_update(runtime, session)
 
             with _metal_surface(context, width=48, height=24) as replacement:

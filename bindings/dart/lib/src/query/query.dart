@@ -2,7 +2,7 @@
 library;
 
 import '../geo/geo.dart';
-import '../json/json.dart';
+import 'dart:typed_data';
 
 /// Feature-state source, feature, and key selector.
 final class FeatureStateSelector {
@@ -70,7 +70,7 @@ final class RenderedFeatureQueryOptions {
   final List<String>? layerIds;
 
   /// Optional MapLibre style-spec filter JSON.
-  final JsonValue? filter;
+  final Uint8List? filter;
 }
 
 /// Options for source feature queries.
@@ -85,61 +85,5 @@ final class SourceFeatureQueryOptions {
   final List<String>? sourceLayerIds;
 
   /// Optional MapLibre style-spec filter JSON.
-  final JsonValue? filter;
-}
-
-/// Copied feature returned by rendered/source feature queries.
-final class QueriedFeature {
-  /// Creates a copied queried feature.
-  const QueriedFeature({
-    required this.feature,
-    this.sourceId,
-    this.sourceLayerId,
-    this.state,
-  });
-
-  /// Copied GeoJSON feature.
-  final FeatureGeoJson feature;
-
-  /// Native render source ID when available.
-  final String? sourceId;
-
-  /// Native source layer ID when available.
-  final String? sourceLayerId;
-
-  /// Rendered feature state when available.
-  final JsonValue? state;
-}
-
-/// Result returned by feature extension queries.
-sealed class FeatureExtensionResult {
-  const FeatureExtensionResult();
-}
-
-/// JSON value feature extension result.
-final class FeatureExtensionValue extends FeatureExtensionResult {
-  /// Creates a JSON value extension result.
-  const FeatureExtensionValue(this.value);
-
-  /// Result value.
-  final JsonValue value;
-}
-
-/// Feature collection feature extension result.
-final class FeatureExtensionFeatureCollection extends FeatureExtensionResult {
-  /// Creates a feature collection extension result.
-  FeatureExtensionFeatureCollection(List<FeatureGeoJson> features)
-    : features = List.unmodifiable(features);
-
-  /// Result features.
-  final List<FeatureGeoJson> features;
-}
-
-/// Feature extension result type unknown to this Dart binding version.
-final class FeatureExtensionUnknown extends FeatureExtensionResult {
-  /// Creates an unknown result preserving the raw native type.
-  const FeatureExtensionUnknown(this.rawType);
-
-  /// Raw native result type value.
-  final int rawType;
+  final Uint8List? filter;
 }

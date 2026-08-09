@@ -228,7 +228,7 @@ func TestMapCommandsAndStyleLoadingUseNativeABI(t *testing.T) {
 	if err := m.RequestStillImage(); !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("RequestStillImage() on continuous map error = %v, want ErrInvalidState", err)
 	}
-	if err := m.SetStyleJSON(minimalStyleJSON); err != nil {
+	if err := m.SetStyleJSON([]byte(minimalStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(): %v", err)
 	}
 	if err := m.SetStyleURL("http://example.com/style.json"); err != nil {
@@ -257,21 +257,21 @@ func TestMapReportsLoadedStyleDocumentAndURL(t *testing.T) {
 		}
 	}()
 
-	if document, err := m.LoadedStyleJSON(); err != nil || document != "" {
+	if document, err := m.LoadedStyleJSON(); err != nil || len(document) != 0 {
 		t.Fatalf("LoadedStyleJSON() before load = %q, %v, want \"\", nil", document, err)
 	}
 	if url, err := m.StyleURL(); err != nil || url != "" {
 		t.Fatalf("StyleURL() before load = %q, %v, want \"\", nil", url, err)
 	}
 
-	if err := m.SetStyleJSON(minimalStyleJSON); err != nil {
+	if err := m.SetStyleJSON([]byte(minimalStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(): %v", err)
 	}
 	document, err := m.LoadedStyleJSON()
 	if err != nil {
 		t.Fatalf("LoadedStyleJSON(): %v", err)
 	}
-	if document != minimalStyleJSON {
+	if string(document) != minimalStyleJSON {
 		t.Fatalf("LoadedStyleJSON() = %q, want %q", document, minimalStyleJSON)
 	}
 	if url, err := m.StyleURL(); err != nil || url != "" {
@@ -291,7 +291,7 @@ func TestMapReportsLoadedStyleDocumentAndURL(t *testing.T) {
 	if url != styleURL {
 		t.Fatalf("StyleURL() = %q, want %q", url, styleURL)
 	}
-	if document, err := m.LoadedStyleJSON(); err != nil || document != minimalStyleJSON {
+	if document, err := m.LoadedStyleJSON(); err != nil || string(document) != minimalStyleJSON {
 		t.Fatalf("LoadedStyleJSON() after URL request = %q, %v, want the previously parsed document", document, err)
 	}
 }
@@ -448,8 +448,8 @@ func TestMapStyleStringsRejectEmbeddedNUL(t *testing.T) {
 	if err := m.SetStyleURL("http://example.com/\x00style.json"); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetStyleURL embedded NUL error = %v, want ErrInvalidArgument", err)
 	}
-	if err := m.SetStyleJSON("{\x00}"); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("SetStyleJSON embedded NUL error = %v, want ErrInvalidArgument", err)
+	if err := m.SetStyleJSON([]byte("{\x00}")); err == nil {
+		t.Fatal("SetStyleJSON embedded NUL error = nil")
 	}
 }
 

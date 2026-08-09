@@ -41,12 +41,19 @@ native_handle!(
     sys::mln_resource_request_handle,
     sys::mln_offline_region_snapshot,
     sys::mln_offline_region_list,
-    sys::mln_json_snapshot,
     sys::mln_style_id_list,
     sys::mln_style_string_list,
-    sys::mln_feature_query_result,
-    sys::mln_feature_extension_result,
 );
+
+impl NativeHandle for sys::mln_buffer {
+    fn to_raw(self) -> u64 {
+        self
+    }
+
+    fn from_raw(raw: u64) -> Self {
+        raw
+    }
+}
 
 /// A native handle a destructor attempted to destroy and could not. The handle
 /// stays live.
@@ -268,25 +275,11 @@ macro_rules! native_guard {
 }
 
 native_guard!(
-    FeatureQueryResultGuard,
-    sys::mln_feature_query_result,
-    sys::mln_feature_query_result_destroy,
-    "mln_feature_query_result",
-    feature_query_result
-);
-native_guard!(
-    FeatureExtensionResultGuard,
-    sys::mln_feature_extension_result,
-    sys::mln_feature_extension_result_destroy,
-    "mln_feature_extension_result",
-    feature_extension_result
-);
-native_guard!(
-    JsonSnapshotGuard,
-    sys::mln_json_snapshot,
-    sys::mln_json_snapshot_destroy,
-    "mln_json_snapshot",
-    json_snapshot
+    BufferGuard,
+    sys::mln_buffer,
+    sys::mln_buffer_destroy,
+    "mln_buffer",
+    buffer
 );
 native_guard!(
     OfflineRegionSnapshotGuard,

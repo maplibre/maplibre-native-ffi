@@ -129,23 +129,19 @@ func (projection *MapProjectionHandle) SetVisibleCoordinates(coordinates []LatLn
 
 // SetVisibleGeometry updates this projection helper's camera to fit geometry
 // inside padding.
-func (projection *MapProjectionHandle) SetVisibleGeometry(geometry Geometry, padding EdgeInsets) error {
+func (projection *MapProjectionHandle) SetVisibleGeometry(geometry []byte, padding EdgeInsets) error {
 	ptr, release, err := projection.ptr()
 	if err != nil {
 		return err
 	}
 	defer release()
 	defer projection.state.KeepAlive()
-	materializer := newCGeometryMaterializer()
-	defer materializer.free()
-	rawGeometry, materialErr := materializer.geometryPtr(geometry)
-	if materialErr != nil {
-		return newBindingError(ErrInvalidArgument, materialErr.Error())
-	}
+	rawGeometry := newCBufferView(geometry)
+	defer rawGeometry.free()
 	return checkNative(func() int32 {
 		return int32(C.mln_map_projection_set_visible_geometry(
 			C.mln_map_projection(ptr),
-			rawGeometry,
+			rawGeometry.raw(),
 			cEdgeInsets(padding),
 		))
 	})

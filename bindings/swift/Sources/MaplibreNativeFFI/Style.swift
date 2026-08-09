@@ -1,4 +1,5 @@
 internal import CMaplibreNativeC
+import Foundation
 
 /// A style source type reported by MapLibre Native.
 ///
@@ -119,7 +120,7 @@ public struct StyleGeoJSONSourceOptions: Equatable, Sendable {
   public var clusterMaxZoom: Double?
   /// Cluster aggregation expressions keyed by property name, as a JSON object
   /// whose members follow the MapLibre Style Spec `clusterProperties` form.
-  public var clusterProperties: JSONValue?
+  public var clusterProperties: Data?
   public var tileSize: UInt32?
   public var buffer: UInt32?
   public var clusterRadius: UInt32?
@@ -136,7 +137,7 @@ public struct StyleGeoJSONSourceOptions: Equatable, Sendable {
     maxZoom: Double? = nil,
     tolerance: Double? = nil,
     clusterMaxZoom: Double? = nil,
-    clusterProperties: JSONValue? = nil,
+    clusterProperties: Data? = nil,
     tileSize: UInt32? = nil,
     buffer: UInt32? = nil,
     clusterRadius: UInt32? = nil,
@@ -165,7 +166,7 @@ public struct StyleGeoJSONSourceOptions: Equatable, Sendable {
       maxZoom: maxZoom,
       tolerance: tolerance,
       clusterMaxZoom: clusterMaxZoom,
-      clusterProperties: clusterProperties?.nativeValue,
+      clusterProperties: clusterProperties,
       tileSize: tileSize,
       buffer: buffer,
       clusterRadius: clusterRadius,
@@ -508,13 +509,13 @@ public struct CustomGeometrySourceOptions: Sendable {
 }
 
 public extension MapHandle {
-  func addStyleSourceJSON(sourceId: String, sourceJSON: JSONValue) throws {
+  func addStyleSourceJSON(sourceId: String, sourceJSON: Data) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_add_style_source_json(
         requireLiveHandle().raw,
         arena.view(sourceId),
-        arena.allocate(sourceJSON.nativeValue)
+        arena.view(sourceJSON)
       ))
     }
   }
@@ -599,20 +600,18 @@ public extension MapHandle {
   /// is created.
   func addGeoJSONSourceData(
     sourceId: String,
-    data: GeoJSON,
+    data: Data,
     options: StyleGeoJSONSourceOptions = StyleGeoJSONSourceOptions()
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try arena.withNativeGeoJSON(data.nativeGeoJSON) { data in
-        try options.nativeOptions.withNativeOptions { options in
-          try checkStatus(mln_map_add_geojson_source_data(
-            requireLiveHandle().raw,
-            arena.view(sourceId),
-            data,
-            options
-          ))
-        }
+      try options.nativeOptions.withNativeOptions { options in
+        try checkStatus(mln_map_add_geojson_source_data(
+          requireLiveHandle().raw,
+          arena.view(sourceId),
+          arena.view(data),
+          options
+        ))
       }
     }
   }
@@ -628,16 +627,14 @@ public extension MapHandle {
     }
   }
 
-  func setGeoJSONSourceData(sourceId: String, data: GeoJSON) throws {
+  func setGeoJSONSourceData(sourceId: String, data: Data) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try arena.withNativeGeoJSON(data.nativeGeoJSON) { data in
-        try checkStatus(mln_map_set_geojson_source_data(
-          requireLiveHandle().raw,
-          arena.view(sourceId),
-          data
-        ))
-      }
+      try checkStatus(mln_map_set_geojson_source_data(
+        requireLiveHandle().raw,
+        arena.view(sourceId),
+        arena.view(data)
+      ))
     }
   }
 
@@ -647,8 +644,8 @@ public extension MapHandle {
     options: StyleTileSourceOptions,
     add: (
       mln_map,
-      mln_string_view,
-      mln_string_view,
+      mln_buffer_view,
+      mln_buffer_view,
       UnsafePointer<mln_style_tile_source_options>?
     ) -> mln_status
   ) throws {
@@ -671,8 +668,8 @@ public extension MapHandle {
     options: StyleTileSourceOptions,
     add: (
       mln_map,
-      mln_string_view,
-      UnsafePointer<mln_string_view>?,
+      mln_buffer_view,
+      UnsafePointer<mln_buffer_view>?,
       Int,
       UnsafePointer<mln_style_tile_source_options>?
     ) -> mln_status
@@ -807,18 +804,16 @@ public extension MapHandle {
   func setCustomGeometrySourceTileData(
     sourceId: String,
     tileId: CanonicalTileID,
-    data: GeoJSON
+    data: Data
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try arena.withNativeGeoJSON(data.nativeGeoJSON) { data in
-        try checkStatus(mln_map_set_custom_geometry_source_tile_data(
-          requireLiveHandle().raw,
-          arena.view(sourceId),
-          tileId.nativeTileID.native,
-          data
-        ))
-      }
+      try checkStatus(mln_map_set_custom_geometry_source_tile_data(
+        requireLiveHandle().raw,
+        arena.view(sourceId),
+        tileId.nativeTileID.native,
+        arena.view(data)
+      ))
     }
   }
 
@@ -1117,14 +1112,14 @@ public extension MapHandle {
   }
 
   func addStyleLayerJSON(
-    _ layerJSON: JSONValue,
+    _ layerJSON: Data,
     beforeLayerId: String? = nil
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_add_style_layer_json(
         requireLiveHandle().raw,
-        arena.allocate(layerJSON.nativeValue),
+        arena.view(layerJSON),
         arena.view(beforeLayerId ?? "")
       ))
     }
@@ -1175,44 +1170,44 @@ public extension MapHandle {
     }
   }
 
-  func styleLayerJSON(_ layerId: String) throws -> JSONValue? {
+  func styleLayerJSON(_ layerId: String) throws -> Data? {
     try mapNativeFailure {
       let arena = NativeInputArena()
       return try NativeStyle.layerJSON(
         requireLiveHandle(),
         layerId: arena.view(layerId)
-      ).map(JSONValue.init(native:))
+      )
     }
   }
 
-  func setStyleLightJSON(_ lightJSON: JSONValue) throws {
+  func setStyleLightJSON(_ lightJSON: Data) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_set_style_light_json(
         requireLiveHandle().raw,
-        arena.allocate(lightJSON.nativeValue)
+        arena.view(lightJSON)
       ))
     }
   }
 
-  func setStyleLightProperty(_ propertyName: String, value: JSONValue) throws {
+  func setStyleLightProperty(_ propertyName: String, value: Data) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_set_style_light_property(
         requireLiveHandle().raw,
         arena.view(propertyName),
-        arena.allocate(value.nativeValue)
+        arena.view(value)
       ))
     }
   }
 
-  func styleLightProperty(_ propertyName: String) throws -> JSONValue? {
+  func styleLightProperty(_ propertyName: String) throws -> Data? {
     try mapNativeFailure {
       let arena = NativeInputArena()
       return try NativeStyle.lightProperty(
         requireLiveHandle(),
         propertyName: arena.view(propertyName)
-      ).map(JSONValue.init(native:))
+      )
     }
   }
 
@@ -1240,7 +1235,7 @@ public extension MapHandle {
   func setLayerProperty(
     layerId: String,
     propertyName: String,
-    value: JSONValue
+    value: Data
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
@@ -1248,13 +1243,13 @@ public extension MapHandle {
         requireLiveHandle().raw,
         arena.view(layerId),
         arena.view(propertyName),
-        arena.allocate(value.nativeValue)
+        arena.view(value)
       ))
     }
   }
 
   func layerProperty(layerId: String,
-                     propertyName: String) throws -> JSONValue?
+                     propertyName: String) throws -> Data?
   {
     try mapNativeFailure {
       let arena = NativeInputArena()
@@ -1262,28 +1257,34 @@ public extension MapHandle {
         requireLiveHandle(),
         layerId: arena.view(layerId),
         propertyName: arena.view(propertyName)
-      ).map(JSONValue.init(native:))
+      )
     }
   }
 
-  func setLayerFilter(layerId: String, filter: JSONValue?) throws {
+  func setLayerFilter(layerId: String, filter: Data?) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_set_layer_filter(
-        requireLiveHandle().raw,
-        arena.view(layerId),
-        filter.map { arena.allocate($0.nativeValue) }
-      ))
+      guard let filter else {
+        return try checkStatus(mln_map_set_layer_filter(
+          requireLiveHandle().raw, arena.view(layerId), nil
+        ))
+      }
+      var filterView = arena.view(filter)
+      try withUnsafePointer(to: &filterView) { filter in
+        try checkStatus(mln_map_set_layer_filter(
+          requireLiveHandle().raw, arena.view(layerId), filter
+        ))
+      }
     }
   }
 
-  func layerFilter(_ layerId: String) throws -> JSONValue? {
+  func layerFilter(_ layerId: String) throws -> Data? {
     try mapNativeFailure {
       let arena = NativeInputArena()
       return try NativeStyle.layerFilter(
         requireLiveHandle(),
         layerId: arena.view(layerId)
-      ).map(JSONValue.init(native:))
+      )
     }
   }
 

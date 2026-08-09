@@ -10,6 +10,17 @@ struct NativeStringError: Error, Equatable {
 }
 
 enum NativeString {
+  static func copyUTF8(data: UnsafeRawPointer?, size: UInt) throws -> String {
+    try copyUTF8(data: data, size: Int(size))
+  }
+
+  static func copyUTF8(data: UnsafeRawPointer?, size: Int) throws -> String {
+    try copyUTF8(
+      data: data?.assumingMemoryBound(to: CChar.self),
+      size: size
+    )
+  }
+
   static func copyUTF8(data: UnsafePointer<CChar>?,
                        size: UInt) throws -> String
   {
@@ -63,13 +74,13 @@ enum NativeString {
 
   static func withStringView<Result>(
     _ text: String,
-    _ body: (mln_string_view) throws -> Result
+    _ body: (mln_buffer_view) throws -> Result
   ) throws -> Result {
     let bytes = Array(text.utf8)
     return try bytes.withUnsafeBufferPointer { buffer in
       let pointer = buffer.baseAddress
         .map { UnsafeRawPointer($0).assumingMemoryBound(to: CChar.self) }
-      return try body(mln_string_view(data: pointer, size: buffer.count))
+      return try body(mln_buffer_view(data: pointer, size: buffer.count))
     }
   }
 }

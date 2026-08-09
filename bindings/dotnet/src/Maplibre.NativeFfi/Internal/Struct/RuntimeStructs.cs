@@ -199,6 +199,9 @@ internal static unsafe class RuntimeStructs
         return Marshal.PtrToStringUTF8((nint)pointer, checked((int)byteLength)) ?? string.Empty;
     }
 
+    internal static string CopyUtf8(void* pointer, nuint byteLength) =>
+        CopyUtf8((sbyte*)pointer, byteLength);
+
     private static byte[] CopyBytes(byte* pointer, nuint byteLength)
     {
         if (pointer is null || byteLength == 0)

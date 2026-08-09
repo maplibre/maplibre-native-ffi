@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:ffi';
+import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
@@ -43,10 +44,42 @@ final class NativeStringView {
   const NativeStringView(this.value, this.byteLength);
 
   /// Native string view struct.
-  final raw.mln_string_view value;
+  final raw.mln_buffer_view value;
 
   /// UTF-8 byte length in [value].
   final int byteLength;
+}
+
+/// Encodes [value] as an explicit-length byte view for one native call.
+raw.mln_buffer_view nativeBufferView(Uint8List value, Allocator allocator) {
+  final data = value.isEmpty
+      ? nullptr.cast<Uint8>()
+      : allocator<Uint8>(value.length);
+  data.asTypedList(value.length).setAll(0, value);
+  final view = allocator<raw.mln_buffer_view>();
+  view.ref.data = data.cast<Void>();
+  view.ref.size = value.length;
+  return view.ref;
+}
+
+/// Copies and destroys an owned native buffer.
+Uint8List copyOwnedBuffer(int buffer) {
+  if (buffer == 0) return Uint8List(0);
+  try {
+    return withNativeArena((arena) {
+      final view = arena<raw.mln_buffer_view>();
+      checkNativeStatus(
+        raw.mln_buffer_get(buffer, view),
+        () => 'failed to read native buffer',
+      );
+      if (view.ref.size == 0) return Uint8List(0);
+      return Uint8List.fromList(
+        view.ref.data.cast<Uint8>().asTypedList(view.ref.size),
+      );
+    });
+  } finally {
+    raw.mln_buffer_destroy(buffer);
+  }
 }
 
 /// Encodes [value] as an explicit-length UTF-8 string view for one native call.
@@ -59,8 +92,8 @@ NativeStringView nativeStringView(String value, Allocator allocator) {
     data[index] = bytes[index];
   }
 
-  final view = allocator<raw.mln_string_view>();
-  view.ref.data = data.cast<Char>();
+  final view = allocator<raw.mln_buffer_view>();
+  view.ref.data = data.cast<Void>();
   view.ref.size = bytes.length;
   return NativeStringView(view.ref, bytes.length);
 }

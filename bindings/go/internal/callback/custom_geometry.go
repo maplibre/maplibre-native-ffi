@@ -68,7 +68,7 @@ func AddCustomGeometrySource(m uint64, sourceID string, options CustomGeometrySo
 
 	sourceData := C.CBytes([]byte(sourceID))
 	defer C.free(sourceData)
-	sourceView := C.mln_string_view{data: (*C.char)(sourceData), size: C.size_t(len(sourceID))}
+	sourceView := C.mln_buffer_view{data: sourceData, size: C.size_t(len(sourceID))}
 
 	raw := C.mln_custom_geometry_source_options_default()
 	raw.fields = C.uint32_t(options.Fields)

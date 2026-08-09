@@ -162,7 +162,7 @@ public sealed class CustomGeometrySourceTests
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
         var tile = new CanonicalTileId(0, 0, 0);
 
         map.AddCustomGeometrySource(
@@ -180,7 +180,11 @@ public sealed class CustomGeometrySourceTests
                 Wrap = false,
             }
         );
-        map.SetCustomGeometrySourceTileData("custom", tile, new GeoJson.FeatureCollection([]));
+        map.SetCustomGeometrySourceTileData(
+            "custom",
+            tile,
+            """{"type":"FeatureCollection","features":[]}"""u8.ToArray()
+        );
         map.InvalidateCustomGeometrySourceTile("custom", tile);
         map.InvalidateCustomGeometrySourceRegion(
             "custom",
@@ -197,7 +201,7 @@ public sealed class CustomGeometrySourceTests
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
         map.AddCustomGeometrySource(
             "custom",
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
@@ -215,7 +219,7 @@ public sealed class CustomGeometrySourceTests
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
         map.AddCustomGeometrySource(
             "custom",
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
@@ -241,13 +245,13 @@ public sealed class CustomGeometrySourceTests
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
         map.AddCustomGeometrySource(
             "custom",
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
         );
 
-        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
 
         Assert.Equal(0, map.CustomGeometrySourceCountForTest);
         Assert.False(map.StyleSourceExists("custom"));

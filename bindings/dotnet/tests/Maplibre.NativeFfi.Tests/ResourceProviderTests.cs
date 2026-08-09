@@ -494,7 +494,7 @@ public sealed unsafe class ResourceProviderTests
         DriveRuntimeUntil(runtime, providerCalled);
         Assert.NotNull(handled);
 
-        map.SetStyleJson(StyleJson);
+        map.SetStyleJson(System.Text.Encoding.UTF8.GetBytes(StyleJson));
         DriveRuntimeUntilCancelled(runtime, handled);
 
         var error = Assert.Throws<InvalidStateException>(() => handled.Complete(StyleResponse()));

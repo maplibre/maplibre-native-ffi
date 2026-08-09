@@ -189,7 +189,7 @@ type StyleGeoJSONSourceOptions struct {
 	ClusterMaxZoom *float64
 	// ClusterProperties holds cluster aggregation expressions as a JSON object
 	// in the MapLibre Style Spec clusterProperties form.
-	ClusterProperties *JSONValue
+	ClusterProperties []byte
 	TileSize          *uint32
 	Buffer            *uint32
 	ClusterRadius     *uint32
@@ -208,7 +208,7 @@ func (options StyleGeoJSONSourceOptions) Equal(other StyleGeoJSONSourceOptions) 
 		equalPointer(options.MaxZoom, other.MaxZoom) &&
 		equalPointer(options.Tolerance, other.Tolerance) &&
 		equalPointer(options.ClusterMaxZoom, other.ClusterMaxZoom) &&
-		equalJSON(options.ClusterProperties, other.ClusterProperties) &&
+		equalOptionalBytes(options.ClusterProperties, other.ClusterProperties) &&
 		equalPointer(options.TileSize, other.TileSize) &&
 		equalPointer(options.Buffer, other.Buffer) &&
 		equalPointer(options.ClusterRadius, other.ClusterRadius) &&
@@ -226,8 +226,7 @@ func (options StyleGeoJSONSourceOptions) Clone() StyleGeoJSONSourceOptions {
 	cloned.Tolerance = clonePointer(options.Tolerance)
 	cloned.ClusterMaxZoom = clonePointer(options.ClusterMaxZoom)
 	if options.ClusterProperties != nil {
-		value := options.ClusterProperties.Clone()
-		cloned.ClusterProperties = &value
+		cloned.ClusterProperties = append([]byte(nil), options.ClusterProperties...)
 	}
 	cloned.TileSize = clonePointer(options.TileSize)
 	cloned.Buffer = clonePointer(options.Buffer)
@@ -272,10 +271,9 @@ func (options StyleGeoJSONSourceOptions) WithClusterMaxZoom(clusterMaxZoom float
 }
 
 // WithClusterProperties returns a copy that sets cluster aggregation expressions.
-func (options StyleGeoJSONSourceOptions) WithClusterProperties(clusterProperties JSONValue) StyleGeoJSONSourceOptions {
+func (options StyleGeoJSONSourceOptions) WithClusterProperties(clusterProperties []byte) StyleGeoJSONSourceOptions {
 	options = options.Clone()
-	options.ClusterProperties = new(JSONValue)
-	*options.ClusterProperties = clusterProperties.Clone()
+	options.ClusterProperties = append([]byte(nil), clusterProperties...)
 	return options
 }
 
@@ -335,11 +333,11 @@ func (options StyleGeoJSONSourceOptions) WithSynchronousUpdate(synchronousUpdate
 	return options
 }
 
-// cStyleGeoJSONSourceOptions keeps the native options struct in C storage
-// because it points at a cluster property tree a Go-side materializer owns.
+// cStyleGeoJSONSourceOptions keeps the native options and cluster-property
+// bytes alive for the native call.
 type cStyleGeoJSONSourceOptions struct {
-	raw          *C.mln_geojson_source_options
-	materializer *cJSONMaterializer
+	raw               *C.mln_geojson_source_options
+	clusterProperties cBufferView
 }
 
 func newCStyleGeoJSONSourceOptions(options *StyleGeoJSONSourceOptions) (*cStyleGeoJSONSourceOptions, error) {
@@ -367,14 +365,9 @@ func newCStyleGeoJSONSourceOptions(options *StyleGeoJSONSourceOptions) (*cStyleG
 		raw.raw.cluster_max_zoom = C.double(*options.ClusterMaxZoom)
 	}
 	if options.ClusterProperties != nil {
-		raw.materializer = newCJSONMaterializer()
-		clusterProperties, err := raw.materializer.valuePtr(*options.ClusterProperties)
-		if err != nil {
-			raw.free()
-			return nil, err
-		}
+		raw.clusterProperties = newCBufferView(options.ClusterProperties)
 		raw.raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
-		raw.raw.cluster_properties = clusterProperties
+		raw.raw.cluster_properties = raw.clusterProperties.raw()
 	}
 	if options.TileSize != nil {
 		raw.raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
@@ -418,9 +411,7 @@ func (options *cStyleGeoJSONSourceOptions) free() {
 	if options == nil {
 		return
 	}
-	if options.materializer != nil {
-		options.materializer.free()
-	}
+	options.clusterProperties.free()
 	if options.raw != nil {
 		C.free(unsafe.Pointer(options.raw))
 	}
@@ -942,7 +933,7 @@ func (m *MapHandle) SetGeoJSONSourceURL(sourceID string, url string) error {
 // copied into MapLibre Native before the call returns, and later
 // SetGeoJSONSourceData and SetGeoJSONSourceURL calls keep the options passed
 // here.
-func (m *MapHandle) AddGeoJSONSourceData(sourceID string, data GeoJSON, options *StyleGeoJSONSourceOptions) error {
+func (m *MapHandle) AddGeoJSONSourceData(sourceID string, data []byte, options *StyleGeoJSONSourceOptions) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
@@ -951,25 +942,21 @@ func (m *MapHandle) AddGeoJSONSourceData(sourceID string, data GeoJSON, options 
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
-	materializer := newCGeoJSONMaterializer()
-	defer materializer.free()
-	rawData, err := materializer.geoJSON(data)
-	if err != nil {
-		return newBindingError(ErrInvalidArgument, err.Error())
-	}
+	rawData := newCBufferView(data)
+	defer rawData.free()
 	rawOptions, err := newCStyleGeoJSONSourceOptions(options)
 	if err != nil {
 		return newBindingError(ErrInvalidArgument, err.Error())
 	}
 	defer rawOptions.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_add_geojson_source_data(C.mln_map(ptr), sourceView.raw(), &rawData, rawOptions.ptr()))
+		return int32(C.mln_map_add_geojson_source_data(C.mln_map(ptr), sourceView.raw(), rawData.raw(), rawOptions.ptr()))
 	})
 }
 
 // SetGeoJSONSourceData updates a GeoJSON source with inline data. Accepted data
 // is copied into MapLibre Native before the call returns.
-func (m *MapHandle) SetGeoJSONSourceData(sourceID string, data GeoJSON) error {
+func (m *MapHandle) SetGeoJSONSourceData(sourceID string, data []byte) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
@@ -978,14 +965,10 @@ func (m *MapHandle) SetGeoJSONSourceData(sourceID string, data GeoJSON) error {
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
-	materializer := newCGeoJSONMaterializer()
-	defer materializer.free()
-	rawData, err := materializer.geoJSON(data)
-	if err != nil {
-		return newBindingError(ErrInvalidArgument, err.Error())
-	}
+	rawData := newCBufferView(data)
+	defer rawData.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_set_geojson_source_data(C.mln_map(ptr), sourceView.raw(), &rawData))
+		return int32(C.mln_map_set_geojson_source_data(C.mln_map(ptr), sourceView.raw(), rawData.raw()))
 	})
 }
 
@@ -1025,7 +1008,7 @@ func (m *MapHandle) AddCustomGeometrySource(sourceID string, options CustomGeome
 }
 
 // SetCustomGeometrySourceTileData sets custom geometry data for one tile.
-func (m *MapHandle) SetCustomGeometrySourceTileData(sourceID string, tileID CanonicalTileID, data GeoJSON) error {
+func (m *MapHandle) SetCustomGeometrySourceTileData(sourceID string, tileID CanonicalTileID, data []byte) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
@@ -1034,18 +1017,14 @@ func (m *MapHandle) SetCustomGeometrySourceTileData(sourceID string, tileID Cano
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
-	materializer := newCGeoJSONMaterializer()
-	defer materializer.free()
-	rawData, err := materializer.geoJSON(data)
-	if err != nil {
-		return newBindingError(ErrInvalidArgument, err.Error())
-	}
+	rawData := newCBufferView(data)
+	defer rawData.free()
 	return checkNative(func() int32 {
 		return int32(C.mln_map_set_custom_geometry_source_tile_data(
 			C.mln_map(ptr),
 			sourceView.raw(),
 			cCanonicalTileID(tileID),
-			&rawData,
+			rawData.raw(),
 		))
 	})
 }
@@ -1468,7 +1447,7 @@ func (m *MapHandle) AddRasterDEMSourceTiles(sourceID string, tiles []string, opt
 }
 
 // AddStyleSourceJSON adds one style source from a style-spec source JSON object.
-func (m *MapHandle) AddStyleSourceJSON(sourceID string, sourceJSON JSONValue) error {
+func (m *MapHandle) AddStyleSourceJSON(sourceID string, sourceJSON []byte) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
@@ -1477,14 +1456,10 @@ func (m *MapHandle) AddStyleSourceJSON(sourceID string, sourceJSON JSONValue) er
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
-	materializer := newCJSONMaterializer()
-	defer materializer.free()
-	rawJSON, err := materializer.value(sourceJSON)
-	if err != nil {
-		return newBindingError(ErrInvalidArgument, err.Error())
-	}
+	rawJSON := newCBufferView(sourceJSON)
+	defer rawJSON.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_add_style_source_json(C.mln_map(ptr), sourceView.raw(), &rawJSON))
+		return int32(C.mln_map_add_style_source_json(C.mln_map(ptr), sourceView.raw(), rawJSON.raw()))
 	})
 }
 
@@ -1680,7 +1655,7 @@ func styleIDListStrings(list C.mln_style_id_list) ([]string, error) {
 	}
 	ids := make([]string, int(count))
 	for i := range ids {
-		var view C.mln_string_view
+		var view C.mln_buffer_view
 		if err := checkNative(func() int32 { return int32(C.mln_style_id_list_get(list, C.size_t(i), &view)) }); err != nil {
 			return nil, err
 		}
@@ -1697,7 +1672,7 @@ func styleStringListStrings(list C.mln_style_string_list) ([]string, error) {
 	}
 	values := make([]string, int(count))
 	for i := range values {
-		var view C.mln_string_view
+		var view C.mln_buffer_view
 		if err := checkNative(func() int32 {
 			return int32(C.mln_style_string_list_get(list, C.size_t(i), &view))
 		}); err != nil {
@@ -1830,7 +1805,7 @@ func (m *MapHandle) SetLocationIndicatorImageName(layerID string, imageKind Loca
 
 // AddStyleLayerJSON adds one style layer from a style-spec layer JSON object.
 // Passing an empty beforeLayerID appends the layer.
-func (m *MapHandle) AddStyleLayerJSON(layerJSON JSONValue, beforeLayerID string) error {
+func (m *MapHandle) AddStyleLayerJSON(layerJSON []byte, beforeLayerID string) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
@@ -1839,14 +1814,10 @@ func (m *MapHandle) AddStyleLayerJSON(layerJSON JSONValue, beforeLayerID string)
 	defer m.state.KeepAlive()
 	beforeView := newCStringView(beforeLayerID)
 	defer beforeView.free()
-	materializer := newCJSONMaterializer()
-	defer materializer.free()
-	rawJSON, err := materializer.value(layerJSON)
-	if err != nil {
-		return newBindingError(ErrInvalidArgument, err.Error())
-	}
+	rawJSON := newCBufferView(layerJSON)
+	defer rawJSON.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_add_style_layer_json(C.mln_map(ptr), &rawJSON, beforeView.raw()))
+		return int32(C.mln_map_add_style_layer_json(C.mln_map(ptr), rawJSON.raw(), beforeView.raw()))
 	})
 }
 
@@ -1899,7 +1870,7 @@ func (m *MapHandle) StyleLayerType(layerID string) (string, bool, error) {
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
-	var layerType C.mln_string_view
+	var layerType C.mln_buffer_view
 	var found C.bool
 	if err := checkNative(func() int32 {
 		return int32(C.mln_map_get_style_layer_type(C.mln_map(ptr), layerView.raw(), &layerType, &found))
@@ -1946,53 +1917,49 @@ func (m *MapHandle) MoveStyleLayer(layerID string, beforeLayerID string) error {
 
 // StyleLayerJSON returns one copied style layer as a style-spec JSON object and
 // whether the layer exists.
-func (m *MapHandle) StyleLayerJSON(layerID string) (JSONValue, bool, error) {
+func (m *MapHandle) StyleLayerJSON(layerID string) ([]byte, bool, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return JSONValue{}, false, err
+		return nil, false, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
-	var snapshot C.mln_json_snapshot
+	var buffer C.mln_buffer
 	var found C.bool
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_style_layer_json(C.mln_map(ptr), layerView.raw(), &snapshot, &found))
+		return int32(C.mln_map_get_style_layer_json(C.mln_map(ptr), layerView.raw(), &buffer, &found))
 	}); err != nil {
-		return JSONValue{}, false, err
+		return nil, false, err
 	}
 	if !bool(found) {
-		return JSONValue{}, false, nil
+		return nil, false, nil
 	}
-	value, err := cJSONSnapshotValue(snapshot)
+	value, err := goOwnedBuffer(buffer)
 	if err != nil {
-		return JSONValue{}, false, err
+		return nil, false, err
 	}
 	return value, true, nil
 }
 
 // SetStyleLightJSON sets the style light from a style-spec light JSON object.
-func (m *MapHandle) SetStyleLightJSON(lightJSON JSONValue) error {
+func (m *MapHandle) SetStyleLightJSON(lightJSON []byte) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	materializer := newCJSONMaterializer()
-	defer materializer.free()
-	rawJSON, err := materializer.value(lightJSON)
-	if err != nil {
-		return newBindingError(ErrInvalidArgument, err.Error())
-	}
+	rawJSON := newCBufferView(lightJSON)
+	defer rawJSON.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_set_style_light_json(C.mln_map(ptr), &rawJSON))
+		return int32(C.mln_map_set_style_light_json(C.mln_map(ptr), rawJSON.raw()))
 	})
 }
 
 // SetStyleLightProperty sets one style light property.
-func (m *MapHandle) SetStyleLightProperty(propertyName string, value JSONValue) error {
+func (m *MapHandle) SetStyleLightProperty(propertyName string, value []byte) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
@@ -2001,35 +1968,31 @@ func (m *MapHandle) SetStyleLightProperty(propertyName string, value JSONValue) 
 	defer m.state.KeepAlive()
 	propertyView := newCStringView(propertyName)
 	defer propertyView.free()
-	materializer := newCJSONMaterializer()
-	defer materializer.free()
-	rawValue, err := materializer.value(value)
-	if err != nil {
-		return newBindingError(ErrInvalidArgument, err.Error())
-	}
+	rawValue := newCBufferView(value)
+	defer rawValue.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_set_style_light_property(C.mln_map(ptr), propertyView.raw(), &rawValue))
+		return int32(C.mln_map_set_style_light_property(C.mln_map(ptr), propertyView.raw(), rawValue.raw()))
 	})
 }
 
 // StyleLightProperty returns one copied style light property as a style-spec
 // JSON value.
-func (m *MapHandle) StyleLightProperty(propertyName string) (JSONValue, error) {
+func (m *MapHandle) StyleLightProperty(propertyName string) ([]byte, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return JSONValue{}, err
+		return nil, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
 	propertyView := newCStringView(propertyName)
 	defer propertyView.free()
-	var snapshot C.mln_json_snapshot
+	var buffer C.mln_buffer
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_style_light_property(C.mln_map(ptr), propertyView.raw(), &snapshot))
+		return int32(C.mln_map_get_style_light_property(C.mln_map(ptr), propertyView.raw(), &buffer))
 	}); err != nil {
-		return JSONValue{}, err
+		return nil, err
 	}
-	return cJSONSnapshotValue(snapshot)
+	return goOwnedBuffer(buffer)
 }
 
 // SetStyleTransitionOptions replaces the style's global transition options
@@ -2067,7 +2030,7 @@ func (m *MapHandle) StyleTransitionOptions() (StyleTransitionOptions, error) {
 }
 
 // SetLayerProperty sets one style layer property.
-func (m *MapHandle) SetLayerProperty(layerID string, propertyName string, value JSONValue) error {
+func (m *MapHandle) SetLayerProperty(layerID string, propertyName string, value []byte) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
@@ -2078,23 +2041,19 @@ func (m *MapHandle) SetLayerProperty(layerID string, propertyName string, value 
 	defer layerView.free()
 	propertyView := newCStringView(propertyName)
 	defer propertyView.free()
-	materializer := newCJSONMaterializer()
-	defer materializer.free()
-	rawValue, err := materializer.value(value)
-	if err != nil {
-		return newBindingError(ErrInvalidArgument, err.Error())
-	}
+	rawValue := newCBufferView(value)
+	defer rawValue.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_set_layer_property(C.mln_map(ptr), layerView.raw(), propertyView.raw(), &rawValue))
+		return int32(C.mln_map_set_layer_property(C.mln_map(ptr), layerView.raw(), propertyView.raw(), rawValue.raw()))
 	})
 }
 
 // LayerProperty returns one copied style layer property as a style-spec JSON
 // value.
-func (m *MapHandle) LayerProperty(layerID string, propertyName string) (JSONValue, error) {
+func (m *MapHandle) LayerProperty(layerID string, propertyName string) ([]byte, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return JSONValue{}, err
+		return nil, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
@@ -2102,13 +2061,13 @@ func (m *MapHandle) LayerProperty(layerID string, propertyName string) (JSONValu
 	defer layerView.free()
 	propertyView := newCStringView(propertyName)
 	defer propertyView.free()
-	var snapshot C.mln_json_snapshot
+	var buffer C.mln_buffer
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_layer_property(C.mln_map(ptr), layerView.raw(), propertyView.raw(), &snapshot))
+		return int32(C.mln_map_get_layer_property(C.mln_map(ptr), layerView.raw(), propertyView.raw(), &buffer))
 	}); err != nil {
-		return JSONValue{}, err
+		return nil, err
 	}
-	return cJSONSnapshotValue(snapshot)
+	return goOwnedBuffer(buffer)
 }
 
 // StyleLayerVisibility reports whether a style layer draws.
@@ -2123,7 +2082,7 @@ const (
 // SetLayerSourceLayer sets one layer's source-layer ID. Layer types that take no
 // source, such as background, are rejected.
 func (m *MapHandle) SetLayerSourceLayer(layerID string, sourceLayer string) error {
-	return m.setLayerText(layerID, sourceLayer, func(rawMap C.mln_map, layer, text C.mln_string_view) int32 {
+	return m.setLayerText(layerID, sourceLayer, func(rawMap C.mln_map, layer, text C.mln_buffer_view) int32 {
 		return int32(C.mln_map_set_layer_source_layer(rawMap, layer, text))
 	})
 }
@@ -2131,7 +2090,7 @@ func (m *MapHandle) SetLayerSourceLayer(layerID string, sourceLayer string) erro
 // LayerSourceLayer returns one layer's source-layer ID, empty when the layer
 // carries none.
 func (m *MapHandle) LayerSourceLayer(layerID string) (string, error) {
-	return m.copyLayerText(layerID, func(rawMap C.mln_map, layer C.mln_string_view, text *C.char, capacity C.size_t, size *C.size_t) int32 {
+	return m.copyLayerText(layerID, func(rawMap C.mln_map, layer C.mln_buffer_view, text *C.char, capacity C.size_t, size *C.size_t) int32 {
 		return int32(C.mln_map_copy_layer_source_layer(rawMap, layer, text, capacity, size))
 	})
 }
@@ -2139,7 +2098,7 @@ func (m *MapHandle) LayerSourceLayer(layerID string) (string, error) {
 // SetLayerSourceID sets one layer's source ID. Layer types that take no source,
 // such as background, are rejected. The named source need not exist yet.
 func (m *MapHandle) SetLayerSourceID(layerID string, sourceID string) error {
-	return m.setLayerText(layerID, sourceID, func(rawMap C.mln_map, layer, text C.mln_string_view) int32 {
+	return m.setLayerText(layerID, sourceID, func(rawMap C.mln_map, layer, text C.mln_buffer_view) int32 {
 		return int32(C.mln_map_set_layer_source_id(rawMap, layer, text))
 	})
 }
@@ -2147,7 +2106,7 @@ func (m *MapHandle) SetLayerSourceID(layerID string, sourceID string) error {
 // LayerSourceID returns one layer's source ID, empty when the layer carries
 // none.
 func (m *MapHandle) LayerSourceID(layerID string) (string, error) {
-	return m.copyLayerText(layerID, func(rawMap C.mln_map, layer C.mln_string_view, text *C.char, capacity C.size_t, size *C.size_t) int32 {
+	return m.copyLayerText(layerID, func(rawMap C.mln_map, layer C.mln_buffer_view, text *C.char, capacity C.size_t, size *C.size_t) int32 {
 		return int32(C.mln_map_copy_layer_source_id(rawMap, layer, text, capacity, size))
 	})
 }
@@ -2155,7 +2114,7 @@ func (m *MapHandle) LayerSourceID(layerID string) (string, error) {
 // SetLayerMinZoom sets the lowest zoom at which one layer draws. Pass
 // math.Inf(-1) for no lower bound.
 func (m *MapHandle) SetLayerMinZoom(layerID string, minZoom float64) error {
-	return m.setLayerZoom(layerID, minZoom, func(rawMap C.mln_map, layer C.mln_string_view, zoom C.double) int32 {
+	return m.setLayerZoom(layerID, minZoom, func(rawMap C.mln_map, layer C.mln_buffer_view, zoom C.double) int32 {
 		return int32(C.mln_map_set_layer_min_zoom(rawMap, layer, zoom))
 	})
 }
@@ -2163,7 +2122,7 @@ func (m *MapHandle) SetLayerMinZoom(layerID string, minZoom float64) error {
 // LayerMinZoom returns the lowest zoom at which one layer draws. A layer with no
 // lower bound reports math.Inf(-1).
 func (m *MapHandle) LayerMinZoom(layerID string) (float64, error) {
-	return m.layerZoom(layerID, func(rawMap C.mln_map, layer C.mln_string_view, out *C.double) int32 {
+	return m.layerZoom(layerID, func(rawMap C.mln_map, layer C.mln_buffer_view, out *C.double) int32 {
 		return int32(C.mln_map_get_layer_min_zoom(rawMap, layer, out))
 	})
 }
@@ -2171,7 +2130,7 @@ func (m *MapHandle) LayerMinZoom(layerID string) (float64, error) {
 // SetLayerMaxZoom sets the highest zoom at which one layer draws. Pass
 // math.Inf(1) for no upper bound.
 func (m *MapHandle) SetLayerMaxZoom(layerID string, maxZoom float64) error {
-	return m.setLayerZoom(layerID, maxZoom, func(rawMap C.mln_map, layer C.mln_string_view, zoom C.double) int32 {
+	return m.setLayerZoom(layerID, maxZoom, func(rawMap C.mln_map, layer C.mln_buffer_view, zoom C.double) int32 {
 		return int32(C.mln_map_set_layer_max_zoom(rawMap, layer, zoom))
 	})
 }
@@ -2179,7 +2138,7 @@ func (m *MapHandle) SetLayerMaxZoom(layerID string, maxZoom float64) error {
 // LayerMaxZoom returns the highest zoom at which one layer draws. A layer with
 // no upper bound reports math.Inf(1).
 func (m *MapHandle) LayerMaxZoom(layerID string) (float64, error) {
-	return m.layerZoom(layerID, func(rawMap C.mln_map, layer C.mln_string_view, out *C.double) int32 {
+	return m.layerZoom(layerID, func(rawMap C.mln_map, layer C.mln_buffer_view, out *C.double) int32 {
 		return int32(C.mln_map_get_layer_max_zoom(rawMap, layer, out))
 	})
 }
@@ -2218,7 +2177,7 @@ func (m *MapHandle) LayerVisibility(layerID string) (StyleLayerVisibility, error
 	return StyleLayerVisibility(visibility), nil
 }
 
-func (m *MapHandle) setLayerText(layerID string, text string, set func(C.mln_map, C.mln_string_view, C.mln_string_view) int32) error {
+func (m *MapHandle) setLayerText(layerID string, text string, set func(C.mln_map, C.mln_buffer_view, C.mln_buffer_view) int32) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
@@ -2264,7 +2223,32 @@ func (m *MapHandle) copyMapText(copy func(C.mln_map, *C.char, C.size_t, *C.size_
 	return string(buffer[:int(size)]), nil
 }
 
-func (m *MapHandle) copyLayerText(layerID string, copy func(C.mln_map, C.mln_string_view, *C.char, C.size_t, *C.size_t) int32) (string, error) {
+func (m *MapHandle) copyMapBytes(copy func(C.mln_map, *C.uint8_t, C.size_t, *C.size_t) int32) ([]byte, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+
+	var required C.size_t
+	if err := checkNative(func() int32 { return copy(C.mln_map(ptr), nil, 0, &required) }); err != nil {
+		return nil, err
+	}
+	if required == 0 {
+		return []byte{}, nil
+	}
+	buffer := make([]byte, int(required))
+	var size C.size_t
+	if err := checkNative(func() int32 {
+		return copy(C.mln_map(ptr), (*C.uint8_t)(unsafe.Pointer(&buffer[0])), C.size_t(len(buffer)), &size)
+	}); err != nil {
+		return nil, err
+	}
+	return buffer[:int(size)], nil
+}
+
+func (m *MapHandle) copyLayerText(layerID string, copy func(C.mln_map, C.mln_buffer_view, *C.char, C.size_t, *C.size_t) int32) (string, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return "", err
@@ -2294,7 +2278,7 @@ func (m *MapHandle) copyLayerText(layerID string, copy func(C.mln_map, C.mln_str
 	return string(buffer[:int(size)]), nil
 }
 
-func (m *MapHandle) setLayerZoom(layerID string, zoom float64, set func(C.mln_map, C.mln_string_view, C.double) int32) error {
+func (m *MapHandle) setLayerZoom(layerID string, zoom float64, set func(C.mln_map, C.mln_buffer_view, C.double) int32) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
@@ -2308,7 +2292,7 @@ func (m *MapHandle) setLayerZoom(layerID string, zoom float64, set func(C.mln_ma
 	})
 }
 
-func (m *MapHandle) layerZoom(layerID string, get func(C.mln_map, C.mln_string_view, *C.double) int32) (float64, error) {
+func (m *MapHandle) layerZoom(layerID string, get func(C.mln_map, C.mln_buffer_view, *C.double) int32) (float64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return 0, err
@@ -2328,7 +2312,7 @@ func (m *MapHandle) layerZoom(layerID string, get func(C.mln_map, C.mln_string_v
 
 // SetLayerFilter sets or clears one style layer filter. Passing nil clears the
 // filter.
-func (m *MapHandle) SetLayerFilter(layerID string, filter *JSONValue) error {
+func (m *MapHandle) SetLayerFilter(layerID string, filter []byte) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
@@ -2337,16 +2321,12 @@ func (m *MapHandle) SetLayerFilter(layerID string, filter *JSONValue) error {
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
-	var rawFilter *C.mln_json_value
-	var materializer *cJSONMaterializer
+	var rawFilter *C.mln_buffer_view
+	var filterView cBufferView
 	if filter != nil {
-		materializer = newCJSONMaterializer()
-		defer materializer.free()
-		value, err := materializer.value(*filter)
-		if err != nil {
-			return newBindingError(ErrInvalidArgument, err.Error())
-		}
-		rawFilter = &value
+		filterView = newCBufferView(filter)
+		defer filterView.free()
+		rawFilter = filterView.ptr()
 	}
 	return checkNative(func() int32 {
 		return int32(C.mln_map_set_layer_filter(C.mln_map(ptr), layerView.raw(), rawFilter))
@@ -2354,20 +2334,20 @@ func (m *MapHandle) SetLayerFilter(layerID string, filter *JSONValue) error {
 }
 
 // LayerFilter returns one copied style layer filter as a style-spec JSON value.
-func (m *MapHandle) LayerFilter(layerID string) (JSONValue, error) {
+func (m *MapHandle) LayerFilter(layerID string) ([]byte, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return JSONValue{}, err
+		return nil, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
-	var snapshot C.mln_json_snapshot
+	var buffer C.mln_buffer
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_layer_filter(C.mln_map(ptr), layerView.raw(), &snapshot))
+		return int32(C.mln_map_get_layer_filter(C.mln_map(ptr), layerView.raw(), &buffer))
 	}); err != nil {
-		return JSONValue{}, err
+		return nil, err
 	}
-	return cJSONSnapshotValue(snapshot)
+	return goOwnedBuffer(buffer)
 }

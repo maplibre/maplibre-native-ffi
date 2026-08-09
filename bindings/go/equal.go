@@ -46,11 +46,3 @@ func equalBoundsConstraint(left, right *BoundsConstraint) bool {
 	}
 	return left.Kind != BoundsConstraintBounded || left.Bounds == right.Bounds
 }
-
-// equalJSON reports whether two optional JSON filters are equal.
-func equalJSON(left, right *JSONValue) bool {
-	if left == nil || right == nil {
-		return left == nil && right == nil
-	}
-	return left.Equal(*right)
-}

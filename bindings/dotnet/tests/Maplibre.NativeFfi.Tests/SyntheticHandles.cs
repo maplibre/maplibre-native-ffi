@@ -17,8 +17,6 @@ internal static class SyntheticHandles
     private const ulong MapKind = 0x02UL << 56;
     private const ulong RenderSessionKind = 0x04UL << 56;
     private const ulong OfflineRegionListKind = 0x06UL << 56;
-    private const ulong JsonSnapshotKind = 0x07UL << 56;
-    private const ulong FeatureQueryResultKind = 0x09UL << 56;
     private const ulong ResourceRequestKind = 0x0CUL << 56;
 
     internal static MlnRuntime Runtime(ulong ordinal = 1) => new(RuntimeKind | ordinal);
@@ -30,12 +28,6 @@ internal static class SyntheticHandles
 
     internal static MlnOfflineRegionList OfflineRegionList(ulong ordinal = 1) =>
         new(OfflineRegionListKind | ordinal);
-
-    internal static MlnJsonSnapshot JsonSnapshot(ulong ordinal = 1) =>
-        new(JsonSnapshotKind | ordinal);
-
-    internal static MlnFeatureQueryResult FeatureQueryResult(ulong ordinal = 1) =>
-        new(FeatureQueryResultKind | ordinal);
 
     internal static MlnResourceRequest ResourceRequest(ulong ordinal = 1) =>
         new(ResourceRequestKind | ordinal);

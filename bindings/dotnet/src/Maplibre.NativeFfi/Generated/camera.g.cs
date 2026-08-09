@@ -110,7 +110,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_map_camera_for_lat_lngs([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_lat_lng *")] mln_lat_lng* coordinates, [NativeTypeName("size_t")] nuint coordinate_count, [NativeTypeName("const mln_camera_fit_options *")] mln_camera_fit_options* fit_options, mln_camera_options* out_camera);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_camera_for_geometry([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_geometry *")] mln_geometry* geometry, [NativeTypeName("const mln_camera_fit_options *")] mln_camera_fit_options* fit_options, mln_camera_options* out_camera);
+        public static extern mln_status mln_map_camera_for_geometry([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view geometry, [NativeTypeName("const mln_camera_fit_options *")] mln_camera_fit_options* fit_options, mln_camera_options* out_camera);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_lat_lng_bounds_for_camera([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_camera_options *")] mln_camera_options* camera, mln_lat_lng_bounds* out_bounds);

@@ -29,10 +29,7 @@ import Testing
 
   let geometryDefinition = OfflineRegionDefinition.geometry(
     styleURL: "asset://style.json",
-    geometry: .lineString([
-      LatLng(latitude: 1, longitude: 2),
-      LatLng(latitude: 3, longitude: 4),
-    ]),
+    geometry: Data(#"{"type":"LineString","coordinates":[[2,1],[4,3]]}"#.utf8),
     minZoom: 0,
     maxZoom: .infinity,
     pixelRatio: 1,
@@ -44,10 +41,10 @@ import Testing
       .rawValue)
     #expect(String(cString: native.pointee.data.geometry.style_url) ==
       "asset://style.json")
-    #expect(native.pointee.data.geometry.geometry.pointee
-      .type == MLN_GEOMETRY_TYPE_LINE_STRING.rawValue)
-    #expect(native.pointee.data.geometry.geometry.pointee.data.line_string
-      .coordinate_count == 2)
+    let geometry = native.pointee.data.geometry.geometry
+    let geometryData = try #require(geometry.data)
+    #expect(Data(bytes: geometryData, count: geometry.size) ==
+      Data(#"{"type":"LineString","coordinates":[[2,1],[4,3]]}"#.utf8))
   }
 }
 
@@ -87,7 +84,7 @@ import Testing
   var definition = mln_offline_region_definition()
   definition.type = MLN_OFFLINE_REGION_DEFINITION_GEOMETRY.rawValue
   definition.data.geometry = mln_offline_geometry_region_definition()
-  definition.data.geometry.geometry = nil
+  definition.data.geometry.geometry = mln_buffer_view(data: nil, size: 1)
 
   do {
     _ = try NativeOfflineRegionDefinition(copying: definition)
@@ -96,7 +93,7 @@ import Testing
     #expect(!failure.isNativeStatus)
     #expect(failure.rawStatus == MLN_STATUS_NATIVE_ERROR.rawValue)
     #expect(failure
-      .diagnostic == "offline geometry region definition geometry is null")
+      .diagnostic == "offline geometry buffer has nil data with non-zero size")
   } catch {
     Issue.record("unexpected error: \(error)")
   }

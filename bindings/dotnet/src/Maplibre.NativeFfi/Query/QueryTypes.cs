@@ -1,6 +1,5 @@
 using Maplibre.NativeFfi.Geo;
 using Maplibre.NativeFfi.Internal;
-using Maplibre.NativeFfi.Json;
 
 namespace Maplibre.NativeFfi.Query;
 
@@ -52,15 +51,24 @@ public sealed record RenderedFeatureQueryOptions
         set => layerIds = value is null ? null : Array.AsReadOnly([.. value]);
     }
 
-    public JsonValue? Filter { get; set; }
+    private byte[]? filter;
+
+    public byte[]? Filter
+    {
+        get => filter?.ToArray();
+        set => filter = value?.ToArray();
+    }
 
     public bool Equals(RenderedFeatureQueryOptions? other) =>
         other is not null
         && ValueEquality.SequenceEquals(LayerIds, other.LayerIds)
-        && Equals(Filter, other.Filter);
+        && ValueEquality.SequenceEquals(filter, other.filter);
 
     public override int GetHashCode() =>
-        HashCode.Combine(ValueEquality.SequenceHashCode(LayerIds), Filter);
+        HashCode.Combine(
+            ValueEquality.SequenceHashCode(LayerIds),
+            ValueEquality.SequenceHashCode(filter)
+        );
 }
 
 /// <remarks>
@@ -78,45 +86,22 @@ public sealed record SourceFeatureQueryOptions
         set => sourceLayerIds = value is null ? null : Array.AsReadOnly([.. value]);
     }
 
-    public JsonValue? Filter { get; set; }
+    private byte[]? filter;
+
+    public byte[]? Filter
+    {
+        get => filter?.ToArray();
+        set => filter = value?.ToArray();
+    }
 
     public bool Equals(SourceFeatureQueryOptions? other) =>
         other is not null
         && ValueEquality.SequenceEquals(SourceLayerIds, other.SourceLayerIds)
-        && Equals(Filter, other.Filter);
+        && ValueEquality.SequenceEquals(filter, other.filter);
 
     public override int GetHashCode() =>
-        HashCode.Combine(ValueEquality.SequenceHashCode(SourceLayerIds), Filter);
-}
-
-public sealed record QueriedFeature(
-    Feature Feature,
-    string? SourceId,
-    string? SourceLayerId,
-    JsonValue? State
-);
-
-public abstract record FeatureExtensionResult
-{
-    private FeatureExtensionResult() { }
-
-    public sealed record Value(JsonValue Json) : FeatureExtensionResult;
-
-    public sealed record FeatureCollection(IReadOnlyList<Feature> Features) : FeatureExtensionResult
-    {
-        private readonly IReadOnlyList<Feature> features = ValueEquality.Snapshot(Features);
-
-        public IReadOnlyList<Feature> Features
-        {
-            get => features;
-            init => features = ValueEquality.Snapshot(value);
-        }
-
-        public bool Equals(FeatureCollection? other) =>
-            other is not null && ValueEquality.SequenceEquals(features, other.features);
-
-        public override int GetHashCode() => ValueEquality.SequenceHashCode(features);
-    }
-
-    public sealed record Unknown(uint RawType) : FeatureExtensionResult;
+        HashCode.Combine(
+            ValueEquality.SequenceHashCode(SourceLayerIds),
+            ValueEquality.SequenceHashCode(filter)
+        );
 }

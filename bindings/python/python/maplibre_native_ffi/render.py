@@ -9,12 +9,8 @@ from typing import Any
 
 from . import _native
 from ._lifecycle import NativeHandleMixin
-from .geo import Feature
-from .json import JsonObject, JsonValue
 from .query import (
-    FeatureExtensionResult,
     FeatureStateSelector,
-    QueriedFeature,
     RenderedFeatureQueryOptions,
     RenderedQueryGeometry,
     SourceFeatureQueryOptions,
@@ -669,67 +665,49 @@ class RenderSessionHandle(NativeHandleMixin):
         self,
         geometry: RenderedQueryGeometry,
         options: RenderedFeatureQueryOptions | None = None,
-    ) -> tuple[QueriedFeature, ...]:
-        """Query rendered features from the latest render session state."""
-        from .query import (
-            QueriedFeature,
-            _geometry_to_native_wire,
-            _rendered_options_to_native_wire,
-        )
+    ) -> bytes:
+        """Query rendered features as a UTF-8 JSON array."""
+        from .query import _geometry_to_native_wire
 
-        layer_ids, filter_ = _rendered_options_to_native_wire(options)
-        raw = self._native.query_rendered_features(
+        return self._native.query_rendered_features(
             _geometry_to_native_wire(geometry),
-            layer_ids,
-            filter_,
+            options.layer_ids if options is not None else None,
+            options.filter if options is not None else None,
         )
-        return tuple(QueriedFeature._from_native(feature) for feature in raw)
 
     def query_source_features(
         self,
         source_id: str,
         options: SourceFeatureQueryOptions | None = None,
-    ) -> tuple[QueriedFeature, ...]:
-        """Query source features from the latest render session state."""
-        from .query import (
-            QueriedFeature,
-            _source_options_to_native_wire,
+    ) -> bytes:
+        """Query source features as a UTF-8 JSON array."""
+        return self._native.query_source_features(
+            source_id,
+            options.source_layer_ids if options is not None else None,
+            options.filter if options is not None else None,
         )
-
-        source_layer_ids, filter_ = _source_options_to_native_wire(options)
-        raw = self._native.query_source_features(source_id, source_layer_ids, filter_)
-        return tuple(QueriedFeature._from_native(feature) for feature in raw)
 
     def query_feature_extensions(
         self,
         source_id: str,
-        feature: Feature,
+        feature: bytes,
         extension: str,
         extension_field: str,
-        arguments: JsonObject | None = None,
-    ) -> FeatureExtensionResult:
-        """Query a feature extension from the latest render session state.
-
-        The `supercluster` extension reads the `cluster_id` feature property and
-        the `limit` and `offset` arguments as `JsonUInt`, and treats other
-        numeric types as absent. `json.from_python` converts a Python `int` to
-        `JsonInt`, so build these arguments with `JsonUInt`.
-        """
-        from .query import FeatureExtensionResult
-
-        raw = self._native.query_feature_extensions(
+        arguments: bytes | None = None,
+    ) -> bytes:
+        """Query a feature extension as UTF-8 JSON or GeoJSON bytes."""
+        return self._native.query_feature_extensions(
             source_id,
             feature,
             extension,
             extension_field,
             arguments,
         )
-        return FeatureExtensionResult._from_native(raw)
 
     def set_feature_state(
         self,
         selector: FeatureStateSelector,
-        state: JsonValue,
+        state: bytes,
     ) -> None:
         """Set per-feature state on a render source for this render session."""
         self._native.set_feature_state(
@@ -740,8 +718,8 @@ class RenderSessionHandle(NativeHandleMixin):
             state,
         )
 
-    def get_feature_state(self, selector: FeatureStateSelector) -> JsonValue:
-        """Return copied per-feature state from a render source."""
+    def get_feature_state(self, selector: FeatureStateSelector) -> bytes:
+        """Return copied per-feature state JSON from a render source."""
         return self._native.get_feature_state(
             selector.source_id,
             selector.source_layer_id,

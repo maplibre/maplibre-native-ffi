@@ -6,7 +6,6 @@ using Maplibre.NativeFfi.Internal.Memory;
 using Maplibre.NativeFfi.Internal.Pointer;
 using Maplibre.NativeFfi.Internal.Status;
 using Maplibre.NativeFfi.Internal.Struct;
-using Maplibre.NativeFfi.Json;
 using Maplibre.NativeFfi.Render;
 using Maplibre.NativeFfi.Runtime;
 using Maplibre.NativeFfi.Style;
@@ -15,7 +14,7 @@ namespace Maplibre.NativeFfi.Map;
 
 internal unsafe delegate mln_status MapAddCustomGeometrySource(
     MlnMap map,
-    mln_string_view sourceId,
+    mln_buffer_view sourceId,
     mln_custom_geometry_source_options* options
 );
 
@@ -402,15 +401,15 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Calculates a camera that fits geographic geometry and fit options.</summary>
-    public CameraOptions CameraForGeometry(Geometry geometry, CameraFitOptions? fitOptions)
+    public CameraOptions CameraForGeometry(byte[] geometry, CameraFitOptions? fitOptions)
     {
-        using var nativeGeometry = NativeGeometry.From(geometry);
+        using var nativeGeometry = NativeStringView.From(geometry, nameof(geometry));
         var nativeFitOptions = fitOptions is null ? default : MapStructs.ToNative(fitOptions);
         var camera = NativeMethods.mln_camera_options_default();
         NativeStatus.Check(
             NativeMethods.mln_map_camera_for_geometry(
                 Handle,
-                nativeGeometry.Pointer,
+                nativeGeometry.Value,
                 fitOptions is null ? null : &nativeFitOptions,
                 &camera
             )
@@ -612,11 +611,11 @@ public sealed unsafe class MapHandle : IDisposable
     /// <see cref="RuntimeEventType.MapLoadingFailed" /> runtime event. A style
     /// MapLibre rejects semantically produces neither an exception nor an event.
     /// </remarks>
-    public void SetStyleJson(string json)
+    public void SetStyleJson(byte[] json)
     {
         ArgumentNullException.ThrowIfNull(json);
-        using var nativeJson = NativeUtf8String.FromNullableString(json, nameof(json));
-        NativeStatus.Check(NativeMethods.mln_map_set_style_json(Handle, nativeJson.Pointer));
+        using var nativeJson = NativeStringView.From(json, nameof(json));
+        NativeStatus.Check(NativeMethods.mln_map_set_style_json(Handle, nativeJson.Value));
         ClearCustomGeometrySources();
     }
 
@@ -626,8 +625,8 @@ public sealed unsafe class MapHandle : IDisposable
     /// mutations do not change it, and a failed parse leaves the previously parsed
     /// document in place. The result is empty when no document has been parsed.
     /// </remarks>
-    public string GetLoadedStyleJson() =>
-        CopyMapText(
+    public byte[] GetLoadedStyleJson() =>
+        CopyMapBytes(
             (map, text, capacity, size) =>
                 NativeMethods.mln_map_copy_loaded_style_json(map, text, capacity, size)
         );
@@ -646,15 +645,15 @@ public sealed unsafe class MapHandle : IDisposable
         );
 
     /// <summary>Adds a style source from a JSON-like value.</summary>
-    public void AddStyleSourceJson(string sourceId, JsonValue sourceJson)
+    public void AddStyleSourceJson(string sourceId, byte[] sourceJson)
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        using var nativeJson = NativeJsonValue.From(sourceJson);
+        using var nativeJson = NativeStringView.From(sourceJson, nameof(sourceJson));
         NativeStatus.Check(
             NativeMethods.mln_map_add_style_source_json(
                 Handle,
                 nativeSourceId.Value,
-                nativeJson.Pointer
+                nativeJson.Value
             )
         );
     }
@@ -906,32 +905,32 @@ public sealed unsafe class MapHandle : IDisposable
     /// <paramref name="options" /> is fixed when the source is created;
     /// <see cref="SetGeoJsonSourceUrl" /> and <see cref="SetGeoJsonSourceData" /> keep it.
     /// </remarks>
-    public void AddGeoJsonSourceData(string sourceId, GeoJson data, GeoJsonSourceOptions? options)
+    public void AddGeoJsonSourceData(string sourceId, byte[] data, GeoJsonSourceOptions? options)
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        using var nativeData = NativeGeoJson.From(data);
+        using var nativeData = NativeStringView.From(data, nameof(data));
         using var nativeOptions = options is null ? null : NativeGeoJsonSourceOptions.From(options);
         var optionsValue = nativeOptions?.Value ?? default;
         NativeStatus.Check(
             NativeMethods.mln_map_add_geojson_source_data(
                 Handle,
                 nativeSourceId.Value,
-                nativeData.Pointer,
+                nativeData.Value,
                 nativeOptions is null ? null : &optionsValue
             )
         );
     }
 
     /// <summary>Updates a GeoJSON source with inline data.</summary>
-    public void SetGeoJsonSourceData(string sourceId, GeoJson data)
+    public void SetGeoJsonSourceData(string sourceId, byte[] data)
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        using var nativeData = NativeGeoJson.From(data);
+        using var nativeData = NativeStringView.From(data, nameof(data));
         NativeStatus.Check(
             NativeMethods.mln_map_set_geojson_source_data(
                 Handle,
                 nativeSourceId.Value,
-                nativeData.Pointer
+                nativeData.Value
             )
         );
     }
@@ -965,18 +964,18 @@ public sealed unsafe class MapHandle : IDisposable
     public void SetCustomGeometrySourceTileData(
         string sourceId,
         CanonicalTileId tileId,
-        GeoJson data
+        byte[] data
     )
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        using var nativeData = NativeGeoJson.From(data);
+        using var nativeData = NativeStringView.From(data, nameof(data));
         var nativeTileId = StyleStructs.ToNative(tileId);
         NativeStatus.Check(
             NativeMethods.mln_map_set_custom_geometry_source_tile_data(
                 Handle,
                 nativeSourceId.Value,
                 nativeTileId,
-                nativeData.Pointer
+                nativeData.Value
             )
         );
     }
@@ -1528,14 +1527,14 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Adds a style layer from a JSON-like value.</summary>
-    public void AddStyleLayerJson(JsonValue layerJson, string beforeLayerId)
+    public void AddStyleLayerJson(byte[] layerJson, string beforeLayerId)
     {
-        using var nativeJson = NativeJsonValue.From(layerJson);
+        using var nativeJson = NativeStringView.From(layerJson, nameof(layerJson));
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
         NativeStatus.Check(
             NativeMethods.mln_map_add_style_layer_json(
                 Handle,
-                nativeJson.Pointer,
+                nativeJson.Value,
                 nativeBeforeLayerId.Value
             )
         );
@@ -1567,7 +1566,7 @@ public sealed unsafe class MapHandle : IDisposable
     public string? StyleLayerType(string layerId)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        mln_string_view layerType = default;
+        mln_buffer_view layerType = default;
         bool found = false;
         NativeStatus.Check(
             NativeMethods.mln_map_get_style_layer_type(
@@ -1577,7 +1576,7 @@ public sealed unsafe class MapHandle : IDisposable
                 &found
             )
         );
-        return found ? RuntimeStructs.CopyUtf8(layerType.data, layerType.size) : null;
+        return found ? RuntimeStructs.CopyUtf8((sbyte*)layerType.data, layerType.size) : null;
     }
 
     /// <summary>Lists style layer IDs in style order.</summary>
@@ -1603,56 +1602,51 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Gets a full style-spec layer JSON snapshot when the layer exists.</summary>
-    public JsonValue? GetStyleLayerJson(string layerId)
+    public byte[]? GetStyleLayerJson(string layerId)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        MlnJsonSnapshot snapshot = default;
+        ulong buffer = 0;
         bool found = false;
         NativeStatus.Check(
-            NativeMethods.mln_map_get_style_layer_json(
-                Handle,
-                nativeLayerId.Value,
-                &snapshot,
-                &found
-            )
+            NativeMethods.mln_map_get_style_layer_json(Handle, nativeLayerId.Value, &buffer, &found)
         );
-        return found ? ValueStructs.ReadJsonSnapshot(snapshot) : null;
+        return found ? ValueStructs.ReadBuffer(buffer) : null;
     }
 
     /// <summary>Sets the style light document from a JSON-like value.</summary>
-    public void SetStyleLightJson(JsonValue lightJson)
+    public void SetStyleLightJson(byte[] lightJson)
     {
-        using var nativeJson = NativeJsonValue.From(lightJson);
-        NativeStatus.Check(NativeMethods.mln_map_set_style_light_json(Handle, nativeJson.Pointer));
+        using var nativeJson = NativeStringView.From(lightJson, nameof(lightJson));
+        NativeStatus.Check(NativeMethods.mln_map_set_style_light_json(Handle, nativeJson.Value));
     }
 
     /// <summary>Sets one style light property from a JSON-like value.</summary>
-    public void SetStyleLightProperty(string propertyName, JsonValue value)
+    public void SetStyleLightProperty(string propertyName, byte[] value)
     {
         using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
-        using var nativeValue = NativeJsonValue.From(value);
+        using var nativeValue = NativeStringView.From(value, nameof(value));
         NativeStatus.Check(
             NativeMethods.mln_map_set_style_light_property(
                 Handle,
                 nativePropertyName.Value,
-                nativeValue.Pointer
+                nativeValue.Value
             )
         );
     }
 
     /// <summary>Gets one style light property snapshot, or null when undefined.</summary>
-    public JsonValue? GetStyleLightProperty(string propertyName)
+    public byte[]? GetStyleLightProperty(string propertyName)
     {
         using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
-        MlnJsonSnapshot snapshot = default;
+        ulong buffer = 0;
         NativeStatus.Check(
             NativeMethods.mln_map_get_style_light_property(
                 Handle,
                 nativePropertyName.Value,
-                &snapshot
+                &buffer
             )
         );
-        return ValueStructs.ReadJsonSnapshot(snapshot);
+        return ValueStructs.ReadOptionalBuffer(buffer);
     }
 
     /// <summary>Sets the style's global transition options.</summary>
@@ -1676,43 +1670,45 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Sets one layer property from a JSON-like value.</summary>
-    public void SetLayerProperty(string layerId, string propertyName, JsonValue value)
+    public void SetLayerProperty(string layerId, string propertyName, byte[] value)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
-        using var nativeValue = NativeJsonValue.From(value);
+        using var nativeValue = NativeStringView.From(value, nameof(value));
         NativeStatus.Check(
             NativeMethods.mln_map_set_layer_property(
                 Handle,
                 nativeLayerId.Value,
                 nativePropertyName.Value,
-                nativeValue.Pointer
+                nativeValue.Value
             )
         );
     }
 
     /// <summary>Gets one layer property snapshot, or null when undefined.</summary>
-    public JsonValue? GetLayerProperty(string layerId, string propertyName)
+    public byte[]? GetLayerProperty(string layerId, string propertyName)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
-        MlnJsonSnapshot snapshot = default;
+        ulong buffer = 0;
         NativeStatus.Check(
             NativeMethods.mln_map_get_layer_property(
                 Handle,
                 nativeLayerId.Value,
                 nativePropertyName.Value,
-                &snapshot
+                &buffer
             )
         );
-        return ValueStructs.ReadJsonSnapshot(snapshot);
+        return ValueStructs.ReadOptionalBuffer(buffer);
     }
 
     /// <summary>Sets or clears one layer filter from a JSON-like value.</summary>
-    public void SetLayerFilter(string layerId, JsonValue? filter)
+    public void SetLayerFilter(string layerId, byte[]? filter)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        using var nativeFilter = filter is null ? null : NativeJsonValue.From(filter);
+        using var nativeFilter = filter is null
+            ? null
+            : NativeStringView.From(filter, nameof(filter));
         NativeStatus.Check(
             NativeMethods.mln_map_set_layer_filter(
                 Handle,
@@ -1723,15 +1719,14 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Gets one layer filter snapshot, or null when no filter exists.</summary>
-    public JsonValue? GetLayerFilter(string layerId)
+    public byte[]? GetLayerFilter(string layerId)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        MlnJsonSnapshot snapshot = default;
+        ulong buffer = 0;
         NativeStatus.Check(
-            NativeMethods.mln_map_get_layer_filter(Handle, nativeLayerId.Value, &snapshot)
+            NativeMethods.mln_map_get_layer_filter(Handle, nativeLayerId.Value, &buffer)
         );
-        var value = ValueStructs.ReadJsonSnapshot(snapshot);
-        return value is JsonValue.Null ? null : value;
+        return ValueStructs.ReadOptionalBuffer(buffer);
     }
 
     /// <summary>Sets one layer's source-layer ID.</summary>
@@ -1781,6 +1776,30 @@ public sealed unsafe class MapHandle : IDisposable
         nuint capacity,
         nuint* size
     );
+
+    private delegate mln_status CopyMapBytesCall(
+        MlnMap map,
+        byte* bytes,
+        nuint capacity,
+        nuint* size
+    );
+
+    private byte[] CopyMapBytes(CopyMapBytesCall copy)
+    {
+        nuint required = 0;
+        NativeStatus.Check(copy(Handle, null, 0, &required));
+        if (required == 0)
+        {
+            return [];
+        }
+        var buffer = new byte[checked((int)required)];
+        nuint copied = 0;
+        fixed (byte* bufferPointer = buffer)
+        {
+            NativeStatus.Check(copy(Handle, bufferPointer, required, &copied));
+        }
+        return copied == required ? buffer : buffer[..checked((int)copied)];
+    }
 
     private string CopyMapText(CopyMapTextCall copy)
     {
@@ -2011,9 +2030,9 @@ public sealed unsafe class MapHandle : IDisposable
             var ids = new string[checked((int)count)];
             for (var index = 0; index < ids.Length; index++)
             {
-                mln_string_view id = default;
+                mln_buffer_view id = default;
                 NativeStatus.Check(NativeMethods.mln_style_id_list_get(list, (nuint)index, &id));
-                ids[index] = RuntimeStructs.CopyUtf8(id.data, id.size);
+                ids[index] = RuntimeStructs.CopyUtf8((sbyte*)id.data, id.size);
             }
 
             return ids;
@@ -2038,11 +2057,11 @@ public sealed unsafe class MapHandle : IDisposable
             var values = new string[checked((int)count)];
             for (var index = 0; index < values.Length; index++)
             {
-                mln_string_view value = default;
+                mln_buffer_view value = default;
                 NativeStatus.Check(
                     NativeMethods.mln_style_string_list_get(list, (nuint)index, &value)
                 );
-                values[index] = RuntimeStructs.CopyUtf8(value.data, value.size);
+                values[index] = RuntimeStructs.CopyUtf8((sbyte*)value.data, value.size);
             }
 
             return values;

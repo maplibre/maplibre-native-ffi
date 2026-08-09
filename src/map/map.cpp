@@ -6241,11 +6241,10 @@ auto map_get_layer_property(
   }
 
   const auto property = layer->getProperty(string_from_view(property_name));
-  const auto value =
-    property.getKind() == mbgl::style::StyleProperty::Kind::Undefined
-      ? mbgl::Value{mbgl::NullValue{}}
-      : property.getValue();
-  return create_buffer(serialize_json_value(value), out_value);
+  if (property.getKind() == mbgl::style::StyleProperty::Kind::Undefined) {
+    return MLN_STATUS_OK;
+  }
+  return create_buffer(serialize_json_value(property.getValue()), out_value);
 }
 
 auto map_set_layer_filter(
@@ -6312,9 +6311,11 @@ auto map_get_layer_filter(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  return create_buffer(
-    serialize_json_value(layer->getFilter().serialize()), out_filter
-  );
+  const auto filter = layer->getFilter().serialize();
+  if (filter.is<mbgl::NullValue>()) {
+    return MLN_STATUS_OK;
+  }
+  return create_buffer(serialize_json_value(filter), out_filter);
 }
 
 namespace {

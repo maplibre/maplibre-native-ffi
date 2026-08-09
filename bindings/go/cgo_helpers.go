@@ -21,8 +21,8 @@ func newCStringView(value string) cStringView {
 	return cStringView{data: C.CBytes([]byte(value)), size: len(value)}
 }
 
-func (view cStringView) raw() C.mln_string_view {
-	return C.mln_string_view{data: (*C.char)(view.data), size: C.size_t(view.size)}
+func (view cStringView) raw() C.mln_buffer_view {
+	return C.mln_buffer_view{data: view.data, size: C.size_t(view.size)}
 }
 
 func (view cStringView) free() {
@@ -43,21 +43,21 @@ func newCStringViewArray(values []string) cStringViewArray {
 		valueCount: len(values),
 	}
 	if len(values) > 0 {
-		out.raw = C.malloc(C.size_t(len(values)) * C.size_t(unsafe.Sizeof(C.mln_string_view{})))
+		out.raw = C.malloc(C.size_t(len(values)) * C.size_t(unsafe.Sizeof(C.mln_buffer_view{})))
 	}
 	for i, value := range values {
 		view := newCStringView(value)
 		out.views[i] = view
-		*(*C.mln_string_view)(unsafe.Add(out.raw, uintptr(i)*unsafe.Sizeof(C.mln_string_view{}))) = view.raw()
+		*(*C.mln_buffer_view)(unsafe.Add(out.raw, uintptr(i)*unsafe.Sizeof(C.mln_buffer_view{}))) = view.raw()
 	}
 	return out
 }
 
-func (array cStringViewArray) ptr() *C.mln_string_view {
+func (array cStringViewArray) ptr() *C.mln_buffer_view {
 	if array.raw == nil {
 		return nil
 	}
-	return (*C.mln_string_view)(array.raw)
+	return (*C.mln_buffer_view)(array.raw)
 }
 
 func (array cStringViewArray) count() C.size_t {
@@ -73,16 +73,58 @@ func (array cStringViewArray) free() {
 	}
 }
 
-func goStringView(view C.mln_string_view) string {
+func goStringView(view C.mln_buffer_view) string {
 	return goCharBytes(view.data, view.size)
 }
 
-func goCharBytes(data *C.char, size C.size_t) string {
-	bytes, ok := goByteSlice(unsafe.Pointer(data), size)
+func goCharBytes(data unsafe.Pointer, size C.size_t) string {
+	bytes, ok := goByteSlice(data, size)
 	if !ok {
 		return ""
 	}
 	return string(bytes)
+}
+
+type cBufferView struct {
+	data unsafe.Pointer
+	size int
+}
+
+func newCBufferView(value []byte) cBufferView {
+	if len(value) == 0 {
+		return cBufferView{}
+	}
+	return cBufferView{data: C.CBytes(value), size: len(value)}
+}
+
+func (view cBufferView) raw() C.mln_buffer_view {
+	return C.mln_buffer_view{data: view.data, size: C.size_t(view.size)}
+}
+
+func (view cBufferView) ptr() *C.mln_buffer_view {
+	return &C.mln_buffer_view{data: view.data, size: C.size_t(view.size)}
+}
+
+func (view cBufferView) free() {
+	if view.data != nil {
+		C.free(view.data)
+	}
+}
+
+func goOwnedBuffer(buffer C.mln_buffer) ([]byte, error) {
+	if buffer == 0 {
+		return nil, nil
+	}
+	defer C.mln_buffer_destroy(buffer)
+	var view C.mln_buffer_view
+	if err := checkNative(func() int32 { return int32(C.mln_buffer_get(buffer, &view)) }); err != nil {
+		return nil, err
+	}
+	bytes, ok := goByteSlice(view.data, view.size)
+	if !ok {
+		return nil, newBindingError(ErrNative, "native buffer data is invalid")
+	}
+	return bytes, nil
 }
 
 func goByteSlice(data unsafe.Pointer, size C.size_t) ([]byte, bool) {

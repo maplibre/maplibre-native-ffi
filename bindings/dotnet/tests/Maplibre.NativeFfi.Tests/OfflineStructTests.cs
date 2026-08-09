@@ -40,7 +40,7 @@ public sealed unsafe class OfflineStructTests
         using var geometry = NativeOfflineRegionDefinition.From(
             new OfflineRegionDefinition.GeometryRegion(
                 "maplibre://geometry",
-                new Geometry.Point(new LatLng(7, 8)),
+                """{"type":"Point","coordinates":[8,7]}"""u8.ToArray(),
                 9,
                 10,
                 3,
@@ -57,10 +57,12 @@ public sealed unsafe class OfflineStructTests
             Marshal.PtrToStringUTF8((nint)geometry.Value.data.geometry.style_url)
         );
         Assert.Equal(
-            (uint)mln_geometry_type.MLN_GEOMETRY_TYPE_POINT,
-            geometry.Value.data.geometry.geometry->type
+            """{"type":"Point","coordinates":[8,7]}""",
+            RuntimeStructs.CopyUtf8(
+                geometry.Value.data.geometry.geometry.data,
+                geometry.Value.data.geometry.geometry.size
+            )
         );
-        Assert.Equal(8, geometry.Value.data.geometry.geometry->data.point.longitude);
         Assert.Equal(0, geometry.Value.data.geometry.include_ideographs);
     }
 

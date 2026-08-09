@@ -30,7 +30,7 @@ public sealed class StyleImageTests
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
         var coordinates = new[]
         {
             new LatLng(10, 10),
@@ -65,7 +65,7 @@ public sealed class StyleImageTests
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
         var image = new PremultipliedRgba8Image([255, 0, 0, 255], new TextureImageInfo(1, 1, 4, 4));
         var options = new StyleImageOptions { PixelRatio = 2, Sdf = true };
 
@@ -100,7 +100,7 @@ public sealed class StyleImageTests
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 64, Height = 64 });
-        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
 
         var image = new PremultipliedRgba8Image(new byte[16], new TextureImageInfo(2, 2, 8, 16));
         var options = new StyleImageOptions

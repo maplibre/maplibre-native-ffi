@@ -67,13 +67,6 @@ internal readonly struct MlnOfflineRegionList(ulong value) : IMlnHandle
     public bool IsNull => Value == 0;
 }
 
-internal readonly struct MlnJsonSnapshot(ulong value) : IMlnHandle
-{
-    public ulong Value { get; } = value;
-
-    public bool IsNull => Value == 0;
-}
-
 internal readonly struct MlnStyleIdList(ulong value) : IMlnHandle
 {
     public ulong Value { get; } = value;
@@ -82,20 +75,6 @@ internal readonly struct MlnStyleIdList(ulong value) : IMlnHandle
 }
 
 internal readonly struct MlnStyleStringList(ulong value) : IMlnHandle
-{
-    public ulong Value { get; } = value;
-
-    public bool IsNull => Value == 0;
-}
-
-internal readonly struct MlnFeatureQueryResult(ulong value) : IMlnHandle
-{
-    public ulong Value { get; } = value;
-
-    public bool IsNull => Value == 0;
-}
-
-internal readonly struct MlnFeatureExtensionResult(ulong value) : IMlnHandle
 {
     public ulong Value { get; } = value;
 

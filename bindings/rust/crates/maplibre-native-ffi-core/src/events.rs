@@ -426,8 +426,8 @@ fn copy_required_text(ptr: *const std::os::raw::c_char, len: usize) -> Result<St
         ));
     }
 
-    let view = sys::mln_string_view {
-        data: ptr,
+    let view = sys::mln_buffer_view {
+        data: ptr.cast(),
         size: len,
     };
     // SAFETY: The C API says event text pointers are valid until the next poll.

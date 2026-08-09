@@ -15,7 +15,7 @@ public sealed class StyleLayerTests
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
         map.AddRasterDemSourceTiles("dem", ["https://example.test/dem/{z}/{x}/{y}.png"], null);
 
         map.AddHillshadeLayer("hillshade", "dem", "");
@@ -45,10 +45,12 @@ public sealed class StyleLayerTests
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 64, Height = 64 });
         map.SetStyleJson(
-            "{\"version\":8,\"sources\":{\"geo\":{\"type\":\"geojson\",\"data\":"
-                + "{\"type\":\"FeatureCollection\",\"features\":[]}}},\"layers\":["
-                + "{\"id\":\"bg\",\"type\":\"background\"},"
-                + "{\"id\":\"fill\",\"type\":\"fill\",\"source\":\"geo\"}]}"
+            System.Text.Encoding.UTF8.GetBytes(
+                "{\"version\":8,\"sources\":{\"geo\":{\"type\":\"geojson\",\"data\":"
+                    + "{\"type\":\"FeatureCollection\",\"features\":[]}}},\"layers\":["
+                    + "{\"id\":\"bg\",\"type\":\"background\"},"
+                    + "{\"id\":\"fill\",\"type\":\"fill\",\"source\":\"geo\"}]}"
+            )
         );
 
         Assert.Equal(string.Empty, map.GetLayerSourceLayer("fill"));
@@ -98,12 +100,12 @@ public sealed class StyleLayerTests
 
         // The style parser fills in its own 300ms duration for a style that declares no
         // transition.
-        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
         var parsed = map.GetStyleTransitionOptions();
         Assert.Equal(300, parsed.Duration);
         Assert.Null(parsed.Delay);
 
-        map.SetStyleJson(transitionStyleJson);
+        map.SetStyleJson(System.Text.Encoding.UTF8.GetBytes(transitionStyleJson));
         var declared = map.GetStyleTransitionOptions();
         Assert.Equal(750, declared.Duration);
         Assert.Equal(100, declared.Delay);
@@ -120,7 +122,7 @@ public sealed class StyleLayerTests
         Assert.Equal(options, map.GetStyleTransitionOptions());
 
         // Loading a style replaces the override with what that style declares.
-        map.SetStyleJson(transitionStyleJson);
+        map.SetStyleJson(System.Text.Encoding.UTF8.GetBytes(transitionStyleJson));
         Assert.Equal(declared, map.GetStyleTransitionOptions());
 
         Assert.Throws<InvalidArgumentException>(() =>

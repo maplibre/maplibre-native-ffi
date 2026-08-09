@@ -1,6 +1,7 @@
 package maplibre
 
 import (
+	"bytes"
 	"errors"
 	"math"
 	"testing"
@@ -27,7 +28,7 @@ func TestDedicatedStyleLayerHelpers(t *testing.T) {
 		}
 	}()
 
-	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	demOptions := StyleTileSourceOptions{}.WithTileSize(512).WithRasterEncoding(StyleRasterDEMEncodingMapbox)
@@ -113,7 +114,7 @@ func TestLayerBaseAccessorsRoundTrip(t *testing.T) {
 		}
 	}()
 
-	if err := m.SetStyleJSON(layerAccessorStyleJSON); err != nil {
+	if err := m.SetStyleJSON([]byte(layerAccessorStyleJSON)); err != nil {
 		t.Fatalf("SetStyleJSON(): %v", err)
 	}
 
@@ -201,30 +202,17 @@ func TestStyleLayerJSONAndPropertySnapshots(t *testing.T) {
 		}
 	}()
 
-	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
-	if err := m.AddStyleSourceJSON("points", JSONObject(
-		JSONMember{Name: "type", Value: JSONString("geojson")},
-		JSONMember{Name: "data", Value: JSONObject(
-			JSONMember{Name: "type", Value: JSONString("FeatureCollection")},
-			JSONMember{Name: "features", Value: JSONArray()},
-		)},
-	)); err != nil {
+	if err := m.AddStyleSourceJSON("points", []byte(`{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}`)); err != nil {
 		t.Fatalf("AddStyleSourceJSON(points): %v", err)
 	}
-	layerJSON := JSONObject(
-		JSONMember{Name: "id", Value: JSONString("points-layer")},
-		JSONMember{Name: "type", Value: JSONString("circle")},
-		JSONMember{Name: "source", Value: JSONString("points")},
-		JSONMember{Name: "paint", Value: JSONObject(
-			JSONMember{Name: "circle-radius", Value: JSONDouble(2)},
-		)},
-	)
+	layerJSON := []byte(`{"id":"points-layer","type":"circle","source":"points","paint":{"circle-radius":2}}`)
 	if err := m.AddStyleLayerJSON(layerJSON, ""); err != nil {
 		t.Fatalf("AddStyleLayerJSON(): %v", err)
 	}
-	layerJSON.Object[1].Value = JSONString("mutated-after-call")
+	layerJSON[0] = 'x'
 	layerType, found, err := m.StyleLayerType("points-layer")
 	if err != nil {
 		t.Fatalf("StyleLayerType(): %v", err)
@@ -239,41 +227,34 @@ func TestStyleLayerJSONAndPropertySnapshots(t *testing.T) {
 	if !found {
 		t.Fatalf("StyleLayerJSON(points-layer) found = false, want true")
 	}
-	var copiedLayerType JSONValue
-	for _, member := range copiedLayer.Object {
-		if member.Name == "type" {
-			copiedLayerType = member.Value
-			break
-		}
+	if !bytes.Contains(copiedLayer, []byte(`"type":"circle"`)) {
+		t.Fatalf("StyleLayerJSON(points-layer) = %s, want copied circle object", copiedLayer)
 	}
-	if copiedLayer.Type != JSONValueTypeObject || copiedLayerType.Type != JSONValueTypeString || copiedLayerType.String != "circle" {
-		t.Fatalf("StyleLayerJSON(points-layer) = %#v, want copied circle object", copiedLayer)
-	}
-	if err := m.SetLayerProperty("points-layer", "circle-radius", JSONDouble(5)); err != nil {
+	if err := m.SetLayerProperty("points-layer", "circle-radius", []byte("5")); err != nil {
 		t.Fatalf("SetLayerProperty(circle-radius): %v", err)
 	}
 	property, err := m.LayerProperty("points-layer", "circle-radius")
 	if err != nil {
 		t.Fatalf("LayerProperty(circle-radius): %v", err)
 	}
-	if property.Type != JSONValueTypeDouble || property.Double != 5 {
-		t.Fatalf("LayerProperty(circle-radius) = %#v, want 5", property)
+	if string(property) != "5.0" {
+		t.Fatalf("LayerProperty(circle-radius) = %s, want 5", property)
 	}
-	filter := JSONArray(JSONString("=="), JSONArray(JSONString("get"), JSONString("kind")), JSONString("unit"))
-	if err := m.SetLayerFilter("points-layer", &filter); err != nil {
+	filter := []byte(`["==",["get","kind"],"unit"]`)
+	if err := m.SetLayerFilter("points-layer", filter); err != nil {
 		t.Fatalf("SetLayerFilter(): %v", err)
 	}
 	gotFilter, err := m.LayerFilter("points-layer")
 	if err != nil {
 		t.Fatalf("LayerFilter(): %v", err)
 	}
-	if gotFilter.Type == JSONValueTypeNull {
+	if len(gotFilter) == 0 {
 		t.Fatalf("LayerFilter() = nil, want copied filter")
 	}
 	if err := m.SetLayerFilter("points-layer", nil); err != nil {
 		t.Fatalf("SetLayerFilter(nil): %v", err)
 	}
-	if err := m.SetLayerProperty("points-layer", "circle-radius", JSONDouble(math.NaN())); !errors.Is(err, ErrInvalidArgument) {
+	if err := m.SetLayerProperty("points-layer", "circle-radius", []byte("NaN")); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetLayerProperty(non-finite JSON double) error = %v, want ErrInvalidArgument", err)
 	}
 	if _, err := m.LayerProperty("missing", "circle-radius"); !errors.Is(err, ErrInvalidArgument) {
@@ -302,34 +283,30 @@ func TestStyleLightPropertyJSONSnapshots(t *testing.T) {
 		}
 	}()
 
-	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
-	if err := m.SetStyleLightJSON(JSONObject(
-		JSONMember{Name: "anchor", Value: JSONString("viewport")},
-		JSONMember{Name: "color", Value: JSONString("#ffffff")},
-		JSONMember{Name: "intensity", Value: JSONDouble(0.5)},
-	)); err != nil {
+	if err := m.SetStyleLightJSON([]byte(`{"anchor":"viewport","color":"#ffffff","intensity":0.5}`)); err != nil {
 		t.Fatalf("SetStyleLightJSON(): %v", err)
 	}
 	undefined, err := m.StyleLightProperty("does-not-exist")
 	if err != nil {
 		t.Fatalf("StyleLightProperty(does-not-exist): %v", err)
 	}
-	if undefined.Type != JSONValueTypeNull {
+	if undefined != nil {
 		t.Fatalf("StyleLightProperty(does-not-exist) = %#v, want JSON null", undefined)
 	}
-	if err := m.SetStyleLightProperty("intensity", JSONDouble(0.75)); err != nil {
+	if err := m.SetStyleLightProperty("intensity", []byte("0.75")); err != nil {
 		t.Fatalf("SetStyleLightProperty(intensity): %v", err)
 	}
 	intensity, err := m.StyleLightProperty("intensity")
 	if err != nil {
 		t.Fatalf("StyleLightProperty(intensity): %v", err)
 	}
-	if intensity.Type != JSONValueTypeDouble || intensity.Double != 0.75 {
-		t.Fatalf("StyleLightProperty(intensity) = %#v, want 0.75", intensity)
+	if string(intensity) != "0.75" {
+		t.Fatalf("StyleLightProperty(intensity) = %s, want 0.75", intensity)
 	}
-	if err := m.SetStyleLightProperty("intensity", JSONDouble(math.Inf(-1))); !errors.Is(err, ErrInvalidArgument) {
+	if err := m.SetStyleLightProperty("intensity", []byte("-Infinity")); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetStyleLightProperty(non-finite JSON double) error = %v, want ErrInvalidArgument", err)
 	}
 }
@@ -355,7 +332,7 @@ func TestStyleLayerMetadataForMissingLayers(t *testing.T) {
 		}
 	}()
 
-	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	ids, err := m.StyleLayerIDs()
@@ -430,7 +407,7 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 	}
 
 	// The style parser fills in its own 300ms duration for a style that declares no transition.
-	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	parsed, err := m.StyleTransitionOptions()
@@ -445,7 +422,7 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 	}
 
 	const transitionStyle = `{"version":8,"transition":{"duration":750,"delay":100},"sources":{},"layers":[]}`
-	if err := m.SetStyleJSON(transitionStyle); err != nil {
+	if err := m.SetStyleJSON([]byte(transitionStyle)); err != nil {
 		t.Fatalf("SetStyleJSON(transition style): %v", err)
 	}
 	declared, err := m.StyleTransitionOptions()
@@ -492,7 +469,7 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 		t.Fatal("a duration-only literal disabled the placement cross-fade")
 	}
 
-	if err := m.SetStyleJSON(transitionStyle); err != nil {
+	if err := m.SetStyleJSON([]byte(transitionStyle)); err != nil {
 		t.Fatalf("SetStyleJSON(transition style): %v", err)
 	}
 	reloaded, err := m.StyleTransitionOptions()

@@ -11,6 +11,8 @@ use maplibre_native_ffi_core::values::{
 };
 use maplibre_native_ffi_sys as sys;
 
+#[cfg(test)]
+use crate::PremultipliedRgba8Image;
 use crate::camera::{
     AnimationOptionsNativeExt, BoundOptionsNativeExt, CameraFitOptionsNativeExt,
     CameraOptionsNativeExt, FreeCameraOptionsNativeExt, ProjectionModeNativeExt,
@@ -19,7 +21,6 @@ use crate::camera::{
 use crate::custom_geometry::CanonicalTileId;
 use crate::custom_geometry::CustomGeometrySourceState;
 use crate::events::MapId;
-use crate::geometry::GeometryNativeExt;
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error};
 use crate::options::{MapOptionsNativeExt, MapTileOptionsNativeExt, MapViewportOptionsNativeExt};
 use crate::render::{
@@ -33,12 +34,9 @@ use crate::runtime::{RuntimeHandle, RuntimeState};
 use crate::values::NativeValue;
 use crate::{
     AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, Error, ErrorKind,
-    FreeCameraOptions, Geometry, HandleOperationError, LatLng, LatLngBounds, MapDebugOptions,
-    MapOptions, MapProjectionHandle, MapTileOptions, MapViewportOptions, ProjectionMode, Result,
-    ScreenPoint,
+    FreeCameraOptions, HandleOperationError, LatLng, LatLngBounds, MapDebugOptions, MapOptions,
+    MapProjectionHandle, MapTileOptions, MapViewportOptions, ProjectionMode, Result, ScreenPoint,
 };
-#[cfg(test)]
-use crate::{GeoJson, JsonValue, PremultipliedRgba8Image};
 
 mod style;
 pub use style::{
@@ -589,11 +587,11 @@ impl MapHandle {
     /// Computes a camera that fits a geometry in the current viewport.
     pub fn camera_for_geometry(
         &self,
-        geometry: &Geometry,
+        geometry: &[u8],
         fit_options: Option<&CameraFitOptions>,
     ) -> Result<CameraOptions> {
         let map = self.inner.native()?;
-        let native_geometry = geometry.try_to_native()?;
+        let native_geometry = maplibre_core::string::buffer_view(geometry);
         let raw_fit = fit_options.map(CameraFitOptions::to_native);
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw_camera = unsafe { sys::mln_camera_options_default() };
@@ -603,7 +601,7 @@ impl MapHandle {
         maplibre_core::check(unsafe {
             sys::mln_map_camera_for_geometry(
                 map,
-                native_geometry.as_ptr(),
+                native_geometry,
                 option_ptr(raw_fit.as_ref()),
                 &mut raw_camera,
             )

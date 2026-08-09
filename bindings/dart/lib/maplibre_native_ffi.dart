@@ -4,7 +4,6 @@ library;
 export 'src/camera/camera.dart';
 export 'src/error/maplibre_exception.dart';
 export 'src/geo/geo.dart';
-export 'src/json/json.dart';
 export 'src/log/log.dart';
 export 'src/map/map.dart';
 export 'src/maplibre.dart' hide logCallbackStateForTesting;

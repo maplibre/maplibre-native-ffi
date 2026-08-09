@@ -96,11 +96,11 @@ internal sealed unsafe class NativeTileSourceOptions : IDisposable
 
 internal sealed unsafe class NativeGeoJsonSourceOptions : IDisposable
 {
-    private readonly NativeJsonValue? clusterProperties;
+    private readonly NativeStringView? clusterProperties;
 
     private NativeGeoJsonSourceOptions(
         mln_geojson_source_options value,
-        NativeJsonValue? clusterProperties
+        NativeStringView? clusterProperties
     )
     {
         Value = value;
@@ -112,7 +112,7 @@ internal sealed unsafe class NativeGeoJsonSourceOptions : IDisposable
     internal static NativeGeoJsonSourceOptions From(GeoJsonSourceOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        NativeJsonValue? clusterProperties = null;
+        NativeStringView? clusterProperties = null;
         try
         {
             var native = NativeMethods.mln_geojson_source_options_default();
@@ -144,8 +144,11 @@ internal sealed unsafe class NativeGeoJsonSourceOptions : IDisposable
             {
                 native.fields |= (uint)
                     mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
-                clusterProperties = NativeJsonValue.From(clusterPropertiesValue);
-                native.cluster_properties = clusterProperties.Pointer;
+                clusterProperties = NativeStringView.From(
+                    clusterPropertiesValue,
+                    nameof(options.ClusterProperties)
+                );
+                native.cluster_properties = clusterProperties.Value;
             }
             if (options.TileSize is { } tileSize)
             {
@@ -478,17 +481,17 @@ internal sealed unsafe class NativeStringViewArray : IDisposable
         this.array = array;
     }
 
-    internal mln_string_view* Pointer => (mln_string_view*)array;
+    internal mln_buffer_view* Pointer => (mln_buffer_view*)array;
     internal nuint Count => (nuint)values.Length;
 
     internal static NativeStringViewArray From(IReadOnlyList<string> strings, string parameterName)
     {
         ArgumentNullException.ThrowIfNull(strings, parameterName);
         var views = new NativeStringView[strings.Count];
-        var array = (nint)NativeAllocation.AllocZeroedArray<mln_string_view>(strings.Count);
+        var array = (nint)NativeAllocation.AllocZeroedArray<mln_buffer_view>(strings.Count);
         try
         {
-            var pointer = (mln_string_view*)array;
+            var pointer = (mln_buffer_view*)array;
             for (var index = 0; index < strings.Count; index++)
             {
                 views[index] = NativeStringView.From(strings[index], $"{parameterName}[{index}]");

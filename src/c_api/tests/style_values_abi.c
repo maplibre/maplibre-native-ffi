@@ -293,6 +293,82 @@ static const char layer_accessor_style_json[] =
   "\"layers\":[{\"id\":\"lines\",\"type\":\"line\",\"source\":\"vec\","
   "\"source-layer\":\"roads\"},{\"id\":\"bg\",\"type\":\"background\"}]}";
 
+static void optional_json_style_values_return_null_handles(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_style_json(map, MLN_BUFFER_LITERAL(layer_accessor_style_json))
+  );
+
+  mln_buffer value = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_light_property(
+                     map, MLN_STRING_LITERAL("intensity"), &value
+                   )
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, value);
+
+  const mln_buffer_view layer_id = MLN_STRING_LITERAL("bg");
+  const mln_buffer_view property_name =
+    MLN_STRING_LITERAL("background-opacity");
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_get_layer_property(map, layer_id, property_name, &value)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, value);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_layer_filter(map, layer_id, &value)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, value);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_layer_property(
+                     map, layer_id, property_name, MLN_BUFFER_LITERAL("0.5")
+                   )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_get_layer_property(map, layer_id, property_name, &value)
+  );
+  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, value);
+  mln_buffer_destroy(value);
+  value = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_layer_property(
+                     map, layer_id, property_name, MLN_BUFFER_LITERAL("null")
+                   )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_get_layer_property(map, layer_id, property_name, &value)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, value);
+
+  const mln_buffer_view filter =
+    MLN_BUFFER_LITERAL("[\"==\",[\"get\",\"kind\"],\"park\"]");
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_layer_filter(map, layer_id, &filter)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_layer_filter(map, layer_id, &value)
+  );
+  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, value);
+  mln_buffer_destroy(value);
+  value = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_layer_filter(map, layer_id, NULL)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_layer_filter(map, layer_id, &value)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, value);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // MapLibre's own setProperty path accepts a sourceless layer as a silent no-op;
 // the typed accessors reject it.
 static void layer_source_accessors_reject_sourceless_layer_types(void) {
@@ -1372,6 +1448,7 @@ void run_style_values_abi_tests(void) {
   RUN_TEST(geojson_source_options_reject_unsafe_raw_headers);
   RUN_TEST(clustered_geojson_data_reports_non_point_geometry);
   RUN_TEST(clustered_geojson_data_requires_a_feature_collection);
+  RUN_TEST(optional_json_style_values_return_null_handles);
   RUN_TEST(layer_source_accessors_reject_sourceless_layer_types);
   RUN_TEST(layer_text_accessors_report_required_capacity);
   RUN_TEST(layer_zoom_and_visibility_accessors_carry_raw_domains);

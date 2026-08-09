@@ -4,7 +4,6 @@ library;
 import 'dart:typed_data';
 
 import '../geo/geo.dart';
-import '../json/json.dart';
 
 /// Style source type.
 final class SourceType {
@@ -290,7 +289,7 @@ final class GeoJsonSourceOptions {
   final double? clusterMaxZoom;
 
   /// Optional cluster aggregation expressions keyed by property name.
-  final JsonValue? clusterProperties;
+  final Uint8List? clusterProperties;
 
   /// Optional tile extent in pixels.
   final int? tileSize;

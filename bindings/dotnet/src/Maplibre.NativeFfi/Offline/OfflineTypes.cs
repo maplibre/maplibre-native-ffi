@@ -23,7 +23,7 @@ public abstract record OfflineRegionDefinition
 
     public sealed record GeometryRegion(
         string StyleUrl,
-        Geometry Geometry,
+        byte[] Geometry,
         double MinimumZoom,
         double MaximumZoom,
         float PixelRatio,

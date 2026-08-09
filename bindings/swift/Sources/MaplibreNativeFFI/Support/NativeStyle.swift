@@ -1,8 +1,36 @@
 internal import CMaplibreNativeC
+import Foundation
 
 enum NativeStyle {
+  static func copyMapData(
+    _ map: NativeMapHandle,
+    copy: (
+      mln_map,
+      UnsafeMutablePointer<UInt8>?,
+      Int,
+      UnsafeMutablePointer<Int>
+    ) -> mln_status
+  ) throws -> Data {
+    let required = try NativeMemory.withTemporary(0) { size in
+      try checkStatus(copy(map.raw, nil, 0, size))
+    }.value
+    guard required > 0 else { return Data() }
+    var bytes = [UInt8](repeating: 0, count: required)
+    let size = try bytes.withUnsafeMutableBufferPointer { buffer in
+      try NativeMemory.withTemporary(0) { size in
+        try checkStatus(copy(map.raw, buffer.baseAddress, required, size))
+      }.value
+    }
+    guard size <= bytes.count else {
+      throw NativeStatusFailure.swiftNativeError(
+        "native data size exceeded caller buffer"
+      )
+    }
+    return Data(bytes[0 ..< size])
+  }
+
   static func removeSource(_ map: NativeMapHandle,
-                           sourceId: mln_string_view) throws -> Bool
+                           sourceId: mln_buffer_view) throws -> Bool
   {
     try NativeMemory.withTemporary(false) { removed in
       try checkStatus(mln_map_remove_style_source(map.raw, sourceId, removed))
@@ -10,7 +38,7 @@ enum NativeStyle {
   }
 
   static func sourceExists(_ map: NativeMapHandle,
-                           sourceId: mln_string_view) throws -> Bool
+                           sourceId: mln_buffer_view) throws -> Bool
   {
     try NativeMemory.withTemporary(false) { exists in
       try checkStatus(mln_map_style_source_exists(map.raw, sourceId, exists))
@@ -18,7 +46,7 @@ enum NativeStyle {
   }
 
   static func sourceType(_ map: NativeMapHandle,
-                         sourceId: mln_string_view) throws -> UInt32?
+                         sourceId: mln_buffer_view) throws -> UInt32?
   {
     var type = UInt32(0)
     let found = try NativeMemory.withTemporary(false) { found in
@@ -33,7 +61,7 @@ enum NativeStyle {
   }
 
   static func sourceInfo(_ map: NativeMapHandle,
-                         sourceId: mln_string_view) throws
+                         sourceId: mln_buffer_view) throws
     -> NativeStyleSourceInfo?
   {
     var info = mln_style_source_info()
@@ -97,7 +125,7 @@ enum NativeStyle {
 
   static func sourceAttribution(
     _ map: NativeMapHandle,
-    sourceId: mln_string_view
+    sourceId: mln_buffer_view
   ) throws -> String? {
     var info = mln_style_source_info()
     info.size = UInt32(MemoryLayout<mln_style_source_info>.size)
@@ -126,7 +154,7 @@ enum NativeStyle {
 
   static func copySourceAttribution(
     _ map: NativeMapHandle,
-    sourceId: mln_string_view,
+    sourceId: mln_buffer_view,
     capacity: Int
   ) throws -> (String?, Int) {
     var bytes = [UInt8](repeating: 0, count: capacity)
@@ -155,8 +183,7 @@ enum NativeStyle {
     }
     let attribution = try bytes.withUnsafeBufferPointer { buffer in
       try NativeString.copyUTF8(
-        data: buffer.baseAddress
-          .map { UnsafeRawPointer($0).assumingMemoryBound(to: CChar.self) },
+        data: buffer.baseAddress.map(UnsafeRawPointer.init),
         size: size
       )
     }
@@ -165,7 +192,7 @@ enum NativeStyle {
 
   static func copySourceURL(
     _ map: NativeMapHandle,
-    sourceId: mln_string_view,
+    sourceId: mln_buffer_view,
     capacity: Int
   ) throws -> (String?, Int) {
     var bytes = [UInt8](repeating: 0, count: capacity)
@@ -194,8 +221,7 @@ enum NativeStyle {
     }
     let url = try bytes.withUnsafeBufferPointer { buffer in
       try NativeString.copyUTF8(
-        data: buffer.baseAddress
-          .map { UnsafeRawPointer($0).assumingMemoryBound(to: CChar.self) },
+        data: buffer.baseAddress.map(UnsafeRawPointer.init),
         size: size
       )
     }
@@ -204,7 +230,7 @@ enum NativeStyle {
 
   static func sourceTileURLs(
     _ map: NativeMapHandle,
-    sourceId: mln_string_view
+    sourceId: mln_buffer_view
   ) throws -> [String]? {
     var found = false
     let listValue = try NativeMemory.withTemporary(UInt64(0)) { outHandle in
@@ -228,7 +254,7 @@ enum NativeStyle {
       try checkStatus(mln_style_string_list_count(list.raw, count))
     }.value
     return try (0 ..< count).map { index in
-      let output = try NativeMemory.withTemporary(mln_string_view()) { value in
+      let output = try NativeMemory.withTemporary(mln_buffer_view()) { value in
         try checkStatus(mln_style_string_list_get(list.raw, index, value))
       }
       return try NativeString.copyUTF8(
@@ -252,7 +278,7 @@ enum NativeStyle {
   }
 
   static func removeImage(_ map: NativeMapHandle,
-                          imageId: mln_string_view) throws -> Bool
+                          imageId: mln_buffer_view) throws -> Bool
   {
     try NativeMemory.withTemporary(false) { removed in
       try checkStatus(mln_map_remove_style_image(map.raw, imageId, removed))
@@ -277,7 +303,7 @@ enum NativeStyle {
   }
 
   static func imageExists(_ map: NativeMapHandle,
-                          imageId: mln_string_view) throws -> Bool
+                          imageId: mln_buffer_view) throws -> Bool
   {
     try NativeMemory.withTemporary(false) { exists in
       try checkStatus(mln_map_style_image_exists(map.raw, imageId, exists))
@@ -285,7 +311,7 @@ enum NativeStyle {
   }
 
   static func imageInfo(_ map: NativeMapHandle,
-                        imageId: mln_string_view) throws
+                        imageId: mln_buffer_view) throws
     -> NativeStyleImageInfo?
   {
     var info = mln_style_image_info_default()
@@ -302,7 +328,7 @@ enum NativeStyle {
 
   static func copyImagePremultipliedRGBA8(
     _ map: NativeMapHandle,
-    imageId: mln_string_view,
+    imageId: mln_buffer_view,
     capacity: Int
   ) throws -> ([UInt8]?, Int) {
     var bytes = [UInt8](repeating: 0, count: capacity)
@@ -334,9 +360,9 @@ enum NativeStyle {
 
   static func addImageSourceURL(
     _ map: NativeMapHandle,
-    sourceId: mln_string_view,
+    sourceId: mln_buffer_view,
     coordinates: [NativeLatLng],
-    url: mln_string_view
+    url: mln_buffer_view
   ) throws {
     try validateImageSourceCoordinates(coordinates)
     let rawCoordinates = coordinates.map(\.native)
@@ -353,7 +379,7 @@ enum NativeStyle {
 
   static func addImageSourceImage(
     _ map: NativeMapHandle,
-    sourceId: mln_string_view,
+    sourceId: mln_buffer_view,
     coordinates: [NativeLatLng],
     image: UnsafePointer<mln_premultiplied_rgba8_image>
   ) throws {
@@ -372,7 +398,7 @@ enum NativeStyle {
 
   static func setImageSourceCoordinates(
     _ map: NativeMapHandle,
-    sourceId: mln_string_view,
+    sourceId: mln_buffer_view,
     coordinates: [NativeLatLng]
   ) throws {
     try validateImageSourceCoordinates(coordinates)
@@ -389,7 +415,7 @@ enum NativeStyle {
 
   static func imageSourceCoordinates(
     _ map: NativeMapHandle,
-    sourceId: mln_string_view
+    sourceId: mln_buffer_view
   ) throws -> [NativeLatLng]? {
     var coordinates = [mln_lat_lng](repeating: mln_lat_lng(), count: 4)
     var found = false
@@ -430,7 +456,7 @@ enum NativeStyle {
   }
 
   static func removeLayer(_ map: NativeMapHandle,
-                          layerId: mln_string_view) throws -> Bool
+                          layerId: mln_buffer_view) throws -> Bool
   {
     try NativeMemory.withTemporary(false) { removed in
       try checkStatus(mln_map_remove_style_layer(map.raw, layerId, removed))
@@ -438,7 +464,7 @@ enum NativeStyle {
   }
 
   static func layerExists(_ map: NativeMapHandle,
-                          layerId: mln_string_view) throws -> Bool
+                          layerId: mln_buffer_view) throws -> Bool
   {
     try NativeMemory.withTemporary(false) { exists in
       try checkStatus(mln_map_style_layer_exists(map.raw, layerId, exists))
@@ -446,9 +472,9 @@ enum NativeStyle {
   }
 
   static func layerType(_ map: NativeMapHandle,
-                        layerId: mln_string_view) throws -> String?
+                        layerId: mln_buffer_view) throws -> String?
   {
-    var layerType = mln_string_view()
+    var layerType = mln_buffer_view()
     let found = try NativeMemory.withTemporary(false) { found in
       try checkStatus(mln_map_get_style_layer_type(
         map.raw,
@@ -477,7 +503,7 @@ enum NativeStyle {
   }
 
   static func layerJSON(_ map: NativeMapHandle,
-                        layerId: mln_string_view) throws -> NativeJSONValue?
+                        layerId: mln_buffer_view) throws -> Data?
   {
     let output = try NativeMemory
       .withTemporary(UInt64(0)) { outHandle in
@@ -491,16 +517,14 @@ enum NativeStyle {
           if !found.pointee { outHandle.pointee = 0 }
         }
       }.value
-    let snapshot = NativeJSONSnapshotHandle(raw: output)
-    guard !snapshot.isNull else { return nil }
-    defer { mln_json_snapshot_destroy(snapshot.raw) }
-    return try NativeJSONSnapshot.copyValue(snapshot)
+    let buffer = NativeBufferHandle(raw: output)
+    return buffer.isNull ? nil : try NativeMemory.copyBuffer(buffer)
   }
 
   static func lightProperty(
     _ map: NativeMapHandle,
-    propertyName: mln_string_view
-  ) throws -> NativeJSONValue? {
+    propertyName: mln_buffer_view
+  ) throws -> Data? {
     let snapshotValue = try NativeMemory
       .withTemporary(UInt64(0)) { outHandle in
         try checkStatus(mln_map_get_style_light_property(
@@ -509,17 +533,15 @@ enum NativeStyle {
           outHandle
         ))
       }.value
-    let snapshot = NativeJSONSnapshotHandle(raw: snapshotValue)
-    guard !snapshot.isNull else { return nil }
-    defer { mln_json_snapshot_destroy(snapshot.raw) }
-    return try NativeJSONSnapshot.copyValue(snapshot)
+    let buffer = NativeBufferHandle(raw: snapshotValue)
+    return buffer.isNull ? nil : try NativeMemory.copyBuffer(buffer)
   }
 
   static func layerProperty(
     _ map: NativeMapHandle,
-    layerId: mln_string_view,
-    propertyName: mln_string_view
-  ) throws -> NativeJSONValue? {
+    layerId: mln_buffer_view,
+    propertyName: mln_buffer_view
+  ) throws -> Data? {
     let snapshotValue = try NativeMemory
       .withTemporary(UInt64(0)) { outHandle in
         try checkStatus(mln_map_get_layer_property(
@@ -529,30 +551,26 @@ enum NativeStyle {
           outHandle
         ))
       }.value
-    let snapshot = NativeJSONSnapshotHandle(raw: snapshotValue)
-    guard !snapshot.isNull else { return nil }
-    defer { mln_json_snapshot_destroy(snapshot.raw) }
-    return try NativeJSONSnapshot.copyValue(snapshot)
+    let buffer = NativeBufferHandle(raw: snapshotValue)
+    return buffer.isNull ? nil : try NativeMemory.copyBuffer(buffer)
   }
 
   static func layerFilter(_ map: NativeMapHandle,
-                          layerId: mln_string_view) throws -> NativeJSONValue?
+                          layerId: mln_buffer_view) throws -> Data?
   {
     let snapshotValue = try NativeMemory
       .withTemporary(UInt64(0)) { outHandle in
         try checkStatus(mln_map_get_layer_filter(map.raw, layerId, outHandle))
       }.value
-    let snapshot = NativeJSONSnapshotHandle(raw: snapshotValue)
-    guard !snapshot.isNull else { return nil }
-    defer { mln_json_snapshot_destroy(snapshot.raw) }
-    return try NativeJSONSnapshot.copyValue(snapshot)
+    let buffer = NativeBufferHandle(raw: snapshotValue)
+    return buffer.isNull ? nil : try NativeMemory.copyBuffer(buffer)
   }
 
   /// Probes the required interval counts, then copies. Null arrays with zero
   /// capacity are a size probe the C API answers with OK.
   static func copyImageStretches(
     _ map: NativeMapHandle,
-    imageId: mln_string_view
+    imageId: mln_buffer_view
   ) throws -> ([ImageStretch], [ImageStretch])? {
     var xCount = 0
     var yCount = 0
@@ -624,10 +642,10 @@ enum NativeStyle {
 
   static func copyLayerText(
     _ map: NativeMapHandle,
-    layerId: mln_string_view,
+    layerId: mln_buffer_view,
     copy: (
       mln_map,
-      mln_string_view,
+      mln_buffer_view,
       UnsafeMutablePointer<CChar>?,
       Int,
       UnsafeMutablePointer<Int>
@@ -668,7 +686,7 @@ enum NativeStyle {
       try checkStatus(mln_style_id_list_count(list.raw, count))
     }.value
     return try (0 ..< count).map { index in
-      let output = try NativeMemory.withTemporary(mln_string_view()) { value in
+      let output = try NativeMemory.withTemporary(mln_buffer_view()) { value in
         try checkStatus(mln_style_id_list_get(list.raw, index, value))
       }
       return try NativeString.copyUTF8(

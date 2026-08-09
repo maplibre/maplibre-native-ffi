@@ -24,7 +24,7 @@ enum NativeOfflineRegionDefinition: Equatable {
   )
   case geometry(
     styleURL: String,
-    geometry: NativeGeometry,
+    geometry: Data,
     minZoom: Double,
     maxZoom: Double,
     pixelRatio: Float,
@@ -79,7 +79,7 @@ enum NativeOfflineRegionDefinition: Equatable {
           size: UInt32(MemoryLayout<mln_offline_geometry_region_definition>
             .size),
           style_url: styleURL,
-          geometry: arena.allocateGeometry(geometry),
+          geometry: arena.view(geometry),
           min_zoom: minZoom,
           max_zoom: maxZoom,
           pixel_ratio: pixelRatio,
@@ -104,15 +104,17 @@ enum NativeOfflineRegionDefinition: Equatable {
       )
     case MLN_OFFLINE_REGION_DEFINITION_GEOMETRY.rawValue:
       let value = raw.data.geometry
-      guard let geometry = value.geometry else {
-        throw NativeStatusFailure
-          .swiftNativeError(
-            "offline geometry region definition geometry is null"
-          )
+      let geometry = value.geometry
+      if geometry.size > 0, geometry.data == nil {
+        throw NativeStatusFailure.swiftNativeError(
+          "offline geometry buffer has nil data with non-zero size"
+        )
       }
-      self = try .geometry(
+      self = .geometry(
         styleURL: NativeString.copyCString(value.style_url),
-        geometry: NativeGeometry(copying: geometry.pointee),
+        geometry: geometry.size == 0 ? Data() : Data(
+          bytes: geometry.data!, count: geometry.size
+        ),
         minZoom: value.min_zoom,
         maxZoom: value.max_zoom,
         pixelRatio: value.pixel_ratio,

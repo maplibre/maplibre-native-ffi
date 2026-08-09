@@ -46,7 +46,7 @@ func TestNinePatchStyleImageRoundTripsStretchContentAndTextFit(t *testing.T) {
 		}
 	}()
 
-	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
 		t.Fatalf("SetStyleJSON(): %v", err)
 	}
 
@@ -146,7 +146,7 @@ func TestStyleImageCopiesPixelsAndMetadata(t *testing.T) {
 		}
 	}()
 
-	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	pixels := []byte{255, 0, 0, 255}
@@ -214,7 +214,7 @@ func TestImageSourceCopiesPixelsAndCoordinates(t *testing.T) {
 		}
 	}()
 
-	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	coordinates := []LatLng{

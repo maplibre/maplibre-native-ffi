@@ -26,14 +26,8 @@ func testOfflineTileDefinition() OfflineTilePyramidRegionDefinition {
 
 func testOfflineGeometryDefinition() OfflineGeometryRegionDefinition {
 	return OfflineGeometryRegionDefinition{
-		StyleURL: "http://example.com/offline-geometry-style.json",
-		Geometry: PolygonGeometry([][]LatLng{{
-			{Latitude: -1, Longitude: -2},
-			{Latitude: -1, Longitude: 2},
-			{Latitude: 1, Longitude: 2},
-			{Latitude: 1, Longitude: -2},
-			{Latitude: -1, Longitude: -2},
-		}}),
+		StyleURL:          "http://example.com/offline-geometry-style.json",
+		Geometry:          []byte(`{"type":"Polygon","coordinates":[[[-2,-1],[2,-1],[2,1],[-2,1],[-2,-1]]]}`),
 		MinZoom:           0,
 		MaxZoom:           1,
 		PixelRatio:        1,
@@ -312,7 +306,7 @@ func TestOfflineRegionStartOperationsValidateGoInputs(t *testing.T) {
 		t.Fatalf("StartCreateOfflineRegion geometry embedded NUL error = %v, want ErrInvalidArgument", err)
 	}
 	geometryDefinition = testOfflineGeometryDefinition()
-	geometryDefinition.Geometry = Geometry{Type: GeometryType(999_999)}
+	geometryDefinition.Geometry = []byte(`{"type":"Unsupported"}`)
 	if _, err := runtime.StartCreateOfflineRegion(geometryDefinition, nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("StartCreateOfflineRegion bad geometry error = %v, want ErrInvalidArgument", err)
 	}
@@ -343,8 +337,8 @@ func TestOfflineGeometryDefinitionMaterializesAndCopies(t *testing.T) {
 	if copied.StyleURL != definition.StyleURL || copied.MinZoom != definition.MinZoom || copied.MaxZoom != definition.MaxZoom || copied.PixelRatio != definition.PixelRatio || copied.IncludeIdeographs != definition.IncludeIdeographs {
 		t.Fatalf("copied scalar fields = %#v, want %#v", copied, definition)
 	}
-	if copied.Geometry.Type != GeometryTypePolygon || len(copied.Geometry.Lines) != 1 || len(copied.Geometry.Lines[0]) != len(definition.Geometry.Lines[0]) {
-		t.Fatalf("copied geometry = %#v, want polygon with %d coordinates", copied.Geometry, len(definition.Geometry.Lines[0]))
+	if string(copied.Geometry) != string(definition.Geometry) {
+		t.Fatalf("copied geometry = %q, want %q", copied.Geometry, definition.Geometry)
 	}
 }
 

@@ -9,7 +9,6 @@ from ._enum import NativeIntEnum, UnknownIntEnum
 from ._lifecycle import NativeHandleMixin
 from .errors import InvalidArgumentError
 from .geo import LatLng, LatLngBounds
-from .json import JsonValue
 from .render import PremultipliedRgba8Image, TextureImageInfo
 
 _CUSTOM_GEOMETRY_SOURCE_HANDLE_CREATE_KEY = object()
@@ -62,7 +61,7 @@ class GeoJsonSourceOptions:
     max_zoom: float | None = None
     tolerance: float | None = None
     cluster_max_zoom: float | None = None
-    cluster_properties: JsonValue | None = None
+    cluster_properties: bytes | None = None
     """Cluster aggregation expressions keyed by property name, as a JSON object
     whose members follow the MapLibre Style Spec `clusterProperties` form."""
     tile_size: int | None = None

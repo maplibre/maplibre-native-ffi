@@ -39,16 +39,6 @@ fn listIndexOf(list: maplibre.StringList, expected: []const u8) !usize {
     return error.MissingListEntry;
 }
 
-fn expectObjectString(value: maplibre.OwnedJsonValue, key: []const u8, expected: []const u8) !void {
-    for (value.object) |member| {
-        if (std.mem.eql(u8, member.key, key)) {
-            try testing.expectEqualStrings(expected, member.value.string);
-            return;
-        }
-    }
-    return error.MissingObjectMember;
-}
-
 test "style ID lists are copied into owned Zig output" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
@@ -71,15 +61,8 @@ test "style layer JSON helpers manage lifecycle and order" {
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
-    const empty_features = [_]maplibre.Feature{};
-    try map.addGeoJsonSourceData(testing.allocator, "empty-layer-source", .{ .feature_collection = empty_features[0..] }, null);
-
-    const layer_members = [_]maplibre.JsonMember{
-        .{ .key = "id", .value = .{ .string = "empty-circle" } },
-        .{ .key = "type", .value = .{ .string = "circle" } },
-        .{ .key = "source", .value = .{ .string = "empty-layer-source" } },
-    };
-    try map.addStyleLayerJson(testing.allocator, .{ .object = layer_members[0..] }, "point-circle");
+    try map.addGeoJsonSourceData(testing.allocator, "empty-layer-source", "{\"type\":\"FeatureCollection\",\"features\":[]}", null);
+    try map.addStyleLayerJson(testing.allocator, "{\"id\":\"empty-circle\",\"type\":\"circle\",\"source\":\"empty-layer-source\"}", "point-circle");
     try testing.expect(try map.styleLayerExists("empty-circle"));
 
     var before_move = try map.listStyleLayerIds(testing.allocator);
@@ -91,8 +74,8 @@ test "style layer JSON helpers manage lifecycle and order" {
     try testing.expectEqualStrings("circle", layer_type.value);
 
     var layer_json = (try map.getStyleLayerJson(testing.allocator, "empty-circle")).?;
-    defer layer_json.deinit(testing.allocator);
-    try expectObjectString(layer_json, "id", "empty-circle");
+    defer layer_json.deinit();
+    try testing.expect(std.mem.indexOf(u8, layer_json.value, "\"id\":\"empty-circle\"") != null);
 
     try map.moveStyleLayer("empty-circle", "");
     try testing.expectError(error.InvalidState, map.removeStyleSource(testing.allocator, "empty-layer-source"));
@@ -227,11 +210,11 @@ test "layer properties accept semantic JSON values and return owned snapshots" {
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
-    try map.setLayerProperty(testing.allocator, "point-circle", "circle-radius", .{ .double = 18.0 });
+    try map.setLayerProperty(testing.allocator, "point-circle", "circle-radius", "18");
 
     var snapshot = (try map.getLayerProperty(testing.allocator, "point-circle", "circle-radius")).?;
-    defer snapshot.deinit(testing.allocator);
-    try testing.expectEqual(@as(f64, 18.0), snapshot.double);
+    defer snapshot.deinit();
+    try testing.expectEqualStrings("18.0", snapshot.value);
 }
 
 test "layer filters accept nested semantic JSON arrays and return owned snapshots" {
@@ -240,22 +223,14 @@ test "layer filters accept nested semantic JSON arrays and return owned snapshot
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
-    const get_values = [_]maplibre.JsonValue{ .{ .string = "get" }, .{ .string = "visible" } };
-    const get_expr = maplibre.JsonValue{ .array = get_values[0..] };
-    const filter_values = [_]maplibre.JsonValue{ .{ .string = "==" }, get_expr, .{ .bool = true } };
-    const filter = maplibre.JsonValue{ .array = filter_values[0..] };
-
-    try map.setLayerFilter(testing.allocator, "point-circle", filter);
+    try map.setLayerFilter(testing.allocator, "point-circle", "[\"==\",[\"get\",\"visible\"],true]");
 
     var snapshot = (try map.getLayerFilter(testing.allocator, "point-circle")).?;
-    defer snapshot.deinit(testing.allocator);
-    const array = snapshot.array;
-    try testing.expectEqual(@as(usize, 3), array.len);
-    try testing.expectEqualStrings("==", array[0].string);
+    defer snapshot.deinit();
+    try testing.expectEqualStrings("[\"==\",[\"get\",\"visible\"],true]", snapshot.value);
 
     try map.setLayerFilter(testing.allocator, "point-circle", null);
-    var cleared = try map.getLayerFilter(testing.allocator, "point-circle");
-    if (cleared) |*value| value.deinit(testing.allocator);
+    try testing.expect((try map.getLayerFilter(testing.allocator, "point-circle")) == null);
 }
 
 test "style light accepts full JSON and property updates" {
@@ -264,25 +239,19 @@ test "style light accepts full JSON and property updates" {
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
-    const position_values = [_]maplibre.JsonValue{ .{ .double = 1.0 }, .{ .double = 2.0 }, .{ .double = 3.0 } };
-    const light_members = [_]maplibre.JsonMember{
-        .{ .key = "color", .value = .{ .string = "blue" } },
-        .{ .key = "intensity", .value = .{ .double = 0.3 } },
-        .{ .key = "position", .value = .{ .array = position_values[0..] } },
-    };
-    try map.setStyleLightJson(testing.allocator, .{ .object = light_members[0..] });
+    try map.setStyleLightJson(testing.allocator, "{\"color\":\"blue\",\"intensity\":0.3,\"position\":[1,2,3]}");
 
     var snapshot = (try map.getStyleLightProperty(testing.allocator, "intensity")).?;
-    defer snapshot.deinit(testing.allocator);
-    try testing.expectApproxEqAbs(@as(f64, 0.3), snapshot.double, 0.000001);
+    defer snapshot.deinit();
+    try testing.expectEqualStrings("0.30000001192092896", snapshot.value);
 
-    try map.setStyleLightProperty(testing.allocator, "intensity", .{ .double = 0.75 });
+    try map.setStyleLightProperty(testing.allocator, "intensity", "0.75");
     var updated = (try map.getStyleLightProperty(testing.allocator, "intensity")).?;
-    defer updated.deinit(testing.allocator);
-    try testing.expectApproxEqAbs(@as(f64, 0.75), updated.double, 0.000001);
+    defer updated.deinit();
+    try testing.expectEqualStrings("0.75", updated.value);
 
     try testing.expect((try map.getStyleLightProperty(testing.allocator, "unknown-light-property")) == null);
-    try testing.expectError(error.InvalidArgument, map.setStyleLightProperty(testing.allocator, "intensity", .{ .bool = false }));
+    try testing.expectError(error.InvalidArgument, map.setStyleLightProperty(testing.allocator, "intensity", "false"));
 }
 
 test "runtime style images copy premultiplied RGBA8 pixels" {
@@ -346,30 +315,23 @@ test "location indicator helpers set focused properties" {
 
     try map.setLocationIndicatorLocation(testing.allocator, "location", .{ .latitude = 37.7749, .longitude = -122.4194 }, 12.0);
     var location = (try map.getLayerProperty(testing.allocator, "location", "location")).?;
-    defer location.deinit(testing.allocator);
-    const location_values = location.array;
-    try testing.expectEqual(@as(usize, 3), location_values.len);
-    try testing.expectApproxEqAbs(@as(f64, 37.7749), location_values[0].double, 0.000001);
-    try testing.expectApproxEqAbs(@as(f64, -122.4194), location_values[1].double, 0.000001);
-    try testing.expectApproxEqAbs(@as(f64, 12.0), location_values[2].double, 0.000001);
+    defer location.deinit();
+    try testing.expectEqualStrings("[37.7749,-122.4194,12.0]", location.value);
 
     try map.setLocationIndicatorBearing(testing.allocator, "location", 45.0);
     var bearing = (try map.getLayerProperty(testing.allocator, "location", "bearing")).?;
-    defer bearing.deinit(testing.allocator);
-    try testing.expectApproxEqAbs(@as(f64, 45.0), bearing.double, 0.000001);
+    defer bearing.deinit();
+    try testing.expectEqualStrings("45.0", bearing.value);
 
     try map.setLocationIndicatorAccuracyRadius(testing.allocator, "location", 33.0);
     var radius = (try map.getLayerProperty(testing.allocator, "location", "accuracy-radius")).?;
-    defer radius.deinit(testing.allocator);
-    try testing.expectApproxEqAbs(@as(f64, 33.0), radius.double, 0.000001);
+    defer radius.deinit();
+    try testing.expectEqualStrings("33.0", radius.value);
 
     try map.setLocationIndicatorImageName(testing.allocator, "location", .top, "top-icon");
     var top_image = (try map.getLayerProperty(testing.allocator, "location", "top-image")).?;
-    defer top_image.deinit(testing.allocator);
-    switch (top_image) {
-        .null => return error.MissingTopImage,
-        else => {},
-    }
+    defer top_image.deinit();
+    try testing.expect(!std.mem.eql(u8, top_image.value, "null"));
     try map.setLocationIndicatorImageName(testing.allocator, "location", .bearing, "bearing-icon");
     try map.setLocationIndicatorImageName(testing.allocator, "location", .shadow, "shadow-icon");
 
@@ -377,7 +339,7 @@ test "location indicator helpers set focused properties" {
     try testing.expectError(error.InvalidArgument, map.setLocationIndicatorBearing(testing.allocator, "point-circle", 1.0));
 }
 
-test "style JSON descriptors reject invalid values" {
+test "style JSON buffers reject invalid values" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
@@ -385,11 +347,11 @@ test "style JSON descriptors reject invalid values" {
 
     try testing.expectError(
         error.InvalidArgument,
-        map.setLayerProperty(testing.allocator, "point-circle", "circle-radius", .{ .double = std.math.inf(f64) }),
+        map.setLayerProperty(testing.allocator, "point-circle", "circle-radius", "1e999"),
     );
     try testing.expectError(
         error.InvalidArgument,
-        map.setLayerProperty(testing.allocator, "point-circle", "circle-radius", .{ .string = "not a radius" }),
+        map.setLayerProperty(testing.allocator, "point-circle", "circle-radius", "\"not a radius\""),
     );
 }
 

@@ -157,7 +157,7 @@ final class OfflineGeometryRegionDefinition extends OfflineRegionDefinition {
   final String styleUrl;
 
   /// Geometry to download.
-  final Geometry geometry;
+  final Uint8List geometry;
 
   /// Minimum zoom.
   final double minZoom;

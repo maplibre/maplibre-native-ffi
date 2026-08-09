@@ -327,13 +327,11 @@ func TestStyleGeoJSONSourceOptionsEqualComparesFieldValues(t *testing.T) {
 		"StyleGeoJSONSourceOptions",
 		func() StyleGeoJSONSourceOptions {
 			return StyleGeoJSONSourceOptions{
-				MinZoom:        optionPtr(1.0),
-				MaxZoom:        optionPtr(2.0),
-				Tolerance:      optionPtr(0.5),
-				ClusterMaxZoom: optionPtr(14.0),
-				ClusterProperties: optionPtr(JSONObject(
-					JSONMember{Name: "total", Value: JSONArray(JSONString("+"), JSONArray(JSONString("get"), JSONString("rank")))},
-				)),
+				MinZoom:           optionPtr(1.0),
+				MaxZoom:           optionPtr(2.0),
+				Tolerance:         optionPtr(0.5),
+				ClusterMaxZoom:    optionPtr(14.0),
+				ClusterProperties: []byte(`{"total":["+",["get","rank"]]}`),
 				TileSize:          optionPtr(uint32(256)),
 				Buffer:            optionPtr(uint32(64)),
 				ClusterRadius:     optionPtr(uint32(0)),
@@ -350,9 +348,7 @@ func TestStyleGeoJSONSourceOptionsEqualComparesFieldValues(t *testing.T) {
 			func(o *StyleGeoJSONSourceOptions) { o.Tolerance = optionPtr(0.25) },
 			func(o *StyleGeoJSONSourceOptions) { o.ClusterMaxZoom = optionPtr(15.0) },
 			func(o *StyleGeoJSONSourceOptions) {
-				o.ClusterProperties = optionPtr(JSONObject(
-					JSONMember{Name: "total", Value: JSONArray(JSONString("+"), JSONArray(JSONString("get"), JSONString("score")))},
-				))
+				o.ClusterProperties = []byte(`{"total":["+",["get","score"]]}`)
 			},
 			func(o *StyleGeoJSONSourceOptions) { o.TileSize = optionPtr(uint32(512)) },
 			func(o *StyleGeoJSONSourceOptions) { o.Buffer = optionPtr(uint32(128)) },
@@ -368,20 +364,17 @@ func TestStyleGeoJSONSourceOptionsEqualComparesFieldValues(t *testing.T) {
 func TestStyleGeoJSONSourceOptionsBuildersDeepCopyRetainedFields(t *testing.T) {
 	original := StyleGeoJSONSourceOptions{}.
 		WithMinZoom(1).
-		WithClusterProperties(JSONObject(JSONMember{
-			Name:  "total",
-			Value: JSONArray(JSONString("+"), JSONInt(1)),
-		}))
+		WithClusterProperties([]byte(`{"total":["+",1]}`))
 	updated := original.WithMaxZoom(2)
 
 	*updated.MinZoom = 9
-	updated.ClusterProperties.Object[0].Value.Array[1] = JSONInt(7)
+	updated.ClusterProperties[0] = 'x'
 
 	if *original.MinZoom != 1 {
 		t.Fatalf("original MinZoom = %v, want 1", *original.MinZoom)
 	}
-	if got := original.ClusterProperties.Object[0].Value.Array[1]; !got.Equal(JSONInt(1)) {
-		t.Fatalf("original nested cluster property = %#v, want JSON int 1", got)
+	if got := string(original.ClusterProperties); got != `{"total":["+",1]}` {
+		t.Fatalf("original cluster properties = %q", got)
 	}
 }
 
@@ -452,13 +445,13 @@ func TestQueryOptionsEqualComparesLayerIDsElementByElement(t *testing.T) {
 		func() RenderedFeatureQueryOptions {
 			return RenderedFeatureQueryOptions{
 				LayerIDs: []string{"a", "b"},
-				Filter:   optionPtr(JSONBool(true)),
+				Filter:   []byte("true"),
 			}
 		},
 		RenderedFeatureQueryOptions.Equal,
 		[]func(*RenderedFeatureQueryOptions){
 			func(o *RenderedFeatureQueryOptions) { o.LayerIDs = []string{"a"} },
-			func(o *RenderedFeatureQueryOptions) { o.Filter = optionPtr(JSONString("filter")) },
+			func(o *RenderedFeatureQueryOptions) { o.Filter = []byte(`"filter"`) },
 		},
 	)
 	assertValueSemantics(
@@ -467,13 +460,13 @@ func TestQueryOptionsEqualComparesLayerIDsElementByElement(t *testing.T) {
 		func() SourceFeatureQueryOptions {
 			return SourceFeatureQueryOptions{
 				SourceLayerIDs: []string{"a", "b"},
-				Filter:         optionPtr(JSONBool(true)),
+				Filter:         []byte("true"),
 			}
 		},
 		SourceFeatureQueryOptions.Equal,
 		[]func(*SourceFeatureQueryOptions){
 			func(o *SourceFeatureQueryOptions) { o.SourceLayerIDs = []string{"a"} },
-			func(o *SourceFeatureQueryOptions) { o.Filter = optionPtr(JSONString("filter")) },
+			func(o *SourceFeatureQueryOptions) { o.Filter = []byte(`"filter"`) },
 		},
 	)
 }
@@ -485,30 +478,5 @@ func TestQueryOptionsEqualSeparatesAbsentFromEmptyLayerIDs(t *testing.T) {
 
 	if absent.Equal(empty) {
 		t.Error("absent LayerIDs compares equal to an empty LayerIDs list")
-	}
-}
-
-func TestJSONValueEqualComparesNestedContainers(t *testing.T) {
-	// Query filters compare by value, so the JSON tree they hold has to as well.
-	left := JSONObject(
-		JSONMember{Name: "list", Value: JSONArray(JSONInt(1), JSONString("two"))},
-	)
-	right := JSONObject(
-		JSONMember{Name: "list", Value: JSONArray(JSONInt(1), JSONString("two"))},
-	)
-	if !left.Equal(right) {
-		t.Error("structurally identical JSON values are not equal")
-	}
-
-	differentOrder := JSONObject(
-		JSONMember{Name: "list", Value: JSONArray(JSONString("two"), JSONInt(1))},
-	)
-	if left.Equal(differentOrder) {
-		t.Error("JSON array element order is not compared")
-	}
-
-	// Integer width is part of the value, so a signed and unsigned 1 differ.
-	if JSONInt(1).Equal(JSONUint(1)) {
-		t.Error("signed and unsigned JSON integers compare equal")
 	}
 }

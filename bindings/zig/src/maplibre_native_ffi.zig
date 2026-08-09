@@ -109,11 +109,6 @@ pub const ScreenBox = render.ScreenBox;
 pub const RenderedQueryGeometry = render.RenderedQueryGeometry;
 pub const RenderedFeatureQueryOptions = render.RenderedFeatureQueryOptions;
 pub const SourceFeatureQueryOptions = render.SourceFeatureQueryOptions;
-pub const OwnedFeature = render.OwnedFeature;
-pub const QueriedFeature = render.QueriedFeature;
-pub const FeatureQueryResult = render.FeatureQueryResult;
-pub const OwnedFeatureCollection = render.OwnedFeatureCollection;
-pub const FeatureExtensionResult = render.FeatureExtensionResult;
 pub const MetalOwnedTextureFrameInfo = render.MetalOwnedTextureFrameInfo;
 pub const VulkanOwnedTextureFrameInfo = render.VulkanOwnedTextureFrameInfo;
 pub const OpenGLOwnedTextureFrameInfo = render.OpenGLOwnedTextureFrameInfo;
@@ -170,16 +165,7 @@ pub const StyleImageInfo = values.StyleImageInfo;
 pub const StyleTransitionOptions = values.StyleTransitionOptions;
 pub const OwnedStyleImage = values.OwnedStyleImage;
 pub const LocationIndicatorImageKind = values.LocationIndicatorImageKind;
-pub const JsonValue = values.JsonValue;
-pub const JsonMember = values.JsonMember;
-pub const OwnedJsonValue = values.OwnedJsonValue;
-pub const OwnedJsonMember = values.OwnedJsonMember;
 pub const StringList = values.StringList;
-pub const Geometry = values.Geometry;
-pub const OwnedGeometry = values.OwnedGeometry;
-pub const FeatureIdentifier = values.FeatureIdentifier;
-pub const Feature = values.Feature;
-pub const GeoJson = values.GeoJson;
 pub const StyleSourceType = values.StyleSourceType;
 pub const StyleTileJsonInfo = values.StyleTileJsonInfo;
 pub const StyleSourceInfo = values.StyleSourceInfo;
@@ -219,24 +205,9 @@ comptime {
     _ = c.MLN_STATUS_OK;
     if (builtin.is_test) {
         @export(&testFailNextOwnedTextureFrameWrapperAllocation, .{ .name = "mln_zig_test_fail_next_owned_texture_frame_wrapper_allocation" });
-        @export(&testUseCountingFeatureQueryResultDestroy, .{ .name = "mln_zig_test_use_counting_feature_query_result_destroy" });
-        @export(&testRestoreFeatureQueryResultDestroy, .{ .name = "mln_zig_test_restore_feature_query_result_destroy" });
-        @export(&testFeatureQueryResultDestroyCount, .{ .name = "mln_zig_test_feature_query_result_destroy_count" });
     }
 }
 
 fn testFailNextOwnedTextureFrameWrapperAllocation() callconv(.c) void {
     render.failNextOwnedTextureFrameWrapperAllocationForTesting();
-}
-
-fn testUseCountingFeatureQueryResultDestroy() callconv(.c) void {
-    render.useCountingFeatureQueryResultDestroyForTesting();
-}
-
-fn testRestoreFeatureQueryResultDestroy() callconv(.c) void {
-    render.restoreFeatureQueryResultDestroyForTesting();
-}
-
-fn testFeatureQueryResultDestroyCount() callconv(.c) usize {
-    return render.featureQueryResultDestroyCountForTesting();
 }

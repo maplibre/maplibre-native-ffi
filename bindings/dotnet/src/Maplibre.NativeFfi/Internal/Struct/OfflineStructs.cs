@@ -30,12 +30,12 @@ internal unsafe delegate void OfflineRegionListDestroy(MlnOfflineRegionList list
 internal sealed unsafe class NativeOfflineRegionDefinition : IDisposable
 {
     private readonly NativeUtf8String styleUrl;
-    private readonly NativeGeometry? geometry;
+    private readonly NativeStringView? geometry;
 
     private NativeOfflineRegionDefinition(
         mln_offline_region_definition value,
         NativeUtf8String styleUrl,
-        NativeGeometry? geometry
+        NativeStringView? geometry
     )
     {
         Value = value;
@@ -49,7 +49,7 @@ internal sealed unsafe class NativeOfflineRegionDefinition : IDisposable
     {
         ArgumentNullException.ThrowIfNull(definition);
         NativeUtf8String? styleUrl = null;
-        NativeGeometry? geometry = null;
+        NativeStringView? geometry = null;
         try
         {
             switch (definition)
@@ -87,7 +87,7 @@ internal sealed unsafe class NativeOfflineRegionDefinition : IDisposable
                         region.StyleUrl,
                         nameof(region.StyleUrl)
                     );
-                    geometry = NativeGeometry.From(region.Geometry);
+                    geometry = NativeStringView.From(region.Geometry, nameof(region.Geometry));
                     return new NativeOfflineRegionDefinition(
                         new mln_offline_region_definition
                         {
@@ -100,7 +100,7 @@ internal sealed unsafe class NativeOfflineRegionDefinition : IDisposable
                                 {
                                     size = (uint)sizeof(mln_offline_geometry_region_definition),
                                     style_url = styleUrl.Pointer,
-                                    geometry = geometry.Pointer,
+                                    geometry = geometry.Value,
                                     min_zoom = region.MinimumZoom,
                                     max_zoom = region.MaximumZoom,
                                     pixel_ratio = region.PixelRatio,
@@ -324,9 +324,7 @@ internal static unsafe class OfflineStructs
     ) =>
         new(
             CopyCString(value.style_url),
-            value.geometry is null
-                ? Geometry.Empty.Instance
-                : QueryStructs.ReadGeometry(*value.geometry),
+            ValueStructs.CopyBufferView(value.geometry),
             value.min_zoom,
             value.max_zoom,
             value.pixel_ratio,
