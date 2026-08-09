@@ -1,23 +1,14 @@
 // Replacing the data on a GeoJSON source for each live-feed update.
 
 #include <maplibre_native_c.h>
+#include <stdio.h>
 #include <string.h>
 
 #define MAX_VEHICLES 512
 
-static mln_string_view sv(const char* text) {
-  return (mln_string_view){.data = text, .size = strlen(text)};
+static mln_buffer_view view(const char* text) {
+  return (mln_buffer_view){.data = text, .size = strlen(text)};
 }
-
-// #region geometry
-static mln_geometry point_geometry(mln_lat_lng position) {
-  return (mln_geometry){
-    .size = sizeof(mln_geometry),
-    .type = MLN_GEOMETRY_TYPE_POINT,
-    .data = {.point = position},
-  };
-}
-// #endregion geometry
 
 mln_status add_vehicle_source(mln_map map) {
   // #region options
@@ -27,40 +18,45 @@ mln_status add_vehicle_source(mln_map map) {
   // #endregion options
 
   // #region add
-  const mln_geojson empty = {
-    .size = sizeof(empty),
-    .type = MLN_GEOJSON_TYPE_FEATURE_COLLECTION,
-    .data = {.feature_collection = {.features = NULL, .feature_count = 0}},
-  };
-  return mln_map_add_geojson_source_data(map, sv("vehicles"), &empty, &options);
+  return mln_map_add_geojson_source_data(
+    map, view("vehicles"),
+    view("{\"type\":\"FeatureCollection\",\"features\":[]}"), &options
+  );
   // #endregion add
 }
 
 mln_status publish_vehicles(
-  mln_map map, const mln_lat_lng* positions, size_t count
+  mln_map map, const mln_lat_lng* positions, size_t count, char* json,
+  size_t json_capacity
 ) {
   if (count > MAX_VEHICLES) count = MAX_VEHICLES;
 
   // #region features
-  // The update call copies the descriptors, so stack storage is enough.
-  mln_geometry geometries[MAX_VEHICLES];
-  mln_feature features[MAX_VEHICLES];
-  for (size_t i = 0; i < count; i++) {
-    geometries[i] = point_geometry(positions[i]);
-    features[i] =
-      (mln_feature){.size = sizeof(mln_feature), .geometry = &geometries[i]};
+  size_t used = 0;
+  int written = snprintf(
+    json, json_capacity, "{\"type\":\"FeatureCollection\",\"features\":["
+  );
+  if (written < 0 || (size_t)written >= json_capacity) {
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
+  used = (size_t)written;
+  for (size_t i = 0; i < count; i++) {
+    written = snprintf(
+      json + used, json_capacity - used,
+      "%s{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
+      "\"coordinates\":[%.8f,%.8f]},\"properties\":{}}",
+      i == 0 ? "" : ",", positions[i].longitude, positions[i].latitude
+    );
+    if (written < 0 || (size_t)written >= json_capacity - used) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    used += (size_t)written;
+  }
+  if (json_capacity - used < 3) return MLN_STATUS_INVALID_ARGUMENT;
+  memcpy(json + used, "]}", 3);
   // #endregion features
 
   // #region publish
-  const mln_geojson data = {
-    .size = sizeof(data),
-    .type = MLN_GEOJSON_TYPE_FEATURE_COLLECTION,
-    .data = {
-      .feature_collection = {.features = features, .feature_count = count}
-    },
-  };
-
-  return mln_map_set_geojson_source_data(map, sv("vehicles"), &data);
+  return mln_map_set_geojson_source_data(map, view("vehicles"), view(json));
   // #endregion publish
 }

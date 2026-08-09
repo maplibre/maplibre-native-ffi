@@ -6,8 +6,6 @@ import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.geo.CanonicalTileId
-import org.maplibre.nativeffi.geo.GeoJson
-import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
@@ -15,7 +13,6 @@ import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.NativeMap
 import org.maplibre.nativeffi.internal.loader.NativeAccess
-import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
@@ -65,13 +62,13 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     NativeAccess.setMapStyleUrl(requireLiveHandle(), url)
   }
 
-  public actual fun setStyleJson(json: String) {
+  public actual fun setStyleJson(json: ByteArray) {
     NativeAccess.ensureLoaded()
     NativeAccess.setMapStyleJson(requireLiveHandle(), json)
     clearCustomGeometrySources()
   }
 
-  public actual fun loadedStyleJson(): String {
+  public actual fun loadedStyleJson(): ByteArray {
     NativeAccess.ensureLoaded()
     return NativeAccess.loadedStyleJson(requireLiveHandle())
   }
@@ -81,7 +78,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     return NativeAccess.styleUrl(requireLiveHandle())
   }
 
-  public actual fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue) {
+  public actual fun addStyleSourceJson(sourceId: String, sourceJson: ByteArray) {
     NativeAccess.ensureLoaded()
     NativeAccess.addStyleSourceJson(requireLiveHandle(), sourceId, sourceJson)
   }
@@ -124,7 +121,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
 
   public actual fun addGeoJsonSourceData(
     sourceId: String,
-    data: GeoJson,
+    data: ByteArray,
     options: GeoJsonSourceOptions?,
   ) {
     NativeAccess.ensureLoaded()
@@ -136,7 +133,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     NativeAccess.setGeoJsonSourceUrl(requireLiveHandle(), sourceId, url)
   }
 
-  public actual fun setGeoJsonSourceData(sourceId: String, data: GeoJson) {
+  public actual fun setGeoJsonSourceData(sourceId: String, data: ByteArray) {
     NativeAccess.ensureLoaded()
     NativeAccess.setGeoJsonSourceData(requireLiveHandle(), sourceId, data)
   }
@@ -156,7 +153,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   public actual fun setCustomGeometrySourceTileData(
     sourceId: String,
     tileId: CanonicalTileId,
-    data: GeoJson,
+    data: ByteArray,
   ) {
     NativeAccess.ensureLoaded()
     NativeAccess.setCustomGeometrySourceTileData(requireLiveHandle(), sourceId, tileId, data)
@@ -281,7 +278,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     return NativeAccess.imageSourceCoordinates(requireLiveHandle(), sourceId)
   }
 
-  public actual fun addStyleLayerJson(layerJson: JsonValue, beforeLayerId: String) {
+  public actual fun addStyleLayerJson(layerJson: ByteArray, beforeLayerId: String) {
     NativeAccess.ensureLoaded()
     NativeAccess.addStyleLayerJson(requireLiveHandle(), layerJson, beforeLayerId)
   }
@@ -354,22 +351,22 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     NativeAccess.moveStyleLayer(requireLiveHandle(), layerId, beforeLayerId)
   }
 
-  public actual fun styleLayerJson(layerId: String): JsonValue? {
+  public actual fun styleLayerJson(layerId: String): ByteArray? {
     NativeAccess.ensureLoaded()
     return NativeAccess.styleLayerJson(requireLiveHandle(), layerId)
   }
 
-  public actual fun setStyleLightJson(lightJson: JsonValue) {
+  public actual fun setStyleLightJson(lightJson: ByteArray) {
     NativeAccess.ensureLoaded()
     NativeAccess.setStyleLightJson(requireLiveHandle(), lightJson)
   }
 
-  public actual fun setStyleLightProperty(propertyName: String, value: JsonValue) {
+  public actual fun setStyleLightProperty(propertyName: String, value: ByteArray) {
     NativeAccess.ensureLoaded()
     NativeAccess.setStyleLightProperty(requireLiveHandle(), propertyName, value)
   }
 
-  public actual fun styleLightProperty(propertyName: String): JsonValue? {
+  public actual fun styleLightProperty(propertyName: String): ByteArray? {
     NativeAccess.ensureLoaded()
     return NativeAccess.styleLightProperty(requireLiveHandle(), propertyName)
   }
@@ -384,17 +381,17 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     return NativeAccess.styleTransitionOptions(requireLiveHandle())
   }
 
-  public actual fun setLayerProperty(layerId: String, propertyName: String, value: JsonValue) {
+  public actual fun setLayerProperty(layerId: String, propertyName: String, value: ByteArray) {
     NativeAccess.ensureLoaded()
     NativeAccess.setLayerProperty(requireLiveHandle(), layerId, propertyName, value)
   }
 
-  public actual fun layerProperty(layerId: String, propertyName: String): JsonValue? {
+  public actual fun layerProperty(layerId: String, propertyName: String): ByteArray? {
     NativeAccess.ensureLoaded()
     return NativeAccess.layerProperty(requireLiveHandle(), layerId, propertyName)
   }
 
-  public actual fun setLayerFilter(layerId: String, filter: JsonValue) {
+  public actual fun setLayerFilter(layerId: String, filter: ByteArray) {
     NativeAccess.ensureLoaded()
     NativeAccess.setLayerFilter(requireLiveHandle(), layerId, filter)
   }
@@ -404,7 +401,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     NativeAccess.clearLayerFilter(requireLiveHandle(), layerId)
   }
 
-  public actual fun layerFilter(layerId: String): JsonValue? {
+  public actual fun layerFilter(layerId: String): ByteArray? {
     NativeAccess.ensureLoaded()
     return NativeAccess.layerFilter(requireLiveHandle(), layerId)
   }
@@ -636,7 +633,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   }
 
   public actual fun cameraForGeometry(
-    geometry: Geometry,
+    geometry: ByteArray,
     fitOptions: CameraFitOptions?,
   ): CameraOptions {
     NativeAccess.ensureLoaded()

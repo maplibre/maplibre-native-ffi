@@ -176,15 +176,14 @@ mln_render_session_dump_debug_logs(mln_render_session session) MLN_NOEXCEPT;
  * The session renderer must already exist; call
  * mln_render_session_render_update() once after loading style data before using
  * feature state. selector->source_id and selector->feature_id are borrowed for
- * the duration of the call. state must be a JSON object descriptor and is
- * copied before return. The accepted command requests a map repaint.
+ * the duration of the call. state must contain one UTF-8 JSON object and is
+ * parsed before return. The accepted command requests a map repaint.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, selector is
  *   null or invalid, selector lacks MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
- *   state is null or not an object, state contains invalid descriptor data, or
- *   state contains non-finite numbers.
+ *   state is empty, invalid JSON, or not an object.
  * - MLN_STATUS_INVALID_STATE when the session is detached or no renderer has
  *   been created for the session yet.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
@@ -194,7 +193,7 @@ mln_render_session_dump_debug_logs(mln_render_session session) MLN_NOEXCEPT;
  */
 MLN_API mln_status mln_render_session_set_feature_state(
   mln_render_session session, const mln_feature_state_selector* selector,
-  const mln_json_value* state
+  mln_buffer_view state
 ) MLN_NOEXCEPT;
 
 /**
@@ -202,10 +201,9 @@ MLN_API mln_status mln_render_session_set_feature_state(
  *
  * The session renderer must already exist. selector->source_id and
  * selector->feature_id are borrowed for the duration of the call. On success,
- * *out_state receives an owned snapshot handle. Use
- * mln_json_snapshot_get() to borrow its root JSON object value, and destroy it
- * with mln_json_snapshot_destroy(). Missing native source or feature state is
- * reported as an empty object snapshot.
+ * *out_state receives an owned buffer containing a UTF-8 JSON object.
+ * Destroy it with mln_buffer_destroy(). Missing native source or feature
+ * state is reported as an empty object.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -221,7 +219,7 @@ MLN_API mln_status mln_render_session_set_feature_state(
  */
 MLN_API mln_status mln_render_session_get_feature_state(
   mln_render_session session, const mln_feature_state_selector* selector,
-  mln_json_snapshot* out_state
+  mln_buffer* out_state
 ) MLN_NOEXCEPT;
 
 /**
@@ -248,28 +246,6 @@ MLN_API mln_status mln_render_session_get_feature_state(
 MLN_API mln_status mln_render_session_remove_feature_state(
   mln_render_session session, const mln_feature_state_selector* selector
 ) MLN_NOEXCEPT;
-
-/**
- * Borrows the root JSON value from a snapshot handle.
- *
- * The returned pointer and all nested pointers remain valid until the snapshot
- * is destroyed.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when snapshot does not name a live snapshot, or
- *   out_value is null.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_json_snapshot_get(
-  mln_json_snapshot snapshot, const mln_json_value** out_value
-) MLN_NOEXCEPT;
-
-/**
- * Destroys a JSON snapshot handle. MLN_HANDLE_NULL is accepted as a no-op, as
- * is a handle this call already retired.
- */
-MLN_API void mln_json_snapshot_destroy(mln_json_snapshot snapshot) MLN_NOEXCEPT;
 
 #ifdef __cplusplus
 }

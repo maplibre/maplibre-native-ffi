@@ -26,14 +26,13 @@ import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.geo.CanonicalTileId
-import org.maplibre.nativeffi.geo.GeoJson
-import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_TILEJSON
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_URL
 import org.maplibre.nativeffi.internal.c.mln_bound_options_default
+import org.maplibre.nativeffi.internal.c.mln_buffer_view
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_free_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_image_stretch
@@ -163,7 +162,6 @@ import org.maplibre.nativeffi.internal.c.mln_map_tile_options_default
 import org.maplibre.nativeffi.internal.c.mln_map_viewport_options_default
 import org.maplibre.nativeffi.internal.c.mln_projection_mode_default
 import org.maplibre.nativeffi.internal.c.mln_screen_point
-import org.maplibre.nativeffi.internal.c.mln_string_view
 import org.maplibre.nativeffi.internal.c.mln_style_image_info_default
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_style_transition_options_default
@@ -171,19 +169,18 @@ import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.NativeMap
 import org.maplibre.nativeffi.internal.lifecycle.asHandle
-import org.maplibre.nativeffi.internal.lifecycle.jsonSnapshotHandle
 import org.maplibre.nativeffi.internal.lifecycle.mapHandle
 import org.maplibre.nativeffi.internal.lifecycle.mapProjectionHandle
+import org.maplibre.nativeffi.internal.lifecycle.ownedBufferHandle
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.lifecycle.styleIdListHandle
 import org.maplibre.nativeffi.internal.lifecycle.styleStringListHandle
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.internal.struct.ByteStructs
 import org.maplibre.nativeffi.internal.struct.CoreStructs
 import org.maplibre.nativeffi.internal.struct.MapStructs
 import org.maplibre.nativeffi.internal.struct.StyleStructs
-import org.maplibre.nativeffi.internal.struct.ValueStructs
-import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
@@ -223,13 +220,19 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     Status.check(mln_map_set_style_url(state.requireLive().rawHandleValue, url))
   }
 
-  public actual fun setStyleJson(json: String) {
-    MemoryUtil.requireValidCString(json)
-    Status.check(mln_map_set_style_json(state.requireLive().rawHandleValue, json))
-    clearCustomGeometrySources()
+  public actual fun setStyleJson(json: ByteArray) {
+    memScoped {
+      Status.check(
+        mln_map_set_style_json(
+          state.requireLive().rawHandleValue,
+          ByteStructs.bufferView(json, this),
+        )
+      )
+      clearCustomGeometrySources()
+    }
   }
 
-  public actual fun loadedStyleJson(): String = copyMapText { handle, text, capacity, outSize ->
+  public actual fun loadedStyleJson(): ByteArray = copyMapBytes { handle, text, capacity, outSize ->
     mln_map_copy_loaded_style_json(handle, text, capacity, outSize)
   }
 
@@ -237,13 +240,13 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     mln_map_copy_style_url(handle, text, capacity, outSize)
   }
 
-  public actual fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue) {
+  public actual fun addStyleSourceJson(sourceId: String, sourceJson: ByteArray) {
     memScoped {
       Status.check(
         mln_map_add_style_source_json(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
-          ValueStructs.jsonValue(sourceJson, this),
+          ByteStructs.bufferView(sourceJson, this),
         )
       )
     }
@@ -334,7 +337,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
 
   public actual fun addGeoJsonSourceData(
     sourceId: String,
-    data: GeoJson,
+    data: ByteArray,
     options: GeoJsonSourceOptions?,
   ) {
     memScoped {
@@ -342,7 +345,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         mln_map_add_geojson_source_data(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
-          ValueStructs.geoJson(data, this),
+          ByteStructs.bufferView(data, this),
           StyleStructs.geoJsonSourceOptions(options, this),
         )
       )
@@ -361,13 +364,13 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     }
   }
 
-  public actual fun setGeoJsonSourceData(sourceId: String, data: GeoJson) {
+  public actual fun setGeoJsonSourceData(sourceId: String, data: ByteArray) {
     memScoped {
       Status.check(
         mln_map_set_geojson_source_data(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
-          ValueStructs.geoJson(data, this),
+          ByteStructs.bufferView(data, this),
         )
       )
     }
@@ -394,7 +397,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
   public actual fun setCustomGeometrySourceTileData(
     sourceId: String,
     tileId: CanonicalTileId,
-    data: GeoJson,
+    data: ByteArray,
   ) {
     memScoped {
       Status.check(
@@ -402,7 +405,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           StyleStructs.canonicalTileId(tileId),
-          ValueStructs.geoJson(data, this),
+          ByteStructs.bufferView(data, this),
         )
       )
     }
@@ -860,12 +863,12 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     }
   }
 
-  public actual fun addStyleLayerJson(layerJson: JsonValue, beforeLayerId: String) {
+  public actual fun addStyleLayerJson(layerJson: ByteArray, beforeLayerId: String) {
     memScoped {
       Status.check(
         mln_map_add_style_layer_json(
           state.requireLive().rawHandleValue,
-          ValueStructs.jsonValue(layerJson, this),
+          ByteStructs.bufferView(layerJson, this),
           CoreStructs.stringView(beforeLayerId, this),
         )
       )
@@ -993,7 +996,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
   }
 
   public actual fun styleLayerType(layerId: String): String? = memScoped {
-    val outType = alloc<org.maplibre.nativeffi.internal.c.mln_string_view>()
+    val outType = alloc<org.maplibre.nativeffi.internal.c.mln_buffer_view>()
     val outFound = alloc<BooleanVar>()
     Status.check(
       mln_map_get_style_layer_type(
@@ -1025,7 +1028,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     }
   }
 
-  public actual fun styleLayerJson(layerId: String): JsonValue? = memScoped {
+  public actual fun styleLayerJson(layerId: String): ByteArray? = memScoped {
     val outLayer = alloc<ULongVar>()
     val outFound = alloc<BooleanVar>()
     outLayer.value = 0uL
@@ -1037,33 +1040,35 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         outFound.ptr,
       )
     )
-    if (outFound.value) ValueStructs.readJsonSnapshot(jsonSnapshotHandle(outLayer.value)) else null
+    if (outFound.value)
+      ByteStructs.ownedBuffer(outLayer.value.asHandle("mln_buffer", ::ownedBufferHandle))
+    else null
   }
 
-  public actual fun setStyleLightJson(lightJson: JsonValue) {
+  public actual fun setStyleLightJson(lightJson: ByteArray) {
     memScoped {
       Status.check(
         mln_map_set_style_light_json(
           state.requireLive().rawHandleValue,
-          ValueStructs.jsonValue(lightJson, this),
+          ByteStructs.bufferView(lightJson, this),
         )
       )
     }
   }
 
-  public actual fun setStyleLightProperty(propertyName: String, value: JsonValue) {
+  public actual fun setStyleLightProperty(propertyName: String, value: ByteArray) {
     memScoped {
       Status.check(
         mln_map_set_style_light_property(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(propertyName, this),
-          ValueStructs.jsonValue(value, this),
+          ByteStructs.bufferView(value, this),
         )
       )
     }
   }
 
-  public actual fun styleLightProperty(propertyName: String): JsonValue? = memScoped {
+  public actual fun styleLightProperty(propertyName: String): ByteArray? = memScoped {
     val outValue = alloc<ULongVar>()
     outValue.value = 0uL
     Status.check(
@@ -1073,7 +1078,8 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         outValue.ptr,
       )
     )
-    ValueStructs.readJsonSnapshot(jsonSnapshotHandle(outValue.value))
+    if (outValue.value == 0uL) null
+    else ByteStructs.ownedBuffer(outValue.value.asHandle("mln_buffer", ::ownedBufferHandle))
   }
 
   public actual fun setStyleTransitionOptions(options: StyleTransitionOptions) {
@@ -1095,20 +1101,20 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     StyleStructs.styleTransitionOptions(outOptions.pointed)
   }
 
-  public actual fun setLayerProperty(layerId: String, propertyName: String, value: JsonValue) {
+  public actual fun setLayerProperty(layerId: String, propertyName: String, value: ByteArray) {
     memScoped {
       Status.check(
         mln_map_set_layer_property(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(propertyName, this),
-          ValueStructs.jsonValue(value, this),
+          ByteStructs.bufferView(value, this),
         )
       )
     }
   }
 
-  public actual fun layerProperty(layerId: String, propertyName: String): JsonValue? = memScoped {
+  public actual fun layerProperty(layerId: String, propertyName: String): ByteArray? = memScoped {
     val outValue = alloc<ULongVar>()
     outValue.value = 0uL
     Status.check(
@@ -1119,16 +1125,17 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         outValue.ptr,
       )
     )
-    ValueStructs.readJsonSnapshot(jsonSnapshotHandle(outValue.value))
+    if (outValue.value == 0uL) null
+    else ByteStructs.ownedBuffer(outValue.value.asHandle("mln_buffer", ::ownedBufferHandle))
   }
 
-  public actual fun setLayerFilter(layerId: String, filter: JsonValue) {
+  public actual fun setLayerFilter(layerId: String, filter: ByteArray) {
     memScoped {
       Status.check(
         mln_map_set_layer_filter(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
-          ValueStructs.jsonValue(filter, this),
+          ByteStructs.bufferViewPointer(filter, this),
         )
       )
     }
@@ -1146,7 +1153,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     }
   }
 
-  public actual fun layerFilter(layerId: String): JsonValue? = memScoped {
+  public actual fun layerFilter(layerId: String): ByteArray? = memScoped {
     val outFilter = alloc<ULongVar>()
     outFilter.value = 0uL
     Status.check(
@@ -1156,7 +1163,8 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         outFilter.ptr,
       )
     )
-    ValueStructs.readJsonSnapshot(jsonSnapshotHandle(outFilter.value))
+    if (outFilter.value == 0uL) null
+    else ByteStructs.ownedBuffer(outFilter.value.asHandle("mln_buffer", ::ownedBufferHandle))
   }
 
   public actual fun setLayerSourceLayer(layerId: String, sourceLayer: String) {
@@ -1212,9 +1220,24 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     buffer.readBytes(checkedInt(outCopied.value, "map copied text size")).decodeToString()
   }
 
+  private fun copyMapBytes(
+    copy: (ULong, CPointer<UByteVar>?, ULong, CPointer<ULongVar>) -> Int
+  ): ByteArray = memScoped {
+    val handle = state.requireLive().rawHandleValue
+    val outSize = alloc<ULongVar>()
+    Status.check(copy(handle, null, 0UL, outSize.ptr))
+    val required = checkedInt(outSize.value, "map byte size")
+    if (required == 0) return@memScoped ByteArray(0)
+
+    val buffer = allocArray<UByteVar>(required)
+    val outCopied = alloc<ULongVar>()
+    Status.check(copy(handle, buffer, required.toULong(), outCopied.ptr))
+    buffer.reinterpret<ByteVar>().readBytes(checkedInt(outCopied.value, "map copied byte size"))
+  }
+
   private fun copyLayerText(
     layerId: String,
-    copy: (ULong, CValue<mln_string_view>, CPointer<ByteVar>?, ULong, CPointer<ULongVar>) -> Int,
+    copy: (ULong, CValue<mln_buffer_view>, CPointer<ByteVar>?, ULong, CPointer<ULongVar>) -> Int,
   ): String = memScoped {
     val handle = state.requireLive().rawHandleValue
     val outSize = alloc<ULongVar>()
@@ -1575,14 +1598,14 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
   }
 
   public actual fun cameraForGeometry(
-    geometry: Geometry,
+    geometry: ByteArray,
     fitOptions: CameraFitOptions?,
   ): CameraOptions = memScoped {
     val outCamera = mln_camera_options_default().getPointer(this)
     Status.check(
       mln_map_camera_for_geometry(
         state.requireLive().rawHandleValue,
-        ValueStructs.geometry(geometry, this),
+        ByteStructs.bufferView(geometry, this),
         fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
         outCamera,
       )

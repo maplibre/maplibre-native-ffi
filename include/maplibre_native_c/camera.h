@@ -550,8 +550,8 @@ MLN_API mln_status mln_map_camera_for_lat_lngs(
 /**
  * Computes a camera that fits a geometry in the current viewport.
  *
- * The geometry descriptor graph is borrowed for the duration of this call and
- * is not retained. Empty geometry objects and geometry collections with no
+ * The UTF-8 GeoJSON Geometry bytes are borrowed for this call and are not
+ * retained. Empty geometry objects and geometry collections with no
  * coordinates are invalid for camera fitting. Passing null fit_options uses
  * zero padding with no bearing or pitch override. On success, *out_camera is
  * overwritten.
@@ -566,7 +566,7 @@ MLN_API mln_status mln_map_camera_for_lat_lngs(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_camera_for_geometry(
-  mln_map map, const mln_geometry* geometry,
+  mln_map map, mln_buffer_view geometry,
   const mln_camera_fit_options* fit_options, mln_camera_options* out_camera
 ) MLN_NOEXCEPT;
 

@@ -16,7 +16,7 @@
 #include "unity.h"
 
 #define MLN_STRING_LITERAL(text) \
-  ((mln_string_view){.data = (text), .size = sizeof(text) - 1})
+  ((mln_buffer_view){.data = (text), .size = sizeof(text) - 1})
 
 // The source carries "encoding":"mlt" so the tiles parse as MapLibre Tiles, and
 // a layer references it because a source only loads tiles once one does.
@@ -60,7 +60,7 @@ static uint32_t serve_recorded_tile(
 static size_t query_admin_feature_count(
   mln_runtime runtime, mln_render_session session
 ) {
-  const mln_string_view source_layers[] = {MLN_STRING_LITERAL("admin")};
+  const mln_buffer_view source_layers[] = {MLN_STRING_LITERAL("admin")};
   mln_source_feature_query_options options =
     mln_source_feature_query_options_default();
   options.fields |= MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
@@ -75,16 +75,22 @@ static size_t query_admin_feature_count(
     );
     TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
 
-    mln_feature_query_result result = MLN_HANDLE_NULL;
+    mln_buffer result = MLN_HANDLE_NULL;
     const mln_status status = mln_render_session_query_source_features(
       session, MLN_STRING_LITERAL("mlt-source"), &options, &result
     );
     if (status == MLN_STATUS_OK) {
-      TEST_ASSERT_EQUAL_INT(
-        MLN_STATUS_OK, mln_feature_query_result_count(result, &count)
-      );
+      mln_buffer_view json = {0};
+      TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_buffer_get(result, &json));
+      static const char marker[] = "\"feature\":";
+      for (size_t index = 0; index + sizeof(marker) - 1 <= json.size;
+           index += 1) {
+        if (memcmp(json.data + index, marker, sizeof(marker) - 1) == 0) {
+          count += 1;
+        }
+      }
     }
-    mln_feature_query_result_destroy(result);
+    mln_buffer_destroy(result);
     if (count == 0) {
       mln_test_sleep_millisecond();
     }
@@ -127,7 +133,8 @@ static size_t decode_recorded_tile(
   mln_map map = mln_test_create_map_with_options(runtime, &map_options);
 
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_style_json(map, mlt_style_json)
+    MLN_STATUS_OK,
+    mln_map_set_style_json(map, MLN_BUFFER_LITERAL(mlt_style_json))
   );
 
   mln_test_render_fixture fixture = {0};

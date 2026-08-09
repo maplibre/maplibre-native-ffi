@@ -13,8 +13,6 @@ import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
-import org.maplibre.nativeffi.geo.Geometry
-import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
@@ -94,7 +92,7 @@ class RuntimeHandleTest {
         runtime.startCreateOfflineRegion(
           OfflineRegionDefinition.GeometryRegion(
             "custom://style.json",
-            Geometry.Point(LatLng(1.0, 2.0)),
+            "{\"type\":\"Point\",\"coordinates\":[2,1]}".encodeToByteArray(),
             0.0,
             1.0,
             1.0f,

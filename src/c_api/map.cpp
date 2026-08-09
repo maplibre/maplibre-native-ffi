@@ -111,7 +111,7 @@ auto mln_map_set_style_url(mln_map map, const char* url) noexcept
   });
 }
 
-auto mln_map_set_style_json(mln_map map, const char* json) noexcept
+auto mln_map_set_style_json(mln_map map, mln_buffer_view json) noexcept
   -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_style_json(map, json);
@@ -119,7 +119,7 @@ auto mln_map_set_style_json(mln_map map, const char* json) noexcept
 }
 
 auto mln_map_copy_loaded_style_json(
-  mln_map map, char* out_json, size_t json_capacity, size_t* out_json_size
+  mln_map map, uint8_t* out_json, size_t json_capacity, size_t* out_json_size
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_copy_loaded_style_json(
@@ -146,7 +146,7 @@ auto mln_style_id_list_count(mln_style_id_list list, size_t* out_count) noexcept
 }
 
 auto mln_style_id_list_get(
-  mln_style_id_list list, size_t index, mln_string_view* out_id
+  mln_style_id_list list, size_t index, mln_buffer_view* out_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::style_id_list_get(list, index, out_id);
@@ -166,7 +166,7 @@ auto mln_style_string_list_count(
 }
 
 auto mln_style_string_list_get(
-  mln_style_string_list list, size_t index, mln_string_view* out_value
+  mln_style_string_list list, size_t index, mln_buffer_view* out_value
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::style_string_list_get(list, index, out_value);
@@ -179,7 +179,7 @@ auto mln_style_string_list_destroy(mln_style_string_list list) noexcept
 }
 
 auto mln_map_add_style_source_json(
-  mln_map map, mln_string_view source_id, const mln_json_value* source_json
+  mln_map map, mln_buffer_view source_id, mln_buffer_view source_json
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_add_style_source_json(map, source_id, source_json);
@@ -187,7 +187,7 @@ auto mln_map_add_style_source_json(
 }
 
 auto mln_map_remove_style_source(
-  mln_map map, mln_string_view source_id, bool* out_removed
+  mln_map map, mln_buffer_view source_id, bool* out_removed
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_remove_style_source(map, source_id, out_removed);
@@ -195,7 +195,7 @@ auto mln_map_remove_style_source(
 }
 
 auto mln_map_style_source_exists(
-  mln_map map, mln_string_view source_id, bool* out_exists
+  mln_map map, mln_buffer_view source_id, bool* out_exists
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_style_source_exists(map, source_id, out_exists);
@@ -203,7 +203,7 @@ auto mln_map_style_source_exists(
 }
 
 auto mln_map_get_style_source_type(
-  mln_map map, mln_string_view source_id, uint32_t* out_source_type,
+  mln_map map, mln_buffer_view source_id, uint32_t* out_source_type,
   bool* out_found
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -214,7 +214,7 @@ auto mln_map_get_style_source_type(
 }
 
 auto mln_map_get_style_source_info(
-  mln_map map, mln_string_view source_id, mln_style_source_info* out_info,
+  mln_map map, mln_buffer_view source_id, mln_style_source_info* out_info,
   bool* out_found
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -225,7 +225,7 @@ auto mln_map_get_style_source_info(
 }
 
 auto mln_map_copy_style_source_attribution(
-  mln_map map, mln_string_view source_id, char* out_attribution,
+  mln_map map, mln_buffer_view source_id, char* out_attribution,
   size_t attribution_capacity, size_t* out_attribution_size, bool* out_found
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -237,7 +237,7 @@ auto mln_map_copy_style_source_attribution(
 }
 
 auto mln_map_copy_style_source_url(
-  mln_map map, mln_string_view source_id, char* out_url, size_t url_capacity,
+  mln_map map, mln_buffer_view source_id, char* out_url, size_t url_capacity,
   size_t* out_url_size, bool* out_found
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -248,7 +248,7 @@ auto mln_map_copy_style_source_url(
 }
 
 auto mln_map_get_style_source_tile_urls(
-  mln_map map, mln_string_view source_id, mln_style_string_list* out_tile_urls,
+  mln_map map, mln_buffer_view source_id, mln_style_string_list* out_tile_urls,
   bool* out_found
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -267,7 +267,7 @@ auto mln_map_list_style_source_ids(
 }
 
 auto mln_map_add_geojson_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
   const mln_geojson_source_options* options
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -276,7 +276,7 @@ auto mln_map_add_geojson_source_url(
 }
 
 auto mln_map_add_geojson_source_data(
-  mln_map map, mln_string_view source_id, const mln_geojson* data,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view data,
   const mln_geojson_source_options* options
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -287,7 +287,7 @@ auto mln_map_add_geojson_source_data(
 }
 
 auto mln_map_set_geojson_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_geojson_source_url(map, source_id, url);
@@ -295,7 +295,7 @@ auto mln_map_set_geojson_source_url(
 }
 
 auto mln_map_set_geojson_source_data(
-  mln_map map, mln_string_view source_id, const mln_geojson* data
+  mln_map map, mln_buffer_view source_id, mln_buffer_view data
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_geojson_source_data(map, source_id, data);
@@ -303,7 +303,7 @@ auto mln_map_set_geojson_source_data(
 }
 
 auto mln_map_add_vector_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
   const mln_style_tile_source_options* options
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -312,7 +312,7 @@ auto mln_map_add_vector_source_url(
 }
 
 auto mln_map_add_vector_source_tiles(
-  mln_map map, mln_string_view source_id, const mln_string_view* tiles,
+  mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -323,7 +323,7 @@ auto mln_map_add_vector_source_tiles(
 }
 
 auto mln_map_add_raster_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
   const mln_style_tile_source_options* options
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -332,7 +332,7 @@ auto mln_map_add_raster_source_url(
 }
 
 auto mln_map_add_raster_source_tiles(
-  mln_map map, mln_string_view source_id, const mln_string_view* tiles,
+  mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -343,7 +343,7 @@ auto mln_map_add_raster_source_tiles(
 }
 
 auto mln_map_add_raster_dem_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
   const mln_style_tile_source_options* options
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -354,7 +354,7 @@ auto mln_map_add_raster_dem_source_url(
 }
 
 auto mln_map_add_raster_dem_source_tiles(
-  mln_map map, mln_string_view source_id, const mln_string_view* tiles,
+  mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -365,7 +365,7 @@ auto mln_map_add_raster_dem_source_tiles(
 }
 
 auto mln_map_add_custom_geometry_source(
-  mln_map map, mln_string_view source_id,
+  mln_map map, mln_buffer_view source_id,
   const mln_custom_geometry_source_options* options
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -374,8 +374,8 @@ auto mln_map_add_custom_geometry_source(
 }
 
 auto mln_map_set_custom_geometry_source_tile_data(
-  mln_map map, mln_string_view source_id, mln_canonical_tile_id tile_id,
-  const mln_geojson* data
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view data
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_custom_geometry_source_tile_data(
@@ -385,7 +385,7 @@ auto mln_map_set_custom_geometry_source_tile_data(
 }
 
 auto mln_map_invalidate_custom_geometry_source_tile(
-  mln_map map, mln_string_view source_id, mln_canonical_tile_id tile_id
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_invalidate_custom_geometry_source_tile(
@@ -395,7 +395,7 @@ auto mln_map_invalidate_custom_geometry_source_tile(
 }
 
 auto mln_map_invalidate_custom_geometry_source_region(
-  mln_map map, mln_string_view source_id, mln_lat_lng_bounds bounds
+  mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_invalidate_custom_geometry_source_region(
@@ -405,7 +405,7 @@ auto mln_map_invalidate_custom_geometry_source_region(
 }
 
 auto mln_map_set_style_image(
-  mln_map map, mln_string_view image_id,
+  mln_map map, mln_buffer_view image_id,
   const mln_premultiplied_rgba8_image* image,
   const mln_style_image_options* options
 ) noexcept -> mln_status {
@@ -415,7 +415,7 @@ auto mln_map_set_style_image(
 }
 
 auto mln_map_remove_style_image(
-  mln_map map, mln_string_view image_id, bool* out_removed
+  mln_map map, mln_buffer_view image_id, bool* out_removed
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_remove_style_image(map, image_id, out_removed);
@@ -423,7 +423,7 @@ auto mln_map_remove_style_image(
 }
 
 auto mln_map_style_image_exists(
-  mln_map map, mln_string_view image_id, bool* out_exists
+  mln_map map, mln_buffer_view image_id, bool* out_exists
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_style_image_exists(map, image_id, out_exists);
@@ -431,7 +431,7 @@ auto mln_map_style_image_exists(
 }
 
 auto mln_map_get_style_image_info(
-  mln_map map, mln_string_view image_id, mln_style_image_info* out_info,
+  mln_map map, mln_buffer_view image_id, mln_style_image_info* out_info,
   bool* out_found
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -442,7 +442,7 @@ auto mln_map_get_style_image_info(
 }
 
 auto mln_map_copy_style_image_stretches(
-  mln_map map, mln_string_view image_id, mln_image_stretch* out_stretch_x,
+  mln_map map, mln_buffer_view image_id, mln_image_stretch* out_stretch_x,
   size_t stretch_x_capacity, size_t* out_stretch_x_count,
   mln_image_stretch* out_stretch_y, size_t stretch_y_capacity,
   size_t* out_stretch_y_count, bool* out_found
@@ -456,7 +456,7 @@ auto mln_map_copy_style_image_stretches(
 }
 
 auto mln_map_copy_style_image_premultiplied_rgba8(
-  mln_map map, mln_string_view image_id, uint8_t* out_pixels,
+  mln_map map, mln_buffer_view image_id, uint8_t* out_pixels,
   size_t pixel_capacity, size_t* out_byte_length, bool* out_found
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -467,8 +467,8 @@ auto mln_map_copy_style_image_premultiplied_rgba8(
 }
 
 auto mln_map_add_image_source_url(
-  mln_map map, mln_string_view source_id, const mln_lat_lng* coordinates,
-  size_t coordinate_count, mln_string_view url
+  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
+  size_t coordinate_count, mln_buffer_view url
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_add_image_source_url(
@@ -478,7 +478,7 @@ auto mln_map_add_image_source_url(
 }
 
 auto mln_map_add_image_source_image(
-  mln_map map, mln_string_view source_id, const mln_lat_lng* coordinates,
+  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
   size_t coordinate_count, const mln_premultiplied_rgba8_image* image
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -489,7 +489,7 @@ auto mln_map_add_image_source_image(
 }
 
 auto mln_map_set_image_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_image_source_url(map, source_id, url);
@@ -497,7 +497,7 @@ auto mln_map_set_image_source_url(
 }
 
 auto mln_map_set_image_source_image(
-  mln_map map, mln_string_view source_id,
+  mln_map map, mln_buffer_view source_id,
   const mln_premultiplied_rgba8_image* image
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -506,7 +506,7 @@ auto mln_map_set_image_source_image(
 }
 
 auto mln_map_set_image_source_coordinates(
-  mln_map map, mln_string_view source_id, const mln_lat_lng* coordinates,
+  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
   size_t coordinate_count
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -517,7 +517,7 @@ auto mln_map_set_image_source_coordinates(
 }
 
 auto mln_map_get_image_source_coordinates(
-  mln_map map, mln_string_view source_id, mln_lat_lng* out_coordinates,
+  mln_map map, mln_buffer_view source_id, mln_lat_lng* out_coordinates,
   size_t coordinate_capacity, size_t* out_coordinate_count, bool* out_found
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -529,8 +529,8 @@ auto mln_map_get_image_source_coordinates(
 }
 
 auto mln_map_add_hillshade_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view source_id,
-  mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
+  mln_buffer_view before_layer_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_add_hillshade_layer(
@@ -540,8 +540,8 @@ auto mln_map_add_hillshade_layer(
 }
 
 auto mln_map_add_color_relief_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view source_id,
-  mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
+  mln_buffer_view before_layer_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_add_color_relief_layer(
@@ -551,7 +551,7 @@ auto mln_map_add_color_relief_layer(
 }
 
 auto mln_map_add_location_indicator_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_add_location_indicator_layer(
@@ -561,7 +561,7 @@ auto mln_map_add_location_indicator_layer(
 }
 
 auto mln_map_set_location_indicator_location(
-  mln_map map, mln_string_view layer_id, mln_lat_lng coordinate, double altitude
+  mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_location_indicator_location(
@@ -571,7 +571,7 @@ auto mln_map_set_location_indicator_location(
 }
 
 auto mln_map_set_location_indicator_bearing(
-  mln_map map, mln_string_view layer_id, double bearing
+  mln_map map, mln_buffer_view layer_id, double bearing
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_location_indicator_bearing(
@@ -581,7 +581,7 @@ auto mln_map_set_location_indicator_bearing(
 }
 
 auto mln_map_set_location_indicator_accuracy_radius(
-  mln_map map, mln_string_view layer_id, double radius
+  mln_map map, mln_buffer_view layer_id, double radius
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_location_indicator_accuracy_radius(
@@ -591,8 +591,8 @@ auto mln_map_set_location_indicator_accuracy_radius(
 }
 
 auto mln_map_set_location_indicator_image_name(
-  mln_map map, mln_string_view layer_id, uint32_t image_kind,
-  mln_string_view image_id
+  mln_map map, mln_buffer_view layer_id, uint32_t image_kind,
+  mln_buffer_view image_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_location_indicator_image_name(
@@ -602,7 +602,7 @@ auto mln_map_set_location_indicator_image_name(
 }
 
 auto mln_map_add_style_layer_json(
-  mln_map map, const mln_json_value* layer_json, mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_json, mln_buffer_view before_layer_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_add_style_layer_json(
@@ -612,7 +612,7 @@ auto mln_map_add_style_layer_json(
 }
 
 auto mln_map_remove_style_layer(
-  mln_map map, mln_string_view layer_id, bool* out_removed
+  mln_map map, mln_buffer_view layer_id, bool* out_removed
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_remove_style_layer(map, layer_id, out_removed);
@@ -620,7 +620,7 @@ auto mln_map_remove_style_layer(
 }
 
 auto mln_map_style_layer_exists(
-  mln_map map, mln_string_view layer_id, bool* out_exists
+  mln_map map, mln_buffer_view layer_id, bool* out_exists
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_style_layer_exists(map, layer_id, out_exists);
@@ -628,7 +628,7 @@ auto mln_map_style_layer_exists(
 }
 
 auto mln_map_get_style_layer_type(
-  mln_map map, mln_string_view layer_id, mln_string_view* out_layer_type,
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view* out_layer_type,
   bool* out_found
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -647,7 +647,7 @@ auto mln_map_list_style_layer_ids(
 }
 
 auto mln_map_move_style_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_move_style_layer(map, layer_id, before_layer_id);
@@ -655,8 +655,7 @@ auto mln_map_move_style_layer(
 }
 
 auto mln_map_get_style_layer_json(
-  mln_map map, mln_string_view layer_id, mln_json_snapshot* out_layer,
-  bool* out_found
+  mln_map map, mln_buffer_view layer_id, mln_buffer* out_layer, bool* out_found
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_get_style_layer_json(
@@ -666,7 +665,7 @@ auto mln_map_get_style_layer_json(
 }
 
 auto mln_map_set_style_light_json(
-  mln_map map, const mln_json_value* light_json
+  mln_map map, mln_buffer_view light_json
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_style_light_json(map, light_json);
@@ -674,7 +673,7 @@ auto mln_map_set_style_light_json(
 }
 
 auto mln_map_set_style_light_property(
-  mln_map map, mln_string_view property_name, const mln_json_value* value
+  mln_map map, mln_buffer_view property_name, mln_buffer_view value
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_style_light_property(map, property_name, value);
@@ -682,7 +681,7 @@ auto mln_map_set_style_light_property(
 }
 
 auto mln_map_get_style_light_property(
-  mln_map map, mln_string_view property_name, mln_json_snapshot* out_value
+  mln_map map, mln_buffer_view property_name, mln_buffer* out_value
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_get_style_light_property(
@@ -708,8 +707,8 @@ auto mln_map_get_style_transition_options(
 }
 
 auto mln_map_set_layer_property(
-  mln_map map, mln_string_view layer_id, mln_string_view property_name,
-  const mln_json_value* value
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
+  mln_buffer_view value
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_layer_property(
@@ -719,8 +718,8 @@ auto mln_map_set_layer_property(
 }
 
 auto mln_map_get_layer_property(
-  mln_map map, mln_string_view layer_id, mln_string_view property_name,
-  mln_json_snapshot* out_value
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
+  mln_buffer* out_value
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_get_layer_property(
@@ -730,7 +729,7 @@ auto mln_map_get_layer_property(
 }
 
 auto mln_map_set_layer_filter(
-  mln_map map, mln_string_view layer_id, const mln_json_value* filter
+  mln_map map, mln_buffer_view layer_id, const mln_buffer_view* filter
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_layer_filter(map, layer_id, filter);
@@ -738,7 +737,7 @@ auto mln_map_set_layer_filter(
 }
 
 auto mln_map_get_layer_filter(
-  mln_map map, mln_string_view layer_id, mln_json_snapshot* out_filter
+  mln_map map, mln_buffer_view layer_id, mln_buffer* out_filter
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_get_layer_filter(map, layer_id, out_filter);
@@ -746,7 +745,7 @@ auto mln_map_get_layer_filter(
 }
 
 auto mln_map_set_layer_source_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view source_layer
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_layer_source_layer(map, layer_id, source_layer);
@@ -754,7 +753,7 @@ auto mln_map_set_layer_source_layer(
 }
 
 auto mln_map_copy_layer_source_layer(
-  mln_map map, mln_string_view layer_id, char* out_source_layer,
+  mln_map map, mln_buffer_view layer_id, char* out_source_layer,
   size_t source_layer_capacity, size_t* out_source_layer_size
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -766,7 +765,7 @@ auto mln_map_copy_layer_source_layer(
 }
 
 auto mln_map_set_layer_source_id(
-  mln_map map, mln_string_view layer_id, mln_string_view source_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_layer_source_id(map, layer_id, source_id);
@@ -774,7 +773,7 @@ auto mln_map_set_layer_source_id(
 }
 
 auto mln_map_copy_layer_source_id(
-  mln_map map, mln_string_view layer_id, char* out_source_id,
+  mln_map map, mln_buffer_view layer_id, char* out_source_id,
   size_t source_id_capacity, size_t* out_source_id_size
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -785,7 +784,7 @@ auto mln_map_copy_layer_source_id(
 }
 
 auto mln_map_set_layer_min_zoom(
-  mln_map map, mln_string_view layer_id, double min_zoom
+  mln_map map, mln_buffer_view layer_id, double min_zoom
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_layer_min_zoom(map, layer_id, min_zoom);
@@ -793,7 +792,7 @@ auto mln_map_set_layer_min_zoom(
 }
 
 auto mln_map_get_layer_min_zoom(
-  mln_map map, mln_string_view layer_id, double* out_min_zoom
+  mln_map map, mln_buffer_view layer_id, double* out_min_zoom
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_get_layer_min_zoom(map, layer_id, out_min_zoom);
@@ -801,7 +800,7 @@ auto mln_map_get_layer_min_zoom(
 }
 
 auto mln_map_set_layer_max_zoom(
-  mln_map map, mln_string_view layer_id, double max_zoom
+  mln_map map, mln_buffer_view layer_id, double max_zoom
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_layer_max_zoom(map, layer_id, max_zoom);
@@ -809,7 +808,7 @@ auto mln_map_set_layer_max_zoom(
 }
 
 auto mln_map_get_layer_max_zoom(
-  mln_map map, mln_string_view layer_id, double* out_max_zoom
+  mln_map map, mln_buffer_view layer_id, double* out_max_zoom
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_get_layer_max_zoom(map, layer_id, out_max_zoom);
@@ -817,7 +816,7 @@ auto mln_map_get_layer_max_zoom(
 }
 
 auto mln_map_set_layer_visibility(
-  mln_map map, mln_string_view layer_id, uint32_t visibility
+  mln_map map, mln_buffer_view layer_id, uint32_t visibility
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_layer_visibility(map, layer_id, visibility);
@@ -825,7 +824,7 @@ auto mln_map_set_layer_visibility(
 }
 
 auto mln_map_get_layer_visibility(
-  mln_map map, mln_string_view layer_id, uint32_t* out_visibility
+  mln_map map, mln_buffer_view layer_id, uint32_t* out_visibility
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_get_layer_visibility(map, layer_id, out_visibility);
@@ -1047,7 +1046,7 @@ auto mln_map_projection_set_visible_coordinates(
 }
 
 auto mln_map_projection_set_visible_geometry(
-  mln_map_projection projection, const mln_geometry* geometry,
+  mln_map_projection projection, mln_buffer_view geometry,
   mln_edge_insets padding
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -1202,7 +1201,7 @@ auto mln_map_camera_for_lat_lngs(
 }
 
 auto mln_map_camera_for_geometry(
-  mln_map map, const mln_geometry* geometry,
+  mln_map map, mln_buffer_view geometry,
   const mln_camera_fit_options* fit_options, mln_camera_options* out_camera
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {

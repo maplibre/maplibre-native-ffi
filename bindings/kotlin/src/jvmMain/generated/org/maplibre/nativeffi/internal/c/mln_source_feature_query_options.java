@@ -17,9 +17,9 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  * struct mln_source_feature_query_options {
  *     uint32_t size;
  *     uint32_t fields;
- *     const mln_string_view *source_layer_ids;
+ *     const mln_buffer_view *source_layer_ids;
  *     size_t source_layer_id_count;
- *     const mln_json_value *filter;
+ *     const mln_buffer_view *filter;
  * }
  * }
  */
@@ -137,7 +137,7 @@ public class mln_source_feature_query_options {
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * const mln_string_view *source_layer_ids
+     * const mln_buffer_view *source_layer_ids
      * }
      */
     public static final AddressLayout source_layer_ids$layout() {
@@ -149,7 +149,7 @@ public class mln_source_feature_query_options {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * const mln_string_view *source_layer_ids
+     * const mln_buffer_view *source_layer_ids
      * }
      */
     public static final long source_layer_ids$offset() {
@@ -159,7 +159,7 @@ public class mln_source_feature_query_options {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * const mln_string_view *source_layer_ids
+     * const mln_buffer_view *source_layer_ids
      * }
      */
     public static MemorySegment source_layer_ids(MemorySegment struct) {
@@ -169,7 +169,7 @@ public class mln_source_feature_query_options {
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * const mln_string_view *source_layer_ids
+     * const mln_buffer_view *source_layer_ids
      * }
      */
     public static void source_layer_ids(MemorySegment struct, MemorySegment fieldValue) {
@@ -225,7 +225,7 @@ public class mln_source_feature_query_options {
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * const mln_json_value *filter
+     * const mln_buffer_view *filter
      * }
      */
     public static final AddressLayout filter$layout() {
@@ -237,7 +237,7 @@ public class mln_source_feature_query_options {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * const mln_json_value *filter
+     * const mln_buffer_view *filter
      * }
      */
     public static final long filter$offset() {
@@ -247,7 +247,7 @@ public class mln_source_feature_query_options {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * const mln_json_value *filter
+     * const mln_buffer_view *filter
      * }
      */
     public static MemorySegment filter(MemorySegment struct) {
@@ -257,7 +257,7 @@ public class mln_source_feature_query_options {
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * const mln_json_value *filter
+     * const mln_buffer_view *filter
      * }
      */
     public static void filter(MemorySegment struct, MemorySegment fieldValue) {

@@ -5,25 +5,19 @@ import org.bytedeco.javacpp.BoolPointer
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.LongPointer
 import org.bytedeco.javacpp.Pointer
-import org.bytedeco.javacpp.PointerPointer
-import org.bytedeco.javacpp.SizeTPointer
 import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.error.MaplibreStatus
-import org.maplibre.nativeffi.geo.Feature
-import org.maplibre.nativeffi.geo.FeatureIdentifier
-import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.internal.javacpp.ByteArrayViewScope
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.javacpp.ownedBuffer
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
-import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.query.FeatureExtensionResult
 import org.maplibre.nativeffi.query.FeatureStateSelector
-import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
@@ -158,23 +152,23 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     Status.check(MaplibreNativeC.mln_render_session_dump_debug_logs(requireLiveHandle()))
   }
 
-  public actual fun setFeatureState(selector: FeatureStateSelector, value: JsonValue) {
+  public actual fun setFeatureState(selector: FeatureStateSelector, value: ByteArray) {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("set feature state")
     FeatureStateSelectorScope(selector).use { nativeSelector ->
-      JsonScope(value).use { nativeValue ->
+      ByteArrayViewScope(value).use { nativeValue ->
         Status.check(
           MaplibreNativeC.mln_render_session_set_feature_state(
             requireLiveHandle(),
             nativeSelector.selector,
-            nativeValue.value,
+            nativeValue.view,
           )
         )
       }
     }
   }
 
-  public actual fun getFeatureState(selector: FeatureStateSelector): JsonValue {
+  public actual fun getFeatureState(selector: FeatureStateSelector): ByteArray {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("get feature state")
     FeatureStateSelectorScope(selector).use { nativeSelector ->
@@ -187,7 +181,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
             outState,
           )
         )
-        return jsonSnapshot(outState) ?: JsonValue.ObjectValue(emptyList())
+        return ownedBuffer(outState.get())
       }
     }
   }
@@ -208,7 +202,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
   public actual fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): List<QueriedFeature> {
+  ): ByteArray {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("query rendered features")
     RenderedQueryGeometryScope(geometry).use { nativeGeometry ->
@@ -223,7 +217,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
               outResult,
             )
           )
-          return featureQueryResult(outResult)
+          return ownedBuffer(outResult.get())
         }
       }
     }
@@ -232,7 +226,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
   public actual fun querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ): List<QueriedFeature> {
+  ): ByteArray {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("query source features")
     StringViewScope(sourceId).use { nativeSourceId ->
@@ -247,7 +241,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
               outResult,
             )
           )
-          return featureQueryResult(outResult)
+          return ownedBuffer(outResult.get())
         }
       }
     }
@@ -255,32 +249,32 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
 
   public actual fun queryFeatureExtension(
     sourceId: String,
-    feature: Feature,
+    feature: ByteArray,
     extension: String,
     extensionField: String,
-    arguments: JsonValue?,
-  ): FeatureExtensionResult {
+    arguments: ByteArray?,
+  ): ByteArray {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("query feature extension")
     StringViewScope(sourceId).use { nativeSourceId ->
-      FeatureScope(feature).use { nativeFeature ->
+      ByteArrayViewScope(feature).use { nativeFeature ->
         StringViewScope(extension).use { nativeExtension ->
           StringViewScope(extensionField).use { nativeExtensionField ->
-            JsonScope(arguments ?: JsonValue.Null).use { nativeArguments ->
+            ByteArrayViewScope(arguments ?: byteArrayOf()).use { nativeArguments ->
               LongPointer(1).use { outResult ->
                 outResult.put(0, 0L)
                 Status.check(
                   MaplibreNativeC.mln_render_session_query_feature_extensions(
                     requireLiveHandle(),
                     nativeSourceId.view,
-                    nativeFeature.feature,
+                    nativeFeature.view,
                     nativeExtension.view,
                     nativeExtensionField.view,
-                    if (arguments == null) null else nativeArguments.value,
+                    if (arguments == null) null else nativeArguments.view,
                     outResult,
                   )
                 )
-                return featureExtensionResult(outResult)
+                return ownedBuffer(outResult.get())
               }
             }
           }
@@ -754,230 +748,16 @@ private fun openglOwnedTextureFrame(
 private fun address(pointer: Pointer?): Long =
   if (pointer == null || pointer.isNull) 0L else pointer.address()
 
-private fun jsonSnapshot(outSnapshot: LongPointer): JsonValue? {
-  // A null snapshot means the value is absent, which the C API reports as success.
-  val snapshot = outSnapshot.get()
-  if (snapshot == 0L) return null
-  return try {
-    PointerPointer<Pointer>(1).use { outValue ->
-      outValue.put(0, null as Pointer?)
-      Status.check(MaplibreNativeC.mln_json_snapshot_get(snapshot, outValue))
-      val valuePointer = outValue.get(Pointer::class.java, 0) ?: return null
-      if (valuePointer.isNull) null else jsonValue(MaplibreNativeC.mln_json_value(valuePointer))
-    }
-  } finally {
-    MaplibreNativeC.mln_json_snapshot_destroy(snapshot)
-  }
-}
-
-private fun jsonValue(value: MaplibreNativeC.mln_json_value): JsonValue =
-  when (value.type()) {
-    MaplibreNativeC.MLN_JSON_VALUE_TYPE_NULL -> JsonValue.Null
-    MaplibreNativeC.MLN_JSON_VALUE_TYPE_BOOL -> JsonValue.Bool(value.data_bool_value())
-    MaplibreNativeC.MLN_JSON_VALUE_TYPE_UINT -> JsonValue.UInt(value.data_uint_value())
-    MaplibreNativeC.MLN_JSON_VALUE_TYPE_INT -> JsonValue.Int(value.data_int_value())
-    MaplibreNativeC.MLN_JSON_VALUE_TYPE_DOUBLE -> JsonValue.DoubleValue(value.data_double_value())
-    MaplibreNativeC.MLN_JSON_VALUE_TYPE_STRING ->
-      JsonValue.StringValue(stringView(value.data_string_value()))
-    MaplibreNativeC.MLN_JSON_VALUE_TYPE_ARRAY -> jsonArray(value.data_array_value())
-    MaplibreNativeC.MLN_JSON_VALUE_TYPE_OBJECT -> jsonObject(value.data_object_value())
-    else -> JsonValue.Unknown(value.type(), value.size())
-  }
-
-private fun jsonArray(array: MaplibreNativeC.mln_json_array): JsonValue.Array {
-  val nativeValues = array.values()
-  return JsonValue.Array(
-    List(Math.toIntExact(array.value_count())) { index ->
-      jsonValue(nativeValues.getPointer(index.toLong()))
-    }
-  )
-}
-
-private fun jsonObject(obj: MaplibreNativeC.mln_json_object): JsonValue.ObjectValue {
-  val nativeMembers = obj.members()
-  return JsonValue.ObjectValue(
-    List(Math.toIntExact(obj.member_count())) { index ->
-      val member = nativeMembers.getPointer(index.toLong())
-      JsonValue.Member(stringView(member.key()), jsonValue(member.value()))
-    }
-  )
-}
-
-private fun stringView(value: MaplibreNativeC.mln_string_view): String {
+private fun stringView(value: MaplibreNativeC.mln_buffer_view): String {
   val size = Math.toIntExact(value.size())
   if (size == 0) return ""
   val bytes = ByteArray(size)
-  value.data().get(bytes, 0, size)
+  BytePointer(value.data()).get(bytes, 0, size)
   return String(bytes, StandardCharsets.UTF_8)
 }
 
 private fun pointerOrNull(pointer: NativePointer): Pointer? =
   if (pointer.isNull) null else AddressPointer(pointer.address)
-
-private fun featureQueryResult(outResult: LongPointer): List<QueriedFeature> {
-  val result = outResult.get()
-  return featureQueryResult(
-    result,
-    counter = MaplibreNativeC::mln_feature_query_result_count,
-    getter = MaplibreNativeC::mln_feature_query_result_get,
-    destroyer = MaplibreNativeC::mln_feature_query_result_destroy,
-  )
-}
-
-private fun featureQueryResult(
-  result: Long,
-  counter: (Long, SizeTPointer) -> Int,
-  getter: (Long, Long, MaplibreNativeC.mln_queried_feature) -> Int,
-  destroyer: (Long) -> Unit,
-): List<QueriedFeature> {
-  return try {
-    SizeTPointer(1).use { outCount ->
-      Status.check(counter(result, outCount))
-      val count = Math.toIntExact(outCount.get())
-      List(count) { index ->
-        val outFeature = MaplibreNativeC.mln_queried_feature()
-        try {
-          outFeature.size(outFeature.sizeof())
-          Status.check(getter(result, index.toLong(), outFeature))
-          queriedFeature(outFeature)
-        } finally {
-          outFeature.close()
-        }
-      }
-    }
-  } finally {
-    destroyer(result)
-  }
-}
-
-private fun featureExtensionResult(outResult: LongPointer): FeatureExtensionResult {
-  val result = outResult.get()
-  return try {
-    val info = MaplibreNativeC.mln_feature_extension_result_info()
-    try {
-      info.size(info.sizeof())
-      Status.check(MaplibreNativeC.mln_feature_extension_result_get(result, info))
-      when (info.type()) {
-        MaplibreNativeC.MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE ->
-          FeatureExtensionResult.Value(jsonValue(info.data_value()))
-        MaplibreNativeC.MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION ->
-          FeatureExtensionResult.FeatureCollection(
-            featureCollection(info.data_feature_collection())
-          )
-        else -> FeatureExtensionResult.Unknown(info.type())
-      }
-    } finally {
-      info.close()
-    }
-  } finally {
-    MaplibreNativeC.mln_feature_extension_result_destroy(result)
-  }
-}
-
-private fun queriedFeature(value: MaplibreNativeC.mln_queried_feature): QueriedFeature {
-  val fields = value.fields()
-  val sourceId =
-    if ((fields and MaplibreNativeC.MLN_QUERIED_FEATURE_SOURCE_ID) != 0) {
-      stringView(value.source_id())
-    } else {
-      null
-    }
-  val sourceLayerId =
-    if ((fields and MaplibreNativeC.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID) != 0) {
-      stringView(value.source_layer_id())
-    } else {
-      null
-    }
-  val state =
-    if ((fields and MaplibreNativeC.MLN_QUERIED_FEATURE_STATE) != 0 && !value.state().isNull) {
-      jsonValue(value.state())
-    } else {
-      null
-    }
-  return QueriedFeature(feature(value.feature()), sourceId, sourceLayerId, state)
-}
-
-private fun featureCollection(value: MaplibreNativeC.mln_feature_collection): List<Feature> {
-  val count = Math.toIntExact(value.feature_count())
-  val nativeFeatures = value.features()
-  return List(count) { index -> feature(nativeFeatures.getPointer(index.toLong())) }
-}
-
-private fun feature(value: MaplibreNativeC.mln_feature): Feature {
-  val properties =
-    List(Math.toIntExact(value.property_count())) { index ->
-      val member = value.properties().getPointer(index.toLong())
-      JsonValue.Member(stringView(member.key()), jsonValue(member.value()))
-    }
-  return Feature(geometry(value.geometry()), properties, featureIdentifier(value))
-}
-
-private fun featureIdentifier(value: MaplibreNativeC.mln_feature): FeatureIdentifier =
-  when (value.identifier_type()) {
-    MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_NULL -> FeatureIdentifier.Null
-    MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_UINT ->
-      FeatureIdentifier.UInt(value.identifier_uint_value())
-    MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_INT ->
-      FeatureIdentifier.Int(value.identifier_int_value())
-    MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE ->
-      FeatureIdentifier.DoubleValue(value.identifier_double_value())
-    MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_STRING ->
-      FeatureIdentifier.StringValue(stringView(value.identifier_string_value()))
-    else -> FeatureIdentifier.Unknown(value.identifier_type())
-  }
-
-private fun geometry(value: MaplibreNativeC.mln_geometry): Geometry =
-  when (value.type()) {
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_EMPTY -> Geometry.Empty
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_POINT -> Geometry.Point(latLng(value.data_point()))
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_LINE_STRING ->
-      Geometry.LineString(coordinateSpan(value.data_line_string()))
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_POLYGON -> Geometry.Polygon(polygon(value.data_polygon()))
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POINT ->
-      Geometry.MultiPoint(coordinateSpan(value.data_multi_point()))
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING -> {
-      val native = value.data_multi_line_string()
-      val lines = native.lines()
-      Geometry.MultiLineString(
-        List(Math.toIntExact(native.line_count())) { index ->
-          coordinateSpan(lines.getPointer(index.toLong()))
-        }
-      )
-    }
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POLYGON -> {
-      val native = value.data_multi_polygon()
-      val polygons = native.polygons()
-      Geometry.MultiPolygon(
-        List(Math.toIntExact(native.polygon_count())) { index ->
-          polygon(polygons.getPointer(index.toLong()))
-        }
-      )
-    }
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION -> {
-      val native = value.data_geometry_collection()
-      val geometries = native.geometries()
-      Geometry.Collection(
-        List(Math.toIntExact(native.geometry_count())) { index ->
-          geometry(geometries.getPointer(index.toLong()))
-        }
-      )
-    }
-    else -> Geometry.Unknown(value.type(), value.size())
-  }
-
-private fun coordinateSpan(value: MaplibreNativeC.mln_coordinate_span): List<LatLng> {
-  val coordinates = value.coordinates()
-  return List(Math.toIntExact(value.coordinate_count())) { index ->
-    latLng(coordinates.getPointer(index.toLong()))
-  }
-}
-
-private fun polygon(value: MaplibreNativeC.mln_polygon_geometry): List<List<LatLng>> {
-  val rings = value.rings()
-  return List(Math.toIntExact(value.ring_count())) { index ->
-    coordinateSpan(rings.getPointer(index.toLong()))
-  }
-}
 
 private fun latLng(value: MaplibreNativeC.mln_lat_lng): LatLng =
   LatLng(value.latitude(), value.longitude())
@@ -1028,7 +808,7 @@ private class RenderedQueryGeometryScope(value: RenderedQueryGeometry) : AutoClo
 private class RenderedFeatureQueryOptionsScope(value: RenderedFeatureQueryOptions?) :
   AutoCloseable {
   private val strings = mutableListOf<StringViewScope>()
-  private val filter = value?.filter?.let(::JsonScope)
+  private val filter = value?.filterTransit?.let(::ByteArrayViewScope)
   private val layerIds = value?.layerIds?.let { stringViewArray(it) }
   val options: MaplibreNativeC.mln_rendered_feature_query_options? = value?.let {
     MaplibreNativeC.mln_rendered_feature_query_options_default().apply {
@@ -1040,7 +820,7 @@ private class RenderedFeatureQueryOptionsScope(value: RenderedFeatureQueryOption
         }
         layer_id_count(layerIdValues.size.toLong())
       }
-      filter?.let { nativeFilter -> filter(nativeFilter.value) }
+      filter?.let { nativeFilter -> filter(nativeFilter.view) }
       fields(fields)
     }
   }
@@ -1052,15 +832,15 @@ private class RenderedFeatureQueryOptionsScope(value: RenderedFeatureQueryOption
     strings.asReversed().forEach(StringViewScope::close)
   }
 
-  private fun stringViewArray(values: List<String>): MaplibreNativeC.mln_string_view? {
+  private fun stringViewArray(values: List<String>): MaplibreNativeC.mln_buffer_view? {
     if (values.isEmpty()) {
       return null
     }
-    val out = MaplibreNativeC.mln_string_view(values.size.toLong())
+    val out = MaplibreNativeC.mln_buffer_view(values.size.toLong())
     values.forEachIndexed { index, value ->
       val scope = StringViewScope(value)
       strings += scope
-      out.position(index.toLong()).put<MaplibreNativeC.mln_string_view>(scope.view)
+      out.position(index.toLong()).put<MaplibreNativeC.mln_buffer_view>(scope.view)
     }
     out.position(0)
     return out
@@ -1069,7 +849,7 @@ private class RenderedFeatureQueryOptionsScope(value: RenderedFeatureQueryOption
 
 private class SourceFeatureQueryOptionsScope(value: SourceFeatureQueryOptions?) : AutoCloseable {
   private val strings = mutableListOf<StringViewScope>()
-  private val filter = value?.filter?.let(::JsonScope)
+  private val filter = value?.filterTransit?.let(::ByteArrayViewScope)
   private val sourceLayerIds = value?.sourceLayerIds?.let { stringViewArray(it) }
   val options: MaplibreNativeC.mln_source_feature_query_options? = value?.let {
     MaplibreNativeC.mln_source_feature_query_options_default().apply {
@@ -1081,7 +861,7 @@ private class SourceFeatureQueryOptionsScope(value: SourceFeatureQueryOptions?) 
         }
         source_layer_id_count(sourceLayerIdValues.size.toLong())
       }
-      filter?.let { nativeFilter -> filter(nativeFilter.value) }
+      filter?.let { nativeFilter -> filter(nativeFilter.view) }
       fields(fields)
     }
   }
@@ -1093,223 +873,19 @@ private class SourceFeatureQueryOptionsScope(value: SourceFeatureQueryOptions?) 
     strings.asReversed().forEach(StringViewScope::close)
   }
 
-  private fun stringViewArray(values: List<String>): MaplibreNativeC.mln_string_view? {
+  private fun stringViewArray(values: List<String>): MaplibreNativeC.mln_buffer_view? {
     if (values.isEmpty()) {
       return null
     }
-    val out = MaplibreNativeC.mln_string_view(values.size.toLong())
+    val out = MaplibreNativeC.mln_buffer_view(values.size.toLong())
     values.forEachIndexed { index, value ->
       val scope = StringViewScope(value)
       strings += scope
-      out.position(index.toLong()).put<MaplibreNativeC.mln_string_view>(scope.view)
+      out.position(index.toLong()).put<MaplibreNativeC.mln_buffer_view>(scope.view)
     }
     out.position(0)
     return out
   }
-}
-
-private class FeatureScope(feature: Feature) : AutoCloseable {
-  private val scope = FeatureDescriptorScope()
-  val feature: MaplibreNativeC.mln_feature = scope.feature(feature, 0)
-
-  override fun close() {
-    scope.close()
-  }
-}
-
-private class FeatureDescriptorScope : AutoCloseable {
-  private val owned = mutableListOf<Pointer>()
-  private val strings = mutableListOf<StringViewScope>()
-  private val jsonValues = mutableListOf<JsonScope>()
-
-  override fun close() {
-    jsonValues.asReversed().forEach(JsonScope::close)
-    owned.asReversed().forEach(Pointer::close)
-    strings.asReversed().forEach(StringViewScope::close)
-  }
-
-  fun feature(value: Feature, depth: Int): MaplibreNativeC.mln_feature {
-    val out = own(MaplibreNativeC.mln_feature())
-    out.size(out.sizeof())
-    out.geometry(geometry(value.geometry, depth + 1))
-    if (value.properties.isNotEmpty()) {
-      val nativeMembers = own(MaplibreNativeC.mln_json_member(value.properties.size.toLong()))
-      value.properties.forEachIndexed { index, member ->
-        nativeMembers.position(index.toLong())
-        nativeMembers.key(string(member.key))
-        nativeMembers.value(json(member.value))
-      }
-      nativeMembers.position(0)
-      out.properties(nativeMembers)
-    }
-    out.property_count(value.properties.size.toLong())
-    featureIdentifier(out, value.identifier)
-    return out
-  }
-
-  private fun geometry(value: Geometry, depth: Int): MaplibreNativeC.mln_geometry {
-    Status.requireArgument(depth <= Geometry.MAX_COLLECTION_DEPTH) {
-      "Geometry collection depth exceeds ${Geometry.MAX_COLLECTION_DEPTH}"
-    }
-    val out = own(MaplibreNativeC.mln_geometry())
-    out.size(out.sizeof())
-    when (value) {
-      Geometry.Empty -> out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_EMPTY)
-      is Geometry.Point ->
-        out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_POINT).data_point(latLng(value.coordinate))
-      is Geometry.LineString ->
-        out
-          .type(MaplibreNativeC.MLN_GEOMETRY_TYPE_LINE_STRING)
-          .data_line_string(coordinateSpan(value.coordinates))
-      is Geometry.Polygon ->
-        out
-          .type(MaplibreNativeC.MLN_GEOMETRY_TYPE_POLYGON)
-          .data_polygon(polygonGeometry(value.rings))
-      is Geometry.MultiPoint ->
-        out
-          .type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POINT)
-          .data_multi_point(coordinateSpan(value.coordinates))
-      is Geometry.MultiLineString ->
-        out
-          .type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING)
-          .data_multi_line_string(multiLineGeometry(value.lines))
-      is Geometry.MultiPolygon ->
-        out
-          .type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POLYGON)
-          .data_multi_polygon(multiPolygonGeometry(value.polygons))
-      is Geometry.Collection ->
-        out
-          .type(MaplibreNativeC.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION)
-          .data_geometry_collection(geometryCollection(value.geometries, depth + 1))
-      is Geometry.Unknown ->
-        throw Status.invalidArgument("unknown geometries cannot be used as input")
-    }
-    return out
-  }
-
-  private fun coordinateSpan(values: List<LatLng>): MaplibreNativeC.mln_coordinate_span {
-    val out = own(MaplibreNativeC.mln_coordinate_span())
-    if (values.isNotEmpty()) {
-      val coordinates = own(MaplibreNativeC.mln_lat_lng(values.size.toLong()))
-      values.forEachIndexed { index, value ->
-        coordinates.position(index.toLong()).latitude(value.latitude).longitude(value.longitude)
-      }
-      coordinates.position(0)
-      out.coordinates(coordinates)
-    }
-    out.coordinate_count(values.size.toLong())
-    return out
-  }
-
-  private fun coordinateSpans(values: List<List<LatLng>>): MaplibreNativeC.mln_coordinate_span? {
-    if (values.isEmpty()) {
-      return null
-    }
-    val out = own(MaplibreNativeC.mln_coordinate_span(values.size.toLong()))
-    values.forEachIndexed { index, value ->
-      out.position(index.toLong()).put<MaplibreNativeC.mln_coordinate_span>(coordinateSpan(value))
-    }
-    out.position(0)
-    return out
-  }
-
-  private fun polygonGeometry(rings: List<List<LatLng>>): MaplibreNativeC.mln_polygon_geometry {
-    val out = own(MaplibreNativeC.mln_polygon_geometry())
-    coordinateSpans(rings)?.let(out::rings)
-    out.ring_count(rings.size.toLong())
-    return out
-  }
-
-  private fun multiLineGeometry(
-    lines: List<List<LatLng>>
-  ): MaplibreNativeC.mln_multi_line_geometry {
-    val out = own(MaplibreNativeC.mln_multi_line_geometry())
-    coordinateSpans(lines)?.let(out::lines)
-    out.line_count(lines.size.toLong())
-    return out
-  }
-
-  private fun multiPolygonGeometry(
-    polygons: List<List<List<LatLng>>>
-  ): MaplibreNativeC.mln_multi_polygon_geometry {
-    val out = own(MaplibreNativeC.mln_multi_polygon_geometry())
-    if (polygons.isNotEmpty()) {
-      val nativePolygons = own(MaplibreNativeC.mln_polygon_geometry(polygons.size.toLong()))
-      polygons.forEachIndexed { index, polygon ->
-        nativePolygons
-          .position(index.toLong())
-          .put<MaplibreNativeC.mln_polygon_geometry>(polygonGeometry(polygon))
-      }
-      nativePolygons.position(0)
-      out.polygons(nativePolygons)
-    }
-    out.polygon_count(polygons.size.toLong())
-    return out
-  }
-
-  private fun geometryCollection(
-    geometries: List<Geometry>,
-    depth: Int,
-  ): MaplibreNativeC.mln_geometry_collection {
-    val out = own(MaplibreNativeC.mln_geometry_collection())
-    if (geometries.isNotEmpty()) {
-      val nativeGeometries = own(MaplibreNativeC.mln_geometry(geometries.size.toLong()))
-      geometries.forEachIndexed { index, childGeometry ->
-        nativeGeometries
-          .position(index.toLong())
-          .put<MaplibreNativeC.mln_geometry>(geometry(childGeometry, depth))
-      }
-      nativeGeometries.position(0)
-      out.geometries(nativeGeometries)
-    }
-    out.geometry_count(geometries.size.toLong())
-    return out
-  }
-
-  private fun featureIdentifier(out: MaplibreNativeC.mln_feature, value: FeatureIdentifier) {
-    when (value) {
-      FeatureIdentifier.Null ->
-        out.identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_NULL)
-      is FeatureIdentifier.UInt ->
-        out
-          .identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_UINT)
-          .identifier_uint_value(value.value)
-      is FeatureIdentifier.Int ->
-        out
-          .identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_INT)
-          .identifier_int_value(value.value)
-      is FeatureIdentifier.DoubleValue ->
-        out
-          .identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE)
-          .identifier_double_value(value.value)
-      is FeatureIdentifier.StringValue ->
-        out
-          .identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_STRING)
-          .identifier_string_value(string(value.value))
-      is FeatureIdentifier.Unknown ->
-        throw Status.invalidArgument("unknown feature identifiers cannot be used as input")
-    }
-  }
-
-  private fun <T : Pointer> own(pointer: T): T {
-    owned += pointer
-    return pointer
-  }
-
-  private fun string(value: String): MaplibreNativeC.mln_string_view {
-    val scope = StringViewScope(value)
-    strings += scope
-    return scope.view
-  }
-
-  private fun json(value: JsonValue): MaplibreNativeC.mln_json_value {
-    val scope = JsonScope(value)
-    jsonValues += scope
-    return scope.value
-  }
-
-  private fun latLng(value: LatLng): MaplibreNativeC.mln_lat_lng =
-    own(MaplibreNativeC.mln_lat_lng().latitude(value.latitude).longitude(value.longitude))
 }
 
 private class FeatureStateSelectorScope(value: FeatureStateSelector) : AutoCloseable {
@@ -1348,87 +924,9 @@ private class FeatureStateSelectorScope(value: FeatureStateSelector) : AutoClose
   }
 }
 
-private class JsonScope(value: JsonValue) : AutoCloseable {
-  private val owned = mutableListOf<Pointer>()
-  private val strings = mutableListOf<StringViewScope>()
-  val value: MaplibreNativeC.mln_json_value = jsonValue(value)
-
-  override fun close() {
-    owned.asReversed().forEach(Pointer::close)
-    strings.asReversed().forEach(StringViewScope::close)
-  }
-
-  private fun <T : Pointer> own(pointer: T): T {
-    owned += pointer
-    return pointer
-  }
-
-  private fun string(value: String): MaplibreNativeC.mln_string_view {
-    val scope = StringViewScope(value)
-    strings += scope
-    return scope.view
-  }
-
-  private fun jsonValue(value: JsonValue, depth: Int = 0): MaplibreNativeC.mln_json_value {
-    Status.requireArgument(depth <= JsonValue.MAX_DESCRIPTOR_DEPTH) {
-      "JSON descriptor depth exceeds ${JsonValue.MAX_DESCRIPTOR_DEPTH}"
-    }
-    val out = own(MaplibreNativeC.mln_json_value())
-    out.size(out.sizeof())
-    when (value) {
-      JsonValue.Null -> out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_NULL)
-      is JsonValue.Bool ->
-        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_BOOL).data_bool_value(value.value)
-      is JsonValue.UInt ->
-        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_UINT).data_uint_value(value.value)
-      is JsonValue.Int ->
-        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_INT).data_int_value(value.value)
-      is JsonValue.DoubleValue ->
-        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_DOUBLE).data_double_value(value.value)
-      is JsonValue.StringValue ->
-        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_STRING).data_string_value(string(value.value))
-      is JsonValue.Array -> {
-        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_ARRAY)
-        val array = own(MaplibreNativeC.mln_json_array())
-        if (value.values.isNotEmpty()) {
-          val nativeValues = own(MaplibreNativeC.mln_json_value(value.values.size.toLong()))
-          value.values.forEachIndexed { index, child ->
-            nativeValues
-              .position(index.toLong())
-              .put<MaplibreNativeC.mln_json_value>(jsonValue(child, depth + 1))
-          }
-          nativeValues.position(0)
-          array.values(nativeValues)
-        }
-        array.value_count(value.values.size.toLong())
-        out.data_array_value(array)
-      }
-      is JsonValue.ObjectValue -> {
-        out.type(MaplibreNativeC.MLN_JSON_VALUE_TYPE_OBJECT)
-        val obj = own(MaplibreNativeC.mln_json_object())
-        if (value.members.isNotEmpty()) {
-          val nativeMembers = own(MaplibreNativeC.mln_json_member(value.members.size.toLong()))
-          value.members.forEachIndexed { index, member ->
-            nativeMembers.position(index.toLong())
-            nativeMembers.key(string(member.key))
-            nativeMembers.value(jsonValue(member.value, depth + 1))
-          }
-          nativeMembers.position(0)
-          obj.members(nativeMembers)
-        }
-        obj.member_count(value.members.size.toLong())
-        out.data_object_value(obj)
-      }
-      is JsonValue.Unknown ->
-        throw Status.invalidArgument("unknown JSON values cannot be used as input")
-    }
-    return out
-  }
-}
-
 private class StringViewScope(value: String) : AutoCloseable {
   private val bytes: BytePointer
-  val view: MaplibreNativeC.mln_string_view = MaplibreNativeC.mln_string_view()
+  val view: MaplibreNativeC.mln_buffer_view = MaplibreNativeC.mln_buffer_view()
 
   init {
     val utf8 = value.toByteArray(StandardCharsets.UTF_8)

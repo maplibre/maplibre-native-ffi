@@ -32,21 +32,14 @@ import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.UnsupportedFeatureException
 import org.maplibre.nativeffi.error.WrongThreadException
-import org.maplibre.nativeffi.geo.Feature
-import org.maplibre.nativeffi.geo.FeatureIdentifier
-import org.maplibre.nativeffi.geo.GeoJson
-import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.geo.ScreenPoint
-import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
-import org.maplibre.nativeffi.query.FeatureExtensionResult
 import org.maplibre.nativeffi.query.FeatureStateSelector
-import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
@@ -208,16 +201,7 @@ class RenderSessionHandleTest {
                 ScreenPoint(queryPoint.x + 20.0, queryPoint.y + 20.0),
               )
             )
-          val filter =
-            JsonValue.Array(
-              listOf(
-                JsonValue.StringValue("=="),
-                JsonValue.Array(
-                  listOf(JsonValue.StringValue("get"), JsonValue.StringValue("kind"))
-                ),
-                JsonValue.StringValue("capital"),
-              )
-            )
+          val filter = jsonBytes("""["==",["get","kind"],"capital"]""")
           val rendered =
             waitForQueriedFeature(runtime, map, session) {
               session.queryRenderedFeatures(
@@ -228,8 +212,8 @@ class RenderSessionHandleTest {
                 },
               )
             }
-          assertEquals("point", rendered.sourceId)
-          assertEquals(JsonValue.StringValue("capital"), member(rendered, "kind"))
+          assertEquals("point", stringMember(rendered, "sourceId"))
+          assertEquals("capital", featureStringMember(rendered, "kind"))
 
           val source =
             waitForQueriedFeature(runtime, map, session) {
@@ -238,16 +222,16 @@ class RenderSessionHandleTest {
                 SourceFeatureQueryOptions().apply { this.filter = filter },
               )
             }
-          assertEquals("point", source.sourceId)
-          assertEquals(JsonValue.StringValue("capital"), member(source, "kind"))
+          assertEquals("point", stringMember(source, "sourceId"))
+          assertEquals("capital", featureStringMember(source, "kind"))
 
           assertFailsWith<InvalidArgumentException> {
-            session.setFeatureState(featureStateSelector(), JsonValue.Array(emptyList()))
+            session.setFeatureState(featureStateSelector(), jsonBytes("[]"))
           }
           session.setFeatureState(featureStateSelector(), featureState())
           val copiedState = session.getFeatureState(featureStateSelector())
-          assertEquals(JsonValue.Bool(true), member(copiedState, "hover"))
-          assertEquals(JsonValue.UInt(20), member(copiedState, "radius"))
+          assertEquals("true", rawMember(copiedState, "hover")?.decodeToString())
+          assertEquals(20.0, numberMember(copiedState, "radius"))
 
           renderIfAvailable(runtime, map, session)
           val renderedWithState =
@@ -260,8 +244,9 @@ class RenderSessionHandleTest {
                 },
               )
             }
-          assertEquals(JsonValue.Bool(true), member(renderedWithState.state, "hover"))
-          assertEquals(JsonValue.UInt(20), member(renderedWithState.state, "radius"))
+          val renderedState = rawMember(renderedWithState, "state") ?: error("missing state")
+          assertEquals("true", rawMember(renderedState, "hover")?.decodeToString())
+          assertEquals(20.0, numberMember(renderedState, "radius"))
 
           session.removeFeatureState(
             FeatureStateSelector("point").apply {
@@ -271,8 +256,8 @@ class RenderSessionHandleTest {
           )
           renderIfAvailable(runtime, map, session)
           val afterRemove = session.getFeatureState(featureStateSelector())
-          assertEquals(null, member(afterRemove, "hover"))
-          assertEquals(JsonValue.UInt(20), member(afterRemove, "radius"))
+          assertEquals(null, rawMember(afterRemove, "hover"))
+          assertEquals(20.0, numberMember(afterRemove, "radius"))
 
           val frameHandle = session.acquireMetalOwnedTextureFrame()
           val frame = frameHandle.frame()
@@ -298,7 +283,7 @@ class RenderSessionHandleTest {
             assertFailsWith<InvalidStateException> { session.clearData() }
             assertFailsWith<InvalidStateException> { session.dumpDebugLogs() }
             assertFailsWith<InvalidStateException> {
-              session.setFeatureState(featureStateSelector(), JsonValue.Bool(true))
+              session.setFeatureState(featureStateSelector(), jsonBytes("true"))
             }
             assertFailsWith<InvalidStateException> {
               session.getFeatureState(featureStateSelector())
@@ -313,7 +298,7 @@ class RenderSessionHandleTest {
             assertFailsWith<InvalidStateException> {
               session.queryFeatureExtension(
                 "point",
-                rendered.feature,
+                queryFeature(rendered),
                 "supercluster",
                 "children",
                 null,
@@ -724,49 +709,46 @@ class RenderSessionHandleTest {
                 RenderedFeatureQueryOptions().apply { layerIds = listOf("cluster-circle") },
               )
             }
-          // Native matches cluster_id by exact JSON value type, so the copied
-          // feature must keep the unsigned alternative to resolve on the way
-          // back in.
-          assertTrue(member(cluster, "cluster_id") is JsonValue.UInt)
+          // The serialized feature must keep cluster_id as an integral value so
+          // MapLibre can resolve it when the bytes are passed back in.
+          assertTrue(numberMember(queryFeatureProperties(cluster), "cluster_id") != null)
 
-          // The rendered cluster exists only because the typed GeoJSON adder
-          // passed GeoJsonSourceOptions.cluster, and weightSum comes from the
-          // clusterProperties aggregation lowered through the same options.
-          assertEquals(3.0, numericMember(cluster, "point_count"))
-          assertEquals(6.0, numericMember(cluster, "weightSum"))
+          // The rendered cluster exists because GeoJsonSourceOptions enables
+          // clustering, and weightSum comes from the byte-encoded aggregation.
+          assertEquals(3.0, numberMember(queryFeatureProperties(cluster), "point_count"))
+          assertEquals(6.0, numberMember(queryFeatureProperties(cluster), "weightSum"))
 
           val children =
-            featureCollectionResult(
-              session.queryFeatureExtension(
-                "cluster-source",
-                cluster.feature,
-                "supercluster",
-                "children",
-                null,
-              )
+            session.queryFeatureExtension(
+              "cluster-source",
+              queryFeature(cluster),
+              "supercluster",
+              "children",
+              null,
             )
-          assertTrue(children.isNotEmpty())
+          assertTrue(firstFeature(children) != null)
 
           val expansionZoom =
             session.queryFeatureExtension(
               "cluster-source",
-              cluster.feature,
+              queryFeature(cluster),
               "supercluster",
               "expansion-zoom",
               null,
             )
-          val expansionZoomValue =
-            (expansionZoom as? FeatureExtensionResult.Value)?.value
-              ?: error("expected expansion-zoom value result")
-          assertTrue(expansionZoomValue is JsonValue.UInt)
+          assertTrue(expansionZoom.decodeToString().toULongOrNull() != null)
 
           // An unsigned limit bounds the collection, and an unsigned offset
           // selects a later leaf. Native ignores arguments of another type and
           // falls back to ten leaves at offset zero, so both bounds must move
           // the observed result.
-          val first = singleClusterLeaf(session, cluster.feature, 0)
-          val second = singleClusterLeaf(session, cluster.feature, 1)
-          assertNotEquals(member(first, "name"), member(second, "name"))
+          val feature = queryFeature(cluster)
+          val first = singleClusterLeaf(session, feature, 0)
+          val second = singleClusterLeaf(session, feature, 1)
+          assertNotEquals(
+            featureStringProperty(first, "name"),
+            featureStringProperty(second, "name"),
+          )
         } finally {
           session.close()
         }
@@ -880,11 +862,11 @@ class RenderSessionHandleTest {
     runtime: RuntimeHandle,
     map: MapHandle,
     session: RenderSessionHandle,
-    query: () -> List<QueriedFeature>,
-  ): QueriedFeature {
+    query: () -> ByteArray,
+  ): ByteArray {
     repeat(100) {
-      val features = query()
-      if (features.isNotEmpty()) return features.first()
+      val feature = firstArrayElement(query())
+      if (feature != null) return feature
       renderIfAvailable(runtime, map, session)
       usleep(1_000U)
     }
@@ -906,50 +888,40 @@ class RenderSessionHandleTest {
     }
   }
 
-  private fun featureCollectionResult(result: FeatureExtensionResult): List<Feature> =
-    (result as? FeatureExtensionResult.FeatureCollection)?.features
-      ?: error("expected feature collection result")
-
   /** Returns the one leaf at [offset] through a bounded supercluster query. */
   private fun singleClusterLeaf(
     session: RenderSessionHandle,
-    feature: Feature,
+    feature: ByteArray,
     offset: Long,
-  ): Feature {
+  ): ByteArray {
     val leaves =
-      featureCollectionResult(
-        session.queryFeatureExtension(
-          "cluster-source",
-          feature,
-          "supercluster",
-          "leaves",
-          JsonValue.ObjectValue(
-            listOf(
-              JsonValue.Member("limit", JsonValue.UInt(1)),
-              JsonValue.Member("offset", JsonValue.UInt(offset)),
-            )
-          ),
-        )
+      session.queryFeatureExtension(
+        "cluster-source",
+        feature,
+        "supercluster",
+        "leaves",
+        jsonBytes("""{"limit":1,"offset":$offset}"""),
       )
-    assertEquals(1, leaves.size)
-    return leaves.first()
+    return firstFeature(leaves) ?: error("expected one leaf")
   }
 
   /** Point features close enough together to collapse into one cluster at zoom 0. */
-  private fun clusterPoints(): GeoJson =
-    GeoJson.FeatureCollection(
-      listOf(clusterPoint("one", 0.0), clusterPoint("two", 0.001), clusterPoint("three", 0.002))
+  private fun clusterPoints(): ByteArray =
+    jsonBytes(
+      """
+      {
+        "type": "FeatureCollection",
+        "features": [
+          ${clusterPoint("one", 0.0)},
+          ${clusterPoint("two", 0.001)},
+          ${clusterPoint("three", 0.002)}
+        ]
+      }
+      """
     )
 
-  private fun clusterPoint(name: String, offset: Double): Feature =
-    Feature(
-      Geometry.Point(LatLng(offset, offset)),
-      listOf(
-        JsonValue.Member("name", JsonValue.StringValue(name)),
-        JsonValue.Member("weight", JsonValue.UInt(2)),
-      ),
-      FeatureIdentifier.Null,
-    )
+  private fun clusterPoint(name: String, offset: Double): String =
+    """{"type":"Feature","geometry":{"type":"Point","coordinates":[$offset,$offset]},"properties":{"name":"$name","weight":2}}"""
 
   private fun clusterSourceOptions(): GeoJsonSourceOptions =
     GeoJsonSourceOptions().apply {
@@ -957,75 +929,139 @@ class RenderSessionHandleTest {
       clusterRadius = 50
       clusterMaxZoom = 14.0
       clusterMinPoints = 2
-      clusterProperties =
-        JsonValue.ObjectValue(
-          listOf(
-            JsonValue.Member(
-              "weightSum",
-              JsonValue.Array(
-                listOf(
-                  JsonValue.StringValue("+"),
-                  JsonValue.Array(
-                    listOf(JsonValue.StringValue("get"), JsonValue.StringValue("weight"))
-                  ),
-                )
-              ),
-            )
-          )
-        )
+      clusterProperties = jsonBytes("""{"weightSum":["+",["get","weight"]]}""")
     }
 
-  private fun clusterCircleLayer(): JsonValue =
-    JsonValue.ObjectValue(
-      listOf(
-        JsonValue.Member("id", JsonValue.StringValue("cluster-circle")),
-        JsonValue.Member("type", JsonValue.StringValue("circle")),
-        JsonValue.Member("source", JsonValue.StringValue("cluster-source")),
-        JsonValue.Member(
-          "filter",
-          JsonValue.Array(
-            listOf(JsonValue.StringValue("has"), JsonValue.StringValue("point_count"))
-          ),
-        ),
-        JsonValue.Member(
-          "paint",
-          JsonValue.ObjectValue(
-            listOf(
-              JsonValue.Member("circle-color", JsonValue.StringValue("#2563eb")),
-              JsonValue.Member("circle-radius", JsonValue.UInt(20)),
-            )
-          ),
-        ),
-      )
+  private fun clusterCircleLayer(): ByteArray =
+    jsonBytes(
+      """
+      {
+        "id": "cluster-circle",
+        "type": "circle",
+        "source": "cluster-source",
+        "filter": ["has", "point_count"],
+        "paint": {"circle-color": "#2563eb", "circle-radius": 20}
+      }
+      """
     )
-
-  private fun numericMember(feature: QueriedFeature, key: String): Double? =
-    when (val value = member(feature, key)) {
-      is JsonValue.UInt -> value.value.toDouble()
-      is JsonValue.Int -> value.value.toDouble()
-      is JsonValue.DoubleValue -> value.value
-      else -> null
-    }
-
-  private fun member(feature: Feature, key: String): JsonValue? =
-    feature.properties.firstOrNull { it.key == key }?.value
-
-  private fun member(feature: QueriedFeature, key: String): JsonValue? =
-    feature.feature.properties.firstOrNull { it.key == key }?.value
-
-  private fun member(value: JsonValue?, key: String): JsonValue? =
-    (value as? JsonValue.ObjectValue)?.members?.firstOrNull { it.key == key }?.value
 
   private fun featureStateSelector(): FeatureStateSelector =
     FeatureStateSelector("point").apply { featureId = "feature-1" }
 
-  private fun featureState(): JsonValue.ObjectValue =
-    JsonValue.ObjectValue(
-      listOf(
-        JsonValue.Member("hover", JsonValue.Bool(true)),
-        JsonValue.Member("radius", JsonValue.UInt(20)),
-      )
-    )
+  private fun featureState(): ByteArray = jsonBytes("""{"hover":true,"radius":20}""")
+
+  private fun jsonBytes(value: String): ByteArray = value.trimIndent().encodeToByteArray()
+
+  private fun queryFeature(result: ByteArray): ByteArray =
+    rawMember(result, "feature") ?: error("query result has no feature")
+
+  private fun queryFeatureProperties(result: ByteArray): ByteArray =
+    rawMember(queryFeature(result), "properties") ?: error("feature has no properties")
+
+  private fun featureStringMember(result: ByteArray, key: String): String? =
+    stringMember(queryFeatureProperties(result), key)
+
+  private fun featureStringProperty(feature: ByteArray, key: String): String? =
+    rawMember(feature, "properties")?.let { stringMember(it, key) }
+
+  private fun firstFeature(collection: ByteArray): ByteArray? =
+    rawMember(collection, "features")?.let(::firstArrayElement)
+
+  private fun numberMember(value: ByteArray, key: String): Double? =
+    rawMember(value, key)?.decodeToString()?.toDoubleOrNull()
+
+  private fun stringMember(value: ByteArray, key: String): String? {
+    val encoded = rawMember(value, key)?.decodeToString() ?: return null
+    if (encoded.length < 2 || encoded.first() != '"' || encoded.last() != '"') return null
+    return encoded.substring(1, encoded.lastIndex)
+  }
+
+  /** Extracts a top-level object member without introducing a JSON model into transit tests. */
+  private fun rawMember(value: ByteArray, key: String): ByteArray? {
+    val json = value.decodeToString()
+    var cursor = skipWhitespace(json, 0)
+    if (cursor >= json.length || json[cursor] != '{') return null
+    cursor++
+    while (true) {
+      cursor = skipWhitespace(json, cursor)
+      if (cursor >= json.length || json[cursor] == '}') return null
+      if (json[cursor] != '"') return null
+      val keyEnd = jsonStringEnd(json, cursor)
+      val memberName = json.substring(cursor + 1, keyEnd - 1)
+      cursor = skipWhitespace(json, keyEnd)
+      if (cursor >= json.length || json[cursor] != ':') return null
+      val valueStart = skipWhitespace(json, cursor + 1)
+      val valueEnd = jsonValueEnd(json, valueStart)
+      if (memberName == key) return json.substring(valueStart, valueEnd).encodeToByteArray()
+      cursor = skipWhitespace(json, valueEnd)
+      if (cursor >= json.length || json[cursor] != ',') return null
+      cursor++
+    }
+  }
+
+  private fun firstArrayElement(value: ByteArray): ByteArray? {
+    val json = value.decodeToString()
+    var cursor = skipWhitespace(json, 0)
+    if (cursor >= json.length || json[cursor] != '[') return null
+    cursor = skipWhitespace(json, cursor + 1)
+    if (cursor >= json.length || json[cursor] == ']') return null
+    return json.substring(cursor, jsonValueEnd(json, cursor)).encodeToByteArray()
+  }
+
+  private fun skipWhitespace(json: String, start: Int): Int {
+    var cursor = start
+    while (cursor < json.length && json[cursor].isWhitespace()) cursor++
+    return cursor
+  }
+
+  private fun jsonStringEnd(json: String, start: Int): Int {
+    var escaped = false
+    for (cursor in start + 1 until json.length) {
+      val character = json[cursor]
+      if (escaped) {
+        escaped = false
+      } else if (character == '\\') {
+        escaped = true
+      } else if (character == '"') {
+        return cursor + 1
+      }
+    }
+    error("unterminated JSON string")
+  }
+
+  private fun jsonValueEnd(json: String, start: Int): Int {
+    if (json[start] == '"') return jsonStringEnd(json, start)
+    if (json[start] != '{' && json[start] != '[') {
+      var cursor = start
+      while (
+        cursor < json.length &&
+          !json[cursor].isWhitespace() &&
+          json[cursor] != ',' &&
+          json[cursor] != '}' &&
+          json[cursor] != ']'
+      ) {
+        cursor++
+      }
+      return cursor
+    }
+
+    var depth = 0
+    var cursor = start
+    while (cursor < json.length) {
+      when (json[cursor]) {
+        '"' -> cursor = jsonStringEnd(json, cursor) - 1
+        '{',
+        '[' -> depth++
+        '}',
+        ']' -> {
+          depth--
+          if (depth == 0) return cursor + 1
+        }
+      }
+      cursor++
+    }
+    error("unterminated JSON value")
+  }
 
   private fun spawnSessionRenderOnNativeThread(
     session: RenderSessionHandle,

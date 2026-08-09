@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi.offline
 
-import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLngBounds
 
 /** Offline region definition copied into native storage at creation time. */
@@ -14,14 +13,41 @@ public sealed interface OfflineRegionDefinition {
     public val includeIdeographs: Boolean,
   ) : OfflineRegionDefinition
 
-  public data class GeometryRegion(
+  public class GeometryRegion(
     public val styleUrl: String,
-    public val geometry: Geometry,
+    geometry: ByteArray,
     public val minZoom: Double,
     public val maxZoom: Double,
     public val pixelRatio: Float,
     public val includeIdeographs: Boolean,
-  ) : OfflineRegionDefinition
+  ) : OfflineRegionDefinition {
+    private val geometryBytes: ByteArray = geometry.copyOf()
+
+    public val geometry: ByteArray
+      get() = geometryBytes.copyOf()
+
+    internal val geometryTransit: ByteArray
+      get() = geometryBytes
+
+    override fun equals(other: Any?): Boolean =
+      other is GeometryRegion &&
+        styleUrl == other.styleUrl &&
+        geometryBytes.contentEquals(other.geometryBytes) &&
+        minZoom == other.minZoom &&
+        maxZoom == other.maxZoom &&
+        pixelRatio == other.pixelRatio &&
+        includeIdeographs == other.includeIdeographs
+
+    override fun hashCode(): Int {
+      var result = styleUrl.hashCode()
+      result = 31 * result + geometryBytes.contentHashCode()
+      result = 31 * result + minZoom.hashCode()
+      result = 31 * result + maxZoom.hashCode()
+      result = 31 * result + pixelRatio.hashCode()
+      result = 31 * result + includeIdeographs.hashCode()
+      return result
+    }
+  }
 
   public class Unknown internal constructor(public val rawType: Int, public val rawSize: Int) :
     OfflineRegionDefinition {

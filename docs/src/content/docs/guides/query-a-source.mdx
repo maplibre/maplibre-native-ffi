@@ -33,8 +33,9 @@ argument, and it differs from the source-layer IDs in the options.
 
 <Code code={region(sourceFeatures, "query")} lang="c" title="query-source-features.c" />
 
-A successful query can return an empty result for an unknown source ID. Check
-the result count when the host expects features.
+A successful query can return an empty JSON array for an unknown source ID.
+Borrow the result bytes from the owned buffer and parse the query-envelope array
+with the host's JSON library.
 
 <Code code={region(sourceFeatures, "read")} lang="c" title="query-source-features.c" />
 
@@ -48,8 +49,9 @@ An extension query runs a named extension against one source feature. The
 `supercluster` extension reads a clustered GeoJSON source. Its `leaves` field
 returns the features under one cluster as a feature collection.
 
-`supercluster` matches numbers by exact JSON type. Build the `limit` and `offset`
-arguments as unsigned values.
+`supercluster` matches numbers by exact native JSON type. Encode `limit` and
+`offset` as nonnegative integer literals so MapLibre reads them as unsigned
+values.
 
 <Code code={region(clusterLeaves, "arguments")} lang="c" title="cluster-leaves.c" />
 
@@ -58,14 +60,12 @@ within that extension.
 
 <Code code={region(clusterLeaves, "query")} lang="c" title="cluster-leaves.c" />
 
-An extension result identifies whether it contains a single value or a feature
-collection. Check the result kind before reading the value.
+An extension result is one owned buffer. For `leaves`, parse it as a
+GeoJSON FeatureCollection; scalar extension fields return their JSON value.
 
 <Code code={region(clusterLeaves, "leaves")} lang="c" title="cluster-leaves.c" />
 
-Pass the cluster feature to the extension query exactly as a source query
-returned it. `supercluster` also matches `cluster_id` by exact JSON type. A
-double or signed integer counts as absent. A feature descriptor copied from a
-query result preserves each property's JSON type. Rebuilding the feature through
-a JSON layer that stores every number as a double produces a successful query
-with an empty result.
+Pass the `feature` object from the source-query envelope to the extension query.
+`supercluster` also matches `cluster_id` by exact JSON type. Preserve its
+nonnegative integer literal; rewriting every number as a double produces a
+successful query with an empty result.

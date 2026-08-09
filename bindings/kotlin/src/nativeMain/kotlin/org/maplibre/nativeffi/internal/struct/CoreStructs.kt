@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.internal.struct
 
+import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CValue
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -7,17 +8,18 @@ import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.cValue
 import kotlinx.cinterop.get
+import kotlinx.cinterop.reinterpret
 import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.internal.c.mln_buffer_view
 import org.maplibre.nativeffi.internal.c.mln_edge_insets
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_lat_lng_bounds
 import org.maplibre.nativeffi.internal.c.mln_projected_meters
 import org.maplibre.nativeffi.internal.c.mln_screen_point
-import org.maplibre.nativeffi.internal.c.mln_string_view
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 
 /** Materializes core copied values at the C boundary. */
@@ -93,14 +95,15 @@ internal object CoreStructs {
   fun edgeInsets(value: mln_edge_insets): EdgeInsets =
     EdgeInsets(value.top, value.left, value.bottom, value.right)
 
-  fun stringView(value: String, scope: MemScope): CValue<mln_string_view> = cValue {
+  fun stringView(value: String, scope: MemScope): CValue<mln_buffer_view> = cValue {
     data = MemoryUtil.utf8Bytes(scope, value)
     size = value.encodeToByteArray().size.toULong()
   }
 
-  fun stringView(value: mln_string_view): String = MemoryUtil.copyStringView(value.data, value.size)
+  fun stringView(value: mln_buffer_view): String =
+    MemoryUtil.copyStringView(value.data?.reinterpret<ByteVar>(), value.size)
 
-  fun setStringView(native: mln_string_view, value: String, scope: MemScope) {
+  fun setStringView(native: mln_buffer_view, value: String, scope: MemScope) {
     native.data = MemoryUtil.utf8Bytes(scope, value)
     native.size = value.encodeToByteArray().size.toULong()
   }

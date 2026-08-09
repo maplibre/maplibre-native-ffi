@@ -2,7 +2,6 @@ package org.maplibre.nativeffi.map
 
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
-import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
@@ -35,7 +34,7 @@ internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
     NativeAccess.setProjectionVisibleCoordinates(requireLiveHandle(), coordinates, padding)
   }
 
-  public actual fun setVisibleGeometry(geometry: Geometry, padding: EdgeInsets) {
+  public actual fun setVisibleGeometry(geometry: ByteArray, padding: EdgeInsets) {
     NativeAccess.ensureLoaded()
     NativeAccess.setProjectionVisibleGeometry(requireLiveHandle(), geometry, padding)
   }

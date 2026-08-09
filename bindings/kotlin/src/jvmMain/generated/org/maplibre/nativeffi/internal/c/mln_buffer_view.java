@@ -14,22 +14,22 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
 
 /**
  * {@snippet lang=c :
- * struct mln_multi_polygon_geometry {
- *     const mln_polygon_geometry *polygons;
- *     size_t polygon_count;
+ * struct mln_buffer_view {
+ *     const void *data;
+ *     size_t size;
  * }
  * }
  */
-public class mln_multi_polygon_geometry {
+public class mln_buffer_view {
 
-    mln_multi_polygon_geometry() {
+    mln_buffer_view() {
         // Should not be called directly
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        MapLibreNativeC.C_POINTER.withName("polygons"),
-        MapLibreNativeC.C_LONG.withName("polygon_count")
-    ).withName("mln_multi_polygon_geometry");
+        MapLibreNativeC.C_POINTER.withName("data"),
+        MapLibreNativeC.C_LONG.withName("size")
+    ).withName("mln_buffer_view");
 
     /**
      * The layout of this struct
@@ -38,92 +38,92 @@ public class mln_multi_polygon_geometry {
         return $LAYOUT;
     }
 
-    private static final AddressLayout polygons$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("polygons"));
+    private static final AddressLayout data$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("data"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * const mln_polygon_geometry *polygons
+     * const void *data
      * }
      */
-    public static final AddressLayout polygons$layout() {
-        return polygons$LAYOUT;
+    public static final AddressLayout data$layout() {
+        return data$LAYOUT;
     }
 
-    private static final long polygons$OFFSET = $LAYOUT.byteOffset(groupElement("polygons"));
+    private static final long data$OFFSET = $LAYOUT.byteOffset(groupElement("data"));
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * const mln_polygon_geometry *polygons
+     * const void *data
      * }
      */
-    public static final long polygons$offset() {
-        return polygons$OFFSET;
+    public static final long data$offset() {
+        return data$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * const mln_polygon_geometry *polygons
+     * const void *data
      * }
      */
-    public static MemorySegment polygons(MemorySegment struct) {
-        return struct.get(polygons$LAYOUT, polygons$OFFSET);
+    public static MemorySegment data(MemorySegment struct) {
+        return struct.get(data$LAYOUT, data$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * const mln_polygon_geometry *polygons
+     * const void *data
      * }
      */
-    public static void polygons(MemorySegment struct, MemorySegment fieldValue) {
-        struct.set(polygons$LAYOUT, polygons$OFFSET, fieldValue);
+    public static void data(MemorySegment struct, MemorySegment fieldValue) {
+        struct.set(data$LAYOUT, data$OFFSET, fieldValue);
     }
 
-    private static final OfLong polygon_count$LAYOUT = (OfLong)$LAYOUT.select(groupElement("polygon_count"));
+    private static final OfLong size$LAYOUT = (OfLong)$LAYOUT.select(groupElement("size"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * size_t polygon_count
+     * size_t size
      * }
      */
-    public static final OfLong polygon_count$layout() {
-        return polygon_count$LAYOUT;
+    public static final OfLong size$layout() {
+        return size$LAYOUT;
     }
 
-    private static final long polygon_count$OFFSET = $LAYOUT.byteOffset(groupElement("polygon_count"));
+    private static final long size$OFFSET = $LAYOUT.byteOffset(groupElement("size"));
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * size_t polygon_count
+     * size_t size
      * }
      */
-    public static final long polygon_count$offset() {
-        return polygon_count$OFFSET;
+    public static final long size$offset() {
+        return size$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * size_t polygon_count
+     * size_t size
      * }
      */
-    public static long polygon_count(MemorySegment struct) {
-        return struct.get(polygon_count$LAYOUT, polygon_count$OFFSET);
+    public static long size(MemorySegment struct) {
+        return struct.get(size$LAYOUT, size$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * size_t polygon_count
+     * size_t size
      * }
      */
-    public static void polygon_count(MemorySegment struct, long fieldValue) {
-        struct.set(polygon_count$LAYOUT, polygon_count$OFFSET, fieldValue);
+    public static void size(MemorySegment struct, long fieldValue) {
+        struct.set(size$LAYOUT, size$OFFSET, fieldValue);
     }
 
     /**

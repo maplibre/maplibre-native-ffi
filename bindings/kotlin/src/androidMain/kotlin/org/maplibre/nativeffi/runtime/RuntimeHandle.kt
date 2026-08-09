@@ -9,19 +9,18 @@ import org.bytedeco.javacpp.Pointer
 import org.bytedeco.javacpp.SizeTPointer
 import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.error.InvalidStateException
-import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.internal.callback.HttpHeaderTransformState
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
+import org.maplibre.nativeffi.internal.javacpp.ByteArrayViewScope
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
-import org.maplibre.nativeffi.map.GeometryScope
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.RenderingStats
 import org.maplibre.nativeffi.map.TileOperation
@@ -808,65 +807,12 @@ private fun offlineGeometryDefinition(
 ): OfflineRegionDefinition.GeometryRegion =
   OfflineRegionDefinition.GeometryRegion(
     byteString(definition.style_url(), cStringLength(definition.style_url())),
-    geometry(definition.geometry()),
+    byteArray(definition.geometry().data(), definition.geometry().size()),
     definition.min_zoom(),
     definition.max_zoom(),
     definition.pixel_ratio(),
     definition.include_ideographs(),
   )
-
-private fun geometry(value: MaplibreNativeC.mln_geometry): Geometry =
-  when (value.type()) {
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_EMPTY -> Geometry.Empty
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_POINT -> Geometry.Point(latLng(value.data_point()))
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_LINE_STRING ->
-      Geometry.LineString(coordinateSpan(value.data_line_string()))
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_POLYGON -> Geometry.Polygon(polygon(value.data_polygon()))
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POINT ->
-      Geometry.MultiPoint(coordinateSpan(value.data_multi_point()))
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING -> {
-      val native = value.data_multi_line_string()
-      val lines = native.lines()
-      Geometry.MultiLineString(
-        List(Math.toIntExact(native.line_count())) { index ->
-          coordinateSpan(lines.getPointer(index.toLong()))
-        }
-      )
-    }
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POLYGON -> {
-      val native = value.data_multi_polygon()
-      val polygons = native.polygons()
-      Geometry.MultiPolygon(
-        List(Math.toIntExact(native.polygon_count())) { index ->
-          polygon(polygons.getPointer(index.toLong()))
-        }
-      )
-    }
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION -> {
-      val native = value.data_geometry_collection()
-      val geometries = native.geometries()
-      Geometry.Collection(
-        List(Math.toIntExact(native.geometry_count())) { index ->
-          geometry(geometries.getPointer(index.toLong()))
-        }
-      )
-    }
-    else -> Geometry.Unknown(value.type(), value.size())
-  }
-
-private fun coordinateSpan(value: MaplibreNativeC.mln_coordinate_span): List<LatLng> {
-  val coordinates = value.coordinates()
-  return List(Math.toIntExact(value.coordinate_count())) { index ->
-    latLng(coordinates.getPointer(index.toLong()))
-  }
-}
-
-private fun polygon(value: MaplibreNativeC.mln_polygon_geometry): List<List<LatLng>> {
-  val rings = value.rings()
-  return List(Math.toIntExact(value.ring_count())) { index ->
-    coordinateSpan(rings.getPointer(index.toLong()))
-  }
-}
 
 private fun latLngBounds(bounds: MaplibreNativeC.mln_lat_lng_bounds): LatLngBounds =
   LatLngBounds(
@@ -1027,11 +973,11 @@ private class OfflineRegionDefinitionScope(value: OfflineRegionDefinition) : Aut
     value: OfflineRegionDefinition.GeometryRegion
   ): MaplibreNativeC.mln_offline_geometry_region_definition {
     val out = own(MaplibreNativeC.mln_offline_geometry_region_definition())
-    val geometry = GeometryScope(value.geometry)
+    val geometry = ByteArrayViewScope(value.geometryTransit)
     closeables += geometry
     out.size(out.sizeof())
     out.style_url(utf8(value.styleUrl))
-    out.geometry(geometry.value)
+    out.geometry(geometry.view)
     out.min_zoom(value.minZoom)
     out.max_zoom(value.maxZoom)
     out.pixel_ratio(value.pixelRatio)

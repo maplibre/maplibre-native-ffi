@@ -119,7 +119,8 @@ static void map_lifecycle_rejects_invalid_state_and_stale_handles(void) {
   mln_test_destroy_map(map);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_ARGUMENT, mln_map_destroy(map));
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_set_style_json(map, "{}")
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_json(map, MLN_BUFFER_LITERAL("{}"))
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_map_request_repaint(map)
@@ -138,7 +139,8 @@ static void style_functions_reject_null_inputs(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_set_style_json(map, NULL)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_json(map, (mln_buffer_view){0})
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_map_set_style_url(map, NULL)

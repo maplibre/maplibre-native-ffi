@@ -19,7 +19,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     uint32_t fields;
  *     double min_zoom;
  *     double max_zoom;
- *     mln_string_view attribution;
+ *     mln_buffer_view attribution;
  *     uint32_t scheme;
  *     mln_lat_lng_bounds bounds;
  *     uint32_t tile_size;
@@ -39,7 +39,7 @@ public class mln_style_tile_source_options {
         MapLibreNativeC.C_INT.withName("fields"),
         MapLibreNativeC.C_DOUBLE.withName("min_zoom"),
         MapLibreNativeC.C_DOUBLE.withName("max_zoom"),
-        mln_string_view.layout().withName("attribution"),
+        mln_buffer_view.layout().withName("attribution"),
         MapLibreNativeC.C_INT.withName("scheme"),
         MemoryLayout.paddingLayout(4),
         mln_lat_lng_bounds.layout().withName("bounds"),
@@ -237,7 +237,7 @@ public class mln_style_tile_source_options {
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * mln_string_view attribution
+     * mln_buffer_view attribution
      * }
      */
     public static final GroupLayout attribution$layout() {
@@ -249,7 +249,7 @@ public class mln_style_tile_source_options {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * mln_string_view attribution
+     * mln_buffer_view attribution
      * }
      */
     public static final long attribution$offset() {
@@ -259,7 +259,7 @@ public class mln_style_tile_source_options {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * mln_string_view attribution
+     * mln_buffer_view attribution
      * }
      */
     public static MemorySegment attribution(MemorySegment struct) {
@@ -269,7 +269,7 @@ public class mln_style_tile_source_options {
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * mln_string_view attribution
+     * mln_buffer_view attribution
      * }
      */
     public static void attribution(MemorySegment struct, MemorySegment fieldValue) {

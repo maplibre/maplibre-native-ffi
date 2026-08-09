@@ -1,6 +1,7 @@
 // Loading a style from a URL, or from text the host already holds.
 
 #include <maplibre_native_c.h>
+#include <string.h>
 
 mln_status load_style_from_url(mln_map map, const char* style_url) {
   // #region url
@@ -12,7 +13,8 @@ mln_status load_style_from_url(mln_map map, const char* style_url) {
 
 mln_status load_style_from_text(mln_map map, const char* style_json) {
   // #region json
-  // MapLibre parses and copies the text before the host releases style_json.
-  return mln_map_set_style_json(map, style_json);
+  // MapLibre parses or copies these UTF-8 bytes before the call returns.
+  const mln_buffer_view json = {.data = style_json, .size = strlen(style_json)};
+  return mln_map_set_style_json(map, json);
   // #endregion json
 }

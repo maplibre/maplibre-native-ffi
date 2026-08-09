@@ -4,36 +4,20 @@ import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CValue
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
-import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.cValue
 import kotlinx.cinterop.get
-import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.sizeOf
-import kotlinx.cinterop.value
-import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.ScreenBox
-import org.maplibre.nativeffi.internal.c.MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION
-import org.maplibre.nativeffi.internal.c.MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE
 import org.maplibre.nativeffi.internal.c.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
 import org.maplibre.nativeffi.internal.c.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
 import org.maplibre.nativeffi.internal.c.MLN_FEATURE_STATE_SELECTOR_STATE_KEY
-import org.maplibre.nativeffi.internal.c.MLN_QUERIED_FEATURE_SOURCE_ID
-import org.maplibre.nativeffi.internal.c.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID
-import org.maplibre.nativeffi.internal.c.MLN_QUERIED_FEATURE_STATE
 import org.maplibre.nativeffi.internal.c.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
 import org.maplibre.nativeffi.internal.c.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
-import org.maplibre.nativeffi.internal.c.mln_feature_collection
-import org.maplibre.nativeffi.internal.c.mln_feature_extension_result_destroy
-import org.maplibre.nativeffi.internal.c.mln_feature_extension_result_get
-import org.maplibre.nativeffi.internal.c.mln_feature_extension_result_info
-import org.maplibre.nativeffi.internal.c.mln_feature_query_result_count
-import org.maplibre.nativeffi.internal.c.mln_feature_query_result_destroy
-import org.maplibre.nativeffi.internal.c.mln_feature_query_result_get
+import org.maplibre.nativeffi.internal.c.mln_buffer_view
 import org.maplibre.nativeffi.internal.c.mln_feature_state_selector
-import org.maplibre.nativeffi.internal.c.mln_queried_feature
 import org.maplibre.nativeffi.internal.c.mln_rendered_feature_query_options
 import org.maplibre.nativeffi.internal.c.mln_rendered_feature_query_options_default
 import org.maplibre.nativeffi.internal.c.mln_rendered_query_geometry
@@ -43,14 +27,7 @@ import org.maplibre.nativeffi.internal.c.mln_rendered_query_geometry_point
 import org.maplibre.nativeffi.internal.c.mln_screen_box
 import org.maplibre.nativeffi.internal.c.mln_source_feature_query_options
 import org.maplibre.nativeffi.internal.c.mln_source_feature_query_options_default
-import org.maplibre.nativeffi.internal.c.mln_string_view
-import org.maplibre.nativeffi.internal.lifecycle.NativeFeatureExtensionResult
-import org.maplibre.nativeffi.internal.lifecycle.NativeFeatureQueryResult
-import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
-import org.maplibre.nativeffi.internal.status.Status
-import org.maplibre.nativeffi.query.FeatureExtensionResult
 import org.maplibre.nativeffi.query.FeatureStateSelector
-import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
@@ -58,52 +35,6 @@ import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 /** Materializes feature query descriptors at the C boundary. */
 @OptIn(ExperimentalForeignApi::class)
 internal object QueryStructs {
-  fun featureQueryResult(
-    result: NativeFeatureQueryResult,
-    counter: (ULong, CPointer<ULongVar>) -> Int = ::mln_feature_query_result_count,
-    getter: (ULong, ULong, CPointer<mln_queried_feature>) -> Int = ::mln_feature_query_result_get,
-    destroyer: (ULong) -> Unit = ::mln_feature_query_result_destroy,
-  ): List<QueriedFeature> =
-    try {
-      memScoped {
-        val outCount = alloc<ULongVar>()
-        Status.check(counter(result.rawHandleValue, outCount.ptr))
-        List(checkedInt(outCount.value, "queried feature count")) { index ->
-          val outFeature = alloc<mln_queried_feature>()
-          outFeature.size = sizeOf<mln_queried_feature>().toUInt()
-          Status.check(getter(result.rawHandleValue, index.toULong(), outFeature.ptr))
-          queriedFeature(outFeature)
-        }
-      }
-    } finally {
-      destroyer(result.rawHandleValue)
-    }
-
-  fun featureExtensionResult(
-    result: NativeFeatureExtensionResult,
-    getter: (ULong, CPointer<mln_feature_extension_result_info>) -> Int =
-      ::mln_feature_extension_result_get,
-    destroyer: (ULong) -> Unit = ::mln_feature_extension_result_destroy,
-  ): FeatureExtensionResult =
-    try {
-      memScoped {
-        val info = alloc<mln_feature_extension_result_info>()
-        info.size = sizeOf<mln_feature_extension_result_info>().toUInt()
-        Status.check(getter(result.rawHandleValue, info.ptr))
-        when (info.type) {
-          MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE ->
-            FeatureExtensionResult.Value(ValueStructs.jsonSnapshot(info.data.value))
-          MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION ->
-            FeatureExtensionResult.FeatureCollection(
-              featureCollection(info.data.feature_collection)
-            )
-          else -> FeatureExtensionResult.Unknown(info.type.toInt())
-        }
-      }
-    } finally {
-      destroyer(result.rawHandleValue)
-    }
-
   fun renderedQueryGeometry(
     value: RenderedQueryGeometry,
     scope: MemScope,
@@ -137,7 +68,9 @@ internal object QueryStructs {
       native.layer_ids = stringViewArray(layerIdSnapshot, scope)
       native.layer_id_count = layerIdSnapshot.size.toULong()
     }
-    value.filter?.let { filter -> native.filter = ValueStructs.jsonValue(filter, scope) }
+    value.filterTransit?.let { filter ->
+      native.filter = ByteStructs.bufferViewPointer(filter, scope)
+    }
     return native.ptr
   }
 
@@ -154,7 +87,9 @@ internal object QueryStructs {
       native.source_layer_ids = stringViewArray(sourceLayerIdSnapshot, scope)
       native.source_layer_id_count = sourceLayerIdSnapshot.size.toULong()
     }
-    value.filter?.let { filter -> native.filter = ValueStructs.jsonValue(filter, scope) }
+    value.filterTransit?.let { filter ->
+      native.filter = ByteStructs.bufferViewPointer(filter, scope)
+    }
     return native.ptr
   }
 
@@ -184,39 +119,6 @@ internal object QueryStructs {
     return native.ptr
   }
 
-  private fun queriedFeature(value: mln_queried_feature): QueriedFeature {
-    val fields = value.fields
-    val sourceId =
-      if ((fields and MLN_QUERIED_FEATURE_SOURCE_ID) != 0U) CoreStructs.stringView(value.source_id)
-      else null
-    val sourceLayerId =
-      if ((fields and MLN_QUERIED_FEATURE_SOURCE_LAYER_ID) != 0U)
-        CoreStructs.stringView(value.source_layer_id)
-      else null
-    val state =
-      if ((fields and MLN_QUERIED_FEATURE_STATE) != 0U && value.state != null) {
-        ValueStructs.jsonSnapshot(value.state)
-      } else {
-        null
-      }
-    return QueriedFeature(
-      ValueStructs.featureSnapshot(value.feature.ptr),
-      sourceId,
-      sourceLayerId,
-      state,
-    )
-  }
-
-  private fun checkedInt(value: ULong, name: String): Int {
-    require(value <= Int.MAX_VALUE.toULong()) { "$name exceeds Int.MAX_VALUE" }
-    return value.toInt()
-  }
-
-  private fun featureCollection(value: mln_feature_collection): List<Feature> =
-    List(checkedInt(value.feature_count, "feature extension feature count")) { index ->
-      ValueStructs.featureSnapshot(value.features!![index].ptr)
-    }
-
   private fun screenBox(value: ScreenBox): CValue<mln_screen_box> = cValue {
     min.x = value.min.x
     min.y = value.min.y
@@ -224,9 +126,9 @@ internal object QueryStructs {
     max.y = value.max.y
   }
 
-  private fun stringViewArray(values: List<String>, scope: MemScope): CPointer<mln_string_view>? {
+  private fun stringViewArray(values: List<String>, scope: MemScope): CPointer<mln_buffer_view>? {
     if (values.isEmpty()) return null
-    val array = scope.allocArray<mln_string_view>(values.size)
+    val array = scope.allocArray<mln_buffer_view>(values.size)
     values.forEachIndexed { index, value -> CoreStructs.setStringView(array[index], value, scope) }
     return array
   }

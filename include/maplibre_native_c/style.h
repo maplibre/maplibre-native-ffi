@@ -212,7 +212,7 @@ typedef struct mln_style_tile_source_options {
   uint32_t fields;
   double min_zoom;
   double max_zoom;
-  mln_string_view attribution;
+  mln_buffer_view attribution;
   /** One of mln_style_tile_scheme. Defaults to MLN_STYLE_TILE_SCHEME_XYZ. */
   uint32_t scheme;
   mln_lat_lng_bounds bounds;
@@ -245,9 +245,9 @@ typedef struct mln_geojson_source_options {
   /**
    * Cluster aggregation expressions keyed by property name, as a JSON object
    * whose members follow the MapLibre Style Spec clusterProperties form. The
-   * descriptor graph is borrowed for the call.
+   * UTF-8 bytes are borrowed for the call.
    */
-  const mln_json_value* cluster_properties;
+  mln_buffer_view cluster_properties;
   /** Tile extent in pixels. Defaults to 512. */
   uint32_t tile_size;
   /** Tile buffer in pixels. Defaults to 128. */
@@ -482,7 +482,7 @@ mln_style_id_list_count(mln_style_id_list list, size_t* out_count) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_style_id_list_get(
-  mln_style_id_list list, size_t index, mln_string_view* out_id
+  mln_style_id_list list, size_t index, mln_buffer_view* out_id
 ) MLN_NOEXCEPT;
 
 /** Destroys a style ID list handle. Null is accepted as a no-op. */
@@ -514,7 +514,7 @@ MLN_API mln_status mln_style_string_list_count(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_style_string_list_get(
-  mln_style_string_list list, size_t index, mln_string_view* out_value
+  mln_style_string_list list, size_t index, mln_buffer_view* out_value
 ) MLN_NOEXCEPT;
 
 /** Destroys a style string list handle. Null is accepted as a no-op. */
@@ -540,7 +540,7 @@ MLN_API void mln_style_string_list_destroy(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_style_source_json(
-  mln_map map, mln_string_view source_id, const mln_json_value* source_json
+  mln_map map, mln_buffer_view source_id, mln_buffer_view source_json
 ) MLN_NOEXCEPT;
 
 /**
@@ -559,7 +559,7 @@ MLN_API mln_status mln_map_add_style_source_json(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_remove_style_source(
-  mln_map map, mln_string_view source_id, bool* out_removed
+  mln_map map, mln_buffer_view source_id, bool* out_removed
 ) MLN_NOEXCEPT;
 
 /**
@@ -574,7 +574,7 @@ MLN_API mln_status mln_map_remove_style_source(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_style_source_exists(
-  mln_map map, mln_string_view source_id, bool* out_exists
+  mln_map map, mln_buffer_view source_id, bool* out_exists
 ) MLN_NOEXCEPT;
 
 /**
@@ -592,7 +592,7 @@ MLN_API mln_status mln_map_style_source_exists(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_style_source_type(
-  mln_map map, mln_string_view source_id, uint32_t* out_source_type,
+  mln_map map, mln_buffer_view source_id, uint32_t* out_source_type,
   bool* out_found
 ) MLN_NOEXCEPT;
 
@@ -616,7 +616,7 @@ MLN_API mln_status mln_map_get_style_source_type(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_style_source_info(
-  mln_map map, mln_string_view source_id, mln_style_source_info* out_info,
+  mln_map map, mln_buffer_view source_id, mln_style_source_info* out_info,
   bool* out_found
 ) MLN_NOEXCEPT;
 
@@ -645,7 +645,7 @@ MLN_API mln_status mln_map_get_style_source_info(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_copy_style_source_attribution(
-  mln_map map, mln_string_view source_id, char* out_attribution,
+  mln_map map, mln_buffer_view source_id, char* out_attribution,
   size_t attribution_capacity, size_t* out_attribution_size, bool* out_found
 ) MLN_NOEXCEPT;
 
@@ -672,7 +672,7 @@ MLN_API mln_status mln_map_copy_style_source_attribution(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_copy_style_source_url(
-  mln_map map, mln_string_view source_id, char* out_url, size_t url_capacity,
+  mln_map map, mln_buffer_view source_id, char* out_url, size_t url_capacity,
   size_t* out_url_size, bool* out_found
 ) MLN_NOEXCEPT;
 
@@ -695,7 +695,7 @@ MLN_API mln_status mln_map_copy_style_source_url(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_style_source_tile_urls(
-  mln_map map, mln_string_view source_id, mln_style_string_list* out_tile_urls,
+  mln_map map, mln_buffer_view source_id, mln_style_string_list* out_tile_urls,
   bool* out_found
 ) MLN_NOEXCEPT;
 
@@ -733,7 +733,7 @@ MLN_API mln_status mln_map_list_style_source_ids(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_geojson_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
   const mln_geojson_source_options* options
 ) MLN_NOEXCEPT;
 
@@ -741,7 +741,7 @@ MLN_API mln_status mln_map_add_geojson_source_url(
  * Adds a GeoJSON source with inline data.
  *
  * source_id, data, and options are borrowed for the call. The accepted GeoJSON
- * descriptor is copied into MapLibre Native before return. options may be null
+ * bytes are parsed into MapLibre Native before return. options may be null
  * for defaults, and the options are fixed for the lifetime of the source.
  *
  * When options enable clustering, the data must be a feature collection whose
@@ -759,7 +759,7 @@ MLN_API mln_status mln_map_add_geojson_source_url(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_geojson_source_data(
-  mln_map map, mln_string_view source_id, const mln_geojson* data,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view data,
   const mln_geojson_source_options* options
 ) MLN_NOEXCEPT;
 
@@ -779,14 +779,14 @@ MLN_API mln_status mln_map_add_geojson_source_data(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_geojson_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url
 ) MLN_NOEXCEPT;
 
 /**
  * Updates one GeoJSON source with inline data.
  *
- * source_id and data are borrowed for the call. The accepted GeoJSON descriptor
- * is copied into MapLibre Native before return. The source keeps the
+ * source_id and UTF-8 GeoJSON data are borrowed for the call and parsed before
+ * return. The source keeps the
  * mln_geojson_source_options it was added with.
  *
  * When the source was added with clustering enabled, the data must be a feature
@@ -806,7 +806,7 @@ MLN_API mln_status mln_map_set_geojson_source_url(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_geojson_source_data(
-  mln_map map, mln_string_view source_id, const mln_geojson* data
+  mln_map map, mln_buffer_view source_id, mln_buffer_view data
 ) MLN_NOEXCEPT;
 
 /**
@@ -825,7 +825,7 @@ MLN_API mln_status mln_map_set_geojson_source_data(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_vector_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
   const mln_style_tile_source_options* options
 ) MLN_NOEXCEPT;
 
@@ -846,7 +846,7 @@ MLN_API mln_status mln_map_add_vector_source_url(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_vector_source_tiles(
-  mln_map map, mln_string_view source_id, const mln_string_view* tiles,
+  mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options
 ) MLN_NOEXCEPT;
 
@@ -865,7 +865,7 @@ MLN_API mln_status mln_map_add_vector_source_tiles(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_raster_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
   const mln_style_tile_source_options* options
 ) MLN_NOEXCEPT;
 
@@ -886,7 +886,7 @@ MLN_API mln_status mln_map_add_raster_source_url(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_raster_source_tiles(
-  mln_map map, mln_string_view source_id, const mln_string_view* tiles,
+  mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options
 ) MLN_NOEXCEPT;
 
@@ -906,7 +906,7 @@ MLN_API mln_status mln_map_add_raster_source_tiles(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_raster_dem_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
   const mln_style_tile_source_options* options
 ) MLN_NOEXCEPT;
 
@@ -927,7 +927,7 @@ MLN_API mln_status mln_map_add_raster_dem_source_url(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_raster_dem_source_tiles(
-  mln_map map, mln_string_view source_id, const mln_string_view* tiles,
+  mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options
 ) MLN_NOEXCEPT;
 
@@ -963,15 +963,15 @@ MLN_API mln_status mln_map_add_raster_dem_source_tiles(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_custom_geometry_source(
-  mln_map map, mln_string_view source_id,
+  mln_map map, mln_buffer_view source_id,
   const mln_custom_geometry_source_options* options
 ) MLN_NOEXCEPT;
 
 /**
  * Sets custom geometry source data for one canonical tile.
  *
- * source_id and data are borrowed for the call. The accepted GeoJSON descriptor
- * is copied into MapLibre Native before return.
+ * source_id and UTF-8 GeoJSON data are borrowed for the call and parsed before
+ * return.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -983,8 +983,8 @@ MLN_API mln_status mln_map_add_custom_geometry_source(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_custom_geometry_source_tile_data(
-  mln_map map, mln_string_view source_id, mln_canonical_tile_id tile_id,
-  const mln_geojson* data
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view data
 ) MLN_NOEXCEPT;
 
 /**
@@ -1000,7 +1000,7 @@ MLN_API mln_status mln_map_set_custom_geometry_source_tile_data(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_invalidate_custom_geometry_source_tile(
-  mln_map map, mln_string_view source_id, mln_canonical_tile_id tile_id
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id
 ) MLN_NOEXCEPT;
 
 /**
@@ -1016,7 +1016,7 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_tile(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
-  mln_map map, mln_string_view source_id, mln_lat_lng_bounds bounds
+  mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds
 ) MLN_NOEXCEPT;
 
 /**
@@ -1039,7 +1039,7 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_style_image(
-  mln_map map, mln_string_view image_id,
+  mln_map map, mln_buffer_view image_id,
   const mln_premultiplied_rgba8_image* image,
   const mln_style_image_options* options
 ) MLN_NOEXCEPT;
@@ -1059,7 +1059,7 @@ MLN_API mln_status mln_map_set_style_image(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_remove_style_image(
-  mln_map map, mln_string_view image_id, bool* out_removed
+  mln_map map, mln_buffer_view image_id, bool* out_removed
 ) MLN_NOEXCEPT;
 
 /**
@@ -1074,7 +1074,7 @@ MLN_API mln_status mln_map_remove_style_image(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_style_image_exists(
-  mln_map map, mln_string_view image_id, bool* out_exists
+  mln_map map, mln_buffer_view image_id, bool* out_exists
 ) MLN_NOEXCEPT;
 
 /**
@@ -1093,7 +1093,7 @@ MLN_API mln_status mln_map_style_image_exists(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_style_image_info(
-  mln_map map, mln_string_view image_id, mln_style_image_info* out_info,
+  mln_map map, mln_buffer_view image_id, mln_style_image_info* out_info,
   bool* out_found
 ) MLN_NOEXCEPT;
 
@@ -1120,7 +1120,7 @@ MLN_API mln_status mln_map_get_style_image_info(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_copy_style_image_premultiplied_rgba8(
-  mln_map map, mln_string_view image_id, uint8_t* out_pixels,
+  mln_map map, mln_buffer_view image_id, uint8_t* out_pixels,
   size_t pixel_capacity, size_t* out_byte_length, bool* out_found
 ) MLN_NOEXCEPT;
 
@@ -1147,7 +1147,7 @@ MLN_API mln_status mln_map_copy_style_image_premultiplied_rgba8(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_copy_style_image_stretches(
-  mln_map map, mln_string_view image_id, mln_image_stretch* out_stretch_x,
+  mln_map map, mln_buffer_view image_id, mln_image_stretch* out_stretch_x,
   size_t stretch_x_capacity, size_t* out_stretch_x_count,
   mln_image_stretch* out_stretch_y, size_t stretch_y_capacity,
   size_t* out_stretch_y_count, bool* out_found
@@ -1175,8 +1175,8 @@ MLN_API mln_status mln_map_copy_style_image_stretches(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_image_source_url(
-  mln_map map, mln_string_view source_id, const mln_lat_lng* coordinates,
-  size_t coordinate_count, mln_string_view url
+  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
+  size_t coordinate_count, mln_buffer_view url
 ) MLN_NOEXCEPT;
 
 /**
@@ -1201,7 +1201,7 @@ MLN_API mln_status mln_map_add_image_source_url(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_image_source_image(
-  mln_map map, mln_string_view source_id, const mln_lat_lng* coordinates,
+  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
   size_t coordinate_count, const mln_premultiplied_rgba8_image* image
 ) MLN_NOEXCEPT;
 
@@ -1221,7 +1221,7 @@ MLN_API mln_status mln_map_add_image_source_image(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_image_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url
 ) MLN_NOEXCEPT;
 
 /**
@@ -1241,7 +1241,7 @@ MLN_API mln_status mln_map_set_image_source_url(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_image_source_image(
-  mln_map map, mln_string_view source_id,
+  mln_map map, mln_buffer_view source_id,
   const mln_premultiplied_rgba8_image* image
 ) MLN_NOEXCEPT;
 
@@ -1262,7 +1262,7 @@ MLN_API mln_status mln_map_set_image_source_image(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_image_source_coordinates(
-  mln_map map, mln_string_view source_id, const mln_lat_lng* coordinates,
+  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
   size_t coordinate_count
 ) MLN_NOEXCEPT;
 
@@ -1285,7 +1285,7 @@ MLN_API mln_status mln_map_set_image_source_coordinates(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_image_source_coordinates(
-  mln_map map, mln_string_view source_id, mln_lat_lng* out_coordinates,
+  mln_map map, mln_buffer_view source_id, mln_lat_lng* out_coordinates,
   size_t coordinate_capacity, size_t* out_coordinate_count, bool* out_found
 ) MLN_NOEXCEPT;
 
@@ -1307,8 +1307,8 @@ MLN_API mln_status mln_map_get_image_source_coordinates(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_hillshade_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view source_id,
-  mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
+  mln_buffer_view before_layer_id
 ) MLN_NOEXCEPT;
 
 /**
@@ -1330,8 +1330,8 @@ MLN_API mln_status mln_map_add_hillshade_layer(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_color_relief_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view source_id,
-  mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
+  mln_buffer_view before_layer_id
 ) MLN_NOEXCEPT;
 
 /**
@@ -1351,7 +1351,7 @@ MLN_API mln_status mln_map_add_color_relief_layer(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_location_indicator_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) MLN_NOEXCEPT;
 
 /**
@@ -1371,7 +1371,7 @@ MLN_API mln_status mln_map_add_location_indicator_layer(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_location_indicator_location(
-  mln_map map, mln_string_view layer_id, mln_lat_lng coordinate, double altitude
+  mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude
 ) MLN_NOEXCEPT;
 
 /**
@@ -1387,7 +1387,7 @@ MLN_API mln_status mln_map_set_location_indicator_location(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_location_indicator_bearing(
-  mln_map map, mln_string_view layer_id, double bearing
+  mln_map map, mln_buffer_view layer_id, double bearing
 ) MLN_NOEXCEPT;
 
 /**
@@ -1403,7 +1403,7 @@ MLN_API mln_status mln_map_set_location_indicator_bearing(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_location_indicator_accuracy_radius(
-  mln_map map, mln_string_view layer_id, double radius
+  mln_map map, mln_buffer_view layer_id, double radius
 ) MLN_NOEXCEPT;
 
 /**
@@ -1422,8 +1422,8 @@ MLN_API mln_status mln_map_set_location_indicator_accuracy_radius(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_location_indicator_image_name(
-  mln_map map, mln_string_view layer_id, uint32_t image_kind,
-  mln_string_view image_id
+  mln_map map, mln_buffer_view layer_id, uint32_t image_kind,
+  mln_buffer_view image_id
 ) MLN_NOEXCEPT;
 
 /**
@@ -1449,7 +1449,7 @@ MLN_API mln_status mln_map_set_location_indicator_image_name(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_style_layer_json(
-  mln_map map, const mln_json_value* layer_json, mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_json, mln_buffer_view before_layer_id
 ) MLN_NOEXCEPT;
 
 /**
@@ -1467,7 +1467,7 @@ MLN_API mln_status mln_map_add_style_layer_json(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_remove_style_layer(
-  mln_map map, mln_string_view layer_id, bool* out_removed
+  mln_map map, mln_buffer_view layer_id, bool* out_removed
 ) MLN_NOEXCEPT;
 
 /**
@@ -1482,7 +1482,7 @@ MLN_API mln_status mln_map_remove_style_layer(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_style_layer_exists(
-  mln_map map, mln_string_view layer_id, bool* out_exists
+  mln_map map, mln_buffer_view layer_id, bool* out_exists
 ) MLN_NOEXCEPT;
 
 /**
@@ -1500,7 +1500,7 @@ MLN_API mln_status mln_map_style_layer_exists(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_style_layer_type(
-  mln_map map, mln_string_view layer_id, mln_string_view* out_layer_type,
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view* out_layer_type,
   bool* out_found
 ) MLN_NOEXCEPT;
 
@@ -1538,14 +1538,15 @@ MLN_API mln_status mln_map_list_style_layer_ids(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_move_style_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) MLN_NOEXCEPT;
 
 /**
- * Copies one style layer as a full style-spec layer JSON snapshot.
+ * Serializes one style layer as a full style-spec layer JSON object.
  *
  * On success, out_found reports whether layer_id exists. When found,
- * *out_layer receives an owned snapshot handle.
+ * *out_layer receives an owned UTF-8 JSON buffer. Destroy it with
+ * mln_buffer_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -1557,8 +1558,7 @@ MLN_API mln_status mln_map_move_style_layer(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_style_layer_json(
-  mln_map map, mln_string_view layer_id, mln_json_snapshot* out_layer,
-  bool* out_found
+  mln_map map, mln_buffer_view layer_id, mln_buffer* out_layer, bool* out_found
 ) MLN_NOEXCEPT;
 
 /**
@@ -1576,14 +1576,14 @@ MLN_API mln_status mln_map_get_style_layer_json(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_style_light_json(
-  mln_map map, const mln_json_value* light_json
+  mln_map map, mln_buffer_view light_json
 ) MLN_NOEXCEPT;
 
 /**
  * Sets one style light property using its MapLibre style-spec property name.
  *
  * property_name and value are borrowed for the call. value is a style-spec JSON
- * value descriptor. The function parses and copies the accepted value into
+ * value. The function parses and copies the accepted value into
  * MapLibre Native's typed light property storage before return.
  *
  * Returns:
@@ -1596,16 +1596,15 @@ MLN_API mln_status mln_map_set_style_light_json(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_style_light_property(
-  mln_map map, mln_string_view property_name, const mln_json_value* value
+  mln_map map, mln_buffer_view property_name, mln_buffer_view value
 ) MLN_NOEXCEPT;
 
 /**
- * Copies one style light property as a style-spec JSON value snapshot.
+ * Serializes one style light property as a style-spec JSON value.
  *
- * On success, *out_value receives an owned snapshot handle. Use
- * mln_json_snapshot_get() to borrow its root JSON value. Destroy the snapshot
- * with mln_json_snapshot_destroy(). Undefined native style light properties
- * return null snapshots.
+ * On success, *out_value receives an owned UTF-8 JSON buffer. Destroy it
+ * with mln_buffer_destroy(). Undefined native style light properties
+ * return null buffers.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -1616,7 +1615,7 @@ MLN_API mln_status mln_map_set_style_light_property(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_style_light_property(
-  mln_map map, mln_string_view property_name, mln_json_snapshot* out_value
+  mln_map map, mln_buffer_view property_name, mln_buffer* out_value
 ) MLN_NOEXCEPT;
 
 /**
@@ -1676,7 +1675,7 @@ MLN_API mln_status mln_map_get_style_transition_options(
  * Sets one layer property using its MapLibre style-spec property name.
  *
  * layer_id, property_name, and value are borrowed for the call. value is a
- * style-spec JSON value descriptor. Expressions use style-spec expression JSON
+ * style-spec JSON value. Expressions use style-spec expression JSON
  * arrays. The function parses and copies the accepted value into MapLibre
  * Native's typed style property storage before return.
  *
@@ -1691,17 +1690,16 @@ MLN_API mln_status mln_map_get_style_transition_options(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_layer_property(
-  mln_map map, mln_string_view layer_id, mln_string_view property_name,
-  const mln_json_value* value
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
+  mln_buffer_view value
 ) MLN_NOEXCEPT;
 
 /**
- * Copies one layer property as a style-spec JSON value snapshot.
+ * Serializes one layer property as a style-spec JSON value.
  *
- * On success, *out_value receives an owned snapshot handle. Use
- * mln_json_snapshot_get() to borrow its root JSON value. Destroy the snapshot
- * with mln_json_snapshot_destroy(). Undefined native style properties return
- * null snapshots.
+ * On success, *out_value receives an owned UTF-8 JSON buffer. Destroy it
+ * with mln_buffer_destroy(). Undefined native style properties return
+ * null buffers.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -1713,8 +1711,8 @@ MLN_API mln_status mln_map_set_layer_property(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_layer_property(
-  mln_map map, mln_string_view layer_id, mln_string_view property_name,
-  mln_json_snapshot* out_value
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
+  mln_buffer* out_value
 ) MLN_NOEXCEPT;
 
 /**
@@ -1735,15 +1733,14 @@ MLN_API mln_status mln_map_get_layer_property(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_layer_filter(
-  mln_map map, mln_string_view layer_id, const mln_json_value* filter
+  mln_map map, mln_buffer_view layer_id, const mln_buffer_view* filter
 ) MLN_NOEXCEPT;
 
 /**
- * Copies one layer filter as a style-spec JSON value snapshot.
+ * Serializes one layer filter as a style-spec JSON value.
  *
- * On success, *out_filter receives an owned snapshot handle. Use
- * mln_json_snapshot_get() to borrow its root JSON value. Destroy the snapshot
- * with mln_json_snapshot_destroy(). Missing filters return null snapshots.
+ * On success, *out_filter receives an owned UTF-8 JSON buffer. Destroy it
+ * with mln_buffer_destroy(). Missing filters return null buffers.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -1755,7 +1752,7 @@ MLN_API mln_status mln_map_set_layer_filter(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_layer_filter(
-  mln_map map, mln_string_view layer_id, mln_json_snapshot* out_filter
+  mln_map map, mln_buffer_view layer_id, mln_buffer* out_filter
 ) MLN_NOEXCEPT;
 
 /**
@@ -1778,7 +1775,7 @@ MLN_API mln_status mln_map_get_layer_filter(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_layer_source_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view source_layer
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer
 ) MLN_NOEXCEPT;
 
 /**
@@ -1805,7 +1802,7 @@ MLN_API mln_status mln_map_set_layer_source_layer(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_copy_layer_source_layer(
-  mln_map map, mln_string_view layer_id, char* out_source_layer,
+  mln_map map, mln_buffer_view layer_id, char* out_source_layer,
   size_t source_layer_capacity, size_t* out_source_layer_size
 ) MLN_NOEXCEPT;
 
@@ -1829,7 +1826,7 @@ MLN_API mln_status mln_map_copy_layer_source_layer(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_layer_source_id(
-  mln_map map, mln_string_view layer_id, mln_string_view source_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id
 ) MLN_NOEXCEPT;
 
 /**
@@ -1856,7 +1853,7 @@ MLN_API mln_status mln_map_set_layer_source_id(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_copy_layer_source_id(
-  mln_map map, mln_string_view layer_id, char* out_source_id,
+  mln_map map, mln_buffer_view layer_id, char* out_source_id,
   size_t source_id_capacity, size_t* out_source_id_size
 ) MLN_NOEXCEPT;
 
@@ -1875,7 +1872,7 @@ MLN_API mln_status mln_map_copy_layer_source_id(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_layer_min_zoom(
-  mln_map map, mln_string_view layer_id, double min_zoom
+  mln_map map, mln_buffer_view layer_id, double min_zoom
 ) MLN_NOEXCEPT;
 
 /**
@@ -1892,7 +1889,7 @@ MLN_API mln_status mln_map_set_layer_min_zoom(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_layer_min_zoom(
-  mln_map map, mln_string_view layer_id, double* out_min_zoom
+  mln_map map, mln_buffer_view layer_id, double* out_min_zoom
 ) MLN_NOEXCEPT;
 
 /**
@@ -1910,7 +1907,7 @@ MLN_API mln_status mln_map_get_layer_min_zoom(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_layer_max_zoom(
-  mln_map map, mln_string_view layer_id, double max_zoom
+  mln_map map, mln_buffer_view layer_id, double max_zoom
 ) MLN_NOEXCEPT;
 
 /**
@@ -1927,7 +1924,7 @@ MLN_API mln_status mln_map_set_layer_max_zoom(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_layer_max_zoom(
-  mln_map map, mln_string_view layer_id, double* out_max_zoom
+  mln_map map, mln_buffer_view layer_id, double* out_max_zoom
 ) MLN_NOEXCEPT;
 
 /**
@@ -1945,7 +1942,7 @@ MLN_API mln_status mln_map_get_layer_max_zoom(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_layer_visibility(
-  mln_map map, mln_string_view layer_id, uint32_t visibility
+  mln_map map, mln_buffer_view layer_id, uint32_t visibility
 ) MLN_NOEXCEPT;
 
 /**
@@ -1962,7 +1959,7 @@ MLN_API mln_status mln_map_set_layer_visibility(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_layer_visibility(
-  mln_map map, mln_string_view layer_id, uint32_t* out_visibility
+  mln_map map, mln_buffer_view layer_id, uint32_t* out_visibility
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

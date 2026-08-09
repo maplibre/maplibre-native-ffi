@@ -7,7 +7,6 @@ import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
-import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
@@ -24,9 +23,9 @@ import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.lifecycle.NativeMapProjection
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.internal.struct.ByteStructs
 import org.maplibre.nativeffi.internal.struct.CoreStructs
 import org.maplibre.nativeffi.internal.struct.MapStructs
-import org.maplibre.nativeffi.internal.struct.ValueStructs
 
 /** Owned standalone projection snapshot created from a map. */
 @OptIn(ExperimentalForeignApi::class)
@@ -66,12 +65,12 @@ public actual class MapProjectionHandle internal constructor(handle: NativeMapPr
     }
   }
 
-  public actual fun setVisibleGeometry(geometry: Geometry, padding: EdgeInsets) {
+  public actual fun setVisibleGeometry(geometry: ByteArray, padding: EdgeInsets) {
     memScoped {
       Status.check(
         mln_map_projection_set_visible_geometry(
           state.requireLive().rawHandleValue,
-          ValueStructs.geometry(geometry, this),
+          ByteStructs.bufferView(geometry, this),
           CoreStructs.edgeInsets(padding),
         )
       )

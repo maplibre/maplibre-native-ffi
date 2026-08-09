@@ -1,14 +1,14 @@
 package org.maplibre.nativeffi.style
 
 import org.maplibre.nativeffi.internal.status.Status
-import org.maplibre.nativeffi.json.JsonValue
 
 /**
  * Mutable descriptor for GeoJSON style sources. These options are fixed when the source is created;
  * the data update APIs keep the options the source was added with.
  *
- * Compares and hashes by field value; [copy] returns an independent instance. Keep an instance
- * unmodified while it is a key in a hash-based collection.
+ * Compares and hashes by field value; [copy] returns an independent instance. Assigning
+ * [clusterProperties] snapshots the bytes. Keep an instance unmodified while it is a key in a
+ * hash-based collection.
  */
 public class GeoJsonSourceOptions {
   public var minZoom: Double? = null
@@ -23,7 +23,16 @@ public class GeoJsonSourceOptions {
    * Cluster aggregation expressions keyed by property name, as a JSON object whose members follow
    * the MapLibre Style Spec `clusterProperties` form.
    */
-  public var clusterProperties: JsonValue? = null
+  private var clusterPropertyBytes: ByteArray? = null
+
+  public var clusterProperties: ByteArray?
+    get() = clusterPropertyBytes?.copyOf()
+    set(value) {
+      clusterPropertyBytes = value?.copyOf()
+    }
+
+  internal val clusterPropertiesTransit: ByteArray?
+    get() = clusterPropertyBytes
 
   public var tileSize: Int? = null
     set(value) {
@@ -64,7 +73,7 @@ public class GeoJsonSourceOptions {
         it.maxZoom = maxZoom
         it.tolerance = tolerance
         it.clusterMaxZoom = clusterMaxZoom
-        it.clusterProperties = clusterProperties
+        it.clusterPropertyBytes = clusterPropertyBytes?.copyOf()
         it.tileSize = tileSize
         it.buffer = buffer
         it.clusterRadius = clusterRadius
@@ -82,7 +91,7 @@ public class GeoJsonSourceOptions {
         maxZoom,
         tolerance,
         clusterMaxZoom,
-        clusterProperties,
+        clusterPropertyBytes?.contentHashCode(),
         tileSize,
         buffer,
         clusterRadius,
@@ -93,7 +102,26 @@ public class GeoJsonSourceOptions {
       )
 
   override fun equals(other: Any?): Boolean =
-    other is GeoJsonSourceOptions && fields == other.fields
+    other is GeoJsonSourceOptions &&
+      minZoom == other.minZoom &&
+      maxZoom == other.maxZoom &&
+      tolerance == other.tolerance &&
+      clusterMaxZoom == other.clusterMaxZoom &&
+      geoJsonSourceBytesEqual(clusterPropertyBytes, other.clusterPropertyBytes) &&
+      tileSize == other.tileSize &&
+      buffer == other.buffer &&
+      clusterRadius == other.clusterRadius &&
+      clusterMinPoints == other.clusterMinPoints &&
+      lineMetrics == other.lineMetrics &&
+      cluster == other.cluster &&
+      synchronousUpdate == other.synchronousUpdate
 
   override fun hashCode(): Int = fields.hashCode()
 }
+
+private fun geoJsonSourceBytesEqual(left: ByteArray?, right: ByteArray?): Boolean =
+  when {
+    left == null -> right == null
+    right == null -> false
+    else -> left.contentEquals(right)
+  }
