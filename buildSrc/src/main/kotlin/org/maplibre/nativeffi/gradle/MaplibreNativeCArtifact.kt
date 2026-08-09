@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.gradle
 
+import groovy.json.JsonSlurper
 import java.io.File
 
 class MaplibreNativeCArtifact(val installDir: File, val hostLibraryDirs: List<File>) {
@@ -22,10 +23,21 @@ class MaplibreNativeCArtifact(val installDir: File, val hostLibraryDirs: List<Fi
     get() = runtimeLibraryDirs + hostLibraryDirs
 
   val linkLibraries: List<String>
-    get() = listOf("maplibre-native-c")
+    get() = listOf("maplibre-native-c") + artifactStringList("staticLinkLibraries")
 
   val frameworks: List<String>
-    get() = emptyList()
+    get() = artifactStringList("staticLinkFrameworks")
+
+  private val artifactMetadata: Map<*, *> by lazy {
+    val descriptor = installDir.resolve("share/maplibre-native-c/artifact.json")
+    if (descriptor.isFile) JsonSlurper().parse(descriptor) as Map<*, *> else emptyMap<Any, Any>()
+  }
+
+  private fun artifactStringList(name: String): List<String> =
+    (artifactMetadata[name] as? List<*>)?.map { value ->
+      require(value is String) { "$name in the native artifact descriptor must contain strings" }
+      value
+    } ?: emptyList()
 
   private val runtimeLibraryDir: File
     get() = installDir.resolve(if (targetIsWindows()) "bin" else "lib")

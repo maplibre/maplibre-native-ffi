@@ -410,7 +410,7 @@ class RuntimeHandleTest {
           map.setStyleUrl("http://example.invalid/original-style.json")
           assertTrue(
             waitForCondition {
-              runtime.pump(0)
+              runtime.pump(1)
               calls.load() > 0
             }
           )
@@ -459,14 +459,14 @@ class RuntimeHandleTest {
       try {
         map.setStyleUrl("custom://pass-through-style.json")
         val handle = waitForHandledRequest(runtime, requestHandle)
-        assertFailsWith<InvalidStateException> { handle.isCancelled() }
-        assertFailsWith<InvalidStateException> {
-          handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
-        }
         assertEquals(
           RuntimeEventType.MAP_LOADING_FAILED,
           waitForMapEventRecord(runtime, map, RuntimeEventType.MAP_LOADING_FAILED).type,
         )
+        assertFailsWith<InvalidStateException> { handle.isCancelled() }
+        assertFailsWith<InvalidStateException> {
+          handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
+        }
       } finally {
         map.close()
       }
@@ -497,7 +497,7 @@ class RuntimeHandleTest {
         map.setStyleUrl("custom://close-during-provider.json")
         assertTrue(
           waitForCondition {
-            runtime.pump(0)
+            runtime.pump(1)
             closeError.load() != null
           }
         )
@@ -532,7 +532,7 @@ class RuntimeHandleTest {
         map.setStyleUrl("http://example.invalid/close-during-transform.json")
         assertTrue(
           waitForCondition {
-            runtime.pump(0)
+            runtime.pump(1)
             closeError.load() != null
           }
         )
@@ -560,6 +560,7 @@ class RuntimeHandleTest {
         return completed
       }
       runtime.pump(1)
+      waitForAsyncTestWork()
     }
     error("offline operation did not complete: ${operation.id}")
   }
@@ -576,6 +577,7 @@ class RuntimeHandleTest {
         if (event.type == type && event.mapSource == map) return true
       }
       runtime.pump(1)
+      waitForAsyncTestWork()
     }
     return false
   }
@@ -592,6 +594,7 @@ class RuntimeHandleTest {
         if (event.type == type && event.mapSource == map) return event
       }
       runtime.pump(1)
+      waitForAsyncTestWork()
     }
     error("runtime event $type did not arrive")
   }
@@ -605,6 +608,7 @@ class RuntimeHandleTest {
         return it
       }
       runtime.pump(1)
+      waitForAsyncTestWork()
     }
     error("resource provider did not receive handled request")
   }
@@ -616,6 +620,7 @@ class RuntimeHandleTest {
     repeat(10_000) {
       if (handle.isCancelled()) return true
       runtime.pump(1)
+      waitForAsyncTestWork()
     }
     return false
   }
@@ -648,12 +653,16 @@ class RuntimeHandleTest {
         }
       }
       runtime.pump(1)
+      waitForAsyncTestWork()
     }
     error("map loading failure for $styleUrl did not arrive")
   }
 
   private fun waitForCondition(condition: () -> Boolean): Boolean {
-    repeat(10_000) { if (condition()) return true }
+    repeat(10_000) {
+      if (condition()) return true
+      waitForAsyncTestWork()
+    }
     return false
   }
 }
