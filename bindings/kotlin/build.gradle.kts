@@ -1,6 +1,7 @@
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
@@ -196,6 +197,8 @@ tasks.named<Test>("jvmTest") {
     inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstallDir")
   }
 }
+
+tasks.withType<KotlinNativeSimulatorTest>().configureEach { standalone.set(false) }
 
 // AGP's KMP library plugin registers no lint variant, so `NewApi` never runs for
 // androidMain. This task stands in for it.

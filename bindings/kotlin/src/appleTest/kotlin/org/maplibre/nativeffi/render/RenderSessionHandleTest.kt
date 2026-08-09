@@ -53,8 +53,6 @@ import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
-import platform.CoreGraphics.CGColorSpaceCreateDeviceRGB
-import platform.CoreGraphics.CGColorSpaceRelease
 import platform.CoreGraphics.CGSizeMake
 import platform.Metal.MTLCreateSystemDefaultDevice
 import platform.Metal.MTLDeviceProtocol
@@ -80,7 +78,8 @@ class RenderSessionHandleTest {
   @Test
   fun renderUpdateWithoutPendingUpdateReportsFalseAndKeepsSessionLive() {
     if (!metalSupportedOrInapplicable()) return
-    val device = createMetalDevice()
+    val device =
+      MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
     val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     try {
       val map =
@@ -117,7 +116,8 @@ class RenderSessionHandleTest {
   @Test
   fun metalOwnedTextureSessionRendersReadsBackAcquiresFrameAndDetaches() {
     if (!metalSupportedOrInapplicable()) return
-    val device = createMetalDevice()
+    val device =
+      MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
     Maplibre.setLogCallback(LogCallback { true })
     Maplibre.setAsyncLogSeverities(emptySet())
     try {
@@ -367,7 +367,8 @@ class RenderSessionHandleTest {
   @Test
   fun metalBorrowedTextureAndSurfaceAttachThroughPublicBinding() {
     if (!metalSupportedOrInapplicable()) return
-    val device = createMetalDevice()
+    val device =
+      MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
     Maplibre.setLogCallback(LogCallback { true })
     Maplibre.setAsyncLogSeverities(emptySet())
     try {
@@ -457,7 +458,8 @@ class RenderSessionHandleTest {
   @Test
   fun metalSetTargetReplacesBorrowedTextureAndSurfaceTargets() {
     if (!metalSupportedOrInapplicable()) return
-    val device = createMetalDevice()
+    val device =
+      MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
     Maplibre.setLogCallback(LogCallback { true })
     Maplibre.setAsyncLogSeverities(emptySet())
     try {
@@ -589,7 +591,8 @@ class RenderSessionHandleTest {
   @Test
   fun metalSetTargetReportsUnsupportedForOtherTargetKinds() {
     if (!metalSupportedOrInapplicable()) return
-    val device = createMetalDevice()
+    val device =
+      MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
     val metalContext = MetalContextDescriptor(NativePointer.ofAddress(device.address()))
     val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     try {
@@ -671,7 +674,8 @@ class RenderSessionHandleTest {
   @Test
   fun clusterFeatureExtensionQueriesResolveUnsignedClusterIdAndLimit() {
     if (!metalSupportedOrInapplicable()) return
-    val device = createMetalDevice()
+    val device =
+      MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
     Maplibre.setLogCallback(LogCallback { true })
     Maplibre.setAsyncLogSeverities(emptySet())
     try {
@@ -778,11 +782,6 @@ class RenderSessionHandleTest {
 
   private fun metalSupportedOrInapplicable(): Boolean {
     return RenderBackend.METAL in Maplibre.supportedRenderBackends()
-  }
-
-  private fun createMetalDevice(): MTLDeviceProtocol {
-    CGColorSpaceRelease(CGColorSpaceCreateDeviceRGB())
-    return MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
   }
 
   private fun createStaticMap(runtime: RuntimeHandle): MapHandle =
