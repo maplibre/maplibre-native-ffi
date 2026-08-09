@@ -198,7 +198,10 @@ tasks.named<Test>("jvmTest") {
   }
 }
 
-tasks.withType<KotlinNativeSimulatorTest>().configureEach { standalone.set(false) }
+tasks.withType<KotlinNativeSimulatorTest>().configureEach {
+  standalone.set(false)
+  providers.environmentVariable("MLN_FFI_IOS_SIMULATOR_DEVICE_ID").orNull?.let(device::set)
+}
 
 // AGP's KMP library plugin registers no lint variant, so `NewApi` never runs for
 // androidMain. This task stands in for it.

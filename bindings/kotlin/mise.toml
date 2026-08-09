@@ -121,6 +121,14 @@ case "$usage_preset" in
     )
     gradle_tasks+=(":bindings:kotlin:runtimes:metal:${kotlin_target}Klib")
     mise run //:ios-simulator:boot
+    export MLN_FFI_IOS_SIMULATOR_DEVICE_ID=$(
+      xcrun simctl list devices available iOS |
+        awk -F '[()]' '/ iPhone / && /Booted/ { print $2; exit }'
+    )
+    if [[ -z "$MLN_FFI_IOS_SIMULATOR_DEVICE_ID" ]]; then
+      echo "No booted iOS simulator device found." >&2
+      exit 2
+    fi
     ;;
   ios-arm64-metal)
     echo "The Kotlin iOS tests need a runnable target; test ios-simulator-arm64-metal instead of $usage_preset." >&2
