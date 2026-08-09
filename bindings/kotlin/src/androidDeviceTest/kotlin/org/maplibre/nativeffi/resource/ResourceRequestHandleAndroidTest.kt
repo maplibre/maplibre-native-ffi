@@ -16,6 +16,15 @@ import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 
 class ResourceRequestHandleAndroidTest {
   @Test
+  fun unreachableProviderOwnedHandleReleasesNativeRequest() {
+    val released = CountDownLatch(1)
+
+    registerUnreachableProviderOwnedHandle(released)
+
+    assertTrue(awaitRelease(released), "expected unreachable request cleanup to release native")
+  }
+
+  @Test
   fun completionFailureIsTerminalAndCopiesDiagnosticBeforeReleaseCleanup() {
     val releases = AtomicInteger(0)
     val handle =
@@ -73,5 +82,26 @@ class ResourceRequestHandleAndroidTest {
     completion.join()
     assertEquals(1, releases.get())
     assertFailsWith<InvalidStateException> { handle.isCancelled() }
+  }
+
+  private fun registerUnreachableProviderOwnedHandle(released: CountDownLatch) {
+    val handle = ResourceRequestHandle(1L, releaser = { released.countDown() })
+    assertEquals(
+      ResourceProviderDecision.HANDLE.nativeValue,
+      handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
+    )
+  }
+
+  private fun awaitRelease(released: CountDownLatch): Boolean {
+    repeat(ATTEMPTS) {
+      if (released.await(POLL_MILLIS, TimeUnit.MILLISECONDS)) return true
+      System.gc()
+    }
+    return released.count == 0L
+  }
+
+  private companion object {
+    private const val ATTEMPTS = 100
+    private const val POLL_MILLIS = 20L
   }
 }

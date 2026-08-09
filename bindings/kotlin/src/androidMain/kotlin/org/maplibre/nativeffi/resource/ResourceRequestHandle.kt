@@ -23,7 +23,7 @@ internal constructor(
   },
   releaser: (Long) -> Unit = MaplibreNativeC::mln_resource_request_release,
 ) : AutoCloseable {
-  private val core = ResourceRequestHandleCore { releaser(handleId) }
+  private val core = ResourceRequestHandleCore(ReleaseNativeRequest(handleId, releaser))
 
   init {
     require(handleId != 0L) { "Resource request handle is null" }
@@ -134,6 +134,15 @@ internal constructor(
   private class CloseWhenUnreachableAction(private val core: ResourceRequestHandleCore) : Runnable {
     override fun run() {
       core.close()
+    }
+  }
+
+  private class ReleaseNativeRequest(
+    private val handleId: Long,
+    private val releaser: (Long) -> Unit,
+  ) : () -> Unit {
+    override fun invoke() {
+      releaser(handleId)
     }
   }
 

@@ -16,7 +16,7 @@ internal constructor(
     NativeAccess::isResourceRequestCancelled,
   releaser: (NativeResourceRequest) -> Unit = NativeAccess::releaseResourceRequest,
 ) : AutoCloseable {
-  private val core = ResourceRequestHandleCore { releaser(handle) }
+  private val core = ResourceRequestHandleCore(ReleaseNativeRequest(handle, releaser))
 
   init {
     UnreachableActions.register(this, CloseWhenUnreachableAction(core))
@@ -69,6 +69,15 @@ internal constructor(
   private class CloseWhenUnreachableAction(private val core: ResourceRequestHandleCore) : Runnable {
     override fun run() {
       core.close()
+    }
+  }
+
+  private class ReleaseNativeRequest(
+    private val handle: NativeResourceRequest,
+    private val releaser: (NativeResourceRequest) -> Unit,
+  ) : () -> Unit {
+    override fun invoke() {
+      releaser(handle)
     }
   }
 
