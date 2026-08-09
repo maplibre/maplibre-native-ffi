@@ -22,6 +22,9 @@ extension type const NativeMapProjection(int raw) implements NativeHandle {}
 /// Render session handle id.
 extension type const NativeRenderSession(int raw) implements NativeHandle {}
 
+/// Owned native buffer handle id.
+extension type const NativeOwnedBufferHandle(int raw) implements NativeHandle {}
+
 /// Offline region snapshot handle id.
 extension type const NativeOfflineRegionSnapshot(int raw)
     implements NativeHandle {}

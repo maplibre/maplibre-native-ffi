@@ -236,9 +236,9 @@
 --include-function mln_runtime_offline_regions_merge_database_take_result
 --include-struct mln_animation_options
 --include-struct mln_bound_options
+--include-struct mln_buffer_view
 --include-struct mln_camera_fit_options
 --include-struct mln_camera_options
---include-struct mln_buffer_view
 --include-struct mln_edge_insets
 --include-struct mln_feature_state_selector
 --include-struct mln_free_camera_options

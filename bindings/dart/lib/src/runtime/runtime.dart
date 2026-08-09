@@ -2393,12 +2393,15 @@ final class MapHandle {
   void addGeoJsonSourceUrl(
     String sourceId,
     String url, {
-    GeoJsonSourceOptions options = const GeoJsonSourceOptions(),
+    GeoJsonSourceOptions? options,
   }) {
     withNativeArena((arena) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeUrl = nativeStringView(url, arena);
-      final nativeOptions = _nativeGeoJsonSourceOptions(options, arena);
+      final nativeOptions = _nativeGeoJsonSourceOptions(
+        options ?? GeoJsonSourceOptions(),
+        arena,
+      );
       _check(
         raw.mln_map_add_geojson_source_url(
           _handle.raw,
@@ -2414,12 +2417,15 @@ final class MapHandle {
   void addGeoJsonSourceData(
     String sourceId,
     Uint8List data, {
-    GeoJsonSourceOptions options = const GeoJsonSourceOptions(),
+    GeoJsonSourceOptions? options,
   }) {
     withNativeArena((arena) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeData = nativeBufferView(data, arena);
-      final nativeOptions = _nativeGeoJsonSourceOptions(options, arena);
+      final nativeOptions = _nativeGeoJsonSourceOptions(
+        options ?? GeoJsonSourceOptions(),
+        arena,
+      );
       _check(
         raw.mln_map_add_geojson_source_data(
           _handle.raw,
@@ -3097,7 +3103,7 @@ final class MapHandle {
       if (!outFound.value) {
         return null;
       }
-      return copyOwnedBuffer(outLayer.value);
+      return copyOwnedBuffer(NativeOwnedBufferHandle(outLayer.value));
     });
   }
 
@@ -3137,7 +3143,8 @@ final class MapHandle {
           outValue,
         ),
       );
-      return outValue.value == 0 ? null : copyOwnedBuffer(outValue.value);
+      final buffer = NativeOwnedBufferHandle(outValue.value);
+      return buffer.isNull ? null : copyOwnedBuffer(buffer);
     });
   }
 
@@ -3198,7 +3205,8 @@ final class MapHandle {
           outValue,
         ),
       );
-      return outValue.value == 0 ? null : copyOwnedBuffer(outValue.value);
+      final buffer = NativeOwnedBufferHandle(outValue.value);
+      return buffer.isNull ? null : copyOwnedBuffer(buffer);
     });
   }
 
@@ -3233,7 +3241,8 @@ final class MapHandle {
           outFilter,
         ),
       );
-      return outFilter.value == 0 ? null : copyOwnedBuffer(outFilter.value);
+      final buffer = NativeOwnedBufferHandle(outFilter.value);
+      return buffer.isNull ? null : copyOwnedBuffer(buffer);
     });
   }
 

@@ -644,7 +644,7 @@ public sealed unsafe class MapHandle : IDisposable
                 NativeMethods.mln_map_copy_style_url(map, text, capacity, size)
         );
 
-    /// <summary>Adds a style source from a JSON-like value.</summary>
+    /// <summary>Adds a style source from UTF-8 JSON bytes.</summary>
     public void AddStyleSourceJson(string sourceId, byte[] sourceJson)
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
@@ -1526,7 +1526,7 @@ public sealed unsafe class MapHandle : IDisposable
         );
     }
 
-    /// <summary>Adds a style layer from a JSON-like value.</summary>
+    /// <summary>Adds a style layer from UTF-8 JSON bytes.</summary>
     public void AddStyleLayerJson(byte[] layerJson, string beforeLayerId)
     {
         using var nativeJson = NativeStringView.From(layerJson, nameof(layerJson));
@@ -1605,7 +1605,7 @@ public sealed unsafe class MapHandle : IDisposable
     public byte[]? GetStyleLayerJson(string layerId)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        ulong buffer = 0;
+        MlnBuffer buffer = default;
         bool found = false;
         NativeStatus.Check(
             NativeMethods.mln_map_get_style_layer_json(Handle, nativeLayerId.Value, &buffer, &found)
@@ -1613,14 +1613,14 @@ public sealed unsafe class MapHandle : IDisposable
         return found ? ValueStructs.ReadBuffer(buffer) : null;
     }
 
-    /// <summary>Sets the style light document from a JSON-like value.</summary>
+    /// <summary>Sets the style light document from UTF-8 JSON bytes.</summary>
     public void SetStyleLightJson(byte[] lightJson)
     {
         using var nativeJson = NativeStringView.From(lightJson, nameof(lightJson));
         NativeStatus.Check(NativeMethods.mln_map_set_style_light_json(Handle, nativeJson.Value));
     }
 
-    /// <summary>Sets one style light property from a JSON-like value.</summary>
+    /// <summary>Sets one style light property from UTF-8 JSON bytes.</summary>
     public void SetStyleLightProperty(string propertyName, byte[] value)
     {
         using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
@@ -1638,7 +1638,7 @@ public sealed unsafe class MapHandle : IDisposable
     public byte[]? GetStyleLightProperty(string propertyName)
     {
         using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
-        ulong buffer = 0;
+        MlnBuffer buffer = default;
         NativeStatus.Check(
             NativeMethods.mln_map_get_style_light_property(
                 Handle,
@@ -1669,7 +1669,7 @@ public sealed unsafe class MapHandle : IDisposable
         return StyleStructs.FromNative(native);
     }
 
-    /// <summary>Sets one layer property from a JSON-like value.</summary>
+    /// <summary>Sets one layer property from UTF-8 JSON bytes.</summary>
     public void SetLayerProperty(string layerId, string propertyName, byte[] value)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
@@ -1690,7 +1690,7 @@ public sealed unsafe class MapHandle : IDisposable
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
-        ulong buffer = 0;
+        MlnBuffer buffer = default;
         NativeStatus.Check(
             NativeMethods.mln_map_get_layer_property(
                 Handle,
@@ -1702,7 +1702,7 @@ public sealed unsafe class MapHandle : IDisposable
         return ValueStructs.ReadOptionalBuffer(buffer);
     }
 
-    /// <summary>Sets or clears one layer filter from a JSON-like value.</summary>
+    /// <summary>Sets or clears one layer filter from UTF-8 JSON bytes.</summary>
     public void SetLayerFilter(string layerId, byte[]? filter)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
@@ -1722,7 +1722,7 @@ public sealed unsafe class MapHandle : IDisposable
     public byte[]? GetLayerFilter(string layerId)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        ulong buffer = 0;
+        MlnBuffer buffer = default;
         NativeStatus.Check(
             NativeMethods.mln_map_get_layer_filter(Handle, nativeLayerId.Value, &buffer)
         );

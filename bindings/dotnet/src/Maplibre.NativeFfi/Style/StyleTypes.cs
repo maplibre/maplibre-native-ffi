@@ -156,12 +156,12 @@ public sealed record GeoJsonSourceOptions
     /// </summary>
     public bool? SynchronousUpdate { get; set; }
 
+    private byte[]? clusterProperties;
+
     /// <summary>
     /// Cluster aggregation expressions keyed by property name, as a JSON object whose members
     /// follow the MapLibre Style Spec <c>clusterProperties</c> form.
     /// </summary>
-    private byte[]? clusterProperties;
-
     public byte[]? ClusterProperties
     {
         get => clusterProperties?.ToArray();

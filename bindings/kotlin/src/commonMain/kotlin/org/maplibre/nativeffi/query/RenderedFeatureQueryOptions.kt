@@ -39,14 +39,7 @@ public class RenderedFeatureQueryOptions {
   override fun equals(other: Any?): Boolean =
     other is RenderedFeatureQueryOptions &&
       layerIds == other.layerIds &&
-      renderedQueryBytesEqual(filterBytes, other.filterBytes)
+      filterBytes.contentEquals(other.filterBytes)
 
   override fun hashCode(): Int = fields.hashCode()
 }
-
-private fun renderedQueryBytesEqual(left: ByteArray?, right: ByteArray?): Boolean =
-  when {
-    left == null -> right == null
-    right == null -> false
-    else -> left.contentEquals(right)
-  }

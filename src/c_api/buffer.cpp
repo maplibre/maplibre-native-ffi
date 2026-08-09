@@ -1,3 +1,5 @@
+#define MLN_BUILDING_C
+
 #include "bytes/buffer.hpp"
 
 #include "c_api/boundary.hpp"

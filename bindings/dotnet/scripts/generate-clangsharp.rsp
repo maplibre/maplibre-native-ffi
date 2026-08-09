@@ -15,6 +15,7 @@ maplibre-native-c
 --remap
 int64_t=long
 uint64_t=ulong
+mln_buffer=MlnBuffer
 mln_runtime=MlnRuntime
 mln_map=MlnMap
 mln_map_projection=MlnMapProjection

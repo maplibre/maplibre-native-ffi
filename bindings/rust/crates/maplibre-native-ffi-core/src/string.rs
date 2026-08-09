@@ -7,6 +7,7 @@ use std::str;
 use maplibre_native_ffi_sys as sys;
 
 use crate::error::{Error, Result};
+use crate::handle::NativeHandle;
 
 #[derive(Debug, Clone, Copy)]
 pub struct StringView<'a> {
@@ -71,7 +72,7 @@ pub fn buffer_view(value: &[u8]) -> sys::mln_buffer_view {
 ///
 /// `buffer` must be null or an owned buffer returned by the C API.
 pub unsafe fn copy_owned_buffer(buffer: sys::mln_buffer) -> Result<Vec<u8>> {
-    if buffer == 0 {
+    if buffer.to_raw() == 0 {
         return Ok(Vec::new());
     }
     // SAFETY: The caller transfers ownership of the live buffer to this guard.

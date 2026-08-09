@@ -34,10 +34,10 @@ namespace Maplibre.NativeFfi.Internal.C
     internal static unsafe partial class NativeMethods
     {
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_buffer_get([NativeTypeName("mln_buffer")] ulong buffer, mln_buffer_view* out_view);
+        public static extern mln_status mln_buffer_get([NativeTypeName("mln_buffer")] MlnBuffer buffer, mln_buffer_view* out_view);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void mln_buffer_destroy([NativeTypeName("mln_buffer")] ulong buffer);
+        public static extern void mln_buffer_destroy([NativeTypeName("mln_buffer")] MlnBuffer buffer);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("uint32_t")]

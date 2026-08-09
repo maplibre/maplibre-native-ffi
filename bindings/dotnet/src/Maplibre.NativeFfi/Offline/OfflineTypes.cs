@@ -21,14 +21,56 @@ public abstract record OfflineRegionDefinition
         bool IncludeIdeographs
     ) : OfflineRegionDefinition;
 
-    public sealed record GeometryRegion(
-        string StyleUrl,
-        byte[] Geometry,
-        double MinimumZoom,
-        double MaximumZoom,
-        float PixelRatio,
-        bool IncludeIdeographs
-    ) : OfflineRegionDefinition;
+    public sealed record GeometryRegion : OfflineRegionDefinition
+    {
+        private readonly byte[] geometry;
+
+        public GeometryRegion(
+            string StyleUrl,
+            byte[] Geometry,
+            double MinimumZoom,
+            double MaximumZoom,
+            float PixelRatio,
+            bool IncludeIdeographs
+        )
+        {
+            ArgumentNullException.ThrowIfNull(Geometry);
+            this.StyleUrl = StyleUrl;
+            geometry = (byte[])Geometry.Clone();
+            this.MinimumZoom = MinimumZoom;
+            this.MaximumZoom = MaximumZoom;
+            this.PixelRatio = PixelRatio;
+            this.IncludeIdeographs = IncludeIdeographs;
+        }
+
+        public string StyleUrl { get; }
+        public byte[] Geometry => (byte[])geometry.Clone();
+        public double MinimumZoom { get; }
+        public double MaximumZoom { get; }
+        public float PixelRatio { get; }
+        public bool IncludeIdeographs { get; }
+
+        public bool Equals(GeometryRegion? other) =>
+            other is not null
+            && StyleUrl == other.StyleUrl
+            && geometry.AsSpan().SequenceEqual(other.geometry)
+            && MinimumZoom == other.MinimumZoom
+            && MaximumZoom == other.MaximumZoom
+            && PixelRatio == other.PixelRatio
+            && IncludeIdeographs == other.IncludeIdeographs;
+
+        public override int GetHashCode()
+        {
+            var hash = new HashCode();
+            hash.Add(StyleUrl);
+            hash.AddBytes(geometry);
+            hash.Add(MinimumZoom);
+            hash.Add(MaximumZoom);
+            hash.Add(PixelRatio);
+            hash.Add(IncludeIdeographs);
+            return hash.ToHashCode();
+        }
+    }
 }
 
 public sealed record OfflineRegionInfo

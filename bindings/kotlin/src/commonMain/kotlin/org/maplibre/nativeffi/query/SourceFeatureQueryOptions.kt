@@ -39,14 +39,7 @@ public class SourceFeatureQueryOptions {
   override fun equals(other: Any?): Boolean =
     other is SourceFeatureQueryOptions &&
       sourceLayerIds == other.sourceLayerIds &&
-      sourceQueryBytesEqual(filterBytes, other.filterBytes)
+      filterBytes.contentEquals(other.filterBytes)
 
   override fun hashCode(): Int = fields.hashCode()
 }
-
-private fun sourceQueryBytesEqual(left: ByteArray?, right: ByteArray?): Boolean =
-  when {
-    left == null -> right == null
-    right == null -> false
-    else -> left.contentEquals(right)
-  }

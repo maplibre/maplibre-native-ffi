@@ -352,7 +352,7 @@ final class RenderSessionHandle {
           outState,
         ),
       );
-      return copyOwnedBuffer(outState.value);
+      return copyOwnedBuffer(NativeOwnedBufferHandle(outState.value));
     });
   }
 
@@ -392,7 +392,7 @@ final class RenderSessionHandle {
           outResult,
         ),
       );
-      return copyOwnedBuffer(outResult.value);
+      return copyOwnedBuffer(NativeOwnedBufferHandle(outResult.value));
     });
   }
 
@@ -418,7 +418,7 @@ final class RenderSessionHandle {
           outResult,
         ),
       );
-      return copyOwnedBuffer(outResult.value);
+      return copyOwnedBuffer(NativeOwnedBufferHandle(outResult.value));
     });
   }
 
@@ -452,7 +452,7 @@ final class RenderSessionHandle {
           outResult,
         ),
       );
-      return copyOwnedBuffer(outResult.value);
+      return copyOwnedBuffer(NativeOwnedBufferHandle(outResult.value));
     });
   }
 

@@ -245,7 +245,7 @@ pub const MapHandle = enum(c.mln_map) {
             ),
             diagnosticStore(self),
         );
-        return try copyOwnedBuffer(allocator, buffer, diagnosticStore(self));
+        return try native_temp.copyOwnedBuffer(allocator, buffer, diagnosticStore(self));
     }
 
     pub fn setLayerFilter(
@@ -276,7 +276,7 @@ pub const MapHandle = enum(c.mln_map) {
             c.mln_map_get_layer_filter(try native(self), try temp.stringView(layer_id), &buffer),
             diagnosticStore(self),
         );
-        return try copyOwnedBuffer(allocator, buffer, diagnosticStore(self));
+        return try native_temp.copyOwnedBuffer(allocator, buffer, diagnosticStore(self));
     }
 
     /// Sets one layer's source-layer ID. Layer types that take no source, such as background, are
@@ -792,7 +792,7 @@ pub const MapHandle = enum(c.mln_map) {
             diagnosticStore(self),
         );
         if (!found) return null;
-        return try copyOwnedBuffer(allocator, buffer, diagnosticStore(self)) orelse error.NativeError;
+        return try native_temp.copyOwnedBuffer(allocator, buffer, diagnosticStore(self)) orelse error.NativeError;
     }
 
     pub fn getStyleLayerType(
@@ -849,7 +849,7 @@ pub const MapHandle = enum(c.mln_map) {
             c.mln_map_get_style_light_property(try native(self), try temp.stringView(property_name), &buffer),
             diagnosticStore(self),
         );
-        return try copyOwnedBuffer(allocator, buffer, diagnosticStore(self));
+        return try native_temp.copyOwnedBuffer(allocator, buffer, diagnosticStore(self));
     }
 
     /// Sets the style's global transition options, replacing the whole
@@ -2254,20 +2254,6 @@ pub fn unregisterRenderSession(handle: MapHandle) void {
 
 fn customGeometrySourceCountForTesting(handle: *MapHandle) status.BindingError!usize {
     return (try mapStateForHandle(handle)).custom_geometry_sources.items.len;
-}
-
-fn copyOwnedBuffer(
-    allocator: std.mem.Allocator,
-    buffer: c.mln_buffer,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-) status.Error!?values.OwnedString {
-    if (buffer == 0) return null;
-    defer c.mln_buffer_destroy(buffer);
-    var view = c.mln_buffer_view{ .data = null, .size = 0 };
-    try status.checkStatus(c.mln_buffer_get(buffer, &view), diagnostic_store);
-    if (view.size == 0) return .{ .allocator = allocator, .value = try allocator.dupe(u8, "") };
-    const data: [*]const u8 = @ptrCast(view.data orelse return error.NativeError);
-    return .{ .allocator = allocator, .value = try allocator.dupe(u8, data[0..view.size]) };
 }
 
 fn copyStyleIdList(

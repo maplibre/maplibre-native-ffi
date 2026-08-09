@@ -88,6 +88,7 @@ endfunction()
 
 function(mln_ffi_configure_c_api_implementation target)
   set(MLN_FFI_C_API_SOURCES
+      ${PROJECT_SOURCE_DIR}/src/bytes/buffer.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/android.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/buffer.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/callback_adapter.cpp
@@ -101,7 +102,6 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/c_api/texture.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/version.cpp
       ${PROJECT_SOURCE_DIR}/src/diagnostics/diagnostics.cpp
-      ${PROJECT_SOURCE_DIR}/src/bytes/buffer.cpp
       ${PROJECT_SOURCE_DIR}/src/geojson/geojson.cpp
       ${PROJECT_SOURCE_DIR}/src/handles/handle_table.cpp
       ${PROJECT_SOURCE_DIR}/src/logging/logging.cpp

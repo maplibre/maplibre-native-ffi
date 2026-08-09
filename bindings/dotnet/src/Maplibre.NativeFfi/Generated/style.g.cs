@@ -618,7 +618,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_map_move_style_layer([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view before_layer_id);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_style_layer_json([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("mln_buffer *")] ulong* out_layer, bool* out_found);
+        public static extern mln_status mln_map_get_style_layer_json([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("mln_buffer *")] MlnBuffer* out_layer, bool* out_found);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_set_style_light_json([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view light_json);
@@ -627,7 +627,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_map_set_style_light_property([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view property_name, mln_buffer_view value);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_style_light_property([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view property_name, [NativeTypeName("mln_buffer *")] ulong* out_value);
+        public static extern mln_status mln_map_get_style_light_property([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view property_name, [NativeTypeName("mln_buffer *")] MlnBuffer* out_value);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_set_style_transition_options([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_style_transition_options *")] mln_style_transition_options* options);
@@ -639,13 +639,13 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_map_set_layer_property([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view property_name, mln_buffer_view value);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_layer_property([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view property_name, [NativeTypeName("mln_buffer *")] ulong* out_value);
+        public static extern mln_status mln_map_get_layer_property([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view property_name, [NativeTypeName("mln_buffer *")] MlnBuffer* out_value);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_set_layer_filter([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("const mln_buffer_view *")] mln_buffer_view* filter);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_layer_filter([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("mln_buffer *")] ulong* out_filter);
+        public static extern mln_status mln_map_get_layer_filter([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, [NativeTypeName("mln_buffer *")] MlnBuffer* out_filter);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_set_layer_source_layer([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view layer_id, mln_buffer_view source_layer);

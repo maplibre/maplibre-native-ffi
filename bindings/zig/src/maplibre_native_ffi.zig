@@ -3,6 +3,7 @@ const c = @import("c.zig").raw;
 const diagnostics = @import("diagnostics.zig");
 const logging = @import("logging.zig");
 const map = @import("map.zig");
+const native_temp = @import("native_temp.zig");
 const projection = @import("projection.zig");
 const render = @import("render.zig");
 const runtime = @import("runtime.zig");
@@ -205,9 +206,24 @@ comptime {
     _ = c.MLN_STATUS_OK;
     if (builtin.is_test) {
         @export(&testFailNextOwnedTextureFrameWrapperAllocation, .{ .name = "mln_zig_test_fail_next_owned_texture_frame_wrapper_allocation" });
+        @export(&testUseCountingBufferDestroy, .{ .name = "mln_zig_test_use_counting_buffer_destroy" });
+        @export(&testRestoreBufferDestroy, .{ .name = "mln_zig_test_restore_buffer_destroy" });
+        @export(&testBufferDestroyCount, .{ .name = "mln_zig_test_buffer_destroy_count" });
     }
 }
 
 fn testFailNextOwnedTextureFrameWrapperAllocation() callconv(.c) void {
     render.failNextOwnedTextureFrameWrapperAllocationForTesting();
+}
+
+fn testUseCountingBufferDestroy() callconv(.c) void {
+    native_temp.useCountingBufferDestroyForTesting();
+}
+
+fn testRestoreBufferDestroy() callconv(.c) void {
+    native_temp.restoreBufferDestroyForTesting();
+}
+
+fn testBufferDestroyCount() callconv(.c) usize {
+    return native_temp.bufferDestroyCountForTesting();
 }

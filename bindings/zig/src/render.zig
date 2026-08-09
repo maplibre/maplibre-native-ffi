@@ -501,7 +501,7 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
             c.mln_render_session_get_feature_state(lease.native, &raw_selector, &buffer),
             lease.diagnostic_store,
         );
-        return (try copyOwnedBuffer(allocator, buffer, lease.diagnostic_store)) orelse error.NativeError;
+        return (try native_temp.copyOwnedBuffer(allocator, buffer, lease.diagnostic_store)) orelse error.NativeError;
     }
 
     pub fn removeFeatureState(
@@ -537,7 +537,7 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
             c.mln_render_session_query_rendered_features(lease.native, &raw_geometry, if (options != null) &raw_options else null, &result),
             lease.diagnostic_store,
         );
-        return (try copyOwnedBuffer(allocator, result, lease.diagnostic_store)) orelse error.NativeError;
+        return (try native_temp.copyOwnedBuffer(allocator, result, lease.diagnostic_store)) orelse error.NativeError;
     }
 
     pub fn querySourceFeatures(
@@ -557,7 +557,7 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
             c.mln_render_session_query_source_features(lease.native, raw_source_id, if (options != null) &raw_options else null, &result),
             lease.diagnostic_store,
         );
-        return (try copyOwnedBuffer(allocator, result, lease.diagnostic_store)) orelse error.NativeError;
+        return (try native_temp.copyOwnedBuffer(allocator, result, lease.diagnostic_store)) orelse error.NativeError;
     }
 
     /// Queries a feature extension from the latest render session state.
@@ -590,7 +590,7 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
             c.mln_render_session_query_feature_extensions(lease.native, raw_source_id, raw_feature, raw_extension, raw_extension_field, raw_arguments, &result),
             lease.diagnostic_store,
         );
-        return (try copyOwnedBuffer(allocator, result, lease.diagnostic_store)) orelse error.NativeError;
+        return (try native_temp.copyOwnedBuffer(allocator, result, lease.diagnostic_store)) orelse error.NativeError;
     }
 
     pub fn readPremultipliedRgba8Into(self: *RenderSessionHandle, buffer: []u8) status.Error!TextureImageInfo {
@@ -1321,25 +1321,6 @@ fn featureStateSelectorToNative(
         raw.state_key = try temp.stringView(state_key);
     }
     return raw;
-}
-
-fn copyStringView(allocator: std.mem.Allocator, view: c.mln_buffer_view) std.mem.Allocator.Error![]const u8 {
-    if (view.size == 0) return allocator.dupe(u8, "");
-    const data: [*]const u8 = @ptrCast(view.data orelse return error.OutOfMemory);
-    return allocator.dupe(u8, data[0..view.size]);
-}
-
-fn copyOwnedBuffer(
-    allocator: std.mem.Allocator,
-    buffer: c.mln_buffer,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-) status.Error!?values.OwnedString {
-    if (buffer == 0) return null;
-    defer c.mln_buffer_destroy(buffer);
-    var view = c.mln_buffer_view{ .data = null, .size = 0 };
-    try status.checkStatus(c.mln_buffer_get(buffer, &view), diagnostic_store);
-    const copied = try copyStringView(allocator, view);
-    return .{ .allocator = allocator, .value = copied };
 }
 
 fn metalSurfaceDescriptorToNative(descriptor: MetalSurfaceDescriptor) c.mln_metal_surface_descriptor {

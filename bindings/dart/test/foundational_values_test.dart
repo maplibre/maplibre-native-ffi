@@ -131,8 +131,8 @@ void main() {
     }
     expect(const CameraOptions(zoom: 3), isNot(const CameraOptions(zoom: 4)));
     expect(
-      const GeoJsonSourceOptions(cluster: true, clusterRadius: 50),
-      const GeoJsonSourceOptions(cluster: true, clusterRadius: 50),
+      GeoJsonSourceOptions(cluster: true, clusterRadius: 50),
+      GeoJsonSourceOptions(cluster: true, clusterRadius: 50),
     );
   });
 
@@ -229,6 +229,52 @@ void main() {
     expect(renderedOptions.layerIds, ['roads']);
     expect(renderedOptions.filter, '["==","class","primary"]'.codeUnits);
     expect(sourceOptions.sourceLayerIds, ['transportation']);
+  });
+
+  test('byte-backed values own storage and compare by content', () {
+    final clusterProperties = Uint8List.fromList([1, 2, 3]);
+    final filter = Uint8List.fromList([4, 5, 6]);
+    final geometry = Uint8List.fromList([7, 8, 9]);
+    final geoJsonOptions = GeoJsonSourceOptions(
+      clusterProperties: clusterProperties,
+    );
+    final queryOptions = RenderedFeatureQueryOptions(filter: filter);
+    final offlineDefinition = OfflineGeometryRegionDefinition(
+      styleUrl: 'https://example.invalid/style.json',
+      geometry: geometry,
+      minZoom: 0,
+      maxZoom: 10,
+      pixelRatio: 1,
+    );
+
+    clusterProperties[0] = 9;
+    filter[0] = 9;
+    geometry[0] = 9;
+
+    expect(
+      geoJsonOptions,
+      GeoJsonSourceOptions(clusterProperties: Uint8List.fromList([1, 2, 3])),
+    );
+    expect(
+      queryOptions,
+      RenderedFeatureQueryOptions(filter: Uint8List.fromList([4, 5, 6])),
+    );
+    expect(
+      offlineDefinition,
+      OfflineGeometryRegionDefinition(
+        styleUrl: 'https://example.invalid/style.json',
+        geometry: Uint8List.fromList([7, 8, 9]),
+        minZoom: 0,
+        maxZoom: 10,
+        pixelRatio: 1,
+      ),
+    );
+    expect(
+      () => geoJsonOptions.clusterProperties![0] = 9,
+      throwsUnsupportedError,
+    );
+    expect(() => queryOptions.filter![0] = 9, throwsUnsupportedError);
+    expect(() => offlineDefinition.geometry[0] = 9, throwsUnsupportedError);
   });
 
   test('public enum-like values preserve native raw values', () {

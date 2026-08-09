@@ -740,7 +740,7 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
     effective.cluster_properties.size == 0
   ) {
     mln::core::set_thread_error(
-      "cluster_properties must not be null when its field is present"
+      "cluster_properties must not be empty when its field is present"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -765,6 +765,18 @@ auto to_native_geojson_source_options(const mln_geojson_source_options& options)
   native.synchronousUpdate = options.synchronous_update;
 
   if (options.cluster_properties.size != 0) {
+    auto document = mbgl::JSDocument{};
+    if (!mln::core::parse_json_document(
+          options.cluster_properties, "cluster_properties", document
+        )) {
+      return std::nullopt;
+    }
+    if (!document.IsObject()) {
+      mln::core::set_thread_error(
+        "cluster_properties must contain a JSON object"
+      );
+      return std::nullopt;
+    }
     auto wrapper = std::string{"{\"clusterProperties\":"};
     wrapper.append(
       static_cast<const char*>(options.cluster_properties.data),

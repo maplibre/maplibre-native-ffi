@@ -1,8 +1,10 @@
-/// Rendered and source feature query descriptors, results, and extension APIs.
+/// Rendered and source feature query descriptors.
 library;
 
-import '../geo/geo.dart';
 import 'dart:typed_data';
+
+import '../geo/geo.dart';
+import '../internal/value/byte_values.dart';
 
 /// Feature-state source, feature, and key selector.
 final class FeatureStateSelector {
@@ -63,27 +65,66 @@ final class RenderedQueryLineString extends RenderedQueryGeometry {
 /// Options for rendered feature queries.
 final class RenderedFeatureQueryOptions {
   /// Creates rendered feature query options.
-  RenderedFeatureQueryOptions({List<String>? layerIds, this.filter})
-    : layerIds = layerIds == null ? null : List.unmodifiable(layerIds);
+  RenderedFeatureQueryOptions({List<String>? layerIds, Uint8List? filter})
+    : layerIds = layerIds == null ? null : List.unmodifiable(layerIds),
+      filter = copyOptionalBytes(filter);
 
   /// Optional style layer IDs. When absent, all rendered layers are queried.
   final List<String>? layerIds;
 
   /// Optional MapLibre style-spec filter JSON.
   final Uint8List? filter;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RenderedFeatureQueryOptions &&
+      _optionalStringsEqual(other.layerIds, layerIds) &&
+      optionalBytesEqual(other.filter, filter);
+
+  @override
+  int get hashCode => Object.hash(
+    Object.hashAll(layerIds ?? const <String>[]),
+    optionalBytesHash(filter),
+  );
 }
 
 /// Options for source feature queries.
 final class SourceFeatureQueryOptions {
   /// Creates source feature query options.
-  SourceFeatureQueryOptions({List<String>? sourceLayerIds, this.filter})
+  SourceFeatureQueryOptions({List<String>? sourceLayerIds, Uint8List? filter})
     : sourceLayerIds = sourceLayerIds == null
           ? null
-          : List.unmodifiable(sourceLayerIds);
+          : List.unmodifiable(sourceLayerIds),
+      filter = copyOptionalBytes(filter);
 
   /// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
   final List<String>? sourceLayerIds;
 
   /// Optional MapLibre style-spec filter JSON.
   final Uint8List? filter;
+
+  @override
+  bool operator ==(Object other) =>
+      other is SourceFeatureQueryOptions &&
+      _optionalStringsEqual(other.sourceLayerIds, sourceLayerIds) &&
+      optionalBytesEqual(other.filter, filter);
+
+  @override
+  int get hashCode => Object.hash(
+    Object.hashAll(sourceLayerIds ?? const <String>[]),
+    optionalBytesHash(filter),
+  );
+}
+
+bool _optionalStringsEqual(List<String>? left, List<String>? right) {
+  if (identical(left, right)) return true;
+  if (left == null || right == null || left.length != right.length) {
+    return false;
+  }
+  for (var index = 0; index < left.length; index += 1) {
+    if (left[index] != right[index]) {
+      return false;
+    }
+  }
+  return true;
 }

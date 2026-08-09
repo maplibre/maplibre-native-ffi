@@ -11,6 +11,13 @@ internal interface IMlnHandle
     ulong Value { get; }
 }
 
+internal readonly struct MlnBuffer(ulong value) : IMlnHandle
+{
+    public ulong Value { get; } = value;
+
+    public bool IsNull => Value == 0;
+}
+
 internal readonly struct MlnRuntime(ulong value) : IMlnHandle
 {
     public ulong Value { get; } = value;

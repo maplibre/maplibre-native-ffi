@@ -558,7 +558,7 @@ MLN_API mln_status mln_map_camera_for_lat_lngs(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, geometry is null
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, geometry is empty
  *   or invalid, geometry contains no coordinates, fit_options is invalid,
  *   out_camera is null, or out_camera->size is too small.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner

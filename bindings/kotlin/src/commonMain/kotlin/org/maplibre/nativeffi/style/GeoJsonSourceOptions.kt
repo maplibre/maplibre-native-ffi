@@ -19,12 +19,12 @@ public class GeoJsonSourceOptions {
 
   public var clusterMaxZoom: Double? = null
 
+  private var clusterPropertyBytes: ByteArray? = null
+
   /**
    * Cluster aggregation expressions keyed by property name, as a JSON object whose members follow
    * the MapLibre Style Spec `clusterProperties` form.
    */
-  private var clusterPropertyBytes: ByteArray? = null
-
   public var clusterProperties: ByteArray?
     get() = clusterPropertyBytes?.copyOf()
     set(value) {
@@ -107,7 +107,7 @@ public class GeoJsonSourceOptions {
       maxZoom == other.maxZoom &&
       tolerance == other.tolerance &&
       clusterMaxZoom == other.clusterMaxZoom &&
-      geoJsonSourceBytesEqual(clusterPropertyBytes, other.clusterPropertyBytes) &&
+      clusterPropertyBytes.contentEquals(other.clusterPropertyBytes) &&
       tileSize == other.tileSize &&
       buffer == other.buffer &&
       clusterRadius == other.clusterRadius &&
@@ -118,10 +118,3 @@ public class GeoJsonSourceOptions {
 
   override fun hashCode(): Int = fields.hashCode()
 }
-
-private fun geoJsonSourceBytesEqual(left: ByteArray?, right: ByteArray?): Boolean =
-  when {
-    left == null -> right == null
-    right == null -> false
-    else -> left.contentEquals(right)
-  }

@@ -533,7 +533,7 @@ MLN_API void mln_style_string_list_destroy(
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, source_json is null or invalid, the source ID already
+ *   invalid or empty, source_json is empty or invalid, the source ID already
  *   exists, or the source JSON cannot be converted.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
@@ -751,7 +751,7 @@ MLN_API mln_status mln_map_add_geojson_source_url(
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, data is null or invalid, options is invalid, the source
+ *   invalid or empty, data is empty or invalid, options is invalid, the source
  *   ID already exists, or clustering is enabled and the data is a bare geometry
  *   or a single feature, or a feature carries geometry other than a point.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
@@ -797,7 +797,7 @@ MLN_API mln_status mln_map_set_geojson_source_url(
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, data is null or invalid, the source does not exist, the
+ *   invalid or empty, data is empty or invalid, the source does not exist, the
  *   source is not a GeoJSON source, or the source clusters and the data is a
  *   bare geometry or a single feature, or a feature carries geometry other than
  *   a point.
@@ -976,7 +976,7 @@ MLN_API mln_status mln_map_add_custom_geometry_source(
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, tile_id is invalid, data is null or invalid, the source
+ *   invalid or empty, tile_id is invalid, data is empty or invalid, the source
  *   does not exist, or the source is not a custom geometry source.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
@@ -1442,8 +1442,8 @@ MLN_API mln_status mln_map_set_location_indicator_image_name(
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_json is
- *   null or invalid, the layer ID already exists, before_layer_id is invalid or
- *   does not exist, or the layer JSON cannot be converted.
+ *   empty or invalid, the layer ID already exists, before_layer_id is invalid
+ * or does not exist, or the layer JSON cannot be converted.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -1570,7 +1570,7 @@ MLN_API mln_status mln_map_get_style_layer_json(
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, light_json is
- *   null or invalid, or the light JSON cannot be converted.
+ *   empty or invalid, or the light JSON cannot be converted.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -1589,7 +1589,7 @@ MLN_API mln_status mln_map_set_style_light_json(
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, property_name is
- *   invalid or empty, value is null or invalid, the property name is unknown,
+ *   invalid or empty, value is empty or invalid, the property name is unknown,
  *   or the property value cannot be converted for that property.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
@@ -1682,8 +1682,8 @@ MLN_API mln_status mln_map_get_style_transition_options(
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id or
- *   property_name is invalid or empty, value is null or invalid, the layer does
- *   not exist, the property name is unknown for that layer, or the property
+ *   property_name is invalid or empty, value is empty or invalid, the layer
+ * does not exist, the property name is unknown for that layer, or the property
  *   value cannot be converted for that property.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.

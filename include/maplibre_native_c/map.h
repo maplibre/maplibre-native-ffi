@@ -1019,7 +1019,7 @@ mln_map_set_style_url(mln_map map, const char* url) MLN_NOEXCEPT;
  * Returns:
  * - MLN_STATUS_OK when the load request was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null, not live, or json is empty or
- *   has a non-null size with a null data pointer.
+ *   has a nonzero size with a null data pointer.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when a synchronous native error is reported or an

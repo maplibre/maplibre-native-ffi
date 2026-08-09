@@ -33,6 +33,7 @@ macro_rules! native_handle {
 }
 
 native_handle!(
+    sys::mln_buffer,
     sys::mln_runtime,
     sys::mln_map,
     sys::mln_map_projection,
@@ -44,16 +45,6 @@ native_handle!(
     sys::mln_style_id_list,
     sys::mln_style_string_list,
 );
-
-impl NativeHandle for sys::mln_buffer {
-    fn to_raw(self) -> u64 {
-        self
-    }
-
-    fn from_raw(raw: u64) -> Self {
-        raw
-    }
-}
 
 /// A native handle a destructor attempted to destroy and could not. The handle
 /// stays live.

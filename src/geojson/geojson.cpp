@@ -1,9 +1,12 @@
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <mbgl/style/conversion/geojson.hpp>
 #include <mbgl/style/conversion/stringify.hpp>
+#include <mbgl/style/conversion_impl.hpp>
+#include <mbgl/style/rapidjson_conversion.hpp>
 #include <mbgl/util/feature.hpp>
 #include <mbgl/util/geo.hpp>
 #include <mbgl/util/geojson.hpp>
@@ -25,12 +28,13 @@ namespace {
 
 auto parse_geojson(mln_buffer_view bytes, const char* name)
   -> std::optional<mbgl::GeoJSON> {
-  if (!mln::core::validate_bytes(bytes, name)) {
+  auto document = mbgl::JSDocument{};
+  if (!mln::core::parse_json_document(bytes, name, document)) {
     return std::nullopt;
   }
   auto error = mbgl::style::conversion::Error{};
-  auto converted = mbgl::style::conversion::parseGeoJSON(
-    std::string{static_cast<const char*>(bytes.data), bytes.size}, error
+  auto converted = mbgl::style::conversion::convert<mbgl::GeoJSON>(
+    static_cast<const mbgl::JSValue*>(&document), error
   );
   if (!converted) {
     auto message = std::string{name} + " is invalid: " + error.message;
@@ -54,6 +58,13 @@ auto validate_bytes(mln_buffer_view bytes, const char* name) -> bool {
     set_thread_error(message.c_str());
     return false;
   }
+  const auto value =
+    std::string_view{static_cast<const char*>(bytes.data), bytes.size};
+  if (value.find('\0') != std::string_view::npos) {
+    auto message = std::string{name} + " must not contain embedded NUL";
+    set_thread_error(message.c_str());
+    return false;
+  }
   return true;
 }
 
@@ -63,9 +74,7 @@ auto parse_json_document(
   if (!validate_bytes(bytes, name)) {
     return false;
   }
-  const auto json =
-    std::string{static_cast<const char*>(bytes.data), bytes.size};
-  out_document.Parse<0>(json.c_str());
+  out_document.Parse<0>(static_cast<const char*>(bytes.data), bytes.size);
   if (out_document.HasParseError()) {
     auto message = std::string{name} + " is not valid JSON: " +
                    rapidjson::GetParseError_En(out_document.GetParseError());

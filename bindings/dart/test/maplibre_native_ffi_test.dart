@@ -1391,7 +1391,7 @@ void main() {
       () => map.addGeoJsonSourceData(
         'dart-invalid-geojson-options',
         _jsonBytes('{"type":"FeatureCollection","features":[]}'),
-        options: const GeoJsonSourceOptions(tileSize: 4294967296),
+        options: GeoJsonSourceOptions(tileSize: 4294967296),
       ),
       throwsA(isA<InvalidArgumentException>()),
     );
@@ -1401,7 +1401,7 @@ void main() {
         '{"type":"FeatureCollection","features":[{"type":"Feature",'
         '"geometry":{"type":"Point","coordinates":[0,0]},"properties":{}}]}',
       ),
-      options: const GeoJsonSourceOptions(cluster: true, clusterRadius: 60),
+      options: GeoJsonSourceOptions(cluster: true, clusterRadius: 60),
     );
     expect(
       () => map.setGeoJsonSourceData(

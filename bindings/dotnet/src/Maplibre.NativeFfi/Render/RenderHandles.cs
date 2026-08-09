@@ -500,7 +500,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     {
         using var nativeSelector = NativeFeatureStateSelector.From(selector);
         var selectorValue = nativeSelector.Value;
-        ulong buffer = 0;
+        MlnBuffer buffer = default;
         NativeStatus.Check(
             NativeMethods.mln_render_session_get_feature_state(Handle, &selectorValue, &buffer)
         );
@@ -545,7 +545,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         using var nativeArguments = arguments is null
             ? null
             : NativeStringView.From(arguments, nameof(arguments));
-        ulong result = 0;
+        MlnBuffer result = default;
         NativeStatus.Check(
             NativeMethods.mln_render_session_query_feature_extensions(
                 Handle,
@@ -890,7 +890,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             ? null
             : NativeRenderedFeatureQueryOptions.From(options);
         var geometryValue = nativeGeometry.Value;
-        ulong result = 0;
+        MlnBuffer result = default;
         if (nativeOptions is null)
         {
             NativeStatus.Check(
@@ -923,7 +923,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         using var nativeOptions = options is null
             ? null
             : NativeSourceFeatureQueryOptions.From(options);
-        ulong result = 0;
+        MlnBuffer result = default;
         if (nativeOptions is null)
         {
             NativeStatus.Check(

@@ -117,12 +117,12 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_rendered_query_geometry mln_rendered_query_geometry_line_string([NativeTypeName("const mln_screen_point *")] mln_screen_point* points, [NativeTypeName("size_t")] nuint point_count);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_query_rendered_features([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_rendered_query_geometry *")] mln_rendered_query_geometry* geometry, [NativeTypeName("const mln_rendered_feature_query_options *")] mln_rendered_feature_query_options* options, [NativeTypeName("mln_buffer *")] ulong* out_result);
+        public static extern mln_status mln_render_session_query_rendered_features([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_rendered_query_geometry *")] mln_rendered_query_geometry* geometry, [NativeTypeName("const mln_rendered_feature_query_options *")] mln_rendered_feature_query_options* options, [NativeTypeName("mln_buffer *")] MlnBuffer* out_result);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_query_source_features([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_buffer_view source_id, [NativeTypeName("const mln_source_feature_query_options *")] mln_source_feature_query_options* options, [NativeTypeName("mln_buffer *")] ulong* out_result);
+        public static extern mln_status mln_render_session_query_source_features([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_buffer_view source_id, [NativeTypeName("const mln_source_feature_query_options *")] mln_source_feature_query_options* options, [NativeTypeName("mln_buffer *")] MlnBuffer* out_result);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_query_feature_extensions([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension, mln_buffer_view extension_field, [NativeTypeName("const mln_buffer_view *")] mln_buffer_view* arguments, [NativeTypeName("mln_buffer *")] ulong* out_result);
+        public static extern mln_status mln_render_session_query_feature_extensions([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_buffer_view source_id, mln_buffer_view feature, mln_buffer_view extension, mln_buffer_view extension_field, [NativeTypeName("const mln_buffer_view *")] mln_buffer_view* arguments, [NativeTypeName("mln_buffer *")] MlnBuffer* out_result);
     }
 }

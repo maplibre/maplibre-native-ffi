@@ -2798,6 +2798,16 @@ def test_query_selector_rejects_state_key_without_feature_id() -> None:
         query.FeatureStateSelector(source_id="source", state_key="hover")
 
 
+def test_query_geometry_rejects_mismatched_variant_value() -> None:
+    with pytest.raises(ValueError, match="point query geometry requires point"):
+        query.RenderedQueryGeometry(
+            query.RenderedQueryGeometryType.POINT,
+            box=query.ScreenBox(
+                camera.ScreenPoint(0.0, 0.0), camera.ScreenPoint(1.0, 1.0)
+            ),
+        )
+
+
 def test_process_global_logging_receiver_copies_native_records() -> None:
     receiver = log.set_log_callback(max_queued_records=8, consume=True)
     try:

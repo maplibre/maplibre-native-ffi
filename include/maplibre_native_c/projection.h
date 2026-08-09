@@ -121,7 +121,7 @@ MLN_API mln_status mln_map_projection_set_visible_coordinates(
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live, geometry
- *   is null or invalid, padding contains negative or non-finite values, or the
+ *   is empty or invalid, padding contains negative or non-finite values, or the
  *   geometry contains no coordinates.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the projection
  *   owner thread.

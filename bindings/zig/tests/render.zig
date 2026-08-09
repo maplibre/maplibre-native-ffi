@@ -1650,7 +1650,10 @@ test "render session queries rendered and source features" {
     try testing.expectEqualStrings("\"capital\"", queryFeatureProperty(source.value, "kind").?);
 
     var failing_allocator = testing.FailingAllocator.init(testing.allocator, .{ .fail_index = 0 });
+    test_hooks.useCountingBufferDestroy();
+    defer test_hooks.restoreBufferDestroy();
     try testing.expectError(error.OutOfMemory, session.querySourceFeatures(failing_allocator.allocator(), "point", null));
+    try testing.expectEqual(@as(usize, 1), test_hooks.bufferDestroyCount());
 
     try testing.expectError(error.InvalidArgument, session.queryRenderedFeatures(testing.allocator, .{ .point = .{ .x = std.math.inf(f64), .y = 0.0 } }, null));
     try testing.expectError(error.InvalidArgument, session.querySourceFeatures(testing.allocator, "", null));

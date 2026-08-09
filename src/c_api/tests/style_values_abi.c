@@ -41,13 +41,24 @@ static void style_value_helpers_reject_unsafe_raw_descriptors(void) {
       &options
     )
   );
+
+  static const char nul_style[] =
+    "{\"version\":8,\"sources\":{},\"layers\":[]}\0garbage";
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_set_style_json(
+                                   map, (mln_buffer_view){
+                                          .data = nul_style,
+                                          .size = sizeof(nul_style) - 1,
+                                        }
+                                 )
+  );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
-// Bindings always emit a full struct header, so only raw C callers can present
-// a short size or unknown field bits to the GeoJSON source adders.
-static void geojson_source_options_reject_unsafe_raw_headers(void) {
+// Bindings emit a full struct header and one complete cluster-properties
+// object, so only raw C callers can present these unsafe values.
+static void geojson_source_options_reject_unsafe_raw_values(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   const mln_buffer_view url = {
@@ -134,6 +145,64 @@ static void geojson_source_options_reject_unsafe_raw_headers(void) {
       map, (mln_buffer_view){.data = "json-null-properties", .size = 20}, url,
       &non_object_cluster_properties
     )
+  );
+
+  static const char injected_cluster_properties[] =
+    "{\"total\":[\"+\",1]},\"cluster\":true";
+  mln_geojson_source_options injected_properties =
+    mln_geojson_source_options_default();
+  injected_properties.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
+  injected_properties.cluster_properties = (mln_buffer_view){
+    .data = injected_cluster_properties,
+    .size = sizeof(injected_cluster_properties) - 1,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_geojson_source_url(
+      map, MLN_BUFFER_LITERAL("injected-properties"), url, &injected_properties
+    )
+  );
+
+  static const char trailing_cluster_properties[] =
+    "{\"total\":[\"+\",1]}\0garbage";
+  mln_geojson_source_options trailing_properties =
+    mln_geojson_source_options_default();
+  trailing_properties.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
+  trailing_properties.cluster_properties = (mln_buffer_view){
+    .data = trailing_cluster_properties,
+    .size = sizeof(trailing_cluster_properties) - 1,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_geojson_source_url(
+      map, MLN_BUFFER_LITERAL("trailing-properties"), url, &trailing_properties
+    )
+  );
+
+  static const char trailing_geojson[] =
+    "{\"type\":\"FeatureCollection\",\"features\":[]}garbage";
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_add_geojson_source_data(
+                                   map, MLN_BUFFER_LITERAL("trailing-geojson"),
+                                   (mln_buffer_view){
+                                     .data = trailing_geojson,
+                                     .size = sizeof(trailing_geojson) - 1,
+                                   },
+                                   NULL
+                                 )
+  );
+
+  static const char nul_geojson[] =
+    "{\"type\":\"FeatureCollection\",\"features\":[]}\0garbage";
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_add_geojson_source_data(
+                                   map, MLN_BUFFER_LITERAL("nul-geojson"),
+                                   (mln_buffer_view){
+                                     .data = nul_geojson,
+                                     .size = sizeof(nul_geojson) - 1,
+                                   },
+                                   NULL
+                                 )
   );
 
   // A rejected descriptor leaves the source ID free for a later valid add.
@@ -1445,7 +1514,7 @@ static void style_transition_options_reject_unsafe_raw_headers(void) {
 void run_style_values_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(style_value_helpers_reject_unsafe_raw_descriptors);
-  RUN_TEST(geojson_source_options_reject_unsafe_raw_headers);
+  RUN_TEST(geojson_source_options_reject_unsafe_raw_values);
   RUN_TEST(clustered_geojson_data_reports_non_point_geometry);
   RUN_TEST(clustered_geojson_data_requires_a_feature_collection);
   RUN_TEST(optional_json_style_values_return_null_handles);

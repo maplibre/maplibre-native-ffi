@@ -5,6 +5,44 @@ const diagnostics = @import("diagnostics.zig");
 const status = @import("status.zig");
 const values = @import("values.zig");
 
+const BufferDestroyFn = *const fn (c.mln_buffer) callconv(.c) void;
+var buffer_destroy_for_testing: BufferDestroyFn = c.mln_buffer_destroy;
+var buffer_destroy_count_for_testing = std.atomic.Value(usize).init(0);
+
+pub fn copyOwnedBuffer(
+    allocator: std.mem.Allocator,
+    buffer: c.mln_buffer,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+) status.Error!?values.OwnedString {
+    if (buffer == 0) return null;
+    defer buffer_destroy_for_testing(buffer);
+    var view = c.mln_buffer_view{ .data = null, .size = 0 };
+    try status.checkStatus(c.mln_buffer_get(buffer, &view), diagnostic_store);
+    if (view.size == 0) {
+        return .{ .allocator = allocator, .value = try allocator.dupe(u8, "") };
+    }
+    const data: [*]const u8 = @ptrCast(view.data orelse return error.NativeError);
+    return .{ .allocator = allocator, .value = try allocator.dupe(u8, data[0..view.size]) };
+}
+
+fn countingBufferDestroy(buffer: c.mln_buffer) callconv(.c) void {
+    _ = buffer_destroy_count_for_testing.fetchAdd(1, .seq_cst);
+    c.mln_buffer_destroy(buffer);
+}
+
+pub fn useCountingBufferDestroyForTesting() void {
+    buffer_destroy_count_for_testing.store(0, .seq_cst);
+    buffer_destroy_for_testing = countingBufferDestroy;
+}
+
+pub fn restoreBufferDestroyForTesting() void {
+    buffer_destroy_for_testing = c.mln_buffer_destroy;
+}
+
+pub fn bufferDestroyCountForTesting() usize {
+    return buffer_destroy_count_for_testing.load(.seq_cst);
+}
+
 pub const TempStorage = struct {
     arena: std.heap.ArenaAllocator,
     diagnostic_store: ?*diagnostics.DiagnosticStore = null,

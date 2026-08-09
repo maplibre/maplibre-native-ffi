@@ -175,6 +175,13 @@ MLN_API mln_status mln_render_session_query_source_features(
  * owned buffer containing either a JSON value or a GeoJSON Feature
  * Collection. Destroy it with mln_buffer_destroy().
  *
+ * The "supercluster" extension requires "cluster_id" feature properties and
+ * "limit" and "offset" arguments to be nonnegative integer JSON literals.
+ * Floating-point or negative representations are treated as absent and still
+ * produce MLN_STATUS_OK. An absent cluster ID produces JSON null. Absent limit
+ * and offset values use the native defaults of ten leaves at offset zero. The
+ * result buffer preserves integer JSON representations.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, source_id,

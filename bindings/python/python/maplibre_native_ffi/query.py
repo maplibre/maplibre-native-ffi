@@ -18,7 +18,11 @@ class RenderedQueryGeometryType(NativeIntEnum):
 
 @dataclass(frozen=True, slots=True)
 class ScreenBox:
-    """Screen-space box in logical map pixels."""
+    """Screen-space box in logical map pixels.
+
+    Corners may be given in any order and may extend past the viewport;
+    rendered queries normalize and clip them.
+    """
 
     min: ScreenPoint
     max: ScreenPoint
@@ -58,6 +62,15 @@ class RenderedQueryGeometry:
             raise ValueError(
                 "rendered query geometry must contain exactly one geometry value"
             )
+        if self.type is RenderedQueryGeometryType.POINT and self.point is None:
+            raise ValueError("point query geometry requires point")
+        if self.type is RenderedQueryGeometryType.BOX and self.box is None:
+            raise ValueError("box query geometry requires box")
+        if (
+            self.type is RenderedQueryGeometryType.LINE_STRING
+            and self.line_string is None
+        ):
+            raise ValueError("line-string query geometry requires points")
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,20 +109,25 @@ def _point_to_native_wire(point: ScreenPoint) -> tuple[float, float]:
 
 def _geometry_to_native_wire(geometry: RenderedQueryGeometry) -> dict[str, object]:
     if geometry.type is RenderedQueryGeometryType.POINT:
-        assert geometry.point is not None
+        if geometry.point is None:
+            raise ValueError("point query geometry requires point")
         return {"type": "point", "point": _point_to_native_wire(geometry.point)}
     if geometry.type is RenderedQueryGeometryType.BOX:
-        assert geometry.box is not None
+        if geometry.box is None:
+            raise ValueError("box query geometry requires box")
         return {
             "type": "box",
             "min": _point_to_native_wire(geometry.box.min),
             "max": _point_to_native_wire(geometry.box.max),
         }
-    assert geometry.line_string is not None
-    return {
-        "type": "line_string",
-        "points": [_point_to_native_wire(point) for point in geometry.line_string],
-    }
+    if geometry.type is RenderedQueryGeometryType.LINE_STRING:
+        if geometry.line_string is None:
+            raise ValueError("line-string query geometry requires points")
+        return {
+            "type": "line_string",
+            "points": [_point_to_native_wire(point) for point in geometry.line_string],
+        }
+    raise TypeError(f"unknown rendered query geometry type: {geometry.type!r}")
 
 
 __all__ = [

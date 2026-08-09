@@ -152,7 +152,7 @@ class RenderSessionHandleTest {
               .close()
           }
 
-          map.setStyleJson(QUERY_STYLE_JSON)
+          map.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray())
           assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
           assertTrue(session.renderUpdate())
 
@@ -380,7 +380,7 @@ class RenderSessionHandleTest {
           val session = borrowedMap.attachMetalBorrowedTexture(borrowedDescriptor)
           try {
             assertSame(borrowedMap, session.map())
-            borrowedMap.setStyleJson(QUERY_STYLE_JSON)
+            borrowedMap.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray())
             assertTrue(
               waitForMapEvent(runtime, borrowedMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
             )
@@ -415,7 +415,7 @@ class RenderSessionHandleTest {
             )
           try {
             assertSame(surfaceMap, session.map())
-            surfaceMap.setStyleJson(QUERY_STYLE_JSON)
+            surfaceMap.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray())
             assertTrue(
               waitForMapEvent(runtime, surfaceMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
             )
@@ -471,7 +471,7 @@ class RenderSessionHandleTest {
               )
             )
           try {
-            borrowedMap.setStyleJson(QUERY_STYLE_JSON)
+            borrowedMap.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray())
             assertTrue(
               waitForMapEvent(runtime, borrowedMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
             )
@@ -535,7 +535,7 @@ class RenderSessionHandleTest {
               )
             )
           try {
-            surfaceMap.setStyleJson(QUERY_STYLE_JSON)
+            surfaceMap.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray())
             assertTrue(
               waitForMapEvent(runtime, surfaceMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
             )
@@ -688,7 +688,7 @@ class RenderSessionHandleTest {
               zoom = 0.0
             }
           )
-          map.setStyleJson(CLUSTER_STYLE_JSON)
+          map.setStyleJson(CLUSTER_STYLE_JSON.encodeToByteArray())
           map.addGeoJsonSourceData("cluster-source", clusterPoints(), clusterSourceOptions())
           map.addStyleLayerJson(clusterCircleLayer(), "")
           assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))

@@ -47,6 +47,11 @@ public sealed interface OfflineRegionDefinition {
       result = 31 * result + includeIdeographs.hashCode()
       return result
     }
+
+    override fun toString(): String =
+      "GeometryRegion(styleUrl=$styleUrl, geometry=${geometryBytes.contentToString()}, " +
+        "minZoom=$minZoom, maxZoom=$maxZoom, pixelRatio=$pixelRatio, " +
+        "includeIdeographs=$includeIdeographs)"
   }
 
   public class Unknown internal constructor(public val rawType: Int, public val rawSize: Int) :

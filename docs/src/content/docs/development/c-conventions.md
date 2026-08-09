@@ -37,6 +37,8 @@ every input length-delimited; do not require a trailing null byte. The parameter
 contract states whether a view contains UTF-8 text, serialized JSON, or
 arbitrary bytes. Delegate serialized input to the corresponding MapLibre Native
 parser or converter, and validate only C-owned shape and lifetime rules.
+Document the required JSON number representation when native behavior depends on
+whether a number is an unsigned integer, signed integer, or floating point.
 
 Shape structs for future ABI stability. Option and output structs that may grow
 use `uint32_t size` fields. Default constructors populate them. Use field masks

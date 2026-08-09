@@ -5,8 +5,23 @@ using Maplibre.NativeFfi.Internal.Status;
 
 namespace Maplibre.NativeFfi.Internal.Struct;
 
+internal unsafe delegate mln_status BufferGet(MlnBuffer buffer, mln_buffer_view* outView);
+
+internal delegate void BufferDestroy(MlnBuffer buffer);
+
 internal static unsafe class ValueStructs
 {
+    private static readonly BufferGet DefaultBufferGet = static (buffer, outView) =>
+        NativeMethods.mln_buffer_get(buffer, outView);
+    private static readonly BufferDestroy DefaultBufferDestroy = static buffer =>
+        NativeMethods.mln_buffer_destroy(buffer);
+
+    [ThreadStatic]
+    private static BufferGet? bufferGetForTest;
+
+    [ThreadStatic]
+    private static BufferDestroy? bufferDestroyForTest;
+
     internal static byte[] CopyBufferView(mln_buffer_view view)
     {
         if (view.size == 0)
@@ -22,42 +37,55 @@ internal static unsafe class ValueStructs
         return bytes;
     }
 
-    internal static byte[]? ReadOptionalBuffer(ulong buffer)
+    internal static byte[]? ReadOptionalBuffer(MlnBuffer buffer)
     {
-        if (buffer == 0)
+        if (buffer.IsNull)
         {
             return null;
         }
         return ReadBuffer(buffer);
     }
 
-    internal static byte[] ReadBuffer(ulong buffer)
+    internal static byte[] ReadBuffer(MlnBuffer buffer)
     {
-        if (buffer == 0)
+        if (buffer.IsNull)
         {
             return [];
         }
         try
         {
             mln_buffer_view view = default;
-            NativeStatus.Check(NativeMethods.mln_buffer_get(buffer, &view));
-            if (view.size == 0)
-            {
-                return [];
-            }
-            if (view.data is null)
-            {
-                throw new InvalidOperationException(
-                    "Native buffer data was null with a nonzero size."
-                );
-            }
-            var bytes = new byte[checked((int)view.size)];
-            Marshal.Copy((nint)view.data, bytes, 0, bytes.Length);
-            return bytes;
+            NativeStatus.Check(BufferGetMethod(buffer, &view));
+            return CopyBufferView(view);
         }
         finally
         {
-            NativeMethods.mln_buffer_destroy(buffer);
+            BufferDestroyMethod(buffer);
+        }
+    }
+
+    internal static IDisposable UseBufferMethodsForTest(BufferGet get, BufferDestroy destroy)
+    {
+        var previousGet = bufferGetForTest;
+        var previousDestroy = bufferDestroyForTest;
+        bufferGetForTest = get;
+        bufferDestroyForTest = destroy;
+        return new RestoreBufferMethods(previousGet, previousDestroy);
+    }
+
+    private static BufferGet BufferGetMethod => bufferGetForTest ?? DefaultBufferGet;
+    private static BufferDestroy BufferDestroyMethod =>
+        bufferDestroyForTest ?? DefaultBufferDestroy;
+
+    private sealed class RestoreBufferMethods(
+        BufferGet? previousGet,
+        BufferDestroy? previousDestroy
+    ) : IDisposable
+    {
+        public void Dispose()
+        {
+            bufferGetForTest = previousGet;
+            bufferDestroyForTest = previousDestroy;
         }
     }
 }
