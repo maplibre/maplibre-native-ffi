@@ -102,7 +102,7 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
             f"mise run //bindings/kotlin:test {preset}",
             f"mise run //bindings/go:test {preset}",
             f"mise run //bindings/rust:test {preset}",
-            f"mise run //bindings/zig:{'test' if preset == 'android-x64-egl' else 'build'} {preset}",
+            f"mise run //bindings/zig:test {preset}",
         ]
     else:
         commands = [

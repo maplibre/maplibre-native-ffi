@@ -1032,7 +1032,7 @@ jobs:
       - run: mise run //bindings/rust:test android-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/zig:build android-x64-vulkan
+      - run: mise run //bindings/zig:test android-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/dart:build:mobile android-x64-vulkan

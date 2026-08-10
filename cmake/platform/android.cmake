@@ -1,9 +1,6 @@
 function(mln_ffi_configure_platform_dependencies target)
   target_link_libraries(${target} INTERFACE android atomic z)
   mln_ffi_bundle_clang_cxx_runtime(${target} "${CMAKE_ANDROID_NDK}/NOTICE")
-  if(NOT CMAKE_SYSROOT)
-    message(FATAL_ERROR "The Android toolchain must define CMAKE_SYSROOT")
-  endif()
   string(REGEX REPLACE "^android-" "" android_api_level "${ANDROID_PLATFORM}")
   # The emulator this repository boots runs x86_64 with SwiftShader drivers for
   # both render backends, so every x86_64 configuration can execute its suite.
@@ -34,13 +31,7 @@ function(mln_ffi_configure_platform_dependencies target)
       MLN_FFI_TARGET_PLATFORM
       ${android_target_platform}
       MLN_FFI_ZIG_TARGET
-      "${android_target_triple}.${android_api_level}"
-      MLN_FFI_ZIG_LIBC_SYSROOT
-      "${CMAKE_SYSROOT}"
-      MLN_FFI_ZIG_LIBC_INCLUDE_DIR
-      "${CMAKE_SYSROOT}/usr/include/${android_target_triple}"
-      MLN_FFI_ZIG_LIBC_CRT_DIR
-      "${CMAKE_SYSROOT}/usr/lib/${android_target_triple}/${android_api_level}")
+      "${android_target_triple}.${android_api_level}")
 endfunction()
 
 function(mln_ffi_configure_platform target)
