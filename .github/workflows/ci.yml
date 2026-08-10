@@ -882,6 +882,9 @@ jobs:
       - run: mise run //bindings/rust:build android-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/zig:build android-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/android-map:build opengl arm64-v8a --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"
@@ -930,6 +933,9 @@ jobs:
       - run: mise run //bindings/rust:build android-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/zig:build android-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/dart:build:mobile android-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
@@ -973,6 +979,9 @@ jobs:
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/rust:test android-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/zig:test android-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/android-map:build opengl x86_64 --prebuilt
@@ -1021,6 +1030,9 @@ jobs:
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/rust:test android-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/zig:build android-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/dart:build:mobile android-x64-vulkan

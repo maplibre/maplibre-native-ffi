@@ -1,12 +1,20 @@
 function(mln_ffi_configure_platform_dependencies target)
   target_link_libraries(${target} INTERFACE android atomic z)
   mln_ffi_bundle_clang_cxx_runtime(${target} "${CMAKE_ANDROID_NDK}/NOTICE")
+  if(NOT CMAKE_SYSROOT)
+    message(FATAL_ERROR "The Android toolchain must define CMAKE_SYSROOT")
+  endif()
+  string(REGEX REPLACE "^android-" "" android_api_level "${ANDROID_PLATFORM}")
   # The emulator this repository boots runs x86_64 with SwiftShader drivers for
   # both render backends, so every x86_64 configuration can execute its suite.
   if(ANDROID_ABI STREQUAL "x86_64")
     set(android_test_supported TRUE)
+    set(android_target_platform android-x64)
+    set(android_target_triple x86_64-linux-android)
   else()
     set(android_test_supported FALSE)
+    set(android_target_platform android-arm64)
+    set(android_target_triple aarch64-linux-android)
   endif()
   set_target_properties(
     ${target}
@@ -22,20 +30,17 @@ function(mln_ffi_configure_platform_dependencies target)
       MLN_FFI_STATIC_ARCHIVES
       "mbgl-vendor-icu"
       MLN_FFI_TEST_SUPPORTED
-      ${android_test_supported})
-  if(ANDROID_ABI STREQUAL "arm64-v8a")
-    set_target_properties(
-      ${target}
-      PROPERTIES
-        MLN_FFI_TARGET_PLATFORM android-arm64 MLN_FFI_ZIG_TARGET
-        aarch64-linux-android)
-  else()
-    set_target_properties(
-      ${target}
-      PROPERTIES
-        MLN_FFI_TARGET_PLATFORM android-x64 MLN_FFI_ZIG_TARGET
-        x86_64-linux-android)
-  endif()
+      ${android_test_supported}
+      MLN_FFI_TARGET_PLATFORM
+      ${android_target_platform}
+      MLN_FFI_ZIG_TARGET
+      "${android_target_triple}.${android_api_level}"
+      MLN_FFI_ZIG_LIBC_SYSROOT
+      "${CMAKE_SYSROOT}"
+      MLN_FFI_ZIG_LIBC_INCLUDE_DIR
+      "${CMAKE_SYSROOT}/usr/include/${android_target_triple}"
+      MLN_FFI_ZIG_LIBC_CRT_DIR
+      "${CMAKE_SYSROOT}/usr/lib/${android_target_triple}/${android_api_level}")
 endfunction()
 
 function(mln_ffi_configure_platform target)

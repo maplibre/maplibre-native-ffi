@@ -654,9 +654,9 @@ const EglAttachContext = if (supports_egl) struct {
             };
             return initializeDisplay(egl.eglGetPlatformDisplayEXT(egl.EGL_PLATFORM_ANGLE_ANGLE, null, &display_attributes));
         }
-        // OpenHarmony's EGL serves its own window system, so it keeps the
-        // default display.
-        if (builtin.abi.isOpenHarmony()) {
+        // Android and OpenHarmony EGL serve their own window systems, so they
+        // keep the default display.
+        if (builtin.abi == .android or builtin.abi.isOpenHarmony()) {
             return initializeDisplay(egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY));
         }
         // These fixtures render into pbuffers and never present, so they name
