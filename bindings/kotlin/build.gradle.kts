@@ -1,7 +1,10 @@
+import java.time.Duration
 import org.gradle.api.tasks.testing.Test
+import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
@@ -197,6 +200,13 @@ tasks.named<Test>("jvmTest") {
       .files(maplibreNativeC.loaderLibraryDirs)
       .withPropertyName("maplibreNativeCLoaderLibraryDirs")
     inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstallDir")
+  }
+}
+
+tasks.withType<KotlinNativeTest>().configureEach {
+  timeout.set(Duration.ofMinutes(5))
+  testLogging {
+    events(TestLogEvent.STARTED, TestLogEvent.PASSED, TestLogEvent.SKIPPED, TestLogEvent.FAILED)
   }
 }
 

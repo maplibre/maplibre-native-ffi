@@ -193,7 +193,6 @@ class LogCallbackStateTest : org.maplibre.nativeffi.NativeTestBase() {
   @Test
   fun concurrentCloseDuringLogCallbackAllowsEnteredCallbackAndSuppressesLaterUpcalls() {
     val phase = AtomicInt(LOG_PHASE_READY)
-    val closeStarted = AtomicInt(0)
     val closeReturned = AtomicInt(0)
     val error = AtomicReference<Throwable?>(null)
     val accepted = AtomicInt(0)
@@ -213,13 +212,11 @@ class LogCallbackStateTest : org.maplibre.nativeffi.NativeTestBase() {
         waitForLogPhase(phase, LOG_PHASE_ENTERED)
         runNativeAction(
           NativeAction(error) {
-            closeStarted.store(1)
             state.close()
             closeReturned.store(1)
           }
         ) {
-          waitForAtomic(closeStarted, 1)
-          usleep(50_000U)
+          waitForLogClosing(state)
           assertEquals(0, closeReturned.load())
           assertEquals(0U, state.invoke(1U, 3U, 8L, null))
           phase.store(LOG_PHASE_RELEASE)
@@ -328,13 +325,12 @@ private fun waitForLogPhase(phase: AtomicInt, expected: Int) {
   error("timed out waiting for log callback phase $expected")
 }
 
-@OptIn(ExperimentalAtomicApi::class)
-private fun waitForAtomic(value: AtomicInt, expected: Int) {
+private fun waitForLogClosing(state: LogCallbackState) {
   repeat(10_000) {
-    if (value.load() == expected) return
+    if (state.isClosingForTesting()) return
     usleep(1_000U)
   }
-  error("timed out waiting for atomic value $expected")
+  error("timed out waiting for log callback close")
 }
 
 private const val LOG_PHASE_READY = 0

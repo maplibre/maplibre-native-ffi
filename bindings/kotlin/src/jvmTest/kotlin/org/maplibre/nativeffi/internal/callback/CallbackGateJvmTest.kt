@@ -33,7 +33,7 @@ class CallbackGateJvmTest {
     }
     closeThread.start()
 
-    Thread.sleep(50)
+    assertTrue(waitForClosing(gate))
     assertFalse(closeReturned.get())
     assertFalse(gate.isClosedForTesting())
     assertEquals(0, closes)
@@ -45,5 +45,14 @@ class CallbackGateJvmTest {
     assertTrue(closeReturned.get())
     assertTrue(gate.isClosedForTesting())
     assertEquals(1, closes)
+  }
+
+  private fun waitForClosing(gate: CallbackGate): Boolean {
+    val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+    while (System.nanoTime() < deadline) {
+      if (gate.isClosingForTesting()) return true
+      Thread.yield()
+    }
+    return false
   }
 }

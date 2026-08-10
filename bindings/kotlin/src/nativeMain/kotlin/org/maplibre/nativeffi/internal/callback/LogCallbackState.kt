@@ -43,6 +43,8 @@ internal class LogCallbackState private constructor(private val callback: LogCal
 
   internal fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
 
+  internal fun isClosingForTesting(): Boolean = gate.isClosingForTesting()
+
   internal companion object {
     private val registry = LogCallbackRegistry<LogCallbackState>()
 

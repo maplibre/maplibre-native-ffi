@@ -58,6 +58,8 @@ internal class CallbackGate(private val name: String, private val closeNative: (
 
   fun isClosedForTesting(): Boolean = state.load() and CLOSED_FLAG != 0
 
+  fun isClosingForTesting(): Boolean = state.load() and CLOSING_FLAG != 0
+
   private fun exit() {
     while (true) {
       val current = state.load()

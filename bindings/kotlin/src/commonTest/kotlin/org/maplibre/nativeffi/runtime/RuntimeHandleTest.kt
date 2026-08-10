@@ -515,7 +515,7 @@ class RuntimeHandleTest {
           if (request.url == "http://example.invalid/close-during-transform.json") {
             closeError.store(assertFailsWith<InvalidStateException> { runtime.close() })
           }
-          null
+          "unsupported://close-during-transform.json"
         }
       )
       val map =
