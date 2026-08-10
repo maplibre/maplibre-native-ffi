@@ -39,6 +39,7 @@ val mavenArtifact = "maplibre-native-ffi"
 kotlin {
   iosArm64()
   iosSimulatorArm64()
+  linuxArm64()
   linuxX64()
   macosArm64()
 
@@ -130,6 +131,7 @@ canonicalizeKmpRootMetadata(
       "iosArm64" to "$mavenArtifact-iosarm64",
       "iosSimulatorArm64" to "$mavenArtifact-iossimulatorarm64",
       "jvm" to "$mavenArtifact-jvm",
+      "linuxArm64" to "$mavenArtifact-linuxarm64",
       "linuxX64" to "$mavenArtifact-linuxx64",
       "macosArm64" to "$mavenArtifact-macosarm64",
     ),

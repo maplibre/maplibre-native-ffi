@@ -55,19 +55,23 @@ fun nativeTargets(
   targetFamily: MaplibreRuntimeTargetFamily,
 ): Map<String, NativeTargetConfiguration> =
   when (targetFamily) {
-    // Linux arm64 is absent because Kotlin/Native has no arm64 Linux host, so
-    // that target would have to be cross-compiled from x64.
     MaplibreRuntimeTargetFamily.LINUX -> {
       require(backend != MaplibreRuntimeBackend.METAL) {
         "Metal does not support the Linux runtime target family"
       }
       mapOf(
+        "linuxArm64" to
+          NativeTargetConfiguration(
+            "linux-${backend.id}.def",
+            "linux-arm64",
+            listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
+          ),
         "linuxX64" to
           NativeTargetConfiguration(
             "linux-${backend.id}.def",
             "linux-x64",
             listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
-          )
+          ),
       )
     }
     MaplibreRuntimeTargetFamily.APPLE -> {
@@ -431,6 +435,7 @@ canonicalizeKmpRootMetadata(
         mapOf(
           "android" to "$mavenArtifact-android",
           "jvm" to "$mavenArtifact-jvm",
+          "linuxArm64" to "$mavenArtifact-linuxarm64",
           "linuxX64" to "$mavenArtifact-linuxx64",
         )
       MaplibreRuntimeTargetFamily.APPLE ->

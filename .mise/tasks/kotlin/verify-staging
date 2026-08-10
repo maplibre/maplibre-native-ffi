@@ -26,6 +26,7 @@ API_BEARING_MODULES = {
     "maplibre-native-ffi-iosarm64",
     "maplibre-native-ffi-iossimulatorarm64",
     "maplibre-native-ffi-jvm",
+    "maplibre-native-ffi-linuxarm64",
     "maplibre-native-ffi-linuxx64",
     "maplibre-native-ffi-macosarm64",
 }
@@ -36,17 +37,20 @@ ROOT_TARGET_MODULES = {
         "iosArm64": "maplibre-native-ffi-iosarm64",
         "iosSimulatorArm64": "maplibre-native-ffi-iossimulatorarm64",
         "jvm": "maplibre-native-ffi-jvm",
+        "linuxArm64": "maplibre-native-ffi-linuxarm64",
         "linuxX64": "maplibre-native-ffi-linuxx64",
         "macosArm64": "maplibre-native-ffi-macosarm64",
     },
     "maplibre-native-ffi-runtime-opengl": {
         "android": "maplibre-native-ffi-runtime-opengl-android",
         "jvm": "maplibre-native-ffi-runtime-opengl-jvm",
+        "linuxArm64": "maplibre-native-ffi-runtime-opengl-linuxarm64",
         "linuxX64": "maplibre-native-ffi-runtime-opengl-linuxx64",
     },
     "maplibre-native-ffi-runtime-vulkan": {
         "android": "maplibre-native-ffi-runtime-vulkan-android",
         "jvm": "maplibre-native-ffi-runtime-vulkan-jvm",
+        "linuxArm64": "maplibre-native-ffi-runtime-vulkan-linuxarm64",
         "linuxX64": "maplibre-native-ffi-runtime-vulkan-linuxx64",
     },
     "maplibre-native-ffi-runtime-metal": {
@@ -405,7 +409,9 @@ def verify_jvm(root: pathlib.Path) -> None:
 
 def verify_native(root: pathlib.Path) -> None:
     modules = {
+        "maplibre-native-ffi-runtime-opengl-linuxarm64",
         "maplibre-native-ffi-runtime-opengl-linuxx64",
+        "maplibre-native-ffi-runtime-vulkan-linuxarm64",
         "maplibre-native-ffi-runtime-vulkan-linuxx64",
         "maplibre-native-ffi-runtime-metal-macosarm64",
         "maplibre-native-ffi-runtime-metal-iosarm64",
@@ -427,6 +433,10 @@ def verify_native(root: pathlib.Path) -> None:
                 for name in names
             ):
                 raise SystemExit(f"{interop} does not embed libmaplibre-native-c.a")
+            if "-linux" in module and not any(
+                name.endswith("/included/libmln_ffi_platform.a") for name in names
+            ):
+                raise SystemExit(f"{interop} does not embed libmln_ffi_platform.a")
             for license_name in COMMON_NATIVE_LICENSES:
                 expected = f"resources/licenses/maplibre-native-c/{license_name}"
                 if expected not in names:

@@ -39,6 +39,8 @@ prepare_native_inputs() {
         android-arm64-vulkan
         android-x64-egl
         android-x64-vulkan
+        linux-arm64-egl
+        linux-arm64-vulkan
         linux-x64-egl
         linux-x64-vulkan
       )
@@ -125,6 +127,14 @@ publish_linux_leaves() {
     "$@"
 
   publish_tasks \
+    :bindings:kotlin \
+    "$repository" \
+    LinuxArm64 -- \
+    "$@" \
+    -Pkotlin.native.enableKlibsCrossCompilation=true \
+    -PmaplibreNativeCInstallDir="$install_root/linux-arm64-egl"
+
+  publish_tasks \
     :bindings:kotlin:runtimes:opengl \
     "$repository" \
     LinuxX64 -- \
@@ -132,11 +142,32 @@ publish_linux_leaves() {
     -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-x64-egl"
 
   publish_tasks \
+    :bindings:kotlin:runtimes:opengl \
+    "$repository" \
+    LinuxArm64 -- \
+    "$@" \
+    -Pkotlin.native.enableKlibsCrossCompilation=true \
+    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-arm64-egl"
+
+  publish_tasks \
     :bindings:kotlin:runtimes:vulkan \
     "$repository" \
     LinuxX64 -- \
     "$@" \
     -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-x64-vulkan"
+
+  publish_tasks \
+    :bindings:kotlin:runtimes:vulkan \
+    "$repository" \
+    LinuxArm64 -- \
+    "$@" \
+    -Pkotlin.native.enableKlibsCrossCompilation=true \
+    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-arm64-vulkan"
+
+  ./gradlew \
+    -Pkotlin.native.enableKlibsCrossCompilation=true \
+    -PmaplibreNativeCInstallDir="$install_root/linux-arm64-egl" \
+    :bindings:kotlin:linkDebugTestLinuxArm64
 }
 
 publish_apple_leaves() {
