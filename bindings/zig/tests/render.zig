@@ -2132,7 +2132,10 @@ test "OpenGL surface renders through public bindings" {
     defer testing.allocator.free(pixels);
     @memset(pixels, 0);
     try context.readSurfaceRGBA8(128, 128, pixels);
-    try testing.expect(hasNonZeroByte(pixels));
+    // The style's background color reaches the surface through the clear the
+    // session's exclusive context allows, so a corner away from the circle
+    // layer carries it exactly.
+    try testing.expectEqualSlices(u8, &.{ 0xd8, 0xf1, 0xff, 0xff }, pixels[0..4]);
 
     try testing.expectError(error.Unsupported, session.acquireOpenGLOwnedTextureFrame());
     var readback_buffer: [128 * 128 * 4]u8 = undefined;

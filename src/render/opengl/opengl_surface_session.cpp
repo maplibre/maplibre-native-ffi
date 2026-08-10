@@ -24,6 +24,7 @@
 
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
+#include "render/opengl/context_mode.hpp"
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 #include "render/opengl/egl_context.hpp"
 #endif
@@ -58,7 +59,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   OpenGLSurfaceBackend(
     const mln_opengl_surface_descriptor& descriptor, mbgl::Size size
   )
-      : mbgl::gl::RendererBackend(mbgl::gfx::ContextMode::Shared),
+      : mbgl::gl::RendererBackend(mln::core::opengl::session_context_mode),
         mbgl::gfx::Renderable(
           size, std::make_unique<OpenGLSurfaceRenderableResource>(*this)
         ),
