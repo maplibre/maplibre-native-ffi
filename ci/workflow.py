@@ -102,6 +102,7 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
             f"mise run //bindings/kotlin:test {preset}",
             f"mise run //bindings/go:test {preset}",
             f"mise run //bindings/rust:test {preset}",
+            f"mise run //bindings/zig:test {preset}",
         ]
         if preset == "android-x64-egl":
             commands.append(f"mise run //bindings/python:test {preset}")
@@ -110,6 +111,7 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
             f"mise run //bindings/kotlin:android-build {arguments} --prebuilt",
             f"mise run //bindings/go:build {preset}",
             f"mise run //bindings/rust:build {preset}",
+            f"mise run //bindings/zig:build {preset}",
         ]
     if build_map:
         commands.append(f"mise run //examples/android-map:build {arguments} --prebuilt")
