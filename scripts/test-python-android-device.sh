@@ -17,6 +17,25 @@ fi
 mise run //:android-sdk-packages
 mise run //:android-emulator:boot x86_64
 
+# cibuildwheel pins its own NDK and removes other NDK versions from the SDK it
+# manages. Give it an isolated SDK view so later repository tasks retain the
+# NDK version installed by the Android preset.
+shared_android_home=${ANDROID_HOME:?ANDROID_HOME must point to the repository Android SDK}
+python_android_home="$MISE_MONOREPO_ROOT/build/android-emulator/$preset/python/android-sdk"
+mkdir -p "$python_android_home/ndk"
+if [[ ! -d "$python_android_home/cmdline-tools" ]]; then
+  cp -a "$shared_android_home/cmdline-tools" "$python_android_home/cmdline-tools"
+fi
+for entry_name in build-tools cmake emulator licenses platform-tools platforms system-images; do
+  sdk_entry="$shared_android_home/$entry_name"
+  destination="$python_android_home/$entry_name"
+  if [[ ! -e "$destination" && ! -L "$destination" ]]; then
+    ln -s "$sdk_entry" "$destination"
+  fi
+done
+export ANDROID_HOME="$python_android_home"
+export ANDROID_SDK_ROOT="$python_android_home"
+
 export CIBW_BUILD=cp314-android_x86_64
 export CIBW_ARCHS_ANDROID=x86_64
 export CIBW_BUILD_FRONTEND='build[uv]'
