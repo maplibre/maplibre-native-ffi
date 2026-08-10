@@ -25,6 +25,79 @@ bitflags::bitflags! {
     }
 }
 
+/// How a session's OpenGL context relates to the thread that attached it.
+///
+/// A shared session leaves the thread as it found it: every render makes the
+/// session context current and restores whatever was current before. The
+/// session context joins the host share group the descriptor names, so a host
+/// may hand the session a texture and sample it from its own context.
+///
+/// A dedicated session owns the thread. It makes its context current once and
+/// keeps it current between renders, and it joins no share group. Use this when
+/// a thread exists to drive one render session and runs no other graphics work.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum OpenGLContextOwnership {
+    /// The session shares its thread with host graphics work.
+    #[default]
+    Shared,
+    /// The session owns its thread's OpenGL context.
+    Dedicated,
+    Unknown(u32),
+}
+
+impl OpenGLContextOwnership {
+    pub fn from_raw(raw: u32) -> Self {
+        match raw {
+            sys::MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED => Self::Shared,
+            sys::MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED => Self::Dedicated,
+            _ => Self::Unknown(raw),
+        }
+    }
+
+    pub fn as_raw(self) -> u32 {
+        match self {
+            Self::Shared => sys::MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
+            Self::Dedicated => sys::MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED,
+            Self::Unknown(raw) => raw,
+        }
+    }
+}
+
+/// OpenGL client API a dedicated EGL session creates its context for.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum OpenGLClientApi {
+    /// No client API is named.
+    #[default]
+    Unspecified,
+    /// Desktop OpenGL, as `EGL_OPENGL_API` names it.
+    Gl,
+    /// OpenGL ES, as `EGL_OPENGL_ES_API` names it.
+    Gles,
+    Unknown(u32),
+}
+
+impl OpenGLClientApi {
+    pub fn from_raw(raw: u32) -> Self {
+        match raw {
+            sys::MLN_OPENGL_CLIENT_API_UNSPECIFIED => Self::Unspecified,
+            sys::MLN_OPENGL_CLIENT_API_GL => Self::Gl,
+            sys::MLN_OPENGL_CLIENT_API_GLES => Self::Gles,
+            _ => Self::Unknown(raw),
+        }
+    }
+
+    pub fn as_raw(self) -> u32 {
+        match self {
+            Self::Unspecified => sys::MLN_OPENGL_CLIENT_API_UNSPECIFIED,
+            Self::Gl => sys::MLN_OPENGL_CLIENT_API_GL,
+            Self::Gles => sys::MLN_OPENGL_CLIENT_API_GLES,
+            Self::Unknown(raw) => raw,
+        }
+    }
+}
+
 bitflags::bitflags! {
     /// Mask of log severities that MapLibre Native may dispatch asynchronously.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

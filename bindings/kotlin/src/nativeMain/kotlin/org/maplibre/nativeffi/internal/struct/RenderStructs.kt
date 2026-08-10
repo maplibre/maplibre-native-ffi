@@ -223,6 +223,7 @@ internal object RenderStructs {
     context: OpenGLContextDescriptor,
   ) {
     native.size = sizeOf<mln_opengl_context_descriptor>().toUInt()
+    native.ownership = context.ownership.nativeValue.toUInt()
     when (context) {
       is WglContextDescriptor -> {
         native.platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL
@@ -248,6 +249,7 @@ internal object RenderStructs {
     native.display = pointer(context.display)
     native.config = pointer(context.config)
     native.share_context = pointer(context.shareContext)
+    native.client_api = context.clientApi.nativeValue.toUInt()
     native.get_proc_address = pointer(context.getProcAddress)
   }
 

@@ -206,16 +206,74 @@ pub const VulkanContextDescriptor = struct {
     get_device_proc_addr: ?NativePointer = null,
 };
 
+/// How a render session's OpenGL context relates to the thread that attached
+/// it.
+pub const OpenGLContextOwnership = union(enum) {
+    /// The session shares its thread with host graphics work. Every render
+    /// makes the session context current and restores whatever was current
+    /// before, and the session context joins the share group that the
+    /// descriptor names.
+    shared,
+    /// The session owns its thread's OpenGL context. It makes its context
+    /// current once, keeps it current between renders, and joins no share
+    /// group. Use this for a thread that exists to drive one render session.
+    dedicated,
+    unknown: u32,
+
+    fn toRaw(self: OpenGLContextOwnership) u32 {
+        return switch (self) {
+            .shared => c.MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
+            .dedicated => c.MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED,
+            .unknown => |raw| raw,
+        };
+    }
+};
+
+/// OpenGL client API that a dedicated EGL session creates its context for.
+pub const OpenGLClientApi = union(enum) {
+    /// No client API is named.
+    unspecified,
+    /// Desktop OpenGL, as `EGL_OPENGL_API` names it.
+    gl,
+    /// OpenGL ES, as `EGL_OPENGL_ES_API` names it.
+    gles,
+    unknown: u32,
+
+    fn toRaw(self: OpenGLClientApi) u32 {
+        return switch (self) {
+            .unspecified => c.MLN_OPENGL_CLIENT_API_UNSPECIFIED,
+            .gl => c.MLN_OPENGL_CLIENT_API_GL,
+            .gles => c.MLN_OPENGL_CLIENT_API_GLES,
+            .unknown => |raw| raw,
+        };
+    }
+};
+
 pub const WglContextDescriptor = struct {
     device_context: NativePointer,
-    share_context: NativePointer,
+    /// Borrowed `HGLRC` whose share group the session context joins. Required
+    /// under shared ownership. A dedicated session joins no share group, so it
+    /// must be null there.
+    share_context: ?NativePointer = null,
+    /// Whether the session shares its thread with host graphics work.
+    ownership: OpenGLContextOwnership = .shared,
     get_proc_address: ?NativePointer = null,
 };
 
 pub const EglContextDescriptor = struct {
     display: NativePointer,
     config: NativePointer,
-    share_context: NativePointer,
+    /// Borrowed `EGLContext` whose share group the session context joins.
+    /// Required under shared ownership, where the session also takes its client
+    /// API from this context. A dedicated session joins no share group, so it
+    /// must be null there and names `client_api` instead.
+    share_context: ?NativePointer = null,
+    /// Client API that the session creates its context for. Required under
+    /// dedicated ownership. A shared session queries `share_context` for it, so
+    /// this is ignored there.
+    client_api: OpenGLClientApi = .unspecified,
+    /// Whether the session shares its thread with host graphics work.
+    ownership: OpenGLContextOwnership = .shared,
     get_proc_address: ?NativePointer = null,
 };
 
@@ -1430,25 +1488,29 @@ fn openglContextToNative(context: OpenGLContextDescriptor) c.mln_opengl_context_
     var raw = c.mln_opengl_context_descriptor{
         .size = @sizeOf(c.mln_opengl_context_descriptor),
         .platform = 0,
+        .ownership = c.MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
         .data = undefined,
     };
     switch (context) {
         .wgl => |wgl| {
             raw.platform = c.MLN_OPENGL_CONTEXT_PLATFORM_WGL;
+            raw.ownership = wgl.ownership.toRaw();
             raw.data.wgl = .{
                 .size = @sizeOf(c.mln_wgl_context_descriptor),
                 .device_context = wgl.device_context.toPtr(),
-                .share_context = wgl.share_context.toPtr(),
+                .share_context = if (wgl.share_context) |pointer| pointer.toPtr() else null,
                 .get_proc_address = if (wgl.get_proc_address) |pointer| pointer.toPtr() else null,
             };
         },
         .egl => |egl| {
             raw.platform = c.MLN_OPENGL_CONTEXT_PLATFORM_EGL;
+            raw.ownership = egl.ownership.toRaw();
             raw.data.egl = .{
                 .size = @sizeOf(c.mln_egl_context_descriptor),
                 .display = egl.display.toPtr(),
                 .config = egl.config.toPtr(),
-                .share_context = egl.share_context.toPtr(),
+                .share_context = if (egl.share_context) |pointer| pointer.toPtr() else null,
+                .client_api = egl.client_api.toRaw(),
                 .get_proc_address = if (egl.get_proc_address) |pointer| pointer.toPtr() else null,
             };
         },

@@ -2764,6 +2764,7 @@ internal object NativeAccess {
 
   private fun fillOpenGLContext(segment: MemorySegment, context: OpenGLContextDescriptor) {
     mln_opengl_context_descriptor.size(segment, mln_opengl_context_descriptor.sizeof().toInt())
+    mln_opengl_context_descriptor.ownership(segment, context.ownership.nativeValue)
     val data = mln_opengl_context_descriptor.data(segment)
     when (context) {
       is WglContextDescriptor -> {
@@ -2795,6 +2796,7 @@ internal object NativeAccess {
     mln_egl_context_descriptor.display(segment, nativePointer(context.display))
     mln_egl_context_descriptor.config(segment, nativePointer(context.config))
     mln_egl_context_descriptor.share_context(segment, nativePointer(context.shareContext))
+    mln_egl_context_descriptor.client_api(segment, context.clientApi.nativeValue)
     mln_egl_context_descriptor.get_proc_address(segment, nativePointer(context.getProcAddress))
   }
 

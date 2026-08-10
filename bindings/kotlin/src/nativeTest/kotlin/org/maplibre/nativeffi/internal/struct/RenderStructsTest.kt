@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
@@ -16,6 +17,8 @@ import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
 import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
+import org.maplibre.nativeffi.render.OpenGLClientApi
+import org.maplibre.nativeffi.render.OpenGLContextOwnership
 import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
 import org.maplibre.nativeffi.render.RenderTargetExtent
@@ -195,6 +198,54 @@ class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
       assertFalse(surface.context.data.egl.share_context == null)
       assertFalse(surface.context.data.egl.get_proc_address == null)
       assertFalse(surface.surface == null)
+      assertEquals(OpenGLContextOwnership.SHARED.nativeValue.toUInt(), surface.context.ownership)
+      assertEquals(
+        OpenGLClientApi.UNSPECIFIED.nativeValue.toUInt(),
+        surface.context.data.egl.client_api,
+      )
+
+      val dedicatedContext =
+        EglContextDescriptor(
+          NativePointer.ofAddress(0x40L),
+          NativePointer.ofAddress(0x50L),
+          NativePointer.NULL,
+          NativePointer.ofAddress(0x70L),
+          clientApi = OpenGLClientApi.GLES,
+          ownership = OpenGLContextOwnership.DEDICATED,
+        )
+      val dedicatedSurface =
+        RenderStructs.openglSurfaceDescriptor(
+            OpenGLSurfaceDescriptor(extent, dedicatedContext, NativePointer.ofAddress(0x80L)),
+            this,
+          )
+          .pointed
+      assertEquals(
+        OpenGLContextOwnership.DEDICATED.nativeValue.toUInt(),
+        dedicatedSurface.context.ownership,
+      )
+      assertEquals(
+        OpenGLClientApi.GLES.nativeValue.toUInt(),
+        dedicatedSurface.context.data.egl.client_api,
+      )
+      assertNull(dedicatedSurface.context.data.egl.share_context)
+
+      val unknownContext =
+        EglContextDescriptor(
+          NativePointer.ofAddress(0x40L),
+          NativePointer.ofAddress(0x50L),
+          NativePointer.NULL,
+          NativePointer.ofAddress(0x70L),
+          clientApi = OpenGLClientApi(97),
+          ownership = OpenGLContextOwnership(98),
+        )
+      val unknownSurface =
+        RenderStructs.openglSurfaceDescriptor(
+            OpenGLSurfaceDescriptor(extent, unknownContext, NativePointer.ofAddress(0x80L)),
+            this,
+          )
+          .pointed
+      assertEquals(98U, unknownSurface.context.ownership)
+      assertEquals(97U, unknownSurface.context.data.egl.client_api)
     }
   }
 }

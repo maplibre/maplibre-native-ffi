@@ -128,14 +128,64 @@ public sealed class VulkanContextDescriptor
     public NativePointer GetDeviceProcAddr { get; set; }
 }
 
+/// <summary>
+/// How a render session's OpenGL context relates to the thread that attached it. This is an open
+/// domain: a value may have no named member here, so a switch over it needs a default case.
+/// Unknown values keep their raw value.
+/// </summary>
+public enum OpenGLContextOwnership : uint
+{
+    /// <summary>
+    /// The session shares its thread with host graphics work. Every render makes the session
+    /// context current and restores whatever was current before, and the session context joins the
+    /// share group named by the descriptor.
+    /// </summary>
+    Shared = 0,
+
+    /// <summary>
+    /// The session owns its thread's OpenGL context. It makes its context current once and keeps
+    /// it current between renders, and it joins no share group.
+    /// </summary>
+    Dedicated = 1,
+}
+
+/// <summary>
+/// OpenGL client API a dedicated EGL session creates its context for. This is an open domain: a
+/// value may have no named member here, so a switch over it needs a default case. Unknown values
+/// keep their raw value.
+/// </summary>
+public enum OpenGLClientApi : uint
+{
+    /// <summary>No client API is named.</summary>
+    Unspecified = 0,
+
+    /// <summary>Desktop OpenGL, as EGL_OPENGL_API names it.</summary>
+    Gl = 1,
+
+    /// <summary>OpenGL ES, as EGL_OPENGL_ES_API names it.</summary>
+    Gles = 2,
+}
+
 public abstract class OpenGLContextDescriptor
 {
     private protected OpenGLContextDescriptor() { }
+
+    /// <summary>
+    /// Whether the session shares its thread with host graphics work. WGL and EGL surface targets
+    /// support both. A texture target hands its texture to the host, so it is shared only.
+    /// </summary>
+    public OpenGLContextOwnership Ownership { get; set; } = OpenGLContextOwnership.Shared;
 }
 
 public sealed class WglContextDescriptor : OpenGLContextDescriptor
 {
     public NativePointer DeviceContext { get; set; }
+
+    /// <summary>
+    /// Context whose share group the session context joins. Required under
+    /// <see cref="OpenGLContextOwnership.Shared"/>, and null under
+    /// <see cref="OpenGLContextOwnership.Dedicated"/>.
+    /// </summary>
     public NativePointer ShareContext { get; set; }
     public NativePointer GetProcAddress { get; set; }
 }
@@ -144,7 +194,20 @@ public sealed class EglContextDescriptor : OpenGLContextDescriptor
 {
     public NativePointer Display { get; set; }
     public NativePointer Config { get; set; }
+
+    /// <summary>
+    /// Context whose share group the session context joins. Required under
+    /// <see cref="OpenGLContextOwnership.Shared"/>, where the session also takes its client API
+    /// from this context, and null under <see cref="OpenGLContextOwnership.Dedicated"/>.
+    /// </summary>
     public NativePointer ShareContext { get; set; }
+
+    /// <summary>
+    /// Client API the session creates its context for. Required under
+    /// <see cref="OpenGLContextOwnership.Dedicated"/>, and ignored under
+    /// <see cref="OpenGLContextOwnership.Shared"/>.
+    /// </summary>
+    public OpenGLClientApi ClientApi { get; set; } = OpenGLClientApi.Unspecified;
     public NativePointer GetProcAddress { get; set; }
 }
 

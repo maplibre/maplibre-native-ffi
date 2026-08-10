@@ -54,11 +54,17 @@ bool mln_test_render_fixture_create(
 );
 void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture);
 
+// Outcome of building the dedicated EGL surface fixture. Unavailable is a skip;
+// a failed attach is a failure, because it is the behavior under test.
+typedef enum mln_test_fixture_result {
+  MLN_TEST_FIXTURE_OK,
+  MLN_TEST_FIXTURE_UNAVAILABLE,
+  MLN_TEST_FIXTURE_ATTACH_FAILED,
+} mln_test_fixture_result;
+
 // Attaches an OpenGL surface session that owns its EGL context, presenting into
-// a pbuffer this helper creates. Returns false when the build has no EGL
-// provider or the platform cannot supply the objects, which is a skip rather
-// than a failure.
-bool mln_test_dedicated_egl_surface_create(
+// a pbuffer this helper creates.
+mln_test_fixture_result mln_test_dedicated_egl_surface_create(
   mln_map map, mln_test_render_fixture* fixture
 );
 void mln_test_dedicated_egl_surface_destroy(mln_test_render_fixture* fixture);

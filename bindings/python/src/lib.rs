@@ -3889,9 +3889,11 @@ impl RenderSessionHandle {
         height: u32,
         scale_factor: f64,
         context_platform: u32,
+        context_ownership: u32,
         context_address_1: usize,
         context_address_2: usize,
         share_context_address: usize,
+        client_api: u32,
         get_proc_address: usize,
         surface_address: usize,
     ) -> PyResult<()> {
@@ -3904,9 +3906,11 @@ impl RenderSessionHandle {
                 },
                 context: opengl_context_fields(
                     context_platform,
+                    context_ownership,
                     context_address_1,
                     context_address_2,
                     share_context_address,
+                    client_api,
                     get_proc_address,
                 )?,
                 surface: surface_address as *mut c_void,
@@ -4009,9 +4013,11 @@ impl RenderSessionHandle {
         physical_width: u32,
         physical_height: u32,
         context_platform: u32,
+        context_ownership: u32,
         context_address_1: usize,
         context_address_2: usize,
         share_context_address: usize,
+        client_api: u32,
         get_proc_address: usize,
         texture: u32,
         target: u32,
@@ -4027,9 +4033,11 @@ impl RenderSessionHandle {
                 physical_height,
                 context: opengl_context_fields(
                     context_platform,
+                    context_ownership,
                     context_address_1,
                     context_address_2,
                     share_context_address,
+                    client_api,
                     get_proc_address,
                 )?,
                 texture,
@@ -7581,9 +7589,11 @@ fn attach_opengl_surface(
     height: u32,
     scale_factor: f64,
     context_platform: u32,
+    context_ownership: u32,
     context_address_1: usize,
     context_address_2: usize,
     share_context_address: usize,
+    client_api: u32,
     get_proc_address: usize,
     surface_address: usize,
 ) -> PyResult<RenderSessionHandle> {
@@ -7596,9 +7606,11 @@ fn attach_opengl_surface(
             },
             context: opengl_context_fields(
                 context_platform,
+                context_ownership,
                 context_address_1,
                 context_address_2,
                 share_context_address,
+                client_api,
                 get_proc_address,
             )?,
             surface: surface_address as *mut c_void,
@@ -7619,9 +7631,11 @@ fn attach_opengl_owned_texture(
     height: u32,
     scale_factor: f64,
     context_platform: u32,
+    context_ownership: u32,
     context_address_1: usize,
     context_address_2: usize,
     share_context_address: usize,
+    client_api: u32,
     get_proc_address: usize,
 ) -> PyResult<RenderSessionHandle> {
     let descriptor = maplibre_core::render::opengl_owned_texture_descriptor_to_native(
@@ -7633,9 +7647,11 @@ fn attach_opengl_owned_texture(
             },
             context: opengl_context_fields(
                 context_platform,
+                context_ownership,
                 context_address_1,
                 context_address_2,
                 share_context_address,
+                client_api,
                 get_proc_address,
             )?,
         },
@@ -7657,9 +7673,11 @@ fn attach_opengl_borrowed_texture(
     physical_width: u32,
     physical_height: u32,
     context_platform: u32,
+    context_ownership: u32,
     context_address_1: usize,
     context_address_2: usize,
     share_context_address: usize,
+    client_api: u32,
     get_proc_address: usize,
     texture: u32,
     target: u32,
@@ -7675,9 +7693,11 @@ fn attach_opengl_borrowed_texture(
             physical_height,
             context: opengl_context_fields(
                 context_platform,
+                context_ownership,
                 context_address_1,
                 context_address_2,
                 share_context_address,
+                client_api,
                 get_proc_address,
             )?,
             texture,
@@ -7713,9 +7733,11 @@ fn vulkan_context_fields(
 
 fn opengl_context_fields(
     context_platform: u32,
+    context_ownership: u32,
     context_address_1: usize,
     context_address_2: usize,
     share_context_address: usize,
+    client_api: u32,
     get_proc_address: usize,
 ) -> PyResult<maplibre_core::render::OpenGLContextDescriptorFields> {
     match context_platform {
@@ -7725,6 +7747,7 @@ fn opengl_context_fields(
                     device_context: context_address_1 as *mut c_void,
                     share_context: share_context_address as *mut c_void,
                     get_proc_address: get_proc_address as *mut c_void,
+                    ownership: context_ownership,
                 },
             ))
         }
@@ -7734,7 +7757,9 @@ fn opengl_context_fields(
                     display: context_address_1 as *mut c_void,
                     config: context_address_2 as *mut c_void,
                     share_context: share_context_address as *mut c_void,
+                    client_api,
                     get_proc_address: get_proc_address as *mut c_void,
+                    ownership: context_ownership,
                 },
             ))
         }

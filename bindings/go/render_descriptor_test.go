@@ -64,6 +64,9 @@ func TestOpenGLContextDescriptorMaterialization(t *testing.T) {
 	if wgl.Platform != testOpenGLContextPlatformWGL() {
 		t.Fatalf("WGL platform = %d, want %d", wgl.Platform, testOpenGLContextPlatformWGL())
 	}
+	if wgl.Ownership != uint32(OpenGLContextOwnershipShared) {
+		t.Fatalf("default WGL ownership = %d, want shared", wgl.Ownership)
+	}
 	if wgl.WGLSize != uint32(testWGLContextDescriptorSize()) ||
 		wgl.DeviceContext != uintptr(wglDescriptor.WGL.DeviceContext) ||
 		wgl.ShareContext != uintptr(wglDescriptor.WGL.ShareContext) ||
@@ -84,12 +87,26 @@ func TestOpenGLContextDescriptorMaterialization(t *testing.T) {
 	if egl.Platform != testOpenGLContextPlatformEGL() {
 		t.Fatalf("EGL platform = %d, want %d", egl.Platform, testOpenGLContextPlatformEGL())
 	}
+	if egl.Ownership != uint32(OpenGLContextOwnershipShared) {
+		t.Fatalf("default EGL ownership = %d, want shared", egl.Ownership)
+	}
 	if egl.EGLSize != uint32(testEGLContextDescriptorSize()) ||
 		egl.Display != uintptr(eglDescriptor.EGL.Display) ||
 		egl.Config != uintptr(eglDescriptor.EGL.Config) ||
 		egl.ShareContext != uintptr(eglDescriptor.EGL.ShareContext) ||
+		egl.ClientAPI != uint32(OpenGLClientAPIUnspecified) ||
 		egl.GetProcAddress != uintptr(eglDescriptor.EGL.GetProcAddress) {
 		t.Fatalf("EGL context descriptor fields = %#v", egl)
+	}
+
+	dedicated := testEGLContextDescriptorFields(OpenGLContextDescriptor{
+		EGL:       &EGLContextDescriptor{Display: 0x888, Config: 0x999, ClientAPI: OpenGLClientAPIGLES},
+		Ownership: OpenGLContextOwnershipDedicated,
+	})
+	if dedicated.Ownership != uint32(OpenGLContextOwnershipDedicated) ||
+		dedicated.ClientAPI != uint32(OpenGLClientAPIGLES) ||
+		dedicated.ShareContext != 0 {
+		t.Fatalf("dedicated EGL context descriptor fields = %#v", dedicated)
 	}
 }
 

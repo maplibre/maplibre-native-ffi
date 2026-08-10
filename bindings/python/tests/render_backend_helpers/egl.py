@@ -63,6 +63,11 @@ def _pointer(value: Any, name: str) -> render.NativePointer:
     return render.NativePointer(_addr(value), _diagnostic_name=name)
 
 
+def current_context_address() -> int:
+    """Return the EGL context currently bound to this thread, or 0 for none."""
+    return _addr(EGL.eglGetCurrentContext())
+
+
 def _display() -> Any:
     if sys.platform != "darwin":
         return EGL.eglGetDisplay(EGL.EGL_DEFAULT_DISPLAY)
@@ -164,6 +169,23 @@ class EglContext:
                 EGL.eglGetProcAddress(b"eglGetProcAddress"),
                 _diagnostic_name="eglGetProcAddress",
             ),
+        )
+
+    def dedicated_descriptor(self) -> render.EglContextDescriptor:
+        """Describe a session that owns this thread's context.
+
+        A dedicated session joins no share group and creates its context for the
+        client API it names, so it carries no share context.
+        """
+        return render.EglContextDescriptor(
+            display=_pointer(self.display, "EGLDisplay"),
+            config=_pointer(self.config, "EGLConfig"),
+            client_api=render.OpenGLClientApi.GLES,
+            get_proc_address=render.NativePointer(
+                EGL.eglGetProcAddress(b"eglGetProcAddress"),
+                _diagnostic_name="eglGetProcAddress",
+            ),
+            ownership=render.OpenGLContextOwnership.DEDICATED,
         )
 
     def owned_texture_descriptor(
@@ -407,6 +429,18 @@ class EglPbufferSurface:
                 self.scale_factor,
             ),
             context=self.context.descriptor(),
+            surface=_pointer(self.surface, "EGLSurface"),
+        )
+
+    def dedicated_descriptor(self) -> render.OpenGLSurfaceDescriptor:
+        """Describe this surface for a session that owns this thread."""
+        return render.OpenGLSurfaceDescriptor(
+            extent=render.RenderTargetExtent(
+                self.width,
+                self.height,
+                self.scale_factor,
+            ),
+            context=self.context.dedicated_descriptor(),
             surface=_pointer(self.surface, "EGLSurface"),
         )
 

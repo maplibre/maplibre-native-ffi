@@ -232,9 +232,98 @@ final class OpenGLContextProviderMask {
       'OpenGLContextProviderMask[bits=0x${bits.toRadixString(16)}]';
 }
 
+/// How a session's OpenGL context relates to the thread that attached it.
+///
+/// Known values use the named constants. Values added by a newer compatible
+/// native library retain their raw integer through [fromRawValue].
+final class OpenGLContextOwnership {
+  const OpenGLContextOwnership._(this.rawValue, this.name);
+
+  /// The session shares its thread with host graphics work.
+  ///
+  /// Every render makes the session context current and restores whatever was
+  /// current before, and the session context joins the share group named by
+  /// the context descriptor.
+  static const shared = OpenGLContextOwnership._(0, 'shared');
+
+  /// The session owns its thread's OpenGL context.
+  ///
+  /// The session makes its context current once and keeps it current between
+  /// renders, and it joins no share group. Use this when a thread exists to
+  /// drive one render session and runs no other graphics work.
+  static const dedicated = OpenGLContextOwnership._(1, 'dedicated');
+
+  /// Creates a context ownership from a raw native value.
+  factory OpenGLContextOwnership.fromRawValue(int rawValue) =>
+      switch (rawValue) {
+        0 => shared,
+        1 => dedicated,
+        _ => OpenGLContextOwnership._(rawValue, 'unknown($rawValue)'),
+      };
+
+  /// Raw native value.
+  final int rawValue;
+
+  /// Human-readable name.
+  final String name;
+
+  @override
+  bool operator ==(Object other) =>
+      other is OpenGLContextOwnership && other.rawValue == rawValue;
+
+  @override
+  int get hashCode => rawValue.hashCode;
+}
+
+/// OpenGL client API a dedicated EGL session creates its context for.
+///
+/// Known values use the named constants. Values added by a newer compatible
+/// native library retain their raw integer through [fromRawValue].
+final class OpenGLClientApi {
+  const OpenGLClientApi._(this.rawValue, this.name);
+
+  /// No client API is named.
+  static const unspecified = OpenGLClientApi._(0, 'unspecified');
+
+  /// Desktop OpenGL, as `EGL_OPENGL_API` names it.
+  static const gl = OpenGLClientApi._(1, 'gl');
+
+  /// OpenGL ES, as `EGL_OPENGL_ES_API` names it.
+  static const gles = OpenGLClientApi._(2, 'gles');
+
+  /// Creates a client API from a raw native value.
+  factory OpenGLClientApi.fromRawValue(int rawValue) => switch (rawValue) {
+    0 => unspecified,
+    1 => gl,
+    2 => gles,
+    _ => OpenGLClientApi._(rawValue, 'unknown($rawValue)'),
+  };
+
+  /// Raw native value.
+  final int rawValue;
+
+  /// Human-readable name.
+  final String name;
+
+  @override
+  bool operator ==(Object other) =>
+      other is OpenGLClientApi && other.rawValue == rawValue;
+
+  @override
+  int get hashCode => rawValue.hashCode;
+}
+
 /// OpenGL backend context fields shared by OpenGL render targets.
 sealed class OpenGLContextDescriptor {
-  const OpenGLContextDescriptor();
+  const OpenGLContextDescriptor({
+    this.ownership = OpenGLContextOwnership.shared,
+  });
+
+  /// Whether the session shares its thread with host graphics work.
+  ///
+  /// WGL and EGL surface sessions support both. A texture session hands its
+  /// texture to the host, so it is shared only.
+  final OpenGLContextOwnership ownership;
 }
 
 /// WGL context fields shared by OpenGL render targets on Windows.
@@ -244,12 +333,16 @@ final class WglContextDescriptor extends OpenGLContextDescriptor {
     required this.deviceContext,
     required this.shareContext,
     this.getProcAddress = NativePointer.nullPointer,
+    super.ownership,
   });
 
-  /// Borrowed HDC used to create a shared session context.
+  /// Borrowed HDC used to create the session context.
   final NativePointer deviceContext;
 
   /// Borrowed HGLRC whose share group the session context joins.
+  ///
+  /// Required under shared ownership. A dedicated session joins no share
+  /// group, so it must be null there.
   final NativePointer shareContext;
 
   /// Optional `wglGetProcAddress`-compatible function for the host loader.
@@ -263,17 +356,32 @@ final class EglContextDescriptor extends OpenGLContextDescriptor {
     required this.display,
     required this.config,
     required this.shareContext,
+    this.clientApi = OpenGLClientApi.unspecified,
     this.getProcAddress = NativePointer.nullPointer,
+    super.ownership,
   });
 
   /// Borrowed EGLDisplay.
   final NativePointer display;
 
-  /// Borrowed EGLConfig used to create a shared session context.
+  /// Borrowed EGLConfig used to create the session context.
+  ///
+  /// OpenGL texture sessions require `EGL_SURFACE_TYPE` to include
+  /// `EGL_PBUFFER_BIT`.
   final NativePointer config;
 
   /// Borrowed EGLContext whose share group the session context joins.
+  ///
+  /// Required under shared ownership, where the session also takes its client
+  /// API from this context. A dedicated session joins no share group, so it
+  /// must be null there and names [clientApi] instead.
   final NativePointer shareContext;
+
+  /// Client API the session creates its context for.
+  ///
+  /// Required under dedicated ownership. A shared session queries
+  /// [shareContext] for it, so this is ignored there.
+  final OpenGLClientApi clientApi;
 
   /// Optional `eglGetProcAddress`-compatible function for the host loader.
   final NativePointer getProcAddress;

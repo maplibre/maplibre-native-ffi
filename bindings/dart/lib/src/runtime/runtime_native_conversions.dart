@@ -810,6 +810,7 @@ raw.mln_opengl_context_descriptor _openglContextDescriptorToNative(
 ) {
   final result = Struct.create<raw.mln_opengl_context_descriptor>();
   result.size = sizeOf<raw.mln_opengl_context_descriptor>();
+  result.ownershipAsInt = value.ownership.rawValue;
   switch (value) {
     case WglContextDescriptor():
       result.platformAsInt =
@@ -835,6 +836,7 @@ raw.mln_opengl_context_descriptor _openglContextDescriptorToNative(
       result.data.egl.share_context = Pointer<Void>.fromAddress(
         value.shareContext.address,
       );
+      result.data.egl.client_apiAsInt = value.clientApi.rawValue;
       result.data.egl.get_proc_address = Pointer<Void>.fromAddress(
         value.getProcAddress.address,
       );

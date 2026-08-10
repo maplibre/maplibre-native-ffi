@@ -432,44 +432,7 @@ impl EglTestContext {
     fn new() -> std::result::Result<Self, Box<dyn StdError>> {
         let lib = load_egl_library()?;
         let egl = load_egl_bindings(&lib)?;
-        // A desktop Linux run without a display server needs Mesa's surfaceless
-        // platform. Device EGL implementations ship no such platform, so they
-        // take the default display.
-        #[cfg(any(target_env = "ohos", target_os = "android"))]
-        let display = unsafe { egl.GetDisplay(egl::DEFAULT_DISPLAY as *mut c_void) };
-        #[cfg(any(target_env = "ohos", target_os = "android"))]
-        let display_operation = "eglGetDisplay";
-        #[cfg(not(any(target_env = "ohos", target_os = "android")))]
-        let display = {
-            const EGL_PLATFORM_SURFACELESS_MESA: u32 = 0x31DD;
-            if !egl.GetPlatformDisplayEXT.is_loaded() {
-                return Err("eglGetPlatformDisplayEXT is unavailable".into());
-            }
-            unsafe {
-                egl.GetPlatformDisplayEXT(
-                    EGL_PLATFORM_SURFACELESS_MESA,
-                    egl::DEFAULT_DISPLAY as *mut c_void,
-                    [egl::NONE as EGLint].as_ptr(),
-                )
-            }
-        };
-        #[cfg(not(any(target_env = "ohos", target_os = "android")))]
-        let display_operation = "eglGetPlatformDisplayEXT";
-        if display == egl::NO_DISPLAY {
-            return Err(format!("{display_operation} failed with 0x{:x}", unsafe {
-                egl.GetError()
-            })
-            .into());
-        }
-
-        let mut major = 0;
-        let mut minor = 0;
-        if unsafe { egl.Initialize(display, &mut major, &mut minor) } == egl::FALSE {
-            return Err(format!("eglInitialize failed with 0x{:x}", unsafe {
-                egl.GetError()
-            })
-            .into());
-        }
+        let display = open_egl_display(&egl)?;
 
         if unsafe { egl.BindAPI(egl::OPENGL_ES_API) } == egl::FALSE {
             let error = unsafe { egl.GetError() };
@@ -479,45 +442,13 @@ impl EglTestContext {
             return Err(format!("eglBindAPI failed with 0x{error:x}").into());
         }
 
-        let config_attributes = [
-            egl::SURFACE_TYPE as EGLint,
-            egl::PBUFFER_BIT as EGLint,
-            egl::RENDERABLE_TYPE as EGLint,
-            egl::OPENGL_ES3_BIT as EGLint,
-            egl::RED_SIZE as EGLint,
-            8,
-            egl::GREEN_SIZE as EGLint,
-            8,
-            egl::BLUE_SIZE as EGLint,
-            8,
-            egl::ALPHA_SIZE as EGLint,
-            8,
-            egl::DEPTH_SIZE as EGLint,
-            24,
-            egl::STENCIL_SIZE as EGLint,
-            8,
-            egl::NONE as EGLint,
-        ];
-        let mut config: EGLConfig = std::ptr::null_mut();
-        let mut config_count = 0;
-        if unsafe {
-            egl.ChooseConfig(
-                display,
-                config_attributes.as_ptr(),
-                &mut config,
-                1,
-                &mut config_count,
-            )
-        } == egl::FALSE
-            || config_count == 0
-            || config.is_null()
-        {
-            let error = unsafe { egl.GetError() };
-            unsafe {
-                egl.Terminate(display);
+        let config = match choose_egl_pbuffer_config(&egl, display) {
+            Ok(config) => config,
+            Err(error) => {
+                unsafe { egl.Terminate(display) };
+                return Err(error);
             }
-            return Err(format!("eglChooseConfig failed with 0x{error:x}").into());
-        }
+        };
 
         let context_attributes = [
             egl::CONTEXT_CLIENT_VERSION as EGLint,
@@ -625,6 +556,181 @@ impl Drop for EglTestContext {
             self.egl.Terminate(self.display);
         }
     }
+}
+
+/// EGL display and pbuffer surface for a dedicated-ownership session.
+///
+/// This fixture creates no context and makes none current: naming dedicated
+/// ownership is what asks the session to create its own context and keep it
+/// current between renders.
+#[cfg(any(target_os = "linux", target_os = "android"))]
+struct DedicatedEglTestSurface {
+    egl: egl::Egl,
+    _lib: Library,
+    display: EGLDisplay,
+    config: EGLConfig,
+    surface: EGLSurface,
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+impl DedicatedEglTestSurface {
+    fn new(width: u32, height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
+        let lib = load_egl_library()?;
+        let egl = load_egl_bindings(&lib)?;
+        let display = open_egl_display(&egl)?;
+        let config = match choose_egl_pbuffer_config(&egl, display) {
+            Ok(config) => config,
+            Err(error) => {
+                unsafe { egl.Terminate(display) };
+                return Err(error);
+            }
+        };
+
+        let surface_attributes = [
+            egl::WIDTH as EGLint,
+            width as EGLint,
+            egl::HEIGHT as EGLint,
+            height as EGLint,
+            egl::NONE as EGLint,
+        ];
+        let surface =
+            unsafe { egl.CreatePbufferSurface(display, config, surface_attributes.as_ptr()) };
+        if surface == egl::NO_SURFACE {
+            let error = unsafe { egl.GetError() };
+            unsafe { egl.Terminate(display) };
+            return Err(format!("eglCreatePbufferSurface failed with 0x{error:x}").into());
+        }
+
+        Ok(Self {
+            egl,
+            _lib: lib,
+            display,
+            config,
+            surface,
+        })
+    }
+
+    fn descriptor(&self) -> OpenGLContextDescriptor {
+        let mut context = EglContextDescriptor::new(
+            unsafe { NativePointer::from_ptr(self.display.cast_mut()) },
+            unsafe { NativePointer::from_ptr(self.config.cast_mut()) },
+            NativePointer::NULL,
+        );
+        context.client_api = OpenGLClientApi::Gles;
+        context.ownership = OpenGLContextOwnership::Dedicated;
+        OpenGLContextDescriptor::Egl(context)
+    }
+
+    fn surface(&self) -> NativePointer {
+        unsafe { NativePointer::from_ptr(self.surface.cast_mut()) }
+    }
+
+    /// Whether an EGL context is current on this thread.
+    fn has_current_context(&self) -> bool {
+        unsafe { self.egl.GetCurrentContext() != egl::NO_CONTEXT }
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+impl Drop for DedicatedEglTestSurface {
+    fn drop(&mut self) {
+        unsafe {
+            self.egl.DestroySurface(self.display, self.surface);
+            self.egl.Terminate(self.display);
+        }
+    }
+}
+
+/// Opens and initializes the EGL display the OpenGL fixtures render through.
+#[cfg(any(target_os = "linux", target_os = "android"))]
+fn open_egl_display(egl: &egl::Egl) -> std::result::Result<EGLDisplay, Box<dyn StdError>> {
+    // A desktop Linux run without a display server needs Mesa's surfaceless
+    // platform. Device EGL implementations ship no such platform, so they take
+    // the default display.
+    #[cfg(any(target_env = "ohos", target_os = "android"))]
+    let display = unsafe { egl.GetDisplay(egl::DEFAULT_DISPLAY as *mut c_void) };
+    #[cfg(any(target_env = "ohos", target_os = "android"))]
+    let display_operation = "eglGetDisplay";
+    #[cfg(not(any(target_env = "ohos", target_os = "android")))]
+    let display = {
+        const EGL_PLATFORM_SURFACELESS_MESA: u32 = 0x31DD;
+        if !egl.GetPlatformDisplayEXT.is_loaded() {
+            return Err("eglGetPlatformDisplayEXT is unavailable".into());
+        }
+        unsafe {
+            egl.GetPlatformDisplayEXT(
+                EGL_PLATFORM_SURFACELESS_MESA,
+                egl::DEFAULT_DISPLAY as *mut c_void,
+                [egl::NONE as EGLint].as_ptr(),
+            )
+        }
+    };
+    #[cfg(not(any(target_env = "ohos", target_os = "android")))]
+    let display_operation = "eglGetPlatformDisplayEXT";
+    if display == egl::NO_DISPLAY {
+        return Err(format!("{display_operation} failed with 0x{:x}", unsafe {
+            egl.GetError()
+        })
+        .into());
+    }
+
+    let mut major = 0;
+    let mut minor = 0;
+    if unsafe { egl.Initialize(display, &mut major, &mut minor) } == egl::FALSE {
+        return Err(format!("eglInitialize failed with 0x{:x}", unsafe {
+            egl.GetError()
+        })
+        .into());
+    }
+    Ok(display)
+}
+
+/// Chooses a pbuffer-capable OpenGL ES 3 config, which the C API requires of
+/// every EGL context descriptor.
+#[cfg(any(target_os = "linux", target_os = "android"))]
+fn choose_egl_pbuffer_config(
+    egl: &egl::Egl,
+    display: EGLDisplay,
+) -> std::result::Result<EGLConfig, Box<dyn StdError>> {
+    let config_attributes = [
+        egl::SURFACE_TYPE as EGLint,
+        egl::PBUFFER_BIT as EGLint,
+        egl::RENDERABLE_TYPE as EGLint,
+        egl::OPENGL_ES3_BIT as EGLint,
+        egl::RED_SIZE as EGLint,
+        8,
+        egl::GREEN_SIZE as EGLint,
+        8,
+        egl::BLUE_SIZE as EGLint,
+        8,
+        egl::ALPHA_SIZE as EGLint,
+        8,
+        egl::DEPTH_SIZE as EGLint,
+        24,
+        egl::STENCIL_SIZE as EGLint,
+        8,
+        egl::NONE as EGLint,
+    ];
+    let mut config: EGLConfig = std::ptr::null_mut();
+    let mut config_count = 0;
+    if unsafe {
+        egl.ChooseConfig(
+            display,
+            config_attributes.as_ptr(),
+            &mut config,
+            1,
+            &mut config_count,
+        )
+    } == egl::FALSE
+        || config_count == 0
+        || config.is_null()
+    {
+        return Err(format!("eglChooseConfig failed with 0x{:x}", unsafe {
+            egl.GetError()
+        })
+        .into());
+    }
+    Ok(config)
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -2555,6 +2661,56 @@ fn opengl_surface_session_renders_with_platform_context() {
     }
 
     session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+/// A dedicated session owns its thread's OpenGL context: it creates a context
+/// that joins no share group, keeps it current between renders, and gives the
+/// thread back when it closes.
+#[cfg(any(target_os = "linux", target_os = "android"))]
+#[test]
+// Spec coverage: BND-162.
+fn dedicated_opengl_surface_session_renders_and_keeps_its_context_current() {
+    if !has_opengl_test_context_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let surface = DedicatedEglTestSurface::new(64, 64)
+        .expect("a dedicated EGL fixture reaches a display and a pbuffer surface");
+    // The fixture makes no context current, so the session has nothing to
+    // inherit and nothing to restore.
+    assert!(!surface.has_current_context());
+
+    let session = map
+        .attach_ref()
+        .unwrap()
+        .attach_opengl_surface(&OpenGLSurfaceDescriptor::new(
+            RenderTargetExtent::new(64, 64, 1.0),
+            surface.descriptor(),
+            surface.surface(),
+        ))
+        .expect("a dedicated OpenGL surface session attaches when EGL is supported");
+
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
+    // The session owns this thread, which is also the map's, so the map only
+    // reaches the style and the extent when this loop pumps the runtime.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut result = RenderResult::NoUpdate;
+    while result != RenderResult::Rendered && Instant::now() < deadline {
+        let _ = runtime.pump(Some(Duration::ZERO));
+        result = session.render_update().unwrap();
+        if result != RenderResult::Rendered {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+    assert_eq!(result, RenderResult::Rendered);
+    assert!(surface.has_current_context());
+
+    session.close().unwrap();
+    // Closing the session releases the thread it had taken over.
+    assert!(!surface.has_current_context());
     map.close().unwrap();
     runtime.close().unwrap();
 }

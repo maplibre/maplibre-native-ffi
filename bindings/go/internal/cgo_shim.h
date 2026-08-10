@@ -22,13 +22,14 @@ static inline void mln_go_opengl_context_set_wgl(
 
 static inline void mln_go_opengl_context_set_egl(
   mln_opengl_context_descriptor* descriptor, void* display, void* config,
-  void* share_context, void* get_proc_address
+  void* share_context, mln_opengl_client_api client_api, void* get_proc_address
 ) {
   descriptor->platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL;
   descriptor->data.egl.size = sizeof(mln_egl_context_descriptor);
   descriptor->data.egl.display = display;
   descriptor->data.egl.config = config;
   descriptor->data.egl.share_context = share_context;
+  descriptor->data.egl.client_api = client_api;
   descriptor->data.egl.get_proc_address = get_proc_address;
 }
 

@@ -25,6 +25,7 @@ try:
         EglContext,
         EglPbufferSurface,
         EglUnavailableError,
+        current_context_address,
     )
 except (
     AttributeError,
@@ -301,6 +302,30 @@ def test_egl_pbuffer_surface_attach_reports_public_session_shape() -> None:
             render_until_update(runtime, session)
         finally:
             session.close()
+
+
+def test_dedicated_egl_surface_renders_and_keeps_its_context_current() -> None:
+    with (
+        _egl_context() as context,
+        _egl_pbuffer_surface(context) as surface,
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map(
+            mln.MapOptions(width=surface.width, height=surface.height)
+        ) as map_handle,
+    ):
+        session = map_handle.attach_opengl_surface(surface.dedicated_descriptor())
+        try:
+            map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON.encode())
+            render_until_update(runtime, session)
+
+            # The session owns this thread, so it keeps its context current
+            # between renders rather than restoring what it found.
+            assert current_context_address() != 0
+        finally:
+            session.close()
+
+        # Closing the session releases the thread it had taken over.
+        assert current_context_address() == 0
 
 
 def test_attach_returns_public_render_session_and_rejects_second_session(

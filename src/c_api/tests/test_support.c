@@ -483,12 +483,16 @@ static bool create_backend_state(void** out_state, void* out_context) {
   return true;
 }
 
-bool mln_test_dedicated_egl_surface_create(
+// These fixtures never call eglTerminate. Android and OpenHarmony resolve
+// EGL_DEFAULT_DISPLAY, so the display is shared with everything else in the
+// process, and terminating it retires EGL objects the C API still holds. A
+// display stays initialized for the process either way, so leaving it is free.
+mln_test_fixture_result mln_test_dedicated_egl_surface_create(
   mln_map map, mln_test_render_fixture* fixture
 ) {
   egl_state* state = calloc(1, sizeof(egl_state));
   if (state == NULL) {
-    return false;
+    return MLN_TEST_FIXTURE_UNAVAILABLE;
   }
   state->display = get_egl_display();
   if (
@@ -496,7 +500,7 @@ bool mln_test_dedicated_egl_surface_create(
     eglInitialize(state->display, NULL, NULL) == EGL_FALSE
   ) {
     free(state);
-    return false;
+    return MLN_TEST_FIXTURE_UNAVAILABLE;
   }
   const EGLint config_attributes[] = {
     EGL_SURFACE_TYPE,
@@ -524,17 +528,15 @@ bool mln_test_dedicated_egl_surface_create(
     ) == EGL_FALSE ||
     config_count == 0 || state->config == NULL
   ) {
-    eglTerminate(state->display);
     free(state);
-    return false;
+    return MLN_TEST_FIXTURE_UNAVAILABLE;
   }
   const EGLint surface_attributes[] = {EGL_WIDTH, 64, EGL_HEIGHT, 64, EGL_NONE};
   state->surface =
     eglCreatePbufferSurface(state->display, state->config, surface_attributes);
   if (state->surface == EGL_NO_SURFACE) {
-    eglTerminate(state->display);
     free(state);
-    return false;
+    return MLN_TEST_FIXTURE_UNAVAILABLE;
   }
 
   // No context and no eglMakeCurrent here: naming dedicated ownership is what
@@ -567,13 +569,12 @@ bool mln_test_dedicated_egl_surface_create(
   mln_render_session session = 0;
   if (mln_opengl_surface_attach(map, &descriptor, &session) != MLN_STATUS_OK) {
     eglDestroySurface(state->display, state->surface);
-    eglTerminate(state->display);
     free(state);
-    return false;
+    return MLN_TEST_FIXTURE_ATTACH_FAILED;
   }
   fixture->session = session;
   fixture->backend_state = state;
-  return true;
+  return MLN_TEST_FIXTURE_OK;
 }
 
 void mln_test_dedicated_egl_surface_destroy(mln_test_render_fixture* fixture) {
@@ -587,7 +588,6 @@ void mln_test_dedicated_egl_surface_destroy(mln_test_render_fixture* fixture) {
   egl_state* state = fixture->backend_state;
   if (state != NULL) {
     eglDestroySurface(state->display, state->surface);
-    eglTerminate(state->display);
     free(state);
     fixture->backend_state = NULL;
   }
@@ -1125,12 +1125,12 @@ static void destroy_backend_state(void* opaque_state) {
 #if !(defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_EGL))
 // Builds without an EGL provider report the dedicated fixture unavailable, so
 // its test skips rather than fails.
-bool mln_test_dedicated_egl_surface_create(
+mln_test_fixture_result mln_test_dedicated_egl_surface_create(
   mln_map map, mln_test_render_fixture* fixture
 ) {
   (void)map;
   (void)fixture;
-  return false;
+  return MLN_TEST_FIXTURE_UNAVAILABLE;
 }
 
 void mln_test_dedicated_egl_surface_destroy(mln_test_render_fixture* fixture) {

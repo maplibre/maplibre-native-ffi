@@ -108,7 +108,50 @@ private final class RenderLeakBox: @unchecked Sendable {
       0x120)
     #expect(UInt(bitPattern: descriptor.pointee.context.data.wgl
         .get_proc_address) == 0x130)
+    #expect(descriptor.pointee.context
+      .ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED)
     #expect(UInt(bitPattern: descriptor.pointee.surface) == 0x140)
+  }
+
+  let dedicatedEgl = OpenGLContextDescriptor.egl(
+    EglContextDescriptor(
+      display: NativePointer(bitPattern: 0x310),
+      config: NativePointer(bitPattern: 0x320),
+      shareContext: .null,
+      clientAPI: .gles
+    ),
+    ownership: .dedicated
+  )
+  let dedicatedSurface = OpenGLSurfaceDescriptor(
+    extent: extent,
+    context: dedicatedEgl,
+    surface: NativePointer(bitPattern: 0x340)
+  )
+  try dedicatedSurface.nativeInput.withNativeDescriptor { descriptor in
+    #expect(descriptor.pointee.context
+      .ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED)
+    #expect(descriptor.pointee.context.data.egl.share_context == nil)
+    #expect(descriptor.pointee.context.data.egl
+      .client_api == MLN_OPENGL_CLIENT_API_GLES)
+  }
+
+  let unknownEgl = OpenGLContextDescriptor.egl(
+    EglContextDescriptor(
+      display: NativePointer(bitPattern: 0x410),
+      config: NativePointer(bitPattern: 0x420),
+      shareContext: .null,
+      clientAPI: .unknown(97)
+    ),
+    ownership: .unknown(98)
+  )
+  let unknownSurface = OpenGLSurfaceDescriptor(
+    extent: extent,
+    context: unknownEgl,
+    surface: NativePointer(bitPattern: 0x440)
+  )
+  try unknownSurface.nativeInput.withNativeDescriptor { descriptor in
+    #expect(descriptor.pointee.context.ownership.rawValue == 98)
+    #expect(descriptor.pointee.context.data.egl.client_api.rawValue == 97)
   }
 
   let egl = OpenGLContextDescriptor.egl(
@@ -140,6 +183,8 @@ private final class RenderLeakBox: @unchecked Sendable {
       0x230)
     #expect(UInt(bitPattern: descriptor.pointee.context.data.egl
         .get_proc_address) == 0x240)
+    #expect(descriptor.pointee.context.data.egl
+      .client_api == MLN_OPENGL_CLIENT_API_UNSPECIFIED)
     #expect(descriptor.pointee.texture == 33)
     #expect(descriptor.pointee.target == 0x0DE1)
   }

@@ -1805,6 +1805,8 @@ void main() {
     final operationKind = OfflineOperationKind.fromRawValue(99);
     final resultKind = OfflineOperationResultKind.fromRawValue(100);
     const unknownDefinition = UnknownOfflineRegionDefinition(101);
+    final ownership = OpenGLContextOwnership.fromRawValue(102);
+    final clientApi = OpenGLClientApi.fromRawValue(103);
 
     expect(eventType.rawValue, 0xfeed);
     expect(eventType, RuntimeEventType.fromRawValue(0xfeed));
@@ -1815,6 +1817,9 @@ void main() {
     expect(operationKind.rawValue, 99);
     expect(resultKind.rawValue, 100);
     expect(unknownDefinition.rawType, 101);
+    expect(ownership, OpenGLContextOwnership.fromRawValue(102));
+    expect(ownership.name, 'unknown(102)');
+    expect(clientApi.rawValue, 103);
   });
 
   test(

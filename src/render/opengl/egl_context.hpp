@@ -55,6 +55,9 @@ class EglSharedContext final {
   // What a dedicated context is current on, so a render that presents through
   // the same surface as the last one makes no EGL call at all.
   EGLSurface current_draw_surface_ = EGL_NO_SURFACE;
+  // Whether a dedicated context has recorded what the thread had current before
+  // it took over, so teardown can hand that back.
+  bool saved_previous_ = false;
 };
 
 auto get_egl_proc_address(

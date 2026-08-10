@@ -172,9 +172,14 @@ by a later `mln_runtime_pump()` rather than inside the render call.
 
 Graphics contexts that bind to a thread, such as OpenGL, are made current for
 the duration of a session call and released before it returns, so a host keeps
-its own context current only on the thread that owns the session. Attach creates
-the session's graphics resources on the calling thread, which is why attach
-belongs on the thread whose context is current rather than on the map's.
+its own context current on the thread that owns the session. A context
+descriptor may instead give the session the thread's context: the session then
+creates that context itself, joins no host share group, and keeps it current
+between calls. Offer that mode where a target draws for one thread alone, and
+keep the shared mode the default, so a descriptor that names no ownership
+behaves as it always has. Attach creates the session's graphics resources on the
+calling thread, which is why attach belongs on the thread that draws rather than
+on the map's.
 
 On Apple targets each entry point drains its own Objective-C autorelease pool,
 so a host may pump frames from a thread that never returns to a run loop.
@@ -279,8 +284,8 @@ ownership, synchronization, borrowed pointer lifetimes, frame generation or
 stale-frame behavior, and teardown rules. Frame generations are session-scoped
 counters in frame structs and are unrelated to the generation inside a handle
 id. Attach entry points also document that the calling thread becomes the
-session's owner thread and what the calling thread's graphics context must
-provide.
+session's owner thread, what the calling thread's graphics context must provide,
+and which context ownership modes the target accepts.
 
 ## Callback Adapter
 

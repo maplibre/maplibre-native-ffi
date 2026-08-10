@@ -163,13 +163,23 @@ MLN_API mln_status mln_vulkan_surface_attach(
  * The map need only be live, so a host may attach on the thread that drives its
  * render loop while the map stays on the runtime loop thread. Attach creates
  * the session's graphics resources on the calling thread, so the host resources
- * named by descriptor must be usable there, so the host context must be current
- * on this thread. The session renders to descriptor->surface and presents
- * through the selected context provider. WGL
- * surfaces present with SwapBuffers(HDC), and EGL surfaces present with
- * eglSwapBuffers(EGLDisplay, EGLSurface). OpenGL context handles are borrowed
- * and must remain valid until detach or destroy. On success, *out_session
- * receives a handle the caller destroys with mln_render_session_destroy().
+ * named by descriptor must be usable there.
+ *
+ * descriptor->context.ownership decides what the session does with the thread's
+ * current context. A shared session builds its context in the share group of
+ * the descriptor's share context, which must be current on this thread, and
+ * every render restores whatever was current before it. A dedicated session
+ * builds its context from the display or device context alone, makes it
+ * current, and keeps it current between renders, so this session holds the
+ * thread's context from attach until detach or destroy, either of which
+ * releases it.
+ *
+ * The session renders to descriptor->surface and presents through the selected
+ * context provider. WGL surfaces present with SwapBuffers(HDC), and EGL
+ * surfaces present with eglSwapBuffers(EGLDisplay, EGLSurface). OpenGL context
+ * handles are borrowed and must remain valid until detach or destroy. On
+ * success, *out_session receives a handle the caller destroys with
+ * mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -304,7 +314,8 @@ MLN_API mln_status mln_vulkan_surface_set_target(
  * when a host reaches for it, and how failures are reported.
  * descriptor->context must name the context provider data the session attached
  * with. The new surface is made current on the next render, so a host may
- * replace a surface it has already destroyed.
+ * replace a surface it has already destroyed. Under dedicated ownership the
+ * session's context stays current on the previous surface until that render.
  *
  * Because nothing is made current here, a surface this call accepts can still
  * turn out to be unusable. An HDC whose pixel format does not match the

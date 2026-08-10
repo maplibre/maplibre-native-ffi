@@ -74,6 +74,21 @@ namespace Maplibre.NativeFfi.Internal.C
         MLN_OPENGL_CONTEXT_PLATFORM_WEBGL = 3U,
     }
 
+    [NativeTypeName("uint32_t")]
+    internal enum mln_opengl_context_ownership : uint
+    {
+        MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED = 0U,
+        MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED = 1U,
+    }
+
+    [NativeTypeName("uint32_t")]
+    internal enum mln_opengl_client_api : uint
+    {
+        MLN_OPENGL_CLIENT_API_UNSPECIFIED = 0U,
+        MLN_OPENGL_CLIENT_API_GL = 1U,
+        MLN_OPENGL_CLIENT_API_GLES = 2U,
+    }
+
     internal unsafe partial struct mln_wgl_context_descriptor
     {
         [NativeTypeName("uint32_t")]
@@ -97,6 +112,8 @@ namespace Maplibre.NativeFfi.Internal.C
 
         public void* share_context;
 
+        public mln_opengl_client_api client_api;
+
         public void* get_proc_address;
     }
 
@@ -116,7 +133,9 @@ namespace Maplibre.NativeFfi.Internal.C
 
         public mln_opengl_context_platform platform;
 
-        [NativeTypeName("__AnonymousRecord_render_target_L129_C3")]
+        public mln_opengl_context_ownership ownership;
+
+        [NativeTypeName("__AnonymousRecord_render_target_L179_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]

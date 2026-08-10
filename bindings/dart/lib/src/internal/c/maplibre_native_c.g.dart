@@ -3334,6 +3334,13 @@ final class mln_egl_context_descriptor extends ffi.Struct {
 
   external ffi.Pointer<ffi.Void> share_context;
 
+  @ffi.Uint32()
+  external int client_apiAsInt;
+
+  mln_opengl_client_api get client_api =>
+      mln_opengl_client_api.fromValue(client_apiAsInt);
+  set client_api(mln_opengl_client_api value) => client_apiAsInt = value.value;
+
   external ffi.Pointer<ffi.Void> get_proc_address;
 
   static ffi.Pointer<mln_egl_context_descriptor> $allocate(
@@ -3342,12 +3349,14 @@ final class mln_egl_context_descriptor extends ffi.Struct {
     required ffi.Pointer<ffi.Void> display,
     required ffi.Pointer<ffi.Void> config,
     required ffi.Pointer<ffi.Void> share_context,
+    required mln_opengl_client_api client_api,
     required ffi.Pointer<ffi.Void> get_proc_address,
   }) => $allocator<mln_egl_context_descriptor>()
     ..ref.size = size
     ..ref.display = display
     ..ref.config = config
     ..ref.share_context = share_context
+    ..ref.client_api = client_api
     ..ref.get_proc_address = get_proc_address;
 }
 
@@ -4298,6 +4307,22 @@ final class mln_opengl_borrowed_texture_descriptor extends ffi.Struct {
   external int target;
 }
 
+enum mln_opengl_client_api {
+  MLN_OPENGL_CLIENT_API_UNSPECIFIED(0),
+  MLN_OPENGL_CLIENT_API_GL(1),
+  MLN_OPENGL_CLIENT_API_GLES(2);
+
+  final int value;
+  const mln_opengl_client_api(this.value);
+
+  static mln_opengl_client_api fromValue(int value) => switch (value) {
+    0 => MLN_OPENGL_CLIENT_API_UNSPECIFIED,
+    1 => MLN_OPENGL_CLIENT_API_GL,
+    2 => MLN_OPENGL_CLIENT_API_GLES,
+    _ => throw ArgumentError('Unknown value for mln_opengl_client_api: $value'),
+  };
+}
+
 final class mln_opengl_context_descriptor extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -4310,7 +4335,31 @@ final class mln_opengl_context_descriptor extends ffi.Struct {
   set platform(mln_opengl_context_platform value) =>
       platformAsInt = value.value;
 
+  @ffi.Uint32()
+  external int ownershipAsInt;
+
+  mln_opengl_context_ownership get ownership =>
+      mln_opengl_context_ownership.fromValue(ownershipAsInt);
+  set ownership(mln_opengl_context_ownership value) =>
+      ownershipAsInt = value.value;
+
   external UnnamedUnion$1 data;
+}
+
+enum mln_opengl_context_ownership {
+  MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED(0),
+  MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED(1);
+
+  final int value;
+  const mln_opengl_context_ownership(this.value);
+
+  static mln_opengl_context_ownership fromValue(int value) => switch (value) {
+    0 => MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
+    1 => MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED,
+    _ => throw ArgumentError(
+      'Unknown value for mln_opengl_context_ownership: $value',
+    ),
+  };
 }
 
 enum mln_opengl_context_platform {

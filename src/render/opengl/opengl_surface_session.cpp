@@ -330,6 +330,14 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   // Makes this session's context current and leaves it current. A render that
   // presents through the surface the last one did makes no WGL call at all.
   void activate_dedicated_wgl() {
+    // Recorded before anything on this thread changes, and only once, so a
+    // teardown that makes this context current cannot overwrite what the
+    // caller had. See EglSharedContext::activate().
+    if (!saved_previous_wgl_) {
+      previous_device_context_ = wglGetCurrentDC();
+      previous_render_context_ = wglGetCurrentContext();
+      saved_previous_wgl_ = true;
+    }
     auto* const draw_surface =
       fallback_drawable_
         ? static_cast<HDC>(descriptor_.context.data.wgl.device_context)
@@ -346,8 +354,10 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
       current_device_context_ = nullptr;
       throw std::runtime_error("Switching OpenGL WGL context failed");
     }
-    current_device_context_ = draw_surface;
+    // Only once the context proves usable, so a throw here leaves the next
+    // activation to make it current and validate it again.
     validate_wgl_context_support();
+    current_device_context_ = draw_surface;
   }
 
   void create_wgl_context() {
@@ -382,6 +392,17 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
       wglDeleteContext(static_cast<HGLRC>(render_context_));
       render_context_ = nullptr;
     }
+    // Teardown runs GL deletes with this context current, so hand back what the
+    // caller had before this session took the thread over.
+    if (saved_previous_wgl_) {
+      (void)wglMakeCurrent(
+        static_cast<HDC>(previous_device_context_),
+        static_cast<HGLRC>(previous_render_context_)
+      );
+      previous_device_context_ = nullptr;
+      previous_render_context_ = nullptr;
+      saved_previous_wgl_ = false;
+    }
   }
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   void destroy_native_context() { egl_context_.reset(); }
@@ -401,6 +422,8 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   void* render_context_ = nullptr;
   // What a dedicated context is current on. See activate_dedicated_wgl().
   void* current_device_context_ = nullptr;
+  // Whether a dedicated context has recorded what the thread had current.
+  bool saved_previous_wgl_ = false;
   void* previous_device_context_ = nullptr;
   void* previous_render_context_ = nullptr;
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)

@@ -356,24 +356,38 @@ auto opengl_context_matches(
   }
   switch (lhs.platform) {
     case MLN_OPENGL_CONTEXT_PLATFORM_WGL:
+      if (lhs.ownership != rhs.ownership) {
+        return false;
+      }
+      // A dedicated context names no share context, so the device context it
+      // was created from is what identifies it under either strictness.
       if (
-        strictness == OpenGLContextMatch::Exact &&
+        (strictness == OpenGLContextMatch::Exact ||
+         lhs.ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED) &&
         lhs.data.wgl.device_context != rhs.data.wgl.device_context
       ) {
         return false;
       }
-      return lhs.data.wgl.share_context == rhs.data.wgl.share_context &&
-             lhs.ownership == rhs.ownership;
+      return lhs.data.wgl.share_context == rhs.data.wgl.share_context;
     case MLN_OPENGL_CONTEXT_PLATFORM_EGL:
       // EGL names its drawable in the target rather than in the context, so
       // both strictnesses ask for the same three handles.
       // A dedicated context names no share context, so its identity rests on
-      // the display, the config, and the API it was created for.
+      // the display, the config, and the API it was created for. A shared
+      // context takes its API from the share context, which leaves client_api
+      // ignored there and so outside its identity.
+      if (lhs.ownership != rhs.ownership) {
+        return false;
+      }
+      if (
+        lhs.ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED &&
+        lhs.data.egl.client_api != rhs.data.egl.client_api
+      ) {
+        return false;
+      }
       return lhs.data.egl.display == rhs.data.egl.display &&
              lhs.data.egl.config == rhs.data.egl.config &&
-             lhs.data.egl.share_context == rhs.data.egl.share_context &&
-             lhs.data.egl.client_api == rhs.data.egl.client_api &&
-             lhs.ownership == rhs.ownership;
+             lhs.data.egl.share_context == rhs.data.egl.share_context;
     case MLN_OPENGL_CONTEXT_PLATFORM_WEBGL:
       // A WebGL context carries its own drawable, so the handle is all there is
       // to compare under either strictness.

@@ -410,30 +410,37 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_fixture fixture = {0};
-  if (!mln_test_dedicated_egl_surface_create(map, &fixture)) {
+  const mln_test_fixture_result fixture_result =
+    mln_test_dedicated_egl_surface_create(map, &fixture);
+  if (fixture_result == MLN_TEST_FIXTURE_UNAVAILABLE) {
     mln_test_destroy_map(map);
     mln_test_destroy_runtime(runtime);
     TEST_IGNORE_MESSAGE("this build has no EGL context provider");
     return;
   }
+  // Attaching with no share context is the behavior under test, so a rejection
+  // here is a failure rather than a reason to skip.
+  TEST_ASSERT_EQUAL_INT(MLN_TEST_FIXTURE_OK, fixture_result);
 
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_style_json(map, dedicated_background_style_json)
+    MLN_STATUS_OK, mln_map_set_style_json(
+                     map, MLN_BUFFER_LITERAL(dedicated_background_style_json)
+                   )
   );
-  bool rendered = false;
+  mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
   // The session owns this thread, which is also the map's, so the map only
   // reaches the style and the extent when this loop pumps the runtime.
-  for (unsigned int attempt = 0; attempt < 500 && !rendered; attempt += 1) {
+  for (unsigned int attempt = 0;
+       attempt < 500 && result != MLN_RENDER_RESULT_RENDERED; attempt += 1) {
     mln_runtime_pump(runtime, 0);
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_render_session_render_update(fixture.session, &rendered)
+      MLN_STATUS_OK, mln_render_session_render_update(fixture.session, &result)
     );
-    if (!rendered) {
+    if (result != MLN_RENDER_RESULT_RENDERED) {
       mln_test_sleep_millisecond();
     }
   }
-  TEST_ASSERT_TRUE(rendered);
+  TEST_ASSERT_EQUAL_INT(MLN_RENDER_RESULT_RENDERED, result);
   TEST_ASSERT_TRUE(mln_test_egl_context_is_current());
 
   mln_test_dedicated_egl_surface_destroy(&fixture);

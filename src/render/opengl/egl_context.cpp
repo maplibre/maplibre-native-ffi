@@ -104,6 +104,13 @@ void EglSharedContext::activate(
     if (context_ != EGL_NO_CONTEXT && current_draw_surface_ == draw_surface) {
       return;
     }
+    // Recorded before anything on this thread changes, and only once, so a
+    // teardown that makes this context current to run GL deletes cannot
+    // overwrite what the caller had.
+    if (!saved_previous_) {
+      save_previous_context();
+      saved_previous_ = true;
+    }
     const auto api = requested_api();
     if (eglBindAPI(api) == EGL_FALSE) {
       throw std::runtime_error("Binding EGL OpenGL API failed");
@@ -206,9 +213,10 @@ void EglSharedContext::restore_previous_context() {
 }
 
 void EglSharedContext::destroy() {
-  // A dedicated context is still current on this thread, and EGL only retires
-  // it once nothing holds it.
-  if (dedicated() && context_ != EGL_NO_CONTEXT) {
+  // A dedicated context that became current is still current on this thread,
+  // and EGL only retires it once nothing holds it. One that never did leaves
+  // the caller's context alone, because ownership never began.
+  if (dedicated() && current_draw_surface_ != EGL_NO_SURFACE) {
     release_current_context();
     current_draw_surface_ = EGL_NO_SURFACE;
   }
@@ -219,6 +227,14 @@ void EglSharedContext::destroy() {
   if (context_ != EGL_NO_CONTEXT) {
     eglDestroyContext(display(), context_);
     context_ = EGL_NO_CONTEXT;
+  }
+  // Teardown runs GL deletes with this context current, so the thread is left
+  // holding it either way. Hand back what the caller had before this session
+  // took over, which is nothing for a host that gave the thread away.
+  if (saved_previous_) {
+    restore_previous_api();
+    restore_previous_context();
+    saved_previous_ = false;
   }
 }
 
