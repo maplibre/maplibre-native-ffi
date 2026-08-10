@@ -626,15 +626,18 @@ class RenderSessionHandle(NativeHandleMixin):
           gate a frame loop on
           ``RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE``.
         - ``NO_UPDATE``: the map has produced no render update so far, because
-          no style is loaded or the first pass is still running. Wait for
+          no style is loaded or the first pass is still running, or a texture
+          session completed a pass without a drawable frame while content is
+          still loading. Wait for
           ``RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE``.
         - ``SIZE_PENDING``: this session resized and the map, which applies its
           size on its own thread, is still behind. The map publishes an update
           for the new size on its own, so wait for the next
           ``RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE``.
         - ``TARGET_NOT_READY``: the render target had no frame available, such
-          as a Metal surface whose next drawable is nil. Wait for a host event
-          that changes the target, or back off and retry.
+          as a Metal surface whose next drawable is nil. No map update resolves
+          this, so wait for a host event that changes the target, or back off
+          and retry.
         """
         return RenderResult(self._native.render_update())
 

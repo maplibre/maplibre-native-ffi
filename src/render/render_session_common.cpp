@@ -1404,7 +1404,10 @@ auto render_session_render_update(
       return after_status;
     }
     if (!frame_rendered) {
-      *out_result = MLN_RENDER_RESULT_TARGET_NOT_READY;
+      // A Metal owned-texture session can finish a pass before its drawable
+      // exists while the map is still loading. The target is valid, so this is
+      // map-update driven rather than target-not-ready.
+      *out_result = MLN_RENDER_RESULT_NO_UPDATE;
       return MLN_STATUS_OK;
     }
   }

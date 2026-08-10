@@ -83,16 +83,17 @@ typedef enum mln_render_result : uint32_t {
  *   surface expose and gates a frame loop on
  *   MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
  * - MLN_RENDER_RESULT_NO_UPDATE means the map has produced no render update
- *   so far, because no style is loaded or the first pass is still running.
- *   Wait for MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
+ *   so far, because no style is loaded or the first pass is still running, or
+ *   a texture session completed a pass without a drawable frame while content
+ *   is still loading. Wait for MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
  * - MLN_RENDER_RESULT_SIZE_PENDING means the session resized and the map,
  *   which applies its size on its own thread, is still behind. The map
  *   publishes an update for the new size on its own, so wait for the next
  *   MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
  * - MLN_RENDER_RESULT_TARGET_NOT_READY means the render target had no frame
- *   available, such as a Metal surface whose next drawable is nil or a texture
- *   target that holds no texture yet. No map update resolves this, so wait for
- *   a host event that changes the target, or back off and retry.
+ *   available, such as a Metal surface whose next drawable is nil. No map
+ *   update resolves this, so wait for a host event that changes the target,
+ *   or back off and retry.
  *
  * In MLN_MAP_MODE_STATIC, pump a resize through the map before requesting the
  * still image. The session applies its extent on the map's owner thread, and a

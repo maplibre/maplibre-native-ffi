@@ -610,17 +610,17 @@ public final class RenderSessionHandle {
   ///   surface expose, and paces a frame loop on the map
   ///   render-update-available event.
   /// - ``RenderResult/noUpdate``: the map has produced no render update so far,
-  ///   because no style is loaded or the first pass is still running. Wait for
-  ///   the map render-update-available event.
+  ///   because no style is loaded or the first pass is still running, or a
+  ///   texture session completed a pass without a drawable frame while content
+  ///   is still loading. Wait for the map render-update-available event.
   /// - ``RenderResult/sizePending``: the session resized and the map, which
   ///   applies its size on its own thread, is still behind. The map publishes
   ///   an update for the new size on its own, so wait for the next map
   ///   render-update-available event.
   /// - ``RenderResult/targetNotReady``: the render target had no frame
-  ///   available, such as a Metal surface whose next drawable is nil or a
-  ///   texture target that holds no texture yet. No map update resolves this,
-  ///   so wait for a host event that changes the target, or retry after a
-  ///   delay.
+  ///   available, such as a Metal surface whose next drawable is nil. No map
+  ///   update resolves this, so wait for a host event that changes the target,
+  ///   or retry after a delay.
   @discardableResult
   public func renderUpdate() throws -> RenderResult {
     try mapNativeFailure {
