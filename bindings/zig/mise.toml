@@ -19,9 +19,11 @@ run = "zig build --build-file ../../build.zig --fetch=needed"
 [tasks.build]
 extends = "ffi:preset"
 run = '''
+source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"
 zig build --build-file ../../build.zig \
   -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
-  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
+  ${zig_cross_args[@]+"${zig_cross_args[@]}"}
 '''
 
 [tasks.test]
@@ -30,6 +32,18 @@ extends = "ffi:preset"
 # simulator, and host presets run in process.
 run = '''
 case "$usage_preset" in
+  android-x64-*)
+    source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"
+    exec zig build test --build-file ../../build.zig \
+      -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+      -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
+      ${zig_cross_args[@]+"${zig_cross_args[@]}"} \
+      --test-timeout 180s --summary all --verbose
+    ;;
+  android-*)
+    echo "The Android emulator runs x64 guests only; check $usage_preset with //bindings/zig:build and test an Android x64 preset instead." >&2
+    exit 2
+    ;;
   ios-simulator-*)
     native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
     mise run //:ios-simulator:boot

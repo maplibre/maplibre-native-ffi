@@ -304,6 +304,9 @@ fn addPlatformSystemHeaderPaths(b: *std.Build, destination: anytype, target: std
 pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget, system_root: ?std.Build.LazyPath) void {
     addPlatformSystemHeaderPaths(b, module, target, system_root);
     if (!target.result.os.tag.isDarwin() and target.result.os.tag != .linux) return;
+    // Android's libraries live under a target- and API-specific directory that
+    // the binding tasks pass as a dependency library directory.
+    if (target.result.abi == .android) return;
     const root = system_root orelse return;
     const system_root_path = root.getPath(b);
 
@@ -617,6 +620,25 @@ pub fn addTestRunStep(
     return b.addRunArtifact(tests);
 }
 
+fn addAndroidTestRunStep(
+    b: *std.Build,
+    tests: []const *std.Build.Step.Compile,
+    native_install_dir: std.Build.LazyPath,
+    android_runner: std.Build.LazyPath,
+) *std.Build.Step.Run {
+    const run_tests = b.addSystemCommand(&.{
+        "bash",
+        android_runner.getPath(b),
+        "180",
+        installPath(b, native_install_dir, "lib/libmaplibre-native-c.so").getPath(b),
+        "--",
+    });
+    for (tests) |test_executable| {
+        run_tests.addArtifactArg(test_executable);
+    }
+    return run_tests;
+}
+
 pub fn build(b: *std.Build) void {
     const native_install_dir = maybeNativeInstallDirPath(b);
     const target = if (native_install_dir) |install_dir|
@@ -666,14 +688,28 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run Zig binding tests");
 
     const binding_tests = addBindingTests(b, options, maplibre_native_ffi);
+    var test_compiles: [test_sources.len + 1]*std.Build.Step.Compile = undefined;
+    test_compiles[0] = binding_tests;
     b.default_step.dependOn(&binding_tests.step);
-    const run_binding_tests = addTestRunStep(b, binding_tests, options.target, b.path("scripts/run-ios-simulator-test.sh"));
-    test_step.dependOn(&run_binding_tests.step);
 
-    for (test_sources) |source| {
+    for (test_sources, 1..) |source, index| {
         const tests = addTestCompile(b, options, source);
+        test_compiles[index] = tests;
         b.default_step.dependOn(&tests.step);
-        const run_tests = addTestRunStep(b, tests, options.target, b.path("scripts/run-ios-simulator-test.sh"));
+    }
+
+    if (options.target.result.abi == .android) {
+        const run_tests = addAndroidTestRunStep(
+            b,
+            &test_compiles,
+            options.native_install_dir,
+            b.path("scripts/run-android-emulator-test.sh"),
+        );
         test_step.dependOn(&run_tests.step);
+    } else {
+        for (test_compiles) |tests| {
+            const run_tests = addTestRunStep(b, tests, options.target, b.path("scripts/run-ios-simulator-test.sh"));
+            test_step.dependOn(&run_tests.step);
+        }
     }
 }
