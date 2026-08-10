@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Git hooks export GIT_DIR / GIT_INDEX_FILE; clear them so the staging
+# repository does not resolve to the calling worktree's shared Git directory.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR
+
 repo_root="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 dependency_parent="$repo_root/build/dependencies"
 dependency_dir="$dependency_parent/rustls-platform-verifier"
