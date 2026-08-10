@@ -984,6 +984,9 @@ jobs:
       - run: mise run //bindings/zig:test android-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/python:test android-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/android-map:build opengl x86_64 --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"

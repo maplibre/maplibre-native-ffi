@@ -499,6 +499,10 @@ def test_pump_clears_the_wake_flag_it_returns_on() -> None:
         )
 
 
+@pytest.mark.skipif(
+    hasattr(sys, "getandroidapilevel"),
+    reason="Android embeds Python and has no standalone interpreter executable",
+)
 def test_closed_handle_finalizers_are_quiet_at_interpreter_shutdown() -> None:
     script = textwrap.dedent(
         """

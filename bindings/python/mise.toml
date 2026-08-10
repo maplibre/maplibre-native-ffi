@@ -16,6 +16,9 @@ description = "Build and install the Python extension for local tests."
 hide = true
 extends = "ffi:preset"
 run = '''
+if [[ "$usage_preset" == android-* ]]; then
+  exit 0
+fi
 # Clear the wheel directory so `--find-links` cannot resolve a stale build.
 rm -rf dist
 maturin_flags=()
@@ -79,6 +82,9 @@ MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = ":_install-extension", args = ["{{usage.preset}}"] }]
 run = '''
+if [[ "$usage_preset" == android-* ]]; then
+  exec mise run :_test-android "$usage_preset"
+fi
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   uv run --project . --no-sync python -m pytest
 '''
@@ -88,3 +94,10 @@ export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
   uv run --project . --no-sync python -m pytest
 '''
+
+[tasks._test-android]
+hide = true
+usage = 'arg "<preset>"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+tools = { "core:java" = "temurin-21.0.11+10.0.LTS" }
+run = '"$MISE_MONOREPO_ROOT/scripts/test-python-android-device.sh" "$usage_preset"'

@@ -57,6 +57,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         .clang_arg("-std=c23")
         .clang_arg(format!("-I{}", include_dir.display()));
 
+    // Cross-build frontends such as cibuildwheel expose the NDK compiler but
+    // do not know bindgen's target-specific environment variable. Derive the
+    // same target and sysroot arguments from that compiler when needed.
+    if target_os == "android" {
+        let target = env::var("TARGET")?;
+        let target_env = target.replace('-', "_");
+        if env::var_os(format!("BINDGEN_EXTRA_CLANG_ARGS_{target_env}")).is_none()
+            && env::var_os("BINDGEN_EXTRA_CLANG_ARGS").is_none()
+            && let Some(compiler) = env::var_os("CC")
+            && let Some(prebuilt) = Path::new(&compiler).parent().and_then(Path::parent)
+        {
+            builder = builder
+                .clang_arg(format!("--target={target}"))
+                .clang_arg(format!("--sysroot={}", prebuilt.join("sysroot").display()));
+        }
+    }
+
     // libclang cannot locate an Apple SDK on its own, and these headers include
     // the SDK's stdint.h. A caller-set SDKROOT already reaches libclang.
     if env::var_os("SDKROOT").is_none() {

@@ -48,6 +48,15 @@ if [[ ! -x "$sdkmanager" ]]; then
   exit 1
 fi
 
+# Android tools conventionally discover the command-line tools through
+# `cmdline-tools/latest`, while mise installs the pinned version by its number.
+# Add the conventional alias without replacing an SDK-managed path.
+tools_version_dir="$(cd "$(dirname "$sdkmanager")/.." && pwd)"
+latest_tools="$sdk_root/cmdline-tools/latest"
+if [[ ! -e "$latest_tools" ]]; then
+  ln -s "${tools_version_dir##*/}" "$latest_tools"
+fi
+
 # A post-install step runs from wherever mise invoked it.
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 compile_sdk="$(

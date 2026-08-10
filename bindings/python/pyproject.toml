@@ -28,6 +28,9 @@ dev = [
 docs = [
   "pdoc>=16,<17",
 ]
+android = [
+  "cibuildwheel>=3.4,<4",
+]
 
 [tool.maturin]
 module-name = "maplibre_native_ffi._native"
