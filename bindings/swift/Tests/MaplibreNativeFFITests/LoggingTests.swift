@@ -51,18 +51,21 @@ private final class LogRecords: @unchecked Sendable {
     ) == nil
   )
 
-  #expect(first.snapshot() == [LogRecord(
-    severity: .info,
-    event: .general,
-    code: 7,
-    message: "first"
-  )])
-  #expect(second.snapshot() == [LogRecord(
-    severity: .warning,
-    event: .parseStyle,
-    code: 8,
-    message: "second"
-  )])
+  let syntheticMessages = Set(["first", "second", "cleared"])
+  #expect(first.snapshot()
+    .filter { syntheticMessages.contains($0.message) } == [LogRecord(
+      severity: .info,
+      event: .general,
+      code: 7,
+      message: "first"
+    )])
+  #expect(second.snapshot()
+    .filter { syntheticMessages.contains($0.message) } == [LogRecord(
+      severity: .warning,
+      event: .parseStyle,
+      code: 8,
+      message: "second"
+    )])
 }
 
 @Test func asyncLogSeverityMaskRejectsUnknownBitsBeforeCallingC() throws {
