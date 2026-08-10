@@ -223,7 +223,7 @@ test "style JSON buffers preserve embedded NUL for native validation" {
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    try testing.expectError(error.NativeError, map.setStyleJson(testing.allocator, "{\x00}"));
+    try testing.expectError(error.InvalidArgument, map.setStyleJson(testing.allocator, "{\x00}"));
     const diagnostic = diagnostics.get().?;
     try testing.expect(diagnostic.raw_status != null);
     try testing.expect(diagnostic.message.len > 0);

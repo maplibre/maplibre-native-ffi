@@ -949,13 +949,8 @@ private class AddressPointer(address: Long) : Pointer(null as Pointer?) {
   }
 }
 
-/** Direct test seam for the JavaCPP render, query, geometry, and feature adapter. */
+/** Direct test seam for the JavaCPP render and query adapter. */
 internal object JavaCppRenderStructs {
-  fun featureRoundTrip(value: Feature): Feature = FeatureScope(value).use { feature(it.feature) }
-
-  fun geometryRoundTrip(value: Geometry): Geometry =
-    featureRoundTrip(Feature(value, emptyList(), FeatureIdentifier.Null)).geometry
-
   fun renderedQueryGeometryType(value: RenderedQueryGeometry): Int =
     RenderedQueryGeometryScope(value).use { it.geometry.type() }
 
@@ -969,27 +964,6 @@ internal object JavaCppRenderStructs {
       it.width(width).height(height).stride(stride).byte_length(byteLength)
       textureImageInfo(it)
     }
-
-  fun featureQueryCleanupAfterCopyFailure(): Int {
-    var destroys = 0
-    try {
-      featureQueryResult(
-        1L,
-        counter = { _, outCount ->
-          outCount.put(1L)
-          MaplibreStatus.OK.nativeCode
-        },
-        getter = { _, _, outFeature ->
-          outFeature.feature().property_count(Int.MAX_VALUE.toLong() + 1)
-          MaplibreStatus.OK.nativeCode
-        },
-        destroyer = { destroys++ },
-      )
-    } catch (_: ArithmeticException) {
-      return destroys
-    }
-    error("feature conversion unexpectedly succeeded")
-  }
 
   fun metalSnapshot(value: MetalBorrowedTextureDescriptor): RenderDescriptorSnapshot =
     metalBorrowedTextureDescriptor(value).use {

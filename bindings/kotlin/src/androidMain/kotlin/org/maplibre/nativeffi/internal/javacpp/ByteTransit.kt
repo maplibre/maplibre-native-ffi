@@ -19,16 +19,23 @@ internal class ByteArrayViewScope(bytes: ByteArray) : AutoCloseable {
   }
 }
 
-internal fun ownedBuffer(handle: Long): ByteArray {
+internal fun ownedBuffer(handle: Long): ByteArray =
+  ownedBuffer(handle, MaplibreNativeC::mln_buffer_get, MaplibreNativeC::mln_buffer_destroy)
+
+internal fun ownedBuffer(
+  handle: Long,
+  getter: (Long, MaplibreNativeC.mln_buffer_view) -> Int,
+  destroyer: (Long) -> Unit,
+): ByteArray {
   require(handle != 0L) { "native buffer handle is null" }
   try {
     MaplibreNativeC.mln_buffer_view().use { bytes ->
-      Status.check(MaplibreNativeC.mln_buffer_get(handle, bytes))
+      Status.check(getter(handle, bytes))
       val size = Math.toIntExact(bytes.size())
       if (size == 0) return byteArrayOf()
       return ByteArray(size).also { output -> BytePointer(bytes.data()).position(0).get(output) }
     }
   } finally {
-    MaplibreNativeC.mln_buffer_destroy(handle)
+    destroyer(handle)
   }
 }

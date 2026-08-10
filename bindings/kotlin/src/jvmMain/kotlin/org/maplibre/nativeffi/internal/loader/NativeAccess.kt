@@ -4367,16 +4367,27 @@ internal object NativeAccess {
     return address.reinterpret(byteCount).toArray(ValueLayout.JAVA_BYTE)
   }
 
-  private fun ownedBuffer(buffer: NativeOwnedBuffer): ByteArray? {
+  private fun ownedBuffer(buffer: NativeOwnedBuffer): ByteArray? =
+    ownedBuffer(
+      buffer,
+      getter = { handle, bytes -> downcall("mln_buffer_get").invokeNative(handle, bytes) as Int },
+      destroyer = { handle -> downcall("mln_buffer_destroy").invokeNative(handle) },
+    )
+
+  private fun ownedBuffer(
+    buffer: NativeOwnedBuffer,
+    getter: (NativeOwnedBuffer, MemorySegment) -> Int,
+    destroyer: (NativeOwnedBuffer) -> Unit,
+  ): ByteArray? {
     if (buffer.isNull) return null
     return try {
       Arena.ofConfined().use { arena ->
         val bytes = mln_buffer_view.allocate(arena)
-        Status.check(downcall("mln_buffer_get").invokeNative(buffer, bytes) as Int)
+        Status.check(getter(buffer, bytes))
         copyBytes(mln_buffer_view.data(bytes), mln_buffer_view.size(bytes))
       }
     } finally {
-      downcall("mln_buffer_destroy").invokeNative(buffer)
+      destroyer(buffer)
     }
   }
 
@@ -5808,20 +5819,6 @@ internal object NativeAccess {
     fun projectionModeOptionsRoundTrip(value: ProjectionModeOptions): ProjectionModeOptions =
       Arena.ofConfined().use { arena -> projectionModeOptions(projectionModeOptions(arena, value)) }
 
-    fun jsonRoundTrip(value: JsonValue): JsonValue =
-      Arena.ofConfined().use { arena -> readJson(jsonValue(arena, value), 0) }
-
-    fun geometryRoundTrip(value: Geometry): Geometry =
-      Arena.ofConfined().use { arena -> geometry(geometry(arena, value, 0)) }
-
-    fun featureRoundTrip(value: Feature): Feature =
-      Arena.ofConfined().use { arena -> feature(feature(arena, value, 0)) }
-
-    fun geoJsonType(value: GeoJson): Int =
-      Arena.ofConfined().use { arena ->
-        geoJson(arena, value).get(ValueLayout.JAVA_INT, GEOJSON_TYPE_OFFSET)
-      }
-
     fun renderedQueryGeometryType(value: RenderedQueryGeometry): Int =
       Arena.ofConfined().use { arena ->
         val native = renderedQueryGeometry(arena, value)
@@ -5927,22 +5924,14 @@ internal object NativeAccess {
         runtimeEventPayload(type, payload, bytes.size.toLong())
       }
 
-    fun featureQueryCleanupAfterCopyFailure(): Int {
+    fun ownedBufferCleanupAfterCopyFailure(): Int {
       var destroys = 0
       try {
-        featureQueryResult(
-          NativeFeatureQueryResult(1L),
-          counter = { _, outCount ->
-            outCount.set(ValueLayout.JAVA_LONG, 0, 1L)
-            MaplibreStatus.OK.nativeCode
-          },
-          getter = { _, _, outFeature ->
-            val feature = outFeature.asSlice(QUERIED_FEATURE_FEATURE_OFFSET, FEATURE_SIZE)
-            feature.set(
-              ValueLayout.JAVA_LONG,
-              FEATURE_PROPERTY_COUNT_OFFSET,
-              Int.MAX_VALUE.toLong() + 1,
-            )
+        ownedBuffer(
+          NativeOwnedBuffer(1L),
+          getter = { _, bytes ->
+            mln_buffer_view.data(bytes, MemorySegment.ofAddress(1L))
+            mln_buffer_view.size(bytes, -1L)
             MaplibreStatus.OK.nativeCode
           },
           destroyer = { destroys++ },
@@ -5950,7 +5939,7 @@ internal object NativeAccess {
       } catch (_: IllegalArgumentException) {
         return destroys
       }
-      error("feature conversion unexpectedly succeeded")
+      error("buffer conversion unexpectedly succeeded")
     }
 
     fun offlineRegionListCleanupAfterCopyFailure(): Int {

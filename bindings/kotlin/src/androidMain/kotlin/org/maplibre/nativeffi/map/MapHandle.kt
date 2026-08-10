@@ -2981,10 +2981,6 @@ internal object JavaCppMapStructs {
   fun projectionModeOptionsRoundTrip(value: ProjectionModeOptions): ProjectionModeOptions =
     ProjectionModeOptionsScope(value).use { projectionModeOptions(it.mode) }
 
-  fun jsonRoundTrip(value: JsonValue): JsonValue = JsonScope(value).use { jsonValue(it.value) }
-
-  fun geoJsonType(value: GeoJson): Int = GeoJsonScope(value).use { it.value.type() }
-
   fun styleImageOptionsSnapshot(value: StyleImageOptions): StyleImageOptionsSnapshot =
     StyleImageOptionsScope(value).use {
       StyleImageOptionsSnapshot(it.options.fields(), it.options.pixel_ratio(), it.options.sdf())
