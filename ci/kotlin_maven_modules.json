@@ -17,9 +17,11 @@
   "maplibre-native-ffi-runtime-opengl-jvm",
   "maplibre-native-ffi-runtime-opengl-linuxarm64",
   "maplibre-native-ffi-runtime-opengl-linuxx64",
+  "maplibre-native-ffi-runtime-opengl-macosarm64",
   "maplibre-native-ffi-runtime-vulkan",
   "maplibre-native-ffi-runtime-vulkan-android",
   "maplibre-native-ffi-runtime-vulkan-jvm",
   "maplibre-native-ffi-runtime-vulkan-linuxarm64",
-  "maplibre-native-ffi-runtime-vulkan-linuxx64"
+  "maplibre-native-ffi-runtime-vulkan-linuxx64",
+  "maplibre-native-ffi-runtime-vulkan-macosarm64"
 ]

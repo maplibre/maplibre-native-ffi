@@ -74,12 +74,12 @@ link requirements for that target and backend. The final application links the
 archive without acquiring a separate MapLibre Native FFI shared library or
 framework.
 
-The native runtime publications are OpenGL and Vulkan for Linux x64 and arm64,
-plus Metal for macOS arm64, iOS arm64, and the iOS arm64 simulator. Each
-published Kotlin/Native target has a matching runtime variant. A Linux x64 host
-cross-compiles the Linux arm64 publications because Kotlin/Native does not run
-on Linux arm64 hosts. Publication compiles and links the arm64 test binary
-without executing it.
+The native runtime publications are OpenGL and Vulkan for Linux x64, Linux
+arm64, and macOS arm64, plus Metal for macOS arm64, iOS arm64, and the iOS arm64
+simulator. Each published Kotlin/Native target has a matching runtime variant. A
+Linux x64 host cross-compiles the Linux arm64 publications because Kotlin/Native
+does not run on Linux arm64 hosts. Publication compiles and links the arm64 test
+binary without executing it.
 
 The Kotlin/Native Linux toolchain is the tightest consumer of the Linux archive.
 Its sysroot supplies glibc 2.19 and GCC 8.3, and it statically links its own
@@ -93,9 +93,9 @@ link working, and both come from the zig toolchain described in the
   needs, and never collides with, the C++ runtime a consumer links. Only the
   `mln_*` entry points keep external linkage.
 
-Neither backend declares a graphics link requirement. Both open their loader on
-first use, which matters here because the Kotlin/Native sysroot carries no
-graphics libraries for a consumer's link to resolve one against.
+The OpenGL and Vulkan runtimes declare no graphics link requirement. Both open
+their loader on first use. Linux hosts supply the system loader, and macOS hosts
+supply ANGLE or MoltenVK.
 
 Kotlin/Native test binaries in this repository link the C API shared library
 instead of the archive. That library carries the same glibc floor, so the

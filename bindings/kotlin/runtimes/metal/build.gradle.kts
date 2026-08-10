@@ -1,6 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.maplibre.nativeffi.gradle.MaplibreRuntimeBackend
-import org.maplibre.nativeffi.gradle.MaplibreRuntimeTargetFamily
 import org.maplibre.nativeffi.gradle.configureMaplibreRuntime
 
 plugins {
@@ -16,7 +15,4 @@ kotlin {
   macosArm64()
 }
 
-configureMaplibreRuntime(
-  backend = MaplibreRuntimeBackend.METAL,
-  targetFamily = MaplibreRuntimeTargetFamily.APPLE,
-)
+configureMaplibreRuntime(MaplibreRuntimeBackend.METAL)

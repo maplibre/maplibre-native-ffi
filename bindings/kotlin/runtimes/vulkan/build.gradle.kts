@@ -1,7 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.MaplibreRuntimeBackend
-import org.maplibre.nativeffi.gradle.MaplibreRuntimeTargetFamily
 import org.maplibre.nativeffi.gradle.configureMaplibreRuntime
 
 plugins {
@@ -22,6 +21,7 @@ kotlin {
 
   linuxArm64()
   linuxX64()
+  macosArm64()
 
   android {
     namespace = "org.maplibre.nativeffi.runtime.vulkan"
@@ -49,7 +49,4 @@ androidComponents {
   }
 }
 
-configureMaplibreRuntime(
-  backend = MaplibreRuntimeBackend.VULKAN,
-  targetFamily = MaplibreRuntimeTargetFamily.LINUX,
-)
+configureMaplibreRuntime(MaplibreRuntimeBackend.VULKAN)
