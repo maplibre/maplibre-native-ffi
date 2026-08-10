@@ -12,10 +12,7 @@ pub mod camera;
 pub mod enums;
 pub mod error;
 pub mod events;
-pub mod geojson;
-pub mod geometry;
 pub mod handle;
-pub mod json;
 pub mod logging;
 pub mod options;
 pub mod ptr;
@@ -50,9 +47,6 @@ pub use events::{
     RenderingStats, RuntimeEventPayload, StyleImageMissingEvent, TileActionEvent, TileId,
     UnknownRuntimeEventPayload,
 };
-pub use geojson::{Feature, FeatureIdentifier, GeoJson};
-pub use geometry::Geometry;
-pub use json::{JsonMember, JsonValue};
 pub use logging::LogRecord;
 pub use options::{MapOptions, MapTileOptions, MapViewportOptions};
 pub use query::{

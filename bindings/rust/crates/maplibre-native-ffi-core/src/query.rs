@@ -1,11 +1,8 @@
-use std::mem;
 use std::ptr;
 
 use maplibre_native_ffi_sys as sys;
 
-use crate::geojson::{Feature, feature_from_native};
-use crate::json::{JsonValue, NativeJsonValue, json_value_from_native, json_value_try_to_native};
-use crate::string::{StringView, string_view};
+use crate::string::{StringView, buffer_view, string_view};
 use crate::values::{ScreenBox, ScreenPoint, screen_point_to_native};
 use crate::{Error, Result};
 
@@ -135,8 +132,8 @@ impl FeatureStateSelectorNativeExt for FeatureStateSelector {
     }
 }
 
-fn empty_string_view() -> sys::mln_string_view {
-    sys::mln_string_view {
+fn empty_string_view() -> sys::mln_buffer_view {
+    sys::mln_buffer_view {
         data: ptr::null(),
         size: 0,
     }
@@ -248,15 +245,14 @@ impl RenderedQueryGeometryNativeExt for RenderedQueryGeometry {
 #[non_exhaustive]
 pub struct RenderedFeatureQueryOptions {
     pub layer_ids: Option<Vec<String>>,
-    pub filter: Option<JsonValue>,
+    pub filter: Option<Vec<u8>>,
 }
 
 pub struct NativeRenderedFeatureQueryOptions<'a> {
     raw: sys::mln_rendered_feature_query_options,
     _layer_id_views: Vec<StringView<'a>>,
-    _raw_layer_ids: Vec<sys::mln_string_view>,
-    _filter: Option<NativeJsonValue>,
-    _filter_raw: Option<Box<sys::mln_json_value>>,
+    _raw_layer_ids: Vec<sys::mln_buffer_view>,
+    _filter_raw: Option<Box<sys::mln_buffer_view>>,
 }
 
 impl<'a> NativeRenderedFeatureQueryOptions<'a> {
@@ -272,12 +268,7 @@ impl<'a> NativeRenderedFeatureQueryOptions<'a> {
             raw.layer_ids = const_ptr_or_null(&raw_layer_ids);
             raw.layer_id_count = raw_layer_ids.len();
         }
-        let filter = options
-            .filter
-            .as_ref()
-            .map(json_value_try_to_native)
-            .transpose()?;
-        let filter_raw = filter.as_ref().map(|filter| Box::new(*filter.as_ref()));
+        let filter_raw = options.filter.as_deref().map(buffer_view).map(Box::new);
         if let Some(filter_raw) = &filter_raw {
             raw.filter = filter_raw.as_ref();
         }
@@ -285,7 +276,6 @@ impl<'a> NativeRenderedFeatureQueryOptions<'a> {
             raw,
             _layer_id_views: layer_id_views,
             _raw_layer_ids: raw_layer_ids,
-            _filter: filter,
             _filter_raw: filter_raw,
         })
     }
@@ -323,15 +313,14 @@ impl RenderedFeatureQueryOptionsNativeExt for RenderedFeatureQueryOptions {
 #[non_exhaustive]
 pub struct SourceFeatureQueryOptions {
     pub source_layer_ids: Option<Vec<String>>,
-    pub filter: Option<JsonValue>,
+    pub filter: Option<Vec<u8>>,
 }
 
 pub struct NativeSourceFeatureQueryOptions<'a> {
     raw: sys::mln_source_feature_query_options,
     _source_layer_id_views: Vec<StringView<'a>>,
-    _raw_source_layer_ids: Vec<sys::mln_string_view>,
-    _filter: Option<NativeJsonValue>,
-    _filter_raw: Option<Box<sys::mln_json_value>>,
+    _raw_source_layer_ids: Vec<sys::mln_buffer_view>,
+    _filter_raw: Option<Box<sys::mln_buffer_view>>,
 }
 
 impl<'a> NativeSourceFeatureQueryOptions<'a> {
@@ -350,12 +339,7 @@ impl<'a> NativeSourceFeatureQueryOptions<'a> {
             raw.source_layer_ids = const_ptr_or_null(&raw_source_layer_ids);
             raw.source_layer_id_count = raw_source_layer_ids.len();
         }
-        let filter = options
-            .filter
-            .as_ref()
-            .map(json_value_try_to_native)
-            .transpose()?;
-        let filter_raw = filter.as_ref().map(|filter| Box::new(*filter.as_ref()));
+        let filter_raw = options.filter.as_deref().map(buffer_view).map(Box::new);
         if let Some(filter_raw) = &filter_raw {
             raw.filter = filter_raw.as_ref();
         }
@@ -363,7 +347,6 @@ impl<'a> NativeSourceFeatureQueryOptions<'a> {
             raw,
             _source_layer_id_views: source_layer_id_views,
             _raw_source_layer_ids: raw_source_layer_ids,
-            _filter: filter,
             _filter_raw: filter_raw,
         })
     }
@@ -396,178 +379,6 @@ impl SourceFeatureQueryOptionsNativeExt for SourceFeatureQueryOptions {
     }
 }
 
-/// One copied query result feature.
-#[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
-pub struct QueriedFeature {
-    pub feature: Feature,
-    pub source_id: Option<String>,
-    pub source_layer_id: Option<String>,
-    pub state: Option<JsonValue>,
-}
-
-/// Copied feature-extension query result.
-#[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
-pub enum FeatureExtensionResult {
-    Value(JsonValue),
-    FeatureCollection(Vec<Feature>),
-    Unknown(u32),
-}
-
-/// Copies an owned native feature-query result into owned Rust data.
-///
-/// # Safety
-///
-/// `ptr` must point to a live `mln_feature_query_result` handle owned by the
-/// caller and returned by the matching C API. This function takes ownership of
-/// that handle and releases it before returning, including on copy errors.
-pub unsafe fn copy_feature_query_result(
-    handle: sys::mln_feature_query_result,
-) -> Result<Vec<QueriedFeature>> {
-    // SAFETY: handle is an owned query result returned by the C API and released by the guard.
-    let result = unsafe { crate::handle::feature_query_result(handle) }?;
-    let mut count = 0;
-    // SAFETY: result is live and count points to writable storage.
-    crate::check(unsafe { sys::mln_feature_query_result_count(result.handle(), &mut count) })?;
-    let mut features = Vec::with_capacity(count);
-    for index in 0..count {
-        let mut raw = sys::mln_queried_feature {
-            size: mem::size_of::<sys::mln_queried_feature>() as u32,
-            fields: 0,
-            feature: empty_feature(),
-            source_id: empty_string_view(),
-            source_layer_id: empty_string_view(),
-            state: ptr::null(),
-        };
-        // SAFETY: result is live, index is within count reported by native,
-        // and raw points to initialized writable storage with size set.
-        crate::check(unsafe {
-            sys::mln_feature_query_result_get(result.handle(), index, &mut raw)
-        })?;
-        // SAFETY: raw now contains result-owned views valid until result drops;
-        // this copies all nested data before the next iteration/drop.
-        features.push(unsafe { copy_queried_feature(&raw) }?);
-    }
-    Ok(features)
-}
-
-/// Copies a borrowed native queried feature descriptor into owned Rust data.
-///
-/// # Safety
-///
-/// `raw` and all nested pointers indicated by `raw.fields` must be valid for
-/// the duration of this call. The returned value owns all copied data.
-unsafe fn copy_queried_feature(raw: &sys::mln_queried_feature) -> Result<QueriedFeature> {
-    // SAFETY: Caller promises raw.feature nested storage is valid for this call.
-    let feature = unsafe { feature_from_native(&raw.feature, 0) }?;
-    let source_id = if raw.fields & sys::MLN_QUERIED_FEATURE_SOURCE_ID != 0 {
-        // SAFETY: Caller promises native string storage is valid.
-        Some(unsafe { crate::string::copy_string_view(raw.source_id) }?)
-    } else {
-        None
-    };
-    let source_layer_id = if raw.fields & sys::MLN_QUERIED_FEATURE_SOURCE_LAYER_ID != 0 {
-        // SAFETY: Caller promises native string storage is valid.
-        Some(unsafe { crate::string::copy_string_view(raw.source_layer_id) }?)
-    } else {
-        None
-    };
-    let state = if raw.fields & sys::MLN_QUERIED_FEATURE_STATE != 0 && !raw.state.is_null() {
-        // SAFETY: Caller promises state storage is valid.
-        Some(unsafe { json_value_from_native(&*raw.state) }?)
-    } else {
-        None
-    };
-    Ok(QueriedFeature {
-        feature,
-        source_id,
-        source_layer_id,
-        state,
-    })
-}
-
-/// Copies an owned native feature-extension result into owned Rust data.
-///
-/// # Safety
-///
-/// `ptr` must point to a live `mln_feature_extension_result` handle owned by
-/// the caller and returned by the matching C API. This function takes ownership
-/// of that handle and releases it before returning, including on copy errors.
-pub unsafe fn copy_feature_extension_result(
-    handle: sys::mln_feature_extension_result,
-) -> Result<FeatureExtensionResult> {
-    // SAFETY: handle is an owned extension result returned by the C API and released by the guard.
-    let result = unsafe { crate::handle::feature_extension_result(handle) }?;
-    let mut info = sys::mln_feature_extension_result_info {
-        size: mem::size_of::<sys::mln_feature_extension_result_info>() as u32,
-        type_: 0,
-        data: sys::mln_feature_extension_result_info__bindgen_ty_1 { value: ptr::null() },
-    };
-    // SAFETY: result is live and info points to initialized writable storage.
-    crate::check(unsafe { sys::mln_feature_extension_result_get(result.handle(), &mut info) })?;
-    match info.type_ {
-        sys::MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE => {
-            // SAFETY: Active union member is selected by type_. Native returned
-            // a value pointer valid until result drops; this copies it now.
-            let value = unsafe { info.data.value };
-            if value.is_null() {
-                return Err(Error::invalid_argument(
-                    "feature extension value result must not be null",
-                ));
-            }
-            // SAFETY: value was checked non-null and is result-owned.
-            Ok(FeatureExtensionResult::Value(unsafe {
-                json_value_from_native(&*value)
-            }?))
-        }
-        sys::MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION => {
-            // SAFETY: Active union member is selected by type_.
-            let collection = unsafe { info.data.feature_collection };
-            let features = feature_collection_slice(
-                collection.features,
-                collection.feature_count,
-                "feature extension feature collection",
-            )?;
-            let mut copied = Vec::with_capacity(features.len());
-            for feature in features {
-                // SAFETY: features came from validated collection storage.
-                copied.push(unsafe { feature_from_native(feature, 1) }?);
-            }
-            Ok(FeatureExtensionResult::FeatureCollection(copied))
-        }
-        type_ => Ok(FeatureExtensionResult::Unknown(type_)),
-    }
-}
-
-fn feature_collection_slice<'a>(
-    ptr: *const sys::mln_feature,
-    len: usize,
-    context: &'static str,
-) -> Result<&'a [sys::mln_feature]> {
-    if len == 0 {
-        return Ok(&[]);
-    }
-    if ptr.is_null() {
-        return Err(Error::invalid_argument(format!(
-            "{context} pointer must not be null when length is nonzero"
-        )));
-    }
-    // SAFETY: ptr is non-null and caller/native reports len initialized entries.
-    Ok(unsafe { std::slice::from_raw_parts(ptr, len) })
-}
-
-fn empty_feature() -> sys::mln_feature {
-    sys::mln_feature {
-        size: mem::size_of::<sys::mln_feature>() as u32,
-        geometry: ptr::null(),
-        properties: ptr::null(),
-        property_count: 0,
-        identifier_type: sys::MLN_FEATURE_IDENTIFIER_TYPE_NULL,
-        identifier: sys::mln_feature__bindgen_ty_1 { uint_value: 0 },
-    }
-}
-
 fn const_ptr_or_null<T>(values: &[T]) -> *const T {
     if values.is_empty() {
         ptr::null()
@@ -579,7 +390,6 @@ fn const_ptr_or_null<T>(values: &[T]) -> *const T {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{JsonMember, JsonValue};
 
     #[test]
     fn feature_state_selector_materializes_fields_and_empty_views() {
@@ -641,25 +451,8 @@ mod tests {
     }
 
     #[test]
-    fn feature_extension_collection_slice_rejects_missing_nonempty_pointer() {
-        let empty = feature_collection_slice(ptr::null(), 0, "test collection").unwrap();
-        assert!(empty.is_empty());
-
-        let Err(err) = feature_collection_slice(ptr::null(), 1, "test collection") else {
-            panic!("missing nonempty feature collection pointer should fail");
-        };
-        assert!(
-            err.to_string()
-                .contains("test collection pointer must not be null")
-        );
-    }
-
-    #[test]
     fn feature_query_options_materialize_arrays_filters_and_backing_storage() {
-        let filter = JsonValue::object(vec![JsonMember::new(
-            "kind",
-            JsonValue::String("park".into()),
-        )]);
+        let filter = br#"{"kind":"park"}"#.to_vec();
         let rendered_options = RenderedFeatureQueryOptions {
             layer_ids: Some(vec!["point-circle".into()]),
             filter: Some(filter.clone()),

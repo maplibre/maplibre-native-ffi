@@ -137,7 +137,7 @@ def test_vulkan_borrowed_texture_attach_reports_public_render_session_shape() ->
             try:
                 _assert_public_session_shape(session)
 
-                map_handle.set_style_json(EMPTY_STYLE_JSON)
+                map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
                 render_until_update(runtime, session)
 
                 with pytest.raises(mln.UnsupportedFeatureError) as raised:
@@ -200,7 +200,7 @@ def test_vulkan_borrowed_texture_set_target_hands_over_a_replacement() -> None:
         ):
             session = map_handle.attach_vulkan_borrowed_texture(descriptor)
             try:
-                map_handle.set_style_json(EMPTY_STYLE_JSON)
+                map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
                 render_until_update(runtime, session)
 
                 with pytest.raises(mln.UnsupportedFeatureError) as raised:

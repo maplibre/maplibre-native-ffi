@@ -1004,21 +1004,7 @@ test "offline region definitions reject invalid public values" {
 
     try testing.expectError(error.InvalidArgument, createOfflineRegion(&runtime, testing.allocator, .{ .geometry = .{
         .style_url = offline_style_url,
-        .geometry = .empty,
-        .min_zoom = 5.0,
-        .max_zoom = 6.0,
-    } }, &.{}));
-
-    var nested_geometries: [66]maplibre.Geometry = undefined;
-    nested_geometries[nested_geometries.len - 1] = .{ .point = .{ .latitude = 1.0, .longitude = 2.0 } };
-    var nested_index = nested_geometries.len - 1;
-    while (nested_index > 0) {
-        nested_index -= 1;
-        nested_geometries[nested_index] = .{ .collection = nested_geometries[nested_index + 1 .. nested_index + 2] };
-    }
-    try testing.expectError(error.InvalidArgument, createOfflineRegion(&runtime, testing.allocator, .{ .geometry = .{
-        .style_url = offline_style_url,
-        .geometry = nested_geometries[0],
+        .geometry = "{",
         .min_zoom = 5.0,
         .max_zoom = 6.0,
     } }, &.{}));
@@ -1052,12 +1038,7 @@ fn expectOfflineGeometryRegion(region: *const maplibre.OwnedOfflineRegion, expec
     try testing.expectEqual(@as(f64, 6.0), definition.max_zoom);
     try testing.expectEqual(@as(f32, 2.0), definition.pixel_ratio);
     try testing.expect(definition.include_ideographs);
-    const copied_line = definition.geometry.line_string;
-    try testing.expectEqual(@as(usize, 2), copied_line.len);
-    try testing.expectEqual(@as(f64, 1.0), copied_line[0].latitude);
-    try testing.expectEqual(@as(f64, 2.0), copied_line[0].longitude);
-    try testing.expectEqual(@as(f64, 3.0), copied_line[1].latitude);
-    try testing.expectEqual(@as(f64, 4.0), copied_line[1].longitude);
+    try testing.expectEqualStrings("{\"type\":\"LineString\",\"coordinates\":[[2.0,1.0],[4.0,3.0]]}", definition.geometry);
     try testing.expectEqualSlices(u8, expected_metadata, region.metadata);
 }
 
@@ -1093,10 +1074,6 @@ test "offline geometry regions expose copied geometry values" {
     const cache_path = try tempPath(testing.allocator, tmp.sub_path[0..], "geometry-cache.db");
     defer testing.allocator.free(cache_path);
 
-    const coordinates = [_]maplibre.LatLng{
-        .{ .latitude = 1.0, .longitude = 2.0 },
-        .{ .latitude = 3.0, .longitude = 4.0 },
-    };
     const metadata = [_]u8{ 7, 8, 9 };
     var region_id: maplibre.OfflineRegionId = 0;
 
@@ -1106,7 +1083,7 @@ test "offline geometry regions expose copied geometry values" {
 
         var created = try createOfflineRegion(&runtime, testing.allocator, .{ .geometry = .{
             .style_url = offline_style_url,
-            .geometry = .{ .line_string = coordinates[0..] },
+            .geometry = "{\"type\":\"LineString\",\"coordinates\":[[2,1],[4,3]]}",
             .min_zoom = 5.0,
             .max_zoom = 6.0,
             .pixel_ratio = 2.0,

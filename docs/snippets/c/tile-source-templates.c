@@ -4,44 +4,22 @@
 #include <maplibre_native_c.h>
 #include <string.h>
 
-static mln_string_view sv(const char* text) {
-  return (mln_string_view){.data = text, .size = strlen(text)};
-}
-
-static mln_json_value json_string(const char* text) {
-  return (mln_json_value){
-    .size = sizeof(mln_json_value),
-    .type = MLN_JSON_VALUE_TYPE_STRING,
-    .data = {.string_value = sv(text)},
-  };
+static mln_buffer_view view(const char* text) {
+  return (mln_buffer_view){.data = text, .size = strlen(text)};
 }
 
 // An empty before-layer ID puts the layer on top of the style.
-static mln_status add_layer(
-  mln_map map, const char* layer_id, const char* layer_type,
-  const char* source_id
-) {
-  const mln_json_value id_value = json_string(layer_id);
-  const mln_json_value type_value = json_string(layer_type);
-  const mln_json_value source_value = json_string(source_id);
-  const mln_json_member members[] = {
-    {.key = sv("id"), .value = &id_value},
-    {.key = sv("type"), .value = &type_value},
-    {.key = sv("source"), .value = &source_value},
-  };
-  const mln_json_value layer = {
-    .size = sizeof(layer),
-    .type = MLN_JSON_VALUE_TYPE_OBJECT,
-    .data = {.object_value = {.members = members, .member_count = 3}},
-  };
-  return mln_map_add_style_layer_json(map, &layer, sv(""));
+static mln_status add_layer(mln_map map) {
+  const char layer[] =
+    "{\"id\":\"ortho\",\"type\":\"raster\",\"source\":\"ortho\"}";
+  return mln_map_add_style_layer_json(map, view(layer), view(""));
 }
 
 mln_status add_orthophotos(mln_map map) {
   // #region tiles
-  const mln_string_view tiles[] = {
-    sv("https://a.tiles.example.com/ortho/{z}/{x}/{y}.png"),
-    sv("https://b.tiles.example.com/ortho/{z}/{x}/{y}.png"),
+  const mln_buffer_view tiles[] = {
+    view("https://a.tiles.example.com/ortho/{z}/{x}/{y}.png"),
+    view("https://b.tiles.example.com/ortho/{z}/{x}/{y}.png"),
   };
   // #endregion tiles
 
@@ -62,16 +40,16 @@ mln_status add_orthophotos(mln_map map) {
     .southwest = {.latitude = 47.2, .longitude = 5.8},
     .northeast = {.latitude = 55.1, .longitude = 15.1},
   };
-  options.attribution = sv("Imagery: Example Survey");
+  options.attribution = view("Imagery: Example Survey");
   // #endregion bounds
 
   // #region source
   const mln_status status = mln_map_add_raster_source_tiles(
-    map, sv("ortho"), tiles, sizeof(tiles) / sizeof(tiles[0]), &options
+    map, view("ortho"), tiles, sizeof(tiles) / sizeof(tiles[0]), &options
   );
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  return add_layer(map, "ortho", "raster", "ortho");
+  return add_layer(map);
   // #endregion source
 }

@@ -71,6 +71,8 @@ internal class LogCallbackState private constructor(private val callback: LogCal
 
   fun checkCanClose() = gate.checkCanClose()
 
+  fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
+
   override fun close() = gate.close()
 
   private fun copyCString(address: MemorySegment): String {
@@ -90,12 +92,22 @@ internal class LogCallbackState private constructor(private val callback: LogCal
 
     fun set(callback: LogCallback) {
       NativeAccess.ensureLoaded()
+      replace(callback) { replacement ->
+        Status.check(NativeAccess.setLogCallback(replacement.stub))
+      }
+    }
+
+    internal fun setForTesting(callback: LogCallback, register: (LogCallbackState) -> Unit = {}) {
+      replace(callback, register)
+    }
+
+    private fun replace(callback: LogCallback, register: (LogCallbackState) -> Unit) {
       val replacement = LogCallbackState(callback)
       var previous: LogCallbackState? = null
       try {
         withUpdateLock {
           current.load()?.checkCanClose()
-          Status.check(NativeAccess.setLogCallback(replacement.stub))
+          register(replacement)
           previous = current.exchange(replacement)
         }
       } catch (error: Throwable) {
@@ -117,6 +129,10 @@ internal class LogCallbackState private constructor(private val callback: LogCal
     }
 
     fun currentForTesting(): LogCallbackState? = current.load()
+
+    internal fun clearForTesting() {
+      closeQuietly(current.exchange(null))
+    }
 
     private fun closeQuietly(state: LogCallbackState?) {
       try {

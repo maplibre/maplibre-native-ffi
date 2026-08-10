@@ -17,19 +17,20 @@ belongs to the loaded style. Set it again after every later style load, as
 
 Style properties use style-spec JSON values. A constant is a scalar, and an
 expression is an array whose first element names the operator. The remaining
-elements are its arguments. This C snippet builds a descriptor tree with one
-small constructor per JSON type.
+elements are its arguments. The C API accepts the complete UTF-8 JSON value as
+one buffer view.
 
 <Code code={region(styleByData, "node")} lang="c" title="style-by-data.c" />
 
-Build inner expressions before the arrays that contain them. `["get", "mag"]`
-reads the feature property named `mag`, and `["linear"]` names the interpolation
-curve.
+`["get", "mag"]` reads the feature property named `mag`, and `["linear"]`
+names the interpolation curve. The snippet embeds both in the complete
+expression.
 
 <Code code={region(styleByData, "expression")} lang="c" title="style-by-data.c" />
 
-Those two nodes become elements of the outer array, alongside the stop pairs
-that scale a circle from 4 pixels at magnitude 1 to 24 pixels at magnitude 6.
+The stop pairs scale a circle from 4 pixels at magnitude 1 to 24 pixels at
+magnitude 6. A buffer view carries the expression without rebuilding its nodes at
+the C boundary.
 
 <Code code={region(styleByData, "property")} lang="c" title="style-by-data.c" />
 
@@ -40,13 +41,12 @@ one that the style specification defines for that layer's type.
 
 A filter is a boolean expression that selects the source features to draw. It
 uses the same value representation as a style property. An empty filter clears
-the layer's filter. The snippet reuses the `magnitude` node in this second value.
+the layer's filter. The snippet passes the complete filter expression.
 
 <Code code={region(styleByData, "filter")} lang="c" title="style-by-data.c" />
 
-The host owns the descriptors, arrays, and strings, and can allocate them on the
-stack. MapLibre parses and copies a property value or filter before the call
-returns.
+The host owns the byte storage. MapLibre parses or copies a property value or
+filter before the call returns.
 
 Both calls run on the map's owner thread and apply to the live style
 immediately. A host that pumps the runtime and renders on update draws the new

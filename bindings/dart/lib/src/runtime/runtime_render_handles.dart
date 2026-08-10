@@ -71,15 +71,15 @@ final class MapProjectionHandle {
 
   /// Updates the camera so geometry coordinates are visible within [padding].
   void setVisibleGeometry(
-    Geometry geometry, {
+    Uint8List geometry, {
     EdgeInsets padding = const EdgeInsets(),
   }) {
     withNativeArena((arena) {
-      final nativeGeometry = native_geometry.nativeGeometry(geometry, arena);
+      final nativeGeometry = nativeBufferView(geometry, arena);
       _check(
         raw.mln_map_projection_set_visible_geometry(
           _handle.raw,
-          nativeGeometry.pointer,
+          nativeGeometry,
           native_struct.edgeInsetsToNative(padding),
         ),
       );
@@ -382,22 +382,22 @@ final class RenderSessionHandle {
   }
 
   /// Sets per-feature state on a render source.
-  void setFeatureState(FeatureStateSelector selector, JsonObject state) {
+  void setFeatureState(FeatureStateSelector selector, Uint8List state) {
     withNativeArena((arena) {
       final nativeSelector = _featureStateSelectorToNative(selector, arena);
-      final nativeState = native_json.nativeJsonValue(state, arena);
+      final nativeState = nativeBufferView(state, arena);
       _check(
         raw.mln_render_session_set_feature_state(
           _handle.raw,
           nativeSelector,
-          nativeState.pointer,
+          nativeState,
         ),
       );
     });
   }
 
   /// Copies per-feature state from a render source.
-  JsonValue? getFeatureState(FeatureStateSelector selector) {
+  Uint8List getFeatureState(FeatureStateSelector selector) {
     return withNativeArena((arena) {
       final nativeSelector = _featureStateSelectorToNative(selector, arena);
       final outState = arena<Uint64>();
@@ -409,7 +409,7 @@ final class RenderSessionHandle {
           outState,
         ),
       );
-      return _copyJsonSnapshot(NativeJsonSnapshot(outState.value));
+      return copyOwnedBuffer(NativeOwnedBufferHandle(outState.value));
     });
   }
 
@@ -427,7 +427,7 @@ final class RenderSessionHandle {
   }
 
   /// Queries rendered features from the latest render session state.
-  List<QueriedFeature> queryRenderedFeatures(
+  Uint8List queryRenderedFeatures(
     RenderedQueryGeometry geometry, {
     RenderedFeatureQueryOptions? options,
   }) {
@@ -449,12 +449,12 @@ final class RenderSessionHandle {
           outResult,
         ),
       );
-      return _copyFeatureQueryResult(NativeFeatureQueryResult(outResult.value));
+      return copyOwnedBuffer(NativeOwnedBufferHandle(outResult.value));
     });
   }
 
   /// Queries source features from the latest render session state.
-  List<QueriedFeature> querySourceFeatures(
+  Uint8List querySourceFeatures(
     String sourceId, {
     SourceFeatureQueryOptions? options,
   }) {
@@ -475,31 +475,27 @@ final class RenderSessionHandle {
           outResult,
         ),
       );
-      return _copyFeatureQueryResult(NativeFeatureQueryResult(outResult.value));
+      return copyOwnedBuffer(NativeOwnedBufferHandle(outResult.value));
     });
   }
 
   /// Queries a feature extension from the latest render session state.
-  FeatureExtensionResult queryFeatureExtensions({
+  Uint8List queryFeatureExtensions({
     required String sourceId,
-    required FeatureGeoJson feature,
+    required Uint8List feature,
     required String extension,
     required String extensionField,
-    JsonValue? arguments,
+    Uint8List? arguments,
   }) {
     return withNativeArena((arena) {
       final nativeSourceId = nativeStringView(sourceId, arena);
-      final nativeFeature = native_geometry
-          .nativeGeoJson(feature, arena)
-          .pointer
-          .ref
-          .data
-          .feature;
+      final nativeFeature = nativeBufferView(feature, arena);
       final nativeExtension = nativeStringView(extension, arena);
       final nativeExtensionField = nativeStringView(extensionField, arena);
       final nativeArguments = arguments == null
-          ? nullptr.cast<raw.mln_json_value>()
-          : native_json.nativeJsonValue(arguments, arena).pointer;
+          ? nullptr.cast<raw.mln_buffer_view>()
+          : (arena<raw.mln_buffer_view>()
+              ..ref = nativeBufferView(arguments, arena));
       final outResult = arena<Uint64>();
       outResult.value = 0;
       _check(
@@ -513,9 +509,7 @@ final class RenderSessionHandle {
           outResult,
         ),
       );
-      return _copyFeatureExtensionResult(
-        NativeFeatureExtensionResult(outResult.value),
-      );
+      return copyOwnedBuffer(NativeOwnedBufferHandle(outResult.value));
     });
   }
 

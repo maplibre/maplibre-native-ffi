@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
@@ -15,6 +16,8 @@ import 'package:maplibre_native_ffi/src/runtime/runtime.dart'
 import 'package:test/test.dart';
 
 const _emptyStyleJson = '{"version":8,"sources":{},"layers":[]}';
+
+Uint8List _jsonBytes(String value) => Uint8List.fromList(utf8.encode(value));
 
 /// Dispatches one record through the registered adapter log callback, the way
 /// MapLibre's logging threads do, and reports the consume value native code
@@ -664,12 +667,12 @@ void main() {
     final map = runtime.createMap();
 
     // Nothing parsed and nothing requested yet.
-    expect(map.getLoadedStyleJson(), '');
+    expect(map.getLoadedStyleJson(), isEmpty);
     expect(map.getStyleUrl(), '');
 
     // The document reads back byte-for-byte, so it can be reloaded unchanged.
-    map.setStyleJson(_emptyStyleJson);
-    expect(map.getLoadedStyleJson(), _emptyStyleJson);
+    map.setStyleJson(_jsonBytes(_emptyStyleJson));
+    expect(map.getLoadedStyleJson(), _jsonBytes(_emptyStyleJson));
     // Inline JSON clears the URL.
     expect(map.getStyleUrl(), '');
 
@@ -677,7 +680,7 @@ void main() {
     // document still reports the style that last parsed.
     map.setStyleUrl('https://example.com/style.json');
     expect(map.getStyleUrl(), 'https://example.com/style.json');
-    expect(map.getLoadedStyleJson(), _emptyStyleJson);
+    expect(map.getLoadedStyleJson(), _jsonBytes(_emptyStyleJson));
 
     map.close();
     runtime.close();
@@ -688,7 +691,7 @@ void main() {
     () async {
       final runtime = RuntimeHandle.create();
       final map = runtime.createMap();
-      map.setStyleJson(_emptyStyleJson);
+      map.setStyleJson(_jsonBytes(_emptyStyleJson));
 
       map.addCustomGeometrySource(
         'dart-lifecycle-source',
@@ -709,7 +712,7 @@ void main() {
         map,
         'dart-lifecycle-source',
       )!;
-      map.setStyleJson(_emptyStyleJson);
+      map.setStyleJson(_jsonBytes(_emptyStyleJson));
       expect(reloadProbe.retirementQueued, isTrue);
 
       map.addCustomGeometrySource(
@@ -733,7 +736,7 @@ void main() {
     final runtime = RuntimeHandle.create();
     final map = runtime.createMap();
     try {
-      map.setStyleJson('{"version":8,"sources":{},"layers":[]}');
+      map.setStyleJson(_jsonBytes(_emptyStyleJson));
       final image = PremultipliedRgba8Image(
         width: 2,
         height: 2,
@@ -800,10 +803,12 @@ void main() {
     final map = runtime.createMap();
     try {
       map.setStyleJson(
-        '{"version":8,"sources":{"geo":{"type":"geojson","data":'
-        '{"type":"FeatureCollection","features":[]}}},"layers":['
-        '{"id":"bg","type":"background"},'
-        '{"id":"fill","type":"fill","source":"geo"}]}',
+        _jsonBytes(
+          '{"version":8,"sources":{"geo":{"type":"geojson","data":'
+          '{"type":"FeatureCollection","features":[]}}},"layers":['
+          '{"id":"bg","type":"background"},'
+          '{"id":"fill","type":"fill","source":"geo"}]}',
+        ),
       );
 
       expect(map.getLayerSourceLayer('fill'), '');
@@ -856,12 +861,12 @@ void main() {
 
       // The style parser fills in its own 300ms duration for a style that
       // declares no transition.
-      map.setStyleJson(_emptyStyleJson);
+      map.setStyleJson(_jsonBytes(_emptyStyleJson));
       final parsed = map.getStyleTransitionOptions();
       expect(parsed.durationMs, 300);
       expect(parsed.delayMs, isNull);
 
-      map.setStyleJson(transitionStyleJson);
+      map.setStyleJson(_jsonBytes(transitionStyleJson));
       final declared = map.getStyleTransitionOptions();
       expect(declared.durationMs, 750);
       expect(declared.delayMs, 100);
@@ -887,7 +892,7 @@ void main() {
       );
 
       // Loading a style replaces the override with what that style declares.
-      map.setStyleJson(transitionStyleJson);
+      map.setStyleJson(_jsonBytes(transitionStyleJson));
       expect(map.getStyleTransitionOptions(), declared);
 
       expect(
@@ -1111,7 +1116,7 @@ void main() {
       ),
     );
     runtime.clearResourceProvider();
-    map.setStyleJson(_emptyStyleJson);
+    map.setStyleJson(_jsonBytes(_emptyStyleJson));
     map.requestRepaint();
     expect(() => map.requestStillImage(), throwsA(isA<MaplibreException>()));
     map.setDebugOptions(MapDebugOptions.tileBorders);
@@ -1385,22 +1390,23 @@ void main() {
     expect(
       () => map.addGeoJsonSourceData(
         'dart-invalid-geojson-options',
-        FeatureCollectionGeoJson([]),
-        options: const GeoJsonSourceOptions(tileSize: 4294967296),
+        _jsonBytes('{"type":"FeatureCollection","features":[]}'),
+        options: GeoJsonSourceOptions(tileSize: 4294967296),
       ),
       throwsA(isA<InvalidArgumentException>()),
     );
     map.addGeoJsonSourceData(
       'dart-clustered-geojson-source',
-      FeatureCollectionGeoJson([
-        FeatureGeoJson(geometry: const PointGeometry(LatLng(0, 0))),
-      ]),
-      options: const GeoJsonSourceOptions(cluster: true, clusterRadius: 60),
+      _jsonBytes(
+        '{"type":"FeatureCollection","features":[{"type":"Feature",'
+        '"geometry":{"type":"Point","coordinates":[0,0]},"properties":{}}]}',
+      ),
+      options: GeoJsonSourceOptions(cluster: true, clusterRadius: 60),
     );
     expect(
       () => map.setGeoJsonSourceData(
         'dart-clustered-geojson-source',
-        const GeometryGeoJson(PointGeometry(LatLng(0, 0))),
+        _jsonBytes('{"type":"Point","coordinates":[0,0]}'),
       ),
       throwsA(isA<InvalidArgumentException>()),
     );
@@ -1476,8 +1482,13 @@ void main() {
       const LatLng(37.7749, -122.4194),
     );
     final location =
-        map.getLayerProperty('dart-location-layer', 'location') as JsonArray;
-    expect(location.values.map((value) => (value as JsonDouble).value), [
+        jsonDecode(
+              utf8.decode(
+                map.getLayerProperty('dart-location-layer', 'location')!,
+              ),
+            )
+            as List<dynamic>;
+    expect(location.cast<num>(), [
       closeTo(37.7749, 1e-6),
       closeTo(-122.4194, 1e-6),
       closeTo(0, 1e-6),
@@ -1562,7 +1573,7 @@ void main() {
     map.setCustomGeometrySourceTileData(
       'dart-custom-source',
       const CanonicalTileId(z: 0, x: 0, y: 0),
-      FeatureCollectionGeoJson([]),
+      _jsonBytes('{"type":"FeatureCollection","features":[]}'),
     );
     map.invalidateCustomGeometrySourceTile(
       'dart-custom-source',
@@ -1588,9 +1599,9 @@ void main() {
 
     map.addGeoJsonSourceData(
       'dart-geojson-source',
-      FeatureGeoJson(
-        geometry: PointGeometry(LatLng(0, 0)),
-        properties: [JsonMember('kind', JsonString('dart'))],
+      _jsonBytes(
+        '{"type":"Feature","geometry":{"type":"Point","coordinates":[0,0]},'
+        '"properties":{"kind":"dart"}}',
       ),
     );
     expect(map.styleSourceExists('dart-geojson-source'), isTrue);
@@ -1603,48 +1614,41 @@ void main() {
 
     map.setGeoJsonSourceData(
       'dart-geojson-source',
-      const GeometryGeoJson(PointGeometry(LatLng(1, 2))),
+      _jsonBytes('{"type":"Point","coordinates":[2,1]}'),
     );
     map.addStyleLayerJson(
-      JsonObject([
-        JsonMember('id', JsonString('dart-circle-layer')),
-        JsonMember('type', JsonString('circle')),
-        JsonMember('source', JsonString('dart-geojson-source')),
-      ]),
+      _jsonBytes(
+        '{"id":"dart-circle-layer","type":"circle","source":"dart-geojson-source"}',
+      ),
     );
     expect(map.styleLayerExists('dart-circle-layer'), isTrue);
     expect(map.getStyleLayerType('dart-circle-layer'), 'circle');
     expect(map.listStyleLayerIds(), contains('dart-circle-layer'));
     final layerJson = map.getStyleLayerJson('dart-circle-layer');
-    expect(layerJson, isA<JsonObject>());
     expect(
-      (layerJson! as JsonObject).members.map((member) => member.key),
-      contains('id'),
+      jsonDecode(utf8.decode(layerJson!)),
+      containsPair('id', 'dart-circle-layer'),
     );
 
     map.setLayerProperty(
       'dart-circle-layer',
       'circle-radius',
-      const JsonDouble(6.5),
+      _jsonBytes('6.5'),
     );
     expect(
       map.getLayerProperty('dart-circle-layer', 'circle-radius'),
-      isA<JsonDouble>(),
+      _jsonBytes('6.5'),
     );
     map.setLayerFilter(
       'dart-circle-layer',
-      JsonArray([
-        JsonString('=='),
-        JsonArray([const JsonString('get'), const JsonString('kind')]),
-        JsonString('dart'),
-      ]),
+      _jsonBytes('["==",["get","kind"],"dart"]'),
     );
-    expect(map.getLayerFilter('dart-circle-layer'), isA<JsonArray>());
-    map.setLayerFilter('dart-circle-layer', null);
     expect(
       map.getLayerFilter('dart-circle-layer'),
-      anyOf(isNull, isA<JsonNull>()),
+      _jsonBytes('["==",["get","kind"],"dart"]'),
     );
+    map.setLayerFilter('dart-circle-layer', null);
+    expect(map.getLayerFilter('dart-circle-layer'), isNull);
 
     expect(map.removeStyleLayer('dart-circle-layer'), isTrue);
     expect(map.removeStyleSource('dart-geojson-source'), isTrue);
@@ -1669,7 +1673,7 @@ void main() {
   test('BND-109 source inspection returns independent copied metadata', () {
     final runtime = RuntimeHandle.create();
     final map = runtime.createMap();
-    map.setStyleJson(_emptyStyleJson);
+    map.setStyleJson(_jsonBytes(_emptyStyleJson));
 
     const tileUrls = [
       'https://a.example.com/{z}/{x}/{y}.mvt',

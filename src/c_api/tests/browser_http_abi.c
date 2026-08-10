@@ -114,7 +114,7 @@ static void style_loads_over_http_from_the_runner_origin(void) {
   char seen[256];
   seen[0] = '\0';
   for (size_t index = 0; index < count; index += 1) {
-    mln_string_view id = {0};
+    mln_buffer_view id = {0};
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_style_id_list_get(layers, index, &id)
     );

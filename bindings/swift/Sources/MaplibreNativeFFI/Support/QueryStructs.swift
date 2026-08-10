@@ -1,4 +1,5 @@
 internal import CMaplibreNativeC
+import Foundation
 
 enum NativeRenderedQueryGeometry: Equatable {
   case point(NativeScreenPoint)
@@ -39,9 +40,9 @@ enum NativeRenderedQueryGeometry: Equatable {
 
 struct NativeRenderedFeatureQueryOptions: Equatable {
   let layerIds: [String]
-  let filter: NativeJSONValue?
+  let filter: Data?
 
-  init(layerIds: [String] = [], filter: NativeJSONValue? = nil) {
+  init(layerIds: [String] = [], filter: Data? = nil) {
     self.layerIds = layerIds
     self.filter = filter
   }
@@ -52,27 +53,40 @@ struct NativeRenderedFeatureQueryOptions: Equatable {
   ) throws -> Result {
     if layerIds.isEmpty, filter == nil { return try body(nil) }
     let arena = NativeInputArena()
+    defer { withExtendedLifetime(arena) {} }
     let layerViews = layerIds.map { arena.view($0) }
     return try layerViews.withUnsafeBufferPointer { layerViews in
-      var options = mln_rendered_feature_query_options_default()
-      if !self.layerIds.isEmpty {
-        options.fields |= MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS.rawValue
-        options.layer_ids = layerViews.baseAddress
-        options.layer_id_count = layerViews.count
-      }
       if let filter {
-        options.filter = arena.allocate(filter)
+        var filterView = arena.view(filter)
+        return try withUnsafePointer(to: &filterView) { filter in
+          var options = mln_rendered_feature_query_options_default()
+          if !self.layerIds.isEmpty {
+            options.fields |= MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
+              .rawValue
+            options.layer_ids = layerViews.baseAddress
+            options.layer_id_count = layerViews.count
+          }
+          options.filter = filter
+          return try withUnsafePointer(to: &options, body)
+        }
+      } else {
+        var options = mln_rendered_feature_query_options_default()
+        if !self.layerIds.isEmpty {
+          options.fields |= MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS.rawValue
+          options.layer_ids = layerViews.baseAddress
+          options.layer_id_count = layerViews.count
+        }
+        return try withUnsafePointer(to: &options, body)
       }
-      return try withUnsafePointer(to: &options, body)
     }
   }
 }
 
 struct NativeSourceFeatureQueryOptions: Equatable {
   let sourceLayerIds: [String]
-  let filter: NativeJSONValue?
+  let filter: Data?
 
-  init(sourceLayerIds: [String] = [], filter: NativeJSONValue? = nil) {
+  init(sourceLayerIds: [String] = [], filter: Data? = nil) {
     self.sourceLayerIds = sourceLayerIds
     self.filter = filter
   }
@@ -82,19 +96,32 @@ struct NativeSourceFeatureQueryOptions: Equatable {
   ) throws -> Result {
     if sourceLayerIds.isEmpty, filter == nil { return try body(nil) }
     let arena = NativeInputArena()
+    defer { withExtendedLifetime(arena) {} }
     let layerViews = sourceLayerIds.map { arena.view($0) }
     return try layerViews.withUnsafeBufferPointer { layerViews in
-      var options = mln_source_feature_query_options_default()
-      if !self.sourceLayerIds.isEmpty {
-        options.fields |= MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
-          .rawValue
-        options.source_layer_ids = layerViews.baseAddress
-        options.source_layer_id_count = layerViews.count
-      }
       if let filter {
-        options.filter = arena.allocate(filter)
+        var filterView = arena.view(filter)
+        return try withUnsafePointer(to: &filterView) { filter in
+          var options = mln_source_feature_query_options_default()
+          if !self.sourceLayerIds.isEmpty {
+            options.fields |= MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
+              .rawValue
+            options.source_layer_ids = layerViews.baseAddress
+            options.source_layer_id_count = layerViews.count
+          }
+          options.filter = filter
+          return try withUnsafePointer(to: &options, body)
+        }
+      } else {
+        var options = mln_source_feature_query_options_default()
+        if !self.sourceLayerIds.isEmpty {
+          options.fields |= MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
+            .rawValue
+          options.source_layer_ids = layerViews.baseAddress
+          options.source_layer_id_count = layerViews.count
+        }
+        return try withUnsafePointer(to: &options, body)
       }
-      return try withUnsafePointer(to: &options, body)
     }
   }
 }
@@ -123,6 +150,7 @@ struct NativeFeatureStateSelector: Equatable {
     -> Result) throws -> Result
   {
     let arena = NativeInputArena()
+    defer { withExtendedLifetime(arena) {} }
     var selector = mln_feature_state_selector()
     selector.size = UInt32(MemoryLayout<mln_feature_state_selector>.size)
     selector.source_id = arena.view(sourceId)
@@ -139,16 +167,5 @@ struct NativeFeatureStateSelector: Equatable {
       selector.state_key = arena.view(stateKey)
     }
     return try withUnsafePointer(to: &selector, body)
-  }
-}
-
-struct NativeFeatureQueryResultReader {
-  let handle: NativeFeatureQueryResultHandle
-
-  func copyFeatures() throws -> [NativeQueriedFeature] {
-    let count = try NativeQuery.featureQueryResultCount(handle)
-    return try (0 ..< count).map { index in
-      try NativeQuery.featureQueryResultGet(handle, index: index)
-    }
   }
 }

@@ -321,9 +321,7 @@ raw.mln_offline_geometry_region_definition _offlineGeometryDefinitionToNative(
     definition.styleUrl,
     allocator,
   ).pointer.cast<Char>();
-  result.geometry = native_geometry
-      .nativeGeometry(definition.geometry, allocator)
-      .pointer;
+  result.geometry = nativeBufferView(definition.geometry, allocator);
   result.min_zoom = definition.minZoom;
   result.max_zoom = definition.maxZoom;
   result.pixel_ratio = definition.pixelRatio;
@@ -473,7 +471,9 @@ OfflineRegionDefinition _offlineRegionDefinitionFromNative(
   final geometry = definition.data.geometry;
   return OfflineGeometryRegionDefinition(
     styleUrl: geometry.style_url.cast<Utf8>().toDartString(),
-    geometry: native_geometry.geometryFromNative(geometry.geometry.ref),
+    geometry: Uint8List.fromList(
+      geometry.geometry.data.cast<Uint8>().asTypedList(geometry.geometry.size),
+    ),
     minZoom: geometry.min_zoom,
     maxZoom: geometry.max_zoom,
     pixelRatio: geometry.pixel_ratio,

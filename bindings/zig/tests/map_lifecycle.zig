@@ -213,7 +213,7 @@ test "runtime supports multiple maps" {
     try runtime.pump(0);
 }
 
-test "live map string methods reject embedded NUL before C calls" {
+test "style JSON buffers preserve embedded NUL for native validation" {
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
     defer diagnostics.deinit();
     try diagnostics.set(-5, "stale native diagnostic");
@@ -223,8 +223,8 @@ test "live map string methods reject embedded NUL before C calls" {
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    try testing.expectError(error.InvalidString, map.setStyleJson(testing.allocator, "{\x00}"));
+    try testing.expectError(error.InvalidArgument, map.setStyleJson(testing.allocator, "{\x00}"));
     const diagnostic = diagnostics.get().?;
-    try testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
-    try testing.expectEqualStrings("style JSON contains embedded NUL", diagnostic.message);
+    try testing.expect(diagnostic.raw_status != null);
+    try testing.expect(diagnostic.message.len > 0);
 }

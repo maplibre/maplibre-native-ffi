@@ -104,7 +104,7 @@ enum NativeMap {
 
   static func cameraForGeometry(
     _ map: NativeMapHandle,
-    geometry: UnsafePointer<mln_geometry>,
+    geometry: mln_buffer_view,
     fitOptions: UnsafePointer<mln_camera_fit_options>?
   ) throws -> mln_camera_options {
     var camera = mln_camera_options_default()

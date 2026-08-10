@@ -104,7 +104,7 @@ struct NativeGeoJSONSourceOptions: Equatable {
   var maxZoom: Double?
   var tolerance: Double?
   var clusterMaxZoom: Double?
-  var clusterProperties: NativeJSONValue?
+  var clusterProperties: Data?
   var tileSize: UInt32?
   var buffer: UInt32?
   var clusterRadius: UInt32?
@@ -118,7 +118,7 @@ struct NativeGeoJSONSourceOptions: Equatable {
     maxZoom: Double? = nil,
     tolerance: Double? = nil,
     clusterMaxZoom: Double? = nil,
-    clusterProperties: NativeJSONValue? = nil,
+    clusterProperties: Data? = nil,
     tileSize: UInt32? = nil,
     buffer: UInt32? = nil,
     clusterRadius: UInt32? = nil,
@@ -171,7 +171,7 @@ struct NativeGeoJSONSourceOptions: Equatable {
     }
     if let clusterProperties {
       options.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES.rawValue
-      options.cluster_properties = arena.allocate(clusterProperties)
+      options.cluster_properties = arena.view(clusterProperties)
     }
     if let tileSize {
       options.fields |= MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE.rawValue

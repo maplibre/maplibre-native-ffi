@@ -560,44 +560,28 @@ auto render_session_clear_data(mln_render_session session) -> mln_status;
 auto render_session_dump_debug_logs(mln_render_session session) -> mln_status;
 auto render_session_set_feature_state(
   mln_render_session session, const mln_feature_state_selector* selector,
-  const mln_json_value* state
+  mln_buffer_view state
 ) -> mln_status;
 auto render_session_get_feature_state(
   mln_render_session session, const mln_feature_state_selector* selector,
-  mln_json_snapshot* out_state
+  mln_buffer* out_state
 ) -> mln_status;
 auto render_session_remove_feature_state(
   mln_render_session session, const mln_feature_state_selector* selector
 ) -> mln_status;
 auto render_session_query_rendered_features(
   mln_render_session session, const mln_rendered_query_geometry* geometry,
-  const mln_rendered_feature_query_options* options,
-  mln_feature_query_result* out_result
+  const mln_rendered_feature_query_options* options, mln_buffer* out_result
 ) -> mln_status;
 auto render_session_query_source_features(
-  mln_render_session session, mln_string_view source_id,
-  const mln_source_feature_query_options* options,
-  mln_feature_query_result* out_result
+  mln_render_session session, mln_buffer_view source_id,
+  const mln_source_feature_query_options* options, mln_buffer* out_result
 ) -> mln_status;
 auto render_session_query_feature_extensions(
-  mln_render_session session, mln_string_view source_id,
-  const mln_feature* feature, mln_string_view extension,
-  mln_string_view extension_field, const mln_json_value* arguments,
-  mln_feature_extension_result* out_result
+  mln_render_session session, mln_buffer_view source_id,
+  mln_buffer_view feature, mln_buffer_view extension,
+  mln_buffer_view extension_field, const mln_buffer_view* arguments,
+  mln_buffer* out_result
 ) -> mln_status;
-auto feature_query_result_count(
-  mln_feature_query_result result, std::size_t* out_count
-) -> mln_status;
-auto feature_query_result_get(
-  mln_feature_query_result result, std::size_t index,
-  mln_queried_feature* out_feature
-) -> mln_status;
-auto feature_query_result_destroy(mln_feature_query_result result) -> void;
-auto feature_extension_result_get(
-  mln_feature_extension_result result,
-  mln_feature_extension_result_info* out_info
-) -> mln_status;
-auto feature_extension_result_destroy(mln_feature_extension_result result)
-  -> void;
 
 }  // namespace mln::core

@@ -134,7 +134,7 @@ static mln_offline_region_definition offline_tile_definition(void) {
 }
 
 static mln_offline_region_definition offline_geometry_definition(
-  const mln_geometry* geometry
+  mln_buffer_view geometry
 ) {
   return (mln_offline_region_definition){
     .size = sizeof(mln_offline_region_definition),
@@ -297,21 +297,10 @@ static void offline_regions_reject_raw_invalid_descriptors(void) {
   );
   TEST_ASSERT_EQUAL_UINT64(0, operation_id);
 
-  const mln_lat_lng coordinates[] = {
-    {.latitude = 1.0, .longitude = 2.0},
-    {.latitude = 3.0, .longitude = 4.0},
-  };
-  const mln_geometry geometry = {
-    .size = sizeof(mln_geometry),
-    .type = MLN_GEOMETRY_TYPE_LINE_STRING,
-    .data = {
-      .line_string = {
-        .coordinates = coordinates,
-        .coordinate_count = sizeof(coordinates) / sizeof(coordinates[0]),
-      }
-    },
-  };
-  definition = offline_geometry_definition(&geometry);
+  const mln_buffer_view geometry = MLN_BUFFER_LITERAL(
+    "{\"type\":\"LineString\",\"coordinates\":[[2,1],[4,3]]}"
+  );
+  definition = offline_geometry_definition(geometry);
   definition.data.geometry.style_url = NULL;
   operation_id = 123;
   TEST_ASSERT_EQUAL_INT(
@@ -322,8 +311,8 @@ static void offline_regions_reject_raw_invalid_descriptors(void) {
   );
   TEST_ASSERT_EQUAL_UINT64(0, operation_id);
 
-  definition = offline_geometry_definition(&geometry);
-  definition.data.geometry.geometry = NULL;
+  definition = offline_geometry_definition(geometry);
+  definition.data.geometry.geometry = (mln_buffer_view){0};
   operation_id = 123;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,

@@ -67,29 +67,15 @@ test "supported OpenGL context providers are exposed semantically" {
     }
 }
 
-fn expectFeaturePropertyString(feature: *const maplibre.QueriedFeature, key: []const u8, expected: []const u8) !void {
-    for (feature.feature.properties) |property| {
-        if (std.mem.eql(u8, property.key, key)) {
-            const actual = switch (property.value) {
-                .string => |value| value,
-                else => return error.ExpectedString,
-            };
-            try testing.expectEqualStrings(expected, actual);
-            return;
-        }
-    }
-    return error.MissingFeatureProperty;
-}
-
 fn waitForRenderedFeatureQuery(
     runtime: *maplibre.RuntimeHandle,
     session: *maplibre.RenderSessionHandle,
     geometry: maplibre.RenderedQueryGeometry,
     options: maplibre.RenderedFeatureQueryOptions,
-) !maplibre.FeatureQueryResult {
+) !maplibre.OwnedString {
     for (0..1000) |_| {
         var result = try session.queryRenderedFeatures(testing.allocator, geometry, options);
-        if (result.features.len > 0) return result;
+        if (firstArrayElement(result.value) != null) return result;
         result.deinit();
         try runtime.pump(0);
         _ = try session.renderUpdate();
@@ -101,16 +87,12 @@ fn waitForRenderedFeatureQuery(
 fn waitForSourceFeatureQuery(
     runtime: *maplibre.RuntimeHandle,
     session: *maplibre.RenderSessionHandle,
-) !maplibre.FeatureQueryResult {
+) !maplibre.OwnedString {
     for (0..1000) |_| {
         var result = try session.querySourceFeatures(testing.allocator, "point", .{
-            .filter = .{ .array = &.{
-                .{ .string = "==" },
-                .{ .array = &.{ .{ .string = "get" }, .{ .string = "kind" } } },
-                .{ .string = "capital" },
-            } },
+            .filter = "[\"==\",[\"get\",\"kind\"],\"capital\"]",
         });
-        if (result.features.len > 0) return result;
+        if (firstArrayElement(result.value) != null) return result;
         result.deinit();
         try runtime.pump(0);
         _ = try session.renderUpdate();
@@ -119,44 +101,83 @@ fn waitForSourceFeatureQuery(
     return error.SourceFeatureNotQueryable;
 }
 
-fn ownedGeometryAsBorrowed(geometry: maplibre.OwnedGeometry) maplibre.Geometry {
-    return switch (geometry) {
-        .empty => .empty,
-        .point => |point| .{ .point = point },
-        .line_string => |coordinates| .{ .line_string = coordinates },
-        .polygon => |rings| .{ .polygon = rings },
-        .multi_point => |coordinates| .{ .multi_point = coordinates },
-        .multi_line_string => |lines| .{ .multi_line_string = lines },
-        .multi_polygon => |polygons| .{ .multi_polygon = polygons },
-        .collection => .empty,
-    };
+fn skipWhitespace(json: []const u8, start: usize) usize {
+    var cursor = start;
+    while (cursor < json.len and std.ascii.isWhitespace(json[cursor])) cursor += 1;
+    return cursor;
 }
 
-fn ownedJsonAsBorrowed(value: maplibre.OwnedJsonValue) maplibre.JsonValue {
-    return switch (value) {
-        .null => .null,
-        .bool => |item| .{ .bool = item },
-        .uint => |item| .{ .uint = item },
-        .int => |item| .{ .int = item },
-        .double => |item| .{ .double = item },
-        .string => |item| .{ .string = item },
-        .array, .object => .null,
-    };
-}
-
-fn queriedFeatureAsBorrowed(allocator: std.mem.Allocator, queried: *const maplibre.QueriedFeature) !struct { feature: maplibre.Feature, properties: []maplibre.JsonMember } {
-    const properties = try allocator.alloc(maplibre.JsonMember, queried.feature.properties.len);
-    for (queried.feature.properties, properties) |property, *out| {
-        out.* = .{ .key = property.key, .value = ownedJsonAsBorrowed(property.value) };
+fn jsonStringEnd(json: []const u8, start: usize) ?usize {
+    var escaped = false;
+    var cursor = start + 1;
+    while (cursor < json.len) : (cursor += 1) {
+        if (escaped) escaped = false else if (json[cursor] == '\\') escaped = true else if (json[cursor] == '"') return cursor + 1;
     }
-    return .{
-        .feature = .{
-            .geometry = ownedGeometryAsBorrowed(queried.feature.geometry),
-            .properties = properties,
-            .identifier = queried.feature.identifier,
-        },
-        .properties = properties,
-    };
+    return null;
+}
+
+fn jsonValueEnd(json: []const u8, start: usize) ?usize {
+    if (start >= json.len) return null;
+    if (json[start] == '"') return jsonStringEnd(json, start);
+    if (json[start] != '{' and json[start] != '[') {
+        var cursor = start;
+        while (cursor < json.len and !std.ascii.isWhitespace(json[cursor]) and json[cursor] != ',' and json[cursor] != '}' and json[cursor] != ']') cursor += 1;
+        return cursor;
+    }
+    var depth: usize = 0;
+    var cursor = start;
+    while (cursor < json.len) {
+        if (json[cursor] == '"') {
+            cursor = jsonStringEnd(json, cursor) orelse return null;
+            continue;
+        }
+        if (json[cursor] == '{' or json[cursor] == '[') depth += 1;
+        if (json[cursor] == '}' or json[cursor] == ']') {
+            depth -= 1;
+            if (depth == 0) return cursor + 1;
+        }
+        cursor += 1;
+    }
+    return null;
+}
+
+fn rawMember(json: []const u8, key: []const u8) ?[]const u8 {
+    var cursor = skipWhitespace(json, 0);
+    if (cursor >= json.len or json[cursor] != '{') return null;
+    cursor += 1;
+    while (true) {
+        cursor = skipWhitespace(json, cursor);
+        if (cursor >= json.len or json[cursor] == '}') return null;
+        const key_end = jsonStringEnd(json, cursor) orelse return null;
+        const member_name = json[cursor + 1 .. key_end - 1];
+        cursor = skipWhitespace(json, key_end);
+        if (cursor >= json.len or json[cursor] != ':') return null;
+        const value_start = skipWhitespace(json, cursor + 1);
+        const value_end = jsonValueEnd(json, value_start) orelse return null;
+        if (std.mem.eql(u8, member_name, key)) return json[value_start..value_end];
+        cursor = skipWhitespace(json, value_end);
+        if (cursor >= json.len or json[cursor] != ',') return null;
+        cursor += 1;
+    }
+}
+
+fn firstArrayElement(json: []const u8) ?[]const u8 {
+    var cursor = skipWhitespace(json, 0);
+    if (cursor >= json.len or json[cursor] != '[') return null;
+    cursor = skipWhitespace(json, cursor + 1);
+    if (cursor >= json.len or json[cursor] == ']') return null;
+    return json[cursor .. jsonValueEnd(json, cursor) orelse return null];
+}
+
+fn queryFeature(result: []const u8) ?[]const u8 {
+    const queried = firstArrayElement(result) orelse return null;
+    return rawMember(queried, "feature");
+}
+
+fn queryFeatureProperty(result: []const u8, key: []const u8) ?[]const u8 {
+    const feature = queryFeature(result) orelse return null;
+    const properties = rawMember(feature, "properties") orelse return null;
+    return rawMember(properties, key);
 }
 
 fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
@@ -1566,51 +1587,27 @@ test "render session feature state set get and remove" {
     const session = &owned.session;
 
     const selector = maplibre.FeatureStateSelector{ .source_id = "point", .feature_id = "feature-1" };
-    const state_members = [_]maplibre.JsonMember{
-        .{ .key = "hover", .value = .{ .bool = true } },
-        .{ .key = "radius", .value = .{ .uint = std.math.maxInt(u64) } },
-    };
-    try testing.expectError(error.InvalidState, session.setFeatureState(testing.allocator, selector, .{ .object = state_members[0..] }));
+    const feature_state = "{\"hover\":true,\"radius\":18446744073709551615}";
+    try testing.expectError(error.InvalidState, session.setFeatureState(testing.allocator, selector, feature_state));
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
     try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
 
-    try session.setFeatureState(testing.allocator, selector, .{ .object = state_members[0..] });
+    try session.setFeatureState(testing.allocator, selector, feature_state);
     var snapshot = try session.getFeatureState(testing.allocator, selector);
-    defer snapshot.deinit(testing.allocator);
-    const members = switch (snapshot) {
-        .object => |items| items,
-        else => return error.ExpectedObject,
-    };
-    try testing.expectEqual(@as(usize, 2), members.len);
-    var saw_hover = false;
-    var saw_radius = false;
-    for (members) |member| {
-        if (std.mem.eql(u8, member.key, "hover")) {
-            try testing.expectEqual(true, member.value.bool);
-            saw_hover = true;
-        } else if (std.mem.eql(u8, member.key, "radius")) {
-            try testing.expectEqual(@as(u64, std.math.maxInt(u64)), member.value.uint);
-            saw_radius = true;
-        }
-    }
-    try testing.expect(saw_hover);
-    try testing.expect(saw_radius);
+    defer snapshot.deinit();
+    try testing.expectEqualStrings("true", rawMember(snapshot.value, "hover").?);
+    try testing.expectEqualStrings("18446744073709551615", rawMember(snapshot.value, "radius").?);
 
     try session.removeFeatureState(testing.allocator, .{ .source_id = "point", .feature_id = "feature-1", .state_key = "hover" });
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
     try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
 
     var after_remove = try session.getFeatureState(testing.allocator, selector);
-    defer after_remove.deinit(testing.allocator);
-    const after_members = switch (after_remove) {
-        .object => |items| items,
-        else => return error.ExpectedObject,
-    };
-    try testing.expectEqual(@as(usize, 1), after_members.len);
-    try testing.expectEqualStrings("radius", after_members[0].key);
-    try testing.expectEqual(@as(u64, std.math.maxInt(u64)), after_members[0].value.uint);
+    defer after_remove.deinit();
+    try testing.expect(rawMember(after_remove.value, "hover") == null);
+    try testing.expectEqualStrings("18446744073709551615", rawMember(after_remove.value, "radius").?);
 
     try testing.expectError(error.InvalidArgument, session.removeFeatureState(testing.allocator, .{ .source_id = "point", .state_key = "hover" }));
 }
@@ -1639,28 +1636,24 @@ test "render session queries rendered and source features" {
         .max = .{ .x = query_point.x + 20, .y = query_point.y + 20 },
     } }, .{
         .layer_ids = &.{"point-circle"},
-        .filter = .{ .array = &.{
-            .{ .string = "==" },
-            .{ .array = &.{ .{ .string = "get" }, .{ .string = "kind" } } },
-            .{ .string = "capital" },
-        } },
+        .filter = "[\"==\",[\"get\",\"kind\"],\"capital\"]",
     });
     defer rendered.deinit();
-    try testing.expect(rendered.features[0].source_id != null);
-    try testing.expectEqualStrings("point", rendered.features[0].source_id.?);
-    try expectFeaturePropertyString(&rendered.features[0], "kind", "capital");
+    const rendered_item = firstArrayElement(rendered.value).?;
+    try testing.expectEqualStrings("\"point\"", rawMember(rendered_item, "sourceId").?);
+    try testing.expectEqualStrings("\"capital\"", queryFeatureProperty(rendered.value, "kind").?);
 
     var source = try waitForSourceFeatureQuery(&runtime, session);
     defer source.deinit();
-    try testing.expect(source.features[0].source_id != null);
-    try testing.expectEqualStrings("point", source.features[0].source_id.?);
-    try expectFeaturePropertyString(&source.features[0], "kind", "capital");
+    const source_item = firstArrayElement(source.value).?;
+    try testing.expectEqualStrings("\"point\"", rawMember(source_item, "sourceId").?);
+    try testing.expectEqualStrings("\"capital\"", queryFeatureProperty(source.value, "kind").?);
 
-    test_hooks.useCountingFeatureQueryResultDestroy();
-    defer test_hooks.restoreFeatureQueryResultDestroy();
     var failing_allocator = testing.FailingAllocator.init(testing.allocator, .{ .fail_index = 0 });
+    test_hooks.useCountingBufferDestroy();
+    defer test_hooks.restoreBufferDestroy();
     try testing.expectError(error.OutOfMemory, session.querySourceFeatures(failing_allocator.allocator(), "point", null));
-    try testing.expectEqual(@as(usize, 1), test_hooks.featureQueryResultDestroyCount());
+    try testing.expectEqual(@as(usize, 1), test_hooks.bufferDestroyCount());
 
     try testing.expectError(error.InvalidArgument, session.queryRenderedFeatures(testing.allocator, .{ .point = .{ .x = std.math.inf(f64), .y = 0.0 } }, null));
     try testing.expectError(error.InvalidArgument, session.querySourceFeatures(testing.allocator, "", null));
@@ -1690,7 +1683,7 @@ test "render session clips rendered box queries to the viewport" {
         .max = .{ .x = 8192, .y = 8192 },
     } }, options);
     defer oversized.deinit();
-    try expectFeaturePropertyString(&oversized.features[0], "kind", "capital");
+    try testing.expectEqualStrings("\"capital\"", queryFeatureProperty(oversized.value, "kind").?);
 
     // Corners in either order describe the same box.
     var inverted = try session.queryRenderedFeatures(testing.allocator, .{ .box = .{
@@ -1698,7 +1691,7 @@ test "render session clips rendered box queries to the viewport" {
         .max = .{ .x = -8192, .y = -8192 },
     } }, options);
     defer inverted.deinit();
-    try testing.expectEqual(@as(usize, 1), inverted.features.len);
+    try testing.expect(firstArrayElement(inverted.value) != null);
 
     // Clipping keeps a fully off-screen box empty rather than collapsing it
     // onto a viewport edge.
@@ -1707,7 +1700,7 @@ test "render session clips rendered box queries to the viewport" {
         .max = .{ .x = 4096, .y = 4096 },
     } }, options);
     defer offscreen.deinit();
-    try testing.expectEqual(@as(usize, 0), offscreen.features.len);
+    try testing.expect(firstArrayElement(offscreen.value) == null);
 }
 
 test "render session queries cluster feature extensions" {
@@ -1736,64 +1729,29 @@ test "render session queries cluster feature extensions" {
     } }, .{ .layer_ids = &.{"cluster-circle"} });
     defer clusters.deinit();
 
-    const borrowed = try queriedFeatureAsBorrowed(testing.allocator, &clusters.features[0]);
-    defer testing.allocator.free(borrowed.properties);
+    const feature = queryFeature(clusters.value).?;
+    var children = try session.queryFeatureExtension(testing.allocator, "cluster-source", feature, "supercluster", "children", null);
+    defer children.deinit();
+    try testing.expect(firstArrayElement(rawMember(children.value, "features").?) != null);
 
-    var children = try session.queryFeatureExtension(testing.allocator, "cluster-source", borrowed.feature, "supercluster", "children", null);
-    defer children.deinit(testing.allocator);
-    const child_collection = switch (children) {
-        .feature_collection => |collection| collection,
-        else => return error.ExpectedFeatureCollection,
-    };
-    try testing.expect(child_collection.features.len > 0);
-
-    var expansion_zoom = try session.queryFeatureExtension(testing.allocator, "cluster-source", borrowed.feature, "supercluster", "expansion-zoom", null);
-    defer expansion_zoom.deinit(testing.allocator);
-    const zoom_value = switch (expansion_zoom) {
-        .value => |value| value,
-        else => return error.ExpectedValue,
-    };
-    try testing.expect(zoom_value == .uint);
+    var expansion_zoom = try session.queryFeatureExtension(testing.allocator, "cluster-source", feature, "supercluster", "expansion-zoom", null);
+    defer expansion_zoom.deinit();
+    _ = try std.fmt.parseInt(u64, expansion_zoom.value, 10);
 
     // Native reads `limit` and `offset` only as unsigned values, falling back
     // to ten leaves at offset zero, so both must move the observed result.
-    const first_args = [_]maplibre.JsonMember{
-        .{ .key = "limit", .value = .{ .uint = 1 } },
-        .{ .key = "offset", .value = .{ .uint = 0 } },
-    };
-    var first = try session.queryFeatureExtension(testing.allocator, "cluster-source", borrowed.feature, "supercluster", "leaves", .{ .object = first_args[0..] });
-    defer first.deinit(testing.allocator);
-    const second_args = [_]maplibre.JsonMember{
-        .{ .key = "limit", .value = .{ .uint = 1 } },
-        .{ .key = "offset", .value = .{ .uint = 1 } },
-    };
-    var second = try session.queryFeatureExtension(testing.allocator, "cluster-source", borrowed.feature, "supercluster", "leaves", .{ .object = second_args[0..] });
-    defer second.deinit(testing.allocator);
-    try testing.expect(!std.mem.eql(u8, try singleLeafName(first), try singleLeafName(second)));
+    var first = try session.queryFeatureExtension(testing.allocator, "cluster-source", feature, "supercluster", "leaves", "{\"limit\":1,\"offset\":0}");
+    defer first.deinit();
+    var second = try session.queryFeatureExtension(testing.allocator, "cluster-source", feature, "supercluster", "leaves", "{\"limit\":1,\"offset\":1}");
+    defer second.deinit();
+    try testing.expect(!std.mem.eql(u8, leafName(first.value).?, leafName(second.value).?));
 }
 
-fn featurePropertyNumber(feature: *const maplibre.QueriedFeature, key: []const u8) !f64 {
-    for (feature.feature.properties) |property| {
-        if (!std.mem.eql(u8, property.key, key)) continue;
-        return switch (property.value) {
-            .uint => |value| @floatFromInt(value),
-            .int => |value| @floatFromInt(value),
-            .double => |value| value,
-            else => error.ExpectedNumberProperty,
-        };
-    }
-    return error.MissingFeatureProperty;
-}
-
-fn featurePropertyBool(feature: *const maplibre.QueriedFeature, key: []const u8) !bool {
-    for (feature.feature.properties) |property| {
-        if (!std.mem.eql(u8, property.key, key)) continue;
-        return switch (property.value) {
-            .bool => |value| value,
-            else => error.ExpectedBoolProperty,
-        };
-    }
-    return error.MissingFeatureProperty;
+fn leafName(collection: []const u8) ?[]const u8 {
+    const features = rawMember(collection, "features") orelse return null;
+    const feature = firstArrayElement(features) orelse return null;
+    const properties = rawMember(feature, "properties") orelse return null;
+    return rawMember(properties, "name");
 }
 
 test "GeoJSON source options cluster nearby points and aggregate cluster properties" {
@@ -1812,40 +1770,21 @@ test "GeoJSON source options cluster nearby points and aggregate cluster propert
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_style_loaded));
 
-    const first_properties = [_]maplibre.JsonMember{.{ .key = "rank", .value = .{ .uint = 1 } }};
-    const second_properties = [_]maplibre.JsonMember{.{ .key = "rank", .value = .{ .uint = 2 } }};
-    const third_properties = [_]maplibre.JsonMember{.{ .key = "rank", .value = .{ .uint = 3 } }};
-    const features = [_]maplibre.Feature{
-        .{ .geometry = .{ .point = .{ .latitude = 0.0, .longitude = 0.0 } }, .properties = first_properties[0..] },
-        .{ .geometry = .{ .point = .{ .latitude = 0.001, .longitude = 0.001 } }, .properties = second_properties[0..] },
-        .{ .geometry = .{ .point = .{ .latitude = 0.002, .longitude = 0.002 } }, .properties = third_properties[0..] },
-    };
-    const rank_expression = [_]maplibre.JsonValue{ .{ .string = "get" }, .{ .string = "rank" } };
-    const total_expression = [_]maplibre.JsonValue{ .{ .string = "+" }, .{ .array = rank_expression[0..] } };
-    const cluster_properties = [_]maplibre.JsonMember{.{ .key = "total", .value = .{ .array = total_expression[0..] } }};
+    const features = "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]},\"properties\":{\"rank\":1}},{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0.001,0.001]},\"properties\":{\"rank\":2}},{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0.002,0.002]},\"properties\":{\"rank\":3}}]}";
     try map.addGeoJsonSourceData(
         testing.allocator,
         "cluster-options-source",
-        .{ .feature_collection = features[0..] },
+        features,
         .{
             .cluster = true,
             .cluster_radius = 50,
             .cluster_min_points = 2,
             .cluster_max_zoom = 14,
-            .cluster_properties = .{ .object = cluster_properties[0..] },
+            .cluster_properties = "{\"total\":[\"+\",[\"get\",\"rank\"]]}",
         },
     );
 
-    const filter = [_]maplibre.JsonValue{ .{ .string = "has" }, .{ .string = "point_count" } };
-    const paint = [_]maplibre.JsonMember{.{ .key = "circle-radius", .value = .{ .uint = 20 } }};
-    const layer_members = [_]maplibre.JsonMember{
-        .{ .key = "id", .value = .{ .string = "cluster-options-circle" } },
-        .{ .key = "type", .value = .{ .string = "circle" } },
-        .{ .key = "source", .value = .{ .string = "cluster-options-source" } },
-        .{ .key = "filter", .value = .{ .array = filter[0..] } },
-        .{ .key = "paint", .value = .{ .object = paint[0..] } },
-    };
-    try map.addStyleLayerJson(testing.allocator, .{ .object = layer_members[0..] }, "");
+    try map.addStyleLayerJson(testing.allocator, "{\"id\":\"cluster-options-circle\",\"type\":\"circle\",\"source\":\"cluster-options-source\",\"filter\":[\"has\",\"point_count\"],\"paint\":{\"circle-radius\":20}}", "");
 
     for (0..5) |_| {
         if (!try waitForEvent(&runtime, .map_render_update_available)) break;
@@ -1861,27 +1800,9 @@ test "GeoJSON source options cluster nearby points and aggregate cluster propert
     } }, .{ .layer_ids = &.{"cluster-options-circle"} });
     defer clusters.deinit();
 
-    const cluster = &clusters.features[0];
-    try testing.expect(try featurePropertyBool(cluster, "cluster"));
-    try testing.expectEqual(@as(f64, 3), try featurePropertyNumber(cluster, "point_count"));
-    try testing.expectEqual(@as(f64, 6), try featurePropertyNumber(cluster, "total"));
-}
-
-fn singleLeafName(result: maplibre.FeatureExtensionResult) ![]const u8 {
-    const collection = switch (result) {
-        .feature_collection => |value| value,
-        else => return error.ExpectedFeatureCollection,
-    };
-    try testing.expectEqual(@as(usize, 1), collection.features.len);
-    for (collection.features[0].properties) |member| {
-        if (std.mem.eql(u8, member.key, "name")) {
-            return switch (member.value) {
-                .string => |value| value,
-                else => error.ExpectedStringProperty,
-            };
-        }
-    }
-    return error.MissingNameProperty;
+    try testing.expectEqualStrings("true", queryFeatureProperty(clusters.value, "cluster").?);
+    try testing.expectEqualStrings("3", queryFeatureProperty(clusters.value, "point_count").?);
+    try testing.expectEqualStrings("6.0", queryFeatureProperty(clusters.value, "total").?);
 }
 
 test "unsupported backend owned texture attachment reports unsupported" {
@@ -2132,7 +2053,10 @@ test "OpenGL surface renders through public bindings" {
     defer testing.allocator.free(pixels);
     @memset(pixels, 0);
     try context.readSurfaceRGBA8(128, 128, pixels);
-    try testing.expect(hasNonZeroByte(pixels));
+    // The style's background color reaches the surface through the clear the
+    // session's exclusive context allows, so a corner away from the circle
+    // layer carries it exactly.
+    try testing.expectEqualSlices(u8, &.{ 0xd8, 0xf1, 0xff, 0xff }, pixels[0..4]);
 
     try testing.expectError(error.Unsupported, session.acquireOpenGLOwnedTextureFrame());
     var readback_buffer: [128 * 128 * 4]u8 = undefined;

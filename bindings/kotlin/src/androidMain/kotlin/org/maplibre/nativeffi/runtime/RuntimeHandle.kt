@@ -9,19 +9,18 @@ import org.bytedeco.javacpp.Pointer
 import org.bytedeco.javacpp.SizeTPointer
 import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.error.InvalidStateException
-import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.internal.callback.HttpHeaderTransformState
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
+import org.maplibre.nativeffi.internal.javacpp.ByteArrayViewScope
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
-import org.maplibre.nativeffi.map.GeometryScope
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.RenderingStats
 import org.maplibre.nativeffi.map.TileOperation
@@ -546,15 +545,42 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
     liveMaps.remove(map.nativeHandleId())
   }
 
+  internal fun copyEventForTesting(
+    type: Int,
+    sourceType: Int,
+    sourceId: Long,
+    code: Int,
+    payload: RuntimeEventPayload,
+    message: String,
+  ): RuntimeEvent = copiedRuntimeEvent(type, sourceType, sourceId, code, payload, message)
+
   private fun requireLiveHandle(): Long {
     core.requireLive()
     return handleId
   }
 
   private fun runtimeEvent(event: MaplibreNativeC.mln_runtime_event): RuntimeEvent {
-    val sourceType = RuntimeEventSourceType.fromNative(event.source_type())
-    val mapSource = if (sourceType == RuntimeEventSourceType.MAP) mapFor(event.source()) else null
-    val eventType = RuntimeEventType.fromNative(event.type())
+    return copiedRuntimeEvent(
+      event.type(),
+      event.source_type(),
+      event.source(),
+      event.code(),
+      runtimeEventPayload(event),
+      byteString(event.message(), event.message_size()),
+    )
+  }
+
+  private fun copiedRuntimeEvent(
+    rawType: Int,
+    rawSourceType: Int,
+    sourceId: Long,
+    code: Int,
+    payload: RuntimeEventPayload,
+    message: String,
+  ): RuntimeEvent {
+    val sourceType = RuntimeEventSourceType.fromNative(rawSourceType)
+    val mapSource = if (sourceType == RuntimeEventSourceType.MAP) mapFor(sourceId) else null
+    val eventType = RuntimeEventType.fromNative(rawType)
     if (eventType == RuntimeEventType.MAP_STYLE_LOADED) {
       mapSource?.releaseDetachedCustomGeometrySources()
     }
@@ -563,9 +589,9 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
       sourceType,
       if (sourceType == RuntimeEventSourceType.RUNTIME) this else null,
       mapSource,
-      event.code(),
-      runtimeEventPayload(event),
-      byteString(event.message(), event.message_size()),
+      code,
+      payload,
+      message,
     )
   }
 
@@ -579,68 +605,8 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
     return map
   }
 
-  private fun runtimeEventPayload(event: MaplibreNativeC.mln_runtime_event): RuntimeEventPayload {
-    val payloadType = event.payload_type()
-    val payloadBytes = payloadBytes(event)
-    return when (payloadType) {
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_NONE -> RuntimeEventPayload.None
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME ->
-        if (hasPayloadSize(event, PayloadSizes.RENDER_FRAME)) {
-          renderFramePayload(event.payload())
-        } else {
-          RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-        }
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP ->
-        if (hasPayloadSize(event, PayloadSizes.RENDER_MAP)) {
-          renderMapPayload(event.payload())
-        } else {
-          RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-        }
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING ->
-        if (hasPayloadSize(event, PayloadSizes.STYLE_IMAGE_MISSING)) {
-          styleImageMissingPayload(event.payload())
-        } else {
-          RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-        }
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION ->
-        if (hasPayloadSize(event, PayloadSizes.TILE_ACTION)) {
-          tileActionPayload(event.payload())
-        } else {
-          RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-        }
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS ->
-        if (hasPayloadSize(event, PayloadSizes.OFFLINE_REGION_STATUS)) {
-          offlineRegionStatusPayload(event.payload())
-        } else {
-          RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-        }
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR ->
-        if (hasPayloadSize(event, PayloadSizes.OFFLINE_REGION_RESPONSE_ERROR)) {
-          offlineRegionResponseErrorPayload(event.payload())
-        } else {
-          RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-        }
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT ->
-        if (hasPayloadSize(event, PayloadSizes.OFFLINE_REGION_TILE_COUNT_LIMIT)) {
-          offlineRegionTileCountLimitPayload(event.payload())
-        } else {
-          RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-        }
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED ->
-        if (hasPayloadSize(event, PayloadSizes.OFFLINE_OPERATION_COMPLETED)) {
-          offlineOperationCompletedPayload(event.payload())
-        } else {
-          RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-        }
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED ->
-        if (hasPayloadSize(event, PayloadSizes.CAMERA_TRANSITION_FINISHED)) {
-          cameraTransitionFinishedPayload(event.payload())
-        } else {
-          RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-        }
-      else -> RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-    }
-  }
+  private fun runtimeEventPayload(event: MaplibreNativeC.mln_runtime_event): RuntimeEventPayload =
+    JavaCppRuntimeStructs.runtimeEventPayload(event)
 
   private fun takeOfflineRegionSnapshot(
     operationId: Long,
@@ -775,20 +741,34 @@ private fun offlineRegionSnapshot(outSnapshot: LongPointer): OfflineRegionInfo {
 private fun offlineRegionList(outList: LongPointer): List<OfflineRegionInfo> {
   val list = outList.get()
   require(list != 0L) { "offline operation returned a null region list" }
+  return offlineRegionList(
+    list,
+    counter = MaplibreNativeC::mln_offline_region_list_count,
+    getter = MaplibreNativeC::mln_offline_region_list_get,
+    destroyer = MaplibreNativeC::mln_offline_region_list_destroy,
+  )
+}
+
+private fun offlineRegionList(
+  list: Long,
+  counter: (Long, SizeTPointer) -> Int,
+  getter: (Long, Long, MaplibreNativeC.mln_offline_region_info) -> Int,
+  destroyer: (Long) -> Unit,
+): List<OfflineRegionInfo> {
   return try {
     SizeTPointer(1).use { outCount ->
-      Status.check(MaplibreNativeC.mln_offline_region_list_count(list, outCount))
+      Status.check(counter(list, outCount))
       val count = Math.toIntExact(outCount.get())
       List(count) { index ->
         MaplibreNativeC.mln_offline_region_info().use { info ->
           info.size(info.sizeof())
-          Status.check(MaplibreNativeC.mln_offline_region_list_get(list, index.toLong(), info))
+          Status.check(getter(list, index.toLong(), info))
           offlineRegionInfo(info)
         }
       }
     }
   } finally {
-    MaplibreNativeC.mln_offline_region_list_destroy(list)
+    destroyer(list)
   }
 }
 
@@ -827,65 +807,12 @@ private fun offlineGeometryDefinition(
 ): OfflineRegionDefinition.GeometryRegion =
   OfflineRegionDefinition.GeometryRegion(
     byteString(definition.style_url(), cStringLength(definition.style_url())),
-    geometry(definition.geometry()),
+    byteArray(definition.geometry().data(), definition.geometry().size()),
     definition.min_zoom(),
     definition.max_zoom(),
     definition.pixel_ratio(),
     definition.include_ideographs(),
   )
-
-private fun geometry(value: MaplibreNativeC.mln_geometry): Geometry =
-  when (value.type()) {
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_EMPTY -> Geometry.Empty
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_POINT -> Geometry.Point(latLng(value.data_point()))
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_LINE_STRING ->
-      Geometry.LineString(coordinateSpan(value.data_line_string()))
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_POLYGON -> Geometry.Polygon(polygon(value.data_polygon()))
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POINT ->
-      Geometry.MultiPoint(coordinateSpan(value.data_multi_point()))
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING -> {
-      val native = value.data_multi_line_string()
-      val lines = native.lines()
-      Geometry.MultiLineString(
-        List(Math.toIntExact(native.line_count())) { index ->
-          coordinateSpan(lines.getPointer(index.toLong()))
-        }
-      )
-    }
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POLYGON -> {
-      val native = value.data_multi_polygon()
-      val polygons = native.polygons()
-      Geometry.MultiPolygon(
-        List(Math.toIntExact(native.polygon_count())) { index ->
-          polygon(polygons.getPointer(index.toLong()))
-        }
-      )
-    }
-    MaplibreNativeC.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION -> {
-      val native = value.data_geometry_collection()
-      val geometries = native.geometries()
-      Geometry.Collection(
-        List(Math.toIntExact(native.geometry_count())) { index ->
-          geometry(geometries.getPointer(index.toLong()))
-        }
-      )
-    }
-    else -> Geometry.Unknown(value.type(), value.size())
-  }
-
-private fun coordinateSpan(value: MaplibreNativeC.mln_coordinate_span): List<LatLng> {
-  val coordinates = value.coordinates()
-  return List(Math.toIntExact(value.coordinate_count())) { index ->
-    latLng(coordinates.getPointer(index.toLong()))
-  }
-}
-
-private fun polygon(value: MaplibreNativeC.mln_polygon_geometry): List<List<LatLng>> {
-  val rings = value.rings()
-  return List(Math.toIntExact(value.ring_count())) { index ->
-    coordinateSpan(rings.getPointer(index.toLong()))
-  }
-}
 
 private fun latLngBounds(bounds: MaplibreNativeC.mln_lat_lng_bounds): LatLngBounds =
   LatLngBounds(
@@ -1046,11 +973,11 @@ private class OfflineRegionDefinitionScope(value: OfflineRegionDefinition) : Aut
     value: OfflineRegionDefinition.GeometryRegion
   ): MaplibreNativeC.mln_offline_geometry_region_definition {
     val out = own(MaplibreNativeC.mln_offline_geometry_region_definition())
-    val geometry = GeometryScope(value.geometry)
+    val geometry = ByteArrayViewScope(value.geometryTransit)
     closeables += geometry
     out.size(out.sizeof())
     out.style_url(utf8(value.styleUrl))
-    out.geometry(geometry.value)
+    out.geometry(geometry.view)
     out.min_zoom(value.minZoom)
     out.max_zoom(value.maxZoom)
     out.pixel_ratio(value.pixelRatio)
@@ -1074,5 +1001,100 @@ private class OfflineRegionDefinitionScope(value: OfflineRegionDefinition) : Aut
   private fun <T : Pointer> own(pointer: T): T {
     owned.add(pointer)
     return pointer
+  }
+}
+
+/** Direct test seam for the JavaCPP offline and runtime-event adapter. */
+internal object JavaCppRuntimeStructs {
+  fun offlineRegionDefinitionRoundTrip(value: OfflineRegionDefinition): OfflineRegionDefinition =
+    OfflineRegionDefinitionScope(value).use { offlineRegionDefinition(it.definition) }
+
+  fun offlineRegionInfoSnapshot(
+    id: Long,
+    definition: OfflineRegionDefinition,
+    metadata: ByteArray,
+  ): OfflineRegionInfo =
+    OfflineRegionDefinitionScope(definition).use { nativeDefinition ->
+      BytePointer(Math.max(metadata.size, 1).toLong()).use { nativeMetadata ->
+        if (metadata.isNotEmpty()) nativeMetadata.put(metadata, 0, metadata.size)
+        MaplibreNativeC.mln_offline_region_info().use { info ->
+          info.id(id)
+          info.definition(nativeDefinition.definition)
+          info.metadata(if (metadata.isEmpty()) null else nativeMetadata)
+          info.metadata_size(metadata.size.toLong())
+          offlineRegionInfo(info)
+        }
+      }
+    }
+
+  fun unknownRuntimePayload(type: Int, bytes: ByteArray): RuntimeEventPayload =
+    BytePointer(Math.max(bytes.size, 1).toLong()).use { storage ->
+      if (bytes.isNotEmpty()) storage.put(bytes, 0, bytes.size)
+      MaplibreNativeC.mln_runtime_event().use { event ->
+        event.payload_type(type)
+        event.payload(if (bytes.isEmpty()) null else storage)
+        event.payload_size(bytes.size.toLong())
+        runtimeEventPayload(event)
+      }
+    }
+
+  fun offlineRegionListCleanupAfterCopyFailure(): Int {
+    var destroys = 0
+    try {
+      offlineRegionList(
+        1L,
+        counter = { _, outCount ->
+          outCount.put(Long.MAX_VALUE)
+          org.maplibre.nativeffi.error.MaplibreStatus.OK.nativeCode
+        },
+        getter = { _, _, _ -> org.maplibre.nativeffi.error.MaplibreStatus.OK.nativeCode },
+        destroyer = { destroys++ },
+      )
+    } catch (_: ArithmeticException) {
+      return destroys
+    }
+    error("offline list conversion unexpectedly succeeded")
+  }
+
+  fun runtimeEventPayload(event: MaplibreNativeC.mln_runtime_event): RuntimeEventPayload {
+    val payloadType = event.payload_type()
+    val payloadBytes = payloadBytes(event)
+    return when (payloadType) {
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_NONE -> RuntimeEventPayload.None
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME ->
+        if (hasPayloadSize(event, PayloadSizes.RENDER_FRAME)) renderFramePayload(event.payload())
+        else RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP ->
+        if (hasPayloadSize(event, PayloadSizes.RENDER_MAP)) renderMapPayload(event.payload())
+        else RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING ->
+        if (hasPayloadSize(event, PayloadSizes.STYLE_IMAGE_MISSING)) {
+          styleImageMissingPayload(event.payload())
+        } else RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION ->
+        if (hasPayloadSize(event, PayloadSizes.TILE_ACTION)) tileActionPayload(event.payload())
+        else RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS ->
+        if (hasPayloadSize(event, PayloadSizes.OFFLINE_REGION_STATUS)) {
+          offlineRegionStatusPayload(event.payload())
+        } else RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR ->
+        if (hasPayloadSize(event, PayloadSizes.OFFLINE_REGION_RESPONSE_ERROR)) {
+          offlineRegionResponseErrorPayload(event.payload())
+        } else RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT ->
+        if (hasPayloadSize(event, PayloadSizes.OFFLINE_REGION_TILE_COUNT_LIMIT)) {
+          offlineRegionTileCountLimitPayload(event.payload())
+        } else RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED ->
+        if (hasPayloadSize(event, PayloadSizes.OFFLINE_OPERATION_COMPLETED)) {
+          offlineOperationCompletedPayload(event.payload())
+        } else RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED ->
+        if (hasPayloadSize(event, PayloadSizes.CAMERA_TRANSITION_FINISHED)) {
+          cameraTransitionFinishedPayload(event.payload())
+        } else RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+      else -> RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+    }
   }
 }

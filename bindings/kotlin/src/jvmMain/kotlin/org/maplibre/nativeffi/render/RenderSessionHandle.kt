@@ -1,17 +1,13 @@
 package org.maplibre.nativeffi.render
 
 import java.lang.foreign.MemorySegment
-import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.status.Status
-import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.query.FeatureExtensionResult
 import org.maplibre.nativeffi.query.FeatureStateSelector
-import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
@@ -109,13 +105,13 @@ internal constructor(private val map: MapHandle, private val handle: NativeRende
     NativeAccess.dumpRenderSessionDebugLogs(requireLiveHandle())
   }
 
-  public actual fun setFeatureState(selector: FeatureStateSelector, value: JsonValue) {
+  public actual fun setFeatureState(selector: FeatureStateSelector, value: ByteArray) {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("set feature state")
     NativeAccess.setFeatureState(requireLiveHandle(), selector, value)
   }
 
-  public actual fun getFeatureState(selector: FeatureStateSelector): JsonValue {
+  public actual fun getFeatureState(selector: FeatureStateSelector): ByteArray {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("get feature state")
     return NativeAccess.getFeatureState(requireLiveHandle(), selector)
@@ -130,7 +126,7 @@ internal constructor(private val map: MapHandle, private val handle: NativeRende
   public actual fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): List<QueriedFeature> {
+  ): ByteArray {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("query rendered features")
     return NativeAccess.queryRenderedFeatures(requireLiveHandle(), geometry, options)
@@ -139,7 +135,7 @@ internal constructor(private val map: MapHandle, private val handle: NativeRende
   public actual fun querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ): List<QueriedFeature> {
+  ): ByteArray {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("query source features")
     return NativeAccess.querySourceFeatures(requireLiveHandle(), sourceId, options)
@@ -147,11 +143,11 @@ internal constructor(private val map: MapHandle, private val handle: NativeRende
 
   public actual fun queryFeatureExtension(
     sourceId: String,
-    feature: Feature,
+    feature: ByteArray,
     extension: String,
     extensionField: String,
-    arguments: JsonValue?,
-  ): FeatureExtensionResult {
+    arguments: ByteArray?,
+  ): ByteArray {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("query feature extension")
     return NativeAccess.queryFeatureExtension(

@@ -1,6 +1,5 @@
 using Maplibre.NativeFfi.Geo;
 using Maplibre.NativeFfi.Internal;
-using Maplibre.NativeFfi.Json;
 using Maplibre.NativeFfi.Render;
 
 namespace Maplibre.NativeFfi.Style;
@@ -157,11 +156,50 @@ public sealed record GeoJsonSourceOptions
     /// </summary>
     public bool? SynchronousUpdate { get; set; }
 
+    private byte[]? clusterProperties;
+
     /// <summary>
     /// Cluster aggregation expressions keyed by property name, as a JSON object whose members
     /// follow the MapLibre Style Spec <c>clusterProperties</c> form.
     /// </summary>
-    public JsonValue? ClusterProperties { get; set; }
+    public byte[]? ClusterProperties
+    {
+        get => clusterProperties?.ToArray();
+        set => clusterProperties = value?.ToArray();
+    }
+
+    public bool Equals(GeoJsonSourceOptions? other) =>
+        other is not null
+        && MinimumZoom == other.MinimumZoom
+        && MaximumZoom == other.MaximumZoom
+        && TileSize == other.TileSize
+        && Buffer == other.Buffer
+        && Tolerance == other.Tolerance
+        && LineMetrics == other.LineMetrics
+        && Cluster == other.Cluster
+        && ClusterRadius == other.ClusterRadius
+        && ClusterMaximumZoom == other.ClusterMaximumZoom
+        && ClusterMinimumPoints == other.ClusterMinimumPoints
+        && SynchronousUpdate == other.SynchronousUpdate
+        && ValueEquality.SequenceEquals(clusterProperties, other.clusterProperties);
+
+    public override int GetHashCode() =>
+        HashCode.Combine(
+            MinimumZoom,
+            MaximumZoom,
+            TileSize,
+            Buffer,
+            Tolerance,
+            LineMetrics,
+            Cluster,
+            HashCode.Combine(
+                ClusterRadius,
+                ClusterMaximumZoom,
+                ClusterMinimumPoints,
+                SynchronousUpdate,
+                ValueEquality.SequenceHashCode(clusterProperties)
+            )
+        );
 }
 
 public sealed class CustomGeometrySourceOptions

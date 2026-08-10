@@ -10,7 +10,7 @@
 #include "unity.h"
 
 #define MLN_STRING_LITERAL(text) \
-  ((mln_string_view){.data = (text), .size = sizeof(text) - 1})
+  ((mln_buffer_view){.data = (text), .size = sizeof(text) - 1})
 
 static void style_value_helpers_reject_unsafe_raw_descriptors(void) {
   mln_runtime runtime = mln_test_create_runtime();
@@ -24,7 +24,7 @@ static void style_value_helpers_reject_unsafe_raw_descriptors(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_set_image_source_coordinates(
-      map, (mln_string_view){.data = "image-url-source", .size = 16},
+      map, (mln_buffer_view){.data = "image-url-source", .size = 16},
       coordinates, 3
     )
   );
@@ -36,21 +36,32 @@ static void style_value_helpers_reject_unsafe_raw_descriptors(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_add_raster_dem_source_url(
-      map, (mln_string_view){.data = "bad-dem", .size = 7},
-      (mln_string_view){.data = "https://example.com/bad.json", .size = 28},
+      map, (mln_buffer_view){.data = "bad-dem", .size = 7},
+      (mln_buffer_view){.data = "https://example.com/bad.json", .size = 28},
       &options
     )
+  );
+
+  static const char nul_style[] =
+    "{\"version\":8,\"sources\":{},\"layers\":[]}\0garbage";
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_set_style_json(
+                                   map, (mln_buffer_view){
+                                          .data = nul_style,
+                                          .size = sizeof(nul_style) - 1,
+                                        }
+                                 )
   );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
-// Bindings always emit a full struct header, so only raw C callers can present
-// a short size or unknown field bits to the GeoJSON source adders.
-static void geojson_source_options_reject_unsafe_raw_headers(void) {
+// Bindings emit a full struct header and one complete cluster-properties
+// object, so only raw C callers can present these unsafe values.
+static void geojson_source_options_reject_unsafe_raw_values(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  const mln_string_view url = {
+  const mln_buffer_view url = {
     .data = "https://example.com/points.geojson", .size = 34
   };
 
@@ -59,7 +70,7 @@ static void geojson_source_options_reject_unsafe_raw_headers(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_add_geojson_source_url(
-      map, (mln_string_view){.data = "short-header", .size = 12}, url,
+      map, (mln_buffer_view){.data = "short-header", .size = 12}, url,
       &short_size
     )
   );
@@ -70,7 +81,7 @@ static void geojson_source_options_reject_unsafe_raw_headers(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_add_geojson_source_url(
-      map, (mln_string_view){.data = "unknown-field", .size = 13}, url,
+      map, (mln_buffer_view){.data = "unknown-field", .size = 13}, url,
       &unknown_field
     )
   );
@@ -82,7 +93,7 @@ static void geojson_source_options_reject_unsafe_raw_headers(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_add_geojson_source_url(
-      map, (mln_string_view){.data = "fractional-min", .size = 14}, url,
+      map, (mln_buffer_view){.data = "fractional-min", .size = 14}, url,
       &fractional_min_zoom
     )
   );
@@ -94,7 +105,7 @@ static void geojson_source_options_reject_unsafe_raw_headers(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_add_geojson_source_url(
-      map, (mln_string_view){.data = "fractional-max", .size = 14}, url,
+      map, (mln_buffer_view){.data = "fractional-max", .size = 14}, url,
       &fractional_max_zoom
     )
   );
@@ -107,7 +118,7 @@ static void geojson_source_options_reject_unsafe_raw_headers(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_add_geojson_source_url(
-      map, (mln_string_view){.data = "fractional-cluster", .size = 18}, url,
+      map, (mln_buffer_view){.data = "fractional-cluster", .size = 18}, url,
       &fractional_cluster_max_zoom
     )
   );
@@ -118,27 +129,80 @@ static void geojson_source_options_reject_unsafe_raw_headers(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_add_geojson_source_url(
-      map, (mln_string_view){.data = "null-properties", .size = 15}, url,
+      map, (mln_buffer_view){.data = "null-properties", .size = 15}, url,
       &null_cluster_properties
     )
   );
 
-  mln_json_value json_null_cluster_properties = {
-    .size = sizeof(mln_json_value),
-    .type = MLN_JSON_VALUE_TYPE_NULL,
-  };
   mln_geojson_source_options non_object_cluster_properties =
     mln_geojson_source_options_default();
   non_object_cluster_properties.fields =
     MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
-  non_object_cluster_properties.cluster_properties =
-    &json_null_cluster_properties;
+  non_object_cluster_properties.cluster_properties = MLN_BUFFER_LITERAL("null");
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_add_geojson_source_url(
-      map, (mln_string_view){.data = "json-null-properties", .size = 20}, url,
+      map, (mln_buffer_view){.data = "json-null-properties", .size = 20}, url,
       &non_object_cluster_properties
     )
+  );
+
+  static const char injected_cluster_properties[] =
+    "{\"total\":[\"+\",1]},\"cluster\":true";
+  mln_geojson_source_options injected_properties =
+    mln_geojson_source_options_default();
+  injected_properties.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
+  injected_properties.cluster_properties = (mln_buffer_view){
+    .data = injected_cluster_properties,
+    .size = sizeof(injected_cluster_properties) - 1,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_geojson_source_url(
+      map, MLN_BUFFER_LITERAL("injected-properties"), url, &injected_properties
+    )
+  );
+
+  static const char trailing_cluster_properties[] =
+    "{\"total\":[\"+\",1]}\0garbage";
+  mln_geojson_source_options trailing_properties =
+    mln_geojson_source_options_default();
+  trailing_properties.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
+  trailing_properties.cluster_properties = (mln_buffer_view){
+    .data = trailing_cluster_properties,
+    .size = sizeof(trailing_cluster_properties) - 1,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_geojson_source_url(
+      map, MLN_BUFFER_LITERAL("trailing-properties"), url, &trailing_properties
+    )
+  );
+
+  static const char trailing_geojson[] =
+    "{\"type\":\"FeatureCollection\",\"features\":[]}garbage";
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_add_geojson_source_data(
+                                   map, MLN_BUFFER_LITERAL("trailing-geojson"),
+                                   (mln_buffer_view){
+                                     .data = trailing_geojson,
+                                     .size = sizeof(trailing_geojson) - 1,
+                                   },
+                                   NULL
+                                 )
+  );
+
+  static const char nul_geojson[] =
+    "{\"type\":\"FeatureCollection\",\"features\":[]}\0garbage";
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_add_geojson_source_data(
+                                   map, MLN_BUFFER_LITERAL("nul-geojson"),
+                                   (mln_buffer_view){
+                                     .data = nul_geojson,
+                                     .size = sizeof(nul_geojson) - 1,
+                                   },
+                                   NULL
+                                 )
   );
 
   // A rejected descriptor leaves the source ID free for a later valid add.
@@ -147,7 +211,7 @@ static void geojson_source_options_reject_unsafe_raw_headers(void) {
   clustered.cluster = true;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_add_geojson_source_url(
-                     map, (mln_string_view){.data = "short-header", .size = 12},
+                     map, (mln_buffer_view){.data = "short-header", .size = 12},
                      url, &clustered
                    )
   );
@@ -162,38 +226,27 @@ static void clustered_geojson_data_reports_non_point_geometry(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
 
-  const mln_geometry child = {
-    .size = sizeof(mln_geometry),
-    .type = MLN_GEOMETRY_TYPE_POINT,
-    .data = {.point = {.latitude = 37.8, .longitude = -122.4}}
-  };
-  const mln_geometry point = {
-    .size = sizeof(mln_geometry),
-    .type = MLN_GEOMETRY_TYPE_POINT,
-    .data = {.point = {.latitude = 37.7, .longitude = -122.5}}
-  };
-  const mln_geometry collection = {
-    .size = sizeof(mln_geometry),
-    .type = MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION,
-    .data = {.geometry_collection = {.geometries = &child, .geometry_count = 1}}
-  };
-  const mln_feature features[] = {
-    {.size = sizeof(mln_feature), .geometry = &point},
-    {.size = sizeof(mln_feature), .geometry = &collection},
-  };
-  const mln_geojson data = {
-    .size = sizeof(mln_geojson),
-    .type = MLN_GEOJSON_TYPE_FEATURE_COLLECTION,
-    .data = {.feature_collection = {.features = features, .feature_count = 2}}
-  };
+  static const char data[] =
+    "{\"type\":\"FeatureCollection\",\"features\":["
+    "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
+    "\"coordinates\":[-122.5,37.7]},\"properties\":{}},"
+    "{\"type\":\"Feature\",\"geometry\":{\"type\":\"GeometryCollection\","
+    "\"geometries\":[{\"type\":\"Point\",\"coordinates\":[-122.4,37.8]}]},"
+    "\"properties\":{}}]}";
+  static const char points[] =
+    "{\"type\":\"FeatureCollection\",\"features\":["
+    "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
+    "\"coordinates\":[-122.5,37.7]},\"properties\":{}}]}";
 
   mln_geojson_source_options clustered = mln_geojson_source_options_default();
   clustered.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
   clustered.cluster = true;
-  const mln_string_view clustered_id = {.data = "quakes", .size = 6};
+  const mln_buffer_view clustered_id = {.data = "quakes", .size = 6};
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_add_geojson_source_data(map, clustered_id, &data, &clustered)
+    mln_map_add_geojson_source_data(
+      map, clustered_id, MLN_BUFFER_LITERAL(data), &clustered
+    )
   );
 
   const char* message = mln_thread_last_error_message();
@@ -206,24 +259,21 @@ static void clustered_geojson_data_reports_non_point_geometry(void) {
   // The constraint belongs to clustering alone, so the same data tiles fine on
   // an unclustered source, and the rejected ID stays free.
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_add_geojson_source_data(map, clustered_id, &data, NULL)
+    MLN_STATUS_OK, mln_map_add_geojson_source_data(
+                     map, clustered_id, MLN_BUFFER_LITERAL(data), NULL
+                   )
   );
 
   // A source added with clustering rejects the same data on update.
-  const mln_string_view updated_id = {.data = "clustered-quakes", .size = 16};
-  const mln_geojson points = {
-    .size = sizeof(mln_geojson),
-    .type = MLN_GEOJSON_TYPE_FEATURE_COLLECTION,
-    .data = {.feature_collection = {.features = features, .feature_count = 1}}
-  };
+  const mln_buffer_view updated_id = {.data = "clustered-quakes", .size = 16};
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_add_geojson_source_data(map, updated_id, &points, &clustered)
+    MLN_STATUS_OK, mln_map_add_geojson_source_data(
+                     map, updated_id, MLN_BUFFER_LITERAL(points), &clustered
+                   )
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_geojson_source_data(map, updated_id, &data)
+    mln_map_set_geojson_source_data(map, updated_id, MLN_BUFFER_LITERAL(data))
   );
   TEST_ASSERT_NOT_NULL(
     strstr(mln_thread_last_error_message(), "\"clustered-quakes\"")
@@ -237,22 +287,11 @@ static void clustered_geojson_data_requires_a_feature_collection(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
 
-  const mln_geometry point = {
-    .size = sizeof(mln_geometry),
-    .type = MLN_GEOMETRY_TYPE_POINT,
-    .data = {.point = {.latitude = 37.7, .longitude = -122.5}}
-  };
-  const mln_feature feature = {.size = sizeof(mln_feature), .geometry = &point};
-  const mln_geojson bare_geometry = {
-    .size = sizeof(mln_geojson),
-    .type = MLN_GEOJSON_TYPE_GEOMETRY,
-    .data = {.geometry = &point}
-  };
-  const mln_geojson single_feature = {
-    .size = sizeof(mln_geojson),
-    .type = MLN_GEOJSON_TYPE_FEATURE,
-    .data = {.feature = &feature}
-  };
+  static const char bare_geometry[] =
+    "{\"type\":\"Point\",\"coordinates\":[-122.5,37.7]}";
+  static const char single_feature[] =
+    "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
+    "\"coordinates\":[-122.5,37.7]},\"properties\":{}}";
 
   mln_geojson_source_options clustered = mln_geojson_source_options_default();
   clustered.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
@@ -260,11 +299,12 @@ static void clustered_geojson_data_requires_a_feature_collection(void) {
 
   // MapLibre Native clusters feature collections only, so both of these would
   // tile unclustered rather than honouring the requested cluster option.
-  const mln_string_view geometry_id = {.data = "quakes", .size = 6};
+  const mln_buffer_view geometry_id = {.data = "quakes", .size = 6};
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_add_geojson_source_data(
-                                   map, geometry_id, &bare_geometry, &clustered
-                                 )
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_geojson_source_data(
+      map, geometry_id, MLN_BUFFER_LITERAL(bare_geometry), &clustered
+    )
   );
   const char* message = mln_thread_last_error_message();
   TEST_ASSERT_NOT_NULL(message);
@@ -273,9 +313,10 @@ static void clustered_geojson_data_requires_a_feature_collection(void) {
   TEST_ASSERT_NOT_NULL(strstr(message, "a bare geometry"));
 
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_add_geojson_source_data(
-                                   map, geometry_id, &single_feature, &clustered
-                                 )
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_geojson_source_data(
+      map, geometry_id, MLN_BUFFER_LITERAL(single_feature), &clustered
+    )
   );
   TEST_ASSERT_NOT_NULL(
     strstr(mln_thread_last_error_message(), "a single feature")
@@ -284,27 +325,28 @@ static void clustered_geojson_data_requires_a_feature_collection(void) {
   // The constraint belongs to clustering alone, so the same data tiles fine on
   // an unclustered source, and the rejected ID stays free.
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_add_geojson_source_data(map, geometry_id, &bare_geometry, NULL)
+    MLN_STATUS_OK, mln_map_add_geojson_source_data(
+                     map, geometry_id, MLN_BUFFER_LITERAL(bare_geometry), NULL
+                   )
   );
 
   // An empty feature collection carries nothing to cluster, so it stays
   // accepted and a later update supplies the features to cluster.
-  const mln_geojson empty = {
-    .size = sizeof(mln_geojson),
-    .type = MLN_GEOJSON_TYPE_FEATURE_COLLECTION,
-    .data = {.feature_collection = {.features = NULL, .feature_count = 0}}
-  };
-  const mln_string_view empty_id = {.data = "pending", .size = 7};
+  static const char empty[] =
+    "{\"type\":\"FeatureCollection\",\"features\":[]}";
+  const mln_buffer_view empty_id = {.data = "pending", .size = 7};
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_add_geojson_source_data(map, empty_id, &empty, &clustered)
+    MLN_STATUS_OK, mln_map_add_geojson_source_data(
+                     map, empty_id, MLN_BUFFER_LITERAL(empty), &clustered
+                   )
   );
 
   // A source added with clustering rejects a bare geometry on update too.
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_geojson_source_data(map, empty_id, &bare_geometry)
+    mln_map_set_geojson_source_data(
+      map, empty_id, MLN_BUFFER_LITERAL(bare_geometry)
+    )
   );
   TEST_ASSERT_NOT_NULL(strstr(mln_thread_last_error_message(), "\"pending\""));
 
@@ -320,17 +362,94 @@ static const char layer_accessor_style_json[] =
   "\"layers\":[{\"id\":\"lines\",\"type\":\"line\",\"source\":\"vec\","
   "\"source-layer\":\"roads\"},{\"id\":\"bg\",\"type\":\"background\"}]}";
 
+static void optional_json_style_values_return_null_handles(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_style_json(map, MLN_BUFFER_LITERAL(layer_accessor_style_json))
+  );
+
+  mln_buffer value = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_light_property(
+                     map, MLN_STRING_LITERAL("intensity"), &value
+                   )
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, value);
+
+  const mln_buffer_view layer_id = MLN_STRING_LITERAL("bg");
+  const mln_buffer_view property_name =
+    MLN_STRING_LITERAL("background-opacity");
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_get_layer_property(map, layer_id, property_name, &value)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, value);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_layer_filter(map, layer_id, &value)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, value);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_layer_property(
+                     map, layer_id, property_name, MLN_BUFFER_LITERAL("0.5")
+                   )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_get_layer_property(map, layer_id, property_name, &value)
+  );
+  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, value);
+  mln_buffer_destroy(value);
+  value = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_layer_property(
+                     map, layer_id, property_name, MLN_BUFFER_LITERAL("null")
+                   )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_get_layer_property(map, layer_id, property_name, &value)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, value);
+
+  const mln_buffer_view filter =
+    MLN_BUFFER_LITERAL("[\"==\",[\"get\",\"kind\"],\"park\"]");
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_layer_filter(map, layer_id, &filter)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_layer_filter(map, layer_id, &value)
+  );
+  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, value);
+  mln_buffer_destroy(value);
+  value = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_layer_filter(map, layer_id, NULL)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_layer_filter(map, layer_id, &value)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, value);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // MapLibre's own setProperty path accepts a sourceless layer as a silent no-op;
 // the typed accessors reject it.
 static void layer_source_accessors_reject_sourceless_layer_types(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_style_json(map, layer_accessor_style_json)
+    MLN_STATUS_OK,
+    mln_map_set_style_json(map, MLN_BUFFER_LITERAL(layer_accessor_style_json))
   );
 
-  const mln_string_view background = MLN_STRING_LITERAL("bg");
-  const mln_string_view source_layer = MLN_STRING_LITERAL("roads");
+  const mln_buffer_view background = MLN_STRING_LITERAL("bg");
+  const mln_buffer_view source_layer = MLN_STRING_LITERAL("roads");
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_set_layer_source_layer(map, background, source_layer)
@@ -339,7 +458,7 @@ static void layer_source_accessors_reject_sourceless_layer_types(void) {
   TEST_ASSERT_NOT_NULL(message);
   TEST_ASSERT_NOT_NULL(strstr(message, "source-layer"));
 
-  const mln_string_view source_id = MLN_STRING_LITERAL("vec");
+  const mln_buffer_view source_id = MLN_STRING_LITERAL("vec");
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_set_layer_source_id(map, background, source_id)
@@ -347,15 +466,12 @@ static void layer_source_accessors_reject_sourceless_layer_types(void) {
 
   // The style-spec property path still reaches the same layer and reports OK
   // without changing it, which is why the typed setters exist.
-  const mln_json_value roads = {
-    .size = sizeof(mln_json_value),
-    .type = MLN_JSON_VALUE_TYPE_STRING,
-    .data = {.string_value = {.data = "roads", .size = 5}}
-  };
-  const mln_string_view property_name = MLN_STRING_LITERAL("source-layer");
+  const mln_buffer_view property_name = MLN_STRING_LITERAL("source-layer");
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_set_layer_property(map, background, property_name, &roads)
+    mln_map_set_layer_property(
+      map, background, property_name, MLN_BUFFER_LITERAL("\"roads\"")
+    )
   );
 
   mln_test_destroy_map(map);
@@ -366,12 +482,13 @@ static void layer_text_accessors_report_required_capacity(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_style_json(map, layer_accessor_style_json)
+    MLN_STATUS_OK,
+    mln_map_set_style_json(map, MLN_BUFFER_LITERAL(layer_accessor_style_json))
   );
 
   // A null buffer with zero capacity is a size probe, so it reports the length
   // and succeeds rather than sharing a status with a missing layer.
-  const mln_string_view lines = MLN_STRING_LITERAL("lines");
+  const mln_buffer_view lines = MLN_STRING_LITERAL("lines");
   size_t required = 0;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
@@ -400,7 +517,7 @@ static void layer_text_accessors_report_required_capacity(void) {
   TEST_ASSERT_EQUAL_INT(0, memcmp(buffer, "roads", 5));
 
   // A sourceless layer reads back as empty rather than failing.
-  const mln_string_view background = MLN_STRING_LITERAL("bg");
+  const mln_buffer_view background = MLN_STRING_LITERAL("bg");
   required = 123;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_copy_layer_source_id(
@@ -427,10 +544,11 @@ static void layer_zoom_and_visibility_accessors_carry_raw_domains(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_style_json(map, layer_accessor_style_json)
+    MLN_STATUS_OK,
+    mln_map_set_style_json(map, MLN_BUFFER_LITERAL(layer_accessor_style_json))
   );
 
-  const mln_string_view lines = MLN_STRING_LITERAL("lines");
+  const mln_buffer_view lines = MLN_STRING_LITERAL("lines");
   double min_zoom = 0.0;
   double max_zoom = 0.0;
   TEST_ASSERT_EQUAL_INT(
@@ -482,7 +600,7 @@ static void layer_zoom_and_visibility_accessors_carry_raw_domains(void) {
   );
 
   // A missing layer is rejected the same way the rest of the layer family does.
-  const mln_string_view missing = MLN_STRING_LITERAL("nope");
+  const mln_buffer_view missing = MLN_STRING_LITERAL("nope");
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_get_layer_min_zoom(map, missing, &min_zoom)
@@ -496,7 +614,8 @@ static void style_image_stretch_descriptors_reject_unsafe_raw_values(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_style_json(map, layer_accessor_style_json)
+    MLN_STATUS_OK,
+    mln_map_set_style_json(map, MLN_BUFFER_LITERAL(layer_accessor_style_json))
   );
 
   const uint8_t pixels[4 * 4] = {0};
@@ -507,7 +626,7 @@ static void style_image_stretch_descriptors_reject_unsafe_raw_values(void) {
   image.pixels = pixels;
   image.byte_length = sizeof(pixels);
 
-  const mln_string_view image_id = MLN_STRING_LITERAL("patch");
+  const mln_buffer_view image_id = MLN_STRING_LITERAL("patch");
 
   // A backwards interval, a non-finite bound, and a null array with a non-zero
   // count are all rejected.
@@ -662,7 +781,7 @@ static void style_image_stretch_descriptors_reject_unsafe_raw_values(void) {
   TEST_ASSERT_EQUAL_FLOAT(2.0F, copied_y[1].to);
 
   // A missing image reports zero counts without failing.
-  const mln_string_view missing = MLN_STRING_LITERAL("nope");
+  const mln_buffer_view missing = MLN_STRING_LITERAL("nope");
   x_count = 123;
   y_count = 123;
   found = true;
@@ -686,14 +805,16 @@ static void copy_entry_points_answer_a_null_buffer_as_a_size_probe(void) {
     MLN_STATUS_OK,
     mln_map_set_style_json(
       map,
-      "{\"version\":8,\"sources\":{\"vec\":{\"type\":\"vector\","
-      "\"attribution\":\"probe\","
-      "\"tiles\":[\"https://example.com/{z}/{x}/{y}.mvt\"]}},\"layers\":[]}"
+      MLN_BUFFER_LITERAL(
+        "{\"version\":8,\"sources\":{\"vec\":{\"type\":\"vector\","
+        "\"attribution\":\"probe\","
+        "\"tiles\":[\"https://example.com/{z}/{x}/{y}.mvt\"]}},\"layers\":[]}"
+      )
     )
   );
 
   // Source attribution reports its length and succeeds.
-  const mln_string_view source_id = MLN_STRING_LITERAL("vec");
+  const mln_buffer_view source_id = MLN_STRING_LITERAL("vec");
   size_t attribution_size = 0;
   bool found = false;
   TEST_ASSERT_EQUAL_INT(
@@ -723,7 +844,7 @@ static void copy_entry_points_answer_a_null_buffer_as_a_size_probe(void) {
   image.stride = 4;
   image.pixels = pixels;
   image.byte_length = sizeof(pixels);
-  const mln_string_view image_id = MLN_STRING_LITERAL("dot");
+  const mln_buffer_view image_id = MLN_STRING_LITERAL("dot");
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_style_image(map, image_id, &image, NULL)
   );
@@ -785,17 +906,18 @@ static void style_source_info_rebuilds_an_inline_tile_source(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_set_style_json(
-      map,
-      "{\"version\":8,\"sources\":{\"vec\":{\"type\":\"vector\","
-      "\"tiles\":[\"https://a.example/{z}/{x}/{y}.mlt\","
-      "\"https://b.example/{z}/{x}/{y}.mlt\"],\"minzoom\":2,"
-      "\"maxzoom\":7,\"scheme\":\"tms\",\"bounds\":[-10,-5,20,15],"
-      "\"encoding\":\"mlt\",\"attribution\":\"example\"}},"
-      "\"layers\":[]}"
+      map, MLN_BUFFER_LITERAL(
+             "{\"version\":8,\"sources\":{\"vec\":{\"type\":\"vector\","
+             "\"tiles\":[\"https://a.example/{z}/{x}/{y}.mlt\","
+             "\"https://b.example/{z}/{x}/{y}.mlt\"],\"minzoom\":2,"
+             "\"maxzoom\":7,\"scheme\":\"tms\",\"bounds\":[-10,-5,20,15],"
+             "\"encoding\":\"mlt\",\"attribution\":\"example\"}},"
+             "\"layers\":[]}"
+           )
     )
   );
 
-  const mln_string_view source_id = MLN_STRING_LITERAL("vec");
+  const mln_buffer_view source_id = MLN_STRING_LITERAL("vec");
   mln_style_source_info info = {.size = sizeof(mln_style_source_info)};
   bool found = false;
   TEST_ASSERT_EQUAL_INT(
@@ -834,7 +956,7 @@ static void style_source_info_rebuilds_an_inline_tile_source(void) {
   );
   TEST_ASSERT_EQUAL_size_t(2, tile_count);
 
-  mln_string_view tiles[2] = {0};
+  mln_buffer_view tiles[2] = {0};
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_style_string_list_get(tile_urls, 0, &tiles[0])
   );
@@ -871,7 +993,7 @@ static void style_source_info_rebuilds_an_inline_tile_source(void) {
   options.min_zoom = info.min_zoom;
   options.max_zoom = info.max_zoom;
   options.attribution =
-    (mln_string_view){.data = attribution, .size = attribution_size};
+    (mln_buffer_view){.data = attribution, .size = attribution_size};
   options.scheme = info.scheme;
   options.bounds = info.bounds;
   options.vector_encoding = info.vector_encoding;
@@ -898,7 +1020,7 @@ static void style_source_info_reports_url_backed_tile_source(void) {
   static const char source_url[] = "https://example.com/source.json";
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  const mln_string_view source_id = MLN_STRING_LITERAL("remote");
+  const mln_buffer_view source_id = MLN_STRING_LITERAL("remote");
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_add_vector_source_url(
                      map, source_id, MLN_STRING_LITERAL(source_url), NULL
@@ -960,16 +1082,18 @@ static void style_source_info_reports_other_source_shapes(void) {
     MLN_STATUS_OK,
     mln_map_set_style_json(
       map,
-      "{\"version\":8,\"sources\":{"
-      "\"dem\":{\"type\":\"raster-dem\",\"tiles\":[\"https://example.com/dem/"
-      "{z}/{x}/{y}.png\"],\"tileSize\":256,\"encoding\":\"terrarium\"},"
-      "\"geo-url\":{\"type\":\"geojson\",\"data\":\"https://example.com/"
-      "data.geojson\"},"
-      "\"geo-data\":{\"type\":\"geojson\",\"data\":{\"type\":"
-      "\"FeatureCollection\",\"features\":[]}},"
-      "\"image\":{\"type\":\"image\",\"url\":\"https://example.com/"
-      "image.png\",\"coordinates\":[[-1,1],[1,1],[1,-1],[-1,-1]]}},"
-      "\"layers\":[]}"
+      MLN_BUFFER_LITERAL(
+        "{\"version\":8,\"sources\":{"
+        "\"dem\":{\"type\":\"raster-dem\",\"tiles\":[\"https://example.com/dem/"
+        "{z}/{x}/{y}.png\"],\"tileSize\":256,\"encoding\":\"terrarium\"},"
+        "\"geo-url\":{\"type\":\"geojson\",\"data\":\"https://example.com/"
+        "data.geojson\"},"
+        "\"geo-data\":{\"type\":\"geojson\",\"data\":{\"type\":"
+        "\"FeatureCollection\",\"features\":[]}},"
+        "\"image\":{\"type\":\"image\",\"url\":\"https://example.com/"
+        "image.png\",\"coordinates\":[[-1,1],[1,1],[1,-1],[-1,-1]]}},"
+        "\"layers\":[]}"
+      )
     )
   );
 
@@ -992,7 +1116,7 @@ static void style_source_info_reports_other_source_shapes(void) {
     MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM, info.raster_encoding
   );
 
-  const mln_string_view url_ids[] = {
+  const mln_buffer_view url_ids[] = {
     MLN_STRING_LITERAL("geo-url"), MLN_STRING_LITERAL("image")
   };
   for (size_t index = 0; index < 2; index += 1) {
@@ -1099,7 +1223,9 @@ static void loaded_style_document_reports_the_parsed_bytes(void) {
   static const char style_json[] =
     "{\"version\":8,\"name\":\"probe\",\"sources\":{},\"layers\":[]}";
   const size_t style_json_length = sizeof(style_json) - 1;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_set_style_json(map, style_json));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_json(map, MLN_BUFFER_LITERAL(style_json))
+  );
 
   // The copy is byte-for-byte the string that was loaded, so a host can hand it
   // straight back to mln_map_set_style_json().
@@ -1109,7 +1235,7 @@ static void loaded_style_document_reports_the_parsed_bytes(void) {
   );
   TEST_ASSERT_EQUAL_size_t(style_json_length, size);
 
-  char document[sizeof(style_json)] = {0};
+  uint8_t document[sizeof(style_json)] = {0};
   size = 0;
   // An exact-length buffer is enough because the copy carries no terminator.
   TEST_ASSERT_EQUAL_INT(
@@ -1127,31 +1253,17 @@ static void loaded_style_document_reports_the_parsed_bytes(void) {
   TEST_ASSERT_EQUAL_size_t(0, size);
 
   // Mutating the live style does not rewrite the parsed document.
-  const mln_json_value layer_id = {
-    .size = sizeof(mln_json_value),
-    .type = MLN_JSON_VALUE_TYPE_STRING,
-    .data = {.string_value = MLN_STRING_LITERAL("stale-background")}
-  };
-  const mln_json_value layer_type = {
-    .size = sizeof(mln_json_value),
-    .type = MLN_JSON_VALUE_TYPE_STRING,
-    .data = {.string_value = MLN_STRING_LITERAL("background")}
-  };
-  const mln_json_member layer_members[] = {
-    {.key = MLN_STRING_LITERAL("id"), .value = &layer_id},
-    {.key = MLN_STRING_LITERAL("type"), .value = &layer_type},
-  };
-  const mln_json_value layer = {
-    .size = sizeof(mln_json_value),
-    .type = MLN_JSON_VALUE_TYPE_OBJECT,
-    .data = {.object_value = {.members = layer_members, .member_count = 2}}
-  };
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_add_style_layer_json(map, &layer, (mln_string_view){NULL, 0})
+    MLN_STATUS_OK, mln_map_add_style_layer_json(
+                     map,
+                     MLN_BUFFER_LITERAL(
+                       "{\"id\":\"stale-background\",\"type\":\"background\"}"
+                     ),
+                     (mln_buffer_view){NULL, 0}
+                   )
   );
 
-  char after[sizeof(style_json)] = {0};
+  uint8_t after[sizeof(style_json)] = {0};
   size = 0;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
@@ -1162,9 +1274,10 @@ static void loaded_style_document_reports_the_parsed_bytes(void) {
 
   // A failed parse leaves the previously parsed document in place.
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_NATIVE_ERROR, mln_map_set_style_json(map, "{\"version\":")
+    MLN_STATUS_NATIVE_ERROR,
+    mln_map_set_style_json(map, MLN_BUFFER_LITERAL("{\"version\":"))
   );
-  char retained[sizeof(style_json)] = {0};
+  uint8_t retained[sizeof(style_json)] = {0};
   size = 0;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
@@ -1401,9 +1514,10 @@ static void style_transition_options_reject_unsafe_raw_headers(void) {
 void run_style_values_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(style_value_helpers_reject_unsafe_raw_descriptors);
-  RUN_TEST(geojson_source_options_reject_unsafe_raw_headers);
+  RUN_TEST(geojson_source_options_reject_unsafe_raw_values);
   RUN_TEST(clustered_geojson_data_reports_non_point_geometry);
   RUN_TEST(clustered_geojson_data_requires_a_feature_collection);
+  RUN_TEST(optional_json_style_values_return_null_handles);
   RUN_TEST(layer_source_accessors_reject_sourceless_layer_types);
   RUN_TEST(layer_text_accessors_report_required_capacity);
   RUN_TEST(layer_zoom_and_visibility_accessors_carry_raw_domains);

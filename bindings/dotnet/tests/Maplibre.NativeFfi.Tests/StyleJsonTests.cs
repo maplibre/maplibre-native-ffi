@@ -1,9 +1,4 @@
-using System.Runtime.InteropServices;
-using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Geo;
-using Maplibre.NativeFfi.Internal.C;
-using Maplibre.NativeFfi.Internal.Struct;
-using Maplibre.NativeFfi.Json;
 using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Runtime;
 using Maplibre.NativeFfi.Style;
@@ -11,89 +6,15 @@ using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
 
-public sealed unsafe class StyleJsonTests
+public sealed class StyleJsonTests
 {
-    [BindingSpecTest("BND-064")]
-    [Fact]
-    public void NativeJsonValueMaterializesNestedObjectsAndArrays()
-    {
-        using var native = NativeJsonValue.From(
-            new JsonValue.Object([
-                new JsonMember("type", new JsonValue.String("geojson")),
-                new JsonMember(
-                    "data",
-                    new JsonValue.Object([
-                        new JsonMember("type", new JsonValue.String("FeatureCollection")),
-                        new JsonMember("features", new JsonValue.Array([])),
-                    ])
-                ),
-            ])
-        );
-
-        Assert.Equal((uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_OBJECT, native.Pointer->type);
-        Assert.Equal(2u, native.Pointer->data.object_value.member_count);
-        var first = native.Pointer->data.object_value.members[0];
-        Assert.Equal("type", Marshal.PtrToStringUTF8((nint)first.key.data, (int)first.key.size));
-        Assert.Equal((uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_STRING, first.value->type);
-    }
-
-    [BindingSpecTest("BND-025")]
-    [Fact]
-    public void NativeJsonValueRejectsNonFiniteNumbersBeforeNativeCall()
-    {
-        var error = Assert.Throws<InvalidArgumentException>(() =>
-            NativeJsonValue.From(new JsonValue.Double(double.NaN))
-        );
-        Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
-    }
-
-    [Fact]
-    public void JsonReaderRejectsNonZeroCountsWithNullBackingPointers()
-    {
-        var arrayValue = new mln_json_value
-        {
-            type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_ARRAY,
-            data =
-            {
-                array_value = new mln_json_array { value_count = 1, values = null },
-            },
-        };
-        var arrayError = Assert.Throws<InvalidOperationException>(() =>
-            ReadJsonValueForTest(arrayValue)
-        );
-        Assert.Contains("mln_json_array", arrayError.Message, StringComparison.Ordinal);
-
-        var objectValue = new mln_json_value
-        {
-            type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_OBJECT,
-            data =
-            {
-                object_value = new mln_json_object { member_count = 1, members = null },
-            },
-        };
-        var objectError = Assert.Throws<InvalidOperationException>(() =>
-            ReadJsonValueForTest(objectValue)
-        );
-        Assert.Contains("mln_json_object", objectError.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void JsonReaderRejectsUnknownNativeValueTypes()
-    {
-        var value = new mln_json_value { type = uint.MaxValue };
-
-        var error = Assert.Throws<InvalidOperationException>(() => ReadJsonValueForTest(value));
-
-        Assert.Contains("Unknown native JSON value type", error.Message, StringComparison.Ordinal);
-    }
-
     [BindingSpecTest("BND-105")]
     [Fact]
     public void UrlAndTileSourceApisAdaptThroughNativeMap()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.SetStyleJson(EmptyStyle());
 
         map.AddGeoJsonSourceUrl("geo-url", "https://example.test/data.geojson", null);
         map.SetGeoJsonSourceUrl("geo-url", "https://example.test/other.geojson");
@@ -150,7 +71,7 @@ public sealed unsafe class StyleJsonTests
         using (var runtime = RuntimeHandle.Create(new RuntimeOptions()))
         using (var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 }))
         {
-            map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+            map.SetStyleJson(EmptyStyle());
             map.AddVectorSourceUrl("url-vector", "https://example.test/vector.json", null);
             map.AddVectorSourceTiles(
                 "inline-vector",
@@ -201,7 +122,7 @@ public sealed unsafe class StyleJsonTests
             rebuiltRuntime,
             new MapOptions { Width = 512, Height = 512 }
         );
-        rebuiltMap.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        rebuiltMap.SetStyleJson(EmptyStyle());
         rebuiltMap.AddVectorSourceTiles(
             "rebuilt",
             inlineInfo.TileJson!.TileUrls,
@@ -223,12 +144,12 @@ public sealed unsafe class StyleJsonTests
     [Fact]
     public void LoadedStyleDocumentAndUrlReadBackWhatWasLoaded()
     {
-        const string styleJson = "{\"version\":8,\"sources\":{},\"layers\":[]}";
+        var styleJson = EmptyStyle();
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
 
         // Nothing parsed and nothing requested yet.
-        Assert.Equal(string.Empty, map.GetLoadedStyleJson());
+        Assert.Empty(map.GetLoadedStyleJson());
         Assert.Equal(string.Empty, map.GetStyleUrl());
 
         // The document reads back byte-for-byte, so it can be reloaded unchanged.
@@ -251,7 +172,7 @@ public sealed unsafe class StyleJsonTests
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
 
-        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.SetStyleJson(EmptyStyle());
         var runtimeEvent = RuntimeEventTestHelpers.WaitForMapEvent(
             runtime,
             map,
@@ -273,30 +194,16 @@ public sealed unsafe class StyleJsonTests
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.SetStyleJson(EmptyStyle());
         map.AddStyleSourceJson("geo", GeoJsonSource());
-        map.AddStyleLayerJson(
-            new JsonValue.Object([
-                new JsonMember("id", new JsonValue.String("fill")),
-                new JsonMember("type", new JsonValue.String("fill")),
-                new JsonMember("source", new JsonValue.String("geo")),
-            ]),
-            ""
-        );
+        map.AddStyleLayerJson("""{"id":"fill","type":"fill","source":"geo"}"""u8.ToArray(), "");
 
-        map.SetLayerProperty("fill", "fill-opacity", new JsonValue.Double(0.5));
-        map.SetLayerFilter(
-            "fill",
-            new JsonValue.Array([
-                new JsonValue.String("=="),
-                new JsonValue.String("kind"),
-                new JsonValue.String("park"),
-            ])
-        );
+        map.SetLayerProperty("fill", "fill-opacity", "0.5"u8.ToArray());
+        map.SetLayerFilter("fill", """["==","kind","park"]"""u8.ToArray());
 
-        Assert.Equal(new JsonValue.Double(0.5), map.GetLayerProperty("fill", "fill-opacity"));
-        Assert.IsType<JsonValue.Object>(map.GetStyleLayerJson("fill"));
-        Assert.IsType<JsonValue.Array>(map.GetLayerFilter("fill"));
+        Assert.Equal("0.5"u8.ToArray(), map.GetLayerProperty("fill", "fill-opacity"));
+        Assert.NotEmpty(Assert.IsType<byte[]>(map.GetStyleLayerJson("fill")));
+        Assert.Equal("""["==","kind","park"]"""u8.ToArray(), map.GetLayerFilter("fill"));
 
         map.SetLayerFilter("fill", null);
         Assert.Null(map.GetLayerFilter("fill"));
@@ -308,7 +215,7 @@ public sealed unsafe class StyleJsonTests
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.SetStyleJson(EmptyStyle());
 
         map.AddStyleSourceJson("geo", GeoJsonSource());
         Assert.True(map.StyleSourceExists("geo"));
@@ -320,13 +227,7 @@ public sealed unsafe class StyleJsonTests
         Assert.Equal(SourceType.GeoJson, sourceInfo.Type);
         Assert.Null(sourceInfo.Attribution);
 
-        map.AddStyleLayerJson(
-            new JsonValue.Object([
-                new JsonMember("id", new JsonValue.String("background")),
-                new JsonMember("type", new JsonValue.String("background")),
-            ]),
-            ""
-        );
+        map.AddStyleLayerJson("""{"id":"background","type":"background"}"""u8.ToArray(), "");
         Assert.True(map.StyleLayerExists("background"));
         Assert.Equal("background", map.StyleLayerType("background"));
         Assert.Contains("background", map.StyleLayerIds());
@@ -335,20 +236,8 @@ public sealed unsafe class StyleJsonTests
         Assert.True(map.RemoveStyleSource("geo"));
     }
 
-    private static JsonValue GeoJsonSource() =>
-        new JsonValue.Object([
-            new JsonMember("type", new JsonValue.String("geojson")),
-            new JsonMember(
-                "data",
-                new JsonValue.Object([
-                    new JsonMember("type", new JsonValue.String("FeatureCollection")),
-                    new JsonMember("features", new JsonValue.Array([])),
-                ])
-            ),
-        ]);
+    private static byte[] EmptyStyle() => """{"version":8,"sources":{},"layers":[]}"""u8.ToArray();
 
-    private static void ReadJsonValueForTest(mln_json_value value)
-    {
-        ValueStructs.ReadJsonValue(&value);
-    }
+    private static byte[] GeoJsonSource() =>
+        """{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}"""u8.ToArray();
 }

@@ -17,6 +17,8 @@
 --include-constant MLN_STATUS_WRONG_THREAD
 --include-function mln_map_copy_layer_source_id
 --include-function mln_map_copy_layer_source_layer
+--include-function mln_buffer_destroy
+--include-function mln_buffer_get
 --include-function mln_c_version
 --include-function mln_supported_render_backend_mask
 
@@ -234,40 +236,27 @@
 --include-function mln_runtime_offline_regions_merge_database_take_result
 --include-struct mln_animation_options
 --include-struct mln_bound_options
+--include-struct mln_buffer_view
 --include-struct mln_camera_fit_options
 --include-struct mln_camera_options
---include-struct mln_coordinate_span
 --include-struct mln_edge_insets
---include-struct mln_feature
---include-struct mln_feature_collection
 --include-struct mln_feature_state_selector
 --include-struct mln_free_camera_options
---include-struct mln_geojson
---include-struct mln_geometry
---include-struct mln_geometry_collection
 --include-struct mln_image_content
 --include-struct mln_image_stretch
---include-struct mln_json_array
---include-struct mln_json_member
---include-struct mln_json_object
---include-struct mln_json_value
 --include-struct mln_lat_lng
 --include-struct mln_lat_lng_bounds
 --include-struct mln_map_options
 --include-struct mln_map_tile_options
 --include-struct mln_map_viewport_options
---include-struct mln_multi_line_geometry
---include-struct mln_multi_polygon_geometry
 --include-struct mln_offline_geometry_region_definition
 --include-struct mln_offline_region_definition
 --include-struct mln_offline_region_info
 --include-struct mln_offline_tile_pyramid_region_definition
---include-struct mln_polygon_geometry
 --include-struct mln_projected_meters
 --include-struct mln_projection_mode
 --include-struct mln_quaternion
 --include-struct mln_screen_point
---include-struct mln_string_view
 --include-struct mln_unit_bezier
 --include-struct mln_vec3
 
@@ -294,21 +283,11 @@
 --include-function mln_projected_meters_for_lat_lng
 
 # include/maplibre_native_c/query.h
---include-constant MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION
---include-constant MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE
---include-constant MLN_QUERIED_FEATURE_SOURCE_ID
---include-constant MLN_QUERIED_FEATURE_SOURCE_LAYER_ID
---include-constant MLN_QUERIED_FEATURE_STATE
 --include-constant MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
 --include-constant MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX
 --include-constant MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING
 --include-constant MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT
 --include-constant MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
---include-function mln_feature_extension_result_destroy
---include-function mln_feature_extension_result_get
---include-function mln_feature_query_result_count
---include-function mln_feature_query_result_destroy
---include-function mln_feature_query_result_get
 --include-function mln_render_session_query_feature_extensions
 --include-function mln_render_session_query_rendered_features
 --include-function mln_render_session_query_source_features
@@ -317,8 +296,6 @@
 --include-function mln_rendered_query_geometry_line_string
 --include-function mln_rendered_query_geometry_point
 --include-function mln_source_feature_query_options_default
---include-struct mln_feature_extension_result_info
---include-struct mln_queried_feature
 --include-struct mln_rendered_feature_query_options
 --include-struct mln_rendered_query_geometry
 --include-struct mln_screen_box
@@ -326,8 +303,6 @@
 --include-struct mln_source_feature_query_options
 
 # include/maplibre_native_c/render_session.h
---include-function mln_json_snapshot_destroy
---include-function mln_json_snapshot_get
 --include-function mln_render_session_clear_data
 --include-function mln_render_session_destroy
 --include-function mln_render_session_detach

@@ -4,66 +4,32 @@
 #include <maplibre_native_c.h>
 #include <string.h>
 
-static mln_string_view sv(const char* text) {
-  return (mln_string_view){.data = text, .size = strlen(text)};
-}
-
-static mln_json_value json_string(const char* text) {
-  return (mln_json_value){
-    .size = sizeof(mln_json_value),
-    .type = MLN_JSON_VALUE_TYPE_STRING,
-    .data = {.string_value = sv(text)},
-  };
-}
-
-static mln_json_value json_double(double number) {
-  return (mln_json_value){
-    .size = sizeof(mln_json_value),
-    .type = MLN_JSON_VALUE_TYPE_DOUBLE,
-    .data = {.double_value = number},
-  };
-}
-
 // #region node
-static mln_json_value json_array(const mln_json_value* values, size_t count) {
-  return (mln_json_value){
-    .size = sizeof(mln_json_value),
-    .type = MLN_JSON_VALUE_TYPE_ARRAY,
-    .data = {.array_value = {.values = values, .value_count = count}},
-  };
+static mln_buffer_view view(const char* text) {
+  return (mln_buffer_view){.data = text, .size = strlen(text)};
 }
 // #endregion node
 
 mln_status size_and_filter_by_magnitude(mln_map map, const char* layer_id) {
   // #region expression
-  const mln_json_value get_mag[] = {json_string("get"), json_string("mag")};
-  const mln_json_value magnitude = json_array(get_mag, 2);
-  const mln_json_value linear_operator = json_string("linear");
-  const mln_json_value linear = json_array(&linear_operator, 1);
+  const char radius[] =
+    "[\"interpolate\",[\"linear\"],[\"get\",\"mag\"],1,4,6,24]";
   // #endregion expression
 
   // #region property
-  // ["interpolate", ["linear"], ["get", "mag"], 1, 4, 6, 24]
-  const mln_json_value ramp[] = {
-    json_string("interpolate"), linear,           magnitude,
-    json_double(1.0),           json_double(4.0), json_double(6.0),
-    json_double(24.0),
-  };
-  const mln_json_value radius = json_array(ramp, 7);
+  const mln_buffer_view radius_json = view(radius);
   // #endregion property
 
   // #region set
-  const mln_status status =
-    mln_map_set_layer_property(map, sv(layer_id), sv("circle-radius"), &radius);
+  const mln_status status = mln_map_set_layer_property(
+    map, view(layer_id), view("circle-radius"), radius_json
+  );
   if (status != MLN_STATUS_OK) return status;
   // #endregion set
 
   // #region filter
   // [">=", ["get", "mag"], 2.5]
-  const mln_json_value test[] = {
-    json_string(">="), magnitude, json_double(2.5)
-  };
-  const mln_json_value filter = json_array(test, 3);
-  return mln_map_set_layer_filter(map, sv(layer_id), &filter);
+  const mln_buffer_view filter = view("[\">=\",[\"get\",\"mag\"],2.5]");
+  return mln_map_set_layer_filter(map, view(layer_id), &filter);
   // #endregion filter
 }

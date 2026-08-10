@@ -10,10 +10,7 @@
 mod camera;
 mod custom_geometry;
 mod events;
-mod geojson;
-mod geometry;
 mod handle;
-mod json;
 mod logging;
 mod map;
 mod options;
@@ -39,9 +36,6 @@ pub use events::{
     RuntimeEvent, RuntimeEventPayload, RuntimeEventSource, StyleImageMissingEvent, TileActionEvent,
     TileId, UnknownRuntimeEventPayload,
 };
-pub use geojson::{Feature, FeatureIdentifier, GeoJson};
-pub use geometry::Geometry;
-pub use json::{JsonMember, JsonValue};
 pub use logging::{LogRecord, clear_log_callback, set_async_log_severity_mask, set_log_callback};
 pub use map::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, MapAttachRef,
@@ -61,19 +55,19 @@ pub use maplibre_core::{
 pub use maplibre_native_ffi_core::handle::{NativeHandleLeak, set_leak_reporter};
 pub use projection::MapProjectionHandle;
 pub use render::{
-    DetachedRenderSessionHandle, EglContextDescriptor, FeatureExtensionResult,
-    FeatureStateSelector, FrameNativePointer, FrameOpenGLTextureName,
-    MetalBorrowedTextureDescriptor, MetalContextDescriptor, MetalOwnedTextureDescriptor,
-    MetalOwnedTextureFrame, MetalOwnedTextureFrameHandle, MetalSurfaceDescriptor, NativePointer,
-    OpenGLBorrowedTextureDescriptor, OpenGLContextDescriptor, OpenGLOwnedTextureDescriptor,
-    OpenGLOwnedTextureFrame, OpenGLOwnedTextureFrameHandle, OpenGLSurfaceDescriptor,
-    PremultipliedRgba8Image, QueriedFeature, RenderSessionHandle, RenderTargetExtent,
-    RenderedFeatureQueryOptions, RenderedQueryGeometry, SourceFeatureQueryOptions,
-    TextureImageInfo, VulkanBorrowedTextureDescriptor, VulkanContextDescriptor,
-    VulkanOwnedTextureDescriptor, VulkanOwnedTextureFrame, VulkanOwnedTextureFrameHandle,
-    VulkanSurfaceDescriptor, WebGlContextDescriptor, WebGpuBorrowedTextureDescriptor,
-    WebGpuContextDescriptor, WebGpuOwnedTextureDescriptor, WebGpuOwnedTextureFrame,
-    WebGpuOwnedTextureFrameHandle, WebGpuSurfaceDescriptor, WglContextDescriptor,
+    DetachedRenderSessionHandle, EglContextDescriptor, FeatureStateSelector, FrameNativePointer,
+    FrameOpenGLTextureName, MetalBorrowedTextureDescriptor, MetalContextDescriptor,
+    MetalOwnedTextureDescriptor, MetalOwnedTextureFrame, MetalOwnedTextureFrameHandle,
+    MetalSurfaceDescriptor, NativePointer, OpenGLBorrowedTextureDescriptor,
+    OpenGLContextDescriptor, OpenGLOwnedTextureDescriptor, OpenGLOwnedTextureFrame,
+    OpenGLOwnedTextureFrameHandle, OpenGLSurfaceDescriptor, PremultipliedRgba8Image,
+    RenderSessionHandle, RenderTargetExtent, RenderedFeatureQueryOptions, RenderedQueryGeometry,
+    SourceFeatureQueryOptions, TextureImageInfo, VulkanBorrowedTextureDescriptor,
+    VulkanContextDescriptor, VulkanOwnedTextureDescriptor, VulkanOwnedTextureFrame,
+    VulkanOwnedTextureFrameHandle, VulkanSurfaceDescriptor, WebGlContextDescriptor,
+    WebGpuBorrowedTextureDescriptor, WebGpuContextDescriptor, WebGpuOwnedTextureDescriptor,
+    WebGpuOwnedTextureFrame, WebGpuOwnedTextureFrameHandle, WebGpuSurfaceDescriptor,
+    WglContextDescriptor,
 };
 pub use resource::{
     ByteRange, HttpHeader, HttpHeaderTransformRequest, ResourceProviderDecision, ResourceRequest,

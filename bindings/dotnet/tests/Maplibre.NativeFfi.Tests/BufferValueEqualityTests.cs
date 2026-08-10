@@ -48,6 +48,37 @@ public sealed class BufferValueEqualityTests
         Assert.NotEqual(left, new OfflineRegionInfo(8, definition, [1, 2, 3]));
     }
 
+    [BindingSpecTest("BND-069", "BND-070")]
+    [Fact]
+    public void OfflineGeometryRegionOwnsAndComparesGeometryContents()
+    {
+        var geometry = new byte[] { 1, 2, 3 };
+        var left = new OfflineRegionDefinition.GeometryRegion(
+            "https://example.invalid/style.json",
+            geometry,
+            0,
+            10,
+            1,
+            false
+        );
+        var right = new OfflineRegionDefinition.GeometryRegion(
+            "https://example.invalid/style.json",
+            [1, 2, 3],
+            0,
+            10,
+            1,
+            false
+        );
+
+        geometry[0] = 9;
+        var returned = left.Geometry;
+        returned[1] = 9;
+
+        Assert.Equal(left, right);
+        Assert.Equal(left.GetHashCode(), right.GetHashCode());
+        Assert.Equal(new byte[] { 1, 2, 3 }, left.Geometry);
+    }
+
     [BindingSpecTest("BND-070")]
     [Fact]
     public void UnknownEventPayloadComparesPayloadContents()

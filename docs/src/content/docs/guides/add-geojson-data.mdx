@@ -21,8 +21,8 @@ A source reads its data from a URL or from host memory. Use
 `mln_map_add_geojson_source_url` for data that a server publishes. MapLibre
 fetches the URL through its resource system and reloads it when requested. Use
 `mln_map_add_geojson_source_data` for data that the host computes or receives
-through its own transport. The call copies the geometry and feature descriptors
-before it returns.
+through its own transport. Pass one complete UTF-8 GeoJSON value as a buffer view;
+the call parses or copies it before returning.
 
 Choose the source options at creation. Changing them requires removing every
 layer that draws the source, replacing the source, and adding the layers again.
@@ -51,9 +51,9 @@ layers, or name an existing layer to insert the new layer beneath it.
 
 ## Supply the data from memory
 
-Inline data uses a GeoJSON descriptor that the host builds. A clustering source
-requires a feature collection in which every feature has point geometry. Other
-shapes report an invalid-argument status.
+Inline data uses a complete GeoJSON value produced by the host's serializer. A
+clustering source requires a feature collection in which every feature has
+point geometry. Other shapes report an invalid-argument status.
 
 <Code code={region(geojsonDataset, "inline-data")} lang="c" title="geojson-dataset.c" />
 

@@ -3,9 +3,9 @@ package org.maplibre.nativeffi.map
 import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
-import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.internal.javacpp.ByteArrayViewScope
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
@@ -59,9 +59,9 @@ public actual class MapProjectionHandle internal constructor(private val handleI
     }
   }
 
-  public actual fun setVisibleGeometry(geometry: Geometry, padding: EdgeInsets) {
+  public actual fun setVisibleGeometry(geometry: ByteArray, padding: EdgeInsets) {
     NativeAccess.ensureLoaded()
-    GeometryScope(geometry).use { nativeGeometry ->
+    ByteArrayViewScope(geometry).use { nativeGeometry ->
       MaplibreNativeC.mln_edge_insets()
         .top(padding.top)
         .left(padding.left)
@@ -71,7 +71,7 @@ public actual class MapProjectionHandle internal constructor(private val handleI
           Status.check(
             MaplibreNativeC.mln_map_projection_set_visible_geometry(
               requireLiveHandle(),
-              nativeGeometry.value,
+              nativeGeometry.view,
               nativePadding,
             )
           )

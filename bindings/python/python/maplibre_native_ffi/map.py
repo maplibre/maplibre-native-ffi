@@ -23,8 +23,7 @@ from .camera import (
     Unbounded,
 )
 from .errors import InvalidArgumentError
-from .geo import GeoJson, Geometry, LatLng, LatLngBounds
-from .json import JsonObject, JsonValue
+from .geo import LatLng, LatLngBounds
 from .render import (
     MetalBorrowedTextureDescriptor,
     MetalOwnedTextureDescriptor,
@@ -372,7 +371,7 @@ def _geojson_source_parts(
     float | None,
     float | None,
     float | None,
-    JsonValue | None,
+    bytes | None,
     int | None,
     int | None,
     int | None,
@@ -465,7 +464,7 @@ class MapProjectionHandle(NativeHandleMixin):
             (padding.top, padding.left, padding.bottom, padding.right),
         )
 
-    def set_visible_geometry(self, geometry: Geometry, padding: EdgeInsets) -> None:
+    def set_visible_geometry(self, geometry: bytes, padding: EdgeInsets) -> None:
         """Update this helper's camera so geometry coordinates are visible."""
         self._native.set_visible_geometry(
             geometry,
@@ -636,7 +635,7 @@ class MapHandle(NativeHandleMixin):
         """
         self._native.set_style_url(url)
 
-    def set_style_json(self, json: str) -> None:
+    def set_style_json(self, json: bytes) -> None:
         """Load inline style JSON through MapLibre Native style APIs.
 
         Malformed JSON is reported twice: this call raises the parse error, and
@@ -646,7 +645,7 @@ class MapHandle(NativeHandleMixin):
         """
         self._native.set_style_json(json)
 
-    def get_loaded_style_json(self) -> str:
+    def get_loaded_style_json(self) -> bytes:
         """Return the style document this map's style was last parsed from.
 
         This is the loaded document, not a serialization of the live style, so
@@ -666,7 +665,7 @@ class MapHandle(NativeHandleMixin):
         """
         return self._native.copy_style_url()
 
-    def add_style_source_json(self, source_id: str, source_json: JsonObject) -> None:
+    def add_style_source_json(self, source_id: str, source_json: bytes) -> None:
         """Add one style source from a style-spec source JSON object."""
         self._native.add_style_source_json(source_id, source_json)
 
@@ -684,7 +683,7 @@ class MapHandle(NativeHandleMixin):
     def add_geojson_source_data(
         self,
         source_id: str,
-        data: GeoJson,
+        data: bytes,
         options: GeoJsonSourceOptions | None = None,
     ) -> None:
         """Add a GeoJSON source with inline data."""
@@ -696,7 +695,7 @@ class MapHandle(NativeHandleMixin):
         """Update one GeoJSON source to load data from a URL."""
         self._native.set_geojson_source_url(source_id, url)
 
-    def set_geojson_source_data(self, source_id: str, data: GeoJson) -> None:
+    def set_geojson_source_data(self, source_id: str, data: bytes) -> None:
         """Update one GeoJSON source with inline data."""
         self._native.set_geojson_source_data(source_id, data)
 
@@ -901,25 +900,25 @@ class MapHandle(NativeHandleMixin):
 
     def add_style_layer_json(
         self,
-        layer_json: JsonObject,
+        layer_json: bytes,
         before_layer_id: str | None = None,
     ) -> None:
         """Add one style layer from a full style-spec layer JSON object."""
         self._native.add_style_layer_json(layer_json, before_layer_id)
 
-    def get_style_layer_json(self, layer_id: str) -> JsonValue | None:
+    def get_style_layer_json(self, layer_id: str) -> bytes | None:
         """Return one style layer as a full style-spec layer JSON object."""
         return self._native.get_style_layer_json(layer_id)
 
-    def set_style_light_json(self, light_json: JsonObject) -> None:
+    def set_style_light_json(self, light_json: bytes) -> None:
         """Set the style light from a style-spec light JSON object."""
         self._native.set_style_light_json(light_json)
 
-    def set_style_light_property(self, property_name: str, value: JsonValue) -> None:
+    def set_style_light_property(self, property_name: str, value: bytes) -> None:
         """Set one style light property by style-spec property name."""
         self._native.set_style_light_property(property_name, value)
 
-    def get_style_light_property(self, property_name: str) -> JsonValue | None:
+    def get_style_light_property(self, property_name: str) -> bytes | None:
         """Return one style light property as a style-spec JSON value."""
         return self._native.get_style_light_property(property_name)
 
@@ -946,20 +945,20 @@ class MapHandle(NativeHandleMixin):
         self,
         layer_id: str,
         property_name: str,
-        value: JsonValue,
+        value: bytes,
     ) -> None:
         """Set one layer property by style-spec property name."""
         self._native.set_layer_property(layer_id, property_name, value)
 
-    def get_layer_property(self, layer_id: str, property_name: str) -> JsonValue | None:
+    def get_layer_property(self, layer_id: str, property_name: str) -> bytes | None:
         """Return one layer property as a style-spec JSON value."""
         return self._native.get_layer_property(layer_id, property_name)
 
-    def set_layer_filter(self, layer_id: str, filter: JsonValue | None) -> None:
+    def set_layer_filter(self, layer_id: str, filter: bytes | None) -> None:
         """Set or clear one layer filter."""
         self._native.set_layer_filter(layer_id, filter)
 
-    def get_layer_filter(self, layer_id: str) -> JsonValue | None:
+    def get_layer_filter(self, layer_id: str) -> bytes | None:
         """Return one layer filter as a style-spec JSON value."""
         return self._native.get_layer_filter(layer_id)
 
@@ -1226,7 +1225,7 @@ class MapHandle(NativeHandleMixin):
 
     def camera_for_geometry(
         self,
-        geometry: Geometry,
+        geometry: bytes,
         fit: CameraFitOptions | None = None,
     ) -> CameraOptions:
         """Compute a camera that fits a geometry in the current viewport."""
@@ -1456,7 +1455,7 @@ class MapHandle(NativeHandleMixin):
         self,
         source_id: str,
         tile_id: CanonicalTileId,
-        data: GeoJson,
+        data: bytes,
     ) -> None:
         """Set custom geometry source data for one canonical tile."""
         self._native.set_custom_geometry_source_tile_data(

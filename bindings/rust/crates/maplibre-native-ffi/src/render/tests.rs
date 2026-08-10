@@ -21,6 +21,7 @@ use ash::vk::Handle;
 use glow as gl_api;
 #[cfg(not(target_os = "emscripten"))]
 use glow::HasContext;
+use serde_json::{Value as JsonValue, json};
 // Emscripten fixtures bind WebGL directly because glow does not build there.
 #[cfg(target_os = "emscripten")]
 mod webgl_gl;
@@ -37,10 +38,10 @@ use webgl_gl as gl_api;
 use super::*;
 use crate::logging::test_support::LoggingTestGuard;
 use crate::{
-    AnimationOptions, CameraChangeMode, CameraOptions, ErrorKind, FeatureIdentifier, GeoJson,
-    GeoJsonSourceOptions, Geometry, JsonMember, LatLng, LogSeverity, LogSeverityMask, MapAttachRef,
-    MapHandle, MapMode, MapOptions, OpenGLContextProviderMask, RenderBackendMask,
-    RuntimeEventPayload, RuntimeEventType, RuntimeHandle, ScreenBox, ScreenPoint,
+    AnimationOptions, CameraChangeMode, CameraOptions, ErrorKind, GeoJsonSourceOptions, LatLng,
+    LogSeverity, LogSeverityMask, MapAttachRef, MapHandle, MapMode, MapOptions,
+    OpenGLContextProviderMask, RenderBackendMask, RuntimeEventPayload, RuntimeEventType,
+    RuntimeHandle, ScreenBox, ScreenPoint,
 };
 
 assert_not_impl_any!(NativePointer: Send, Sync);
@@ -2237,7 +2238,8 @@ fn load_feature_state_style(
     map: &MapHandle,
     session: &RenderSessionHandle,
 ) {
-    map.set_style_json(FEATURE_STATE_STYLE_JSON).unwrap();
+    map.set_style_json(FEATURE_STATE_STYLE_JSON.as_bytes())
+        .unwrap();
     assert!(wait_for_runtime_event(
         runtime,
         RuntimeEventType::MapRenderUpdateAvailable
@@ -2250,83 +2252,62 @@ fn load_query_style(runtime: &RuntimeHandle, map: &MapHandle, session: &RenderSe
     camera.center = Some(LatLng::new(37.7749, -122.4194));
     camera.zoom = Some(10.0);
     map.jump_to(&camera).unwrap();
-    map.set_style_json(QUERY_STYLE_JSON).unwrap();
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     render_available_updates(runtime, session, 5);
 }
 
-fn cluster_point(latitude: f64, longitude: f64, name: &str, weight: u64) -> Feature {
-    Feature::new(
-        Geometry::Point(LatLng::new(latitude, longitude)),
-        vec![
-            JsonMember::new("name", JsonValue::String(name.to_owned())),
-            JsonMember::new("weight", JsonValue::UInt(weight)),
-        ],
-    )
+fn cluster_point(latitude: f64, longitude: f64, name: &str, weight: u64) -> JsonValue {
+    json!({
+        "type": "Feature",
+        "geometry": {"type": "Point", "coordinates": [longitude, latitude]},
+        "properties": {"name": name, "weight": weight},
+    })
 }
 
-/// Builds the clustered source through the typed GeoJSON adder so the render
-/// tests exercise `GeoJsonSourceOptions` rather than raw style JSON.
+/// Builds the clustered source through the GeoJSON data adder so the render
+/// tests exercise `GeoJsonSourceOptions`.
 fn load_cluster_style(runtime: &RuntimeHandle, map: &MapHandle, session: &RenderSessionHandle) {
     let mut camera = CameraOptions::default();
     camera.center = Some(LatLng::new(0.0, 0.0));
     camera.zoom = Some(0.0);
     map.jump_to(&camera).unwrap();
-    map.set_style_json(CLUSTER_BASE_STYLE_JSON).unwrap();
+    map.set_style_json(CLUSTER_BASE_STYLE_JSON.as_bytes())
+        .unwrap();
 
-    let data = GeoJson::FeatureCollection(vec![
-        cluster_point(0.0, 0.0, "one", 1),
-        cluster_point(0.001, 0.001, "two", 2),
-        cluster_point(0.002, 0.002, "three", 3),
-    ]);
+    let data = serde_json::to_vec(&json!({
+        "type": "FeatureCollection",
+        "features": [
+            cluster_point(0.0, 0.0, "one", 1),
+            cluster_point(0.001, 0.001, "two", 2),
+            cluster_point(0.002, 0.002, "three", 3),
+        ],
+    }))
+    .unwrap();
     let mut options = GeoJsonSourceOptions::default();
     options.cluster = Some(true);
     options.cluster_radius = Some(60);
     options.cluster_min_points = Some(2);
     options.cluster_max_zoom = Some(17.0);
-    options.cluster_properties = Some(JsonValue::Object(vec![JsonMember::new(
-        "weight_sum",
-        JsonValue::Array(vec![
-            JsonValue::String("+".to_owned()),
-            JsonValue::Array(vec![
-                JsonValue::String("get".to_owned()),
-                JsonValue::String("weight".to_owned()),
-            ]),
-        ]),
-    )]));
+    options.cluster_properties =
+        Some(serde_json::to_vec(&json!({"weight_sum": ["+", ["get", "weight"]]})).unwrap());
     map.add_geojson_source_data("cluster-source", &data, Some(&options))
         .unwrap();
 
-    let layer = JsonValue::Object(vec![
-        JsonMember::new("id", JsonValue::String("cluster-circle".to_owned())),
-        JsonMember::new("type", JsonValue::String("circle".to_owned())),
-        JsonMember::new("source", JsonValue::String("cluster-source".to_owned())),
-        JsonMember::new(
-            "filter",
-            JsonValue::Array(vec![
-                JsonValue::String("has".to_owned()),
-                JsonValue::String("point_count".to_owned()),
-            ]),
-        ),
-        JsonMember::new(
-            "paint",
-            JsonValue::Object(vec![
-                JsonMember::new("circle-color", JsonValue::String("#2563eb".to_owned())),
-                JsonMember::new("circle-radius", JsonValue::Double(20.0)),
-            ]),
-        ),
-    ]);
+    let layer = serde_json::to_vec(&json!({
+        "id": "cluster-circle",
+        "type": "circle",
+        "source": "cluster-source",
+        "filter": ["has", "point_count"],
+        "paint": {"circle-color": "#2563eb", "circle-radius": 20.0},
+    }))
+    .unwrap();
     map.add_style_layer_json(&layer, None).unwrap();
 
     render_available_updates(runtime, session, 5);
 }
 
-fn numeric_member(feature: &Feature, key: &str) -> Option<f64> {
-    match feature_member(feature, key)? {
-        JsonValue::UInt(value) => Some(*value as f64),
-        JsonValue::Int(value) => Some(*value as f64),
-        JsonValue::Double(value) => Some(*value),
-        _ => None,
-    }
+fn numeric_member(value: &JsonValue, key: &str) -> Option<f64> {
+    json_member(value, key)?.as_f64()
 }
 
 fn render_available_updates(runtime: &RuntimeHandle, session: &RenderSessionHandle, count: usize) {
@@ -2355,12 +2336,15 @@ fn wait_for_rendered_feature(
     geometry: &RenderedQueryGeometry,
     options: &RenderedFeatureQueryOptions,
     description: &str,
-) -> QueriedFeature {
+) -> JsonValue {
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
-        let features = session
-            .query_rendered_features(geometry, Some(options))
-            .unwrap();
+        let features: Vec<JsonValue> = serde_json::from_slice(
+            &session
+                .query_rendered_features(geometry, Some(options))
+                .unwrap(),
+        )
+        .unwrap();
         if features.len() == 1 {
             return features.into_iter().next().unwrap();
         }
@@ -2376,12 +2360,15 @@ fn wait_for_source_feature(
     source_id: &str,
     options: &SourceFeatureQueryOptions,
     description: &str,
-) -> QueriedFeature {
+) -> JsonValue {
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
-        let features = session
-            .query_source_features(source_id, Some(options))
-            .unwrap();
+        let features: Vec<JsonValue> = serde_json::from_slice(
+            &session
+                .query_source_features(source_id, Some(options))
+                .unwrap(),
+        )
+        .unwrap();
         if features.len() == 1 {
             return features.into_iter().next().unwrap();
         }
@@ -2391,55 +2378,53 @@ fn wait_for_source_feature(
     panic!("timed out waiting for {description}");
 }
 
-fn single_cluster_leaf(session: &RenderSessionHandle, feature: &Feature, offset: u64) -> Feature {
-    let arguments = JsonValue::Object(vec![
-        JsonMember::new("limit", JsonValue::UInt(1)),
-        JsonMember::new("offset", JsonValue::UInt(offset)),
-    ]);
+fn single_cluster_leaf(
+    session: &RenderSessionHandle,
+    feature: &JsonValue,
+    offset: u64,
+) -> JsonValue {
+    let feature = serde_json::to_vec(feature).unwrap();
+    let arguments = serde_json::to_vec(&json!({"limit": 1, "offset": offset})).unwrap();
     let result = session
         .query_feature_extension(
             "cluster-source",
-            feature,
+            &feature,
             "supercluster",
             "leaves",
             Some(&arguments),
         )
         .unwrap();
-    let FeatureExtensionResult::FeatureCollection(leaves) = result else {
-        panic!("expected leaves feature collection");
-    };
+    let result: JsonValue = serde_json::from_slice(&result).unwrap();
+    let leaves = result["features"]
+        .as_array()
+        .expect("expected leaves feature collection");
     assert_eq!(leaves.len(), 1);
-    leaves.into_iter().next().unwrap()
+    leaves[0].clone()
 }
 
-fn feature_member<'a>(feature: &'a Feature, key: &str) -> Option<&'a JsonValue> {
-    feature
-        .properties
-        .iter()
-        .find(|member| member.key == key)
-        .map(|member| &member.value)
+fn queried_feature(value: &JsonValue) -> &JsonValue {
+    &value["feature"]
+}
+
+fn feature_member<'a>(feature: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
+    feature.get("properties")?.get(key)
 }
 
 fn json_member<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
-    let JsonValue::Object(members) = value else {
-        return None;
-    };
-    members
-        .iter()
-        .find(|member| member.key == key)
-        .map(|member| &member.value)
+    value.as_object()?.get(key)
 }
 
 fn assert_json_member(value: &JsonValue, key: &str, expected: &JsonValue) {
     assert_eq!(json_member(value, key), Some(expected));
 }
 
-fn assert_point_geometry_close(geometry: &Geometry, expected: LatLng) {
-    let Geometry::Point(actual) = geometry else {
-        panic!("expected point geometry, got {geometry:?}");
-    };
-    assert!((actual.latitude - expected.latitude).abs() < 0.0001);
-    assert!((actual.longitude - expected.longitude).abs() < 0.0001);
+fn assert_point_geometry_close(geometry: &JsonValue, expected: LatLng) {
+    assert_eq!(geometry["type"], json!("Point"));
+    let coordinates = geometry["coordinates"]
+        .as_array()
+        .expect("expected point coordinates");
+    assert!((coordinates[1].as_f64().unwrap() - expected.latitude).abs() < 0.0001);
+    assert!((coordinates[0].as_f64().unwrap() - expected.longitude).abs() < 0.0001);
 }
 
 #[test]
@@ -2489,7 +2474,7 @@ fn opengl_owned_texture_session_attaches_with_platform_context() {
         ErrorKind::InvalidState | ErrorKind::Unsupported
     ));
 
-    map.set_style_json(QUERY_STYLE_JSON).unwrap();
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     assert!(wait_for_runtime_event(
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
@@ -2556,7 +2541,7 @@ fn opengl_surface_session_renders_with_platform_context() {
     )
     .expect("OpenGL surface test session should attach when OpenGL is supported");
 
-    map.set_style_json(QUERY_STYLE_JSON).unwrap();
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     assert!(wait_for_runtime_event(
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
@@ -2593,7 +2578,7 @@ fn webgpu_surface_session_renders_and_presents_through_a_canvas() {
         .attach_webgpu_surface(&surface.descriptor(extent.clone(), &context))
         .expect("WebGPU surface session should attach when WebGPU is supported");
 
-    map.set_style_json(QUERY_STYLE_JSON).unwrap();
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     assert!(wait_for_runtime_event(
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
@@ -2620,7 +2605,8 @@ fn webgpu_surface_session_renders_and_presents_through_a_canvas() {
 
     // A surface hands out one texture per frame, so a second frame proves the
     // first was released rather than held.
-    map.set_style_json(CLUSTER_BASE_STYLE_JSON).unwrap();
+    map.set_style_json(CLUSTER_BASE_STYLE_JSON.as_bytes())
+        .unwrap();
     assert!(wait_for_runtime_event(
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
@@ -2642,7 +2628,7 @@ fn webgpu_surface_session_renders_and_presents_through_a_canvas() {
     session
         .set_webgpu_surface_target(&replacement.descriptor(extent, &context))
         .expect("a replacement naming the same device and format is accepted");
-    map.set_style_json(QUERY_STYLE_JSON).unwrap();
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     assert!(wait_for_runtime_event(
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
@@ -2670,7 +2656,7 @@ fn webgpu_borrowed_texture_session_renders_into_a_host_texture() {
     )
     .expect("WebGPU borrowed texture session should attach when WebGPU is supported");
 
-    map.set_style_json(QUERY_STYLE_JSON).unwrap();
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     assert!(wait_for_runtime_event(
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
@@ -2718,7 +2704,7 @@ fn opengl_borrowed_texture_session_renders_with_platform_context() {
     )
     .expect("OpenGL borrowed texture test session should attach when OpenGL is supported");
 
-    map.set_style_json(QUERY_STYLE_JSON).unwrap();
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     assert!(wait_for_runtime_event(
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
@@ -2752,7 +2738,7 @@ fn set_target_hands_a_live_session_a_new_borrowed_texture() {
         create_opengl_borrowed_texture_session(&map.attach_ref().unwrap(), initial_extent)
             .expect("OpenGL borrowed texture test session should attach when OpenGL is supported");
 
-    map.set_style_json(QUERY_STYLE_JSON).unwrap();
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     assert!(wait_for_runtime_event(
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
@@ -3116,20 +3102,18 @@ fn feature_state_set_get_and_remove_copy_snapshots() {
     )
     .expect("Metal or Vulkan owned texture test session should attach when supported");
     let selector = FeatureStateSelector::new("point").with_feature_id("feature-1");
-    let state = JsonValue::Object(vec![
-        JsonMember::new("hover", JsonValue::Bool(true)),
-        JsonMember::new("radius", JsonValue::UInt(20)),
-    ]);
+    let state = br#"{"hover":true,"radius":20}"#;
 
-    let error = session.set_feature_state(&selector, &state).unwrap_err();
+    let error = session.set_feature_state(&selector, state).unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidState);
 
     load_feature_state_style(&runtime, &map, &session);
 
-    session.set_feature_state(&selector, &state).unwrap();
-    let copied = session.get_feature_state(&selector).unwrap();
-    assert_json_member(&copied, "hover", &JsonValue::Bool(true));
-    assert_json_member(&copied, "radius", &JsonValue::UInt(20));
+    session.set_feature_state(&selector, state).unwrap();
+    let copied: JsonValue =
+        serde_json::from_slice(&session.get_feature_state(&selector).unwrap()).unwrap();
+    assert_json_member(&copied, "hover", &json!(true));
+    assert_json_member(&copied, "radius", &json!(20));
 
     let hover_selector = FeatureStateSelector::new("point")
         .with_feature_id("feature-1")
@@ -3139,8 +3123,9 @@ fn feature_state_set_get_and_remove_copy_snapshots() {
     let _ = wait_for_runtime_event(&runtime, RuntimeEventType::MapRenderUpdateAvailable);
     let _ = session.render_update();
 
-    let after_remove = session.get_feature_state(&selector).unwrap();
-    assert_json_member(&after_remove, "radius", &JsonValue::UInt(20));
+    let after_remove: JsonValue =
+        serde_json::from_slice(&session.get_feature_state(&selector).unwrap()).unwrap();
+    assert_json_member(&after_remove, "radius", &json!(20));
     assert!(json_member(&after_remove, "hover").is_none());
 
     session.close().unwrap();
@@ -3172,9 +3157,9 @@ fn rendered_and_source_queries_copy_results() {
 
     load_query_style(&runtime, &map, &session);
     let state_selector = FeatureStateSelector::new("point").with_feature_id("feature-1");
-    let query_state = JsonValue::Object(vec![JsonMember::new("selected", JsonValue::Bool(true))]);
+    let query_state = br#"{"selected":true}"#;
     session
-        .set_feature_state(&state_selector, &query_state)
+        .set_feature_state(&state_selector, query_state)
         .unwrap();
     let _ = wait_for_runtime_event(&runtime, RuntimeEventType::MapRenderUpdateAvailable);
     let _ = session.render_update();
@@ -3186,17 +3171,10 @@ fn rendered_and_source_queries_copy_results() {
         ScreenPoint::new(query_point.x - 20.0, query_point.y - 20.0),
         ScreenPoint::new(query_point.x + 20.0, query_point.y + 20.0),
     ));
-    let filter = JsonValue::Array(vec![
-        JsonValue::String("==".into()),
-        JsonValue::Array(vec![
-            JsonValue::String("get".into()),
-            JsonValue::String("kind".into()),
-        ]),
-        JsonValue::String("capital".into()),
-    ]);
+    let filter = br#"["==",["get","kind"],"capital"]"#;
     let mut rendered_options = RenderedFeatureQueryOptions::default();
     rendered_options.layer_ids = Some(vec!["point-circle".into()]);
-    rendered_options.filter = Some(filter.clone());
+    rendered_options.filter = Some(filter.to_vec());
     let rendered = wait_for_rendered_feature(
         &runtime,
         &session,
@@ -3204,21 +3182,21 @@ fn rendered_and_source_queries_copy_results() {
         &rendered_options,
         "rendered point feature",
     );
-    assert_eq!(rendered.source_id.as_deref(), Some("point"));
-    assert_eq!(rendered.source_layer_id, None);
-    assert_eq!(
-        rendered.feature.identifier,
-        FeatureIdentifier::String("feature-1".into())
+    assert_eq!(rendered["sourceId"], json!("point"));
+    assert_eq!(rendered["sourceLayerId"], JsonValue::Null);
+    assert_eq!(queried_feature(&rendered)["id"], json!("feature-1"));
+    assert_point_geometry_close(
+        &queried_feature(&rendered)["geometry"],
+        LatLng::new(37.7749, -122.4194),
     );
-    assert_point_geometry_close(&rendered.feature.geometry, LatLng::new(37.7749, -122.4194));
     assert_eq!(
-        feature_member(&rendered.feature, "kind"),
-        Some(&JsonValue::String("capital".into()))
+        feature_member(queried_feature(&rendered), "kind"),
+        Some(&json!("capital"))
     );
-    assert_eq!(rendered.state, Some(query_state));
+    assert_eq!(rendered["state"], json!({"selected": true}));
 
     let mut source_options = SourceFeatureQueryOptions::default();
-    source_options.filter = Some(filter);
+    source_options.filter = Some(filter.to_vec());
     let source = wait_for_source_feature(
         &runtime,
         &session,
@@ -3226,16 +3204,16 @@ fn rendered_and_source_queries_copy_results() {
         &source_options,
         "source point feature",
     );
-    assert_eq!(source.source_id.as_deref(), Some("point"));
-    assert_eq!(source.source_layer_id, None);
-    assert_eq!(
-        source.feature.identifier,
-        FeatureIdentifier::String("feature-1".into())
+    assert_eq!(source["sourceId"], json!("point"));
+    assert_eq!(source["sourceLayerId"], JsonValue::Null);
+    assert_eq!(queried_feature(&source)["id"], json!("feature-1"));
+    assert_point_geometry_close(
+        &queried_feature(&source)["geometry"],
+        LatLng::new(37.7749, -122.4194),
     );
-    assert_point_geometry_close(&source.feature.geometry, LatLng::new(37.7749, -122.4194));
     assert_eq!(
-        feature_member(&source.feature, "kind"),
-        Some(&JsonValue::String("capital".into()))
+        feature_member(queried_feature(&source), "kind"),
+        Some(&json!("capital"))
     );
 
     session.close().unwrap();
@@ -3273,23 +3251,20 @@ fn rendered_box_queries_clip_to_the_viewport() {
         &options,
         "over-covering box query",
     );
-    assert_eq!(
-        rendered.feature.identifier,
-        FeatureIdentifier::String("feature-1".into())
-    );
+    assert_eq!(queried_feature(&rendered)["id"], json!("feature-1"));
 
     // Corners in either order describe the same box.
     let inverted = RenderedQueryGeometry::box_(ScreenBox::new(
         ScreenPoint::new(4096.0, 4096.0),
         ScreenPoint::new(-4096.0, -4096.0),
     ));
-    assert_eq!(
-        session
+    let inverted_features: Vec<JsonValue> = serde_json::from_slice(
+        &session
             .query_rendered_features(&inverted, Some(&options))
-            .unwrap()
-            .len(),
-        1
-    );
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(inverted_features.len(), 1);
 
     // Clipping keeps a fully off-screen box empty instead of collapsing it onto
     // a viewport edge.
@@ -3297,12 +3272,13 @@ fn rendered_box_queries_clip_to_the_viewport() {
         ScreenPoint::new(512.0, 512.0),
         ScreenPoint::new(1024.0, 1024.0),
     ));
-    assert!(
-        session
+    let offscreen_features: Vec<JsonValue> = serde_json::from_slice(
+        &session
             .query_rendered_features(&offscreen, Some(&options))
-            .unwrap()
-            .is_empty()
-    );
+            .unwrap(),
+    )
+    .unwrap();
+    assert!(offscreen_features.is_empty());
 
     session.close().unwrap();
     map.close().unwrap();
@@ -3337,33 +3313,38 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
     // Native matches cluster_id by exact JSON value type, so the copied feature
     // keeps the unsigned alternative to resolve on the way back in.
     assert!(matches!(
-        feature_member(&cluster.feature, "cluster_id"),
-        Some(&JsonValue::UInt(_))
+        feature_member(queried_feature(&cluster), "cluster_id"),
+        Some(JsonValue::Number(_))
     ));
 
     // weight_sum comes from the cluster_properties aggregation lowered through
     // GeoJsonSourceOptions.
-    assert_eq!(numeric_member(&cluster.feature, "point_count"), Some(3.0));
-    assert_eq!(numeric_member(&cluster.feature, "weight_sum"), Some(6.0));
+    assert_eq!(
+        numeric_member(&queried_feature(&cluster)["properties"], "point_count"),
+        Some(3.0)
+    );
+    assert_eq!(
+        numeric_member(&queried_feature(&cluster)["properties"], "weight_sum"),
+        Some(6.0)
+    );
 
+    let cluster_feature = serde_json::to_vec(queried_feature(&cluster)).unwrap();
     let children = session
         .query_feature_extension(
             "cluster-source",
-            &cluster.feature,
+            &cluster_feature,
             "supercluster",
             "children",
             None,
         )
         .unwrap();
-    let FeatureExtensionResult::FeatureCollection(children) = children else {
-        panic!("expected children feature collection");
-    };
-    assert!(!children.is_empty());
+    let children: JsonValue = serde_json::from_slice(&children).unwrap();
+    assert!(!children["features"].as_array().unwrap().is_empty());
 
     // Native ignores arguments of another type and falls back to ten leaves at
     // offset zero, so both unsigned bounds must move the observed result.
-    let first = single_cluster_leaf(&session, &cluster.feature, 0);
-    let second = single_cluster_leaf(&session, &cluster.feature, 1);
+    let first = single_cluster_leaf(&session, queried_feature(&cluster), 0);
+    let second = single_cluster_leaf(&session, queried_feature(&cluster), 1);
     assert_ne!(
         feature_member(&first, "name"),
         feature_member(&second, "name")
@@ -3372,16 +3353,14 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
     let expansion_zoom = session
         .query_feature_extension(
             "cluster-source",
-            &cluster.feature,
+            &cluster_feature,
             "supercluster",
             "expansion-zoom",
             None,
         )
         .unwrap();
-    assert!(matches!(
-        expansion_zoom,
-        FeatureExtensionResult::Value(JsonValue::UInt(_))
-    ));
+    let expansion_zoom: JsonValue = serde_json::from_slice(&expansion_zoom).unwrap();
+    assert!(expansion_zoom.is_u64());
 
     session.close().unwrap();
     map.close().unwrap();
@@ -3406,7 +3385,8 @@ fn sustained_render_loop_outlasts_the_graphics_queue_depth() {
     .expect("Metal or Vulkan owned texture test session should attach when supported");
     // A background-only style keeps each frame to the passes that take command
     // buffers, without the tile work that would make the loop slow.
-    map.set_style_json(CLUSTER_BASE_STYLE_JSON).unwrap();
+    map.set_style_json(CLUSTER_BASE_STYLE_JSON.as_bytes())
+        .unwrap();
     render_available_updates(&runtime, &session, 3);
 
     // Metal allows 64 command buffers in flight per queue and a frame takes
@@ -3727,7 +3707,8 @@ fn a_second_thread_attaches_a_session_and_renders() {
     // Continuous mode, so the map publishes render updates without a
     // still-image request driving them.
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
-    map.set_style_json(CLUSTER_BASE_STYLE_JSON).unwrap();
+    map.set_style_json(CLUSTER_BASE_STYLE_JSON.as_bytes())
+        .unwrap();
     let attach_ref = map.attach_ref().unwrap();
 
     std::thread::scope(|scope| {
@@ -3772,7 +3753,8 @@ fn session_calls_are_rejected_on_a_foreign_thread() {
     }
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
-    map.set_style_json(CLUSTER_BASE_STYLE_JSON).unwrap();
+    map.set_style_json(CLUSTER_BASE_STYLE_JSON.as_bytes())
+        .unwrap();
     let (_context, session) = create_owned_texture_session(
         &map.attach_ref().unwrap(),
         RenderTargetExtent::new(64, 64, 1.0),
@@ -3830,9 +3812,7 @@ fn acquired_frame_state_rejects_reentrant_session_operations_before_native_calls
     for error in [
         session.resize(32, 16, 1.0).unwrap_err(),
         session.render_update().unwrap_err(),
-        session
-            .set_feature_state(&selector, &JsonValue::Object(Vec::new()))
-            .unwrap_err(),
+        session.set_feature_state(&selector, b"{}").unwrap_err(),
         session.get_feature_state(&selector).unwrap_err(),
         session.remove_feature_state(&selector).unwrap_err(),
         session
@@ -3845,7 +3825,7 @@ fn acquired_frame_state_rejects_reentrant_session_operations_before_native_calls
         session
             .query_feature_extension(
                 "point",
-                &Feature::new(crate::Geometry::Empty, Vec::new()),
+                br#"{"type":"Feature","geometry":null,"properties":{}}"#,
                 "x",
                 "y",
                 None,

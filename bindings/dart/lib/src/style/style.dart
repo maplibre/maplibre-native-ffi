@@ -4,7 +4,7 @@ library;
 import 'dart:typed_data';
 
 import '../geo/geo.dart';
-import '../json/json.dart';
+import '../internal/value/byte_values.dart';
 
 /// Style source type.
 final class SourceType {
@@ -262,12 +262,12 @@ final class TileSourceOptions {
 /// Options fixed when a GeoJSON source is created.
 final class GeoJsonSourceOptions {
   /// Creates GeoJSON source options.
-  const GeoJsonSourceOptions({
+  GeoJsonSourceOptions({
     this.minZoom,
     this.maxZoom,
     this.tolerance,
     this.clusterMaxZoom,
-    this.clusterProperties,
+    Uint8List? clusterProperties,
     this.tileSize,
     this.buffer,
     this.clusterRadius,
@@ -275,7 +275,7 @@ final class GeoJsonSourceOptions {
     this.lineMetrics,
     this.cluster,
     this.synchronousUpdate,
-  });
+  }) : clusterProperties = copyOptionalBytes(clusterProperties);
 
   /// Optional minimum tiling zoom.
   final double? minZoom;
@@ -290,7 +290,7 @@ final class GeoJsonSourceOptions {
   final double? clusterMaxZoom;
 
   /// Optional cluster aggregation expressions keyed by property name.
-  final JsonValue? clusterProperties;
+  final Uint8List? clusterProperties;
 
   /// Optional tile extent in pixels.
   final int? tileSize;
@@ -321,7 +321,7 @@ final class GeoJsonSourceOptions {
       other.maxZoom == maxZoom &&
       other.tolerance == tolerance &&
       other.clusterMaxZoom == clusterMaxZoom &&
-      other.clusterProperties == clusterProperties &&
+      optionalBytesEqual(other.clusterProperties, clusterProperties) &&
       other.tileSize == tileSize &&
       other.buffer == buffer &&
       other.clusterRadius == clusterRadius &&
@@ -336,7 +336,7 @@ final class GeoJsonSourceOptions {
     maxZoom,
     tolerance,
     clusterMaxZoom,
-    clusterProperties,
+    optionalBytesHash(clusterProperties),
     tileSize,
     buffer,
     clusterRadius,

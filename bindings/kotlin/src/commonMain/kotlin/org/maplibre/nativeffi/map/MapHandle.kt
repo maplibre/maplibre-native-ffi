@@ -6,12 +6,9 @@ import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.geo.CanonicalTileId
-import org.maplibre.nativeffi.geo.GeoJson
-import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
-import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
@@ -59,13 +56,13 @@ public expect class MapHandle : AutoCloseable {
    *
    * @see org.maplibre.nativeffi.runtime.RuntimeHandle.pollEvent
    */
-  public fun setStyleJson(json: String)
+  public fun setStyleJson(json: ByteArray)
 
   /**
    * Returns the style document this map's style was last parsed from, byte-for-byte, or an empty
-   * string when no document has been parsed. Runtime mutations do not change it.
+   * byte array when no document has been parsed. Runtime mutations do not change it.
    */
-  public fun loadedStyleJson(): String
+  public fun loadedStyleJson(): ByteArray
 
   /**
    * Returns the URL this map's style was last requested from, recorded when the request is made
@@ -73,7 +70,7 @@ public expect class MapHandle : AutoCloseable {
    */
   public fun styleUrl(): String
 
-  public fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue)
+  public fun addStyleSourceJson(sourceId: String, sourceJson: ByteArray)
 
   public fun removeStyleSource(sourceId: String): Boolean
 
@@ -87,18 +84,18 @@ public expect class MapHandle : AutoCloseable {
 
   public fun addGeoJsonSourceUrl(sourceId: String, url: String, options: GeoJsonSourceOptions?)
 
-  public fun addGeoJsonSourceData(sourceId: String, data: GeoJson, options: GeoJsonSourceOptions?)
+  public fun addGeoJsonSourceData(sourceId: String, data: ByteArray, options: GeoJsonSourceOptions?)
 
   public fun setGeoJsonSourceUrl(sourceId: String, url: String)
 
-  public fun setGeoJsonSourceData(sourceId: String, data: GeoJson)
+  public fun setGeoJsonSourceData(sourceId: String, data: ByteArray)
 
   public fun addCustomGeometrySource(sourceId: String, options: CustomGeometrySourceOptions)
 
   public fun setCustomGeometrySourceTileData(
     sourceId: String,
     tileId: CanonicalTileId,
-    data: GeoJson,
+    data: ByteArray,
   )
 
   public fun invalidateCustomGeometrySourceTile(sourceId: String, tileId: CanonicalTileId)
@@ -165,7 +162,7 @@ public expect class MapHandle : AutoCloseable {
 
   public fun imageSourceCoordinates(sourceId: String): List<LatLng>?
 
-  public fun addStyleLayerJson(layerJson: JsonValue, beforeLayerId: String)
+  public fun addStyleLayerJson(layerJson: ByteArray, beforeLayerId: String)
 
   public fun addHillshadeLayer(layerId: String, sourceId: String, beforeLayerId: String)
 
@@ -195,13 +192,13 @@ public expect class MapHandle : AutoCloseable {
 
   public fun moveStyleLayer(layerId: String, beforeLayerId: String)
 
-  public fun styleLayerJson(layerId: String): JsonValue?
+  public fun styleLayerJson(layerId: String): ByteArray?
 
-  public fun setStyleLightJson(lightJson: JsonValue)
+  public fun setStyleLightJson(lightJson: ByteArray)
 
-  public fun setStyleLightProperty(propertyName: String, value: JsonValue)
+  public fun setStyleLightProperty(propertyName: String, value: ByteArray)
 
-  public fun styleLightProperty(propertyName: String): JsonValue?
+  public fun styleLightProperty(propertyName: String): ByteArray?
 
   /**
    * Sets the style's global transition options, replacing rather than merging. Loading a style
@@ -211,15 +208,15 @@ public expect class MapHandle : AutoCloseable {
 
   public fun styleTransitionOptions(): StyleTransitionOptions
 
-  public fun setLayerProperty(layerId: String, propertyName: String, value: JsonValue)
+  public fun setLayerProperty(layerId: String, propertyName: String, value: ByteArray)
 
-  public fun layerProperty(layerId: String, propertyName: String): JsonValue?
+  public fun layerProperty(layerId: String, propertyName: String): ByteArray?
 
-  public fun setLayerFilter(layerId: String, filter: JsonValue)
+  public fun setLayerFilter(layerId: String, filter: ByteArray)
 
   public fun clearLayerFilter(layerId: String)
 
-  public fun layerFilter(layerId: String): JsonValue?
+  public fun layerFilter(layerId: String): ByteArray?
 
   /** Sets one layer's source-layer ID. Layer types that take no source are rejected. */
   public fun setLayerSourceLayer(layerId: String, sourceLayer: String)
@@ -348,7 +345,7 @@ public expect class MapHandle : AutoCloseable {
     fitOptions: CameraFitOptions?,
   ): CameraOptions
 
-  public fun cameraForGeometry(geometry: Geometry, fitOptions: CameraFitOptions?): CameraOptions
+  public fun cameraForGeometry(geometry: ByteArray, fitOptions: CameraFitOptions?): CameraOptions
 
   public fun latLngBoundsForCamera(camera: CameraOptions): LatLngBounds
 

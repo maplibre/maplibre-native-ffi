@@ -7,11 +7,11 @@ from dataclasses import dataclass
 
 import maplibre_native_ffi as mln
 import pytest
-from maplibre_native_ffi import camera, geo, json, query, render
+from maplibre_native_ffi import camera, query, render
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
     assert_cluster_feature_extensions,
-    assert_typed_geojson_cluster_source,
+    assert_geojson_cluster_source,
     skip_or_fail_fixture_setup,
 )
 
@@ -82,7 +82,7 @@ class VulkanOwnedSession:
         self.context.close()
 
     def render_once(self) -> None:
-        self.map.set_style_json(EMPTY_STYLE_JSON)
+        self.map.set_style_json(EMPTY_STYLE_JSON.encode())
         frame = wait_for_vulkan_frame(self, lambda _: True)
         frame.close()
 
@@ -109,7 +109,7 @@ def wait_for_texture_info(
     *,
     iterations: int = 5000,
 ) -> render.TextureImageInfo:
-    fixture.map.set_style_json(EMPTY_STYLE_JSON)
+    fixture.map.set_style_json(EMPTY_STYLE_JSON.encode())
     request_still_image_if_needed(fixture.map)
     for _ in range(iterations):
         fixture.runtime.pump()
@@ -290,7 +290,7 @@ def test_a_worker_thread_attaches_its_own_session_and_renders() -> None:
     try:
         map_handle = runtime.create_map(mln.MapOptions(width=64, height=64))
         try:
-            map_handle.set_style_json(EMPTY_STYLE_JSON)
+            map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
             worker = threading.Thread(target=attach_render_close, args=(map_handle,))
             worker.start()
             while worker.is_alive():
@@ -440,7 +440,7 @@ def test_active_vulkan_frame_rejects_nested_acquire_and_session_operations(
     point_query = query.RenderedQueryGeometry.point_geometry(
         camera.ScreenPoint(0.0, 0.0)
     )
-    feature = geo.Feature(geometry=geo.EmptyGeometry())
+    feature = b'{"type":"Feature","geometry":null,"properties":{}}'
 
     calls: tuple[Callable[[], object], ...] = (
         lambda: vulkan_owned_session.session.resize(16, 16, 1.0),
@@ -466,7 +466,7 @@ def test_active_vulkan_frame_rejects_nested_acquire_and_session_operations(
         ),
         lambda: vulkan_owned_session.session.set_feature_state(
             selector,
-            json.JsonObject((json.JsonMember("hover", True),)),
+            b'{"hover":true}',
         ),
         lambda: vulkan_owned_session.session.get_feature_state(selector),
         lambda: vulkan_owned_session.session.remove_feature_state(selector),
@@ -547,7 +547,7 @@ def test_cluster_feature_extension_queries_resolve_unsigned_cluster_id_and_limit
 def test_typed_geojson_source_options_cluster_nearby_points(
     vulkan_owned_session: VulkanOwnedSession,
 ) -> None:
-    assert_typed_geojson_cluster_source(
+    assert_geojson_cluster_source(
         vulkan_owned_session.runtime,
         vulkan_owned_session.map,
         vulkan_owned_session.session,

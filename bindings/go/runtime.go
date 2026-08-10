@@ -676,7 +676,7 @@ func runtimeEventFromCWithSource(event C.mln_runtime_event, source RuntimeEventS
 		Code:        int32(event.code),
 		PayloadType: RuntimeEventPayloadType(event.payload_type),
 		PayloadSize: uintptr(event.payload_size),
-		Message:     goCharBytes(event.message, event.message_size),
+		Message:     goCharBytes(unsafe.Pointer(event.message), event.message_size),
 		Payload:     runtimeEventPayloadFromC(event),
 		rawSource:   MapID(event.source),
 	}
@@ -753,7 +753,7 @@ func runtimeEventPayloadFromC(event C.mln_runtime_event) any {
 			return runtimeEventUnknownPayloadFromC(event)
 		}
 		payload := (*C.mln_runtime_event_style_image_missing)(event.payload)
-		return RuntimeEventStyleImageMissingPayload{ImageID: goCharBytes(payload.image_id, payload.image_id_size)}
+		return RuntimeEventStyleImageMissingPayload{ImageID: goCharBytes(unsafe.Pointer(payload.image_id), payload.image_id_size)}
 	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION):
 		if !runtimeEventPayloadHasSize(event, unsafe.Sizeof(C.mln_runtime_event_tile_action{})) {
 			return runtimeEventUnknownPayloadFromC(event)
@@ -764,7 +764,7 @@ func runtimeEventPayloadFromC(event C.mln_runtime_event) any {
 			Operation:    TileOperation(operation),
 			RawOperation: operation,
 			TileID:       tileIDFromC(payload.tile_id),
-			SourceID:     goCharBytes(payload.source_id, payload.source_id_size),
+			SourceID:     goCharBytes(unsafe.Pointer(payload.source_id), payload.source_id_size),
 		}
 	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED):
 		if !runtimeEventPayloadHasSize(event, unsafe.Sizeof(C.mln_runtime_event_camera_transition_finished{})) {

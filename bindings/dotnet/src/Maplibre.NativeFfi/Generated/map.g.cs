@@ -285,189 +285,6 @@ namespace Maplibre.NativeFfi.Internal.C
         public double longitude;
     }
 
-    internal unsafe partial struct mln_string_view
-    {
-        [NativeTypeName("const char *")]
-        public sbyte* data;
-
-        [NativeTypeName("size_t")]
-        public nuint size;
-    }
-
-    [NativeTypeName("uint32_t")]
-    internal enum mln_geometry_type : uint
-    {
-        MLN_GEOMETRY_TYPE_EMPTY = 0,
-        MLN_GEOMETRY_TYPE_POINT = 1,
-        MLN_GEOMETRY_TYPE_LINE_STRING = 2,
-        MLN_GEOMETRY_TYPE_POLYGON = 3,
-        MLN_GEOMETRY_TYPE_MULTI_POINT = 4,
-        MLN_GEOMETRY_TYPE_MULTI_LINE_STRING = 5,
-        MLN_GEOMETRY_TYPE_MULTI_POLYGON = 6,
-        MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION = 7,
-    }
-
-    internal unsafe partial struct mln_coordinate_span
-    {
-        [NativeTypeName("const mln_lat_lng *")]
-        public mln_lat_lng* coordinates;
-
-        [NativeTypeName("size_t")]
-        public nuint coordinate_count;
-    }
-
-    internal unsafe partial struct mln_polygon_geometry
-    {
-        [NativeTypeName("const mln_coordinate_span *")]
-        public mln_coordinate_span* rings;
-
-        [NativeTypeName("size_t")]
-        public nuint ring_count;
-    }
-
-    internal unsafe partial struct mln_multi_line_geometry
-    {
-        [NativeTypeName("const mln_coordinate_span *")]
-        public mln_coordinate_span* lines;
-
-        [NativeTypeName("size_t")]
-        public nuint line_count;
-    }
-
-    internal unsafe partial struct mln_multi_polygon_geometry
-    {
-        [NativeTypeName("const mln_polygon_geometry *")]
-        public mln_polygon_geometry* polygons;
-
-        [NativeTypeName("size_t")]
-        public nuint polygon_count;
-    }
-
-    internal unsafe partial struct mln_geometry_collection
-    {
-        [NativeTypeName("const mln_geometry *")]
-        public mln_geometry* geometries;
-
-        [NativeTypeName("size_t")]
-        public nuint geometry_count;
-    }
-
-    internal partial struct mln_geometry
-    {
-        [NativeTypeName("uint32_t")]
-        public uint size;
-
-        [NativeTypeName("uint32_t")]
-        public uint type;
-
-        [NativeTypeName("__AnonymousRecord_map_L402_C3")]
-        public _data_e__Union data;
-
-        [StructLayout(LayoutKind.Explicit)]
-        internal partial struct _data_e__Union
-        {
-            [FieldOffset(0)]
-            public mln_lat_lng point;
-
-            [FieldOffset(0)]
-            public mln_coordinate_span line_string;
-
-            [FieldOffset(0)]
-            public mln_polygon_geometry polygon;
-
-            [FieldOffset(0)]
-            public mln_coordinate_span multi_point;
-
-            [FieldOffset(0)]
-            public mln_multi_line_geometry multi_line_string;
-
-            [FieldOffset(0)]
-            public mln_multi_polygon_geometry multi_polygon;
-
-            [FieldOffset(0)]
-            public mln_geometry_collection geometry_collection;
-        }
-    }
-
-    [NativeTypeName("uint32_t")]
-    internal enum mln_json_value_type : uint
-    {
-        MLN_JSON_VALUE_TYPE_NULL = 0,
-        MLN_JSON_VALUE_TYPE_BOOL = 1,
-        MLN_JSON_VALUE_TYPE_UINT = 2,
-        MLN_JSON_VALUE_TYPE_INT = 3,
-        MLN_JSON_VALUE_TYPE_DOUBLE = 4,
-        MLN_JSON_VALUE_TYPE_STRING = 5,
-        MLN_JSON_VALUE_TYPE_ARRAY = 6,
-        MLN_JSON_VALUE_TYPE_OBJECT = 7,
-    }
-
-    internal unsafe partial struct mln_json_array
-    {
-        [NativeTypeName("const mln_json_value *")]
-        public mln_json_value* values;
-
-        [NativeTypeName("size_t")]
-        public nuint value_count;
-    }
-
-    internal unsafe partial struct mln_json_member
-    {
-        public mln_string_view key;
-
-        [NativeTypeName("const mln_json_value *")]
-        public mln_json_value* value;
-    }
-
-    internal unsafe partial struct mln_json_object
-    {
-        [NativeTypeName("const mln_json_member *")]
-        public mln_json_member* members;
-
-        [NativeTypeName("size_t")]
-        public nuint member_count;
-    }
-
-    internal partial struct mln_json_value
-    {
-        [NativeTypeName("uint32_t")]
-        public uint size;
-
-        [NativeTypeName("uint32_t")]
-        public uint type;
-
-        [NativeTypeName("__AnonymousRecord_map_L459_C3")]
-        public _data_e__Union data;
-
-        [StructLayout(LayoutKind.Explicit)]
-        internal partial struct _data_e__Union
-        {
-            [FieldOffset(0)]
-            [NativeTypeName("bool")]
-            public byte bool_value;
-
-            [FieldOffset(0)]
-            [NativeTypeName("uint64_t")]
-            public ulong uint_value;
-
-            [FieldOffset(0)]
-            [NativeTypeName("int64_t")]
-            public long int_value;
-
-            [FieldOffset(0)]
-            public double double_value;
-
-            [FieldOffset(0)]
-            public mln_string_view string_value;
-
-            [FieldOffset(0)]
-            public mln_json_array array_value;
-
-            [FieldOffset(0)]
-            public mln_json_object object_value;
-        }
-    }
-
     [NativeTypeName("uint32_t")]
     internal enum mln_feature_state_selector_field : uint
     {
@@ -484,106 +301,13 @@ namespace Maplibre.NativeFfi.Internal.C
         [NativeTypeName("uint32_t")]
         public uint fields;
 
-        public mln_string_view source_id;
+        public mln_buffer_view source_id;
 
-        public mln_string_view source_layer_id;
+        public mln_buffer_view source_layer_id;
 
-        public mln_string_view feature_id;
+        public mln_buffer_view feature_id;
 
-        public mln_string_view state_key;
-    }
-
-    [NativeTypeName("uint32_t")]
-    internal enum mln_feature_identifier_type : uint
-    {
-        MLN_FEATURE_IDENTIFIER_TYPE_NULL = 0,
-        MLN_FEATURE_IDENTIFIER_TYPE_UINT = 1,
-        MLN_FEATURE_IDENTIFIER_TYPE_INT = 2,
-        MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE = 3,
-        MLN_FEATURE_IDENTIFIER_TYPE_STRING = 4,
-    }
-
-    internal unsafe partial struct mln_feature
-    {
-        [NativeTypeName("uint32_t")]
-        public uint size;
-
-        [NativeTypeName("const mln_geometry *")]
-        public mln_geometry* geometry;
-
-        [NativeTypeName("const mln_json_member *")]
-        public mln_json_member* properties;
-
-        [NativeTypeName("size_t")]
-        public nuint property_count;
-
-        [NativeTypeName("uint32_t")]
-        public uint identifier_type;
-
-        [NativeTypeName("__AnonymousRecord_map_L514_C3")]
-        public _identifier_e__Union identifier;
-
-        [StructLayout(LayoutKind.Explicit)]
-        internal partial struct _identifier_e__Union
-        {
-            [FieldOffset(0)]
-            [NativeTypeName("uint64_t")]
-            public ulong uint_value;
-
-            [FieldOffset(0)]
-            [NativeTypeName("int64_t")]
-            public long int_value;
-
-            [FieldOffset(0)]
-            public double double_value;
-
-            [FieldOffset(0)]
-            public mln_string_view string_value;
-        }
-    }
-
-    [NativeTypeName("uint32_t")]
-    internal enum mln_geojson_type : uint
-    {
-        MLN_GEOJSON_TYPE_GEOMETRY = 1,
-        MLN_GEOJSON_TYPE_FEATURE = 2,
-        MLN_GEOJSON_TYPE_FEATURE_COLLECTION = 3,
-    }
-
-    internal unsafe partial struct mln_feature_collection
-    {
-        [NativeTypeName("const mln_feature *")]
-        public mln_feature* features;
-
-        [NativeTypeName("size_t")]
-        public nuint feature_count;
-    }
-
-    internal partial struct mln_geojson
-    {
-        [NativeTypeName("uint32_t")]
-        public uint size;
-
-        [NativeTypeName("uint32_t")]
-        public uint type;
-
-        [NativeTypeName("__AnonymousRecord_map_L545_C3")]
-        public _data_e__Union data;
-
-        [StructLayout(LayoutKind.Explicit)]
-        internal unsafe partial struct _data_e__Union
-        {
-            [FieldOffset(0)]
-            [NativeTypeName("const mln_geometry *")]
-            public mln_geometry* geometry;
-
-            [FieldOffset(0)]
-            [NativeTypeName("const mln_feature *")]
-            public mln_feature* feature;
-
-            [FieldOffset(0)]
-            public mln_feature_collection feature_collection;
-        }
+        public mln_buffer_view state_key;
     }
 
     internal partial struct mln_lat_lng_bounds
@@ -640,8 +364,7 @@ namespace Maplibre.NativeFfi.Internal.C
         [NativeTypeName("const char *")]
         public sbyte* style_url;
 
-        [NativeTypeName("const mln_geometry *")]
-        public mln_geometry* geometry;
+        public mln_buffer_view geometry;
 
         public double min_zoom;
 
@@ -661,7 +384,7 @@ namespace Maplibre.NativeFfi.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L616_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L410_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -845,10 +568,10 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_map_set_style_url([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const char *")] sbyte* url);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_style_json([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const char *")] sbyte* json);
+        public static extern mln_status mln_map_set_style_json([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view json);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_copy_loaded_style_json([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("char *")] sbyte* out_json, [NativeTypeName("size_t")] nuint json_capacity, [NativeTypeName("size_t *")] nuint* out_json_size);
+        public static extern mln_status mln_map_copy_loaded_style_json([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("uint8_t *")] byte* out_json, [NativeTypeName("size_t")] nuint json_capacity, [NativeTypeName("size_t *")] nuint* out_json_size);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_copy_style_url([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("char *")] sbyte* out_url, [NativeTypeName("size_t")] nuint url_capacity, [NativeTypeName("size_t *")] nuint* out_url_size);

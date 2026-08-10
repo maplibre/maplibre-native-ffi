@@ -506,9 +506,9 @@ _renderedFeatureQueryOptionsToNative(
   }
   final filter = options.filter;
   if (filter != null) {
-    nativeOptions.ref.filter = native_json
-        .nativeJsonValue(filter, allocator)
-        .pointer;
+    final nativeFilter = allocator<raw.mln_buffer_view>();
+    nativeFilter.ref = nativeBufferView(filter, allocator);
+    nativeOptions.ref.filter = nativeFilter;
   }
   return nativeOptions;
 }
@@ -534,9 +534,9 @@ _sourceFeatureQueryOptionsToNative(
   }
   final filter = options.filter;
   if (filter != null) {
-    nativeOptions.ref.filter = native_json
-        .nativeJsonValue(filter, allocator)
-        .pointer;
+    final nativeFilter = allocator<raw.mln_buffer_view>();
+    nativeFilter.ref = nativeBufferView(filter, allocator);
+    nativeOptions.ref.filter = nativeFilter;
   }
   return nativeOptions;
 }
@@ -664,9 +664,10 @@ Pointer<raw.mln_geojson_source_options> _nativeGeoJsonSourceOptions(
         .mln_geojson_source_option_field
         .MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
         .value;
-    nativeOptions.ref.cluster_properties = native_json
-        .nativeJsonValue(clusterProperties, allocator)
-        .pointer;
+    nativeOptions.ref.cluster_properties = nativeBufferView(
+      clusterProperties,
+      allocator,
+    );
   }
   final tileSize = options.tileSize;
   if (tileSize != null) {
@@ -747,102 +748,18 @@ Pointer<raw.mln_lat_lng> _latLngArray(
   return nativeCoordinates;
 }
 
-Pointer<raw.mln_string_view> _stringViewArray(
+Pointer<raw.mln_buffer_view> _stringViewArray(
   List<String> values,
   Allocator allocator,
 ) {
   if (values.isEmpty) {
-    return nullptr.cast<raw.mln_string_view>();
+    return nullptr.cast<raw.mln_buffer_view>();
   }
-  final views = allocator<raw.mln_string_view>(values.length);
+  final views = allocator<raw.mln_buffer_view>(values.length);
   for (var index = 0; index < values.length; index += 1) {
     views[index] = nativeStringView(values[index], allocator).value;
   }
   return views;
-}
-
-List<QueriedFeature> _copyFeatureQueryResult(NativeFeatureQueryResult result) {
-  try {
-    return withNativeArena((arena) {
-      final outCount = arena<Size>();
-      _check(raw.mln_feature_query_result_count(result.raw, outCount));
-      return [
-        for (var index = 0; index < outCount.value; index += 1)
-          _copyQueriedFeature(result, index, arena),
-      ];
-    });
-  } finally {
-    raw.mln_feature_query_result_destroy(result.raw);
-  }
-}
-
-QueriedFeature _copyQueriedFeature(
-  NativeFeatureQueryResult result,
-  int index,
-  Allocator allocator,
-) {
-  final outFeature = allocator<raw.mln_queried_feature>();
-  outFeature.ref.size = sizeOf<raw.mln_queried_feature>();
-  _check(raw.mln_feature_query_result_get(result.raw, index, outFeature));
-  final feature = outFeature.ref;
-  final state =
-      (feature.fields &
-                  raw
-                      .mln_queried_feature_field
-                      .MLN_QUERIED_FEATURE_STATE
-                      .value) ==
-              0 ||
-          feature.state == nullptr
-      ? null
-      : native_json.jsonValueFromNative(feature.state.ref);
-  return QueriedFeature(
-    feature: native_geometry.featureGeoJsonFromNative(feature.feature),
-    sourceId:
-        (feature.fields &
-                raw
-                    .mln_queried_feature_field
-                    .MLN_QUERIED_FEATURE_SOURCE_ID
-                    .value) ==
-            0
-        ? null
-        : _copyStringView(feature.source_id),
-    sourceLayerId:
-        (feature.fields &
-                raw
-                    .mln_queried_feature_field
-                    .MLN_QUERIED_FEATURE_SOURCE_LAYER_ID
-                    .value) ==
-            0
-        ? null
-        : _copyStringView(feature.source_layer_id),
-    state: state,
-  );
-}
-
-FeatureExtensionResult _copyFeatureExtensionResult(
-  NativeFeatureExtensionResult result,
-) {
-  try {
-    return withNativeArena((arena) {
-      final outInfo = arena<raw.mln_feature_extension_result_info>();
-      outInfo.ref.size = sizeOf<raw.mln_feature_extension_result_info>();
-      _check(raw.mln_feature_extension_result_get(result.raw, outInfo));
-      final info = outInfo.ref;
-      return switch (info.type) {
-        1 => FeatureExtensionValue(
-          native_json.jsonValueFromNative(info.data.value.ref),
-        ),
-        2 => FeatureExtensionFeatureCollection(
-          native_geometry.featureCollectionFromNative(
-            info.data.feature_collection,
-          ),
-        ),
-        _ => FeatureExtensionUnknown(info.type),
-      };
-    });
-  } finally {
-    raw.mln_feature_extension_result_destroy(result.raw);
-  }
 }
 
 raw.mln_render_target_extent _renderTargetExtentToNative(
@@ -1101,10 +1018,26 @@ String _copyMapText(
   });
 }
 
+Uint8List _copyMapData(
+  NativeMap map,
+  int Function(int, Pointer<Uint8>, int, Pointer<Size>) copy,
+) {
+  return withNativeArena((arena) {
+    final outSize = arena<Size>();
+    _check(copy(map.raw, nullptr.cast<Uint8>(), 0, outSize));
+    final required = outSize.value;
+    if (required == 0) return Uint8List(0);
+    final buffer = arena<Uint8>(required);
+    final outCopied = arena<Size>();
+    _check(copy(map.raw, buffer, required, outCopied));
+    return Uint8List.fromList(buffer.asTypedList(outCopied.value));
+  });
+}
+
 String _copyLayerText(
   NativeMap map,
   String layerId,
-  int Function(int, raw.mln_string_view, Pointer<Char>, int, Pointer<Size>)
+  int Function(int, raw.mln_buffer_view, Pointer<Char>, int, Pointer<Size>)
   copy,
 ) {
   return withNativeArena((arena) {
@@ -1127,7 +1060,7 @@ String _copyLayerText(
 
 String? _copyStyleSourceAttribution(
   NativeMap map,
-  raw.mln_string_view sourceId,
+  raw.mln_buffer_view sourceId,
   bool hasAttribution,
   int attributionSize,
   Allocator allocator,
@@ -1161,7 +1094,7 @@ String? _copyStyleSourceAttribution(
 
 String? _copyStyleSourceUrl(
   NativeMap map,
-  raw.mln_string_view sourceId,
+  raw.mln_buffer_view sourceId,
   bool hasUrl,
   int urlSize,
   Allocator allocator,
@@ -1191,27 +1124,6 @@ String? _copyStyleSourceUrl(
   return buffer.cast<Utf8>().toDartString(length: outSize.value);
 }
 
-JsonValue? _copyJsonSnapshot(NativeJsonSnapshot snapshot) {
-  // A null snapshot means the value is absent, which the C API reports as
-  // success.
-  if (snapshot.isNull) {
-    return null;
-  }
-  try {
-    return withNativeArena((arena) {
-      final outValue = arena<Pointer<raw.mln_json_value>>();
-      outValue.value = nullptr;
-      _check(raw.mln_json_snapshot_get(snapshot.raw, outValue));
-      if (outValue.value == nullptr) {
-        return null;
-      }
-      return native_json.jsonValueFromNative(outValue.value.ref);
-    });
-  } finally {
-    raw.mln_json_snapshot_destroy(snapshot.raw);
-  }
-}
-
 List<String> _copyStyleIdList(NativeStyleIdList list) {
   try {
     return withNativeArena((arena) {
@@ -1219,7 +1131,7 @@ List<String> _copyStyleIdList(NativeStyleIdList list) {
       _check(raw.mln_style_id_list_count(list.raw, outCount));
       final ids = <String>[];
       for (var index = 0; index < outCount.value; index += 1) {
-        final outId = arena<raw.mln_string_view>();
+        final outId = arena<raw.mln_buffer_view>();
         _check(raw.mln_style_id_list_get(list.raw, index, outId));
         ids.add(_copyStringView(outId.ref) ?? '');
       }
@@ -1237,7 +1149,7 @@ List<String> _copyStyleStringList(NativeStyleStringList list) {
       _check(raw.mln_style_string_list_count(list.raw, outCount));
       final values = <String>[];
       for (var index = 0; index < outCount.value; index += 1) {
-        final outValue = arena<raw.mln_string_view>();
+        final outValue = arena<raw.mln_buffer_view>();
         _check(raw.mln_style_string_list_get(list.raw, index, outValue));
         values.add(_copyStringView(outValue.ref) ?? '');
       }
@@ -1248,10 +1160,10 @@ List<String> _copyStyleStringList(NativeStyleStringList list) {
   }
 }
 
-String? _copyStringView(raw.mln_string_view view) =>
+String? _copyStringView(raw.mln_buffer_view view) =>
     _copyNativeString(view.data, view.size);
 
-String? _copyNativeString(Pointer<Char> pointer, int byteLength) {
+String? _copyNativeString(Pointer<Void> pointer, int byteLength) {
   if (pointer == nullptr || byteLength == 0) {
     return null;
   }

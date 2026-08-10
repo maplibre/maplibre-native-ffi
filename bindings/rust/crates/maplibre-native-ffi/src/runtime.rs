@@ -21,7 +21,7 @@ use crate::{
     Result,
 };
 #[cfg(test)]
-use crate::{Geometry, LatLngBounds, MapHandle, MapOptions};
+use crate::{LatLngBounds, MapHandle, MapOptions};
 
 pub use maplibre_core::runtime::{OfflineRegionDefinition, OfflineRegionInfo, RuntimeOptions};
 pub(crate) use maplibre_core::runtime::{
@@ -1307,7 +1307,7 @@ mod tests {
 
         let geometry_definition = OfflineRegionDefinition::GeometryRegion {
             style_url: "custom://offline-geometry-style.json".into(),
-            geometry: Geometry::Point(crate::LatLng::new(37.5, -122.5)),
+            geometry: br#"{"type":"Point","coordinates":[-122.5,37.5]}"#.to_vec(),
             min_zoom: 0.0,
             max_zoom: 1.0,
             pixel_ratio: 1.0,
@@ -2414,7 +2414,7 @@ mod tests {
         let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
         let map_id = map.id();
 
-        let error = map.set_style_json("{").unwrap_err();
+        let error = map.set_style_json(b"{").unwrap_err();
         assert_eq!(error.kind(), ErrorKind::NativeError);
         assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_NATIVE_ERROR));
 

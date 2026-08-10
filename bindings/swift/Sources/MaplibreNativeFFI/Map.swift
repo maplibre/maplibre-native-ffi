@@ -209,11 +209,14 @@ public final class MapHandle {
   /// the same message arrives as a map-loading-failed runtime event. A style
   /// MapLibre rejects semantically, such as one with an unknown `version`,
   /// produces neither an error nor an event.
-  public func setStyleJSON(_ json: String) throws {
+  public func setStyleJSON(_ json: Data) throws {
     try mapNativeFailure {
-      try NativeString.withCString(json) { json in
-        try checkStatus(mln_map_set_style_json(handle.requireLive().raw, json))
-      }
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      try checkStatus(mln_map_set_style_json(
+        handle.requireLive().raw,
+        arena.view(json)
+      ))
       resetCallbackRetentionState()
     }
   }
@@ -222,12 +225,11 @@ public final class MapHandle {
   /// byte, rather than a serialization of the live style. Runtime mutations do
   /// not change it, and a failed parse leaves the previous document in place.
   /// The result is empty when no document has been parsed.
-  public func loadedStyleJSON() throws -> String {
+  public func loadedStyleJSON() throws -> Data {
     try mapNativeFailure {
-      try NativeStyle
-        .copyMapText(handle.requireLive()) { map, text, capacity, size in
-          mln_map_copy_loaded_style_json(map, text, capacity, size)
-        }
+      try NativeStyle.copyMapData(handle.requireLive()) {
+        mln_map_copy_loaded_style_json($0, $1, $2, $3)
+      }
     }
   }
 

@@ -88,7 +88,7 @@ pub const MapProjectionHandle = enum(c.mln_map_projection) {
     pub fn setVisibleGeometry(
         self: *MapProjectionHandle,
         allocator: std.mem.Allocator,
-        geometry: values.Geometry,
+        geometry: []const u8,
         padding: values.EdgeInsets,
     ) status.Error!void {
         var temp = native_temp.TempStorage.init(allocator);
@@ -98,7 +98,7 @@ pub const MapProjectionHandle = enum(c.mln_map_projection) {
         try status.checkStatus(
             c.mln_map_projection_set_visible_geometry(
                 lease.native,
-                try temp.geometry(geometry),
+                try temp.stringView(geometry),
                 values.edgeInsetsToNative(padding),
             ),
             lease.diagnostic_store,

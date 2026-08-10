@@ -177,7 +177,7 @@ test "camera fitting computes camera and visible bounds" {
     try testing.expect(coordinate_camera.center != null);
     try testing.expect(coordinate_camera.zoom != null);
 
-    const geometry_camera = try map.cameraForGeometry(testing.allocator, .{ .line_string = coordinates[0..] }, null);
+    const geometry_camera = try map.cameraForGeometry(testing.allocator, "{\"type\":\"LineString\",\"coordinates\":[[-125,35],[-120,39]]}", null);
     try testing.expect(geometry_camera.center != null);
     try testing.expect(geometry_camera.zoom != null);
 
@@ -271,7 +271,7 @@ test "camera public descriptors report invalid native arguments" {
     };
     try testing.expectError(error.InvalidArgument, map.cameraForLatLngBounds(inverted_bounds, null));
     try testing.expectError(error.InvalidArgument, map.cameraForLatLngs(testing.allocator, &.{}, null));
-    try testing.expectError(error.InvalidArgument, map.cameraForGeometry(testing.allocator, .empty, null));
+    try testing.expectError(error.InvalidArgument, map.cameraForGeometry(testing.allocator, "{", null));
 
     try testing.expectError(error.InvalidArgument, map.setBounds(.{ .min_zoom = 10, .max_zoom = 1 }));
     try testing.expectError(error.InvalidArgument, map.setFreeCameraOptions(.{ .position = .{ .x = std.math.inf(f64), .y = 0, .z = 0 } }));

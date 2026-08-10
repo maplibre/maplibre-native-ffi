@@ -16,10 +16,8 @@ import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
 import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
-import org.maplibre.nativeffi.render.OpenGLContextProvider
 import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
-import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.render.RenderTargetExtent
 import org.maplibre.nativeffi.render.TextureImageInfo
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
@@ -28,19 +26,6 @@ import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 
 @OptIn(ExperimentalForeignApi::class)
 class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
-  @Test
-  fun renderBackendMasksRoundTrip() {
-    assertEquals(
-      setOf(RenderBackend.METAL, RenderBackend.VULKAN, RenderBackend.OPENGL, RenderBackend.WEBGPU),
-      RenderBackend.fromMask(15U),
-    )
-    assertEquals(
-      setOf(OpenGLContextProvider.WGL, OpenGLContextProvider.EGL, OpenGLContextProvider.WEBGL),
-      OpenGLContextProvider.fromMask(7U),
-    )
-    assertEquals(emptySet(), RenderBackend.fromMask(0U))
-  }
-
   @Test
   fun textureImageInfoCopiesMetadataAndRejectsOversizedLengths() {
     memScoped {

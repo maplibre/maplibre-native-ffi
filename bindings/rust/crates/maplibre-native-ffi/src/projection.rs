@@ -6,12 +6,10 @@ use maplibre_native_ffi_core::values::{empty_lat_lng, empty_screen_point, lat_ln
 use maplibre_native_ffi_sys as sys;
 
 use crate::camera::CameraOptionsNativeExt;
-use crate::geometry::GeometryNativeExt;
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::values::NativeValue;
 use crate::{
-    CameraOptions, EdgeInsets, Error, Geometry, HandleOperationError, LatLng, MapHandle, Result,
-    ScreenPoint,
+    CameraOptions, EdgeInsets, Error, HandleOperationError, LatLng, MapHandle, Result, ScreenPoint,
 };
 
 #[derive(Debug)]
@@ -129,15 +127,15 @@ impl MapProjectionHandle {
     }
 
     /// Updates the projection camera so geometry coordinates are visible.
-    pub fn set_visible_geometry(&self, geometry: &Geometry, padding: EdgeInsets) -> Result<()> {
+    pub fn set_visible_geometry(&self, geometry: &[u8], padding: EdgeInsets) -> Result<()> {
         let projection = self.inner.native()?;
-        let native_geometry = geometry.try_to_native()?;
+        let native_geometry = maplibre_core::string::buffer_view(geometry);
         // SAFETY: projection is live, native_geometry owns backing storage for
         // the duration of this call, and padding is passed by value.
         maplibre_core::check(unsafe {
             sys::mln_map_projection_set_visible_geometry(
                 projection,
-                native_geometry.as_ptr(),
+                native_geometry,
                 padding.to_native(),
             )
         })
@@ -250,7 +248,7 @@ mod tests {
         assert!(error.diagnostic().contains("at least one coordinate"));
         projection
             .set_visible_geometry(
-                &Geometry::LineString(vec![LatLng::new(0.0, 0.0), LatLng::new(1.0, 1.0)]),
+                br#"{"type":"LineString","coordinates":[[0.0,0.0],[1.0,1.0]]}"#,
                 padding,
             )
             .unwrap();

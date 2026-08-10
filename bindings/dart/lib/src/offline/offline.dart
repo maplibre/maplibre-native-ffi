@@ -4,6 +4,7 @@ library;
 import 'dart:typed_data';
 
 import '../geo/geo.dart';
+import '../internal/value/byte_values.dart';
 
 /// Ambient cache maintenance operation.
 final class AmbientCacheOperation {
@@ -144,20 +145,20 @@ final class OfflineTilePyramidRegionDefinition extends OfflineRegionDefinition {
 /// Geometry offline region definition.
 final class OfflineGeometryRegionDefinition extends OfflineRegionDefinition {
   /// Creates a geometry offline region definition.
-  const OfflineGeometryRegionDefinition({
+  OfflineGeometryRegionDefinition({
     required this.styleUrl,
-    required this.geometry,
+    required Uint8List geometry,
     required this.minZoom,
     required this.maxZoom,
     required this.pixelRatio,
     this.includeIdeographs = false,
-  });
+  }) : geometry = copyBytes(geometry);
 
   /// Style URL copied during region creation.
   final String styleUrl;
 
   /// Geometry to download.
-  final Geometry geometry;
+  final Uint8List geometry;
 
   /// Minimum zoom.
   final double minZoom;
@@ -170,6 +171,26 @@ final class OfflineGeometryRegionDefinition extends OfflineRegionDefinition {
 
   /// Whether ideographs are included.
   final bool includeIdeographs;
+
+  @override
+  bool operator ==(Object other) =>
+      other is OfflineGeometryRegionDefinition &&
+      other.styleUrl == styleUrl &&
+      optionalBytesEqual(other.geometry, geometry) &&
+      other.minZoom == minZoom &&
+      other.maxZoom == maxZoom &&
+      other.pixelRatio == pixelRatio &&
+      other.includeIdeographs == includeIdeographs;
+
+  @override
+  int get hashCode => Object.hash(
+    styleUrl,
+    optionalBytesHash(geometry),
+    minZoom,
+    maxZoom,
+    pixelRatio,
+    includeIdeographs,
+  );
 }
 
 /// Copied offline region metadata and definition.

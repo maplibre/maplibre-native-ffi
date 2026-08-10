@@ -11,8 +11,6 @@ use maplibre_native_ffi_sys as sys;
 
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::map::MapAttachRef;
-#[cfg(test)]
-use crate::{Feature, JsonValue};
 use crate::{HandleOperationError, Result};
 
 /// Borrowed opaque native address used for backend interop handles. It does not
@@ -189,8 +187,8 @@ impl fmt::Debug for FrameOpenGLTextureName<'_> {
 
 mod query;
 pub use query::{
-    FeatureExtensionResult, FeatureStateSelector, QueriedFeature, RenderedFeatureQueryOptions,
-    RenderedQueryGeometry, SourceFeatureQueryOptions,
+    FeatureStateSelector, RenderedFeatureQueryOptions, RenderedQueryGeometry,
+    SourceFeatureQueryOptions,
 };
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]

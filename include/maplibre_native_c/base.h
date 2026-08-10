@@ -88,10 +88,40 @@ typedef uint64_t mln_map;
 typedef uint64_t mln_map_projection;
 typedef uint64_t mln_offline_region_snapshot;
 typedef uint64_t mln_offline_region_list;
-typedef uint64_t mln_json_snapshot;
+typedef uint64_t mln_buffer;
 typedef uint64_t mln_resource_request_handle;
 typedef uint64_t mln_render_session;
 typedef uint64_t mln_wake_source;
+
+/**
+ * Borrowed data. The data pointer may be null only when size is zero.
+ *
+ * Each parameter documents whether its view contains UTF-8 text, serialized
+ * data, or arbitrary bytes. The view carries no ownership and requires no
+ * trailing null byte.
+ */
+typedef struct mln_buffer_view {
+  const void* data;
+  size_t size;
+} mln_buffer_view;
+
+/**
+ * Borrows the data stored by an owned buffer.
+ *
+ * The view remains valid until buffer is destroyed. The caller must not access
+ * it concurrently with mln_buffer_destroy().
+ *
+ * Returns:
+ * - MLN_STATUS_OK when out_view receives the borrowed view.
+ * - MLN_STATUS_INVALID_ARGUMENT when buffer is null or not live, buffer has the
+ *   wrong handle type, or out_view is null.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status
+mln_buffer_get(mln_buffer buffer, mln_buffer_view* out_view) MLN_NOEXCEPT;
+
+/** Destroys an owned buffer. A null handle is a no-op. */
+MLN_API void mln_buffer_destroy(mln_buffer buffer) MLN_NOEXCEPT;
 
 /**
  * Reports the C ABI contract version. The value is 0 while the ABI is unstable,

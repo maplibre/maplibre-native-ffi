@@ -1,6 +1,7 @@
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
@@ -38,6 +39,7 @@ val mavenArtifact = "maplibre-native-ffi"
 kotlin {
   iosArm64()
   iosSimulatorArm64()
+  linuxArm64()
   linuxX64()
   macosArm64()
 
@@ -53,6 +55,11 @@ kotlin {
     minSdk = libs.versions.android.minSdk.get().toInt()
 
     withJava()
+    withDeviceTestBuilder { sourceSetTreeName = "test" }
+      .configure {
+        instrumentationRunner = "org.maplibre.nativeffi.MaplibreTestRunner"
+        execution = "HOST"
+      }
 
     optimization {
       consumerKeepRules.file(
@@ -92,6 +99,14 @@ kotlin {
   sourceSets {
     androidMain { dependencies { implementation(libs.javacpp) } }
 
+    named("androidDeviceTest") {
+      dependencies {
+        implementation(kotlin("test"))
+        implementation(libs.androidx.test.runner)
+        implementation(project(":bindings:kotlin:runtimes:$androidBackend"))
+      }
+    }
+
     commonTest.dependencies { implementation(kotlin("test")) }
   }
 }
@@ -116,6 +131,7 @@ canonicalizeKmpRootMetadata(
       "iosArm64" to "$mavenArtifact-iosarm64",
       "iosSimulatorArm64" to "$mavenArtifact-iossimulatorarm64",
       "jvm" to "$mavenArtifact-jvm",
+      "linuxArm64" to "$mavenArtifact-linuxarm64",
       "linuxX64" to "$mavenArtifact-linuxx64",
       "macosArm64" to "$mavenArtifact-macosarm64",
     ),
@@ -182,6 +198,11 @@ tasks.named<Test>("jvmTest") {
       .withPropertyName("maplibreNativeCLoaderLibraryDirs")
     inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstallDir")
   }
+}
+
+tasks.withType<KotlinNativeSimulatorTest>().configureEach {
+  standalone.set(false)
+  providers.environmentVariable("MLN_FFI_IOS_SIMULATOR_DEVICE_ID").orNull?.let(device::set)
 }
 
 // AGP's KMP library plugin registers no lint variant, so `NewApi` never runs for

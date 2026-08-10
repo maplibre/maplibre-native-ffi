@@ -96,10 +96,6 @@ var owned_texture_frame_registry: std.ArrayList(OwnedTextureFrameRegistrySlot) =
 var owned_texture_frame_free_list: std.ArrayList(usize) = .empty;
 var fail_next_owned_texture_frame_wrapper_allocation_for_testing = std.atomic.Value(bool).init(false);
 
-const FeatureQueryResultDestroyFn = *const fn (c.mln_feature_query_result) callconv(.c) void;
-var feature_query_result_destroy_for_testing: FeatureQueryResultDestroyFn = c.mln_feature_query_result_destroy;
-var feature_query_result_destroy_count_for_testing = std.atomic.Value(usize).init(0);
-
 pub const NativePointer = enum(usize) {
     _,
 
@@ -321,84 +317,12 @@ pub const RenderedQueryGeometry = union(enum) {
 
 pub const RenderedFeatureQueryOptions = struct {
     layer_ids: ?[]const []const u8 = null,
-    filter: ?values.JsonValue = null,
+    filter: ?[]const u8 = null,
 };
 
 pub const SourceFeatureQueryOptions = struct {
     source_layer_ids: ?[]const []const u8 = null,
-    filter: ?values.JsonValue = null,
-};
-
-pub const OwnedFeature = struct {
-    allocator: std.mem.Allocator,
-    geometry: values.OwnedGeometry,
-    properties: []values.OwnedJsonMember,
-    identifier: values.FeatureIdentifier,
-
-    pub fn deinit(self: *OwnedFeature) void {
-        self.geometry.deinit(self.allocator);
-        for (self.properties) |*property| {
-            self.allocator.free(property.key);
-            property.value.deinit(self.allocator);
-        }
-        self.allocator.free(self.properties);
-        if (self.identifier == .string) self.allocator.free(self.identifier.string);
-        self.properties = &.{};
-        self.identifier = .null;
-    }
-};
-
-pub const QueriedFeature = struct {
-    feature: OwnedFeature,
-    source_id: ?[]const u8,
-    source_layer_id: ?[]const u8,
-    state: ?values.OwnedJsonValue,
-
-    pub fn deinit(self: *QueriedFeature) void {
-        const allocator = self.feature.allocator;
-        self.feature.deinit();
-        if (self.source_id) |source_id| allocator.free(source_id);
-        if (self.source_layer_id) |source_layer_id| allocator.free(source_layer_id);
-        if (self.state) |*state_value| state_value.deinit(allocator);
-        self.source_id = null;
-        self.source_layer_id = null;
-        self.state = null;
-    }
-};
-
-pub const FeatureQueryResult = struct {
-    allocator: std.mem.Allocator,
-    features: []QueriedFeature,
-
-    pub fn deinit(self: *FeatureQueryResult) void {
-        for (self.features) |*feature| feature.deinit();
-        self.allocator.free(self.features);
-        self.features = &.{};
-    }
-};
-
-pub const OwnedFeatureCollection = struct {
-    allocator: std.mem.Allocator,
-    features: []OwnedFeature,
-
-    pub fn deinit(self: *OwnedFeatureCollection) void {
-        for (self.features) |*feature| feature.deinit();
-        self.allocator.free(self.features);
-        self.features = &.{};
-    }
-};
-
-pub const FeatureExtensionResult = union(enum) {
-    value: values.OwnedJsonValue,
-    feature_collection: OwnedFeatureCollection,
-
-    pub fn deinit(self: *FeatureExtensionResult, allocator: std.mem.Allocator) void {
-        switch (self.*) {
-            .value => |*value| value.deinit(allocator),
-            .feature_collection => |*collection| collection.deinit(),
-        }
-        self.* = .{ .value = .null };
-    }
+    filter: ?[]const u8 = null,
 };
 
 pub const MetalOwnedTextureFrameInfo = struct {
@@ -571,12 +495,12 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
         self: *RenderSessionHandle,
         allocator: std.mem.Allocator,
         selector: FeatureStateSelector,
-        feature_state: values.JsonValue,
+        feature_state: []const u8,
     ) status.Error!void {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_selector = try featureStateSelectorToNative(&temp, selector);
-        const raw_state = try temp.jsonValue(feature_state);
+        const raw_state = try temp.stringView(feature_state);
         const lease = try renderSessionLease(self.*);
         defer lease.release();
         try status.checkStatus(
@@ -589,21 +513,18 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
         self: *RenderSessionHandle,
         allocator: std.mem.Allocator,
         selector: FeatureStateSelector,
-    ) status.Error!values.OwnedJsonValue {
+    ) status.Error!values.OwnedString {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_selector = try featureStateSelectorToNative(&temp, selector);
-        var snapshot: c.mln_json_snapshot = 0;
+        var buffer: c.mln_buffer = 0;
         const lease = try renderSessionLease(self.*);
         defer lease.release();
         try status.checkStatus(
-            c.mln_render_session_get_feature_state(lease.native, &raw_selector, &snapshot),
+            c.mln_render_session_get_feature_state(lease.native, &raw_selector, &buffer),
             lease.diagnostic_store,
         );
-        defer c.mln_json_snapshot_destroy(snapshot);
-        var raw: ?*const c.mln_json_value = null;
-        try status.checkStatus(c.mln_json_snapshot_get(snapshot, &raw), lease.diagnostic_store);
-        return try values.ownedJsonValueFromNative(allocator, raw.?);
+        return (try native_temp.copyOwnedBuffer(allocator, buffer, lease.diagnostic_store)) orelse error.NativeError;
     }
 
     pub fn removeFeatureState(
@@ -627,20 +548,19 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
         allocator: std.mem.Allocator,
         geometry: RenderedQueryGeometry,
         options: ?RenderedFeatureQueryOptions,
-    ) status.Error!FeatureQueryResult {
+    ) status.Error!values.OwnedString {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_geometry = try renderedQueryGeometryToNative(&temp, geometry);
         var raw_options = if (options) |query_options| try renderedFeatureQueryOptionsToNative(&temp, query_options) else undefined;
-        var result: c.mln_feature_query_result = 0;
+        var result: c.mln_buffer = 0;
         const lease = try renderSessionLease(self.*);
         defer lease.release();
         try status.checkStatus(
             c.mln_render_session_query_rendered_features(lease.native, &raw_geometry, if (options != null) &raw_options else null, &result),
             lease.diagnostic_store,
         );
-        defer destroyFeatureQueryResult(result);
-        return try copyFeatureQueryResult(allocator, result, lease.diagnostic_store);
+        return (try native_temp.copyOwnedBuffer(allocator, result, lease.diagnostic_store)) orelse error.NativeError;
     }
 
     pub fn querySourceFeatures(
@@ -648,53 +568,54 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
         allocator: std.mem.Allocator,
         source_id: []const u8,
         options: ?SourceFeatureQueryOptions,
-    ) status.Error!FeatureQueryResult {
+    ) status.Error!values.OwnedString {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         const raw_source_id = try temp.stringView(source_id);
         var raw_options = if (options) |query_options| try sourceFeatureQueryOptionsToNative(&temp, query_options) else undefined;
-        var result: c.mln_feature_query_result = 0;
+        var result: c.mln_buffer = 0;
         const lease = try renderSessionLease(self.*);
         defer lease.release();
         try status.checkStatus(
             c.mln_render_session_query_source_features(lease.native, raw_source_id, if (options != null) &raw_options else null, &result),
             lease.diagnostic_store,
         );
-        defer destroyFeatureQueryResult(result);
-        return try copyFeatureQueryResult(allocator, result, lease.diagnostic_store);
+        return (try native_temp.copyOwnedBuffer(allocator, result, lease.diagnostic_store)) orelse error.NativeError;
     }
 
     /// Queries a feature extension from the latest render session state.
     ///
-    /// The `supercluster` extension reads `cluster_id`, `limit`, and `offset`
-    /// as `.uint` and treats other numeric types as absent: a non-`.uint`
-    /// `cluster_id` yields a `.value` result holding `.null`, and a non-`.uint`
-    /// `limit` or `offset` falls back to ten leaves at offset zero.
+    /// The returned string contains either a JSON value or a GeoJSON Feature
+    /// Collection. The `supercluster` extension requires `cluster_id`, `limit`,
+    /// and `offset` to be nonnegative integer JSON literals. Floating-point or
+    /// negative representations are treated as absent. An absent cluster ID
+    /// produces JSON null; absent limit and offset values use ten leaves at
+    /// offset zero.
     pub fn queryFeatureExtension(
         self: *RenderSessionHandle,
         allocator: std.mem.Allocator,
         source_id: []const u8,
-        feature: values.Feature,
+        feature: []const u8,
         extension: []const u8,
         extension_field: []const u8,
-        arguments: ?values.JsonValue,
-    ) status.Error!FeatureExtensionResult {
+        arguments: ?[]const u8,
+    ) status.Error!values.OwnedString {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         const raw_source_id = try temp.stringView(source_id);
-        const raw_feature = try temp.feature(feature);
+        const raw_feature = try temp.stringView(feature);
         const raw_extension = try temp.stringView(extension);
         const raw_extension_field = try temp.stringView(extension_field);
-        const raw_arguments = if (arguments) |value| try temp.jsonValue(value) else null;
-        var result: c.mln_feature_extension_result = 0;
+        var raw_arguments_value = if (arguments) |value| try temp.stringView(value) else undefined;
+        const raw_arguments = if (arguments != null) &raw_arguments_value else null;
+        var result: c.mln_buffer = 0;
         const lease = try renderSessionLease(self.*);
         defer lease.release();
         try status.checkStatus(
             c.mln_render_session_query_feature_extensions(lease.native, raw_source_id, raw_feature, raw_extension, raw_extension_field, raw_arguments, &result),
             lease.diagnostic_store,
         );
-        defer c.mln_feature_extension_result_destroy(result);
-        return try copyFeatureExtensionResult(allocator, result, lease.diagnostic_store);
+        return (try native_temp.copyOwnedBuffer(allocator, result, lease.diagnostic_store)) orelse error.NativeError;
     }
 
     pub fn readPremultipliedRgba8Into(self: *RenderSessionHandle, buffer: []u8) status.Error!TextureImageInfo {
@@ -1182,28 +1103,6 @@ pub fn failNextOwnedTextureFrameWrapperAllocationForTesting() void {
     fail_next_owned_texture_frame_wrapper_allocation_for_testing.store(true, .seq_cst);
 }
 
-fn destroyFeatureQueryResult(result: c.mln_feature_query_result) void {
-    feature_query_result_destroy_for_testing(result);
-}
-
-fn countingFeatureQueryResultDestroy(result: c.mln_feature_query_result) callconv(.c) void {
-    _ = feature_query_result_destroy_count_for_testing.fetchAdd(1, .seq_cst);
-    c.mln_feature_query_result_destroy(result);
-}
-
-pub fn useCountingFeatureQueryResultDestroyForTesting() void {
-    feature_query_result_destroy_count_for_testing.store(0, .seq_cst);
-    feature_query_result_destroy_for_testing = countingFeatureQueryResultDestroy;
-}
-
-pub fn restoreFeatureQueryResultDestroyForTesting() void {
-    feature_query_result_destroy_for_testing = c.mln_feature_query_result_destroy;
-}
-
-pub fn featureQueryResultDestroyCountForTesting() usize {
-    return feature_query_result_destroy_count_for_testing.load(.seq_cst);
-}
-
 fn registerOwnedTextureFrameState(comptime T: type, frame_state_handle: *OwnedTextureFrameState) std.mem.Allocator.Error!T {
     lockOwnedTextureFrameRegistry();
     defer unlockOwnedTextureFrameRegistry();
@@ -1390,7 +1289,11 @@ fn renderedFeatureQueryOptionsToNative(
         raw.layer_ids = (try stringViewArray(temp, layer_ids)).ptr;
         raw.layer_id_count = layer_ids.len;
     }
-    if (options.filter) |filter| raw.filter = try temp.jsonValue(filter);
+    if (options.filter) |filter| {
+        const view = try temp.arena.allocator().create(c.mln_buffer_view);
+        view.* = try temp.stringView(filter);
+        raw.filter = view;
+    }
     return raw;
 }
 
@@ -1404,12 +1307,16 @@ fn sourceFeatureQueryOptionsToNative(
         raw.source_layer_ids = (try stringViewArray(temp, source_layer_ids)).ptr;
         raw.source_layer_id_count = source_layer_ids.len;
     }
-    if (options.filter) |filter| raw.filter = try temp.jsonValue(filter);
+    if (options.filter) |filter| {
+        const view = try temp.arena.allocator().create(c.mln_buffer_view);
+        view.* = try temp.stringView(filter);
+        raw.filter = view;
+    }
     return raw;
 }
 
-fn stringViewArray(temp: *native_temp.TempStorage, values_list: []const []const u8) status.Error![]c.mln_string_view {
-    const raw = try temp.arena.allocator().alloc(c.mln_string_view, values_list.len);
+fn stringViewArray(temp: *native_temp.TempStorage, values_list: []const []const u8) status.Error![]c.mln_buffer_view {
+    const raw = try temp.arena.allocator().alloc(c.mln_buffer_view, values_list.len);
     for (values_list, raw) |value, *out| out.* = try temp.stringView(value);
     return raw;
 }
@@ -1439,147 +1346,6 @@ fn featureStateSelectorToNative(
         raw.state_key = try temp.stringView(state_key);
     }
     return raw;
-}
-
-fn copyFeatureQueryResult(
-    allocator: std.mem.Allocator,
-    result: c.mln_feature_query_result,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-) status.Error!FeatureQueryResult {
-    var count: usize = 0;
-    try status.checkStatus(c.mln_feature_query_result_count(result, &count), diagnostic_store);
-    const features = try allocator.alloc(QueriedFeature, count);
-    var initialized: usize = 0;
-    errdefer {
-        for (features[0..initialized]) |*feature| feature.deinit();
-        allocator.free(features);
-    }
-    for (features, 0..) |*feature, index| {
-        var raw = c.mln_queried_feature{
-            .size = @sizeOf(c.mln_queried_feature),
-            .fields = 0,
-            .feature = undefined,
-            .source_id = .{ .data = null, .size = 0 },
-            .source_layer_id = .{ .data = null, .size = 0 },
-            .state = null,
-        };
-        try status.checkStatus(c.mln_feature_query_result_get(result, index, &raw), diagnostic_store);
-        feature.* = try copyQueriedFeature(allocator, &raw);
-        initialized += 1;
-    }
-    return .{ .allocator = allocator, .features = features };
-}
-
-fn copyQueriedFeature(allocator: std.mem.Allocator, raw: *const c.mln_queried_feature) status.Error!QueriedFeature {
-    const feature = try copyOwnedFeature(allocator, &raw.feature);
-    errdefer {
-        var mutable_feature = feature;
-        mutable_feature.deinit();
-    }
-
-    const source_id = if ((raw.fields & c.MLN_QUERIED_FEATURE_SOURCE_ID) != 0) try copyStringView(allocator, raw.source_id) else null;
-    errdefer if (source_id) |value| allocator.free(value);
-    const source_layer_id = if ((raw.fields & c.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID) != 0) try copyStringView(allocator, raw.source_layer_id) else null;
-    errdefer if (source_layer_id) |value| allocator.free(value);
-    const feature_state = if ((raw.fields & c.MLN_QUERIED_FEATURE_STATE) != 0 and raw.state != null) try values.ownedJsonValueFromNative(allocator, raw.state.?) else null;
-    errdefer if (feature_state) |*value| {
-        var mutable_value = value.*;
-        mutable_value.deinit(allocator);
-    };
-
-    return .{
-        .feature = feature,
-        .source_id = source_id,
-        .source_layer_id = source_layer_id,
-        .state = feature_state,
-    };
-}
-
-fn copyFeatureExtensionResult(
-    allocator: std.mem.Allocator,
-    result: c.mln_feature_extension_result,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-) status.Error!FeatureExtensionResult {
-    var info = c.mln_feature_extension_result_info{
-        .size = @sizeOf(c.mln_feature_extension_result_info),
-        .type = 0,
-        .data = .{ .value = null },
-    };
-    try status.checkStatus(c.mln_feature_extension_result_get(result, &info), diagnostic_store);
-    return switch (info.type) {
-        c.MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE => .{ .value = try values.ownedJsonValueFromNative(allocator, info.data.value) },
-        c.MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION => .{ .feature_collection = try copyFeatureCollection(allocator, info.data.feature_collection) },
-        else => error.UnknownStatus,
-    };
-}
-
-fn copyFeatureCollection(allocator: std.mem.Allocator, raw: c.mln_feature_collection) status.Error!OwnedFeatureCollection {
-    const features = try allocator.alloc(OwnedFeature, raw.feature_count);
-    var initialized: usize = 0;
-    errdefer {
-        for (features[0..initialized]) |*feature| feature.deinit();
-        allocator.free(features);
-    }
-    if (raw.feature_count > 0) {
-        for (raw.features[0..raw.feature_count], features) |feature, *out| {
-            out.* = try copyOwnedFeature(allocator, &feature);
-            initialized += 1;
-        }
-    }
-    return .{ .allocator = allocator, .features = features };
-}
-
-fn copyOwnedFeature(allocator: std.mem.Allocator, raw: *const c.mln_feature) status.Error!OwnedFeature {
-    const geometry = try values.ownedGeometryFromNative(allocator, raw.geometry);
-    errdefer {
-        var mutable_geometry = geometry;
-        mutable_geometry.deinit(allocator);
-    }
-
-    const properties = try allocator.alloc(values.OwnedJsonMember, raw.property_count);
-    var properties_initialized: usize = 0;
-    errdefer {
-        for (properties[0..properties_initialized]) |*property| {
-            allocator.free(property.key);
-            property.value.deinit(allocator);
-        }
-        allocator.free(properties);
-    }
-    if (raw.property_count > 0) {
-        for (raw.properties[0..raw.property_count], properties) |property, *out| {
-            const key = try copyStringView(allocator, property.key);
-            errdefer allocator.free(key);
-            const value = try values.ownedJsonValueFromNative(allocator, property.value);
-            out.* = .{ .key = key, .value = value };
-            properties_initialized += 1;
-        }
-    }
-
-    const identifier = try copyFeatureIdentifier(allocator, raw.*);
-    errdefer if (identifier == .string) allocator.free(identifier.string);
-
-    return .{
-        .allocator = allocator,
-        .geometry = geometry,
-        .properties = properties,
-        .identifier = identifier,
-    };
-}
-
-fn copyFeatureIdentifier(allocator: std.mem.Allocator, raw: c.mln_feature) status.Error!values.FeatureIdentifier {
-    return switch (raw.identifier_type) {
-        c.MLN_FEATURE_IDENTIFIER_TYPE_NULL => .null,
-        c.MLN_FEATURE_IDENTIFIER_TYPE_UINT => .{ .uint = raw.identifier.uint_value },
-        c.MLN_FEATURE_IDENTIFIER_TYPE_INT => .{ .int = raw.identifier.int_value },
-        c.MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE => .{ .double = raw.identifier.double_value },
-        c.MLN_FEATURE_IDENTIFIER_TYPE_STRING => .{ .string = try copyStringView(allocator, raw.identifier.string_value) },
-        else => error.UnknownStatus,
-    };
-}
-
-fn copyStringView(allocator: std.mem.Allocator, view: c.mln_string_view) std.mem.Allocator.Error![]const u8 {
-    if (view.size == 0) return allocator.dupe(u8, "");
-    return allocator.dupe(u8, view.data[0..view.size]);
 }
 
 fn metalSurfaceDescriptorToNative(descriptor: MetalSurfaceDescriptor) c.mln_metal_surface_descriptor {
@@ -1688,10 +1454,4 @@ fn openglContextToNative(context: OpenGLContextDescriptor) c.mln_opengl_context_
         },
     }
     return raw;
-}
-
-test "feature identifier copy rejects unknown native tags" {
-    var feature = std.mem.zeroes(c.mln_feature);
-    feature.identifier_type = 0xbeef;
-    try std.testing.expectError(error.UnknownStatus, copyFeatureIdentifier(std.testing.allocator, feature));
 }

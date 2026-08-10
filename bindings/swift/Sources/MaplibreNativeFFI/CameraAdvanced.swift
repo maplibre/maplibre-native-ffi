@@ -1,5 +1,6 @@
 
 internal import CMaplibreNativeC
+import Foundation
 
 public struct CameraFitOptions: Equatable, Sendable {
   public var padding: EdgeInsets?
@@ -493,17 +494,18 @@ public extension MapHandle {
   }
 
   func cameraForGeometry(
-    _ geometry: Geometry,
+    _ geometry: Data,
     fitOptions: CameraFitOptions? = nil
   ) throws -> CameraOptions {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try (fitOptions?.nativeInput ?? NativeCameraFitOptionsInput())
         .withOptionalNativeOptions { fitOptions in
           try CameraOptions(native: NativeCameraOptionsInput(NativeMap
               .cameraForGeometry(
                 requireLiveHandle(),
-                geometry: arena.allocateGeometry(geometry.nativeGeometry),
+                geometry: arena.view(geometry),
                 fitOptions: fitOptions
               )))
         }

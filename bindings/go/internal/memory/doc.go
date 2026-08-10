@@ -1,3 +1,3 @@
-// Package memory owns private cgo memory helpers for strings, string views,
-// temporary descriptor graphs, pinned slices, and C-owned retained storage.
+// Package memory owns private cgo memory helpers for strings, buffer views,
+// pinned slices, and C-owned retained storage.
 package memory

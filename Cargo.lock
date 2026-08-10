@@ -1020,6 +1020,7 @@ dependencies = [
  "libloading",
  "maplibre-native-ffi-core",
  "maplibre-native-ffi-sys",
+ "serde_json",
  "static_assertions",
 ]
 

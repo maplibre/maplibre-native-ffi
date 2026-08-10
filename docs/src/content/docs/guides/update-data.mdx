@@ -20,18 +20,14 @@ the same source ID, preserving the layers that draw it.
 
 <Code code={region(liveUpdates, "add")} lang="c" title="geojson-live-updates.c" />
 
-For each change, the host builds one geometry and one feature descriptor per
-item in its collection. A point geometry contains one coordinate.
-
-<Code code={region(liveUpdates, "geometry")} lang="c" title="geojson-live-updates.c" />
-
-The geometries and the features occupy two parallel arrays, sized for the
-largest collection that the host publishes.
+For each change, the host serializes its collection as one UTF-8 GeoJSON
+FeatureCollection. The snippet writes each position as a point feature into a
+caller-provided buffer.
 
 <Code code={region(liveUpdates, "features")} lang="c" title="geojson-live-updates.c" />
 
-A feature collection holds those descriptors, and one call publishes it to the
-source.
+One call publishes the complete buffer view to the source. MapLibre parses or
+copies the bytes before returning, so the host can reuse the buffer afterward.
 
 <Code code={region(liveUpdates, "publish")} lang="c" title="geojson-live-updates.c" />
 

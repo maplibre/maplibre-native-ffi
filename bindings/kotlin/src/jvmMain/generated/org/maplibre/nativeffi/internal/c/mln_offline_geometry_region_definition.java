@@ -17,7 +17,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  * struct mln_offline_geometry_region_definition {
  *     uint32_t size;
  *     const char *style_url;
- *     const mln_geometry *geometry;
+ *     mln_buffer_view geometry;
  *     double min_zoom;
  *     double max_zoom;
  *     float pixel_ratio;
@@ -35,7 +35,7 @@ public class mln_offline_geometry_region_definition {
         MapLibreNativeC.C_INT.withName("size"),
         MemoryLayout.paddingLayout(4),
         MapLibreNativeC.C_POINTER.withName("style_url"),
-        MapLibreNativeC.C_POINTER.withName("geometry"),
+        mln_buffer_view.layout().withName("geometry"),
         MapLibreNativeC.C_DOUBLE.withName("min_zoom"),
         MapLibreNativeC.C_DOUBLE.withName("max_zoom"),
         MapLibreNativeC.C_FLOAT.withName("pixel_ratio"),
@@ -138,15 +138,15 @@ public class mln_offline_geometry_region_definition {
         struct.set(style_url$LAYOUT, style_url$OFFSET, fieldValue);
     }
 
-    private static final AddressLayout geometry$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("geometry"));
+    private static final GroupLayout geometry$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("geometry"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * const mln_geometry *geometry
+     * mln_buffer_view geometry
      * }
      */
-    public static final AddressLayout geometry$layout() {
+    public static final GroupLayout geometry$layout() {
         return geometry$LAYOUT;
     }
 
@@ -155,7 +155,7 @@ public class mln_offline_geometry_region_definition {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * const mln_geometry *geometry
+     * mln_buffer_view geometry
      * }
      */
     public static final long geometry$offset() {
@@ -165,21 +165,21 @@ public class mln_offline_geometry_region_definition {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * const mln_geometry *geometry
+     * mln_buffer_view geometry
      * }
      */
     public static MemorySegment geometry(MemorySegment struct) {
-        return struct.get(geometry$LAYOUT, geometry$OFFSET);
+        return struct.asSlice(geometry$OFFSET, geometry$LAYOUT.byteSize());
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * const mln_geometry *geometry
+     * mln_buffer_view geometry
      * }
      */
     public static void geometry(MemorySegment struct, MemorySegment fieldValue) {
-        struct.set(geometry$LAYOUT, geometry$OFFSET, fieldValue);
+        MemorySegment.copy(fieldValue, 0L, struct, geometry$OFFSET, geometry$LAYOUT.byteSize());
     }
 
     private static final OfDouble min_zoom$LAYOUT = (OfDouble)$LAYOUT.select(groupElement("min_zoom"));

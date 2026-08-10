@@ -78,7 +78,8 @@ static void a_second_thread_attaches_and_renders(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_style_json(map, background_style_json)
+    MLN_STATUS_OK,
+    mln_map_set_style_json(map, MLN_BUFFER_LITERAL(background_style_json))
   );
 
   render_probe probe = {.map = map};
@@ -326,7 +327,8 @@ static void resize_from_the_render_thread_lands_on_the_map_thread(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_style_json(map, background_style_json)
+    MLN_STATUS_OK,
+    mln_map_set_style_json(map, MLN_BUFFER_LITERAL(background_style_json))
   );
 
   resize_probe probe = {.map = map};
@@ -403,7 +405,8 @@ static void render_thread_is_not_poisoned_for_runtime_creation(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_style_json(map, background_style_json)
+    MLN_STATUS_OK,
+    mln_map_set_style_json(map, MLN_BUFFER_LITERAL(background_style_json))
   );
 
   runtime_after_render_probe probe = {.map = map};

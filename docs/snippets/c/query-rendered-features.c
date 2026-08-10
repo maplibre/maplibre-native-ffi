@@ -4,38 +4,21 @@
 #include <maplibre_native_c.h>
 #include <string.h>
 
-static mln_string_view sv(const char* text) {
-  return (mln_string_view){.data = text, .size = strlen(text)};
+static mln_buffer_view view(const char* text) {
+  return (mln_buffer_view){.data = text, .size = strlen(text)};
 }
 
-static void copy_text(mln_string_view view, char* out, size_t out_size) {
-  const size_t length = view.size < out_size - 1 ? view.size : out_size - 1;
-  memcpy(out, view.data, length);
-  out[length] = '\0';
-}
-
-static bool copy_first_source_id(
-  mln_feature_query_result result, char* out_source_id, size_t out_size
-) {
-  size_t count = 0;
-  mln_feature_query_result_count(result, &count);
+static void read_query_result(mln_buffer result) {
   // #region read
-  for (size_t index = 0; index < count; index++) {
-    mln_queried_feature feature = {.size = sizeof(feature)};
-    const mln_status got =
-      mln_feature_query_result_get(result, index, &feature);
-    if (got != MLN_STATUS_OK) continue;
-    if ((feature.fields & MLN_QUERIED_FEATURE_SOURCE_ID) == 0) continue;
-    copy_text(feature.source_id, out_source_id, out_size);
-    return true;
-  }
+  mln_buffer_view json = {0};
+  if (mln_buffer_get(result, &json) != MLN_STATUS_OK) return;
+  // Parse json.data[0..json.size] as the query-envelope array and copy any
+  // values that must outlive result.
   // #endregion read
-  return false;
 }
 
-bool source_at_screen_point(
-  mln_render_session session, mln_screen_point at, char* out_source_id,
-  size_t out_size
+mln_status features_at_screen_point(
+  mln_render_session session, mln_screen_point at
 ) {
   // #region geometry
   const mln_rendered_query_geometry geometry =
@@ -46,7 +29,9 @@ bool source_at_screen_point(
   // #endregion geometry
 
   // #region layers
-  const mln_string_view layer_ids[] = {sv("poi-labels"), sv("building-fill")};
+  const mln_buffer_view layer_ids[] = {
+    view("poi-labels"), view("building-fill")
+  };
   mln_rendered_feature_query_options options =
     mln_rendered_feature_query_options_default();
   options.fields = MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
@@ -55,14 +40,14 @@ bool source_at_screen_point(
   // #endregion layers
 
   // #region query
-  mln_feature_query_result result = MLN_HANDLE_NULL;
+  mln_buffer result = MLN_HANDLE_NULL;
   const mln_status queried = mln_render_session_query_rendered_features(
     session, &geometry, &options, &result
   );
-  if (queried != MLN_STATUS_OK) return false;
+  if (queried != MLN_STATUS_OK) return queried;
 
-  const bool found = copy_first_source_id(result, out_source_id, out_size);
-  mln_feature_query_result_destroy(result);
-  return found;
+  read_query_result(result);
+  mln_buffer_destroy(result);
+  return MLN_STATUS_OK;
   // #endregion query
 }

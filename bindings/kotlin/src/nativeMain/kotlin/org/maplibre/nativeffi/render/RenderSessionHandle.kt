@@ -15,7 +15,6 @@ import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.toLong
 import kotlinx.cinterop.value
-import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.internal.c.mln_metal_borrowed_texture_attach
 import org.maplibre.nativeffi.internal.c.mln_metal_borrowed_texture_set_target
 import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_acquire_frame
@@ -58,21 +57,16 @@ import org.maplibre.nativeffi.internal.c.mln_vulkan_surface_set_target
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
 import org.maplibre.nativeffi.internal.lifecycle.asHandle
-import org.maplibre.nativeffi.internal.lifecycle.featureExtensionResultHandle
-import org.maplibre.nativeffi.internal.lifecycle.featureQueryResultHandle
-import org.maplibre.nativeffi.internal.lifecycle.jsonSnapshotHandle
+import org.maplibre.nativeffi.internal.lifecycle.ownedBufferHandle
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.lifecycle.renderSessionHandle
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.internal.struct.ByteStructs
 import org.maplibre.nativeffi.internal.struct.CoreStructs
 import org.maplibre.nativeffi.internal.struct.QueryStructs
 import org.maplibre.nativeffi.internal.struct.RenderStructs
-import org.maplibre.nativeffi.internal.struct.ValueStructs
-import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.query.FeatureExtensionResult
 import org.maplibre.nativeffi.query.FeatureStateSelector
-import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
@@ -202,20 +196,20 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     Status.check(mln_render_session_dump_debug_logs(state.requireLive().rawHandleValue))
   }
 
-  public actual fun setFeatureState(selector: FeatureStateSelector, value: JsonValue) {
+  public actual fun setFeatureState(selector: FeatureStateSelector, value: ByteArray) {
     activeFrame.ensureInactive("set feature state")
     memScoped {
       Status.check(
         mln_render_session_set_feature_state(
           state.requireLive().rawHandleValue,
           QueryStructs.featureStateSelector(selector, this),
-          ValueStructs.jsonValue(value, this),
+          ByteStructs.bufferView(value, this),
         )
       )
     }
   }
 
-  public actual fun getFeatureState(selector: FeatureStateSelector): JsonValue = memScoped {
+  public actual fun getFeatureState(selector: FeatureStateSelector): ByteArray = memScoped {
     activeFrame.ensureInactive("get feature state")
     val outState = alloc<ULongVar>()
     outState.value = 0uL
@@ -226,8 +220,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         outState.ptr,
       )
     )
-    ValueStructs.readJsonSnapshot(jsonSnapshotHandle(outState.value))
-      ?: JsonValue.ObjectValue(emptyList())
+    ByteStructs.ownedBuffer(outState.value.asHandle("mln_buffer", ::ownedBufferHandle))
   }
 
   public actual fun removeFeatureState(selector: FeatureStateSelector) {
@@ -245,7 +238,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
   public actual fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): List<QueriedFeature> = memScoped {
+  ): ByteArray = memScoped {
     activeFrame.ensureInactive("query rendered features")
     val outResult = alloc<ULongVar>()
     outResult.value = 0uL
@@ -257,15 +250,13 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         outResult.ptr,
       )
     )
-    QueryStructs.featureQueryResult(
-      outResult.value.asHandle("mln_feature_query_result", ::featureQueryResultHandle)
-    )
+    ByteStructs.ownedBuffer(outResult.value.asHandle("mln_buffer", ::ownedBufferHandle))
   }
 
   public actual fun querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ): List<QueriedFeature> = memScoped {
+  ): ByteArray = memScoped {
     activeFrame.ensureInactive("query source features")
     val outResult = alloc<ULongVar>()
     outResult.value = 0uL
@@ -277,18 +268,16 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         outResult.ptr,
       )
     )
-    QueryStructs.featureQueryResult(
-      outResult.value.asHandle("mln_feature_query_result", ::featureQueryResultHandle)
-    )
+    ByteStructs.ownedBuffer(outResult.value.asHandle("mln_buffer", ::ownedBufferHandle))
   }
 
   public actual fun queryFeatureExtension(
     sourceId: String,
-    feature: Feature,
+    feature: ByteArray,
     extension: String,
     extensionField: String,
-    arguments: JsonValue?,
-  ): FeatureExtensionResult = memScoped {
+    arguments: ByteArray?,
+  ): ByteArray = memScoped {
     activeFrame.ensureInactive("query feature extension")
     val outResult = alloc<ULongVar>()
     outResult.value = 0uL
@@ -296,16 +285,14 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
       mln_render_session_query_feature_extensions(
         state.requireLive().rawHandleValue,
         CoreStructs.stringView(sourceId, this),
-        ValueStructs.feature(feature, this),
+        ByteStructs.bufferView(feature, this),
         CoreStructs.stringView(extension, this),
         CoreStructs.stringView(extensionField, this),
-        arguments?.let { ValueStructs.jsonValue(it, this) },
+        arguments?.let { ByteStructs.bufferViewPointer(it, this) },
         outResult.ptr,
       )
     )
-    QueryStructs.featureExtensionResult(
-      outResult.value.asHandle("mln_feature_extension_result", ::featureExtensionResultHandle)
-    )
+    ByteStructs.ownedBuffer(outResult.value.asHandle("mln_buffer", ::ownedBufferHandle))
   }
 
   public actual fun textureImageInfo(): TextureImageInfo = memScoped {

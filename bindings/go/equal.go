@@ -21,6 +21,13 @@ func clonePointer[T any](value *T) *T {
 	return cloned
 }
 
+func cloneBytes(value []byte) []byte {
+	if value == nil {
+		return nil
+	}
+	return append([]byte{}, value...)
+}
+
 // equalStrings reports whether two optional string lists are equal. A nil list
 // marks an absent field and is never equal to an empty list.
 func equalStrings(left, right []string) bool {
@@ -45,12 +52,4 @@ func equalBoundsConstraint(left, right *BoundsConstraint) bool {
 		return false
 	}
 	return left.Kind != BoundsConstraintBounded || left.Bounds == right.Bounds
-}
-
-// equalJSON reports whether two optional JSON filters are equal.
-func equalJSON(left, right *JSONValue) bool {
-	if left == nil || right == nil {
-		return left == nil && right == nil
-	}
-	return left.Equal(*right)
 }

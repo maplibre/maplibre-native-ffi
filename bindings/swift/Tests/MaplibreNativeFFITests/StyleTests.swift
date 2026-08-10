@@ -83,7 +83,7 @@ import Testing
   )
   defer { try? map.close() }
 
-  try map.setStyleJSON(#"{"version":8,"sources":{},"layers":[]}"#)
+  try map.setStyleJSON(jsonData(#"{"version":8,"sources":{},"layers":[]}"#))
   let bounds = LatLngBounds(
     southwest: LatLng(latitude: -1, longitude: -2),
     northeast: LatLng(latitude: 3, longitude: 4)
@@ -110,7 +110,7 @@ import Testing
   )
   try map.addGeoJSONSourceData(
     sourceId: "data",
-    data: .featureCollection([])
+    data: jsonData(#"{"type":"FeatureCollection","features":[]}"#)
   )
 
   let inline = try #require(try map.styleSourceInfo("inline"))
@@ -184,7 +184,7 @@ import Testing
 
 @Test func imageSourceCoordinatesRejectInvalidCountBeforeCallingC() throws {
   let map = SyntheticHandles.map()
-  let sourceId = mln_string_view()
+  let sourceId = mln_buffer_view()
   let coordinate = NativeLatLng(latitude: 1, longitude: 2)
 
   do {
@@ -192,7 +192,7 @@ import Testing
       map,
       sourceId: sourceId,
       coordinates: [coordinate],
-      url: mln_string_view()
+      url: mln_buffer_view()
     )
     Issue.record("invalid coordinate count should throw")
   } catch let failure as NativeStatusFailure {
@@ -203,30 +203,6 @@ import Testing
       "image source coordinates must contain exactly 4 coordinates")
   } catch {
     Issue.record("unexpected error: \(error)")
-  }
-}
-
-@Test func geoJSONFeatureMaterializesNativeDescriptorTree() throws {
-  let geoJSON = GeoJSON.feature(Feature(
-    geometry: .polygon([[
-      LatLng(latitude: 1, longitude: 2),
-      LatLng(latitude: 3, longitude: 4),
-    ]]),
-    properties: [JSONMember(key: "name", value: .string("shape"))],
-    identifier: .uint(7)
-  ))
-
-  let arena = NativeInputArena()
-  try arena.withNativeGeoJSON(geoJSON.nativeGeoJSON) { native in
-    #expect(native.pointee.type == MLN_GEOJSON_TYPE_FEATURE.rawValue)
-    #expect(native.pointee.data.feature!.pointee
-      .identifier_type == MLN_FEATURE_IDENTIFIER_TYPE_UINT.rawValue)
-    #expect(native.pointee.data.feature!.pointee.identifier.uint_value == 7)
-    #expect(native.pointee.data.feature!.pointee.geometry.pointee
-      .type == MLN_GEOMETRY_TYPE_POLYGON.rawValue)
-    #expect(native.pointee.data.feature!.pointee.geometry.pointee.data.polygon
-      .ring_count == 1)
-    #expect(native.pointee.data.feature!.pointee.property_count == 1)
   }
 }
 
@@ -422,9 +398,9 @@ import Testing
   )
   defer { try? map.close() }
 
-  try map.setStyleJSON("""
+  try map.setStyleJSON(jsonData("""
   {"version":8,"sources":{},"layers":[]}
-  """)
+  """))
   try map.addCustomGeometrySource(
     sourceId: "custom",
     options: CustomGeometrySourceOptions(fetchTile: { _ in })
@@ -447,11 +423,11 @@ import Testing
   defer { try? map.close() }
 
   // Nothing parsed and nothing requested yet.
-  #expect(try map.loadedStyleJSON() == "")
+  #expect(try map.loadedStyleJSON() == Data())
   #expect(try map.styleURL() == "")
 
   // The document reads back byte-for-byte, so it can be reloaded unchanged.
-  let styleJSON = #"{"version":8,"sources":{},"layers":[]}"#
+  let styleJSON = jsonData(#"{"version":8,"sources":{},"layers":[]}"#)
   try map.setStyleJSON(styleJSON)
   #expect(try map.loadedStyleJSON() == styleJSON)
   // Inline JSON clears the URL.
@@ -474,9 +450,9 @@ import Testing
   )
   defer { try? map.close() }
 
-  try map.setStyleJSON("""
+  try map.setStyleJSON(jsonData("""
   {"version":8,"sources":{},"layers":[]}
-  """)
+  """))
   map.storeCustomGeometrySourceCallbacks(
     NativeCustomGeometrySourceCallbacks(fetchTile: { _ in }),
     sourceId: "missing"
@@ -499,9 +475,9 @@ import Testing
   )
   defer { try? map.close() }
 
-  try map.setStyleJSON("""
+  try map.setStyleJSON(jsonData("""
   {"version":8,"sources":{"custom":{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}},"layers":[]}
-  """)
+  """))
   map.storeCustomGeometrySourceCallbacks(
     NativeCustomGeometrySourceCallbacks(fetchTile: { _ in }),
     sourceId: "custom"
@@ -543,9 +519,9 @@ import Testing
   )
   defer { try? map.close() }
 
-  try map.setStyleJSON("""
+  try map.setStyleJSON(jsonData("""
   {"version":8,"sources":{},"layers":[]}
-  """)
+  """))
 
   let image = StyleRGBA8Image(
     width: 2,
@@ -598,9 +574,9 @@ import Testing
   )
   defer { try? map.close() }
 
-  try map.setStyleJSON("""
+  try map.setStyleJSON(jsonData("""
   {"version":8,"sources":{"geo":{"type":"geojson","data":  {"type":"FeatureCollection","features":[]}}},  "layers":[{"id":"bg","type":"background"},  {"id":"fill","type":"fill","source":"geo"}]}
-  """)
+  """))
 
   #expect(try map.layerSourceLayer("fill") == "")
   try map.setLayerSourceLayer(layerId: "fill", sourceLayer: "roads")
@@ -644,7 +620,7 @@ import Testing
     maxZoom: 12,
     tolerance: 0.5,
     clusterMaxZoom: 15,
-    clusterProperties: clusterPropertiesValue(),
+    clusterProperties: clusterPropertiesData,
     tileSize: 256,
     buffer: 64,
     clusterRadius: 60,
@@ -677,9 +653,11 @@ import Testing
     )
     #expect(native.pointee.synchronous_update)
 
-    let clusterProperties = try #require(native.pointee.cluster_properties)
-    let copied = try NativeJSONValue(copying: clusterProperties.pointee)
-    #expect(JSONValue(native: copied) == clusterPropertiesValue())
+    let clusterProperties = native.pointee.cluster_properties
+    let data = try #require(clusterProperties.data)
+    #expect(
+      Data(bytes: data, count: clusterProperties.size) == clusterPropertiesData
+    )
   }
 
   // Absent options keep the descriptor out of the call.
@@ -698,9 +676,9 @@ import Testing
   )
   defer { try? map.close() }
 
-  try map.setStyleJSON("""
+  try map.setStyleJSON(jsonData("""
   {"version":8,"sources":{},"layers":[]}
-  """)
+  """))
 
   try map.addGeoJSONSourceData(
     sourceId: "clustered",
@@ -714,9 +692,9 @@ import Testing
   // The cluster aggregation graph is borrowed for the call and parsed by
   // MapLibre Native, so an unparseable expression fails the add.
   var invalid = clusterOptions()
-  invalid.clusterProperties = .object([
-    JSONMember(key: "weight_sum", value: .string("not-an-expression")),
-  ])
+  invalid.clusterProperties = jsonData(
+    #"{"weight_sum":"not-an-expression"}"#
+  )
 
   do {
     try map.addGeoJSONSourceData(
@@ -753,14 +731,14 @@ import Testing
 
   // The style parser fills in its own 300ms duration for a style that declares
   // no transition.
-  try map.setStyleJSON("""
+  try map.setStyleJSON(jsonData("""
   {"version":8,"sources":{},"layers":[]}
-  """)
+  """))
   let parsed = try map.styleTransitionOptions()
   #expect(parsed.durationMilliseconds == 300)
   #expect(parsed.delayMilliseconds == nil)
 
-  try map.setStyleJSON(transitionStyleJSON)
+  try map.setStyleJSON(jsonData(transitionStyleJSON))
   let declared = try map.styleTransitionOptions()
   #expect(declared.durationMilliseconds == 750)
   #expect(declared.delayMilliseconds == 100)
@@ -782,7 +760,7 @@ import Testing
   #expect(try map.styleTransitionOptions().enablePlacementTransitions == true)
 
   // Loading a style replaces the override with what that style declares.
-  try map.setStyleJSON(transitionStyleJSON)
+  try map.setStyleJSON(jsonData(transitionStyleJSON))
   #expect(try map.styleTransitionOptions() == declared)
 
   do {
@@ -801,31 +779,26 @@ private let transitionStyleJSON = """
 {"version":8,"transition":{"duration":750,"delay":100},"sources":{},"layers":[]}
 """
 
-private func clusterPropertiesValue() -> JSONValue {
-  .object([
-    JSONMember(
-      key: "weight_sum",
-      value: .array([.string("+"), .array([.string("get"), .string("weight")])])
-    ),
-  ])
-}
+private let clusterPropertiesData = jsonData(
+  #"{"weight_sum":["+",["get","weight"]]}"#
+)
 
 private func clusterOptions() -> StyleGeoJSONSourceOptions {
   StyleGeoJSONSourceOptions(
     clusterMaxZoom: 17,
-    clusterProperties: clusterPropertiesValue(),
+    clusterProperties: clusterPropertiesData,
     clusterRadius: 60,
     clusterMinPoints: 2,
     cluster: true
   )
 }
 
-private func nearbyPoints() -> GeoJSON {
-  .featureCollection((0 ..< 3).map { index in
-    let offset = Double(index) * 0.001
-    return Feature(
-      geometry: .point(LatLng(latitude: offset, longitude: offset)),
-      properties: [JSONMember(key: "weight", value: .uint(UInt64(index + 1)))]
-    )
-  })
+private func nearbyPoints() -> Data {
+  jsonData(
+    #"{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[0,0]},"properties":{"weight":1}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.001,0.001]},"properties":{"weight":2}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.002,0.002]},"properties":{"weight":3}}]}"#
+  )
+}
+
+private func jsonData(_ value: String) -> Data {
+  Data(value.utf8)
 }

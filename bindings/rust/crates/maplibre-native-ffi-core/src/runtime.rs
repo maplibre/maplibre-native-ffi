@@ -52,7 +52,7 @@ pub enum OfflineRegionDefinition {
     },
     GeometryRegion {
         style_url: String,
-        geometry: crate::Geometry,
+        geometry: Vec<u8>,
         min_zoom: f64,
         max_zoom: f64,
         pixel_ratio: f32,
@@ -80,7 +80,7 @@ pub enum NativeOfflineRegionDefinition {
     },
     GeometryRegion {
         style_url: CString,
-        geometry: crate::geometry::NativeGeometry,
+        geometry: Vec<u8>,
         min_zoom: f64,
         max_zoom: f64,
         pixel_ratio: f32,
@@ -115,7 +115,7 @@ impl NativeOfflineRegionDefinition {
                 include_ideographs,
             } => Ok(Self::GeometryRegion {
                 style_url: string::c_string(style_url)?,
-                geometry: crate::geometry::geometry_try_to_native(geometry)?,
+                geometry: geometry.clone(),
                 min_zoom: *min_zoom,
                 max_zoom: *max_zoom,
                 pixel_ratio: *pixel_ratio,
@@ -164,7 +164,7 @@ impl NativeOfflineRegionDefinition {
                         size: std::mem::size_of::<sys::mln_offline_geometry_region_definition>()
                             as u32,
                         style_url: style_url.as_ptr(),
-                        geometry: geometry.as_ptr(),
+                        geometry: string::buffer_view(geometry),
                         min_zoom: *min_zoom,
                         max_zoom: *max_zoom,
                         pixel_ratio: *pixel_ratio,
@@ -244,18 +244,11 @@ pub fn copy_offline_region_definition(
         sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY => {
             // SAFETY: Active union member is selected by raw.type_.
             let geometry = unsafe { raw.data.geometry };
-            if geometry.geometry.is_null() {
-                return Err(crate::Error::invalid_argument(
-                    "offline region geometry must not be null",
-                ));
-            }
             Ok(OfflineRegionDefinition::GeometryRegion {
                 // SAFETY: Native snapshot/list storage owns a NUL-terminated style URL.
                 style_url: unsafe { string::copy_c_string(geometry.style_url) }?,
-                // SAFETY: geometry.geometry is non-null and borrowed from live snapshot/list storage.
-                geometry: unsafe {
-                    crate::geometry::geometry_from_native_with_depth(&*geometry.geometry, 0)
-                }?,
+                // SAFETY: The geometry buffer is borrowed from live snapshot/list storage.
+                geometry: unsafe { string::copy_string_view_bytes(geometry.geometry) }?,
                 min_zoom: geometry.min_zoom,
                 max_zoom: geometry.max_zoom,
                 pixel_ratio: geometry.pixel_ratio,
@@ -471,10 +464,11 @@ mod tests {
     }
 
     #[test]
-    fn offline_geometry_definition_materializes_nested_geometry_pointer() {
+    fn offline_geometry_definition_materializes_geometry_buffer() {
+        let geometry_json = br#"{"type":"Point","coordinates":[2,1]}"#;
         let definition = OfflineRegionDefinition::GeometryRegion {
             style_url: "maplibre://geometry".to_owned(),
-            geometry: crate::Geometry::Point(crate::LatLng::new(1.0, 2.0)),
+            geometry: geometry_json.to_vec(),
             min_zoom: 3.0,
             max_zoom: 4.0,
             pixel_ratio: 1.5,
@@ -490,7 +484,8 @@ mod tests {
             geometry.size,
             std::mem::size_of::<sys::mln_offline_geometry_region_definition>() as u32
         );
-        assert!(!geometry.geometry.is_null());
+        assert_eq!(geometry.geometry.size, geometry_json.len());
+        assert!(!geometry.geometry.data.is_null());
     }
 
     #[test]
@@ -585,7 +580,7 @@ mod tests {
     }
 
     #[test]
-    fn offline_region_definition_rejects_null_geometry_pointer() {
+    fn offline_region_definition_rejects_nonempty_null_geometry_buffer() {
         let style_url = b"maplibre://geometry\0";
         let raw = sys::mln_offline_region_definition {
             size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
@@ -594,7 +589,10 @@ mod tests {
                 geometry: sys::mln_offline_geometry_region_definition {
                     size: std::mem::size_of::<sys::mln_offline_geometry_region_definition>() as u32,
                     style_url: style_url.as_ptr().cast(),
-                    geometry: std::ptr::null(),
+                    geometry: sys::mln_buffer_view {
+                        data: std::ptr::null(),
+                        size: 1,
+                    },
                     min_zoom: 1.0,
                     max_zoom: 4.0,
                     pixel_ratio: 1.0,
@@ -608,7 +606,7 @@ mod tests {
         };
         assert!(
             err.to_string()
-                .contains("offline region geometry must not be null")
+                .contains("native string view data must not be null")
         );
     }
 }

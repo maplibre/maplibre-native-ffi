@@ -24,7 +24,7 @@ public enum OfflineRegionDefinition: Equatable, Sendable {
   )
   case geometry(
     styleURL: String,
-    geometry: Geometry,
+    geometry: Data,
     minZoom: Double,
     maxZoom: Double,
     pixelRatio: Float,
@@ -59,7 +59,7 @@ public enum OfflineRegionDefinition: Equatable, Sendable {
     ):
       .geometry(
         styleURL: styleURL,
-        geometry: geometry.nativeGeometry,
+        geometry: geometry,
         minZoom: minZoom,
         maxZoom: maxZoom,
         pixelRatio: pixelRatio,
@@ -96,7 +96,7 @@ public enum OfflineRegionDefinition: Equatable, Sendable {
     ):
       self = .geometry(
         styleURL: styleURL,
-        geometry: Geometry(native: geometry),
+        geometry: geometry,
         minZoom: minZoom,
         maxZoom: maxZoom,
         pixelRatio: pixelRatio,

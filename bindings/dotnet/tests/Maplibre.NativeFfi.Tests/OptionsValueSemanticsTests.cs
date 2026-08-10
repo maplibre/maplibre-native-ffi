@@ -1,6 +1,5 @@
 using Maplibre.NativeFfi.Camera;
 using Maplibre.NativeFfi.Geo;
-using Maplibre.NativeFfi.Json;
 using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Query;
 using Maplibre.NativeFfi.Runtime;
@@ -285,9 +284,7 @@ public sealed class OptionsValueSemanticsTests
                     ClusterMaximumZoom = 15,
                     ClusterMinimumPoints = 3,
                     SynchronousUpdate = true,
-                    ClusterProperties = new JsonValue.Object([
-                        new JsonMember("sum", new JsonValue.Int(1)),
-                    ]),
+                    ClusterProperties = """{"sum":1}"""u8.ToArray(),
                 },
             options => options.MinimumZoom = 10,
             options => options.MaximumZoom = 20,
@@ -300,10 +297,7 @@ public sealed class OptionsValueSemanticsTests
             options => options.ClusterMaximumZoom = 17,
             options => options.ClusterMinimumPoints = 2,
             options => options.SynchronousUpdate = false,
-            options =>
-                options.ClusterProperties = new JsonValue.Object([
-                    new JsonMember("sum", new JsonValue.Int(2)),
-                ])
+            options => options.ClusterProperties = """{"sum":2}"""u8.ToArray()
         );
 
         // A present zero-valued field stays distinguishable from an absent one.
@@ -311,18 +305,8 @@ public sealed class OptionsValueSemanticsTests
 
         // Distinct cluster-property trees holding equal contents compare equal.
         Assert.Equal(
-            new GeoJsonSourceOptions
-            {
-                ClusterProperties = new JsonValue.Object([
-                    new JsonMember("sum", new JsonValue.Int(1)),
-                ]),
-            },
-            new GeoJsonSourceOptions
-            {
-                ClusterProperties = new JsonValue.Object([
-                    new JsonMember("sum", new JsonValue.Int(1)),
-                ]),
-            }
+            new GeoJsonSourceOptions { ClusterProperties = """{"sum":1}"""u8.ToArray() },
+            new GeoJsonSourceOptions { ClusterProperties = """{"sum":1}"""u8.ToArray() }
         );
     }
 
@@ -366,20 +350,20 @@ public sealed class OptionsValueSemanticsTests
                 new RenderedFeatureQueryOptions
                 {
                     LayerIds = new[] { "a", "b" },
-                    Filter = new JsonValue.Bool(true),
+                    Filter = "true"u8.ToArray(),
                 },
             options => options.LayerIds = new[] { "a" },
-            options => options.Filter = new JsonValue.String("filter")
+            options => options.Filter = "\"filter\""u8.ToArray()
         );
         AssertValueSemantics(
             () =>
                 new SourceFeatureQueryOptions
                 {
                     SourceLayerIds = new[] { "a", "b" },
-                    Filter = new JsonValue.Bool(true),
+                    Filter = "true"u8.ToArray(),
                 },
             options => options.SourceLayerIds = new[] { "a" },
-            options => options.Filter = new JsonValue.String("filter")
+            options => options.Filter = "\"filter\""u8.ToArray()
         );
 
         // Distinct list instances holding the same elements compare equal.
@@ -434,24 +418,5 @@ public sealed class OptionsValueSemanticsTests
         Assert.Equal(1, original.Zoom);
         Assert.Equal(2, derived.Zoom);
         Assert.NotSame(original, derived);
-    }
-
-    [BindingSpecTest("BND-070")]
-    [Fact]
-    public void JsonContainerValuesCompareStructurally()
-    {
-        // Query filters compare by value, so the JSON tree they hold has to as well.
-        Assert.Equal(
-            new JsonValue.Array(new JsonValue[] { new JsonValue.Int(1) }),
-            new JsonValue.Array(new JsonValue[] { new JsonValue.Int(1) })
-        );
-        Assert.Equal(
-            new JsonValue.Object(new[] { new JsonMember("k", new JsonValue.Int(1)) }),
-            new JsonValue.Object(new[] { new JsonMember("k", new JsonValue.Int(1)) })
-        );
-        Assert.NotEqual(
-            new JsonValue.Object(new[] { new JsonMember("k", new JsonValue.Int(1)) }),
-            new JsonValue.Object(new[] { new JsonMember("k", new JsonValue.Int(2)) })
-        );
     }
 }

@@ -16,7 +16,6 @@ import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 import org.maplibre.nativeffi.gradle.MaplibreRuntimeBackend
 import org.maplibre.nativeffi.gradle.MaplibreRuntimeConvention
-import org.maplibre.nativeffi.gradle.MaplibreRuntimeTargetFamily
 import org.maplibre.nativeffi.gradle.VerifyAndroidRuntimeBackend
 import org.maplibre.nativeffi.gradle.VerifyMaplibreRuntimeInstall
 import org.maplibre.nativeffi.gradle.canonicalizeKmpRootMetadata
@@ -50,36 +49,32 @@ fun String.capitalized(): String = replaceFirstChar(Char::uppercaseChar)
 fun String.taskSuffix(): String =
   split('-').joinToString("") { it.replaceFirstChar(Char::uppercaseChar) }
 
-fun nativeTargets(
-  backend: MaplibreRuntimeBackend,
-  targetFamily: MaplibreRuntimeTargetFamily,
-): Map<String, NativeTargetConfiguration> =
-  when (targetFamily) {
-    // Linux arm64 is absent because Kotlin/Native has no arm64 Linux host, so
-    // that target would have to be cross-compiled from x64.
-    MaplibreRuntimeTargetFamily.LINUX -> {
-      require(backend != MaplibreRuntimeBackend.METAL) {
-        "Metal does not support the Linux runtime target family"
-      }
+fun nativeTargets(backend: MaplibreRuntimeBackend): Map<String, NativeTargetConfiguration> =
+  when (backend) {
+    MaplibreRuntimeBackend.OPENGL,
+    MaplibreRuntimeBackend.VULKAN ->
       mapOf(
+        "linuxArm64" to
+          NativeTargetConfiguration(
+            "linux-${backend.id}.def",
+            "linux-arm64",
+            listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
+          ),
         "linuxX64" to
           NativeTargetConfiguration(
             "linux-${backend.id}.def",
             "linux-x64",
             listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
-          )
+          ),
+        "macosArm64" to NativeTargetConfiguration("macos-${backend.id}.def", "macos-arm64"),
       )
-    }
-    MaplibreRuntimeTargetFamily.APPLE -> {
-      require(backend == MaplibreRuntimeBackend.METAL) {
-        "Only Metal supports Apple Kotlin/Native targets"
-      }
+
+    MaplibreRuntimeBackend.METAL ->
       mapOf(
         "iosArm64" to NativeTargetConfiguration("ios-metal.def", "ios-arm64"),
         "iosSimulatorArm64" to NativeTargetConfiguration("ios-metal.def", "ios-simulator-arm64"),
         "macosArm64" to NativeTargetConfiguration("macos-metal.def", "macos-arm64"),
       )
-    }
   }
 
 fun registerRuntimeInstallVerification(
@@ -329,7 +324,6 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
 
 val runtime = extensions.getByType<MaplibreRuntimeConvention>()
 val backend = runtime.backend
-val targetFamily = runtime.targetFamily
 val runtimeBackend = backend.id
 val mavenGroup = providers.gradleProperty("maplibre.maven.group").get()
 val mavenVersion = providers.gradleProperty("maplibre.maven.version").get()
@@ -340,9 +334,9 @@ apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
 val maplibreNativeC = extensions.getByType<MaplibreNativeCArtifact>()
 val runtimeInteropDirectory =
   rootProject.layout.projectDirectory.dir("bindings/kotlin/runtimes/common")
-val configuredNativeTargets = nativeTargets(backend, targetFamily)
+val configuredNativeTargets = nativeTargets(backend)
 val configuredJvmTargetPlatforms =
-  if (targetFamily == MaplibreRuntimeTargetFamily.APPLE) {
+  if (backend == MaplibreRuntimeBackend.METAL) {
     jvmTargetPlatforms.filterKeys { it == "natives-macos-arm64" }
   } else {
     jvmTargetPlatforms
@@ -407,7 +401,7 @@ extensions.configure<KotlinMultiplatformExtension> {
 
 configureJvmRuntimeArtifacts(runtimeBackend, configuredJvmTargetPlatforms, maplibreNativeC)
 
-if (targetFamily == MaplibreRuntimeTargetFamily.LINUX) {
+if (backend != MaplibreRuntimeBackend.METAL) {
   configureAndroidRuntimePublication(backend)
 }
 
@@ -426,14 +420,18 @@ canonicalizeKmpRootMetadata(
   group = mavenGroup,
   version = mavenVersion,
   targetModules =
-    when (targetFamily) {
-      MaplibreRuntimeTargetFamily.LINUX ->
+    when (backend) {
+      MaplibreRuntimeBackend.OPENGL,
+      MaplibreRuntimeBackend.VULKAN ->
         mapOf(
           "android" to "$mavenArtifact-android",
           "jvm" to "$mavenArtifact-jvm",
+          "linuxArm64" to "$mavenArtifact-linuxarm64",
           "linuxX64" to "$mavenArtifact-linuxx64",
+          "macosArm64" to "$mavenArtifact-macosarm64",
         )
-      MaplibreRuntimeTargetFamily.APPLE ->
+
+      MaplibreRuntimeBackend.METAL ->
         mapOf(
           "iosArm64" to "$mavenArtifact-iosarm64",
           "iosSimulatorArm64" to "$mavenArtifact-iossimulatorarm64",

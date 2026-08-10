@@ -329,144 +329,6 @@ typedef struct mln_lat_lng {
   double longitude;
 } mln_lat_lng;
 
-/** UTF-8 text view. The pointer may be null only when size is 0. */
-typedef struct mln_string_view {
-  /** UTF-8 bytes. Null only when size is 0. */
-  const char* data;
-  size_t size;
-} mln_string_view;
-
-typedef struct mln_json_value mln_json_value;
-typedef struct mln_geometry mln_geometry;
-
-/** Geometry variant tags used by mln_geometry. */
-typedef enum mln_geometry_type : uint32_t {
-  MLN_GEOMETRY_TYPE_EMPTY = 0,
-  MLN_GEOMETRY_TYPE_POINT = 1,
-  MLN_GEOMETRY_TYPE_LINE_STRING = 2,
-  MLN_GEOMETRY_TYPE_POLYGON = 3,
-  MLN_GEOMETRY_TYPE_MULTI_POINT = 4,
-  MLN_GEOMETRY_TYPE_MULTI_LINE_STRING = 5,
-  MLN_GEOMETRY_TYPE_MULTI_POLYGON = 6,
-  MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION = 7,
-} mln_geometry_type;
-
-/** Coordinate array view. Coordinates are latitude/longitude pairs. */
-typedef struct mln_coordinate_span {
-  /** Coordinates. Null only when coordinate_count is 0. */
-  const mln_lat_lng* coordinates;
-  size_t coordinate_count;
-} mln_coordinate_span;
-
-/** Polygon ring array view. Each ring is a coordinate span. */
-typedef struct mln_polygon_geometry {
-  /** Rings. Null only when ring_count is 0. */
-  const mln_coordinate_span* rings;
-  size_t ring_count;
-} mln_polygon_geometry;
-
-/** Multi-line geometry view. Each line is a coordinate span. */
-typedef struct mln_multi_line_geometry {
-  /** Lines. Null only when line_count is 0. */
-  const mln_coordinate_span* lines;
-  size_t line_count;
-} mln_multi_line_geometry;
-
-/** Multi-polygon geometry view. Each polygon contains ring views. */
-typedef struct mln_multi_polygon_geometry {
-  /** Polygons. Null only when polygon_count is 0. */
-  const mln_polygon_geometry* polygons;
-  size_t polygon_count;
-} mln_multi_polygon_geometry;
-
-/** Geometry collection view. */
-typedef struct mln_geometry_collection {
-  /** Child geometries. Null only when geometry_count is 0. */
-  const mln_geometry* geometries;
-  size_t geometry_count;
-} mln_geometry_collection;
-
-/**
- * MapLibre geometry input descriptor graph.
- *
- * Geometry coordinates use mln_lat_lng for consistency with the rest of the C
- * API. They are converted to native geometry points as longitude/latitude.
- * A root geometry descriptor starts at nesting depth 0. Status-returning
- * functions reject geometry collection children past depth 64 with
- * MLN_STATUS_INVALID_ARGUMENT.
- */
-typedef struct mln_geometry {
-  uint32_t size;
-  /** One of mln_geometry_type. */
-  uint32_t type;
-  union {
-    mln_lat_lng point;
-    mln_coordinate_span line_string;
-    mln_polygon_geometry polygon;
-    mln_coordinate_span multi_point;
-    mln_multi_line_geometry multi_line_string;
-    mln_multi_polygon_geometry multi_polygon;
-    mln_geometry_collection geometry_collection;
-  } data;
-} mln_geometry;
-
-/** JSON-like value variant tags used by mln_json_value. */
-typedef enum mln_json_value_type : uint32_t {
-  MLN_JSON_VALUE_TYPE_NULL = 0,
-  MLN_JSON_VALUE_TYPE_BOOL = 1,
-  MLN_JSON_VALUE_TYPE_UINT = 2,
-  MLN_JSON_VALUE_TYPE_INT = 3,
-  MLN_JSON_VALUE_TYPE_DOUBLE = 4,
-  MLN_JSON_VALUE_TYPE_STRING = 5,
-  MLN_JSON_VALUE_TYPE_ARRAY = 6,
-  MLN_JSON_VALUE_TYPE_OBJECT = 7,
-} mln_json_value_type;
-
-/** JSON value array view. */
-typedef struct mln_json_array {
-  /** Values. Null only when value_count is 0. */
-  const mln_json_value* values;
-  size_t value_count;
-} mln_json_array;
-
-/** JSON object member view. */
-typedef struct mln_json_member {
-  mln_string_view key;
-  /** Value descriptor. Must not be null. */
-  const mln_json_value* value;
-} mln_json_member;
-
-/** JSON object member array view. */
-typedef struct mln_json_object {
-  /** Members. Null only when member_count is 0. */
-  const mln_json_member* members;
-  size_t member_count;
-} mln_json_object;
-
-/**
- * JSON-like value input descriptor graph used by feature properties/states.
- *
- * Input functions reject NaN and infinities for double values because JSON and
- * GeoJSON numbers are finite.
- * A root JSON value descriptor starts at nesting depth 0. Status-returning
- * functions reject array/object children past depth 64 with
- * MLN_STATUS_INVALID_ARGUMENT.
- */
-typedef struct mln_json_value {
-  uint32_t size;
-  /** One of mln_json_value_type. */
-  uint32_t type;
-  union {
-    bool bool_value;
-    uint64_t uint_value;
-    int64_t int_value;
-    double double_value;
-    mln_string_view string_value;
-    mln_json_array array_value;
-    mln_json_object object_value;
-  } data;
-} mln_json_value;
-
 /** Optional fields for mln_feature_state_selector. */
 typedef enum mln_feature_state_selector_field : uint32_t {
   MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID = 1U << 0U,
@@ -479,83 +341,15 @@ typedef struct mln_feature_state_selector {
   uint32_t size;
   uint32_t fields;
   /** Source ID. Required and borrowed for the duration of the call. */
-  mln_string_view source_id;
+  mln_buffer_view source_id;
   /** Optional source layer ID. Required for vector-source disambiguation. */
-  mln_string_view source_layer_id;
+  mln_buffer_view source_layer_id;
   /** Optional feature ID string. Required by set/get and optional for remove.
    */
-  mln_string_view feature_id;
+  mln_buffer_view feature_id;
   /** Optional state key. Used only by remove and requires feature_id. */
-  mln_string_view state_key;
+  mln_buffer_view state_key;
 } mln_feature_state_selector;
-
-/** Feature identifier variant tags used by mln_feature. */
-typedef enum mln_feature_identifier_type : uint32_t {
-  MLN_FEATURE_IDENTIFIER_TYPE_NULL = 0,
-  MLN_FEATURE_IDENTIFIER_TYPE_UINT = 1,
-  MLN_FEATURE_IDENTIFIER_TYPE_INT = 2,
-  MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE = 3,
-  MLN_FEATURE_IDENTIFIER_TYPE_STRING = 4,
-} mln_feature_identifier_type;
-
-/** GeoJSON feature input descriptor graph. */
-typedef struct mln_feature {
-  uint32_t size;
-  /**
-   * Geometry descriptor. Must not be null. Use MLN_GEOMETRY_TYPE_EMPTY for an
-   * empty geometry.
-   */
-  const mln_geometry* geometry;
-  /** Property member views. May be null only when property_count is 0. */
-  const mln_json_member* properties;
-  size_t property_count;
-  /** One of mln_feature_identifier_type. */
-  uint32_t identifier_type;
-  union {
-    uint64_t uint_value;
-    int64_t int_value;
-    double double_value;
-    mln_string_view string_value;
-  } identifier;
-} mln_feature;
-
-/** GeoJSON variant tags used by mln_geojson. */
-typedef enum mln_geojson_type : uint32_t {
-  MLN_GEOJSON_TYPE_GEOMETRY = 1,
-  MLN_GEOJSON_TYPE_FEATURE = 2,
-  MLN_GEOJSON_TYPE_FEATURE_COLLECTION = 3,
-} mln_geojson_type;
-
-/** Feature collection view. */
-typedef struct mln_feature_collection {
-  /** Features. Null only when feature_count is 0. */
-  const mln_feature* features;
-  size_t feature_count;
-} mln_feature_collection;
-
-/**
- * GeoJSON geometry, feature, or feature collection input descriptor graph.
- * Nested geometry and property descriptors share the 64-depth descriptor limit
- * documented on mln_geometry and mln_json_value.
- */
-typedef struct mln_geojson {
-  uint32_t size;
-  /** One of mln_geojson_type. */
-  uint32_t type;
-  union {
-    /**
-     * Geometry descriptor selected by MLN_GEOJSON_TYPE_GEOMETRY. Must not be
-     * null.
-     */
-    const mln_geometry* geometry;
-    /**
-     * Feature descriptor selected by MLN_GEOJSON_TYPE_FEATURE. Must not be
-     * null.
-     */
-    const mln_feature* feature;
-    mln_feature_collection feature_collection;
-  } data;
-} mln_geojson;
 
 /** Geographic bounds in degrees. */
 typedef struct mln_lat_lng_bounds {
@@ -596,8 +390,8 @@ typedef struct mln_offline_geometry_region_definition {
   uint32_t size;
   /** Style URL. Copied during region creation. */
   const char* style_url;
-  /** Geometry descriptor. Borrowed for the duration of region creation. */
-  const mln_geometry* geometry;
+  /** UTF-8 GeoJSON Geometry bytes. Borrowed during region creation. */
+  mln_buffer_view geometry;
   double min_zoom;
   /**
    * Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
@@ -633,8 +427,8 @@ typedef struct mln_offline_region_info {
 /**
  * Starts creating an offline region.
  *
- * Input strings, geometry descriptors, and metadata are copied before this call
- * returns. Completion is reported through
+ * Input strings, GeoJSON geometry bytes, and metadata are copied before this
+ * call returns. Completion is reported through
  * MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED. On successful completion, call
  * mln_runtime_offline_region_create_take_result() to take the snapshot.
  *
@@ -1224,26 +1018,27 @@ mln_map_set_style_url(mln_map map, const char* url) MLN_NOEXCEPT;
  *
  * Returns:
  * - MLN_STATUS_OK when the load request was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null, not live, or json is null.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null, not live, or json is empty or
+ *   has a nonzero size with a null data pointer.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when a synchronous native error is reported or an
  *   internal exception is converted to status.
  */
 MLN_API mln_status
-mln_map_set_style_json(mln_map map, const char* json) MLN_NOEXCEPT;
+mln_map_set_style_json(mln_map map, mln_buffer_view json) MLN_NOEXCEPT;
 
 /**
  * Copies the style document this map's style was last parsed from.
  *
  * This is a state snapshot of the loaded document, not a serialization of the
  * live style. The bytes are the document the style loader last parsed
- * successfully: the string passed to mln_map_set_style_json(), or the response
+ * successfully: the bytes passed to mln_map_set_style_json(), or the response
  * body fetched for mln_map_set_style_url(). Runtime mutations through the
  * style APIs, such as adding a layer or setting a paint property, do not change
  * it, and a failed parse leaves the previously parsed document in place.
  *
- * A copy of the document is byte-for-byte identical to the string that was
+ * A copy of the document is byte-for-byte identical to the bytes that were
  * passed to mln_map_set_style_json(), so a host may hand it back to that
  * function unchanged.
  *
@@ -1267,7 +1062,7 @@ mln_map_set_style_json(mln_map map, const char* json) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_copy_loaded_style_json(
-  mln_map map, char* out_json, size_t json_capacity, size_t* out_json_size
+  mln_map map, uint8_t* out_json, size_t json_capacity, size_t* out_json_size
 ) MLN_NOEXCEPT;
 
 /**

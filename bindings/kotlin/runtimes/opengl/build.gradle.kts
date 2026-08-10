@@ -1,7 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.MaplibreRuntimeBackend
-import org.maplibre.nativeffi.gradle.MaplibreRuntimeTargetFamily
 import org.maplibre.nativeffi.gradle.configureMaplibreRuntime
 
 plugins {
@@ -20,7 +19,9 @@ val packagedAndroidRuntimeLibs =
 kotlin {
   jvm { compilerOptions { jvmTarget.set(JvmTarget.fromTarget(libs.versions.java.release.get())) } }
 
+  linuxArm64()
   linuxX64()
+  macosArm64()
 
   android {
     namespace = "org.maplibre.nativeffi.runtime.opengl"
@@ -48,7 +49,4 @@ androidComponents {
   }
 }
 
-configureMaplibreRuntime(
-  backend = MaplibreRuntimeBackend.OPENGL,
-  targetFamily = MaplibreRuntimeTargetFamily.LINUX,
-)
+configureMaplibreRuntime(MaplibreRuntimeBackend.OPENGL)

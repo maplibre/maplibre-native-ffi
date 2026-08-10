@@ -3,9 +3,14 @@ package org.maplibre.nativeffi.internal.callback
 import java.lang.foreign.Arena
 import java.lang.foreign.MemorySegment
 import java.lang.foreign.ValueLayout
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.resource.ResourceKind
 import org.maplibre.nativeffi.resource.ResourceLoadingMethod
@@ -72,6 +77,65 @@ class ResourceProviderStateTest {
           )
         }
       }
+  }
+
+  @Test
+  fun providerClosureDuringAndConcurrentWithCallbacksRejectsLaterEntry() {
+    lateinit var reentrant: ResourceProviderState
+    reentrant =
+      ResourceProviderState(
+        ResourceProviderCallback { _, _ ->
+          reentrant.close()
+          ResourceProviderDecision.PASS_THROUGH
+        }
+      )
+    Arena.ofConfined().use { arena ->
+      assertEquals(
+        ResourceProviderDecision.PASS_THROUGH.nativeValue,
+        reentrant.invoke(
+          MemorySegment.NULL,
+          resourceRequest(arena),
+          SyntheticHandles.resourceRequest().raw,
+        ),
+      )
+      assertTrue(reentrant.isClosedForTesting())
+      assertEquals(
+        UNKNOWN_DECISION,
+        reentrant.invoke(
+          MemorySegment.NULL,
+          resourceRequest(arena),
+          SyntheticHandles.resourceRequest().raw,
+        ),
+      )
+    }
+
+    val entered = CountDownLatch(1)
+    val release = CountDownLatch(1)
+    val state =
+      ResourceProviderState(
+        ResourceProviderCallback { _, _ ->
+          entered.countDown()
+          release.await(5, TimeUnit.SECONDS)
+          ResourceProviderDecision.PASS_THROUGH
+        }
+      )
+    Arena.ofShared().use { arena ->
+      val request = resourceRequest(arena)
+      val invocation = thread {
+        state.invoke(MemorySegment.NULL, request, SyntheticHandles.resourceRequest().raw)
+      }
+      assertTrue(entered.await(5, TimeUnit.SECONDS))
+      val closed = CountDownLatch(1)
+      val closer = thread {
+        state.close()
+        closed.countDown()
+      }
+      assertFalse(closed.await(50, TimeUnit.MILLISECONDS))
+      release.countDown()
+      invocation.join()
+      closer.join()
+      assertTrue(state.isClosedForTesting())
+    }
   }
 
   private fun resourceRequest(arena: Arena): MemorySegment {

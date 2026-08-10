@@ -1,7 +1,6 @@
 using Maplibre.NativeFfi.Geo;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Struct;
-using Maplibre.NativeFfi.Json;
 using Maplibre.NativeFfi.Query;
 using Xunit;
 
@@ -54,7 +53,7 @@ public sealed unsafe class QueryStructTests
             new RenderedFeatureQueryOptions
             {
                 LayerIds = ["roads", "labels"],
-                Filter = new JsonValue.Bool(true),
+                Filter = "true"u8.ToArray(),
             }
         );
         Assert.Equal(
@@ -71,15 +70,15 @@ public sealed unsafe class QueryStructTests
             )
         );
         Assert.Equal(
-            (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_BOOL,
-            rendered.Value.filter->type
+            "true",
+            RuntimeStructs.CopyUtf8(rendered.Value.filter->data, rendered.Value.filter->size)
         );
 
         using var source = NativeSourceFeatureQueryOptions.From(
             new SourceFeatureQueryOptions
             {
                 SourceLayerIds = ["landuse"],
-                Filter = new JsonValue.String("visible"),
+                Filter = "\"visible\""u8.ToArray(),
             }
         );
         Assert.Equal(
@@ -96,156 +95,8 @@ public sealed unsafe class QueryStructTests
             )
         );
         Assert.Equal(
-            (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_STRING,
-            source.Value.filter->type
+            "\"visible\"",
+            RuntimeStructs.CopyUtf8(source.Value.filter->data, source.Value.filter->size)
         );
-    }
-
-    [BindingSpecTest("BND-106")]
-    [Fact]
-    public void QueriedFeatureCopiesNestedFeatureAndOptionalFields()
-    {
-        var coordinates = stackalloc mln_lat_lng[2];
-        coordinates[0] = new mln_lat_lng { latitude = 1, longitude = 2 };
-        coordinates[1] = new mln_lat_lng { latitude = 3, longitude = 4 };
-        var geometry = new mln_geometry
-        {
-            size = (uint)sizeof(mln_geometry),
-            type = (uint)mln_geometry_type.MLN_GEOMETRY_TYPE_LINE_STRING,
-            data =
-            {
-                line_string = new mln_coordinate_span
-                {
-                    coordinates = coordinates,
-                    coordinate_count = 2,
-                },
-            },
-        };
-
-        using var propertyKey = NativeStringView.From("name", "propertyKey");
-        using var propertyValue = NativeJsonValue.From(new JsonValue.String("park"));
-        var properties = stackalloc mln_json_member[1];
-        properties[0] = new mln_json_member
-        {
-            key = propertyKey.Value,
-            value = propertyValue.Pointer,
-        };
-        using var identifier = NativeStringView.From("feature-1", "identifier");
-        var feature = new mln_feature
-        {
-            size = (uint)sizeof(mln_feature),
-            geometry = &geometry,
-            properties = properties,
-            property_count = 1,
-            identifier_type = (uint)mln_feature_identifier_type.MLN_FEATURE_IDENTIFIER_TYPE_STRING,
-            identifier = { string_value = identifier.Value },
-        };
-
-        using var sourceId = NativeStringView.From("source", "sourceId");
-        using var sourceLayerId = NativeStringView.From("layer", "sourceLayerId");
-        using var state = NativeJsonValue.From(
-            new JsonValue.Object([new JsonMember("hover", new JsonValue.Bool(true))])
-        );
-        var queried = QueryStructs.ReadQueriedFeature(
-            new mln_queried_feature
-            {
-                size = (uint)sizeof(mln_queried_feature),
-                fields = (uint)(
-                    mln_queried_feature_field.MLN_QUERIED_FEATURE_SOURCE_ID
-                    | mln_queried_feature_field.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID
-                    | mln_queried_feature_field.MLN_QUERIED_FEATURE_STATE
-                ),
-                feature = feature,
-                source_id = sourceId.Value,
-                source_layer_id = sourceLayerId.Value,
-                state = state.Pointer,
-            }
-        );
-
-        Assert.Equal("source", queried.SourceId);
-        Assert.Equal("layer", queried.SourceLayerId);
-        Assert.IsType<JsonValue.Object>(queried.State);
-        var line = Assert.IsType<Geometry.LineString>(queried.Feature.Geometry);
-        Assert.Equal(new LatLng(3, 4), line.Coordinates[1]);
-        Assert.Equal(
-            new JsonMember("name", new JsonValue.String("park")),
-            queried.Feature.Properties[0]
-        );
-        var id = Assert.IsType<FeatureIdentifier.String>(queried.Feature.Identifier);
-        Assert.Equal("feature-1", id.Value);
-    }
-
-    [BindingSpecTest("BND-066")]
-    [Fact]
-    public void FeatureQueryResultIsDestroyedWhenCopyingFeatureFails()
-    {
-        var destroyCalls = 0;
-        using var methods = QueryStructs.UseFeatureQueryResultMethodsForTest(
-            (_, count) =>
-            {
-                *count = 1;
-                return mln_status.MLN_STATUS_OK;
-            },
-            (_, _, feature) =>
-            {
-                *feature = new mln_queried_feature
-                {
-                    size = (uint)sizeof(mln_queried_feature),
-                    feature = new mln_feature
-                    {
-                        size = (uint)sizeof(mln_feature),
-                        identifier_type = 999,
-                    },
-                };
-                return mln_status.MLN_STATUS_OK;
-            },
-            _ => destroyCalls++
-        );
-
-        Assert.Throws<InvalidOperationException>(() =>
-            QueryStructs.ReadFeatureQueryResult(SyntheticHandles.FeatureQueryResult(1234))
-        );
-
-        Assert.Equal(1, destroyCalls);
-    }
-
-    [BindingSpecTest("BND-106")]
-    [Fact]
-    public void NativeFeatureNullIdentifierMaterializesNullIdentifier()
-    {
-        var feature = QueryStructs.ReadFeature(
-            new mln_feature
-            {
-                size = (uint)sizeof(mln_feature),
-                identifier_type = (uint)
-                    mln_feature_identifier_type.MLN_FEATURE_IDENTIFIER_TYPE_NULL,
-            }
-        );
-
-        Assert.Same(FeatureIdentifier.Null.Instance, feature.Identifier);
-    }
-
-    [Fact]
-    public void UnknownNativeFeatureDiscriminantsThrow()
-    {
-        var geometryError = Assert.Throws<InvalidOperationException>(() =>
-            QueryStructs.ReadGeometry(
-                new mln_geometry { size = (uint)sizeof(mln_geometry), type = 999 }
-            )
-        );
-        Assert.Contains("mln_geometry_type", geometryError.Message, StringComparison.Ordinal);
-        Assert.Contains("999", geometryError.Message, StringComparison.Ordinal);
-
-        var identifierError = Assert.Throws<InvalidOperationException>(() =>
-            QueryStructs.ReadFeature(
-                new mln_feature { size = (uint)sizeof(mln_feature), identifier_type = 999 }
-            )
-        );
-        Assert.Contains(
-            "mln_feature_identifier_type",
-            identifierError.Message,
-            StringComparison.Ordinal
-        );
-        Assert.Contains("999", identifierError.Message, StringComparison.Ordinal);
     }
 }

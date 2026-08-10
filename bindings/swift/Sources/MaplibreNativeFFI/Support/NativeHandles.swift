@@ -37,7 +37,7 @@ struct NativeOfflineRegionListHandle: NativeHandle {
   let raw: UInt64
 }
 
-struct NativeJSONSnapshotHandle: NativeHandle {
+struct NativeBufferHandle: NativeHandle {
   let raw: UInt64
 }
 
@@ -46,14 +46,6 @@ struct NativeStyleIdListHandle: NativeHandle {
 }
 
 struct NativeStyleStringListHandle: NativeHandle {
-  let raw: UInt64
-}
-
-struct NativeFeatureQueryResultHandle: NativeHandle {
-  let raw: UInt64
-}
-
-struct NativeFeatureExtensionResultHandle: NativeHandle {
   let raw: UInt64
 }
 

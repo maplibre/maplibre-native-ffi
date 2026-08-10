@@ -1,7 +1,6 @@
 #ifndef MLN_GO_CGO_OFFLINE_SHIM_H
 #define MLN_GO_CGO_OFFLINE_SHIM_H
 
-#include "cgo_geometry_shim.h"
 #include "maplibre_native_c.h"
 
 static inline mln_offline_region_definition
@@ -25,7 +24,7 @@ mln_go_offline_tile_pyramid_region_definition(
 
 static inline mln_offline_region_definition
 mln_go_offline_geometry_region_definition(
-  const char* style_url, const mln_geometry* geometry, double min_zoom,
+  const char* style_url, mln_buffer_view geometry, double min_zoom,
   double max_zoom, float pixel_ratio, bool include_ideographs
 ) {
   mln_offline_region_definition definition;

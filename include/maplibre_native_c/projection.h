@@ -112,8 +112,8 @@ MLN_API mln_status mln_map_projection_set_visible_coordinates(
 /**
  * Updates a projection helper camera so geometry coordinates are visible.
  *
- * The geometry descriptor graph, including all nested pointers, is borrowed for
- * the duration of this call and is not retained. Use
+ * The UTF-8 GeoJSON Geometry bytes are borrowed for this call and are not
+ * retained. Use
  * mln_map_projection_get_camera() after this call to read the computed camera.
  * Empty geometry objects and geometry collections with no coordinates are
  * invalid for camera fitting.
@@ -121,14 +121,14 @@ MLN_API mln_status mln_map_projection_set_visible_coordinates(
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live, geometry
- *   is null or invalid, padding contains negative or non-finite values, or the
+ *   is empty or invalid, padding contains negative or non-finite values, or the
  *   geometry contains no coordinates.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the projection
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_projection_set_visible_geometry(
-  mln_map_projection projection, const mln_geometry* geometry,
+  mln_map_projection projection, mln_buffer_view geometry,
   mln_edge_insets padding
 ) MLN_NOEXCEPT;
 

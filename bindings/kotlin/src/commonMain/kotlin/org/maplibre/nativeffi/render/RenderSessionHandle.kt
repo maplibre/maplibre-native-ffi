@@ -1,11 +1,7 @@
 package org.maplibre.nativeffi.render
 
-import org.maplibre.nativeffi.geo.Feature
-import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.query.FeatureExtensionResult
 import org.maplibre.nativeffi.query.FeatureStateSelector
-import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
@@ -111,35 +107,32 @@ public expect class RenderSessionHandle : AutoCloseable {
 
   public fun dumpDebugLogs()
 
-  public fun setFeatureState(selector: FeatureStateSelector, value: JsonValue)
+  public fun setFeatureState(selector: FeatureStateSelector, value: ByteArray)
 
-  public fun getFeatureState(selector: FeatureStateSelector): JsonValue
+  public fun getFeatureState(selector: FeatureStateSelector): ByteArray
 
   public fun removeFeatureState(selector: FeatureStateSelector)
 
   public fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): List<QueriedFeature>
+  ): ByteArray
 
-  public fun querySourceFeatures(
-    sourceId: String,
-    options: SourceFeatureQueryOptions?,
-  ): List<QueriedFeature>
+  public fun querySourceFeatures(sourceId: String, options: SourceFeatureQueryOptions?): ByteArray
 
   /**
    * Queries a feature extension from the latest render session state.
    *
-   * The `supercluster` extension reads the `cluster_id` feature property and the `limit` and
-   * `offset` arguments as [JsonValue.UInt]; other numeric types are treated as absent.
+   * [feature] contains one UTF-8 GeoJSON Feature. [arguments], when present, contains a UTF-8 JSON
+   * object. The result is either a JSON value or a GeoJSON FeatureCollection.
    */
   public fun queryFeatureExtension(
     sourceId: String,
-    feature: Feature,
+    feature: ByteArray,
     extension: String,
     extensionField: String,
-    arguments: JsonValue?,
-  ): FeatureExtensionResult
+    arguments: ByteArray?,
+  ): ByteArray
 
   public fun textureImageInfo(): TextureImageInfo
 

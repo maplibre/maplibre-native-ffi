@@ -50,6 +50,8 @@ internal class LogCallbackState private constructor(private val callback: LogCal
 
   fun checkCanClose() = gate.checkCanClose()
 
+  fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
+
   override fun close() = gate.close()
 
   internal companion object {
@@ -58,12 +60,22 @@ internal class LogCallbackState private constructor(private val callback: LogCal
 
     fun set(callback: LogCallback) {
       NativeAccess.ensureLoaded()
+      replace(callback) { replacement ->
+        Status.check(MaplibreNativeC.mln_log_set_callback(replacement.nativeCallback, null))
+      }
+    }
+
+    internal fun setForTesting(callback: LogCallback, register: (LogCallbackState) -> Unit = {}) {
+      replace(callback, register)
+    }
+
+    private fun replace(callback: LogCallback, register: (LogCallbackState) -> Unit) {
       val replacement = LogCallbackState(callback)
       var previous: LogCallbackState? = null
       try {
         withUpdateLock {
           current.load()?.checkCanClose()
-          Status.check(MaplibreNativeC.mln_log_set_callback(replacement.nativeCallback, null))
+          register(replacement)
           previous = current.exchange(replacement)
         }
       } catch (error: Throwable) {
@@ -85,6 +97,10 @@ internal class LogCallbackState private constructor(private val callback: LogCal
     }
 
     fun currentForTesting(): LogCallbackState? = current.load()
+
+    internal fun clearForTesting() {
+      closeQuietly(current.exchange(null))
+    }
 
     private fun closeQuietly(state: LogCallbackState?) {
       try {

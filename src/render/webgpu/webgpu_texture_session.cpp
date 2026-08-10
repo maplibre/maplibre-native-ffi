@@ -132,7 +132,7 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
   WebGPUTextureBackend(
     const mln_webgpu_owned_texture_descriptor& descriptor, mbgl::Size size
   )
-      : mbgl::webgpu::RendererBackend(mbgl::gfx::ContextMode::Shared),
+      : mbgl::webgpu::RendererBackend(mbgl::gfx::ContextMode::Unique),
         mbgl::gfx::HeadlessBackend(size),
         owns_color_texture_(true),
         color_format_(webgpu_owned_color_format) {
@@ -150,7 +150,7 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
   WebGPUTextureBackend(
     const mln_webgpu_borrowed_texture_descriptor& descriptor, mbgl::Size size
   )
-      : mbgl::webgpu::RendererBackend(mbgl::gfx::ContextMode::Shared),
+      : mbgl::webgpu::RendererBackend(mbgl::gfx::ContextMode::Unique),
         mbgl::gfx::HeadlessBackend(size),
         owns_color_texture_(false),
         texture_(static_cast<WGPUTexture>(descriptor.texture)),
@@ -628,7 +628,7 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
   WebGPUSurfaceBackend(
     const mln_webgpu_surface_descriptor& descriptor, mbgl::Size size
   )
-      : mbgl::webgpu::RendererBackend(mbgl::gfx::ContextMode::Shared),
+      : mbgl::webgpu::RendererBackend(mbgl::gfx::ContextMode::Unique),
         mbgl::gfx::Renderable(
           size, std::make_unique<RenderableResource>(*this)
         ),

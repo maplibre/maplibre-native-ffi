@@ -17,13 +17,9 @@ use maplibre_native_ffi_core::values::lat_lngs_to_native;
 use maplibre_native_ffi_sys as sys;
 
 use crate::custom_geometry::{CanonicalTileId, CustomGeometrySourceState};
-use crate::geojson::GeoJsonNativeExt;
-use crate::json::JsonValueNativeExt;
 use crate::render::PremultipliedRgba8Image;
 use crate::values::NativeValue;
-use crate::{
-    CustomGeometrySourceOptions, Error, ErrorKind, GeoJson, JsonValue, LatLng, LatLngBounds, Result,
-};
+use crate::{CustomGeometrySourceOptions, Error, ErrorKind, LatLng, LatLngBounds, Result};
 
 impl super::MapHandle {
     /// Loads a style URL through MapLibre Native style APIs.
@@ -44,13 +40,12 @@ impl super::MapHandle {
     ///
     /// A parse failure is reported twice: this call returns the error, and the
     /// same message arrives as a loading-failed runtime event.
-    pub fn set_style_json(&self, json: &str) -> Result<()> {
+    pub fn set_style_json(&self, json: &[u8]) -> Result<()> {
         let map = self.inner.native()?;
-        let json = maplibre_core::string::c_string(json)?;
-        // SAFETY: map is live and json is a NUL-terminated UTF-8 string the C
-        // API consumes before returning. Style replacement completes before a
+        let json = maplibre_core::string::buffer_view(json);
+        // SAFETY: map is live and json is valid for the call. Style replacement completes before a
         // successful return, so the old callback state can be released after.
-        maplibre_core::check(unsafe { sys::mln_map_set_style_json(map, json.as_ptr()) })?;
+        maplibre_core::check(unsafe { sys::mln_map_set_style_json(map, json) })?;
         self.inner.clear_custom_geometry_sources();
         Ok(())
     }
@@ -58,13 +53,13 @@ impl super::MapHandle {
     /// Copies the style document this map's style was last parsed from: the
     /// string given to [`Self::set_style_json`] or the body fetched for
     /// [`Self::set_style_url`], byte for byte. Runtime mutations do not change
-    /// it. An empty string means no document has been parsed.
-    pub fn loaded_style_json(&self) -> Result<String> {
+    /// it. An empty buffer means no document has been parsed.
+    pub fn loaded_style_json(&self) -> Result<Vec<u8>> {
         let map = self.inner.native()?;
         // SAFETY: map is live, and each call writes only through the pointers
         // it is given.
         unsafe {
-            copy_text(|text, capacity, out_size| {
+            copy_bytes(|text, capacity, out_size| {
                 sys::mln_map_copy_loaded_style_json(map, text, capacity, out_size)
             })
         }
@@ -118,19 +113,19 @@ impl super::MapHandle {
         &self,
         source_id: &str,
         tile_id: CanonicalTileId,
-        data: &GeoJson,
+        data: &[u8],
     ) -> Result<()> {
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
-        let data = data.try_to_native()?;
+        let data = maplibre_core::string::buffer_view(data);
         // SAFETY: map is live, source_id is valid for this call, tile_id is
-        // passed by value, and data owns the descriptor graph for this call.
+        // passed by value, and data remains valid for this call.
         maplibre_core::check(unsafe {
             sys::mln_map_set_custom_geometry_source_tile_data(
                 map,
                 source_id.raw(),
                 tile_id.to_native(),
-                data.as_ptr(),
+                data,
             )
         })
     }
@@ -174,14 +169,14 @@ impl super::MapHandle {
     }
 
     /// Adds one style source from a style-spec source JSON object.
-    pub fn add_style_source_json(&self, source_id: &str, source_json: &JsonValue) -> Result<()> {
+    pub fn add_style_source_json(&self, source_id: &str, source_json: &[u8]) -> Result<()> {
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
-        let source_json = source_json.try_to_native()?;
-        // SAFETY: map is live, source_id is an explicit-length view valid for
-        // this call, and source_json owns the descriptor graph for this call.
+        let source_json = maplibre_core::string::buffer_view(source_json);
+        // SAFETY: map is live, source_id and source_json are explicit-length
+        // views valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_style_source_json(map, source_id.raw(), source_json.as_ptr())
+            sys::mln_map_add_style_source_json(map, source_id.raw(), source_json)
         })
     }
 
@@ -702,7 +697,7 @@ impl super::MapHandle {
     fn copy_style_source_attribution(
         &self,
         map: sys::mln_map,
-        source_id: sys::mln_string_view,
+        source_id: sys::mln_buffer_view,
         attribution_size: usize,
     ) -> Result<Option<String>> {
         if attribution_size == 0 {
@@ -761,7 +756,7 @@ impl super::MapHandle {
     fn copy_style_source_url(
         &self,
         map: sys::mln_map,
-        source_id: sys::mln_string_view,
+        source_id: sys::mln_buffer_view,
         url_size: usize,
     ) -> Result<Option<String>> {
         let mut buffer = vec![0u8; url_size];
@@ -805,7 +800,7 @@ impl super::MapHandle {
     fn copy_style_source_tile_urls(
         &self,
         map: sys::mln_map,
-        source_id: sys::mln_string_view,
+        source_id: sys::mln_buffer_view,
     ) -> Result<Option<Vec<String>>> {
         let mut out = maplibre_core::ptr::OutHandle::<sys::mln_style_string_list>::new();
         let mut found = false;
@@ -843,8 +838,8 @@ impl super::MapHandle {
             .as_ref()
             .map_or(ptr::null(), NativeGeoJsonSourceOptions::as_ptr);
         // SAFETY: map is live, source_id and url are valid for this call, and
-        // options_ptr is null or points to call-scoped native options that own
-        // any cluster-properties descriptor graph.
+        // options_ptr is null or points to call-scoped native options that keep
+        // the cluster-properties buffer alive.
         maplibre_core::check(unsafe {
             sys::mln_map_add_geojson_source_url(map, source_id.raw(), url.raw(), options_ptr)
         })
@@ -855,23 +850,23 @@ impl super::MapHandle {
     pub fn add_geojson_source_data(
         &self,
         source_id: &str,
-        data: &GeoJson,
+        data: &[u8],
         options: Option<&GeoJsonSourceOptions>,
     ) -> Result<()> {
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
-        let data = data.try_to_native()?;
+        let data = maplibre_core::string::buffer_view(data);
         let options = options
             .map(GeoJsonSourceOptions::try_to_native)
             .transpose()?;
         let options_ptr = options
             .as_ref()
             .map_or(ptr::null(), NativeGeoJsonSourceOptions::as_ptr);
-        // SAFETY: map is live, source_id is valid for this call, data owns the
-        // descriptor graph for this call, and options_ptr is null or points to
-        // call-scoped native options that own any cluster-properties graph.
+        // SAFETY: map is live, source_id and data remain valid for this call,
+        // and options_ptr is null or points to call-scoped native options that
+        // keep the cluster-properties buffer alive.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_geojson_source_data(map, source_id.raw(), data.as_ptr(), options_ptr)
+            sys::mln_map_add_geojson_source_data(map, source_id.raw(), data, options_ptr)
         })
     }
 
@@ -891,30 +886,29 @@ impl super::MapHandle {
     /// Updates one GeoJSON source with inline data.
     ///
     /// The source keeps the options it was added with.
-    pub fn set_geojson_source_data(&self, source_id: &str, data: &GeoJson) -> Result<()> {
+    pub fn set_geojson_source_data(&self, source_id: &str, data: &[u8]) -> Result<()> {
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
-        let data = data.try_to_native()?;
-        // SAFETY: map is live, source_id is valid for this call, and data owns
-        // the descriptor graph for this call.
+        let data = maplibre_core::string::buffer_view(data);
+        // SAFETY: map is live, and source_id and data remain valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_geojson_source_data(map, source_id.raw(), data.as_ptr())
+            sys::mln_map_set_geojson_source_data(map, source_id.raw(), data)
         })
     }
 
     /// Adds one style layer from a full style-spec layer JSON object.
     pub fn add_style_layer_json(
         &self,
-        layer_json: &JsonValue,
+        layer_json: &[u8],
         before_layer_id: Option<&str>,
     ) -> Result<()> {
         let map = self.inner.native()?;
-        let layer_json = layer_json.try_to_native()?;
+        let layer_json = maplibre_core::string::buffer_view(layer_json);
         let before_layer_id = maplibre_core::string::string_view(before_layer_id.unwrap_or(""));
-        // SAFETY: map is live, layer_json owns the descriptor graph, and
-        // before_layer_id is an explicit-length view valid for this call.
+        // SAFETY: map is live, and layer_json and before_layer_id are
+        // explicit-length views valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_style_layer_json(map, layer_json.as_ptr(), before_layer_id.raw())
+            sys::mln_map_add_style_layer_json(map, layer_json, before_layer_id.raw())
         })
     }
 
@@ -1045,55 +1039,57 @@ impl super::MapHandle {
     }
 
     /// Copies one style layer as a full style-spec JSON object.
-    pub fn style_layer_json(&self, layer_id: &str) -> Result<Option<JsonValue>> {
+    pub fn style_layer_json(&self, layer_id: &str) -> Result<Option<Vec<u8>>> {
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
         let mut found = false;
         // SAFETY: map is live, layer_id is valid for this call, out is a
         // null-initialized out-pointer, and found points to writable storage.
         maplibre_core::check(unsafe {
             sys::mln_map_get_style_layer_json(map, layer_id.raw(), out.as_mut_ptr(), &mut found)
         })?;
-        // SAFETY: On success, the C API returns either null or an owned JSON
-        // snapshot handle for this call; core copies and releases it.
-        let snapshot = unsafe { maplibre_core::json::copy_json_snapshot(out.get()) }?;
-        if found { Ok(snapshot) } else { Ok(None) }
+        if !found {
+            return Ok(None);
+        }
+        // SAFETY: Success transfers the owned buffer to this call.
+        unsafe { maplibre_core::string::copy_owned_buffer(out.get()) }.map(Some)
     }
 
     /// Sets the style light from a style-spec light JSON object.
-    pub fn set_style_light_json(&self, light_json: &JsonValue) -> Result<()> {
+    pub fn set_style_light_json(&self, light_json: &[u8]) -> Result<()> {
         let map = self.inner.native()?;
-        let light_json = light_json.try_to_native()?;
-        // SAFETY: map is live and light_json owns the descriptor graph for this call.
-        maplibre_core::check(unsafe { sys::mln_map_set_style_light_json(map, light_json.as_ptr()) })
+        let light_json = maplibre_core::string::buffer_view(light_json);
+        // SAFETY: map is live and light_json remains valid for this call.
+        maplibre_core::check(unsafe { sys::mln_map_set_style_light_json(map, light_json) })
     }
 
     /// Sets one style light property.
-    pub fn set_style_light_property(&self, property_name: &str, value: &JsonValue) -> Result<()> {
+    pub fn set_style_light_property(&self, property_name: &str, value: &[u8]) -> Result<()> {
         let map = self.inner.native()?;
         let property_name = maplibre_core::string::string_view(property_name);
-        let value = value.try_to_native()?;
-        // SAFETY: map is live, property_name is valid for this call, and value
-        // owns the descriptor graph for this call.
+        let value = maplibre_core::string::buffer_view(value);
+        // SAFETY: map is live, and property_name and value remain valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_style_light_property(map, property_name.raw(), value.as_ptr())
+            sys::mln_map_set_style_light_property(map, property_name.raw(), value)
         })
     }
 
     /// Copies one style light property as a style-spec JSON value.
-    pub fn style_light_property(&self, property_name: &str) -> Result<Option<JsonValue>> {
+    pub fn style_light_property(&self, property_name: &str) -> Result<Option<Vec<u8>>> {
         let map = self.inner.native()?;
         let property_name = maplibre_core::string::string_view(property_name);
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
         // SAFETY: map is live, property_name is valid for this call, and out is
         // a null-initialized out-pointer.
         maplibre_core::check(unsafe {
             sys::mln_map_get_style_light_property(map, property_name.raw(), out.as_mut_ptr())
         })?;
-        // SAFETY: On success, the C API returns either null or an owned JSON
-        // snapshot handle for this call; core copies and releases it.
-        unsafe { maplibre_core::json::copy_json_snapshot(out.get()) }
+        let Some(buffer) = out.into_option() else {
+            return Ok(None);
+        };
+        // SAFETY: Success transfers the owned buffer to this call.
+        unsafe { maplibre_core::string::copy_owned_buffer(buffer) }.map(Some)
     }
 
     /// Sets the style's global transition options. This replaces the whole
@@ -1123,30 +1119,25 @@ impl super::MapHandle {
         &self,
         layer_id: &str,
         property_name: &str,
-        value: &JsonValue,
+        value: &[u8],
     ) -> Result<()> {
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         let property_name = maplibre_core::string::string_view(property_name);
-        let value = value.try_to_native()?;
-        // SAFETY: map is live, string views are valid for this call, and value
-        // owns the descriptor graph for this call.
+        let value = maplibre_core::string::buffer_view(value);
+        // SAFETY: map is live, and all string and buffer views remain valid for
+        // this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_layer_property(
-                map,
-                layer_id.raw(),
-                property_name.raw(),
-                value.as_ptr(),
-            )
+            sys::mln_map_set_layer_property(map, layer_id.raw(), property_name.raw(), value)
         })
     }
 
     /// Copies one layer style property as a style-spec JSON value.
-    pub fn layer_property(&self, layer_id: &str, property_name: &str) -> Result<Option<JsonValue>> {
+    pub fn layer_property(&self, layer_id: &str, property_name: &str) -> Result<Option<Vec<u8>>> {
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         let property_name = maplibre_core::string::string_view(property_name);
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
         // SAFETY: map is live, string views are valid for this call, and out is
         // a null-initialized out-pointer.
         maplibre_core::check(unsafe {
@@ -1157,48 +1148,44 @@ impl super::MapHandle {
                 out.as_mut_ptr(),
             )
         })?;
-        // SAFETY: On success, the C API returns either null or an owned JSON
-        // snapshot handle for this call; core copies and releases it.
-        unsafe { maplibre_core::json::copy_json_snapshot(out.get()) }
+        let Some(buffer) = out.into_option() else {
+            return Ok(None);
+        };
+        // SAFETY: Success transfers the owned buffer to this call.
+        unsafe { maplibre_core::string::copy_owned_buffer(buffer) }.map(Some)
     }
 
     /// Sets or clears one layer filter.
-    pub fn set_layer_filter(&self, layer_id: &str, filter: Option<&JsonValue>) -> Result<()> {
+    pub fn set_layer_filter(&self, layer_id: &str, filter: Option<&[u8]>) -> Result<()> {
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
-        let native_filter = filter.map(JsonValue::try_to_native).transpose()?;
+        let native_filter = filter.map(maplibre_core::string::buffer_view);
         // SAFETY: map is live, layer_id is valid for this call, and the
         // optional filter descriptor is either null or valid for this call.
         maplibre_core::check(unsafe {
             sys::mln_map_set_layer_filter(
                 map,
                 layer_id.raw(),
-                native_filter
-                    .as_ref()
-                    .map_or(ptr::null(), |filter| filter.as_ptr()),
+                native_filter.as_ref().map_or(ptr::null(), ptr::from_ref),
             )
         })
     }
 
     /// Copies one layer filter as a style-spec JSON value.
-    pub fn layer_filter(&self, layer_id: &str) -> Result<Option<JsonValue>> {
+    pub fn layer_filter(&self, layer_id: &str) -> Result<Option<Vec<u8>>> {
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
         // SAFETY: map is live, layer_id is valid for this call, and out is a
         // null-initialized out-pointer.
         maplibre_core::check(unsafe {
             sys::mln_map_get_layer_filter(map, layer_id.raw(), out.as_mut_ptr())
         })?;
-        // SAFETY: On success, the C API returns either null or an owned JSON
-        // snapshot handle for this call; core copies and releases it. Some
-        // native backends represent a cleared filter as a JSON null snapshot.
-        Ok(
-            match unsafe { maplibre_core::json::copy_json_snapshot(out.get()) }? {
-                Some(JsonValue::Null) => None,
-                filter => filter,
-            },
-        )
+        let Some(buffer) = out.into_option() else {
+            return Ok(None);
+        };
+        // SAFETY: Success transfers the owned buffer to this call.
+        unsafe { maplibre_core::string::copy_owned_buffer(buffer) }.map(Some)
     }
 
     /// Copies one runtime style image's stretchable intervals.
@@ -1454,4 +1441,33 @@ unsafe fn copy_text(
             "native text was not valid UTF-8",
         )
     })
+}
+
+/// Probes the required byte length, then copies the bytes into owned storage.
+///
+/// # Safety
+///
+/// `copy` must write at most `capacity` bytes and report the required length
+/// through the size pointer.
+unsafe fn copy_bytes(
+    copy: impl Fn(*mut u8, usize, *mut usize) -> sys::mln_status,
+) -> Result<Vec<u8>> {
+    let mut required = 0;
+    maplibre_core::check(copy(ptr::null_mut(), 0, &mut required))?;
+    if required == 0 {
+        return Ok(Vec::new());
+    }
+
+    let mut buffer = vec![0u8; required];
+    let mut copied = 0;
+    maplibre_core::check(copy(buffer.as_mut_ptr(), buffer.len(), &mut copied))?;
+    if copied > buffer.len() {
+        return Err(Error::new(
+            ErrorKind::NativeError,
+            None,
+            "native byte size exceeded caller buffer",
+        ));
+    }
+    buffer.truncate(copied);
+    Ok(buffer)
 }

@@ -21,7 +21,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     double max_zoom;
  *     double tolerance;
  *     double cluster_max_zoom;
- *     const mln_json_value *cluster_properties;
+ *     mln_buffer_view cluster_properties;
  *     uint32_t tile_size;
  *     uint32_t buffer;
  *     uint32_t cluster_radius;
@@ -45,7 +45,7 @@ public class mln_geojson_source_options {
         MapLibreNativeC.C_DOUBLE.withName("max_zoom"),
         MapLibreNativeC.C_DOUBLE.withName("tolerance"),
         MapLibreNativeC.C_DOUBLE.withName("cluster_max_zoom"),
-        MapLibreNativeC.C_POINTER.withName("cluster_properties"),
+        mln_buffer_view.layout().withName("cluster_properties"),
         MapLibreNativeC.C_INT.withName("tile_size"),
         MapLibreNativeC.C_INT.withName("buffer"),
         MapLibreNativeC.C_INT.withName("cluster_radius"),
@@ -327,15 +327,15 @@ public class mln_geojson_source_options {
         struct.set(cluster_max_zoom$LAYOUT, cluster_max_zoom$OFFSET, fieldValue);
     }
 
-    private static final AddressLayout cluster_properties$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("cluster_properties"));
+    private static final GroupLayout cluster_properties$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("cluster_properties"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * const mln_json_value *cluster_properties
+     * mln_buffer_view cluster_properties
      * }
      */
-    public static final AddressLayout cluster_properties$layout() {
+    public static final GroupLayout cluster_properties$layout() {
         return cluster_properties$LAYOUT;
     }
 
@@ -344,7 +344,7 @@ public class mln_geojson_source_options {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * const mln_json_value *cluster_properties
+     * mln_buffer_view cluster_properties
      * }
      */
     public static final long cluster_properties$offset() {
@@ -354,21 +354,21 @@ public class mln_geojson_source_options {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * const mln_json_value *cluster_properties
+     * mln_buffer_view cluster_properties
      * }
      */
     public static MemorySegment cluster_properties(MemorySegment struct) {
-        return struct.get(cluster_properties$LAYOUT, cluster_properties$OFFSET);
+        return struct.asSlice(cluster_properties$OFFSET, cluster_properties$LAYOUT.byteSize());
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * const mln_json_value *cluster_properties
+     * mln_buffer_view cluster_properties
      * }
      */
     public static void cluster_properties(MemorySegment struct, MemorySegment fieldValue) {
-        struct.set(cluster_properties$LAYOUT, cluster_properties$OFFSET, fieldValue);
+        MemorySegment.copy(fieldValue, 0L, struct, cluster_properties$OFFSET, cluster_properties$LAYOUT.byteSize());
     }
 
     private static final OfInt tile_size$LAYOUT = (OfInt)$LAYOUT.select(groupElement("tile_size"));
