@@ -39,6 +39,7 @@ export ANDROID_SDK_ROOT="$python_android_home"
 export CIBW_BUILD=cp314-android_x86_64
 export CIBW_ARCHS_ANDROID=x86_64
 export CIBW_BUILD_FRONTEND='build[uv]'
+export CIBW_CONFIG_SETTINGS_ANDROID='build-args=--no-default-features'
 export CIBW_ENVIRONMENT_ANDROID="MAPLIBRE_NATIVE_C_INSTALL_DIR=$native_install_dir"
 export CIBW_TEST_COMMAND_ANDROID='python -m pytest tests'
 export CIBW_TEST_REQUIRES_ANDROID='pytest>=9,<10 pyopengl>=3.1.10,<4'

@@ -10,7 +10,11 @@ name = "_native"
 crate-type = ["cdylib"]
 test = false
 
+[features]
+default = ["abi3"]
+abi3 = ["pyo3/abi3-py314"]
+
 [dependencies]
 maplibre-native-ffi-core = { path = "../rust/crates/maplibre-native-ffi-core" }
 maplibre-native-ffi-sys = { path = "../rust/crates/maplibre-native-ffi-sys" }
-pyo3 = { version = "0.29.0", features = ["abi3-py314"] }
+pyo3 = { version = "0.29.0" }
