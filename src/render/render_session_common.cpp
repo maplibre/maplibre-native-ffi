@@ -1308,18 +1308,18 @@ auto surface_session_set_target(
 }
 
 auto render_session_render_update(
-  mln_render_session session, bool* out_rendered
+  mln_render_session session, mln_render_result* out_result
 ) -> mln_status {
   mln_render_session_object* live = nullptr;
   const auto status = validate_live_attached_render_session(session, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (out_rendered == nullptr) {
-    set_thread_error("out_rendered must not be null");
+  if (out_result == nullptr) {
+    set_thread_error("out_result must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  *out_rendered = false;
+  *out_result = MLN_RENDER_RESULT_NO_UPDATE;
   if (live->kind == RenderSessionKind::Texture && live->texture.acquired) {
     set_thread_error("cannot render while a texture frame is acquired");
     return MLN_STATUS_INVALID_STATE;
@@ -1341,6 +1341,7 @@ auto render_session_render_update(
 
   auto update = map_latest_update(live->map);
   if (!update) {
+    *out_result = MLN_RENDER_RESULT_NO_UPDATE;
     return MLN_STATUS_OK;
   }
 
@@ -1352,6 +1353,7 @@ auto render_session_render_update(
   if (
     update->transformState.getSize() != mbgl::Size{live->width, live->height}
   ) {
+    *out_result = MLN_RENDER_RESULT_SIZE_PENDING;
     return MLN_STATUS_OK;
   }
 
@@ -1370,6 +1372,7 @@ auto render_session_render_update(
       return MLN_STATUS_NATIVE_ERROR;
     }
     if (!surface_ready) {
+      *out_result = MLN_RENDER_RESULT_TARGET_NOT_READY;
       return MLN_STATUS_OK;
     }
   }
@@ -1401,11 +1404,12 @@ auto render_session_render_update(
       return after_status;
     }
     if (!frame_rendered) {
+      *out_result = MLN_RENDER_RESULT_TARGET_NOT_READY;
       return MLN_STATUS_OK;
     }
   }
   live->rendered_generation = live->generation;
-  *out_rendered = true;
+  *out_result = MLN_RENDER_RESULT_RENDERED;
   return MLN_STATUS_OK;
 }
 

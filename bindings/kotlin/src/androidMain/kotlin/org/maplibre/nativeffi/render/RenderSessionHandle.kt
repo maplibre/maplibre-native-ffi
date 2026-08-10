@@ -1,7 +1,6 @@
 package org.maplibre.nativeffi.render
 
 import java.nio.charset.StandardCharsets
-import org.bytedeco.javacpp.BoolPointer
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.LongPointer
 import org.bytedeco.javacpp.Pointer
@@ -121,16 +120,12 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     )
   }
 
-  public actual fun renderUpdate(): Boolean {
+  public actual fun renderUpdate(): RenderResult {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("render")
-    BoolPointer(1).use { outRendered ->
-      outRendered.put(0, false)
-      Status.check(
-        MaplibreNativeC.mln_render_session_render_update(requireLiveHandle(), outRendered)
-      )
-      return outRendered.get()
-    }
+    val outResult = intArrayOf(0)
+    Status.check(MaplibreNativeC.mln_render_session_render_update(requireLiveHandle(), outResult))
+    return RenderResult.fromNative(outResult[0])
   }
 
   public actual fun detach() {

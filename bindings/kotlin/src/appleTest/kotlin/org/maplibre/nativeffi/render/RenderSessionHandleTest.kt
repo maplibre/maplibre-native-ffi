@@ -76,7 +76,7 @@ class RenderSessionHandleTest {
   // owner-thread checks.
 
   @Test
-  fun renderUpdateWithoutPendingUpdateReportsFalseAndKeepsSessionLive() {
+  fun renderUpdateWithoutPendingUpdateReportsNoUpdateAndKeepsSessionLive() {
     if (!metalSupportedOrInapplicable()) return
     val device =
       MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
@@ -100,7 +100,7 @@ class RenderSessionHandleTest {
             )
           )
         try {
-          assertFalse(session.renderUpdate())
+          assertEquals(RenderResult.NO_UPDATE, session.renderUpdate())
           session.resize(32, 16, 1.0)
         } finally {
           session.close()
@@ -161,7 +161,7 @@ class RenderSessionHandleTest {
 
           map.setStyleJson(QUERY_STYLE_JSON)
           assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
-          assertTrue(session.renderUpdate())
+          assertEquals(RenderResult.RENDERED, session.renderUpdate())
 
           val sessionCallError = AtomicReference<Throwable?>(null)
           spawnSessionRenderOnNativeThread(session, sessionCallError)
@@ -173,7 +173,7 @@ class RenderSessionHandleTest {
           assertEquals(MaplibreStatus.WRONG_THREAD, sessionCallWrongThread.status)
           assertTrue(sessionCallDiagnostic.isNotBlank())
 
-          assertTrue(session.renderUpdate())
+          assertEquals(RenderResult.RENDERED, session.renderUpdate())
 
           assertEquals(sessionCallDiagnostic, sessionCallWrongThread.diagnostic)
 
@@ -342,9 +342,9 @@ class RenderSessionHandleTest {
           // the map publishes an update matching the new target only once
           // pumped.
           session.resize(16, 8, 2.0)
-          assertFalse(session.renderUpdate())
+          assertEquals(RenderResult.SIZE_PENDING, session.renderUpdate())
           runtime.pump(0)
-          assertTrue(session.renderUpdate())
+          assertEquals(RenderResult.RENDERED, session.renderUpdate())
           session.detach()
           assertFailsWith<InvalidStateException> { session.renderUpdate() }
           assertFalse(session.isClosed)
@@ -399,7 +399,7 @@ class RenderSessionHandleTest {
             assertTrue(
               waitForMapEvent(runtime, borrowedMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
             )
-            assertTrue(session.renderUpdate())
+            assertEquals(RenderResult.RENDERED, session.renderUpdate())
             assertFailsWith<UnsupportedFeatureException> { session.acquireMetalOwnedTextureFrame() }
             assertFailsWith<UnsupportedFeatureException> { session.textureImageInfo() }
           } finally {
@@ -434,7 +434,7 @@ class RenderSessionHandleTest {
             assertTrue(
               waitForMapEvent(runtime, surfaceMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
             )
-            assertTrue(session.renderUpdate())
+            assertEquals(RenderResult.RENDERED, session.renderUpdate())
             assertFailsWith<UnsupportedFeatureException> { session.acquireMetalOwnedTextureFrame() }
             assertFailsWith<UnsupportedFeatureException> { session.textureImageInfo() }
           } finally {
@@ -490,7 +490,7 @@ class RenderSessionHandleTest {
             assertTrue(
               waitForMapEvent(runtime, borrowedMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
             )
-            assertTrue(session.renderUpdate())
+            assertEquals(RenderResult.RENDERED, session.renderUpdate())
 
             // A caller-owned texture is sized by its owner, so the host
             // reallocates and hands the replacement over instead of resizing.
@@ -511,9 +511,9 @@ class RenderSessionHandleTest {
             )
             session.setMetalBorrowedTextureTarget(replacement)
             assertSame(borrowedMap, session.map())
-            assertFalse(session.renderUpdate())
+            assertEquals(RenderResult.SIZE_PENDING, session.renderUpdate())
             runtime.pump(0)
-            assertTrue(session.renderUpdate())
+            assertEquals(RenderResult.RENDERED, session.renderUpdate())
             // The session paints the texture it was handed, not the one it had.
             assertTrue(
               readMetalTextureRgba(device, replacementTexture, 16, 8).any { it != 0.toByte() },
@@ -554,7 +554,7 @@ class RenderSessionHandleTest {
             assertTrue(
               waitForMapEvent(runtime, surfaceMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
             )
-            assertTrue(session.renderUpdate())
+            assertEquals(RenderResult.RENDERED, session.renderUpdate())
 
             // A recreated host surface replaces the presentation target while
             // the session and its renderer go on living.
@@ -566,9 +566,9 @@ class RenderSessionHandleTest {
               )
             )
             assertSame(surfaceMap, session.map())
-            assertFalse(session.renderUpdate())
+            assertEquals(RenderResult.SIZE_PENDING, session.renderUpdate())
             runtime.pump(0)
-            assertTrue(session.renderUpdate())
+            assertEquals(RenderResult.RENDERED, session.renderUpdate())
           } finally {
             session.close()
           }
@@ -707,7 +707,7 @@ class RenderSessionHandleTest {
           map.addGeoJsonSourceData("cluster-source", clusterPoints(), clusterSourceOptions())
           map.addStyleLayerJson(clusterCircleLayer(), "")
           assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
-          assertTrue(session.renderUpdate())
+          assertEquals(RenderResult.RENDERED, session.renderUpdate())
 
           val queryPoint = map.pixelForLatLng(LatLng(0.0, 0.0))
           val queryGeometry =
@@ -900,7 +900,7 @@ class RenderSessionHandleTest {
     repeat(100) {
       val event = runtime.pollEvent() ?: return
       if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE && event.mapSource == map) {
-        assertTrue(session.renderUpdate())
+        assertEquals(RenderResult.RENDERED, session.renderUpdate())
         return
       }
     }

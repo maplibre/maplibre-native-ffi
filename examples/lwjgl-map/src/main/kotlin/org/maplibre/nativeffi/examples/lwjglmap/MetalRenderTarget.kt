@@ -6,6 +6,7 @@ import org.maplibre.nativeffi.render.MetalContextDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
 import org.maplibre.nativeffi.render.NativePointer
+import org.maplibre.nativeffi.render.RenderResult
 import org.maplibre.nativeffi.render.RenderSessionHandle
 
 internal object MetalRenderTarget {
@@ -96,7 +97,7 @@ internal object MetalRenderTarget {
       session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
     }
 
-    override fun renderUpdate(): Boolean = session.renderUpdate()
+    override fun renderUpdate(): Boolean = session.renderUpdate() == RenderResult.RENDERED
 
     override fun close() {
       session.close()
@@ -114,7 +115,7 @@ internal object MetalRenderTarget {
     }
 
     override fun renderUpdate(): Boolean {
-      if (!session.renderUpdate()) {
+      if (session.renderUpdate() != RenderResult.RENDERED) {
         return false
       }
       return session.acquireMetalOwnedTextureFrame().use { frameHandle ->
@@ -161,7 +162,7 @@ internal object MetalRenderTarget {
     }
 
     override fun renderUpdate(): Boolean {
-      if (!session.renderUpdate()) {
+      if (session.renderUpdate() != RenderResult.RENDERED) {
         return false
       }
       return compositor.drawTexture(texture.texture())

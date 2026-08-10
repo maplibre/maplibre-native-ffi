@@ -693,7 +693,7 @@ public sealed unsafe class RenderSessionTests
 
     [BindingSpecTest("BND-164", "BND-165")]
     [Fact]
-    public void RenderUpdateWithoutPendingUpdateReportsFalseAndResizePassesExtent()
+    public void RenderUpdateAfterResizeReportsSizePendingAndResizePassesExtent()
     {
         uint resizedWidth = 0;
         uint resizedHeight = 0;
@@ -706,9 +706,9 @@ public sealed unsafe class RenderSessionTests
                 resizedScale = scale;
                 return mln_status.MLN_STATUS_OK;
             },
-            (_, outRendered) =>
+            (_, outResult) =>
             {
-                *outRendered = false;
+                *outResult = mln_render_result.MLN_RENDER_RESULT_SIZE_PENDING;
                 return mln_status.MLN_STATUS_OK;
             },
             (_, _, _, _) => mln_status.MLN_STATUS_OK,
@@ -717,7 +717,7 @@ public sealed unsafe class RenderSessionTests
         var session = RenderSessionHandle.CreateForTest(SyntheticHandles.RenderSession(1234));
 
         session.Resize(320, 240, 2);
-        Assert.False(session.RenderUpdate());
+        Assert.Equal(RenderResult.SizePending, session.RenderUpdate());
 
         Assert.Equal(320u, resizedWidth);
         Assert.Equal(240u, resizedHeight);

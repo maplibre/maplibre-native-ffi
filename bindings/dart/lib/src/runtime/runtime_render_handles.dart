@@ -125,6 +125,45 @@ final class MapProjectionHandle {
   }
 }
 
+/// Outcome reported by [RenderSessionHandle.renderUpdate].
+final class RenderResult {
+  const RenderResult._(this.rawValue, this.name);
+
+  /// The render target holds a new frame.
+  static const rendered = RenderResult._(0, 'rendered');
+
+  /// The map has produced no render update so far.
+  static const noUpdate = RenderResult._(1, 'noUpdate');
+
+  /// The map has not applied the session's current size yet.
+  static const sizePending = RenderResult._(2, 'sizePending');
+
+  /// The render target had no frame to draw into.
+  static const targetNotReady = RenderResult._(3, 'targetNotReady');
+
+  /// Creates a render result while preserving unknown native values.
+  factory RenderResult.fromRawValue(int rawValue) => switch (rawValue) {
+    0 => rendered,
+    1 => noUpdate,
+    2 => sizePending,
+    3 => targetNotReady,
+    _ => RenderResult._(rawValue, 'unknown($rawValue)'),
+  };
+
+  /// Raw native value.
+  final int rawValue;
+
+  /// Human-readable name.
+  final String name;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RenderResult && other.rawValue == rawValue;
+
+  @override
+  int get hashCode => rawValue.hashCode;
+}
+
 /// Owner-thread render session handle attached to a retained map.
 final class RenderSessionHandle {
   RenderSessionHandle._(NativeRenderSession handle)
@@ -293,13 +332,31 @@ final class RenderSessionHandle {
     });
   }
 
-  /// Processes the latest map render update and reports whether it rendered.
-  bool renderUpdate() {
+  /// Renders the latest map update into this session's render target.
+  ///
+  /// The returned [RenderResult] names the wake to wait for before calling
+  /// again:
+  ///
+  /// - [RenderResult.rendered]: the target holds a new frame. The map retains
+  ///   its latest update, so a host redraws on demand after a resize or a
+  ///   surface expose, and gates a frame loop on
+  ///   [RuntimeEventType.mapRenderUpdateAvailable].
+  /// - [RenderResult.noUpdate]: the map has produced no render update so far,
+  ///   because no style is loaded or the first pass is still running. Wait for
+  ///   [RuntimeEventType.mapRenderUpdateAvailable].
+  /// - [RenderResult.sizePending]: this session resized and the map, which
+  ///   applies its size on its own thread, is still behind. The map publishes
+  ///   an update for the new size on its own, so wait for the next
+  ///   [RuntimeEventType.mapRenderUpdateAvailable].
+  /// - [RenderResult.targetNotReady]: the render target had no frame
+  ///   available, such as a Metal surface whose next drawable is nil. Wait for
+  ///   a host event that changes the target, or back off and retry.
+  RenderResult renderUpdate() {
     _checkNoActiveTextureFrame('render update');
     return withNativeArena((arena) {
-      final rendered = arena<Bool>();
-      _check(raw.mln_render_session_render_update(_handle.raw, rendered));
-      return rendered.value;
+      final result = arena<Uint32>();
+      _check(raw.mln_render_session_render_update(_handle.raw, result));
+      return RenderResult.fromRawValue(result.value);
     });
   }
 

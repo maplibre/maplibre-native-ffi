@@ -488,24 +488,24 @@ Requirements:
   when a resize or reattach completes.
 - The render loop MUST call `render_update` only when it consumed a set request.
 - The render loop MUST consume the render request **before** calling
-  `render_update`, and MUST set it again when `render_update` reports that no
-  update was rendered. Consuming afterwards would discard a request the runtime
-  loop published during the render call, and that frame would never be drawn.
+  `render_update`, and MUST set it again when `render_update` reports any result
+  other than a rendered frame. Consuming afterwards would discard a request the
+  runtime loop published during the render call, and that frame would never be
+  drawn.
 - `map_render_frame_finished` and `map_idle` are delivered by the runtime loop's
   next `pump` after the render loop rendered. An example MUST NOT treat either
   as a synchronous result of the `render_update` it follows, and MUST NOT block
   a render loop iteration waiting for one.
 - After a session resize, the map applies its logical size on the runtime loop's
-  next `pump`, so `render_update` reports no update until then. The render loop
-  MUST keep pacing and retry rather than treating it as a failure.
+  next `pump`, so `render_update` reports a pending size until then. The render
+  loop MUST keep pacing and retry rather than treating it as a failure.
 - A compositor that cannot present the frame it was handed MUST report that as
   no frame rendered, and the render loop MUST set the render request again. A
   minimized or occluded window produces this, and so does a swapchain awaiting
   its rebuild. The map retains the update, so the retry draws it.
 
-Texture modes: after `render_update` reports an update was rendered, MUST run
-the compositor pass to copy the map texture into the host swapchain before
-present.
+Texture modes: after `render_update` reports a rendered frame, MUST run the
+compositor pass to copy the map texture into the host swapchain before present.
 
 ### Viewport
 
@@ -668,7 +668,7 @@ that pass.
 - Set the render request after any resize.
 - The render loop owns the session, so an in-place resize is a local call. The
   map applies the new logical size on the runtime loop's next `pump`, so
-  `render_update` reports no update until then.
+  `render_update` reports a pending size until then.
 
 #### Reattach
 

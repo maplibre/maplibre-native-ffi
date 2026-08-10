@@ -23,10 +23,12 @@ static mln_status render_until_frame(
   *out_rendered = false;
   for (unsigned int attempt = 0; attempt < 500 && !*out_rendered;
        attempt += 1) {
-    status = mln_render_session_render_update(session, out_rendered);
+    mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
+    status = mln_render_session_render_update(session, &result);
     if (status != MLN_STATUS_OK) {
       return status;
     }
+    *out_rendered = result == MLN_RENDER_RESULT_RENDERED;
     if (!*out_rendered) {
       mln_test_sleep_millisecond();
     }
@@ -119,9 +121,9 @@ typedef struct foreign_call_probe {
 
 static void call_session_from_a_foreign_thread(void* argument) {
   foreign_call_probe* probe = (foreign_call_probe*)argument;
-  bool rendered = false;
+  mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
   probe->render_status =
-    mln_render_session_render_update(probe->session, &rendered);
+    mln_render_session_render_update(probe->session, &result);
   probe->resize_status = mln_render_session_resize(probe->session, 32, 32, 1.0);
   probe->detach_status = mln_render_session_detach(probe->session);
   probe->destroy_status = mln_render_session_destroy(probe->session);
@@ -269,7 +271,7 @@ typedef struct resize_probe {
   atomic_bool immediate_render_checked;
   atomic_bool finished;
   bool attached;
-  bool observed_no_update;
+  mln_render_result immediate_result;
   bool rendered;
   mln_status resize_status;
 } resize_probe;
@@ -294,18 +296,19 @@ static void attach_resize_render(void* argument) {
     mln_render_session_resize(fixture.session, 96, 48, 1.0);
 
   // Immediately after the resize the map still holds an update built for the
-  // previous extent, so rendering must report no frame rather than project it
-  // into the new target.
-  bool rendered = true;
+  // previous extent, so rendering must report a pending size rather than
+  // project that update into the new target.
+  mln_render_result immediate = MLN_RENDER_RESULT_RENDERED;
   if (
-    mln_render_session_render_update(fixture.session, &rendered) ==
-      MLN_STATUS_OK &&
-    !rendered
+    mln_render_session_render_update(fixture.session, &immediate) !=
+    MLN_STATUS_OK
   ) {
-    probe->observed_no_update = true;
+    immediate = MLN_RENDER_RESULT_RENDERED;
   }
+  probe->immediate_result = immediate;
   atomic_store(&probe->immediate_render_checked, true);
 
+  bool rendered = immediate == MLN_RENDER_RESULT_RENDERED;
   if (!rendered) {
     (void)render_until_frame(fixture.session, &rendered);
   }
@@ -350,7 +353,7 @@ static void resize_from_the_render_thread_lands_on_the_map_thread(void) {
 
   TEST_ASSERT_TRUE(probe.attached);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.resize_status);
-  TEST_ASSERT_TRUE(probe.observed_no_update);
+  TEST_ASSERT_EQUAL_INT(MLN_RENDER_RESULT_SIZE_PENDING, probe.immediate_result);
   TEST_ASSERT_TRUE(probe.rendered);
 
   uint32_t width = 0;

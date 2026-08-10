@@ -7,6 +7,7 @@ import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLContextDescriptor
 import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
+import org.maplibre.nativeffi.render.RenderResult
 import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.WglContextDescriptor
 
@@ -113,7 +114,7 @@ internal object OpenGLRenderTarget {
       session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
     }
 
-    override fun renderUpdate(): Boolean = session.renderUpdate()
+    override fun renderUpdate(): Boolean = session.renderUpdate() == RenderResult.RENDERED
 
     override fun close() {
       session.close()
@@ -130,7 +131,7 @@ internal object OpenGLRenderTarget {
     }
 
     override fun renderUpdate(): Boolean {
-      if (!session.renderUpdate()) {
+      if (session.renderUpdate() != RenderResult.RENDERED) {
         return false
       }
       session.acquireOpenGLOwnedTextureFrame().use { frameHandle ->
@@ -180,7 +181,7 @@ internal object OpenGLRenderTarget {
     }
 
     override fun renderUpdate(): Boolean {
-      if (!session.renderUpdate()) {
+      if (session.renderUpdate() != RenderResult.RENDERED) {
         return false
       }
       compositor.drawTexture(texture.texture())

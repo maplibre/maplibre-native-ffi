@@ -417,6 +417,29 @@ public struct OpenGLBorrowedTextureDescriptor: Equatable, Sendable {
   }
 }
 
+/// The outcome of a ``RenderSessionHandle/renderUpdate()`` call.
+public enum RenderResult: Sendable, Hashable {
+  /// The call rendered a frame into the render target.
+  case rendered
+  /// The map has no render update yet.
+  case noUpdate
+  /// The map has not applied the session's current size yet.
+  case sizePending
+  /// The render target had no frame to draw into.
+  case targetNotReady
+  case unknown(UInt32)
+
+  public static func fromNative(_ rawValue: UInt32) -> Self {
+    switch rawValue {
+    case 0: .rendered
+    case 1: .noUpdate
+    case 2: .sizePending
+    case 3: .targetNotReady
+    default: .unknown(rawValue)
+    }
+  }
+}
+
 /// A render session, affine to the thread that attached it.
 ///
 /// The session holds no Swift-level retention of its map. Native keeps the map
@@ -578,20 +601,35 @@ public final class RenderSessionHandle {
     }
   }
 
-  /// Renders the latest available map render update.
+  /// Renders the latest available map render update, reporting the outcome.
   ///
-  /// The map retains its latest update, so repeated calls re-render it. Returns
-  /// false when no frame was rendered; that is a normal transient, so call
-  /// again on the next frame rather than wait for another render-update event.
+  /// Each result names the wake that a host waits for before it calls again:
+  ///
+  /// - ``RenderResult/rendered``: the target holds a new frame. The map retains
+  ///   its latest update, so a host redraws on demand after a resize or a
+  ///   surface expose, and paces a frame loop on the map
+  ///   render-update-available event.
+  /// - ``RenderResult/noUpdate``: the map has produced no render update so far,
+  ///   because no style is loaded or the first pass is still running. Wait for
+  ///   the map render-update-available event.
+  /// - ``RenderResult/sizePending``: the session resized and the map, which
+  ///   applies its size on its own thread, is still behind. The map publishes
+  ///   an update for the new size on its own, so wait for the next map
+  ///   render-update-available event.
+  /// - ``RenderResult/targetNotReady``: the render target had no frame
+  ///   available, such as a Metal surface whose next drawable is nil or a
+  ///   texture target that holds no texture yet. No map update resolves this,
+  ///   so wait for a host event that changes the target, or retry after a
+  ///   delay.
   @discardableResult
-  public func renderUpdate() throws -> Bool {
+  public func renderUpdate() throws -> RenderResult {
     try mapNativeFailure {
-      var rendered = false
+      var result = MLN_RENDER_RESULT_RENDERED
       try checkStatus(mln_render_session_render_update(
         handle.requireLive().raw,
-        &rendered
+        &result
       ))
-      return rendered
+      return RenderResult.fromNative(result.rawValue)
     }
   }
 

@@ -118,6 +118,29 @@ pub const NativePointer = enum(usize) {
     }
 };
 
+/// Outcome of a successful `RenderSessionHandle.renderUpdate` call.
+pub const RenderResult = union(enum) {
+    /// The call rendered a frame into the render target.
+    rendered,
+    /// The map has no render update yet.
+    no_update,
+    /// The map has not applied the session's current size yet.
+    size_pending,
+    /// The render target had no frame to draw into.
+    target_not_ready,
+    unknown: u32,
+
+    fn fromRaw(raw: u32) RenderResult {
+        return switch (raw) {
+            c.MLN_RENDER_RESULT_RENDERED => .rendered,
+            c.MLN_RENDER_RESULT_NO_UPDATE => .no_update,
+            c.MLN_RENDER_RESULT_SIZE_PENDING => .size_pending,
+            c.MLN_RENDER_RESULT_TARGET_NOT_READY => .target_not_ready,
+            else => .{ .unknown = raw },
+        };
+    }
+};
+
 pub const RenderBackendSupport = struct {
     metal: bool,
     opengl: bool,
@@ -495,20 +518,20 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
     }
 
     /// Renders the latest available map render update. The map retains its
-    /// latest update, so repeated calls re-render it and return true again.
-    /// Returns false when no frame was rendered, which is a normal transient:
-    /// call again on the next frame rather than wait for another render-update
-    /// event.
-    pub fn renderUpdate(self: *RenderSessionHandle) status.Error!bool {
+    /// latest update, so repeated calls re-render it and report `.rendered`
+    /// again. Every other result names the wake to wait for: `.no_update` and
+    /// `.size_pending` resolve on a render-update-available event, and
+    /// `.target_not_ready` resolves when the host changes the render target.
+    pub fn renderUpdate(self: *RenderSessionHandle) status.Error!RenderResult {
         const lease = try renderSessionLease(self.*);
         defer lease.release();
         try ensureNoActiveOwnedFrame(lease);
-        var rendered: bool = false;
+        var result: c.mln_render_result = c.MLN_RENDER_RESULT_NO_UPDATE;
         try status.checkStatus(
-            c.mln_render_session_render_update(lease.native, &rendered),
+            c.mln_render_session_render_update(lease.native, &result),
             lease.diagnostic_store,
         );
-        return rendered;
+        return RenderResult.fromRaw(@intCast(result));
     }
 
     /// Detaches the render target from this session. The session stays live and

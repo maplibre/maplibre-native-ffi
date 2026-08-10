@@ -45,7 +45,7 @@ test "Metal surface renders to window-attached layer through public binding" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
-    try testing.expect(try surface.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try surface.renderUpdate());
 }
 
 test "Metal surface render acquires one drawable per frame through public binding" {
@@ -71,7 +71,7 @@ test "Metal surface render acquires one drawable per frame through public bindin
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
     try testing.expectEqual(@as(u32, 0), metal_support.nextDrawableCount(window_layer.layer.?));
-    try testing.expect(try surface.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try surface.renderUpdate());
     try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(window_layer.layer.?));
 }
 
@@ -99,7 +99,7 @@ test "Metal surface set target presents through a replacement layer" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
-    try testing.expect(try surface.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try surface.renderUpdate());
     try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(window_layer.layer.?));
 
     // The session presents through whatever replacement surface it is handed.
@@ -119,12 +119,12 @@ test "Metal surface set target presents through a replacement layer" {
 
     // Replacing the surface enqueues the new size for the map's owner thread,
     // so the map publishes a matching update only once pumped.
-    try testing.expect(!try surface.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), try surface.renderUpdate());
     try runtime.pump(0);
     const resized = try map.getSize();
     try testing.expectEqual(@as(u32, 48), resized.width);
     try testing.expectEqual(@as(u32, 32), resized.height);
-    try testing.expect(try surface.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try surface.renderUpdate());
     try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(replacement_layer.layer.?));
     try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(window_layer.layer.?));
 }

@@ -1797,6 +1797,7 @@ void main() {
     final eventType = RuntimeEventType.fromRawValue(0xfeed);
     final sourceType = RuntimeEventSourceType.fromRawValue(0xbeef);
     final renderMode = RenderMode.fromRawValue(42);
+    final renderResult = RenderResult.fromRawValue(42);
     final operationKind = OfflineOperationKind.fromRawValue(99);
     final resultKind = OfflineOperationResultKind.fromRawValue(100);
     const unknownDefinition = UnknownOfflineRegionDefinition(101);
@@ -1805,6 +1806,8 @@ void main() {
     expect(eventType, RuntimeEventType.fromRawValue(0xfeed));
     expect(sourceType.rawValue, 0xbeef);
     expect(renderMode.name, 'unknown(42)');
+    expect(renderResult, RenderResult.fromRawValue(42));
+    expect(renderResult.name, 'unknown(42)');
     expect(operationKind.rawValue, 99);
     expect(resultKind.rawValue, 100);
     expect(unknownDefinition.rawType, 101);

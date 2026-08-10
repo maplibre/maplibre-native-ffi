@@ -67,9 +67,9 @@ static bool await_still_image(
     const still_image_state state = drain_still_image_events(runtime, map);
     if (state == STILL_IMAGE_FAILED) return false;
     if (state == STILL_IMAGE_FINISHED) finished = true;
-    bool produced = false;
-    if (mln_render_session_render_update(session, &produced) == MLN_STATUS_OK) {
-      rendered = rendered || produced;
+    mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
+    if (mln_render_session_render_update(session, &result) == MLN_STATUS_OK) {
+      rendered = rendered || result == MLN_RENDER_RESULT_RENDERED;
     }
   }
   // #endregion await

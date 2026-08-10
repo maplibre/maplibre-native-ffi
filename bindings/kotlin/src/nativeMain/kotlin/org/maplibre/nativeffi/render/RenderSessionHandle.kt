@@ -1,9 +1,9 @@
 package org.maplibre.nativeffi.render
 
-import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.UByteVar
+import kotlinx.cinterop.UIntVar
 import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
@@ -171,14 +171,14 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     }
   }
 
-  public actual fun renderUpdate(): Boolean = memScoped {
+  public actual fun renderUpdate(): RenderResult = memScoped {
     activeFrame.ensureInactive("render")
-    val outRendered = alloc<BooleanVar>()
-    outRendered.value = false
+    val outResult = alloc<UIntVar>()
+    outResult.value = 0u
     Status.check(
-      mln_render_session_render_update(state.requireLive().rawHandleValue, outRendered.ptr)
+      mln_render_session_render_update(state.requireLive().rawHandleValue, outResult.ptr)
     )
-    outRendered.value
+    RenderResult.fromNative(outResult.value)
   }
 
   public actual fun detach() {

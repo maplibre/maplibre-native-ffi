@@ -6,6 +6,7 @@ use std::rc::Rc;
 
 pub use maplibre_core::{PremultipliedRgba8Image, TextureImageInfo};
 use maplibre_native_ffi_core as maplibre_core;
+use maplibre_native_ffi_core::RenderResult;
 use maplibre_native_ffi_sys as sys;
 
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
@@ -1729,19 +1730,21 @@ impl RenderSessionHandle {
     /// Processes the latest map render update for this render target.
     ///
     /// The map retains its latest update, so repeated calls re-render it and
-    /// return `true` again. Returns `false` when no frame was rendered, which
-    /// is a normal transient: call again on the next frame. Gate frame loops on
-    /// render-update-available events rather than on the return value.
-    pub fn render_update(&self) -> Result<bool> {
+    /// report [`RenderResult::Rendered`] again. Every other result names the
+    /// wake to wait for: [`RenderResult::NoUpdate`] and
+    /// [`RenderResult::SizePending`] resolve on a render-update-available
+    /// event, and [`RenderResult::TargetNotReady`] resolves when the host
+    /// changes the render target.
+    pub fn render_update(&self) -> Result<RenderResult> {
         self.inner.ensure_no_frame_acquired()?;
         let session = self.inner.native()?;
-        let mut rendered = false;
+        let mut result = sys::MLN_RENDER_RESULT_NO_UPDATE;
         // SAFETY: session is a live render session handle owned by this wrapper,
-        // and rendered points to caller-owned output storage.
+        // and result points to caller-owned output storage.
         maplibre_core::check(unsafe {
-            sys::mln_render_session_render_update(session, &raw mut rendered)
+            sys::mln_render_session_render_update(session, &raw mut result)
         })?;
-        Ok(rendered)
+        Ok(RenderResult::from_raw(result))
     }
 
     /// Detaches backend-bound render resources from the map, consuming this

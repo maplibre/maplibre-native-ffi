@@ -2242,7 +2242,7 @@ fn load_feature_state_style(
         runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    assert!(session.render_update().unwrap());
+    assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
 }
 
 fn load_query_style(runtime: &RuntimeHandle, map: &MapHandle, session: &RenderSessionHandle) {
@@ -2494,7 +2494,7 @@ fn opengl_owned_texture_session_attaches_with_platform_context() {
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    assert!(session.render_update().unwrap());
+    assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
 
     let frame = session.acquire_opengl_owned_texture_frame().unwrap();
     assert_eq!(frame.frame().unwrap().width, 32);
@@ -2561,7 +2561,7 @@ fn opengl_surface_session_renders_with_platform_context() {
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    assert!(session.render_update().unwrap());
+    assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
 
     #[cfg(any(target_os = "windows", target_os = "emscripten"))]
     {
@@ -2600,7 +2600,7 @@ fn webgpu_surface_session_renders_and_presents_through_a_canvas() {
     ));
     // A frame reported rendered means the surface gave up its texture and took
     // it back at present, which is the whole of the acquire and present cycle.
-    assert!(session.render_update().unwrap());
+    assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
 
     // The frame reached the canvas, not just the render pass: the style paints
     // its background over every pixel.
@@ -2625,7 +2625,7 @@ fn webgpu_surface_session_renders_and_presents_through_a_canvas() {
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    assert!(session.render_update().unwrap());
+    assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
 
     // A session-owned frame belongs to the texture session kind, so this
     // reports the mismatch rather than handing back a texture it does not own.
@@ -2647,7 +2647,7 @@ fn webgpu_surface_session_renders_and_presents_through_a_canvas() {
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    assert!(session.render_update().unwrap());
+    assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
 
     session.close().unwrap();
     map.close().unwrap();
@@ -2675,7 +2675,7 @@ fn webgpu_borrowed_texture_session_renders_into_a_host_texture() {
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    assert!(session.render_update().unwrap());
+    assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
 
     // The style paints its background over every pixel, so finding it in the
     // host's texture is what says this session rendered into the one it was
@@ -2723,7 +2723,7 @@ fn opengl_borrowed_texture_session_renders_with_platform_context() {
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    assert!(session.render_update().unwrap());
+    assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
 
     let error = session.acquire_opengl_owned_texture_frame().unwrap_err();
     assert_eq!(error.kind(), ErrorKind::Unsupported);
@@ -2757,7 +2757,7 @@ fn set_target_hands_a_live_session_a_new_borrowed_texture() {
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    assert!(session.render_update().unwrap());
+    assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
 
     // A caller-owned texture is sized by its owner, so resize is unsupported.
     let resized_extent = RenderTargetExtent::new(96, 64, 1.0);
@@ -2801,7 +2801,7 @@ fn set_target_hands_a_live_session_a_new_borrowed_texture() {
     while Instant::now() < deadline && !rendered_into_replacement {
         let _ = runtime.pump(Some(Duration::ZERO));
         while let Ok(Some(_)) = runtime.poll_event() {}
-        if session.render_update().unwrap() {
+        if session.render_update().unwrap() == RenderResult::Rendered {
             rendered_into_replacement = texture
                 .read_rgba()
                 .unwrap()
@@ -3422,7 +3422,7 @@ fn sustained_render_loop_outlasts_the_graphics_queue_depth() {
         let _ = runtime.pump(Some(Duration::ZERO));
         while let Ok(Some(event)) = runtime.poll_event() {
             if event.event_type == RuntimeEventType::MapRenderUpdateAvailable
-                && session.render_update().unwrap()
+                && session.render_update().unwrap() == RenderResult::Rendered
             {
                 rendered_frames += 1;
             }
@@ -3548,6 +3548,46 @@ fn resize_updates_owned_texture_frame_extent() {
     map.close().unwrap();
     runtime.close().unwrap();
     panic!("timed out waiting for resized owned texture frame");
+}
+
+#[test]
+// A resize leaves the map holding an update built for the previous extent, so
+// the next render reports a pending size until the map catches up.
+fn render_update_reports_size_pending_until_the_map_applies_a_resize() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let (_context, session) = create_owned_texture_session(
+        &map.attach_ref().unwrap(),
+        RenderTargetExtent::new(64, 64, 1.0),
+    )
+    .expect("Metal or Vulkan owned texture test session should attach when supported");
+
+    load_query_style(&runtime, &map, &session);
+    assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
+
+    session.resize(96, 48, 1.0).unwrap();
+    assert_eq!(session.render_update().unwrap(), RenderResult::SizePending);
+
+    // The map publishes an update for the new size on its own thread, so the
+    // state resolves without another host request.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut result = RenderResult::SizePending;
+    while Instant::now() < deadline && result != RenderResult::Rendered {
+        let _ = runtime.pump(Some(Duration::ZERO));
+        while let Ok(Some(_)) = runtime.poll_event() {}
+        result = session.render_update().unwrap();
+        if result != RenderResult::Rendered {
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+    assert_eq!(result, RenderResult::Rendered);
+
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
 }
 
 #[test]
@@ -3700,7 +3740,7 @@ fn a_second_thread_attaches_a_session_and_renders() {
             let deadline = Instant::now() + Duration::from_secs(5);
             let mut rendered = false;
             while Instant::now() < deadline && !rendered {
-                rendered = session.render_update().unwrap();
+                rendered = session.render_update().unwrap() == RenderResult::Rendered;
                 if !rendered {
                     std::thread::sleep(Duration::from_millis(2));
                 }
@@ -3745,11 +3785,11 @@ fn session_calls_are_rejected_on_a_foreign_thread() {
     let kind = std::thread::scope(|scope| {
         scope
             .spawn(move || {
-                let mut rendered = false;
+                let mut result = maplibre_native_ffi_sys::MLN_RENDER_RESULT_NO_UPDATE;
                 // SAFETY: the session is live for the duration of this scope,
                 // and the call is expected to be rejected before it is used.
                 let status = unsafe {
-                    maplibre_native_ffi_sys::mln_render_session_render_update(native, &mut rendered)
+                    maplibre_native_ffi_sys::mln_render_session_render_update(native, &mut result)
                 };
                 maplibre_core::check(status).unwrap_err().kind()
             })
@@ -3831,7 +3871,7 @@ fn acquired_frame_state_rejects_reentrant_session_operations_before_native_calls
 
 #[test]
 // Spec coverage: BND-164.
-fn render_update_without_pending_update_reports_false_and_keeps_session_live() {
+fn render_update_without_pending_update_reports_no_update_and_keeps_session_live() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
@@ -3843,7 +3883,7 @@ fn render_update_without_pending_update_reports_false_and_keeps_session_live() {
     )
     .expect("Metal or Vulkan owned texture test session should attach when supported");
 
-    assert!(!session.render_update().unwrap());
+    assert_eq!(session.render_update().unwrap(), RenderResult::NoUpdate);
 
     session.close().unwrap();
     map.close().unwrap();

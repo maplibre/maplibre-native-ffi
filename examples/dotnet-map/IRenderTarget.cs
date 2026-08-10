@@ -5,6 +5,12 @@ namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal interface IRenderTarget : IDisposable
 {
+    /// <summary>
+    /// Renders the latest map update, and reports whether a frame reached the screen. It reports
+    /// true only for a rendered frame, so the render loop asks for another one when the map has no
+    /// update yet, the map has not applied the session's size yet, or the target had no frame to
+    /// draw into.
+    /// </summary>
     bool Render();
 
     /// <summary>Follows a resized host without detaching the session.</summary>
@@ -144,7 +150,7 @@ internal sealed class OwnedTextureRenderTarget : IRenderTarget
 
     public bool Render()
     {
-        if (!session.RenderUpdate())
+        if (session.RenderUpdate() != RenderResult.Rendered)
         {
             return false;
         }
@@ -258,7 +264,7 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
 
     public bool Render()
     {
-        if (!session.RenderUpdate())
+        if (session.RenderUpdate() != RenderResult.Rendered)
         {
             return false;
         }
@@ -604,7 +610,7 @@ internal sealed class NativeSurfaceRenderTarget : IRenderTarget
 
     public bool Render()
     {
-        return session.RenderUpdate();
+        return session.RenderUpdate() == RenderResult.Rendered;
     }
 
     public void Resize(Viewport viewport)

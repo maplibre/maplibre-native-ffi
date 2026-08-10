@@ -11,6 +11,33 @@ public enum RenderMode : uint
     Full = 1,
 }
 
+/// <summary>
+/// Outcome of a successful render-update call. This is an open domain: a value may have no named
+/// member here, so a switch over it needs a default case. Unknown values keep their raw value.
+/// </summary>
+public enum RenderResult : uint
+{
+    /// <summary>The call rendered a frame into the render target.</summary>
+    Rendered = 0,
+
+    /// <summary>
+    /// The map has no render update yet. Wait for a render-update-available event.
+    /// </summary>
+    NoUpdate = 1,
+
+    /// <summary>
+    /// The map has not applied the session's current size yet. Wait for the next
+    /// render-update-available event.
+    /// </summary>
+    SizePending = 2,
+
+    /// <summary>
+    /// The render target had no frame to draw into. Wait for a host event that changes the render
+    /// target, or back off and retry.
+    /// </summary>
+    TargetNotReady = 3,
+}
+
 /// <summary>Render backend support flags reported by the native library.</summary>
 [Flags]
 public enum RenderBackend : uint

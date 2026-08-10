@@ -73,11 +73,12 @@ final class MetalRenderTarget {
     )
   }
 
-  /// Renders the latest map update, reporting whether a frame was drawn. This
-  /// reports false for a few iterations after attach or resize, because the map
-  /// applies a new logical size on the runtime loop's next pump.
+  /// Renders the latest map update, reporting whether a frame was drawn. For a
+  /// few iterations after attach or resize the session reports a pending size,
+  /// because the map applies a new logical size on the runtime loop's next
+  /// pump.
   func renderUpdate() throws -> Bool {
-    try session.renderUpdate()
+    try session.renderUpdate() == .rendered
   }
 
   func finishFrame() throws {

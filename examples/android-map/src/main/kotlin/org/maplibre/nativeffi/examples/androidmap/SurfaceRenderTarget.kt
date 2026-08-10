@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.examples.androidmap
 
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
+import org.maplibre.nativeffi.render.RenderResult
 import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 
@@ -11,7 +12,7 @@ import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
  */
 internal class SurfaceRenderTarget private constructor(private val session: RenderSessionHandle) :
   AutoCloseable {
-  fun renderUpdate(): Boolean = session.renderUpdate()
+  fun renderUpdate(): Boolean = session.renderUpdate() == RenderResult.RENDERED
 
   /**
    * Follows the host viewport and the surface [graphics] presents through now, keeping the session
