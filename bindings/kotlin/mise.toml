@@ -41,14 +41,25 @@ runtime_backend=
 case "$usage_preset" in
   linux-x64-egl) kotlin_target=linuxX64; runtime_backend=opengl ;;
   linux-x64-vulkan) kotlin_target=linuxX64; runtime_backend=vulkan ;;
+  linux-arm64-egl) kotlin_target=linuxArm64; runtime_backend=opengl ;;
+  linux-arm64-vulkan) kotlin_target=linuxArm64; runtime_backend=vulkan ;;
   macos-arm64-*) kotlin_target=macosArm64 ;;
-  linux-arm64-*|windows-*) kotlin_target= ;;
+  windows-*) kotlin_target= ;;
   *)
     echo "Unsupported Kotlin build preset: $usage_preset" >&2
     exit 2
     ;;
 esac
 gradle_args=(-PmaplibreNativeCInstallDir="build/$usage_preset/install")
+# Kotlin/Native has no Linux arm64 host toolchain, so this target only builds
+# through KLIB cross-compilation from a Linux x64 host.
+if [[ "$kotlin_target" == "linuxArm64" ]]; then
+  if [[ "$(uname -s)" != Linux || "$(uname -m)" != x86_64 ]]; then
+    echo "Linux ARM64 Kotlin/Native KLIBs cross-compile from a Linux x64 host only." >&2
+    exit 2
+  fi
+  gradle_args+=(-Pkotlin.native.enableKlibsCrossCompilation=true)
+fi
 tasks=(:bindings:kotlin:jvmJar)
 if [[ -n "$kotlin_target" ]]; then
   tasks+=(":bindings:kotlin:${kotlin_target}Klib")

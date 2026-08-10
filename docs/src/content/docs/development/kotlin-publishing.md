@@ -74,11 +74,12 @@ link requirements for that target and backend. The final application links the
 archive without acquiring a separate MapLibre Native FFI shared library or
 framework.
 
-The native runtime publications are OpenGL and Vulkan for Linux x64 and macOS
-arm64, plus Metal for macOS arm64, iOS arm64, and the iOS arm64 simulator. Each
-published Kotlin/Native target has a matching runtime variant. Linux arm64 is
-absent because Kotlin/Native has no arm64 Linux host, so that target would have
-to be cross-compiled.
+The native runtime publications are OpenGL and Vulkan for Linux x64, Linux
+arm64, and macOS arm64, plus Metal for macOS arm64, iOS arm64, and the iOS arm64
+simulator. Each published Kotlin/Native target has a matching runtime variant. A
+Linux x64 host cross-compiles the Linux arm64 publications because Kotlin/Native
+does not run on Linux arm64 hosts. Publication compiles and links the arm64 test
+binary without executing it.
 
 The Kotlin/Native Linux toolchain is the tightest consumer of the Linux archive.
 Its sysroot supplies glibc 2.19 and GCC 8.3, and it statically links its own
@@ -166,10 +167,10 @@ Explicit native-library path configuration remains available as an override.
 ## Snapshot publication
 
 Snapshot versions end in `-SNAPSHOT` and publish from the exact commit that
-passed the main CI workflow. A Linux x64 runner builds the Android publications,
-reusing the matrix's CMake install archives to build only the JNI bridge and
-final AARs, while macOS runners build the JVM, macOS, and iOS publications. Each
-consumes native build artifacts produced by the platform and backend CI matrix.
+passed the main CI workflow. A Linux x64 runner builds the Android and Linux
+publications, cross-compiling and linking the Linux arm64 Kotlin suite. A macOS
+runner builds the JVM, macOS, and iOS publications. Each consumes native build
+artifacts produced by the platform and backend CI matrix.
 
 A daily schedule drives publication rather than each push to `main`: the Publish
 snapshots workflow picks the latest successful CI run on `main` and publishes

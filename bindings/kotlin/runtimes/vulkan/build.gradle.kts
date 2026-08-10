@@ -19,6 +19,7 @@ val packagedAndroidRuntimeLibs =
 kotlin {
   jvm { compilerOptions { jvmTarget.set(JvmTarget.fromTarget(libs.versions.java.release.get())) } }
 
+  linuxArm64()
   linuxX64()
   macosArm64()
 
