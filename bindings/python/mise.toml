@@ -77,14 +77,25 @@ MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
 
 [tasks.test]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = ":_install-extension", args = ["{{usage.preset}}"] }]
 run = '''
+if [[ "$usage_preset" == android-* ]]; then
+  exec mise run :_test-android "$usage_preset"
+fi
+mise run :_install-extension "$usage_preset"
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   uv run --project . --no-sync python -m pytest
 '''
 run_windows = '''
+mise run :_install-extension "$usage_preset"
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
   uv run --project . --no-sync python -m pytest
 '''
+
+[tasks._test-android]
+hide = true
+usage = 'arg "<preset>"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+tools = { "core:java" = "temurin-21.0.11+10.0.LTS" }
+run = '"$MISE_MONOREPO_ROOT/scripts/test-python-android-device.sh" "$usage_preset"'

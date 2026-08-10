@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Self
 
-if sys.platform != "darwin":
+if sys.platform not in {"android", "darwin"}:
     # These fixtures render into pbuffers and never present, so they need the
     # surfaceless platform. EGL_DEFAULT_DISPLAY resolves to whatever libEGL was
     # built for, commonly x11, which fails to initialize with no display server.
@@ -15,8 +15,10 @@ if sys.platform != "darwin":
     # Mesa reads on the first EGL call is the only route.
     os.environ.setdefault("EGL_PLATFORM", "surfaceless")
 
-if sys.platform == "darwin":
+if sys.platform in {"android", "darwin"}:
     os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
+
+if sys.platform == "darwin":
     _cdll = ctypes.CDLL
 
     class _MacAngleCDLL(_cdll):  # type: ignore[misc]
