@@ -26,18 +26,12 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_render_session_dump_debug_logs([NativeTypeName("mln_render_session")] MlnRenderSession session);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_set_feature_state([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_feature_state_selector *")] mln_feature_state_selector* selector, [NativeTypeName("const mln_json_value *")] mln_json_value* state);
+        public static extern mln_status mln_render_session_set_feature_state([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_feature_state_selector *")] mln_feature_state_selector* selector, mln_buffer_view state);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_get_feature_state([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_feature_state_selector *")] mln_feature_state_selector* selector, [NativeTypeName("mln_json_snapshot *")] MlnJsonSnapshot* out_state);
+        public static extern mln_status mln_render_session_get_feature_state([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_feature_state_selector *")] mln_feature_state_selector* selector, [NativeTypeName("mln_buffer *")] MlnBuffer* out_state);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_render_session_remove_feature_state([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_feature_state_selector *")] mln_feature_state_selector* selector);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_json_snapshot_get([NativeTypeName("mln_json_snapshot")] MlnJsonSnapshot snapshot, [NativeTypeName("const mln_json_value **")] mln_json_value** out_value);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void mln_json_snapshot_destroy([NativeTypeName("mln_json_snapshot")] MlnJsonSnapshot snapshot);
     }
 }

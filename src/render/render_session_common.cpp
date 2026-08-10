@@ -20,6 +20,7 @@
 #include <mbgl/renderer/query.hpp>
 #include <mbgl/renderer/renderer.hpp>
 #include <mbgl/renderer/update_parameters.hpp>
+#include <mbgl/style/conversion/stringify.hpp>
 #include <mbgl/style/filter.hpp>
 #include <mbgl/util/feature.hpp>
 #include <mbgl/util/geo.hpp>
@@ -28,8 +29,13 @@
 #include <mbgl/util/size.hpp>
 #include <mbgl/util/string.hpp>
 
+#include <mapbox/geojson/rapidjson.hpp>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
+
 #include "render/render_session_common.hpp"
 
+#include "bytes/buffer.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "geojson/geojson.hpp"
 #include "handles/handle_table.hpp"
@@ -38,20 +44,6 @@
 #include "style/style_value.hpp"
 
 namespace mln::core {
-
-struct OwnedQueriedFeatureDescriptor {
-  mln_queried_feature queried{};
-  mln_feature feature{};
-  std::unique_ptr<OwnedGeometryDescriptor> geometry;
-  std::vector<std::string> property_keys;
-  std::vector<std::unique_ptr<OwnedJsonDescriptor>> property_values;
-  std::vector<mln_json_value> property_value_roots;
-  std::vector<mln_json_member> properties;
-  std::string identifier_string;
-  std::string source_id;
-  std::string source_layer_id;
-  std::unique_ptr<OwnedJsonDescriptor> state;
-};
 
 auto render_target_extent_physical_size(
   const mln_render_target_extent* extent, uint32_t* out_width,
@@ -349,29 +341,6 @@ struct HandleTraits<mln_render_session_object> {
   static constexpr auto leasable = false;
 };
 
-struct FeatureQueryResultObject {
-  std::vector<std::unique_ptr<OwnedQueriedFeatureDescriptor>> features;
-};
-
-struct FeatureExtensionResultObject {
-  mln_feature_extension_result_info info{};
-  std::unique_ptr<OwnedJsonDescriptor> value;
-  std::vector<std::unique_ptr<OwnedQueriedFeatureDescriptor>> features;
-  std::vector<mln_feature> feature_roots;
-};
-
-template <>
-struct HandleTraits<FeatureQueryResultObject> {
-  static constexpr auto kind = HandleKind::FeatureQueryResult;
-  static constexpr auto leasable = false;
-};
-
-template <>
-struct HandleTraits<FeatureExtensionResultObject> {
-  static constexpr auto kind = HandleKind::FeatureExtensionResult;
-  static constexpr auto leasable = false;
-};
-
 }  // namespace mln::core
 
 namespace {
@@ -432,7 +401,7 @@ constexpr uint32_t feature_state_selector_known_fields =
   MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID |
   MLN_FEATURE_STATE_SELECTOR_FEATURE_ID | MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
 
-auto validate_string_view(mln_string_view string) -> bool {
+auto validate_string_view(mln_buffer_view string) -> bool {
   if (string.size > 0 && string.data == nullptr) {
     mln::core::set_thread_error("string data must not be null");
     return false;
@@ -441,7 +410,7 @@ auto validate_string_view(mln_string_view string) -> bool {
 }
 
 auto validate_string_views(
-  std::span<const mln_string_view> strings, const char* name
+  std::span<const mln_buffer_view> strings, const char* name
 ) -> bool {
   return std::ranges::all_of(strings, [name](const auto string) -> bool {
     if (!validate_string_view(string)) {
@@ -456,17 +425,11 @@ auto validate_string_views(
   });
 }
 
-auto string_from_view(mln_string_view string) -> std::string {
+auto string_from_view(mln_buffer_view string) -> std::string {
   if (string.size == 0) {
     return {};
   }
-  return std::string{string.data, string.size};
-}
-
-auto string_view_from_string(const std::string& string) -> mln_string_view {
-  return mln_string_view{
-    .data = string.empty() ? nullptr : string.data(), .size = string.size()
-  };
+  return std::string{static_cast<const char*>(string.data), string.size};
 }
 
 auto validate_screen_point(mln_screen_point point) -> bool {
@@ -490,7 +453,7 @@ auto validate_result_output(Handle* out_result) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto make_string_vector(std::span<const mln_string_view> strings)
+auto make_string_vector(std::span<const mln_buffer_view> strings)
   -> std::vector<std::string> {
   auto result = std::vector<std::string>{};
   result.reserve(strings.size());
@@ -567,7 +530,7 @@ auto validate_feature_state_selector(
 
 auto optional_selector_string(
   const mln_feature_state_selector& selector, uint32_t field,
-  mln_string_view value
+  mln_buffer_view value
 ) -> std::optional<std::string> {
   if (!selector_has_field(selector, field)) {
     return std::nullopt;
@@ -607,7 +570,7 @@ auto to_rendered_query_options(
       mln::core::set_thread_error("query layer IDs must not be null");
       return std::nullopt;
     }
-    auto views = std::span<const mln_string_view>{
+    auto views = std::span<const mln_buffer_view>{
       options->layer_ids, options->layer_id_count
     };
     if (!validate_string_views(views, "query layer IDs")) {
@@ -653,7 +616,7 @@ auto to_source_query_options(const mln_source_feature_query_options* options)
       mln::core::set_thread_error("query source layer IDs must not be null");
       return std::nullopt;
     }
-    auto views = std::span<const mln_string_view>{
+    auto views = std::span<const mln_buffer_view>{
       options->source_layer_ids, options->source_layer_id_count
     };
     if (!validate_string_views(views, "query source layer IDs")) {
@@ -720,119 +683,55 @@ auto clip_screen_box_to_viewport(
   };
 }
 
-auto feature_identifier_type(
-  const mbgl::FeatureIdentifier& identifier,
-  mln::core::OwnedQueriedFeatureDescriptor& storage
-) -> uint32_t {
-  if (identifier.is<mbgl::NullValue>()) {
-    return MLN_FEATURE_IDENTIFIER_TYPE_NULL;
-  }
-  if (identifier.is<uint64_t>()) {
-    storage.feature.identifier.uint_value = identifier.get<uint64_t>();
-    return MLN_FEATURE_IDENTIFIER_TYPE_UINT;
-  }
-  if (identifier.is<int64_t>()) {
-    storage.feature.identifier.int_value = identifier.get<int64_t>();
-    return MLN_FEATURE_IDENTIFIER_TYPE_INT;
-  }
-  if (identifier.is<double>()) {
-    storage.feature.identifier.double_value = identifier.get<double>();
-    return MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE;
-  }
-  storage.identifier_string = identifier.get<std::string>();
-  storage.feature.identifier.string_value =
-    string_view_from_string(storage.identifier_string);
-  return MLN_FEATURE_IDENTIFIER_TYPE_STRING;
-}
-
-auto make_queried_feature(
-  const mbgl::Feature& feature, const std::optional<std::string>& source_id
-) -> std::unique_ptr<mln::core::OwnedQueriedFeatureDescriptor> {
-  auto result = std::make_unique<mln::core::OwnedQueriedFeatureDescriptor>();
-  result->geometry = mln::core::to_c_geometry(feature.geometry);
-  result->property_keys.reserve(feature.properties.size());
-  result->property_values.reserve(feature.properties.size());
-  result->property_value_roots.reserve(feature.properties.size());
-  result->properties.reserve(feature.properties.size());
-  for (const auto& [key, value] : feature.properties) {
-    result->property_keys.emplace_back(key);
-    result->property_values.emplace_back(mln::core::to_c_json_value(value));
-  }
-  for (std::size_t index = 0; index < result->property_values.size(); ++index) {
-    result->property_value_roots.emplace_back(
-      result->property_values.at(index)->root
-    );
-    result->properties.emplace_back(
-      mln_json_member{
-        .key = string_view_from_string(result->property_keys.at(index)),
-        .value = &result->property_value_roots.back()
-      }
-    );
-  }
-
-  result->feature = mln_feature{
-    .size = sizeof(mln_feature),
-    .geometry = &result->geometry->root,
-    .properties =
-      result->properties.empty() ? nullptr : result->properties.data(),
-    .property_count = result->properties.size(),
-    .identifier_type = MLN_FEATURE_IDENTIFIER_TYPE_NULL,
-    .identifier = {.uint_value = 0}
-  };
-  result->feature.identifier_type =
-    feature_identifier_type(feature.id, *result);
-
-  result->queried = mln_queried_feature{
-    .size = sizeof(mln_queried_feature),
-    .fields = 0,
-    .feature = result->feature,
-    .source_id = {},
-    .source_layer_id = {},
-    .state = nullptr
-  };
-  result->source_id =
-    feature.source.empty() && source_id ? *source_id : feature.source;
-  if (!result->source_id.empty()) {
-    result->queried.fields |= MLN_QUERIED_FEATURE_SOURCE_ID;
-    result->queried.source_id = string_view_from_string(result->source_id);
-  }
-  result->source_layer_id = feature.sourceLayer;
-  if (!result->source_layer_id.empty()) {
-    result->queried.fields |= MLN_QUERIED_FEATURE_SOURCE_LAYER_ID;
-    result->queried.source_layer_id =
-      string_view_from_string(result->source_layer_id);
-  }
-  if (!feature.state.empty()) {
-    result->state = mln::core::to_c_json_value(mbgl::Value{feature.state});
-    result->queried.fields |= MLN_QUERIED_FEATURE_STATE;
-    result->queried.state = &result->state->root;
-  }
-  return result;
-}
-
 auto create_feature_query_result(
   std::vector<mbgl::Feature> features,
-  const std::optional<std::string>& source_id,
-  mln_feature_query_result* out_result
+  const std::optional<std::string>& source_id, mln_buffer* out_result
 ) -> mln_status {
   const auto output_status = validate_result_output(out_result);
   if (output_status != MLN_STATUS_OK) {
     return output_status;
   }
 
-  auto result = std::make_shared<mln::core::FeatureQueryResultObject>();
-  result->features.reserve(features.size());
+  auto buffer = rapidjson::StringBuffer{};
+  auto writer = rapidjson::Writer<rapidjson::StringBuffer>{buffer};
+  writer.StartArray();
   for (const auto& feature : features) {
-    result->features.emplace_back(make_queried_feature(feature, source_id));
-  }
-  *out_result =
-    mln::core::handle_table<mln::core::FeatureQueryResultObject>().insert(
-      std::move(result)
+    writer.StartObject();
+    writer.Key("feature");
+    auto allocator = mapbox::geojson::rapidjson_allocator{};
+    auto feature_json = mapbox::geojson::convert(
+      static_cast<const mbgl::GeoJSONFeature&>(feature), allocator
     );
-  return MLN_STATUS_OK;
+    feature_json.Accept(writer);
+    const auto effective_source_id =
+      feature.source.empty() && source_id ? *source_id : feature.source;
+    if (!effective_source_id.empty()) {
+      writer.Key("sourceId");
+      writer.String(
+        effective_source_id.data(),
+        static_cast<rapidjson::SizeType>(effective_source_id.size())
+      );
+    }
+    if (!feature.sourceLayer.empty()) {
+      writer.Key("sourceLayerId");
+      writer.String(
+        feature.sourceLayer.data(),
+        static_cast<rapidjson::SizeType>(feature.sourceLayer.size())
+      );
+    }
+    if (!feature.state.empty()) {
+      writer.Key("state");
+      mbgl::style::conversion::stringify(writer, mbgl::Value{feature.state});
+    }
+    writer.EndObject();
+  }
+  writer.EndArray();
+  return mln::core::create_buffer(
+    std::string{buffer.GetString(), buffer.GetSize()}, out_result
+  );
 }
 
-auto validate_non_empty_string(mln_string_view string, const char* name)
+auto validate_non_empty_string(mln_buffer_view string, const char* name)
   -> bool {
   if (!validate_string_view(string)) {
     return false;
@@ -845,12 +744,12 @@ auto validate_non_empty_string(mln_string_view string, const char* name)
   return true;
 }
 
-auto to_feature_extension_arguments(const mln_json_value* arguments)
+auto to_feature_extension_arguments(const mln_buffer_view* arguments)
   -> std::optional<std::optional<std::map<std::string, mbgl::Value>>> {
   if (arguments == nullptr) {
     return std::optional<std::map<std::string, mbgl::Value>>{std::nullopt};
   }
-  auto converted = mln::core::to_native_json_value(arguments);
+  auto converted = mln::core::to_native_json_value(*arguments);
   if (!converted) {
     return std::nullopt;
   }
@@ -868,76 +767,23 @@ auto to_feature_extension_arguments(const mln_json_value* arguments)
   return std::optional<std::map<std::string, mbgl::Value>>{std::move(result)};
 }
 
-auto create_feature_extension_value_result(
-  mbgl::Value value, mln_feature_extension_result* out_result
-) -> mln_status {
-  const auto output_status = validate_result_output(out_result);
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
-
-  auto result = std::make_shared<mln::core::FeatureExtensionResultObject>();
-  result->value = mln::core::to_c_json_value(value);
-  result->info = mln_feature_extension_result_info{
-    .size = sizeof(mln_feature_extension_result_info),
-    .type = MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE,
-    .data = {.value = &result->value->root}
-  };
-  *out_result =
-    mln::core::handle_table<mln::core::FeatureExtensionResultObject>().insert(
-      std::move(result)
-    );
-  return MLN_STATUS_OK;
-}
-
-auto create_feature_extension_collection_result(
-  mbgl::FeatureCollection features, mln_feature_extension_result* out_result
-) -> mln_status {
-  const auto output_status = validate_result_output(out_result);
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
-
-  auto result = std::make_shared<mln::core::FeatureExtensionResultObject>();
-  result->features.reserve(features.size());
-  result->feature_roots.reserve(features.size());
-  for (const auto& feature : features) {
-    result->features.emplace_back(
-      make_queried_feature(mbgl::Feature{feature}, std::nullopt)
-    );
-  }
-  for (const auto& feature : result->features) {
-    result->feature_roots.emplace_back(feature->feature);
-  }
-  result->info = mln_feature_extension_result_info{
-    .size = sizeof(mln_feature_extension_result_info),
-    .type = MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION,
-    .data = {
-      .feature_collection = {
-        .features = result->feature_roots.empty()
-                      ? nullptr
-                      : result->feature_roots.data(),
-        .feature_count = result->feature_roots.size()
-      }
-    }
-  };
-  *out_result =
-    mln::core::handle_table<mln::core::FeatureExtensionResultObject>().insert(
-      std::move(result)
-    );
-  return MLN_STATUS_OK;
-}
-
 auto create_feature_extension_result(
-  mbgl::FeatureExtensionValue value, mln_feature_extension_result* out_result
+  mbgl::FeatureExtensionValue value, mln_buffer* out_result
 ) -> mln_status {
+  const auto output_status = validate_result_output(out_result);
+  if (output_status != MLN_STATUS_OK) {
+    return output_status;
+  }
   if (value.is<mbgl::Value>()) {
-    return create_feature_extension_value_result(
-      std::move(value.get<mbgl::Value>()), out_result
+    return mln::core::create_buffer(
+      mln::core::serialize_json_value(value.get<mbgl::Value>()), out_result
     );
   }
-  return create_feature_extension_collection_result(
-    std::move(value.get<mbgl::FeatureCollection>()), out_result
+  return mln::core::create_buffer(
+    mln::core::serialize_feature_collection(
+      value.get<mbgl::FeatureCollection>()
+    ),
+    out_result
   );
 }
 
@@ -1528,7 +1374,7 @@ auto render_session_dump_debug_logs(mln_render_session session) -> mln_status {
 
 auto render_session_set_feature_state(
   mln_render_session session, const mln_feature_state_selector* selector,
-  const mln_json_value* state
+  mln_buffer_view state
 ) -> mln_status {
   mln_render_session_object* live = nullptr;
   const auto status = validate_live_attached_render_session(session, live);
@@ -1570,7 +1416,7 @@ auto render_session_set_feature_state(
 
 auto render_session_get_feature_state(
   mln_render_session session, const mln_feature_state_selector* selector,
-  mln_json_snapshot* out_state
+  mln_buffer* out_state
 ) -> mln_status {
   mln_render_session_object* live = nullptr;
   const auto status = validate_live_attached_render_session(session, live);
@@ -1597,7 +1443,9 @@ auto render_session_get_feature_state(
     feature_state_source_layer(*selector),
     string_from_view(selector->feature_id)
   );
-  return json_snapshot_create(mbgl::Value{std::move(state)}, out_state);
+  return create_buffer(
+    serialize_json_value(mbgl::Value{std::move(state)}), out_state
+  );
 }
 
 auto render_session_remove_feature_state(
@@ -1638,8 +1486,7 @@ auto render_session_remove_feature_state(
 
 auto render_session_query_rendered_features(
   mln_render_session session, const mln_rendered_query_geometry* geometry,
-  const mln_rendered_feature_query_options* options,
-  mln_feature_query_result* out_result
+  const mln_rendered_feature_query_options* options, mln_buffer* out_result
 ) -> mln_status {
   mln_render_session_object* live = nullptr;
   const auto status = validate_live_attached_render_session(session, live);
@@ -1731,9 +1578,8 @@ auto render_session_query_rendered_features(
 }
 
 auto render_session_query_source_features(
-  mln_render_session session, mln_string_view source_id,
-  const mln_source_feature_query_options* options,
-  mln_feature_query_result* out_result
+  mln_render_session session, mln_buffer_view source_id,
+  const mln_source_feature_query_options* options, mln_buffer* out_result
 ) -> mln_status {
   mln_render_session_object* live = nullptr;
   const auto status = validate_live_attached_render_session(session, live);
@@ -1774,10 +1620,10 @@ auto render_session_query_source_features(
 }
 
 auto render_session_query_feature_extensions(
-  mln_render_session session, mln_string_view source_id,
-  const mln_feature* feature, mln_string_view extension,
-  mln_string_view extension_field, const mln_json_value* arguments,
-  mln_feature_extension_result* out_result
+  mln_render_session session, mln_buffer_view source_id,
+  mln_buffer_view feature, mln_buffer_view extension,
+  mln_buffer_view extension_field, const mln_buffer_view* arguments,
+  mln_buffer* out_result
 ) -> mln_status {
   mln_render_session_object* live = nullptr;
   const auto status = validate_live_attached_render_session(session, live);
@@ -1819,87 +1665,6 @@ auto render_session_query_feature_extensions(
     string_from_view(extension_field), std::move(*native_arguments)
   );
   return create_feature_extension_result(std::move(result), out_result);
-}
-
-auto feature_query_result_count(
-  mln_feature_query_result result, std::size_t* out_count
-) -> mln_status {
-  if (out_count == nullptr) {
-    set_thread_error("out_count must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  // Query results carry no thread affinity, so another thread may destroy one
-  // mid-read. The lock spans the read for that reason.
-  auto& table = handle_table<FeatureQueryResultObject>();
-  const std::scoped_lock lock(table.mutex());
-  const auto* live_result = table.resolve_locked(result);
-  if (live_result == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_count = live_result->features.size();
-  return MLN_STATUS_OK;
-}
-
-auto feature_query_result_get(
-  mln_feature_query_result result, std::size_t index,
-  mln_queried_feature* out_feature
-) -> mln_status {
-  if (out_feature == nullptr) {
-    set_thread_error("out_feature must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_feature->size < sizeof(mln_queried_feature)) {
-    set_thread_error("mln_queried_feature.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto& table = handle_table<FeatureQueryResultObject>();
-  const std::scoped_lock lock(table.mutex());
-  const auto* live_result = table.resolve_locked(result);
-  if (live_result == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (index >= live_result->features.size()) {
-    set_thread_error("index is out of range");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_feature = live_result->features.at(index)->queried;
-  return MLN_STATUS_OK;
-}
-
-auto feature_query_result_destroy(mln_feature_query_result result) -> void {
-  static_cast<void>(handle_table<FeatureQueryResultObject>().remove(result));
-}
-
-auto feature_extension_result_get(
-  mln_feature_extension_result result,
-  mln_feature_extension_result_info* out_info
-) -> mln_status {
-  if (out_info == nullptr) {
-    set_thread_error("out_info must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_info->size < sizeof(mln_feature_extension_result_info)) {
-    set_thread_error("mln_feature_extension_result_info.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto& table = handle_table<FeatureExtensionResultObject>();
-  const std::scoped_lock lock(table.mutex());
-  const auto* live_result = table.resolve_locked(result);
-  if (live_result == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_info = live_result->info;
-  return MLN_STATUS_OK;
-}
-
-auto feature_extension_result_destroy(mln_feature_extension_result result)
-  -> void {
-  static_cast<void>(
-    handle_table<FeatureExtensionResultObject>().remove(result)
-  );
 }
 
 }  // namespace mln::core

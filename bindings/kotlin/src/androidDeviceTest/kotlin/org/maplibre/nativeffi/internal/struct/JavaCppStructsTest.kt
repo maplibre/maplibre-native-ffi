@@ -8,16 +8,11 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
-import org.maplibre.nativeffi.geo.Feature
-import org.maplibre.nativeffi.geo.FeatureIdentifier
-import org.maplibre.nativeffi.geo.GeoJson
-import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.javacpp.JavaCppStructs
-import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.map.ConstrainMode
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
@@ -92,33 +87,6 @@ class JavaCppStructsTest {
   }
 
   @Test
-  fun jsonGeometryFeatureAndGeoJsonDescriptorsPreserveTagsAndValues() {
-    val json =
-      JsonValue.ObjectValue(
-        listOf(
-          JsonValue.Member("key", JsonValue.Int(-1)),
-          JsonValue.Member("key", JsonValue.UInt(-1)),
-          JsonValue.Member("nested", JsonValue.Array(listOf(JsonValue.Bool(true), JsonValue.Null))),
-        )
-      )
-    assertEquals(json, JavaCppStructs.jsonRoundTrip(json))
-
-    val geometry = Geometry.LineString(listOf(LatLng(1.0, 2.0), LatLng(3.0, 4.0)))
-    assertEquals(geometry, JavaCppStructs.geometryRoundTrip(geometry))
-    val feature =
-      Feature(
-        geometry,
-        listOf(JsonValue.Member("name", JsonValue.StringValue("road"))),
-        FeatureIdentifier.UInt(-1),
-      )
-    assertEquals(feature, JavaCppStructs.featureRoundTrip(feature))
-    assertNotEquals(
-      JavaCppStructs.geoJsonType(GeoJson.GeometryValue(geometry)),
-      JavaCppStructs.geoJsonType(GeoJson.FeatureValue(feature)),
-    )
-  }
-
-  @Test
   fun queryGeometryMaterializesEveryDiscriminator() {
     val point =
       JavaCppStructs.renderedQueryGeometryType(RenderedQueryGeometry.Point(ScreenPoint(1.0, 2.0)))
@@ -131,7 +99,11 @@ class JavaCppStructsTest {
         RenderedQueryGeometry.LineString(listOf(ScreenPoint(1.0, 2.0), ScreenPoint(3.0, 4.0)))
       )
     assertEquals(3, setOf(point, box, line).size)
-    assertEquals(1, JavaCppStructs.featureQueryCleanupAfterCopyFailure())
+  }
+
+  @Test
+  fun ownedBufferIsDestroyedAfterCopyFailure() {
+    assertEquals(1, JavaCppStructs.ownedBufferCleanupAfterCopyFailure())
   }
 
   @Test

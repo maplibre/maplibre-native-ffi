@@ -50,13 +50,13 @@ import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENC
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TRANSITION_OPTION_DELAY
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TRANSITION_OPTION_DURATION
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
+import org.maplibre.nativeffi.internal.c.mln_buffer_view
 import org.maplibre.nativeffi.internal.c.mln_canonical_tile_id
 import org.maplibre.nativeffi.internal.c.mln_geojson_source_options
 import org.maplibre.nativeffi.internal.c.mln_geojson_source_options_default
 import org.maplibre.nativeffi.internal.c.mln_image_stretch
 import org.maplibre.nativeffi.internal.c.mln_premultiplied_rgba8_image
 import org.maplibre.nativeffi.internal.c.mln_premultiplied_rgba8_image_default
-import org.maplibre.nativeffi.internal.c.mln_string_view
 import org.maplibre.nativeffi.internal.c.mln_style_id_list_count
 import org.maplibre.nativeffi.internal.c.mln_style_id_list_destroy
 import org.maplibre.nativeffi.internal.c.mln_style_id_list_get
@@ -313,9 +313,9 @@ internal object StyleStructs {
       native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
       native.cluster_max_zoom = it
     }
-    value.clusterProperties?.let {
+    value.clusterPropertiesTransit?.let {
       native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
-      native.cluster_properties = ValueStructs.jsonValue(it, scope)
+      ByteStructs.setBufferView(native.cluster_properties, it, scope)
     }
     value.tileSize?.let {
       native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
@@ -348,9 +348,9 @@ internal object StyleStructs {
     return native.ptr
   }
 
-  fun stringViewArray(values: List<String>, scope: MemScope): CPointer<mln_string_view>? {
+  fun stringViewArray(values: List<String>, scope: MemScope): CPointer<mln_buffer_view>? {
     if (values.isEmpty()) return null
-    val array = scope.allocArray<mln_string_view>(values.size)
+    val array = scope.allocArray<mln_buffer_view>(values.size)
     values.forEachIndexed { index, value -> CoreStructs.setStringView(array[index], value, scope) }
     return array
   }
@@ -366,7 +366,7 @@ internal object StyleStructs {
   fun styleIdList(
     list: ULong,
     counter: (ULong, CPointer<ULongVar>) -> Int,
-    getter: (ULong, ULong, CPointer<mln_string_view>) -> Int,
+    getter: (ULong, ULong, CPointer<mln_buffer_view>) -> Int,
     destroyer: (ULong) -> Unit,
   ): List<String> =
     try {
@@ -374,7 +374,7 @@ internal object StyleStructs {
         val outCount = alloc<ULongVar>()
         Status.check(counter(list, outCount.ptr))
         List(checkedInt(outCount.value, "style id count")) { index ->
-          val outId = alloc<mln_string_view>()
+          val outId = alloc<mln_buffer_view>()
           Status.check(getter(list, index.toULong(), outId.ptr))
           CoreStructs.stringView(outId)
         }
@@ -394,7 +394,7 @@ internal object StyleStructs {
   fun styleStringList(
     list: ULong,
     counter: (ULong, CPointer<ULongVar>) -> Int,
-    getter: (ULong, ULong, CPointer<mln_string_view>) -> Int,
+    getter: (ULong, ULong, CPointer<mln_buffer_view>) -> Int,
     destroyer: (ULong) -> Unit,
   ): List<String> = styleIdList(list, counter, getter, destroyer)
 

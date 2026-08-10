@@ -6,8 +6,7 @@ use maplibre_native_ffi_sys as sys;
 use crate::enums::{
     RasterDemEncoding, SourceType, StyleImageTextFit, TileScheme, VectorTileEncoding,
 };
-use crate::json::{JsonValue, NativeJsonValue, json_value_try_to_native};
-use crate::string::{StringView, string_view};
+use crate::string::{StringView, buffer_view, string_view};
 use crate::values::{
     LatLngBounds, PremultipliedRgba8Image, StyleImageInfo, TextureImageInfo,
     lat_lng_bounds_from_native, lat_lng_bounds_to_native,
@@ -107,7 +106,7 @@ pub struct GeoJsonSourceOptions {
     pub cluster_max_zoom: Option<f64>,
     /// Cluster aggregation expressions keyed by property name, as a JSON object
     /// whose members follow the MapLibre Style Spec `clusterProperties` form.
-    pub cluster_properties: Option<JsonValue>,
+    pub cluster_properties: Option<Vec<u8>>,
     pub tile_size: Option<u32>,
     pub buffer: Option<u32>,
     pub cluster_radius: Option<u32>,
@@ -127,8 +126,7 @@ impl GeoJsonSourceOptions {
 
 pub struct NativeGeoJsonSourceOptions {
     raw: sys::mln_geojson_source_options,
-    _cluster_properties: Option<NativeJsonValue>,
-    _cluster_properties_raw: Option<Box<sys::mln_json_value>>,
+    _cluster_properties: Option<Vec<u8>>,
 }
 
 impl NativeGeoJsonSourceOptions {
@@ -151,17 +149,10 @@ impl NativeGeoJsonSourceOptions {
             raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
             raw.cluster_max_zoom = value;
         }
-        let cluster_properties = options
-            .cluster_properties
-            .as_ref()
-            .map(json_value_try_to_native)
-            .transpose()?;
-        let cluster_properties_raw = cluster_properties
-            .as_ref()
-            .map(|properties| Box::new(*properties.as_ref()));
-        if let Some(properties) = &cluster_properties_raw {
+        let cluster_properties = options.cluster_properties.clone();
+        if let Some(properties) = cluster_properties.as_deref() {
             raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
-            raw.cluster_properties = properties.as_ref();
+            raw.cluster_properties = buffer_view(properties);
         }
         if let Some(value) = options.tile_size {
             raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE;
@@ -194,7 +185,6 @@ impl NativeGeoJsonSourceOptions {
         Ok(Self {
             raw,
             _cluster_properties: cluster_properties,
-            _cluster_properties_raw: cluster_properties_raw,
         })
     }
 
@@ -216,7 +206,7 @@ pub fn geojson_source_options_to_native(
 }
 
 pub struct NativeTileUrls<'a> {
-    raw_tiles: Vec<sys::mln_string_view>,
+    raw_tiles: Vec<sys::mln_buffer_view>,
     _tile_views: Vec<StringView<'a>>,
 }
 
@@ -233,7 +223,7 @@ impl<'a> NativeTileUrls<'a> {
         }
     }
 
-    pub fn as_ptr(&self) -> *const sys::mln_string_view {
+    pub fn as_ptr(&self) -> *const sys::mln_buffer_view {
         crate::ptr::const_ptr_or_null(&self.raw_tiles)
     }
 
@@ -679,7 +669,7 @@ pub unsafe fn copy_style_id_list(handle: sys::mln_style_id_list) -> crate::Resul
 
     let mut ids = Vec::with_capacity(count);
     for index in 0..count {
-        let mut view = sys::mln_string_view {
+        let mut view = sys::mln_buffer_view {
             data: ptr::null(),
             size: 0,
         };
@@ -709,7 +699,7 @@ pub unsafe fn copy_style_string_list(
 
     let mut values = Vec::with_capacity(count);
     for index in 0..count {
-        let mut view = sys::mln_string_view {
+        let mut view = sys::mln_buffer_view {
             data: ptr::null(),
             size: 0,
         };
@@ -788,17 +778,15 @@ mod tests {
             std::mem::size_of::<sys::mln_geojson_source_options>() as u32
         );
         assert_eq!(default_raw.fields, 0);
-        assert!(default_raw.cluster_properties.is_null());
+        assert_eq!(default_raw.cluster_properties.size, 0);
+        assert!(default_raw.cluster_properties.data.is_null());
 
         let options = GeoJsonSourceOptions {
             min_zoom: Some(0.0),
             max_zoom: Some(14.0),
             tolerance: Some(0.5),
             cluster_max_zoom: Some(12.0),
-            cluster_properties: Some(JsonValue::Object(vec![crate::json::JsonMember::new(
-                "sum",
-                JsonValue::String("+".into()),
-            )])),
+            cluster_properties: Some(br#"{"sum":"+"}"#.to_vec()),
             tile_size: Some(256),
             buffer: Some(64),
             cluster_radius: Some(60),
@@ -838,9 +826,8 @@ mod tests {
         assert!(!raw.line_metrics);
         assert!(raw.cluster);
         assert!(raw.synchronous_update);
-        // SAFETY: native keeps the cluster properties descriptor graph alive for
-        // this scope.
-        let copied = unsafe { crate::json::json_value_from_native(&*raw.cluster_properties) }
+        // SAFETY: native keeps the cluster-properties buffer alive for this scope.
+        let copied = unsafe { crate::string::copy_string_view_bytes(raw.cluster_properties) }
             .expect("cluster properties should copy back");
         assert_eq!(copied, options.cluster_properties.unwrap());
     }

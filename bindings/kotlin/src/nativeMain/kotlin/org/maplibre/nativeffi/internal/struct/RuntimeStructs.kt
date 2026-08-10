@@ -284,7 +284,7 @@ internal object RuntimeStructs {
           sizeOf<org.maplibre.nativeffi.internal.c.mln_offline_geometry_region_definition>()
             .toUInt()
         native.data.geometry.style_url = MemoryUtil.cString(scope, value.styleUrl)
-        native.data.geometry.geometry = ValueStructs.geometry(value.geometry, scope)
+        ByteStructs.setBufferView(native.data.geometry.geometry, value.geometryTransit, scope)
         native.data.geometry.min_zoom = value.minZoom
         native.data.geometry.max_zoom = value.maxZoom
         native.data.geometry.pixel_ratio = value.pixelRatio
@@ -361,7 +361,7 @@ internal object RuntimeStructs {
         val definition = value.data.geometry
         OfflineRegionDefinition.GeometryRegion(
           definition.style_url?.toKString() ?: "",
-          ValueStructs.geometrySnapshot(definition.geometry),
+          ByteStructs.copyBufferView(definition.geometry),
           definition.min_zoom,
           definition.max_zoom,
           definition.pixel_ratio,

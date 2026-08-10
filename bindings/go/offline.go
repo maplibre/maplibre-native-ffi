@@ -44,7 +44,7 @@ func (definition OfflineTilePyramidRegionDefinition) validate() error {
 // OfflineGeometryRegionDefinition describes a geometry offline region.
 type OfflineGeometryRegionDefinition struct {
 	StyleURL          string
-	Geometry          Geometry
+	Geometry          []byte
 	MinZoom           float64
 	MaxZoom           float64
 	PixelRatio        float32
@@ -104,26 +104,20 @@ func (definition cOfflineTilePyramidRegionDefinition) free() {
 }
 
 type cOfflineGeometryRegionDefinition struct {
-	styleURL     unsafe.Pointer
-	materializer *cGeometryMaterializer
-	raw          C.mln_offline_region_definition
+	styleURL unsafe.Pointer
+	geometry cBufferView
+	raw      C.mln_offline_region_definition
 }
 
 func newCOfflineGeometryRegionDefinition(definition OfflineGeometryRegionDefinition) (cOfflineGeometryRegionDefinition, error) {
 	styleURL := C.CString(definition.StyleURL)
-	materializer := newCGeometryMaterializer()
-	geometry, err := materializer.geometryPtr(definition.Geometry)
-	if err != nil {
-		C.free(unsafe.Pointer(styleURL))
-		materializer.free()
-		return cOfflineGeometryRegionDefinition{}, newBindingError(ErrInvalidArgument, err.Error())
-	}
+	geometry := newCBufferView(definition.Geometry)
 	return cOfflineGeometryRegionDefinition{
-		styleURL:     unsafe.Pointer(styleURL),
-		materializer: materializer,
+		styleURL: unsafe.Pointer(styleURL),
+		geometry: geometry,
 		raw: C.mln_go_offline_geometry_region_definition(
 			styleURL,
-			geometry,
+			geometry.raw(),
 			C.double(definition.MinZoom),
 			C.double(definition.MaxZoom),
 			C.float(definition.PixelRatio),
@@ -133,9 +127,7 @@ func newCOfflineGeometryRegionDefinition(definition OfflineGeometryRegionDefinit
 }
 
 func (definition cOfflineGeometryRegionDefinition) free() {
-	if definition.materializer != nil {
-		definition.materializer.free()
-	}
+	definition.geometry.free()
 	C.free(definition.styleURL)
 }
 
@@ -470,9 +462,9 @@ func offlineRegionDefinitionFromC(definition *C.mln_offline_region_definition) (
 		}, nil
 	case uint32(C.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY):
 		geometry := C.mln_go_offline_region_definition_geometry(definition)
-		copiedGeometry, err := cGeometry((*C.mln_geometry)(unsafe.Pointer(geometry.geometry)))
-		if err != nil {
-			return nil, err
+		copiedGeometry, ok := goByteSlice(geometry.geometry.data, geometry.geometry.size)
+		if !ok {
+			return nil, newBindingError(ErrNative, "offline geometry buffer is invalid")
 		}
 		return OfflineGeometryRegionDefinition{
 			StyleURL:          C.GoString(geometry.style_url),

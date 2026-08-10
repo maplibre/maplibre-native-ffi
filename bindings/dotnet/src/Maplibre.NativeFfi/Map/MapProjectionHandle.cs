@@ -74,15 +74,15 @@ public sealed unsafe class MapProjectionHandle : IDisposable
     }
 
     /// <summary>Sets a camera that makes the supplied geometry visible with padding.</summary>
-    public void SetVisibleGeometry(Geometry geometry, EdgeInsets padding)
+    public void SetVisibleGeometry(byte[] geometry, EdgeInsets padding)
     {
         ArgumentNullException.ThrowIfNull(geometry);
-        using var nativeGeometry = NativeGeometry.From(geometry);
+        using var nativeGeometry = NativeStringView.From(geometry, nameof(geometry));
         var nativePadding = MapStructs.ToNative(padding);
         NativeStatus.Check(
             NativeMethods.mln_map_projection_set_visible_geometry(
                 Handle,
-                nativeGeometry.Pointer,
+                nativeGeometry.Value,
                 nativePadding
             )
         );

@@ -30,7 +30,7 @@ class OwnerThreadAndroidTest {
       assertTrue(runtimeDiagnostic.isNotBlank())
 
       val mapFailure = failureFromThread {
-        map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
+        map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}".encodeToByteArray())
       }
       val mapWrongThread = mapFailure as? WrongThreadException ?: throw mapFailure
       assertEquals(MaplibreStatus.WRONG_THREAD, mapWrongThread.status)

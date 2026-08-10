@@ -9,7 +9,6 @@ import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.UnsupportedFeatureException
 import org.maplibre.nativeffi.geo.LatLng
-import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.MetalContextDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.NativeBuffer
@@ -49,40 +48,6 @@ class DescriptorValidationTest {
     }
     assertFailsWith<InvalidArgumentException> {
       vulkanBorrowedTextureDescriptor(nullPointer).format = -1
-    }
-  }
-
-  @Test
-  fun structuredJsonInputsPropagateNativeFiniteNumberValidation() {
-    val runtime = RuntimeHandle.create(RuntimeOptions())
-    val map = MapHandle.create(runtime, mapOptions())
-    try {
-      map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
-      val error =
-        assertFailsWith<InvalidArgumentException> {
-          map.addStyleLayerJson(
-            JsonValue.ObjectValue(
-              listOf(
-                JsonValue.Member("id", JsonValue.StringValue("invalid-background")),
-                JsonValue.Member("type", JsonValue.StringValue("background")),
-                JsonValue.Member(
-                  "paint",
-                  JsonValue.ObjectValue(
-                    listOf(
-                      JsonValue.Member("background-opacity", JsonValue.DoubleValue(Double.NaN))
-                    )
-                  ),
-                ),
-              )
-            ),
-            "",
-          )
-        }
-      assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status)
-      assertTrue(error.diagnostic.contains("double value must be finite"))
-    } finally {
-      map.close()
-      runtime.close()
     }
   }
 

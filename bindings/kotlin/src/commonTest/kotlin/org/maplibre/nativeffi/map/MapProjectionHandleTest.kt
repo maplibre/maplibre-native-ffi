@@ -9,7 +9,6 @@ import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.error.InvalidStateException
-import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 
@@ -43,7 +42,7 @@ class MapProjectionHandleTest {
       kotlin.test.assertNotNull(camera.zoom)
       projection.setVisibleCoordinates(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0)), EdgeInsets.ZERO)
       projection.setVisibleGeometry(
-        Geometry.LineString(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0))),
+        "{\"type\":\"LineString\",\"coordinates\":[[0,0],[1,1]]}".encodeToByteArray(),
         EdgeInsets.ZERO,
       )
       val point = projection.pixelForLatLng(LatLng(0.0, 0.0))

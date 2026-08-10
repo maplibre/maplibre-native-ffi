@@ -22,16 +22,9 @@ internal object SyntheticHandles {
   fun offlineRegionList(ordinal: Long = 1): NativeOfflineRegionList =
     NativeOfflineRegionList(kind(0x06) or ordinal)
 
-  fun jsonSnapshot(ordinal: Long = 1): NativeJsonSnapshot =
-    NativeJsonSnapshot(kind(0x07) or ordinal)
+  fun ownedBuffer(ordinal: Long = 1): NativeOwnedBuffer = NativeOwnedBuffer(kind(0x07) or ordinal)
 
   fun styleIdList(ordinal: Long = 1): NativeStyleIdList = NativeStyleIdList(kind(0x08) or ordinal)
-
-  fun featureQueryResult(ordinal: Long = 1): NativeFeatureQueryResult =
-    NativeFeatureQueryResult(kind(0x09) or ordinal)
-
-  fun featureExtensionResult(ordinal: Long = 1): NativeFeatureExtensionResult =
-    NativeFeatureExtensionResult(kind(0x0A) or ordinal)
 
   fun wakeSource(ordinal: Long = 1): NativeWakeSource = NativeWakeSource(kind(0x0B) or ordinal)
 

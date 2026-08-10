@@ -88,7 +88,9 @@ endfunction()
 
 function(mln_ffi_configure_c_api_implementation target)
   set(MLN_FFI_C_API_SOURCES
+      ${PROJECT_SOURCE_DIR}/src/bytes/buffer.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/android.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/buffer.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/callback_adapter.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/diagnostics.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/logging.cpp

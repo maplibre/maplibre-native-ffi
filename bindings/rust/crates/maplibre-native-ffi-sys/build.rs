@@ -84,11 +84,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Every C handle is the same uint64_t; a transparent newtype per handle
         // keeps a map from being passed where a runtime is expected.
         .new_type_alias(concat!(
-            "^mln_(runtime|map|map_projection|render_session|wake_source",
+            "^mln_(buffer|runtime|map|map_projection|render_session|wake_source",
             "|resource_request_handle|offline_region_snapshot",
-            "|offline_region_list|json_snapshot|style_id_list",
-            "|style_string_list",
-            "|feature_query_result|feature_extension_result)$"
+            "|offline_region_list|style_id_list|style_string_list)$"
         ))
         .prepend_enum_name(false)
         .layout_tests(true)

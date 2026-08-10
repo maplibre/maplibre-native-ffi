@@ -22,6 +22,9 @@ extension type const NativeMapProjection(int raw) implements NativeHandle {}
 /// Render session handle id.
 extension type const NativeRenderSession(int raw) implements NativeHandle {}
 
+/// Owned native buffer handle id.
+extension type const NativeOwnedBufferHandle(int raw) implements NativeHandle {}
+
 /// Offline region snapshot handle id.
 extension type const NativeOfflineRegionSnapshot(int raw)
     implements NativeHandle {}
@@ -29,22 +32,11 @@ extension type const NativeOfflineRegionSnapshot(int raw)
 /// Offline region list handle id.
 extension type const NativeOfflineRegionList(int raw) implements NativeHandle {}
 
-/// JSON snapshot handle id.
-extension type const NativeJsonSnapshot(int raw) implements NativeHandle {}
-
 /// Style id list handle id.
 extension type const NativeStyleIdList(int raw) implements NativeHandle {}
 
 /// Style string list handle id.
 extension type const NativeStyleStringList(int raw) implements NativeHandle {}
-
-/// Feature query result handle id.
-extension type const NativeFeatureQueryResult(int raw)
-    implements NativeHandle {}
-
-/// Feature extension result handle id.
-extension type const NativeFeatureExtensionResult(int raw)
-    implements NativeHandle {}
 
 /// Wake source handle id.
 extension type const NativeWakeSource(int raw) implements NativeHandle {}

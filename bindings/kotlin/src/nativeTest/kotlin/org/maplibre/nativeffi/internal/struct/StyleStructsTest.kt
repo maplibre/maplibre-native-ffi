@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.internal.struct
 
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
@@ -31,7 +32,6 @@ import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options
 import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
-import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageOptions
@@ -90,22 +90,7 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
     memScoped {
       assertNull(StyleStructs.geoJsonSourceOptions(null, this))
 
-      val clusterProperties =
-        JsonValue.ObjectValue(
-          listOf(
-            JsonValue.Member(
-              "weight",
-              JsonValue.Array(
-                listOf(
-                  JsonValue.StringValue("+"),
-                  JsonValue.Array(
-                    listOf(JsonValue.StringValue("get"), JsonValue.StringValue("weight"))
-                  ),
-                )
-              ),
-            )
-          )
-        )
+      val clusterProperties = "{\"weight\":[\"+\",[\"get\",\"weight\"]]}".encodeToByteArray()
       val options =
         StyleStructs.geoJsonSourceOptions(
             GeoJsonSourceOptions().apply {
@@ -129,7 +114,7 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(0.0, options.min_zoom)
       assertEquals(0U, options.cluster_min_points)
       assertEquals(false, options.cluster)
-      assertEquals(clusterProperties, ValueStructs.jsonSnapshot(options.cluster_properties))
+      assertContentEquals(clusterProperties, ByteStructs.copyBufferView(options.cluster_properties))
 
       // Fields left absent keep the values mln_geojson_source_options_default() wrote.
       val defaults = alloc<mln_geojson_source_options>()

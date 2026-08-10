@@ -8,12 +8,12 @@ from dataclasses import dataclass
 
 import maplibre_native_ffi as mln
 import pytest
-from maplibre_native_ffi import camera, geo, json, query, render
+from maplibre_native_ffi import camera, query, render
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
     RED_BACKGROUND_STYLE_JSON,
     assert_cluster_feature_extensions,
-    assert_typed_geojson_cluster_source,
+    assert_geojson_cluster_source,
     render_until,
     render_until_update,
     skip_or_fail_fixture_setup,
@@ -94,7 +94,7 @@ class OpenGLOwnedSession:
         self.context.close()
 
     def render_once(self) -> None:
-        self.map.set_style_json(EMPTY_STYLE_JSON)
+        self.map.set_style_json(EMPTY_STYLE_JSON.encode())
         frame = wait_for_opengl_frame(self, lambda _: True)
         frame.close()
 
@@ -193,7 +193,7 @@ def wait_for_texture_info(
     *,
     iterations: int = 5000,
 ) -> render.TextureImageInfo:
-    fixture.map.set_style_json(EMPTY_STYLE_JSON)
+    fixture.map.set_style_json(EMPTY_STYLE_JSON.encode())
     request_still_image_if_needed(fixture.map)
     for _ in range(iterations):
         fixture.runtime.pump()
@@ -297,7 +297,7 @@ def test_egl_pbuffer_surface_attach_reports_public_session_shape() -> None:
         try:
             _assert_public_session_shape(session)
 
-            map_handle.set_style_json(EMPTY_STYLE_JSON)
+            map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
             render_until_update(runtime, session)
         finally:
             session.close()
@@ -470,7 +470,7 @@ def test_active_opengl_frame_rejects_nested_acquire_and_session_operations(
     point_query = query.RenderedQueryGeometry.point_geometry(
         camera.ScreenPoint(0.0, 0.0)
     )
-    feature = geo.Feature(geometry=geo.EmptyGeometry())
+    feature = b'{"type":"Feature","geometry":null,"properties":{}}'
 
     calls: tuple[Callable[[], object], ...] = (
         lambda: opengl_owned_session.session.resize(16, 16, 1.0),
@@ -496,7 +496,7 @@ def test_active_opengl_frame_rejects_nested_acquire_and_session_operations(
         ),
         lambda: opengl_owned_session.session.set_feature_state(
             selector,
-            json.JsonObject((json.JsonMember("hover", True),)),
+            b'{"hover":true}',
         ),
         lambda: opengl_owned_session.session.get_feature_state(selector),
         lambda: opengl_owned_session.session.remove_feature_state(selector),
@@ -577,7 +577,7 @@ def test_egl_borrowed_texture_session_close_preserves_caller_resources() -> None
             try:
                 _assert_public_session_shape(session)
 
-                map_handle.set_style_json(EMPTY_STYLE_JSON)
+                map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
                 render_until_update(runtime, session)
 
                 with pytest.raises(mln.UnsupportedFeatureError) as raised:
@@ -617,7 +617,7 @@ def test_egl_borrowed_texture_set_target_hands_over_a_replacement() -> None:
         ):
             session = map_handle.attach_opengl_borrowed_texture(descriptor)
             try:
-                map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON)
+                map_handle.set_style_json(RED_BACKGROUND_STYLE_JSON.encode())
                 render_until_update(runtime, session)
 
                 with pytest.raises(mln.UnsupportedFeatureError) as raised:
@@ -689,7 +689,7 @@ def test_cluster_feature_extension_queries_resolve_unsigned_cluster_id_and_limit
 def test_typed_geojson_source_options_cluster_nearby_points(
     opengl_owned_session: OpenGLOwnedSession,
 ) -> None:
-    assert_typed_geojson_cluster_source(
+    assert_geojson_cluster_source(
         opengl_owned_session.runtime,
         opengl_owned_session.map,
         opengl_owned_session.session,

@@ -25,22 +25,13 @@ fn createLoadedMap(runtime: *maplibre.RuntimeHandle) !maplibre.MapHandle {
     return map;
 }
 
-test "style source JSON descriptors expose type info and copied attribution" {
+test "style source JSON buffers expose type info and copied attribution" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
-    const empty_features = [_]maplibre.JsonValue{};
-    const data_members = [_]maplibre.JsonMember{
-        .{ .key = "type", .value = .{ .string = "FeatureCollection" } },
-        .{ .key = "features", .value = .{ .array = empty_features[0..] } },
-    };
-    const source_members = [_]maplibre.JsonMember{
-        .{ .key = "type", .value = .{ .string = "geojson" } },
-        .{ .key = "data", .value = .{ .object = data_members[0..] } },
-    };
-    try map.addStyleSourceJson(testing.allocator, "empty-json", .{ .object = source_members[0..] });
+    try map.addStyleSourceJson(testing.allocator, "empty-json", "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}");
 
     try testing.expect(try map.styleSourceExists(testing.allocator, "empty-json"));
     try testing.expectEqual(maplibre.StyleSourceType.geojson, (try map.getStyleSourceType(testing.allocator, "empty-json")).?);
@@ -52,13 +43,7 @@ test "style source JSON descriptors expose type info and copied attribution" {
     try testing.expect(info.url == null);
     try testing.expect(info.tile_json == null);
 
-    const tile_values = [_]maplibre.JsonValue{.{ .string = "https://example.com/{z}/{x}/{y}.pbf" }};
-    const vector_members = [_]maplibre.JsonMember{
-        .{ .key = "type", .value = .{ .string = "vector" } },
-        .{ .key = "tiles", .value = .{ .array = tile_values[0..] } },
-        .{ .key = "attribution", .value = .{ .string = "Example attribution" } },
-    };
-    try map.addStyleSourceJson(testing.allocator, "vector-meta", .{ .object = vector_members[0..] });
+    try map.addStyleSourceJson(testing.allocator, "vector-meta", "{\"type\":\"vector\",\"tiles\":[\"https://example.com/{z}/{x}/{y}.pbf\"],\"attribution\":\"Example attribution\"}");
 
     var vector_info = (try map.getStyleSourceInfo(testing.allocator, "vector-meta")).?;
     defer vector_info.deinit();
@@ -76,8 +61,7 @@ test "style source removal reports state and copies missing results" {
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
-    const empty_features = [_]maplibre.Feature{};
-    try map.addGeoJsonSourceData(testing.allocator, "remove-me", .{ .feature_collection = empty_features[0..] }, null);
+    try map.addGeoJsonSourceData(testing.allocator, "remove-me", "{\"type\":\"FeatureCollection\",\"features\":[]}", null);
     try testing.expect(try map.styleSourceExists(testing.allocator, "remove-me"));
     try testing.expect(try map.removeStyleSource(testing.allocator, "remove-me"));
     try testing.expect(!try map.styleSourceExists(testing.allocator, "remove-me"));
@@ -169,27 +153,10 @@ test "tile source helpers expose copied reconstructible source information" {
     defer relief_type.deinit();
     try testing.expectEqualStrings("color-relief", relief_type.value);
 
-    const linear_values = [_]maplibre.JsonValue{.{ .string = "linear" }};
-    const linear = maplibre.JsonValue{ .array = linear_values[0..] };
-    const elevation_values = [_]maplibre.JsonValue{.{ .string = "elevation" }};
-    const elevation = maplibre.JsonValue{ .array = elevation_values[0..] };
-    const color_ramp_values = [_]maplibre.JsonValue{
-        .{ .string = "interpolate" }, linear,                 elevation,
-        .{ .double = 0.0 },           .{ .string = "black" }, .{ .double = 1000.0 },
-        .{ .string = "white" },
-    };
-    try map.setLayerProperty(testing.allocator, "dem-relief", "color-relief-color", .{ .array = color_ramp_values[0..] });
-
-    const zoom_values = [_]maplibre.JsonValue{.{ .string = "zoom" }};
-    const zoom = maplibre.JsonValue{ .array = zoom_values[0..] };
-    const invalid_color_ramp_values = [_]maplibre.JsonValue{
-        .{ .string = "interpolate" }, linear,                 zoom,
-        .{ .double = 0.0 },           .{ .string = "black" }, .{ .double = 1.0 },
-        .{ .string = "white" },
-    };
+    try map.setLayerProperty(testing.allocator, "dem-relief", "color-relief-color", "[\"interpolate\",[\"linear\"],[\"elevation\"],0,\"black\",1000,\"white\"]");
     try testing.expectError(
         error.InvalidArgument,
-        map.setLayerProperty(testing.allocator, "dem-relief", "color-relief-color", .{ .array = invalid_color_ramp_values[0..] }),
+        map.setLayerProperty(testing.allocator, "dem-relief", "color-relief-color", "[\"interpolate\",[\"linear\"],[\"zoom\"],0,\"black\",1,\"white\"]"),
     );
 
     try testing.expectError(error.InvalidArgument, map.addHillshadeLayer(testing.allocator, "bad-hillshade", "point", ""));
@@ -253,28 +220,17 @@ test "image source helpers add update and copy coordinates" {
     try testing.expectError(error.InvalidArgument, map.setImageSourceUrl(testing.allocator, "point", "https://example.com/not-image.png"));
 }
 
-test "style source JSON descriptors reject invalid source data and pass explicit-length IDs" {
+test "style source JSON buffers reject invalid source data and pass explicit-length IDs" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
-    const source_members = [_]maplibre.JsonMember{.{ .key = "type", .value = .{ .string = "definitely-not-a-source-type" } }};
     try testing.expectError(
         error.InvalidArgument,
-        map.addStyleSourceJson(testing.allocator, "invalid-json-source", .{ .object = source_members[0..] }),
+        map.addStyleSourceJson(testing.allocator, "invalid-json-source", "{\"type\":\"definitely-not-a-source-type\"}"),
     );
-
-    const empty_features = [_]maplibre.JsonValue{};
-    const data_members = [_]maplibre.JsonMember{
-        .{ .key = "type", .value = .{ .string = "FeatureCollection" } },
-        .{ .key = "features", .value = .{ .array = empty_features[0..] } },
-    };
-    const valid_source_members = [_]maplibre.JsonMember{
-        .{ .key = "type", .value = .{ .string = "geojson" } },
-        .{ .key = "data", .value = .{ .object = data_members[0..] } },
-    };
-    try map.addStyleSourceJson(testing.allocator, "nul\x00source", .{ .object = valid_source_members[0..] });
+    try map.addStyleSourceJson(testing.allocator, "nul\x00source", "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}");
     try testing.expect(try map.styleSourceExists(testing.allocator, "nul\x00source"));
     var info = (try map.getStyleSourceInfo(testing.allocator, "nul\x00source")).?;
     defer info.deinit();
@@ -323,8 +279,7 @@ test "custom geometry source helpers add sources and accept tile updates" {
     try testing.expectEqual(maplibre.StyleSourceType.custom_vector, (try map.getStyleSourceType(testing.allocator, "custom")).?);
 
     const tile_id = maplibre.CanonicalTileId{ .z = 0, .x = 0, .y = 0 };
-    const empty_features = [_]maplibre.Feature{};
-    try map.setCustomGeometrySourceTileData(testing.allocator, "custom", tile_id, .{ .feature_collection = empty_features[0..] });
+    try map.setCustomGeometrySourceTileData(testing.allocator, "custom", tile_id, "{\"type\":\"FeatureCollection\",\"features\":[]}");
     try map.invalidateCustomGeometrySourceTile(testing.allocator, "custom", tile_id);
     try map.invalidateCustomGeometrySourceRegion(testing.allocator, "custom", .{
         .southwest = .{ .latitude = -1.0, .longitude = -1.0 },
@@ -346,7 +301,7 @@ test "custom geometry source helpers add sources and accept tile updates" {
             testing.allocator,
             "custom",
             .{ .z = 1, .x = 2, .y = 0 },
-            .{ .feature_collection = empty_features[0..] },
+            "{\"type\":\"FeatureCollection\",\"features\":[]}",
         ),
     );
     try testing.expectError(error.InvalidArgument, map.invalidateCustomGeometrySourceTile(testing.allocator, "point", tile_id));

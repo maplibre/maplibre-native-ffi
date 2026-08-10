@@ -5,7 +5,6 @@ using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Pointer;
 using Maplibre.NativeFfi.Internal.Status;
 using Maplibre.NativeFfi.Internal.Struct;
-using Maplibre.NativeFfi.Json;
 using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Query;
 
@@ -483,29 +482,29 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_render_session_dump_debug_logs(Handle));
     }
 
-    public void SetFeatureState(FeatureStateSelector selector, JsonValue value)
+    public void SetFeatureState(FeatureStateSelector selector, byte[] value)
     {
         using var nativeSelector = NativeFeatureStateSelector.From(selector);
-        using var nativeValue = NativeJsonValue.From(value);
+        using var nativeValue = NativeStringView.From(value, nameof(value));
         var selectorValue = nativeSelector.Value;
         NativeStatus.Check(
             NativeMethods.mln_render_session_set_feature_state(
                 Handle,
                 &selectorValue,
-                nativeValue.Pointer
+                nativeValue.Value
             )
         );
     }
 
-    public JsonValue GetFeatureState(FeatureStateSelector selector)
+    public byte[] GetFeatureState(FeatureStateSelector selector)
     {
         using var nativeSelector = NativeFeatureStateSelector.From(selector);
         var selectorValue = nativeSelector.Value;
-        MlnJsonSnapshot snapshot = default;
+        MlnBuffer buffer = default;
         NativeStatus.Check(
-            NativeMethods.mln_render_session_get_feature_state(Handle, &selectorValue, &snapshot)
+            NativeMethods.mln_render_session_get_feature_state(Handle, &selectorValue, &buffer)
         );
-        return ValueStructs.ReadJsonSnapshot(snapshot) ?? new JsonValue.Object([]);
+        return ValueStructs.ReadBuffer(buffer);
     }
 
     public void RemoveFeatureState(FeatureStateSelector selector)
@@ -517,57 +516,48 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         );
     }
 
-    public IReadOnlyList<QueriedFeature> QueryRenderedFeatures(
+    public byte[] QueryRenderedFeatures(
         RenderedQueryGeometry geometry,
         RenderedFeatureQueryOptions? options
     ) => QueryRenderedFeaturesCore(geometry, options);
 
-    public IReadOnlyList<QueriedFeature> QuerySourceFeatures(
-        string sourceId,
-        SourceFeatureQueryOptions? options
-    ) => QuerySourceFeaturesCore(sourceId, options);
+    public byte[] QuerySourceFeatures(string sourceId, SourceFeatureQueryOptions? options) =>
+        QuerySourceFeaturesCore(sourceId, options);
 
     /// <summary>
     /// Queries a feature extension from the latest render session state.
     /// </summary>
-    /// <remarks>
-    /// The <c>supercluster</c> extension reads <c>cluster_id</c>, <c>limit</c>,
-    /// and <c>offset</c> as <c>JsonValue.UInt</c> and treats other numeric types
-    /// as absent: a non-<c>UInt</c> <c>cluster_id</c> yields a
-    /// <c>FeatureExtensionResult.Value</c> holding <c>JsonValue.Null</c>, and a
-    /// non-<c>UInt</c> <c>limit</c> or <c>offset</c> falls back to ten leaves at
-    /// offset zero.
-    /// </remarks>
-    public FeatureExtensionResult QueryFeatureExtension(
+    public byte[] QueryFeatureExtension(
         string sourceId,
-        Feature feature,
+        byte[] feature,
         string extension,
         string extensionField,
-        JsonValue? arguments
+        byte[]? arguments
     )
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        using var nativeFeature = NativeFeature.From(feature);
+        using var nativeFeature = NativeStringView.From(feature, nameof(feature));
         using var nativeExtension = NativeStringView.From(extension, nameof(extension));
         using var nativeExtensionField = NativeStringView.From(
             extensionField,
             nameof(extensionField)
         );
-        using var nativeArguments = arguments is null ? null : NativeJsonValue.From(arguments);
-        var featureValue = nativeFeature.Value;
-        MlnFeatureExtensionResult result = default;
+        using var nativeArguments = arguments is null
+            ? null
+            : NativeStringView.From(arguments, nameof(arguments));
+        MlnBuffer result = default;
         NativeStatus.Check(
             NativeMethods.mln_render_session_query_feature_extensions(
                 Handle,
                 nativeSourceId.Value,
-                &featureValue,
+                nativeFeature.Value,
                 nativeExtension.Value,
                 nativeExtensionField.Value,
                 nativeArguments?.Pointer,
                 &result
             )
         );
-        return QueryStructs.ReadFeatureExtensionResult(result);
+        return ValueStructs.ReadBuffer(result);
     }
 
     public TextureImageInfo TextureImageInfo()
@@ -890,7 +880,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         }
     }
 
-    private IReadOnlyList<QueriedFeature> QueryRenderedFeaturesCore(
+    private byte[] QueryRenderedFeaturesCore(
         RenderedQueryGeometry geometry,
         RenderedFeatureQueryOptions? options
     )
@@ -900,7 +890,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             ? null
             : NativeRenderedFeatureQueryOptions.From(options);
         var geometryValue = nativeGeometry.Value;
-        MlnFeatureQueryResult result = default;
+        MlnBuffer result = default;
         if (nativeOptions is null)
         {
             NativeStatus.Check(
@@ -924,19 +914,16 @@ public sealed unsafe class RenderSessionHandle : IDisposable
                 )
             );
         }
-        return QueryStructs.ReadFeatureQueryResult(result);
+        return ValueStructs.ReadBuffer(result);
     }
 
-    private IReadOnlyList<QueriedFeature> QuerySourceFeaturesCore(
-        string sourceId,
-        SourceFeatureQueryOptions? options
-    )
+    private byte[] QuerySourceFeaturesCore(string sourceId, SourceFeatureQueryOptions? options)
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeOptions = options is null
             ? null
             : NativeSourceFeatureQueryOptions.From(options);
-        MlnFeatureQueryResult result = default;
+        MlnBuffer result = default;
         if (nativeOptions is null)
         {
             NativeStatus.Check(
@@ -960,7 +947,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
                 )
             );
         }
-        return QueryStructs.ReadFeatureQueryResult(result);
+        return ValueStructs.ReadBuffer(result);
     }
 
     /// <summary>Destroys the render session on the map owner thread.</summary>

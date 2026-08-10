@@ -161,9 +161,8 @@ pub const MapHandle = enum(c.mln_map) {
         json: []const u8,
     ) status.Error!void {
         const native_map = try native(self);
-        const json_z = try nulTerminated(allocator, json, diagnosticStore(self), "style JSON contains embedded NUL");
-        defer allocator.free(json_z);
-        try status.checkStatus(c.mln_map_set_style_json(native_map, json_z.ptr), diagnosticStore(self));
+        _ = allocator;
+        try status.checkStatus(c.mln_map_set_style_json(native_map, stringView(json)), diagnosticStore(self));
         clearCustomGeometrySourceStates(self);
     }
 
@@ -213,7 +212,7 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         layer_id: []const u8,
         property_name: []const u8,
-        value: values.JsonValue,
+        value: []const u8,
     ) status.Error!void {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
@@ -222,7 +221,7 @@ pub const MapHandle = enum(c.mln_map) {
                 try native(self),
                 try temp.stringView(layer_id),
                 try temp.stringView(property_name),
-                try temp.jsonValue(value),
+                try temp.stringView(value),
             ),
             diagnosticStore(self),
         );
@@ -233,32 +232,32 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         layer_id: []const u8,
         property_name: []const u8,
-    ) status.Error!?values.OwnedJsonValue {
+    ) status.Error!?values.OwnedString {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        var snapshot: c.mln_json_snapshot = 0;
+        var buffer: c.mln_buffer = 0;
         try status.checkStatus(
             c.mln_map_get_layer_property(
                 try native(self),
                 try temp.stringView(layer_id),
                 try temp.stringView(property_name),
-                &snapshot,
+                &buffer,
             ),
             diagnosticStore(self),
         );
-        defer c.mln_json_snapshot_destroy(snapshot);
-        return try copyJsonSnapshot(allocator, snapshot, diagnosticStore(self));
+        return try native_temp.copyOwnedBuffer(allocator, buffer, diagnosticStore(self));
     }
 
     pub fn setLayerFilter(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         layer_id: []const u8,
-        filter: ?values.JsonValue,
+        filter: ?[]const u8,
     ) status.Error!void {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        const filter_ptr = if (filter) |value| try temp.jsonValue(value) else null;
+        var filter_view = if (filter) |value| try temp.stringView(value) else undefined;
+        const filter_ptr = if (filter != null) &filter_view else null;
         try status.checkStatus(
             c.mln_map_set_layer_filter(try native(self), try temp.stringView(layer_id), filter_ptr),
             diagnosticStore(self),
@@ -269,16 +268,15 @@ pub const MapHandle = enum(c.mln_map) {
         self: *MapHandle,
         allocator: std.mem.Allocator,
         layer_id: []const u8,
-    ) status.Error!?values.OwnedJsonValue {
+    ) status.Error!?values.OwnedString {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        var snapshot: c.mln_json_snapshot = 0;
+        var buffer: c.mln_buffer = 0;
         try status.checkStatus(
-            c.mln_map_get_layer_filter(try native(self), try temp.stringView(layer_id), &snapshot),
+            c.mln_map_get_layer_filter(try native(self), try temp.stringView(layer_id), &buffer),
             diagnosticStore(self),
         );
-        defer c.mln_json_snapshot_destroy(snapshot);
-        return try copyJsonSnapshot(allocator, snapshot, diagnosticStore(self));
+        return try native_temp.copyOwnedBuffer(allocator, buffer, diagnosticStore(self));
     }
 
     /// Sets one layer's source-layer ID. Layer types that take no source, such as background, are
@@ -374,7 +372,7 @@ pub const MapHandle = enum(c.mln_map) {
         self: *MapHandle,
         allocator: std.mem.Allocator,
         layer_id: []const u8,
-        copy: *const fn (c.mln_map, c.mln_string_view, ?[*]u8, usize, *usize) callconv(.c) c.mln_status,
+        copy: *const fn (c.mln_map, c.mln_buffer_view, ?[*]u8, usize, *usize) callconv(.c) c.mln_status,
     ) status.Error!values.OwnedString {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
@@ -523,12 +521,12 @@ pub const MapHandle = enum(c.mln_map) {
         self: *MapHandle,
         allocator: std.mem.Allocator,
         source_id: []const u8,
-        source_json: values.JsonValue,
+        source_json: []const u8,
     ) status.Error!void {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         try status.checkStatus(
-            c.mln_map_add_style_source_json(try native(self), try temp.stringView(source_id), try temp.jsonValue(source_json)),
+            c.mln_map_add_style_source_json(try native(self), try temp.stringView(source_id), try temp.stringView(source_json)),
             diagnosticStore(self),
         );
     }
@@ -703,7 +701,7 @@ pub const MapHandle = enum(c.mln_map) {
         self: *MapHandle,
         allocator: std.mem.Allocator,
         source_id: []const u8,
-        copy: *const fn (c.mln_map, c.mln_string_view, ?[*]u8, usize, *usize, *bool) callconv(.c) c.mln_status,
+        copy: *const fn (c.mln_map, c.mln_buffer_view, ?[*]u8, usize, *usize, *bool) callconv(.c) c.mln_status,
     ) status.Error!?values.OwnedString {
         var required: usize = 0;
         var found = false;
@@ -742,13 +740,13 @@ pub const MapHandle = enum(c.mln_map) {
     pub fn addStyleLayerJson(
         self: *MapHandle,
         allocator: std.mem.Allocator,
-        layer_json: values.JsonValue,
+        layer_json: []const u8,
         before_layer_id: []const u8,
     ) status.Error!void {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         try status.checkStatus(
-            c.mln_map_add_style_layer_json(try native(self), try temp.jsonValue(layer_json), stringView(before_layer_id)),
+            c.mln_map_add_style_layer_json(try native(self), try temp.stringView(layer_json), stringView(before_layer_id)),
             diagnosticStore(self),
         );
     }
@@ -786,16 +784,15 @@ pub const MapHandle = enum(c.mln_map) {
         self: *MapHandle,
         allocator: std.mem.Allocator,
         layer_id: []const u8,
-    ) status.Error!?values.OwnedJsonValue {
-        var snapshot: c.mln_json_snapshot = 0;
+    ) status.Error!?values.OwnedString {
+        var buffer: c.mln_buffer = 0;
         var found = false;
         try status.checkStatus(
-            c.mln_map_get_style_layer_json(try native(self), stringView(layer_id), &snapshot, &found),
+            c.mln_map_get_style_layer_json(try native(self), stringView(layer_id), &buffer, &found),
             diagnosticStore(self),
         );
-        defer c.mln_json_snapshot_destroy(snapshot);
         if (!found) return null;
-        return try copyJsonSnapshot(allocator, snapshot, diagnosticStore(self)) orelse error.NativeError;
+        return try native_temp.copyOwnedBuffer(allocator, buffer, diagnosticStore(self)) orelse error.NativeError;
     }
 
     pub fn getStyleLayerType(
@@ -803,22 +800,25 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         layer_id: []const u8,
     ) status.Error!?values.OwnedString {
-        var layer_type = c.mln_string_view{ .data = null, .size = 0 };
+        var layer_type = c.mln_buffer_view{ .data = null, .size = 0 };
         var found = false;
         try status.checkStatus(
             c.mln_map_get_style_layer_type(try native(self), stringView(layer_id), &layer_type, &found),
             diagnosticStore(self),
         );
         if (!found) return null;
-        const copied = if (layer_type.size == 0) try allocator.dupe(u8, "") else try allocator.dupe(u8, layer_type.data[0..layer_type.size]);
+        const copied = if (layer_type.size == 0) try allocator.dupe(u8, "") else blk: {
+            const data: [*]const u8 = @ptrCast(layer_type.data orelse return error.NativeError);
+            break :blk try allocator.dupe(u8, data[0..layer_type.size]);
+        };
         return .{ .allocator = allocator, .value = copied };
     }
 
-    pub fn setStyleLightJson(self: *MapHandle, allocator: std.mem.Allocator, value: values.JsonValue) status.Error!void {
+    pub fn setStyleLightJson(self: *MapHandle, allocator: std.mem.Allocator, value: []const u8) status.Error!void {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         try status.checkStatus(
-            c.mln_map_set_style_light_json(try native(self), try temp.jsonValue(value)),
+            c.mln_map_set_style_light_json(try native(self), try temp.stringView(value)),
             diagnosticStore(self),
         );
     }
@@ -827,12 +827,12 @@ pub const MapHandle = enum(c.mln_map) {
         self: *MapHandle,
         allocator: std.mem.Allocator,
         property_name: []const u8,
-        value: values.JsonValue,
+        value: []const u8,
     ) status.Error!void {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         try status.checkStatus(
-            c.mln_map_set_style_light_property(try native(self), try temp.stringView(property_name), try temp.jsonValue(value)),
+            c.mln_map_set_style_light_property(try native(self), try temp.stringView(property_name), try temp.stringView(value)),
             diagnosticStore(self),
         );
     }
@@ -841,16 +841,15 @@ pub const MapHandle = enum(c.mln_map) {
         self: *MapHandle,
         allocator: std.mem.Allocator,
         property_name: []const u8,
-    ) status.Error!?values.OwnedJsonValue {
+    ) status.Error!?values.OwnedString {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        var snapshot: c.mln_json_snapshot = 0;
+        var buffer: c.mln_buffer = 0;
         try status.checkStatus(
-            c.mln_map_get_style_light_property(try native(self), try temp.stringView(property_name), &snapshot),
+            c.mln_map_get_style_light_property(try native(self), try temp.stringView(property_name), &buffer),
             diagnosticStore(self),
         );
-        defer c.mln_json_snapshot_destroy(snapshot);
-        return try copyJsonSnapshot(allocator, snapshot, diagnosticStore(self));
+        return try native_temp.copyOwnedBuffer(allocator, buffer, diagnosticStore(self));
     }
 
     /// Sets the style's global transition options, replacing the whole
@@ -1383,7 +1382,7 @@ pub const MapHandle = enum(c.mln_map) {
         self: *MapHandle,
         allocator: std.mem.Allocator,
         source_id: []const u8,
-        data: values.GeoJson,
+        data: []const u8,
         options: ?values.StyleGeoJsonSourceOptions,
     ) status.Error!void {
         var temp = native_temp.TempStorage.init(allocator);
@@ -1393,7 +1392,7 @@ pub const MapHandle = enum(c.mln_map) {
             c.mln_map_add_geojson_source_data(
                 try native(self),
                 try temp.stringView(source_id),
-                try temp.geoJson(data),
+                try temp.stringView(data),
                 if (options != null) &raw_options else null,
             ),
             diagnosticStore(self),
@@ -1404,12 +1403,12 @@ pub const MapHandle = enum(c.mln_map) {
         self: *MapHandle,
         allocator: std.mem.Allocator,
         source_id: []const u8,
-        data: values.GeoJson,
+        data: []const u8,
     ) status.Error!void {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         try status.checkStatus(
-            c.mln_map_set_geojson_source_data(try native(self), try temp.stringView(source_id), try temp.geoJson(data)),
+            c.mln_map_set_geojson_source_data(try native(self), try temp.stringView(source_id), try temp.stringView(data)),
             diagnosticStore(self),
         );
     }
@@ -1493,7 +1492,7 @@ pub const MapHandle = enum(c.mln_map) {
         allocator: std.mem.Allocator,
         source_id: []const u8,
         tile_id: CanonicalTileId,
-        data: values.GeoJson,
+        data: []const u8,
     ) status.Error!void {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
@@ -1502,7 +1501,7 @@ pub const MapHandle = enum(c.mln_map) {
                 try native(self),
                 try temp.stringView(source_id),
                 canonicalTileIdToNative(tile_id),
-                try temp.geoJson(data),
+                try temp.stringView(data),
             ),
             diagnosticStore(self),
         );
@@ -1808,7 +1807,7 @@ pub const MapHandle = enum(c.mln_map) {
     pub fn cameraForGeometry(
         self: *MapHandle,
         allocator: std.mem.Allocator,
-        geometry: values.Geometry,
+        geometry: []const u8,
         fit_options: ?values.CameraFitOptions,
     ) status.Error!values.CameraOptions {
         var temp = native_temp.TempStorage.init(allocator);
@@ -1817,7 +1816,7 @@ pub const MapHandle = enum(c.mln_map) {
         const fit_ptr = if (fit_options != null) &raw_fit else null;
         var camera = c.mln_camera_options_default();
         try status.checkStatus(
-            c.mln_map_camera_for_geometry(try native(self), try temp.geometry(geometry), fit_ptr, &camera),
+            c.mln_map_camera_for_geometry(try native(self), try temp.stringView(geometry), fit_ptr, &camera),
             diagnosticStore(self),
         );
         return values.cameraOptionsFromNative(camera);
@@ -1942,7 +1941,7 @@ fn styleGeoJsonSourceOptionsToNative(
     }
     if (options.cluster_properties) |cluster_properties| {
         raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
-        raw.cluster_properties = try temp.jsonValue(cluster_properties);
+        raw.cluster_properties = try temp.stringView(cluster_properties);
     }
     if (options.tile_size) |tile_size| {
         raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE;
@@ -2257,18 +2256,6 @@ fn customGeometrySourceCountForTesting(handle: *MapHandle) status.BindingError!u
     return (try mapStateForHandle(handle)).custom_geometry_sources.items.len;
 }
 
-fn copyJsonSnapshot(
-    allocator: std.mem.Allocator,
-    snapshot: c.mln_json_snapshot,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-) status.Error!?values.OwnedJsonValue {
-    if (snapshot == 0) return null;
-    const handle = snapshot;
-    var raw: ?*const c.mln_json_value = null;
-    try status.checkStatus(c.mln_json_snapshot_get(handle, &raw), diagnostic_store);
-    return try values.ownedJsonValueFromNative(allocator, raw.?);
-}
-
 fn copyStyleIdList(
     allocator: std.mem.Allocator,
     list: c.mln_style_id_list,
@@ -2283,9 +2270,12 @@ fn copyStyleIdList(
         allocator.free(items);
     }
     for (items, 0..) |*item, index| {
-        var view = c.mln_string_view{ .data = null, .size = 0 };
+        var view = c.mln_buffer_view{ .data = null, .size = 0 };
         try status.checkStatus(c.mln_style_id_list_get(list, index, &view), diagnostic_store);
-        item.* = if (view.size == 0) try allocator.dupe(u8, "") else try allocator.dupe(u8, view.data[0..view.size]);
+        item.* = if (view.size == 0) try allocator.dupe(u8, "") else blk: {
+            const data: [*]const u8 = @ptrCast(view.data orelse return error.NativeError);
+            break :blk try allocator.dupe(u8, data[0..view.size]);
+        };
         initialized += 1;
     }
     return .{ .allocator = allocator, .items = items };
@@ -2305,15 +2295,18 @@ fn copyStyleStringList(
         allocator.free(items);
     }
     for (items, 0..) |*item, index| {
-        var view = c.mln_string_view{ .data = null, .size = 0 };
+        var view = c.mln_buffer_view{ .data = null, .size = 0 };
         try status.checkStatus(c.mln_style_string_list_get(list, index, &view), diagnostic_store);
-        item.* = if (view.size == 0) try allocator.dupe(u8, "") else try allocator.dupe(u8, view.data[0..view.size]);
+        item.* = if (view.size == 0) try allocator.dupe(u8, "") else blk: {
+            const data: [*]const u8 = @ptrCast(view.data orelse return error.NativeError);
+            break :blk try allocator.dupe(u8, data[0..view.size]);
+        };
         initialized += 1;
     }
     return .{ .allocator = allocator, .items = items };
 }
 
-fn stringView(value: []const u8) c.mln_string_view {
+fn stringView(value: []const u8) c.mln_buffer_view {
     return .{ .data = if (value.len == 0) null else value.ptr, .size = value.len };
 }
 

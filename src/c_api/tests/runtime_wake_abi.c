@@ -322,7 +322,10 @@ static void queued_events_return_from_the_pump_immediately(void) {
   quiesce(runtime);
 
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_style_json(map, (const char*)wake_style_json)
+    MLN_STATUS_OK,
+    mln_map_set_style_json(
+      map, mln_test_buffer_view(wake_style_json, sizeof(wake_style_json) - 1)
+    )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
 

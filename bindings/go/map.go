@@ -167,19 +167,16 @@ func (m *MapHandle) SetStyleURL(url string) error {
 // call returns the parse error, and the same message arrives as a
 // map-loading-failed runtime event. A well-formed style that MapLibre rejects
 // semantically produces neither an error nor an event.
-func (m *MapHandle) SetStyleJSON(json string) error {
-	if err := validateCStringArgument("style JSON", json); err != nil {
-		return err
-	}
+func (m *MapHandle) SetStyleJSON(json []byte) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	cJSON := C.CString(json)
-	defer C.free(unsafe.Pointer(cJSON))
-	if err := checkNative(func() int32 { return int32(C.mln_map_set_style_json(C.mln_map(ptr), cJSON)) }); err != nil {
+	jsonView := newCBufferView(json)
+	defer jsonView.free()
+	if err := checkNative(func() int32 { return int32(C.mln_map_set_style_json(C.mln_map(ptr), jsonView.raw())) }); err != nil {
 		return err
 	}
 	m.releaseCustomGeometrySources()
@@ -191,9 +188,9 @@ func (m *MapHandle) SetStyleJSON(json string) error {
 // mutations such as adding a layer do not change it, and a failed parse leaves
 // the previously parsed document in place. The result is empty only when no
 // document has been parsed.
-func (m *MapHandle) LoadedStyleJSON() (string, error) {
-	return m.copyMapText(func(rawMap C.mln_map, text *C.char, capacity C.size_t, size *C.size_t) int32 {
-		return int32(C.mln_map_copy_loaded_style_json(rawMap, text, capacity, size))
+func (m *MapHandle) LoadedStyleJSON() ([]byte, error) {
+	return m.copyMapBytes(func(rawMap C.mln_map, data *C.uint8_t, capacity C.size_t, size *C.size_t) int32 {
+		return int32(C.mln_map_copy_loaded_style_json(rawMap, data, capacity, size))
 	})
 }
 
@@ -632,7 +629,7 @@ func (m *MapHandle) CameraForLatLngs(coordinates []LatLng, fitOptions *CameraFit
 
 // CameraForGeometry computes a camera that fits a geometry. Passing nil
 // fitOptions uses native default fitting options.
-func (m *MapHandle) CameraForGeometry(geometry Geometry, fitOptions *CameraFitOptions) (CameraOptions, error) {
+func (m *MapHandle) CameraForGeometry(geometry []byte, fitOptions *CameraFitOptions) (CameraOptions, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return CameraOptions{}, err
@@ -640,18 +637,14 @@ func (m *MapHandle) CameraForGeometry(geometry Geometry, fitOptions *CameraFitOp
 	defer release()
 	defer m.state.KeepAlive()
 	var raw C.mln_camera_options = C.mln_camera_options_default()
-	materializer := newCGeometryMaterializer()
-	defer materializer.free()
-	rawGeometry, materialErr := materializer.geometryPtr(geometry)
-	if materialErr != nil {
-		return CameraOptions{}, newBindingError(ErrInvalidArgument, materialErr.Error())
-	}
+	rawGeometry := newCBufferView(geometry)
+	defer rawGeometry.free()
 	rawFitOptions, rawFitOptionsPtr := cCameraFitOptionsPointer(fitOptions)
 	_ = rawFitOptions
 	if err := checkNative(func() int32 {
 		return int32(C.mln_map_camera_for_geometry(
 			C.mln_map(ptr),
-			rawGeometry,
+			rawGeometry.raw(),
 			rawFitOptionsPtr,
 			&raw,
 		))

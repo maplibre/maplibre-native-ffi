@@ -38,9 +38,10 @@
 #include <mbgl/renderer/update_parameters.hpp>
 #include <mbgl/style/conversion.hpp>
 #include <mbgl/style/conversion/geojson_options.hpp>  // IWYU pragma: keep
-#include <mbgl/style/conversion/layer.hpp>            // IWYU pragma: keep
-#include <mbgl/style/conversion/light.hpp>            // IWYU pragma: keep
-#include <mbgl/style/conversion/source.hpp>           // IWYU pragma: keep
+#include <mbgl/style/conversion/json.hpp>
+#include <mbgl/style/conversion/layer.hpp>   // IWYU pragma: keep
+#include <mbgl/style/conversion/light.hpp>   // IWYU pragma: keep
+#include <mbgl/style/conversion/source.hpp>  // IWYU pragma: keep
 #include <mbgl/style/conversion_impl.hpp>
 #include <mbgl/style/image.hpp>
 #include <mbgl/style/layer.hpp>
@@ -48,6 +49,7 @@
 #include <mbgl/style/layers/hillshade_layer.hpp>
 #include <mbgl/style/layers/location_indicator_layer.hpp>
 #include <mbgl/style/light.hpp>
+#include <mbgl/style/rapidjson_conversion.hpp>
 #include <mbgl/style/source.hpp>
 #include <mbgl/style/sources/custom_geometry_source.hpp>
 #include <mbgl/style/sources/geojson_source.hpp>
@@ -75,6 +77,7 @@
 
 #include "map/map.hpp"
 
+#include "bytes/buffer.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "geojson/geojson.hpp"
 #include "handles/handle_table.hpp"
@@ -108,13 +111,20 @@ struct HandleTraits<StyleStringListObject> {
 
 namespace {
 
+auto buffer_view_from_string(const std::string& value) -> mln_buffer_view {
+  return {
+    .data = value.data(),
+    .size = value.size(),
+  };
+}
+
 enum class TileSourceOptionKind : uint8_t { Vector, Raster, RasterDEM };
 
 constexpr auto default_map_width = uint32_t{256};
 constexpr auto default_map_height = uint32_t{256};
 constexpr double default_scale_factor = 1.0;
 
-auto validate_string_view(mln_string_view string, const char* name) -> bool {
+auto validate_string_view(mln_buffer_view string, const char* name) -> bool {
   if (string.size > 0 && string.data == nullptr) {
     auto message = std::string{name} + " data must not be null";
     mln::core::set_thread_error(message.c_str());
@@ -123,19 +133,19 @@ auto validate_string_view(mln_string_view string, const char* name) -> bool {
   return true;
 }
 
-auto string_from_view(mln_string_view string) -> std::string {
+auto string_from_view(mln_buffer_view string) -> std::string {
   if (string.size == 0) {
     return {};
   }
-  return std::string{string.data, string.size};
+  return std::string{static_cast<const char*>(string.data), string.size};
 }
 
-auto string_view_from_string(const std::string& string) -> mln_string_view {
-  return mln_string_view{.data = string.data(), .size = string.size()};
+auto string_view_from_string(const std::string& string) -> mln_buffer_view {
+  return mln_buffer_view{.data = string.data(), .size = string.size()};
 }
 
-auto string_view_from_literal(const char* string) -> mln_string_view {
-  return mln_string_view{.data = string, .size = std::strlen(string)};
+auto string_view_from_literal(const char* string) -> mln_buffer_view {
+  return mln_buffer_view{.data = string, .size = std::strlen(string)};
 }
 
 auto validate_lat_lng_bounds(mln_lat_lng_bounds bounds) -> mln_status;
@@ -517,7 +527,7 @@ auto to_native_raster_encoding(uint32_t encoding)
            : mbgl::Tileset::RasterEncoding::Mapbox;
 }
 
-auto validate_tile_urls(const mln_string_view* tiles, size_t tile_count)
+auto validate_tile_urls(const mln_buffer_view* tiles, size_t tile_count)
   -> mln_status {
   if (tile_count == 0) {
     mln::core::set_thread_error("tile_count must be greater than 0");
@@ -527,7 +537,7 @@ auto validate_tile_urls(const mln_string_view* tiles, size_t tile_count)
     mln::core::set_thread_error("tiles must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  for (const auto tile : std::span<const mln_string_view>{tiles, tile_count}) {
+  for (const auto tile : std::span<const mln_buffer_view>{tiles, tile_count}) {
     if (!validate_string_view(tile, "tile URL")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -539,18 +549,18 @@ auto validate_tile_urls(const mln_string_view* tiles, size_t tile_count)
   return MLN_STATUS_OK;
 }
 
-auto to_native_tile_urls(const mln_string_view* tiles, size_t tile_count)
+auto to_native_tile_urls(const mln_buffer_view* tiles, size_t tile_count)
   -> std::vector<std::string> {
   auto result = std::vector<std::string>{};
   result.reserve(tile_count);
-  for (const auto tile : std::span<const mln_string_view>{tiles, tile_count}) {
+  for (const auto tile : std::span<const mln_buffer_view>{tiles, tile_count}) {
     result.push_back(string_from_view(tile));
   }
   return result;
 }
 
 auto to_native_tileset(
-  const mln_string_view* tiles, size_t tile_count,
+  const mln_buffer_view* tiles, size_t tile_count,
   const mln_style_tile_source_options& options, bool vector_source
 ) -> std::optional<mbgl::Tileset> {
   if (options.min_zoom > options.max_zoom) {
@@ -727,21 +737,12 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
     has_geojson_source_option(
       *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
     ) &&
-    effective.cluster_properties == nullptr
+    effective.cluster_properties.size == 0
   ) {
     mln::core::set_thread_error(
-      "cluster_properties must not be null when its field is present"
+      "cluster_properties must not be empty when its field is present"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (effective.cluster_properties != nullptr) {
-    if (!mln::core::validate_style_json_value(effective.cluster_properties)) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    if (effective.cluster_properties->type != MLN_JSON_VALUE_TYPE_OBJECT) {
-      mln::core::set_thread_error("cluster_properties must be a JSON object");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
   }
   return MLN_STATUS_OK;
 }
@@ -763,21 +764,29 @@ auto to_native_geojson_source_options(const mln_geojson_source_options& options)
   native.clusterMinPoints = options.cluster_min_points;
   native.synchronousUpdate = options.synchronous_update;
 
-  if (options.cluster_properties != nullptr) {
-    constexpr auto key = std::string_view{"clusterProperties"};
-    const auto member = mln_json_member{
-      .key = {.data = key.data(), .size = key.size()},
-      .value = options.cluster_properties
-    };
-    const auto wrapper = mln_json_value{
-      .size = sizeof(mln_json_value),
-      .type = MLN_JSON_VALUE_TYPE_OBJECT,
-      .data = {.object_value = {.members = &member, .member_count = 1}}
-    };
+  if (options.cluster_properties.size != 0) {
+    auto document = mbgl::JSDocument{};
+    if (!mln::core::parse_json_document(
+          options.cluster_properties, "cluster_properties", document
+        )) {
+      return std::nullopt;
+    }
+    if (!document.IsObject()) {
+      mln::core::set_thread_error(
+        "cluster_properties must contain a JSON object"
+      );
+      return std::nullopt;
+    }
+    auto wrapper = std::string{"{\"clusterProperties\":"};
+    wrapper.append(
+      static_cast<const char*>(options.cluster_properties.data),
+      options.cluster_properties.size
+    );
+    wrapper.push_back('}');
     auto error = mbgl::style::conversion::Error{};
     auto converted =
-      mbgl::style::conversion::convert<mbgl::style::GeoJSONOptions>(
-        mbgl::style::conversion::Convertible{&wrapper}, error
+      mbgl::style::conversion::convertJSON<mbgl::style::GeoJSONOptions>(
+        wrapper, error
       );
     if (!converted) {
       mln::core::set_style_conversion_error("GeoJSON source options", error);
@@ -1080,7 +1089,7 @@ auto to_native_canonical_tile_id(mln_canonical_tile_id tile_id)
   };
 }
 
-auto validate_source_id(mln_string_view source_id) -> mln_status {
+auto validate_source_id(mln_buffer_view source_id) -> mln_status {
   if (!validate_string_view(source_id, "source_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1368,7 +1377,7 @@ auto to_native_premultiplied_rgba8_image(
   return result;
 }
 
-auto validate_image_id(mln_string_view image_id) -> mln_status {
+auto validate_image_id(mln_buffer_view image_id) -> mln_status {
   if (!validate_string_view(image_id, "image_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -3437,7 +3446,7 @@ auto geojson_source_options_default() noexcept -> mln_geojson_source_options {
     .max_zoom = static_cast<double>(defaults.maxzoom),
     .tolerance = defaults.tolerance,
     .cluster_max_zoom = static_cast<double>(defaults.clusterMaxZoom),
-    .cluster_properties = nullptr,
+    .cluster_properties = {},
     .tile_size = defaults.tileSize,
     .buffer = defaults.buffer,
     .cluster_radius = defaults.clusterRadius,
@@ -3820,19 +3829,20 @@ auto map_set_style_url(mln_map map, const char* url) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto map_set_style_json(mln_map map, const char* json) -> mln_status {
+auto map_set_style_json(mln_map map, mln_buffer_view json) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (json == nullptr) {
-    set_thread_error("json must not be null");
+  if (!validate_bytes(json, "style JSON")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   try {
     clear_runtime_map_loading_failure(live->runtime, map);
-    live->map->getStyle().loadJSON(json);
+    live->map->getStyle().loadJSON(
+      std::string{reinterpret_cast<const char*>(json.data), json.size}
+    );
   } catch (const std::exception& exception) {
     set_thread_error(exception.what());
     push_runtime_map_event(
@@ -3853,7 +3863,7 @@ auto map_set_style_json(mln_map map, const char* json) -> mln_status {
 // Reports the document the style loader last parsed, not the live style, so
 // runtime style mutations never reach it.
 auto map_copy_loaded_style_json(
-  mln_map map, char* out_json, size_t json_capacity, size_t* out_json_size
+  mln_map map, uint8_t* out_json, size_t json_capacity, size_t* out_json_size
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -3861,8 +3871,8 @@ auto map_copy_loaded_style_json(
     return status;
   }
   return copy_text(
-    live->map->getStyle().getJSON(), out_json, json_capacity, out_json_size,
-    "json_capacity"
+    live->map->getStyle().getJSON(), reinterpret_cast<char*>(out_json),
+    json_capacity, out_json_size, "json_capacity"
   );
 }
 
@@ -3902,7 +3912,7 @@ auto style_id_list_count(mln_style_id_list list, size_t* out_count)
 }
 
 auto style_id_list_get(
-  mln_style_id_list list, size_t index, mln_string_view* out_id
+  mln_style_id_list list, size_t index, mln_buffer_view* out_id
 ) -> mln_status {
   if (out_id == nullptr) {
     set_thread_error("out_id must not be null");
@@ -3945,7 +3955,7 @@ auto style_string_list_count(mln_style_string_list list, size_t* out_count)
 }
 
 auto style_string_list_get(
-  mln_style_string_list list, size_t index, mln_string_view* out_value
+  mln_style_string_list list, size_t index, mln_buffer_view* out_value
 ) -> mln_status {
   if (out_value == nullptr) {
     set_thread_error("out_value must not be null");
@@ -3971,7 +3981,7 @@ auto style_string_list_destroy(mln_style_string_list list) -> void {
 }
 
 auto map_add_style_source_json(
-  mln_map map, mln_string_view source_id, const mln_json_value* source_json
+  mln_map map, mln_buffer_view source_id, mln_buffer_view source_json
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -3985,7 +3995,7 @@ auto map_add_style_source_json(
     set_thread_error("source_id must not be empty");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (!validate_style_json_value(source_json)) {
+  if (!validate_bytes(source_json, "style source")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
@@ -3998,8 +4008,8 @@ auto map_add_style_source_json(
 
   auto error = mbgl::style::conversion::Error{};
   auto source =
-    mbgl::style::conversion::convert<std::unique_ptr<mbgl::style::Source>>(
-      mbgl::style::conversion::Convertible{source_json}, error, id
+    mbgl::style::conversion::convertJSON<std::unique_ptr<mbgl::style::Source>>(
+      string_from_view(source_json), error, id
     );
   if (!source) {
     set_style_conversion_error("style source", error);
@@ -4011,7 +4021,7 @@ auto map_add_style_source_json(
 }
 
 auto map_remove_style_source(
-  mln_map map, mln_string_view source_id, bool* out_removed
+  mln_map map, mln_buffer_view source_id, bool* out_removed
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -4047,7 +4057,7 @@ auto map_remove_style_source(
 }
 
 auto map_style_source_exists(
-  mln_map map, mln_string_view source_id, bool* out_exists
+  mln_map map, mln_buffer_view source_id, bool* out_exists
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -4072,7 +4082,7 @@ auto map_style_source_exists(
 }
 
 auto map_get_style_source_type(
-  mln_map map, mln_string_view source_id, uint32_t* out_source_type,
+  mln_map map, mln_buffer_view source_id, uint32_t* out_source_type,
   bool* out_found
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -4103,7 +4113,7 @@ auto map_get_style_source_type(
 }
 
 auto map_get_style_source_info(
-  mln_map map, mln_string_view source_id, mln_style_source_info* out_info,
+  mln_map map, mln_buffer_view source_id, mln_style_source_info* out_info,
   bool* out_found
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -4189,7 +4199,7 @@ auto map_get_style_source_info(
 }
 
 auto map_copy_style_source_attribution(
-  mln_map map, mln_string_view source_id, char* out_attribution,
+  mln_map map, mln_buffer_view source_id, char* out_attribution,
   size_t attribution_capacity, size_t* out_attribution_size, bool* out_found
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -4244,7 +4254,7 @@ auto map_copy_style_source_attribution(
 }
 
 auto map_copy_style_source_url(
-  mln_map map, mln_string_view source_id, char* out_url, size_t url_capacity,
+  mln_map map, mln_buffer_view source_id, char* out_url, size_t url_capacity,
   size_t* out_url_size, bool* out_found
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -4283,7 +4293,7 @@ auto map_copy_style_source_url(
 }
 
 auto map_get_style_source_tile_urls(
-  mln_map map, mln_string_view source_id, mln_style_string_list* out_tile_urls,
+  mln_map map, mln_buffer_view source_id, mln_style_string_list* out_tile_urls,
   bool* out_found
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -4341,7 +4351,7 @@ auto map_list_style_source_ids(mln_map map, mln_style_id_list* out_source_ids)
 }
 
 auto map_add_geojson_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
   const mln_geojson_source_options* options
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -4387,7 +4397,7 @@ auto map_add_geojson_source_url(
 }
 
 auto map_add_geojson_source_data(
-  mln_map map, mln_string_view source_id, const mln_geojson* data,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view data,
   const mln_geojson_source_options* options
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -4435,7 +4445,7 @@ auto map_add_geojson_source_data(
 }
 
 auto map_set_geojson_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -4470,7 +4480,7 @@ auto map_set_geojson_source_url(
 }
 
 auto map_set_geojson_source_data(
-  mln_map map, mln_string_view source_id, const mln_geojson* data
+  mln_map map, mln_buffer_view source_id, mln_buffer_view data
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -4509,7 +4519,7 @@ auto map_set_geojson_source_data(
 }
 
 auto map_add_vector_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
   const mln_style_tile_source_options* options
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -4577,7 +4587,7 @@ auto map_add_vector_source_url(
 }
 
 auto map_add_vector_source_tiles(
-  mln_map map, mln_string_view source_id, const mln_string_view* tiles,
+  mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -4621,7 +4631,7 @@ auto map_add_vector_source_tiles(
 }
 
 auto map_add_raster_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
   const mln_style_tile_source_options* options
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -4663,7 +4673,7 @@ auto map_add_raster_source_url(
 }
 
 auto map_add_raster_source_tiles(
-  mln_map map, mln_string_view source_id, const mln_string_view* tiles,
+  mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -4706,7 +4716,7 @@ auto map_add_raster_source_tiles(
 }
 
 auto map_add_raster_dem_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
   const mln_style_tile_source_options* options
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -4759,7 +4769,7 @@ auto map_add_raster_dem_source_url(
 }
 
 auto map_add_raster_dem_source_tiles(
-  mln_map map, mln_string_view source_id, const mln_string_view* tiles,
+  mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -4810,7 +4820,7 @@ auto map_add_raster_dem_source_tiles(
 }
 
 auto map_add_custom_geometry_source(
-  mln_map map, mln_string_view source_id,
+  mln_map map, mln_buffer_view source_id,
   const mln_custom_geometry_source_options* options
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -4844,8 +4854,8 @@ auto map_add_custom_geometry_source(
 }
 
 auto map_set_custom_geometry_source_tile_data(
-  mln_map map, mln_string_view source_id, mln_canonical_tile_id tile_id,
-  const mln_geojson* data
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view data
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -4880,7 +4890,7 @@ auto map_set_custom_geometry_source_tile_data(
 }
 
 auto map_invalidate_custom_geometry_source_tile(
-  mln_map map, mln_string_view source_id, mln_canonical_tile_id tile_id
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -4911,7 +4921,7 @@ auto map_invalidate_custom_geometry_source_tile(
 }
 
 auto map_invalidate_custom_geometry_source_region(
-  mln_map map, mln_string_view source_id, mln_lat_lng_bounds bounds
+  mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -4942,7 +4952,7 @@ auto map_invalidate_custom_geometry_source_region(
 }
 
 auto map_set_style_image(
-  mln_map map, mln_string_view image_id,
+  mln_map map, mln_buffer_view image_id,
   const mln_premultiplied_rgba8_image* image,
   const mln_style_image_options* options
 ) -> mln_status {
@@ -5004,7 +5014,7 @@ auto map_set_style_image(
 }
 
 auto map_remove_style_image(
-  mln_map map, mln_string_view image_id, bool* out_removed
+  mln_map map, mln_buffer_view image_id, bool* out_removed
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -5030,7 +5040,7 @@ auto map_remove_style_image(
 }
 
 auto map_style_image_exists(
-  mln_map map, mln_string_view image_id, bool* out_exists
+  mln_map map, mln_buffer_view image_id, bool* out_exists
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -5052,7 +5062,7 @@ auto map_style_image_exists(
 }
 
 auto map_get_style_image_info(
-  mln_map map, mln_string_view image_id, mln_style_image_info* out_info,
+  mln_map map, mln_buffer_view image_id, mln_style_image_info* out_info,
   bool* out_found
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -5081,7 +5091,7 @@ auto map_get_style_image_info(
 }
 
 auto map_copy_style_image_stretches(
-  mln_map map, mln_string_view image_id, mln_image_stretch* out_stretch_x,
+  mln_map map, mln_buffer_view image_id, mln_image_stretch* out_stretch_x,
   size_t stretch_x_capacity, size_t* out_stretch_x_count,
   mln_image_stretch* out_stretch_y, size_t stretch_y_capacity,
   size_t* out_stretch_y_count, bool* out_found
@@ -5161,7 +5171,7 @@ auto map_copy_style_image_stretches(
 }
 
 auto map_copy_style_image_premultiplied_rgba8(
-  mln_map map, mln_string_view image_id, uint8_t* out_pixels,
+  mln_map map, mln_buffer_view image_id, uint8_t* out_pixels,
   size_t pixel_capacity, size_t* out_byte_length, bool* out_found
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -5207,8 +5217,8 @@ auto map_copy_style_image_premultiplied_rgba8(
 }
 
 auto map_add_image_source_url(
-  mln_map map, mln_string_view source_id, const mln_lat_lng* coordinates,
-  size_t coordinate_count, mln_string_view url
+  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
+  size_t coordinate_count, mln_buffer_view url
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -5248,7 +5258,7 @@ auto map_add_image_source_url(
 }
 
 auto map_add_image_source_image(
-  mln_map map, mln_string_view source_id, const mln_lat_lng* coordinates,
+  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
   size_t coordinate_count, const mln_premultiplied_rgba8_image* image
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -5296,7 +5306,7 @@ auto map_add_image_source_image(
 }
 
 auto map_set_image_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -5330,7 +5340,7 @@ auto map_set_image_source_url(
 }
 
 auto map_set_image_source_image(
-  mln_map map, mln_string_view source_id,
+  mln_map map, mln_buffer_view source_id,
   const mln_premultiplied_rgba8_image* image
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -5362,7 +5372,7 @@ auto map_set_image_source_image(
 }
 
 auto map_set_image_source_coordinates(
-  mln_map map, mln_string_view source_id, const mln_lat_lng* coordinates,
+  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
   size_t coordinate_count
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -5395,7 +5405,7 @@ auto map_set_image_source_coordinates(
 }
 
 auto map_get_image_source_coordinates(
-  mln_map map, mln_string_view source_id, mln_lat_lng* out_coordinates,
+  mln_map map, mln_buffer_view source_id, mln_lat_lng* out_coordinates,
   size_t coordinate_capacity, size_t* out_coordinate_count, bool* out_found
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -5444,8 +5454,8 @@ auto map_get_image_source_coordinates(
 }
 
 auto map_add_hillshade_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view source_id,
-  mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
+  mln_buffer_view before_layer_id
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -5496,8 +5506,8 @@ auto map_add_hillshade_layer(
 }
 
 auto map_add_color_relief_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view source_id,
-  mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
+  mln_buffer_view before_layer_id
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -5548,7 +5558,7 @@ auto map_add_color_relief_layer(
 }
 
 auto map_add_location_indicator_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -5586,7 +5596,7 @@ auto map_add_location_indicator_layer(
   return MLN_STATUS_OK;
 }
 
-auto validate_location_indicator_layer(MapObject* map, mln_string_view layer_id)
+auto validate_location_indicator_layer(MapObject* map, mln_buffer_view layer_id)
   -> mln_status {
   if (!validate_string_view(layer_id, "layer_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -5620,7 +5630,7 @@ auto validate_float64_to_float32(double value, const char* name) -> mln_status {
 }
 
 auto map_set_location_indicator_location(
-  mln_map map, mln_string_view layer_id, mln_lat_lng coordinate, double altitude
+  mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -5642,37 +5652,20 @@ auto map_set_location_indicator_location(
 
   // The style property is [latitude, longitude, altitude]; the renderer reads
   // it back as LatLng{values[0], values[1]}.
-  auto values = std::array<mln_json_value, 3>{
-    mln_json_value{
-      .size = sizeof(mln_json_value),
-      .type = MLN_JSON_VALUE_TYPE_DOUBLE,
-      .data = {.double_value = coordinate.latitude}
-    },
-    mln_json_value{
-      .size = sizeof(mln_json_value),
-      .type = MLN_JSON_VALUE_TYPE_DOUBLE,
-      .data = {.double_value = coordinate.longitude}
-    },
-    mln_json_value{
-      .size = sizeof(mln_json_value),
-      .type = MLN_JSON_VALUE_TYPE_DOUBLE,
-      .data = {.double_value = altitude}
-    },
-  };
-  auto location = mln_json_value{
-    .size = sizeof(mln_json_value),
-    .type = MLN_JSON_VALUE_TYPE_ARRAY,
-    .data = {
-      .array_value = {.values = values.data(), .value_count = values.size()}
-    }
-  };
+  const auto location = serialize_json_value(
+    mbgl::Value{mapbox::base::ValueArray{
+      mbgl::Value{coordinate.latitude}, mbgl::Value{coordinate.longitude},
+      mbgl::Value{altitude}
+    }}
+  );
   return map_set_layer_property(
-    map, layer_id, string_view_from_literal("location"), &location
+    map, layer_id, string_view_from_literal("location"),
+    buffer_view_from_string(location)
   );
 }
 
 auto map_set_location_indicator_bearing(
-  mln_map map, mln_string_view layer_id, double bearing
+  mln_map map, mln_buffer_view layer_id, double bearing
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -5687,18 +5680,15 @@ auto map_set_location_indicator_bearing(
   if (bearing_status != MLN_STATUS_OK) {
     return bearing_status;
   }
-  auto value = mln_json_value{
-    .size = sizeof(mln_json_value),
-    .type = MLN_JSON_VALUE_TYPE_DOUBLE,
-    .data = {.double_value = bearing}
-  };
+  const auto value = serialize_json_value(mbgl::Value{bearing});
   return map_set_layer_property(
-    map, layer_id, string_view_from_literal("bearing"), &value
+    map, layer_id, string_view_from_literal("bearing"),
+    buffer_view_from_string(value)
   );
 }
 
 auto map_set_location_indicator_accuracy_radius(
-  mln_map map, mln_string_view layer_id, double radius
+  mln_map map, mln_buffer_view layer_id, double radius
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -5717,18 +5707,15 @@ auto map_set_location_indicator_accuracy_radius(
     set_thread_error("radius must be non-negative");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto value = mln_json_value{
-    .size = sizeof(mln_json_value),
-    .type = MLN_JSON_VALUE_TYPE_DOUBLE,
-    .data = {.double_value = radius}
-  };
+  const auto value = serialize_json_value(mbgl::Value{radius});
   return map_set_layer_property(
-    map, layer_id, string_view_from_literal("accuracy-radius"), &value
+    map, layer_id, string_view_from_literal("accuracy-radius"),
+    buffer_view_from_string(value)
   );
 }
 
 auto location_indicator_image_property(uint32_t image_kind)
-  -> std::optional<mln_string_view> {
+  -> std::optional<mln_buffer_view> {
   switch (image_kind) {
     case MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP:
       return string_view_from_literal("top-image");
@@ -5742,8 +5729,8 @@ auto location_indicator_image_property(uint32_t image_kind)
 }
 
 auto map_set_location_indicator_image_name(
-  mln_map map, mln_string_view layer_id, uint32_t image_kind,
-  mln_string_view image_id
+  mln_map map, mln_buffer_view layer_id, uint32_t image_kind,
+  mln_buffer_view image_id
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -5766,16 +5753,15 @@ auto map_set_location_indicator_image_name(
     set_thread_error("image_kind is invalid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto value = mln_json_value{
-    .size = sizeof(mln_json_value),
-    .type = MLN_JSON_VALUE_TYPE_STRING,
-    .data = {.string_value = image_id}
-  };
-  return map_set_layer_property(map, layer_id, *property, &value);
+  const auto value =
+    serialize_json_value(mbgl::Value{string_from_view(image_id)});
+  return map_set_layer_property(
+    map, layer_id, *property, buffer_view_from_string(value)
+  );
 }
 
 auto map_add_style_layer_json(
-  mln_map map, const mln_json_value* layer_json, mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_json, mln_buffer_view before_layer_id
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -5785,7 +5771,7 @@ auto map_add_style_layer_json(
   if (!validate_string_view(before_layer_id, "before_layer_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (!validate_style_json_value(layer_json)) {
+  if (!validate_bytes(layer_json, "style layer")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
@@ -5801,8 +5787,8 @@ auto map_add_style_layer_json(
 
   auto error = mbgl::style::conversion::Error{};
   auto layer =
-    mbgl::style::conversion::convert<std::unique_ptr<mbgl::style::Layer>>(
-      mbgl::style::conversion::Convertible{layer_json}, error
+    mbgl::style::conversion::convertJSON<std::unique_ptr<mbgl::style::Layer>>(
+      string_from_view(layer_json), error
     );
   if (!layer) {
     set_style_conversion_error("style layer", error);
@@ -5828,7 +5814,7 @@ auto map_add_style_layer_json(
 }
 
 auto map_remove_style_layer(
-  mln_map map, mln_string_view layer_id, bool* out_removed
+  mln_map map, mln_buffer_view layer_id, bool* out_removed
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -5853,7 +5839,7 @@ auto map_remove_style_layer(
 }
 
 auto map_style_layer_exists(
-  mln_map map, mln_string_view layer_id, bool* out_exists
+  mln_map map, mln_buffer_view layer_id, bool* out_exists
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -5878,7 +5864,7 @@ auto map_style_layer_exists(
 }
 
 auto map_get_style_layer_type(
-  mln_map map, mln_string_view layer_id, mln_string_view* out_layer_type,
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view* out_layer_type,
   bool* out_found
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -5924,7 +5910,7 @@ auto map_list_style_layer_ids(mln_map map, mln_style_id_list* out_layer_ids)
 }
 
 auto map_move_style_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -5967,8 +5953,7 @@ auto map_move_style_layer(
 }
 
 auto map_get_style_layer_json(
-  mln_map map, mln_string_view layer_id, mln_json_snapshot* out_layer,
-  bool* out_found
+  mln_map map, mln_buffer_view layer_id, mln_buffer* out_layer, bool* out_found
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -5999,23 +5984,23 @@ auto map_get_style_layer_json(
   if (layer == nullptr) {
     return MLN_STATUS_OK;
   }
-  return json_snapshot_create(layer->serialize(), out_layer);
+  return create_buffer(serialize_json_value(layer->serialize()), out_layer);
 }
 
-auto map_set_style_light_json(mln_map map, const mln_json_value* light_json)
+auto map_set_style_light_json(mln_map map, mln_buffer_view light_json)
   -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (!validate_style_json_value(light_json)) {
+  if (!validate_bytes(light_json, "style light")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   auto error = mbgl::style::conversion::Error{};
-  auto light = mbgl::style::conversion::convert<mbgl::style::Light>(
-    mbgl::style::conversion::Convertible{light_json}, error
+  auto light = mbgl::style::conversion::convertJSON<mbgl::style::Light>(
+    string_from_view(light_json), error
   );
   if (!light) {
     set_style_conversion_error("style light", error);
@@ -6027,7 +6012,7 @@ auto map_set_style_light_json(mln_map map, const mln_json_value* light_json)
 }
 
 auto map_set_style_light_property(
-  mln_map map, mln_string_view property_name, const mln_json_value* value
+  mln_map map, mln_buffer_view property_name, mln_buffer_view value
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -6041,7 +6026,8 @@ auto map_set_style_light_property(
     set_thread_error("property_name must not be empty");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (!validate_style_json_value(value)) {
+  auto document = mbgl::JSDocument{};
+  if (!parse_json_document(value, "style light property", document)) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
@@ -6052,7 +6038,10 @@ auto map_set_style_light_property(
   }
 
   auto error = light->setProperty(
-    string_from_view(property_name), mbgl::style::conversion::Convertible{value}
+    string_from_view(property_name),
+    mbgl::style::conversion::Convertible{
+      static_cast<const mbgl::JSValue*>(&document)
+    }
   );
   if (error) {
     set_style_conversion_error("style light property", *error);
@@ -6062,7 +6051,7 @@ auto map_set_style_light_property(
 }
 
 auto map_get_style_light_property(
-  mln_map map, mln_string_view property_name, mln_json_snapshot* out_value
+  mln_map map, mln_buffer_view property_name, mln_buffer* out_value
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -6093,7 +6082,7 @@ auto map_get_style_light_property(
   if (property.getKind() == mbgl::style::StyleProperty::Kind::Undefined) {
     return MLN_STATUS_OK;
   }
-  return json_snapshot_create(property.getValue(), out_value);
+  return create_buffer(serialize_json_value(property.getValue()), out_value);
 }
 
 auto map_set_style_transition_options(
@@ -6187,8 +6176,8 @@ auto map_get_style_transition_options(
 }
 
 auto map_set_layer_property(
-  mln_map map, mln_string_view layer_id, mln_string_view property_name,
-  const mln_json_value* value
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
+  mln_buffer_view value
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -6206,7 +6195,8 @@ auto map_set_layer_property(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  if (!validate_style_json_value(value)) {
+  auto document = mbgl::JSDocument{};
+  if (!parse_json_document(value, "layer property", document)) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
@@ -6217,7 +6207,10 @@ auto map_set_layer_property(
   }
 
   auto error = layer->setProperty(
-    string_from_view(property_name), mbgl::style::conversion::Convertible{value}
+    string_from_view(property_name),
+    mbgl::style::conversion::Convertible{
+      static_cast<const mbgl::JSValue*>(&document)
+    }
   );
   if (error) {
     set_style_conversion_error("layer property", *error);
@@ -6228,8 +6221,8 @@ auto map_set_layer_property(
 }
 
 auto map_get_layer_property(
-  mln_map map, mln_string_view layer_id, mln_string_view property_name,
-  mln_json_snapshot* out_value
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
+  mln_buffer* out_value
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -6260,15 +6253,14 @@ auto map_get_layer_property(
   }
 
   const auto property = layer->getProperty(string_from_view(property_name));
-  const auto value =
-    property.getKind() == mbgl::style::StyleProperty::Kind::Undefined
-      ? mbgl::Value{mbgl::NullValue{}}
-      : property.getValue();
-  return json_snapshot_create(value, out_value);
+  if (property.getKind() == mbgl::style::StyleProperty::Kind::Undefined) {
+    return MLN_STATUS_OK;
+  }
+  return create_buffer(serialize_json_value(property.getValue()), out_value);
 }
 
 auto map_set_layer_filter(
-  mln_map map, mln_string_view layer_id, const mln_json_value* filter
+  mln_map map, mln_buffer_view layer_id, const mln_buffer_view* filter
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -6304,7 +6296,7 @@ auto map_set_layer_filter(
 }
 
 auto map_get_layer_filter(
-  mln_map map, mln_string_view layer_id, mln_json_snapshot* out_filter
+  mln_map map, mln_buffer_view layer_id, mln_buffer* out_filter
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -6331,13 +6323,17 @@ auto map_get_layer_filter(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  return json_snapshot_create(layer->getFilter().serialize(), out_filter);
+  const auto filter = layer->getFilter().serialize();
+  if (filter.is<mbgl::NullValue>()) {
+    return MLN_STATUS_OK;
+  }
+  return create_buffer(serialize_json_value(filter), out_filter);
 }
 
 namespace {
 
 auto resolve_layer_for_access(
-  mln_map map, mln_string_view layer_id, mbgl::style::Layer*& out_layer
+  mln_map map, mln_buffer_view layer_id, mbgl::style::Layer*& out_layer
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -6391,7 +6387,7 @@ auto validate_layer_zoom(double zoom, const char* field) -> bool {
 }  // namespace
 
 auto map_set_layer_source_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view source_layer
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer
 ) -> mln_status {
   mbgl::style::Layer* layer = nullptr;
   const auto status = resolve_layer_for_access(map, layer_id, layer);
@@ -6410,7 +6406,7 @@ auto map_set_layer_source_layer(
 }
 
 auto map_copy_layer_source_layer(
-  mln_map map, mln_string_view layer_id, char* out_source_layer,
+  mln_map map, mln_buffer_view layer_id, char* out_source_layer,
   size_t source_layer_capacity, size_t* out_source_layer_size
 ) -> mln_status {
   mbgl::style::Layer* layer = nullptr;
@@ -6425,7 +6421,7 @@ auto map_copy_layer_source_layer(
 }
 
 auto map_set_layer_source_id(
-  mln_map map, mln_string_view layer_id, mln_string_view source_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id
 ) -> mln_status {
   mbgl::style::Layer* layer = nullptr;
   const auto status = resolve_layer_for_access(map, layer_id, layer);
@@ -6448,7 +6444,7 @@ auto map_set_layer_source_id(
 }
 
 auto map_copy_layer_source_id(
-  mln_map map, mln_string_view layer_id, char* out_source_id,
+  mln_map map, mln_buffer_view layer_id, char* out_source_id,
   size_t source_id_capacity, size_t* out_source_id_size
 ) -> mln_status {
   mbgl::style::Layer* layer = nullptr;
@@ -6463,7 +6459,7 @@ auto map_copy_layer_source_id(
 }
 
 auto map_set_layer_min_zoom(
-  mln_map map, mln_string_view layer_id, double min_zoom
+  mln_map map, mln_buffer_view layer_id, double min_zoom
 ) -> mln_status {
   mbgl::style::Layer* layer = nullptr;
   const auto status = resolve_layer_for_access(map, layer_id, layer);
@@ -6479,7 +6475,7 @@ auto map_set_layer_min_zoom(
 }
 
 auto map_get_layer_min_zoom(
-  mln_map map, mln_string_view layer_id, double* out_min_zoom
+  mln_map map, mln_buffer_view layer_id, double* out_min_zoom
 ) -> mln_status {
   mbgl::style::Layer* layer = nullptr;
   const auto status = resolve_layer_for_access(map, layer_id, layer);
@@ -6496,7 +6492,7 @@ auto map_get_layer_min_zoom(
 }
 
 auto map_set_layer_max_zoom(
-  mln_map map, mln_string_view layer_id, double max_zoom
+  mln_map map, mln_buffer_view layer_id, double max_zoom
 ) -> mln_status {
   mbgl::style::Layer* layer = nullptr;
   const auto status = resolve_layer_for_access(map, layer_id, layer);
@@ -6512,7 +6508,7 @@ auto map_set_layer_max_zoom(
 }
 
 auto map_get_layer_max_zoom(
-  mln_map map, mln_string_view layer_id, double* out_max_zoom
+  mln_map map, mln_buffer_view layer_id, double* out_max_zoom
 ) -> mln_status {
   mbgl::style::Layer* layer = nullptr;
   const auto status = resolve_layer_for_access(map, layer_id, layer);
@@ -6529,7 +6525,7 @@ auto map_get_layer_max_zoom(
 }
 
 auto map_set_layer_visibility(
-  mln_map map, mln_string_view layer_id, uint32_t visibility
+  mln_map map, mln_buffer_view layer_id, uint32_t visibility
 ) -> mln_status {
   mbgl::style::Layer* layer = nullptr;
   const auto status = resolve_layer_for_access(map, layer_id, layer);
@@ -6554,7 +6550,7 @@ auto map_set_layer_visibility(
 }
 
 auto map_get_layer_visibility(
-  mln_map map, mln_string_view layer_id, uint32_t* out_visibility
+  mln_map map, mln_buffer_view layer_id, uint32_t* out_visibility
 ) -> mln_status {
   mbgl::style::Layer* layer = nullptr;
   const auto status = resolve_layer_for_access(map, layer_id, layer);
@@ -7129,7 +7125,7 @@ auto map_projection_set_visible_coordinates(
 }
 
 auto map_projection_set_visible_geometry(
-  mln_map_projection projection, const mln_geometry* geometry,
+  mln_map_projection projection, mln_buffer_view geometry,
   mln_edge_insets padding
 ) -> mln_status {
   MapProjectionObject* live = nullptr;
@@ -7474,7 +7470,7 @@ auto map_camera_for_lat_lngs(
 }
 
 auto map_camera_for_geometry(
-  mln_map map, const mln_geometry* geometry,
+  mln_map map, mln_buffer_view geometry,
   const mln_camera_fit_options* fit_options, mln_camera_options* out_camera
 ) -> mln_status {
   MapObject* live = nullptr;

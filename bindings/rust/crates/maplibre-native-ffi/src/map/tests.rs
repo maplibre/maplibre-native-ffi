@@ -1,4 +1,5 @@
 use super::*;
+use serde_json::{Value as JsonValue, json};
 use std::time::Duration;
 
 use crate::events::{
@@ -6,8 +7,7 @@ use crate::events::{
 };
 use crate::{
     BoundsConstraint, CameraChangeMode, CustomGeometrySourceOptions, EdgeInsets, ErrorKind,
-    Feature, JsonMember, MapMode, ResourceKind, ResourceProviderDecision, ResourceResponse,
-    TextureImageInfo,
+    MapMode, ResourceKind, ResourceProviderDecision, ResourceResponse, TextureImageInfo,
 };
 
 const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
@@ -22,7 +22,7 @@ const STYLE_WITH_DELAY_ONLY_TRANSITION_JSON: &str =
 fn nine_patch_style_image_round_trips_stretch_content_and_text_fit() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
     let image =
         PremultipliedRgba8Image::new(crate::TextureImageInfo::new(2, 2, 8, 16), vec![0u8; 16]);
@@ -80,7 +80,7 @@ fn nine_patch_style_image_round_trips_stretch_content_and_text_fit() {
 fn layer_base_accessors_round_trip_through_real_c_abi() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(STYLE_WITH_IDS_JSON).unwrap();
+    map.set_style_json(STYLE_WITH_IDS_JSON.as_bytes()).unwrap();
 
     assert_eq!(map.layer_source_layer("geo-fill").unwrap(), "");
     map.set_layer_source_layer("geo-fill", "roads").unwrap();
@@ -126,13 +126,7 @@ fn layer_base_accessors_round_trip_through_real_c_abi() {
 }
 
 fn object_member<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
-    let JsonValue::Object(members) = value else {
-        return None;
-    };
-    members
-        .iter()
-        .find(|member| member.key == key)
-        .map(|member| &member.value)
+    value.as_object()?.get(key)
 }
 
 fn assert_lat_lng_close(actual: LatLng, expected: LatLng) {
@@ -167,11 +161,11 @@ fn style_setters_accept_valid_input_and_reject_embedded_nul() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
     let _ = map.style_source_ids().unwrap();
     let _ = map.style_layer_ids().unwrap();
 
-    map.set_style_json(STYLE_WITH_IDS_JSON).unwrap();
+    map.set_style_json(STYLE_WITH_IDS_JSON.as_bytes()).unwrap();
     let source_ids = map.style_source_ids().unwrap();
     let layer_ids = map.style_layer_ids().unwrap();
     assert!(source_ids.iter().any(|id| id == "geo"));
@@ -187,7 +181,7 @@ fn style_setters_accept_valid_input_and_reject_embedded_nul() {
     assert_eq!(error.raw_status(), None);
     assert!(error.diagnostic().contains("embedded NUL"));
 
-    let error = map.set_style_json("{").unwrap_err();
+    let error = map.set_style_json(b"{").unwrap_err();
     assert_eq!(error.kind(), ErrorKind::NativeError);
     assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_NATIVE_ERROR));
     assert!(!error.diagnostic().trim().is_empty());
@@ -202,12 +196,15 @@ fn loaded_style_document_and_url_read_back_what_was_loaded() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
-    assert_eq!(map.loaded_style_json().unwrap(), "");
+    assert!(map.loaded_style_json().unwrap().is_empty());
     assert_eq!(map.style_url().unwrap(), "");
 
     // The document reads back byte-for-byte, so it can be reloaded unchanged.
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
-    assert_eq!(map.loaded_style_json().unwrap(), VALID_STYLE_JSON);
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    assert_eq!(
+        map.loaded_style_json().unwrap(),
+        VALID_STYLE_JSON.as_bytes()
+    );
     // Inline JSON clears the URL.
     assert_eq!(map.style_url().unwrap(), "");
 
@@ -215,7 +212,10 @@ fn loaded_style_document_and_url_read_back_what_was_loaded() {
     // reports the style that last parsed.
     map.set_style_url("https://example.com/style.json").unwrap();
     assert_eq!(map.style_url().unwrap(), "https://example.com/style.json");
-    assert_eq!(map.loaded_style_json().unwrap(), VALID_STYLE_JSON);
+    assert_eq!(
+        map.loaded_style_json().unwrap(),
+        VALID_STYLE_JSON.as_bytes()
+    );
 
     map.close().unwrap();
     runtime.close().unwrap();
@@ -226,18 +226,13 @@ fn loaded_style_document_and_url_read_back_what_was_loaded() {
 fn style_source_exists_and_remove_call_real_c_api() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
-    let source = JsonValue::Object(vec![
-        JsonMember::new("type", JsonValue::String("geojson".to_owned())),
-        JsonMember::new(
-            "data",
-            JsonValue::Object(vec![
-                JsonMember::new("type", JsonValue::String("FeatureCollection".to_owned())),
-                JsonMember::new("features", JsonValue::Array(Vec::new())),
-            ]),
-        ),
-    ]);
+    let source = serde_json::to_vec(&json!({
+        "type": "geojson",
+        "data": {"type": "FeatureCollection", "features": []},
+    }))
+    .unwrap();
 
     assert!(!map.style_source_exists("owned-source").unwrap());
     assert!(!map.remove_style_source("owned-source").unwrap());
@@ -261,7 +256,7 @@ fn test_style_image(data: Vec<u8>) -> PremultipliedRgba8Image {
 fn style_image_copy_uses_rust_owned_buffer() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
     let original_pixels = vec![
         255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
@@ -313,7 +308,7 @@ fn image_source_coordinates() -> [LatLng; 4] {
 fn image_source_helpers_accept_url_and_inline_images() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
     let coordinates = image_source_coordinates();
     map.add_image_source_url("url-image", &coordinates, "https://example.com/image.png")
@@ -337,7 +332,7 @@ fn image_source_helpers_accept_url_and_inline_images() {
 fn tile_source_helpers_call_real_c_api() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
     map.add_vector_source_url("vector-url", "https://example.com/vector.json", None)
         .unwrap();
@@ -365,23 +360,15 @@ fn tile_source_helpers_call_real_c_api() {
 fn geojson_source_helpers_accept_options_and_keep_them_across_updates() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
     let mut options = GeoJsonSourceOptions::default();
     options.cluster = Some(true);
     options.cluster_radius = Some(40);
     // A present zero must reach native as an explicit buffer of zero.
     options.buffer = Some(0);
-    options.cluster_properties = Some(JsonValue::Object(vec![JsonMember::new(
-        "weight_sum",
-        JsonValue::Array(vec![
-            JsonValue::String("+".to_owned()),
-            JsonValue::Array(vec![
-                JsonValue::String("get".to_owned()),
-                JsonValue::String("weight".to_owned()),
-            ]),
-        ]),
-    )]));
+    options.cluster_properties =
+        Some(serde_json::to_vec(&json!({"weight_sum": ["+", ["get", "weight"]]})).unwrap());
 
     map.add_geojson_source_url(
         "geojson-url",
@@ -394,10 +381,15 @@ fn geojson_source_helpers_accept_options_and_keep_them_across_updates() {
         Some(SourceType::GeoJson)
     );
 
-    let data = GeoJson::FeatureCollection(vec![Feature::new(
-        Geometry::Point(LatLng::new(0.0, 0.0)),
-        vec![JsonMember::new("weight", JsonValue::UInt(1))],
-    )]);
+    let data = serde_json::to_vec(&json!({
+        "type": "FeatureCollection",
+        "features": [{
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [0.0, 0.0]},
+            "properties": {"weight": 1},
+        }],
+    }))
+    .unwrap();
     map.add_geojson_source_data("geojson-data", &data, None)
         .unwrap();
     assert_eq!(
@@ -419,16 +411,16 @@ fn geojson_source_helpers_accept_options_and_keep_them_across_updates() {
 fn clustered_geojson_source_requires_a_feature_collection() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
     let mut options = GeoJsonSourceOptions::default();
     options.cluster = Some(true);
 
     // MapLibre Native clusters feature collections only; anything else tiles
     // unclustered instead of honouring the requested option.
-    let bare = GeoJson::Geometry(Geometry::Point(LatLng::new(0.0, 0.0)));
+    let bare = br#"{"type":"Point","coordinates":[0.0,0.0]}"#;
     let error = map
-        .add_geojson_source_data("quakes", &bare, Some(&options))
+        .add_geojson_source_data("quakes", bare, Some(&options))
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidArgument);
     let message = error.to_string();
@@ -439,23 +431,20 @@ fn clustered_geojson_source_requires_a_feature_collection() {
     );
     assert!(message.contains("a bare geometry"), "{message}");
 
-    let single = GeoJson::Feature(Feature::new(
-        Geometry::Point(LatLng::new(0.0, 0.0)),
-        Vec::new(),
-    ));
+    let single = br#"{"type":"Feature","geometry":{"type":"Point","coordinates":[0.0,0.0]},"properties":{}}"#;
     let error = map
-        .add_geojson_source_data("quakes", &single, Some(&options))
+        .add_geojson_source_data("quakes", single, Some(&options))
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidArgument);
     assert!(error.to_string().contains("a single feature"), "{error}");
 
     // The constraint belongs to clustering alone, and the rejected ID stays free.
-    map.add_geojson_source_data("quakes", &bare, None).unwrap();
+    map.add_geojson_source_data("quakes", bare, None).unwrap();
 
     // An empty feature collection is accepted; a later update supplies the
     // features to cluster.
-    let empty = GeoJson::FeatureCollection(Vec::new());
-    map.add_geojson_source_data("pending", &empty, Some(&options))
+    let empty = br#"{"type":"FeatureCollection","features":[]}"#;
+    map.add_geojson_source_data("pending", empty, Some(&options))
         .unwrap();
 
     map.close().unwrap();
@@ -467,22 +456,16 @@ fn clustered_geojson_source_requires_a_feature_collection() {
 fn clustered_geojson_source_reports_non_point_geometry() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
     let mut options = GeoJsonSourceOptions::default();
     options.cluster = Some(true);
 
-    let mixed = GeoJson::FeatureCollection(vec![
-        Feature::new(Geometry::Point(LatLng::new(0.0, 0.0)), Vec::new()),
-        Feature::new(
-            Geometry::GeometryCollection(vec![Geometry::Point(LatLng::new(1.0, 1.0))]),
-            Vec::new(),
-        ),
-    ]);
+    let mixed = br#"{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[0.0,0.0]},"properties":{}},{"type":"Feature","geometry":{"type":"GeometryCollection","geometries":[{"type":"Point","coordinates":[1.0,1.0]}]},"properties":{}}]}"#;
 
     // Supercluster reads every feature geometry as a point.
     let error = map
-        .add_geojson_source_data("quakes", &mixed, Some(&options))
+        .add_geojson_source_data("quakes", mixed, Some(&options))
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidArgument);
     let message = error.to_string();
@@ -494,7 +477,7 @@ fn clustered_geojson_source_reports_non_point_geometry() {
     assert!(message.contains("geometry collection"), "{message}");
 
     // The constraint belongs to clustering alone, and the rejected ID stays free.
-    map.add_geojson_source_data("quakes", &mixed, None).unwrap();
+    map.add_geojson_source_data("quakes", mixed, None).unwrap();
 
     map.close().unwrap();
     runtime.close().unwrap();
@@ -505,31 +488,19 @@ fn clustered_geojson_source_reports_non_point_geometry() {
 fn style_source_type_and_info_call_real_c_api() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
-    let geojson_source = JsonValue::Object(vec![
-        JsonMember::new("type", JsonValue::String("geojson".to_owned())),
-        JsonMember::new(
-            "data",
-            JsonValue::Object(vec![
-                JsonMember::new("type", JsonValue::String("FeatureCollection".to_owned())),
-                JsonMember::new("features", JsonValue::Array(Vec::new())),
-            ]),
-        ),
-    ]);
-    let vector_source = JsonValue::Object(vec![
-        JsonMember::new("type", JsonValue::String("vector".to_owned())),
-        JsonMember::new(
-            "tiles",
-            JsonValue::Array(vec![JsonValue::String(
-                "https://example.com/{z}/{x}/{y}.pbf".to_owned(),
-            )]),
-        ),
-        JsonMember::new(
-            "attribution",
-            JsonValue::String("Example attribution".to_owned()),
-        ),
-    ]);
+    let geojson_source = serde_json::to_vec(&json!({
+        "type": "geojson",
+        "data": {"type": "FeatureCollection", "features": []},
+    }))
+    .unwrap();
+    let vector_source = serde_json::to_vec(&json!({
+        "type": "vector",
+        "tiles": ["https://example.com/{z}/{x}/{y}.pbf"],
+        "attribution": "Example attribution",
+    }))
+    .unwrap();
 
     assert_eq!(map.style_source_type("missing-source").unwrap(), None);
     assert_eq!(map.style_source_info("missing-source").unwrap(), None);
@@ -565,7 +536,7 @@ fn style_source_type_and_info_call_real_c_api() {
 fn style_source_info_copies_reconstructible_source_state() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
     map.add_vector_source_url("remote", "https://example.com/source.json", None)
         .unwrap();
@@ -622,7 +593,7 @@ fn style_source_info_copies_reconstructible_source_state() {
 fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_state() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
     let mut custom_options = CustomGeometrySourceOptions::new(|_| {}).with_cancel_tile(|_| {});
     custom_options.min_zoom = Some(0.0);
@@ -640,7 +611,7 @@ fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_st
     map.set_custom_geometry_source_tile_data(
         "custom",
         tile_id,
-        &GeoJson::FeatureCollection(Vec::new()),
+        br#"{"type":"FeatureCollection","features":[]}"#,
     )
     .unwrap();
     map.invalidate_custom_geometry_source_tile("custom", tile_id)
@@ -659,7 +630,7 @@ fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_st
         .unwrap();
     assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
 
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
     assert_eq!(map.custom_geometry_source_count_for_testing(), 0);
 
     map.close().unwrap();
@@ -671,7 +642,7 @@ fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_st
 fn custom_geometry_source_state_is_released_on_map_close() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
     map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
         .unwrap();
     assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
@@ -685,7 +656,7 @@ fn custom_geometry_source_state_is_released_on_map_close() {
 fn custom_geometry_source_state_ignores_stale_style_loaded_events() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
     map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
         .unwrap();
 
@@ -705,7 +676,7 @@ fn custom_geometry_source_state_ignores_stale_style_loaded_events() {
 fn custom_geometry_source_state_releases_detached_sources_on_style_loaded_event() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
     map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
         .unwrap();
 
@@ -737,7 +708,7 @@ fn custom_geometry_source_state_releases_detached_sources_on_style_loaded_event(
 fn custom_geometry_source_adds_to_current_style_after_url_style_request() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
     map.set_style_url("unsupported://style.json").unwrap();
 
     map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
@@ -764,7 +735,7 @@ fn custom_geometry_source_state_releases_after_url_style_replacement() {
         })
         .unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
     map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
         .unwrap();
     assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
@@ -813,20 +784,21 @@ fn style_transition_options_round_trip_through_the_real_c_api() {
 
     // The style parser fills in its own 300ms duration when the style carries
     // no transition member.
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
     let parsed = map.style_transition_options().unwrap();
     assert_eq!(parsed.duration_ms, Some(300.0));
     assert_eq!(parsed.delay_ms, None);
 
     // A transition member reports only what it names, so a delay-only
     // transition replaces that default with no duration.
-    map.set_style_json(STYLE_WITH_DELAY_ONLY_TRANSITION_JSON)
+    map.set_style_json(STYLE_WITH_DELAY_ONLY_TRANSITION_JSON.as_bytes())
         .unwrap();
     let delay_only = map.style_transition_options().unwrap();
     assert_eq!(delay_only.duration_ms, None);
     assert_eq!(delay_only.delay_ms, Some(100.0));
 
-    map.set_style_json(STYLE_WITH_TRANSITION_JSON).unwrap();
+    map.set_style_json(STYLE_WITH_TRANSITION_JSON.as_bytes())
+        .unwrap();
     let declared = map.style_transition_options().unwrap();
     assert_eq!(declared.duration_ms, Some(750.0));
     assert_eq!(declared.delay_ms, Some(100.0));
@@ -857,7 +829,8 @@ fn style_transition_options_round_trip_through_the_real_c_api() {
     );
 
     // Loading a style replaces the override with what that style declares.
-    map.set_style_json(STYLE_WITH_TRANSITION_JSON).unwrap();
+    map.set_style_json(STYLE_WITH_TRANSITION_JSON.as_bytes())
+        .unwrap();
     assert_eq!(map.style_transition_options().unwrap(), declared);
 
     let mut negative = StyleTransitionOptions::default();
@@ -872,68 +845,53 @@ fn style_transition_options_round_trip_through_the_real_c_api() {
 
 #[test]
 // Spec coverage: BND-063, BND-064, and BND-105.
-fn style_json_descriptors_copy_owned_rust_values() {
+fn style_json_buffers_copy_owned_rust_values() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(STYLE_WITH_IDS_JSON).unwrap();
+    map.set_style_json(STYLE_WITH_IDS_JSON.as_bytes()).unwrap();
 
-    let layer = JsonValue::Object(vec![
-        JsonMember::new("id", JsonValue::String("owned-background".to_owned())),
-        JsonMember::new("type", JsonValue::String("background".to_owned())),
-        JsonMember::new(
-            "paint",
-            JsonValue::Object(vec![JsonMember::new(
-                "background-opacity",
-                JsonValue::Double(0.5),
-            )]),
-        ),
-    ]);
+    let layer = serde_json::to_vec(&json!({
+        "id": "owned-background",
+        "type": "background",
+        "paint": {"background-opacity": 0.5},
+    }))
+    .unwrap();
     map.add_style_layer_json(&layer, None).unwrap();
     let copied_layer = map
         .style_layer_json("owned-background")
         .unwrap()
         .expect("added layer should have a JSON snapshot");
+    let copied_layer: JsonValue = serde_json::from_slice(&copied_layer).unwrap();
 
     assert_eq!(
         object_member(&copied_layer, "id"),
-        Some(&JsonValue::String("owned-background".to_owned()))
+        Some(&json!("owned-background"))
     );
     let paint = object_member(&copied_layer, "paint").expect("layer paint should be copied");
     assert_eq!(
         object_member(paint, "background-opacity"),
-        Some(&JsonValue::Double(0.5))
+        Some(&json!(0.5))
     );
 
-    map.set_layer_property(
-        "owned-background",
-        "background-opacity",
-        &JsonValue::Double(0.75),
-    )
-    .unwrap();
+    map.set_layer_property("owned-background", "background-opacity", br#"0.75"#)
+        .unwrap();
     assert_eq!(
         map.layer_property("owned-background", "background-opacity")
             .unwrap(),
-        Some(JsonValue::Double(0.75))
+        Some(b"0.75".to_vec())
     );
 
-    let filter = JsonValue::Array(vec![
-        JsonValue::String("==".to_owned()),
-        JsonValue::Array(vec![
-            JsonValue::String("get".to_owned()),
-            JsonValue::String("kind".to_owned()),
-        ]),
-        JsonValue::String("park".to_owned()),
-    ]);
-    map.set_layer_filter("geo-fill", Some(&filter)).unwrap();
-    assert_eq!(map.layer_filter("geo-fill").unwrap(), Some(filter.clone()));
+    let filter = br#"["==",["get","kind"],"park"]"#;
+    map.set_layer_filter("geo-fill", Some(filter)).unwrap();
+    assert_eq!(map.layer_filter("geo-fill").unwrap(), Some(filter.to_vec()));
     map.set_layer_filter("geo-fill", None).unwrap();
     assert_eq!(map.layer_filter("geo-fill").unwrap(), None);
 
     let error = map
-        .set_layer_filter("owned-background", Some(&JsonValue::Double(f64::NAN)))
+        .set_layer_filter("owned-background", Some(b"NaN"))
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert_eq!(error.raw_status(), None);
+    assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
 
     map.close().unwrap();
     runtime.close().unwrap();

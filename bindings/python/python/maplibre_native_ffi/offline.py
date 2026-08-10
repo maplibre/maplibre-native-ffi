@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from ._enum import NativeIntEnum, UnknownIntEnum
 from ._lifecycle import ContextHandleMixin, WarnUnclosedMixin
-from .geo import Geometry, LatLngBounds
+from .geo import LatLngBounds
 from .resource import ResourceErrorReason
 
 _OPERATION_HANDLE_CREATE_KEY = object()
@@ -222,7 +222,7 @@ class OfflineGeometryRegionDefinition:
     """Geometry offline region definition."""
 
     style_url: str
-    geometry: Geometry
+    geometry: bytes
     min_zoom: float
     max_zoom: float
     pixel_ratio: float

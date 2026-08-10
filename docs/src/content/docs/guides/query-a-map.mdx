@@ -40,14 +40,13 @@ land fills out of the result.
 
 <Code code={region(querySnippet, "layers")} lang="c" title="query-rendered-features.c" />
 
-On success, the query returns a result handle that the host owns. Destroy it
-after copying every value that the host keeps.
+On success, the query returns an owned buffer containing a JSON array.
+Destroy it after parsing or copying every value that the host keeps.
 
 <Code code={region(querySnippet, "query")} lang="c" title="query-rendered-features.c" />
 
-Reading an entry produces a queried feature with presence information for its
-optional members. A feature can include an ID, a source layer, and a state
-object. Each member is a view into result-owned storage. Copy every string,
-property value, and geometry that the host keeps before destroying the result.
+Each array entry contains a GeoJSON `feature` object and may contain `sourceId`,
+`sourceLayerId`, and `state`. Borrowing the buffer view does not copy it, and the
+span remains valid until the host destroys the result buffer.
 
 <Code code={region(querySnippet, "read")} lang="c" title="query-rendered-features.c" />

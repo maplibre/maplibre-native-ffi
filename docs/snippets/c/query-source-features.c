@@ -4,26 +4,22 @@
 #include <maplibre_native_c.h>
 #include <string.h>
 
-static mln_string_view sv(const char* text) {
-  return (mln_string_view){.data = text, .size = strlen(text)};
+static mln_buffer_view view(const char* text) {
+  return (mln_buffer_view){.data = text, .size = strlen(text)};
 }
 
-static void read_features(mln_feature_query_result result) {
+static void read_features(mln_buffer result) {
   // #region read
-  size_t count = 0;
-  mln_feature_query_result_count(result, &count);
-  for (size_t index = 0; index < count; index++) {
-    mln_queried_feature feature = {.size = sizeof(feature)};
-    const mln_status got =
-      mln_feature_query_result_get(result, index, &feature);
-    if (got != MLN_STATUS_OK) continue;
-  }
+  mln_buffer_view json = {0};
+  if (mln_buffer_get(result, &json) != MLN_STATUS_OK) return;
+  // Parse json.data[0..json.size] as the query-envelope array. The bytes remain
+  // valid until result is destroyed.
   // #endregion read
 }
 
 void list_source_features(mln_render_session session) {
   // #region options
-  const mln_string_view source_layers[] = {sv("poi")};
+  const mln_buffer_view source_layers[] = {view("poi")};
   mln_source_feature_query_options options =
     mln_source_feature_query_options_default();
   options.fields = MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
@@ -32,14 +28,13 @@ void list_source_features(mln_render_session session) {
   // #endregion options
 
   // #region query
-  mln_feature_query_result result = MLN_HANDLE_NULL;
+  mln_buffer result = MLN_HANDLE_NULL;
   const mln_status queried = mln_render_session_query_source_features(
-    session, sv("places"), &options, &result
+    session, view("places"), &options, &result
   );
   if (queried != MLN_STATUS_OK) return;
 
   read_features(result);
-  // Every feature view belongs to the result; copy retained values first.
-  mln_feature_query_result_destroy(result);
+  mln_buffer_destroy(result);
   // #endregion query
 }

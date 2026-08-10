@@ -31,14 +31,14 @@ The public C header targets C23. ABI-crossing enum types use C23
 fixed-underlying enum syntax: `int32_t` for status values and `uint32_t` for
 non-negative domains and masks unless a native ABI field requires another width.
 
-`mln_json_value` carries the native value alternative, not just a number. Keep
-`MLN_JSON_VALUE_TYPE_UINT`, `MLN_JSON_VALUE_TYPE_INT`, and
-`MLN_JSON_VALUE_TYPE_DOUBLE` distinct in both directions, because native
-consumers match on the exact alternative. `mbgl` reads supercluster
-`cluster_id`, `limit`, and `offset` as unsigned and treats another alternative
-as absent, so a value that loses its tag produces an empty result with
-`MLN_STATUS_OK`. Document the required alternative on any function whose native
-behavior depends on it.
+JSON and GeoJSON cross the ABI as UTF-8 bytes, not recursive C structs. Use
+`mln_buffer_view` for borrowed input and `mln_buffer` for owned output. Keep
+every input length-delimited; do not require a trailing null byte. The parameter
+contract states whether a view contains UTF-8 text, serialized JSON, or
+arbitrary bytes. Delegate serialized input to the corresponding MapLibre Native
+parser or converter, and validate only C-owned shape and lifetime rules.
+Document the required JSON number representation when native behavior depends on
+whether a number is an unsigned integer, signed integer, or floating point.
 
 Shape structs for future ABI stability. Option and output structs that may grow
 use `uint32_t size` fields. Default constructors populate them. Use field masks
@@ -65,15 +65,17 @@ whose capacity is too small still reports the required length and returns
 `MLN_STATUS_INVALID_ARGUMENT`. Entry points whose output length is a documented
 constant need no probe.
 
-JSON crosses the boundary in the representation MapLibre itself holds. A
-structured value crosses as `mln_json_value` going in and an `mln_json_snapshot`
-coming out, because native holds those as value trees and building the text
-would be a conversion no caller asked for. A whole document crosses as copied
-text, because native holds the document as the bytes it parsed, and rebuilding
-it from a tree would lose formatting, number spelling, and escaping that a
-caller may need to reproduce. The distinction is document versus value, which is
-why `mln_map_copy_loaded_style_json()` hands back bytes while
-`mln_map_get_style_layer_json()` hands back a snapshot.
+An `mln_buffer_view` borrows storage only for the call. Parse or copy accepted
+input before returning. An `mln_buffer` owns one contiguous result; its view
+remains valid until the caller destroys the handle. Use a generic buffer instead
+of a domain-specific result handle when an operation serializes JSON or GeoJSON.
+This executes expensive operations once and lets bindings make one bulk copy
+without traversing a native value tree.
+
+Preserve loaded style documents byte-for-byte when MapLibre retains the source
+bytes. Values reconstructed from native state use compact JSON serialization;
+their whitespace, escaping, number spelling, and object member order are not
+stable API behavior.
 
 ## Graphics Loaders
 

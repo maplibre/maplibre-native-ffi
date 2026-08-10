@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi
 
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotSame
@@ -17,7 +18,6 @@ import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.Quaternion
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.geo.Vec3
-import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.map.ConstrainMode
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
@@ -27,6 +27,7 @@ import org.maplibre.nativeffi.map.TileLodMode
 import org.maplibre.nativeffi.map.TileOptions
 import org.maplibre.nativeffi.map.ViewportMode
 import org.maplibre.nativeffi.map.ViewportOptions
+import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 import org.maplibre.nativeffi.runtime.RuntimeOptions
@@ -346,20 +347,8 @@ class OptionsValueSemanticsTest {
   }
 
   /** Builds a `clusterProperties` object whose aggregation operator is [operator]. */
-  private fun clusterProperties(operator: String): JsonValue =
-    JsonValue.ObjectValue(
-      listOf(
-        JsonValue.Member(
-          "weight",
-          JsonValue.Array(
-            listOf(
-              JsonValue.StringValue(operator),
-              JsonValue.Array(listOf(JsonValue.StringValue("get"), JsonValue.StringValue("weight"))),
-            )
-          ),
-        )
-      )
-    )
+  private fun clusterProperties(operator: String): ByteArray =
+    "{\"weight\":[\"$operator\",[\"get\",\"weight\"]]}".encodeToByteArray()
 
   @Test
   fun styleImageOptionsComparesByFieldValue() {
@@ -403,11 +392,11 @@ class OptionsValueSemanticsTest {
       baseline = {
         RenderedFeatureQueryOptions().apply {
           layerIds = listOf("a", "b")
-          filter = JsonValue.Bool(true)
+          filter = "true".encodeToByteArray()
         }
       },
       copyOf = { it.copy() },
-      mutators = listOf({ layerIds = listOf("a") }, { filter = JsonValue.StringValue("filter") }),
+      mutators = listOf({ layerIds = listOf("a") }, { filter = "\"filter\"".encodeToByteArray() }),
     )
   }
 
@@ -417,12 +406,12 @@ class OptionsValueSemanticsTest {
       baseline = {
         SourceFeatureQueryOptions().apply {
           sourceLayerIds = listOf("a", "b")
-          filter = JsonValue.Bool(true)
+          filter = "true".encodeToByteArray()
         }
       },
       copyOf = { it.copy() },
       mutators =
-        listOf({ sourceLayerIds = listOf("a") }, { filter = JsonValue.StringValue("filter") }),
+        listOf({ sourceLayerIds = listOf("a") }, { filter = "\"filter\"".encodeToByteArray() }),
     )
   }
 
@@ -433,6 +422,22 @@ class OptionsValueSemanticsTest {
     val empty = RenderedFeatureQueryOptions().apply { layerIds = emptyList() }
 
     assertNotEquals(absent, empty)
+  }
+
+  @Test
+  fun absentJsonBytesDifferFromEmptyJsonBytes() {
+    assertNotEquals(
+      RenderedFeatureQueryOptions(),
+      RenderedFeatureQueryOptions().apply { filter = byteArrayOf() },
+    )
+    assertNotEquals(
+      SourceFeatureQueryOptions(),
+      SourceFeatureQueryOptions().apply { filter = byteArrayOf() },
+    )
+    assertNotEquals(
+      GeoJsonSourceOptions(),
+      GeoJsonSourceOptions().apply { clusterProperties = byteArrayOf() },
+    )
   }
 
   @Test
@@ -462,6 +467,36 @@ class OptionsValueSemanticsTest {
     sourceLayerIds.add("b")
 
     assertEquals(listOf("a"), sourceOptions.sourceLayerIds)
+  }
+
+  @Test
+  fun byteTransitDescriptorsSnapshotCallerOwnedArrays() {
+    val filter = "true".encodeToByteArray()
+    val query = RenderedFeatureQueryOptions().apply { this.filter = filter }
+    filter[0] = 'f'.code.toByte()
+    assertContentEquals("true".encodeToByteArray(), query.filter)
+
+    val exposedFilter = query.filter ?: error("missing filter")
+    exposedFilter[0] = 'f'.code.toByte()
+    assertContentEquals("true".encodeToByteArray(), query.filter)
+
+    val sourceFilter = "false".encodeToByteArray()
+    val sourceQuery = SourceFeatureQueryOptions().apply { this.filter = sourceFilter }
+    sourceFilter[0] = 't'.code.toByte()
+    assertContentEquals("false".encodeToByteArray(), sourceQuery.filter)
+
+    val properties = "{}".encodeToByteArray()
+    val source = GeoJsonSourceOptions().apply { clusterProperties = properties }
+    properties[0] = '['.code.toByte()
+    assertContentEquals("{}".encodeToByteArray(), source.clusterProperties)
+
+    val geometry = "{\"type\":\"Point\",\"coordinates\":[0,0]}".encodeToByteArray()
+    val region = OfflineRegionDefinition.GeometryRegion("style", geometry, 0.0, 1.0, 1f, false)
+    geometry[0] = '['.code.toByte()
+    assertContentEquals(
+      "{\"type\":\"Point\",\"coordinates\":[0,0]}".encodeToByteArray(),
+      region.geometry,
+    )
   }
 
   @Test

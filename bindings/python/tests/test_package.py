@@ -1,5 +1,6 @@
 import contextlib
 import http.server
+import json
 import math
 import subprocess
 import sys
@@ -16,7 +17,6 @@ from maplibre_native_ffi import (
     _native,
     camera,
     geo,
-    json,
     log,
     offline,
     query,
@@ -32,14 +32,12 @@ _EMPTY_STYLE_JSON = '{"version":8,"sources":{},"layers":[]}'
 _EMPTY_STYLE_BYTES = _EMPTY_STYLE_JSON.encode()
 
 
-def _json_object(value: object) -> json.JsonObject:
-    converted = json.from_python(value)
-    assert isinstance(converted, json.JsonObject)
-    return converted
+def _json_object(value: object) -> bytes:
+    return json.dumps(value, separators=(",", ":")).encode()
 
 
-def _json_value(value: object) -> json.JsonValue:
-    return json.from_python(value)
+def _json_value(value: object) -> bytes:
+    return _json_object(value)
 
 
 @contextlib.contextmanager
@@ -353,16 +351,15 @@ def test_public_type_hints_are_resolvable() -> None:
 
     map_hints = typing.get_type_hints(map_module.MapHandle.add_style_source_json)
     assert map_hints["source_json"] != typing.Any
-    assert "maplibre_native_ffi.json.JsonObject" in repr(map_hints["source_json"])
+    assert map_hints["source_json"] is bytes
 
     layer_hints = typing.get_type_hints(map_module.MapHandle.set_layer_property)
     assert layer_hints["value"] != typing.Any
-    assert layer_hints["value"] is json.JsonValue
-    assert json.JsonUInt in typing.get_args(json.JsonScalar.__value__)
+    assert layer_hints["value"] is bytes
 
     style_hints = typing.get_type_hints(map_module.MapHandle.get_style_layer_json)
     assert style_hints["return"] != typing.Any
-    assert set(typing.get_args(style_hints["return"])) == {json.JsonValue, type(None)}
+    assert set(typing.get_args(style_hints["return"])) == {bytes, type(None)}
 
     map_init_hints = typing.get_type_hints(map_module.MapHandle.__init__)
     assert map_init_hints["runtime"] is mln.RuntimeHandle
@@ -393,10 +390,9 @@ def test_public_type_hints_are_resolvable() -> None:
     extension_hints = typing.get_type_hints(
         render.RenderSessionHandle.query_feature_extensions
     )
-    assert extension_hints["feature"] is geo.Feature
-    assert extension_hints["return"] is query.FeatureExtensionResult
-    assert extension_hints["arguments"] != typing.Any
-    assert "maplibre_native_ffi.json.JsonObject" in repr(extension_hints["arguments"])
+    assert extension_hints["feature"] is bytes
+    assert extension_hints["return"] is bytes
+    assert extension_hints["arguments"] == bytes | None
 
     rendered_hints = typing.get_type_hints(
         render.RenderSessionHandle.query_rendered_features
@@ -511,7 +507,7 @@ def test_closed_handle_finalizers_are_quiet_at_interpreter_shutdown() -> None:
 
         runtime = mln.RuntimeHandle()
         map_handle = runtime.create_map()
-        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        map_handle.set_style_json(b'{"version":8,"sources":{},"layers":[]}')
         source = map_handle.add_custom_geometry_source(
             "custom",
             style.CustomGeometrySourceOptions(max_queued_events=1),
@@ -768,7 +764,13 @@ def test_render_session_methods_propagate_wrong_thread_errors() -> None:
     point_query = query.RenderedQueryGeometry.point_geometry(
         camera.ScreenPoint(1.0, 2.0)
     )
-    feature = geo.Feature(geometry=geo.Point(geo.LatLng(1.0, 2.0)))
+    feature = _json_object(
+        {
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [2.0, 1.0]},
+            "properties": {},
+        }
+    )
     selector = query.FeatureStateSelector(source_id="points", feature_id="feature-1")
     calls = {
         "close": session.close,
@@ -797,13 +799,13 @@ def test_render_session_methods_propagate_wrong_thread_errors() -> None:
                 feature,
                 "supercluster",
                 "leaves",
-                json.JsonObject((json.JsonMember("limit", json.JsonUInt(10)),)),
+                _json_object({"limit": 10}),
             )
         ),
         "set_feature_state": (
             lambda: session.set_feature_state(
                 selector,
-                json.JsonObject((json.JsonMember("hover", True),)),
+                _json_object({"hover": True}),
             )
         ),
         "get_feature_state": lambda: session.get_feature_state(selector),
@@ -988,10 +990,10 @@ def test_style_source_metadata_enums_preserve_unknown_values() -> None:
 
 
 def test_loaded_style_document_and_url_read_back_what_was_loaded() -> None:
-    style_json = '{"version":8,"sources":{},"layers":[]}'
+    style_json = _EMPTY_STYLE_BYTES
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
         # Nothing parsed and nothing requested yet.
-        assert map_handle.get_loaded_style_json() == ""
+        assert map_handle.get_loaded_style_json() == b""
         assert map_handle.get_style_url() == ""
 
         # The document reads back byte-for-byte, so it can be reloaded
@@ -1010,7 +1012,7 @@ def test_loaded_style_document_and_url_read_back_what_was_loaded() -> None:
 
 def test_style_source_url_metadata_and_removal_public_api() -> None:
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         map_handle.add_style_source_json(
             "style-json-points",
             _json_object(
@@ -1035,14 +1037,18 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
                 line_metrics=True,
             ),
         )
-        inline_points = geo.FeatureCollection(
-            (
-                geo.Feature(
-                    geometry=geo.Point(geo.LatLng(1.0, 2.0)),
-                    properties=(json.JsonMember("name", "one"),),
-                    identifier=geo.FeatureIdentifierString("point-1"),
-                ),
-            )
+        inline_points = _json_object(
+            {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "geometry": {"type": "Point", "coordinates": [2.0, 1.0]},
+                        "properties": {"name": "one"},
+                        "id": "point-1",
+                    }
+                ],
+            }
         )
         map_handle.add_geojson_source_data(
             "inline-points",
@@ -1052,7 +1058,7 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
                 cluster_radius=40,
                 cluster_max_zoom=12.0,
                 cluster_min_points=3,
-                cluster_properties=json.from_python(
+                cluster_properties=_json_object(
                     {"name_count": ["+", ["case", ["has", "name"], 1, 0]]}
                 ),
             ),
@@ -1233,7 +1239,7 @@ def test_image_source_url_image_and_coordinates_public_api() -> None:
     )
 
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         map_handle.add_image_source_url(
             "overlay-url",
             coordinates,
@@ -1273,19 +1279,19 @@ def test_style_json_light_layer_property_and_filter_public_api() -> None:
     raw_filter = ["==", ["get", "kind"], "park"]
     filter_value = _json_value(raw_filter)
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         map_handle.add_geojson_source_url(
             "points",
             "https://example.test/points.geojson",
         )
-        with pytest.raises(TypeError, match="unsupported JSON value: dict"):
+        with pytest.raises(TypeError, match="instance of 'bytes'"):
             map_handle.add_style_layer_json(
                 typing.cast(
                     typing.Any,
                     {"id": "raw-dict", "type": "background"},
                 )
             )
-        with pytest.raises(TypeError, match="unsupported JSON value: int"):
+        with pytest.raises(TypeError, match="instance of 'bytes'"):
             map_handle.set_style_light_property(
                 "intensity",
                 typing.cast(typing.Any, 1),
@@ -1295,28 +1301,31 @@ def test_style_json_light_layer_property_and_filter_public_api() -> None:
         map_handle.set_layer_property(
             "json-background",
             "background-color",
-            "#ff0000",
+            _json_value("#ff0000"),
         )
         map_handle.set_layer_filter("json-circle", filter_value)
         map_handle.set_style_light_json(_json_object({"anchor": "viewport"}))
-        map_handle.set_style_light_property("intensity", json.JsonDouble(0.5))
+        map_handle.set_style_light_property("intensity", _json_value(0.5))
 
         layer_json = map_handle.get_style_layer_json("json-background")
         assert layer_json is not None
-        assert ("id", "json-background") in json.to_python(layer_json)
+        assert json.loads(layer_json) == {
+            "id": "json-background",
+            "type": "background",
+            "paint": {"background-color": ["rgba", 255, 0, 0, 1]},
+        }
         assert map_handle.get_style_layer_json("missing") is None
         background_color = map_handle.get_layer_property(
             "json-background",
             "background-color",
         )
-        assert isinstance(background_color, json.JsonArray)
-        assert background_color.values[0] == "rgba"
-        assert json.to_python(map_handle.get_layer_filter("json-circle")) == raw_filter
-        assert map_handle.get_style_light_property("anchor") == "viewport"
-        assert map_handle.get_style_light_property("intensity") == json.JsonDouble(0.5)
+        assert json.loads(background_color) == ["rgba", 255, 0, 0, 1]
+        assert json.loads(map_handle.get_layer_filter("json-circle")) == raw_filter
+        assert json.loads(map_handle.get_style_light_property("anchor")) == "viewport"
+        assert json.loads(map_handle.get_style_light_property("intensity")) == 0.5
 
-        with pytest.raises(ValueError, match="finite"):
-            map_handle.set_style_light_property("intensity", json.JsonDouble(math.inf))
+        with pytest.raises(mln.InvalidArgumentError, match="not valid JSON"):
+            map_handle.set_style_light_property("intensity", b"Infinity")
 
         map_handle.set_layer_filter("json-circle", None)
         assert map_handle.get_layer_filter("json-circle") is None
@@ -1328,7 +1337,7 @@ def test_style_image_metadata_copy_and_removal_public_api() -> None:
         data=bytes([255, 0, 0, 255]),
     )
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         map_handle.set_style_image(
             "marker",
             image,
@@ -1360,7 +1369,7 @@ def test_style_image_metadata_copy_and_removal_public_api() -> None:
 
 def test_builtin_style_layers_and_location_indicator_public_api() -> None:
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         map_handle.add_raster_dem_source_url(
             "dem",
             "https://example.test/dem.json",
@@ -1395,7 +1404,7 @@ def test_builtin_style_layers_and_location_indicator_public_api() -> None:
 
 def test_nine_patch_style_image_round_trips_public_api() -> None:
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        map_handle.set_style_json(_EMPTY_STYLE_JSON)
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         image = render.PremultipliedRgba8Image(
             render.TextureImageInfo(width=2, height=2, stride=8, byte_length=16),
             bytes(16),
@@ -1438,8 +1447,8 @@ def test_nine_patch_style_image_round_trips_public_api() -> None:
 
 def test_style_transition_options_round_trip_public_api() -> None:
     transition_style_json = (
-        '{"version":8,"transition":{"duration":750,"delay":100},'
-        '"sources":{},"layers":[]}'
+        b'{"version":8,"transition":{"duration":750,"delay":100},'
+        b'"sources":{},"layers":[]}'
     )
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
         # A map with no style yet reports no duration or delay. The
@@ -1451,7 +1460,7 @@ def test_style_transition_options_round_trip_public_api() -> None:
 
         # The style parser fills in its own 300ms duration for a style that
         # declares no transition.
-        map_handle.set_style_json(_EMPTY_STYLE_JSON)
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         parsed = map_handle.get_style_transition_options()
         assert parsed.duration_ms == 300.0
         assert parsed.delay_ms is None
@@ -1493,10 +1502,10 @@ def test_style_transition_options_round_trip_public_api() -> None:
 def test_layer_base_accessors_round_trip_public_api() -> None:
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
         map_handle.set_style_json(
-            '{"version":8,"sources":{"geo":{"type":"geojson","data":'
-            '{"type":"FeatureCollection","features":[]}}},"layers":['
-            '{"id":"bg","type":"background"},'
-            '{"id":"fill","type":"fill","source":"geo"}]}'
+            b'{"version":8,"sources":{"geo":{"type":"geojson","data":'
+            b'{"type":"FeatureCollection","features":[]}}},"layers":['
+            b'{"id":"bg","type":"background"},'
+            b'{"id":"fill","type":"fill","source":"geo"}]}'
         )
 
         assert map_handle.get_layer_source_layer("fill") == ""
@@ -1531,7 +1540,7 @@ def test_layer_base_accessors_round_trip_public_api() -> None:
 
 
 def test_style_layer_metadata_move_and_removal_public_api() -> None:
-    style_json = """
+    style_json = b"""
     {
       "version": 8,
       "sources": {},
@@ -1667,7 +1676,15 @@ def test_camera_fit_bounds_and_constraints_public_api() -> None:
             fit,
         )
         fit_geometry = map_handle.camera_for_geometry(
-            geo.LineString((bounds.southwest, bounds.northeast)),
+            _json_object(
+                {
+                    "type": "LineString",
+                    "coordinates": [
+                        [bounds.southwest.longitude, bounds.southwest.latitude],
+                        [bounds.northeast.longitude, bounds.northeast.latitude],
+                    ],
+                }
+            ),
             fit,
         )
         visible_bounds = map_handle.lat_lng_bounds_for_camera(target)
@@ -1897,7 +1914,7 @@ def test_poll_event_returns_none_when_queue_is_empty() -> None:
 def test_poll_event_returns_copied_map_event() -> None:
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
         with pytest.raises((mln.InvalidArgumentError, mln.NativeError)):
-            map_handle.set_style_json("{")
+            map_handle.set_style_json(b"{")
 
         loading_failed = None
         for _ in range(8):
@@ -1921,7 +1938,7 @@ def test_poll_event_returns_copied_map_event() -> None:
 
 def test_pump_and_poll_event_return_copied_style_loaded_event() -> None:
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
 
         style_loaded = None
         for _ in range(32):
@@ -2051,7 +2068,7 @@ def test_render_descriptors_are_public_python_values() -> None:
     assert opengl_wgl.target == 0x0DE1
 
 
-def test_render_session_query_public_api_uses_query_and_geojson_wire_values() -> None:
+def test_render_session_query_public_api_uses_json_buffers() -> None:
     class FakeNativeRenderSession:
         closed = False
         detached = False
@@ -2066,18 +2083,18 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
             geometry: object,
             layer_ids: tuple[str, ...] | None,
             filter_: object,
-        ) -> list[dict[str, object]]:
+        ) -> bytes:
             self.rendered_call = (geometry, layer_ids, filter_)
-            return [queried_feature_native()]
+            return queried_features
 
         def query_source_features(
             self,
             source_id: str,
             source_layer_ids: tuple[str, ...] | None,
             filter_: object,
-        ) -> list[dict[str, object]]:
+        ) -> bytes:
             self.source_call = (source_id, source_layer_ids, filter_)
-            return [queried_feature_native()]
+            return queried_features
 
         def query_feature_extensions(
             self,
@@ -2086,7 +2103,7 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
             extension: str,
             extension_field: str,
             arguments: object,
-        ) -> dict[str, object]:
+        ) -> bytes:
             self.extension_call = (
                 source_id,
                 feature,
@@ -2094,19 +2111,26 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
                 extension_field,
                 arguments,
             )
-            return {"type": 1, "value": json.JsonUInt(7)}
+            return _json_value(7)
 
-    def queried_feature_native() -> dict[str, object]:
-        return {
-            "feature": geo.Feature(
-                geometry=geo.Point(geo.LatLng(1.0, 2.0)),
-                properties=(json.JsonMember("name", "one"),),
-                identifier=geo.FeatureIdentifierString("feature-1"),
-            ),
-            "source_id": "points",
-            "source_layer_id": None,
-            "state": json.JsonObject((json.JsonMember("hover", True),)),
+    feature = _json_object(
+        {
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [2.0, 1.0]},
+            "properties": {"name": "one"},
+            "id": "feature-1",
         }
+    )
+    queried_features = _json_object(
+        [
+            {
+                "feature": json.loads(feature),
+                "source": "points",
+                "sourceLayer": None,
+                "state": {"hover": True},
+            }
+        ]
+    )
 
     fake_native = FakeNativeRenderSession()
     with pytest.raises(TypeError, match="created by MapHandle"):
@@ -2122,17 +2146,9 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
         source_layer_ids=("landuse",),
         filter=_json_value(["==", ["get", "kind"], "park"]),
     )
-    feature = geo.Feature(
-        geometry=geo.Point(geo.LatLng(1.0, 2.0)),
-        properties=(json.JsonMember("name", "one"),),
-        identifier=geo.FeatureIdentifierString("feature-1"),
-    )
-
     rendered = session.query_rendered_features(geometry, rendered_options)
     source = session.query_source_features("points", source_options)
-    # Supercluster reads "limit" as an unsigned value; json.from_python would
-    # convert the Python int to JsonInt, which native treats as absent.
-    leaves_arguments = json.JsonObject((json.JsonMember("limit", json.JsonUInt(10)),))
+    leaves_arguments = _json_object({"limit": 10})
     extension = session.query_feature_extensions(
         "points",
         feature,
@@ -2148,8 +2164,8 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
     )
     assert fake_native.source_call[0] == "points"
     assert fake_native.source_call[1] == ("landuse",)
-    assert rendered[0].feature == feature
-    assert source[0].state == json.JsonObject((json.JsonMember("hover", True),))
+    assert rendered == queried_features
+    assert source == queried_features
     assert fake_native.extension_call == (
         "points",
         feature,
@@ -2157,7 +2173,7 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
         "leaves",
         leaves_arguments,
     )
-    assert extension == query.FeatureExtensionResult.value_result(json.JsonUInt(7))
+    assert extension == _json_value(7)
 
 
 def test_opengl_owned_texture_frame_public_api_uses_native_values() -> None:
@@ -2201,7 +2217,7 @@ def test_opengl_owned_texture_frame_public_api_uses_native_values() -> None:
     assert frame.closed
 
 
-def test_render_session_feature_state_public_api_uses_json_values() -> None:
+def test_render_session_feature_state_public_api_uses_json_buffers() -> None:
     class FakeNativeRenderSession:
         closed = False
         detached = False
@@ -2232,14 +2248,14 @@ def test_render_session_feature_state_public_api_uses_json_values() -> None:
             source_layer_id: str | None,
             feature_id: str | None,
             state_key: str | None,
-        ) -> object:
+        ) -> bytes:
             assert (source_id, source_layer_id, feature_id, state_key) == (
                 "points",
                 "symbols",
                 "feature-1",
                 "hover",
             )
-            return json.JsonObject((json.JsonMember("hover", True),))
+            return _json_object({"hover": True})
 
         def remove_feature_state(
             self,
@@ -2258,7 +2274,7 @@ def test_render_session_feature_state_public_api_uses_json_values() -> None:
         feature_id="feature-1",
         state_key="hover",
     )
-    state = json.JsonObject((json.JsonMember("hover", True),))
+    state = _json_object({"hover": True})
 
     session.set_feature_state(selector, state)
     returned = session.get_feature_state(selector)
@@ -2271,7 +2287,7 @@ def test_render_session_feature_state_public_api_uses_json_values() -> None:
         "hover",
         state,
     )
-    assert json.to_python(returned) == [("hover", True)]
+    assert json.loads(returned) == {"hover": True}
     assert fake_native.remove_call == ("points", "symbols", "feature-1", "hover")
 
 
@@ -2286,21 +2302,21 @@ def test_render_session_feature_state_empty_result_is_empty_object() -> None:
             source_layer_id: str | None,
             feature_id: str | None,
             state_key: str | None,
-        ) -> object:
+        ) -> bytes:
             assert (source_id, source_layer_id, feature_id, state_key) == (
                 "points",
                 None,
                 "feature-1",
                 None,
             )
-            return json.JsonObject(())
+            return b"{}"
 
     session = render.RenderSessionHandle._from_native(
         FakeNativeRenderSession(), object()
     )
     selector = query.FeatureStateSelector(source_id="points", feature_id="feature-1")
 
-    assert json.to_python(session.get_feature_state(selector)) == []
+    assert json.loads(session.get_feature_state(selector)) == {}
 
 
 def test_invalid_render_target_attach_reports_native_status() -> None:
@@ -2369,7 +2385,12 @@ def test_map_projection_converts_coordinates_and_closes() -> None:
                 camera.EdgeInsets(),
             )
             projection.set_visible_geometry(
-                geo.LineString((geo.LatLng(-1.0, -1.0), geo.LatLng(1.0, 1.0))),
+                _json_object(
+                    {
+                        "type": "LineString",
+                        "coordinates": [[-1.0, -1.0], [1.0, 1.0]],
+                    }
+                ),
                 camera.EdgeInsets(),
             )
 
@@ -2751,7 +2772,7 @@ def test_query_descriptors_and_results_preserve_public_shape() -> None:
     )
     rendered_options = query.RenderedFeatureQueryOptions(
         layer_ids=("landuse",),
-        filter=json.JsonArray(("==", "class", "park")),
+        filter=_json_value(["==", "class", "park"]),
     )
     source_options = query.SourceFeatureQueryOptions(source_layer_ids=("landuse",))
     selector = query.FeatureStateSelector(
@@ -2760,15 +2781,6 @@ def test_query_descriptors_and_results_preserve_public_shape() -> None:
         feature_id="feature-1",
         state_key="hover",
     )
-    feature = geo.Feature(geo.Point(geo.LatLng(0.0, 0.0)))
-    queried = query.QueriedFeature(
-        feature=feature,
-        source_id="source",
-        source_layer_id="layer",
-        state=json.JsonObject((json.JsonMember("hover", True),)),
-    )
-    extension = query.FeatureExtensionResult.feature_collection_result((feature,))
-
     assert geometry.point == point
     assert box_geometry.box is not None
     assert line_geometry.line_string == (
@@ -2776,22 +2788,24 @@ def test_query_descriptors_and_results_preserve_public_shape() -> None:
         camera.ScreenPoint(5.0, 5.0),
     )
     assert rendered_options.layer_ids == ("landuse",)
+    assert rendered_options.filter == _json_value(["==", "class", "park"])
     assert source_options.source_layer_ids == ("landuse",)
     assert selector.state_key == "hover"
-    assert queried.source_id == "source"
-    assert extension.feature_collection == (feature,)
-
-
-def test_feature_extension_result_preserves_unknown_native_type() -> None:
-    extension = query.FeatureExtensionResult._from_native({"type": 999_001})
-
-    assert extension.type is query.FeatureExtensionResultType.UNKNOWN
-    assert extension.raw_type == 999_001
 
 
 def test_query_selector_rejects_state_key_without_feature_id() -> None:
     with pytest.raises(ValueError, match="state_key requires feature_id"):
         query.FeatureStateSelector(source_id="source", state_key="hover")
+
+
+def test_query_geometry_rejects_mismatched_variant_value() -> None:
+    with pytest.raises(ValueError, match="point query geometry requires point"):
+        query.RenderedQueryGeometry(
+            query.RenderedQueryGeometryType.POINT,
+            box=query.ScreenBox(
+                camera.ScreenPoint(0.0, 0.0), camera.ScreenPoint(1.0, 1.0)
+            ),
+        )
 
 
 def test_process_global_logging_receiver_copies_native_records() -> None:
@@ -2800,7 +2814,7 @@ def test_process_global_logging_receiver_copies_native_records() -> None:
         log.set_async_log_severity_mask(log.LogSeverityMask.DEFAULT)
         with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
             with pytest.raises((mln.InvalidArgumentError, mln.NativeError)):
-                map_handle.set_style_json("{")
+                map_handle.set_style_json(b"{")
             map_handle.dump_debug_logs()
 
         records = []
@@ -2821,52 +2835,13 @@ def test_log_receiver_reports_dropped_records() -> None:
     try:
         with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
             with pytest.raises((mln.InvalidArgumentError, mln.NativeError)):
-                map_handle.set_style_json("{")
+                map_handle.set_style_json(b"{")
             map_handle.dump_debug_logs()
 
         assert receiver.poll_record() is not None
         assert receiver.dropped_record_count >= 0
     finally:
         log.clear_log_callback()
-
-
-def test_json_values_preserve_order_duplicates_and_numeric_shape() -> None:
-    value = json.JsonObject(
-        (
-            json.JsonMember("same", json.JsonUInt(1)),
-            json.JsonMember("same", json.JsonInt(-1)),
-            json.JsonMember("nested", json.JsonArray((True, json.JsonDouble(1.5)))),
-        )
-    )
-
-    assert json.to_python(value) == [
-        ("same", 1),
-        ("same", -1),
-        ("nested", [True, 1.5]),
-    ]
-    assert value.members[0].value == json.JsonUInt(1)
-    assert value.members[1].value == json.JsonInt(-1)
-
-
-def test_geojson_values_preserve_geometry_and_properties() -> None:
-    feature = geo.Feature(
-        geometry=geo.LineString((geo.LatLng(1.0, 2.0), geo.LatLng(3.0, 4.0))),
-        properties=(
-            json.JsonMember("name", "road"),
-            json.JsonMember("name", "duplicate"),
-        ),
-        identifier=geo.FeatureIdentifierString("feature-1"),
-    )
-    collection = geo.FeatureCollection((feature,))
-
-    assert collection.features[0].geometry == geo.LineString(
-        (geo.LatLng(1.0, 2.0), geo.LatLng(3.0, 4.0))
-    )
-    assert [member.key for member in collection.features[0].properties] == [
-        "name",
-        "name",
-    ]
-    assert collection.features[0].identifier == geo.FeatureIdentifierString("feature-1")
 
 
 def test_resource_values_preserve_native_shape() -> None:
@@ -3644,7 +3619,7 @@ def test_resource_request_release_race_with_cancellation_checks_closes_cleanly()
 
 def test_custom_geometry_source_scaffolding_queues_copied_events() -> None:
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         source = map_handle.add_custom_geometry_source(
             "custom",
             style.CustomGeometrySourceOptions(
@@ -3665,8 +3640,17 @@ def test_custom_geometry_source_scaffolding_queues_copied_events() -> None:
         assert source.dropped_event_count == 1
 
         tile = style.CanonicalTileId(0, 0, 0)
-        data = geo.FeatureCollection(
-            (geo.Feature(geometry=geo.Point(geo.LatLng(0.0, 0.0))),)
+        data = _json_object(
+            {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "geometry": {"type": "Point", "coordinates": [0.0, 0.0]},
+                        "properties": {},
+                    }
+                ],
+            }
         )
         bounds = geo.LatLngBounds(
             southwest=geo.LatLng(-1.0, -1.0),
@@ -3678,13 +3662,13 @@ def test_custom_geometry_source_scaffolding_queues_copied_events() -> None:
         source.close()
         assert source.closed
 
-        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         assert source.closed
 
 
 def test_set_style_url_retires_custom_geometry_callback_state() -> None:
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         source = map_handle.add_custom_geometry_source(
             "custom",
             style.CustomGeometrySourceOptions(max_queued_events=1),
@@ -3699,7 +3683,7 @@ def test_set_style_url_retires_custom_geometry_callback_state() -> None:
 
 def test_remove_style_source_releases_custom_geometry_handle() -> None:
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         source = map_handle.add_custom_geometry_source(
             "custom-remove",
             style.CustomGeometrySourceOptions(max_queued_events=1),
@@ -3714,7 +3698,7 @@ def test_remove_style_source_releases_custom_geometry_handle() -> None:
 def test_map_close_releases_custom_geometry_handle() -> None:
     with mln.RuntimeHandle() as runtime:
         map_handle = runtime.create_map()
-        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         source = map_handle.add_custom_geometry_source(
             "custom-close",
             style.CustomGeometrySourceOptions(max_queued_events=1),
@@ -3730,7 +3714,7 @@ def test_map_close_releases_custom_geometry_handle() -> None:
 
 def test_custom_geometry_source_rejects_empty_queue_capacity() -> None:
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         with pytest.raises(mln.InvalidArgumentError):
             map_handle.add_custom_geometry_source(
                 "custom",

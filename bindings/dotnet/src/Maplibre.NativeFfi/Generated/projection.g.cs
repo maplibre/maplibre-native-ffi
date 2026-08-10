@@ -20,7 +20,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_map_projection_set_visible_coordinates([NativeTypeName("mln_map_projection")] MlnMapProjection projection, [NativeTypeName("const mln_lat_lng *")] mln_lat_lng* coordinates, [NativeTypeName("size_t")] nuint coordinate_count, mln_edge_insets padding);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_projection_set_visible_geometry([NativeTypeName("mln_map_projection")] MlnMapProjection projection, [NativeTypeName("const mln_geometry *")] mln_geometry* geometry, mln_edge_insets padding);
+        public static extern mln_status mln_map_projection_set_visible_geometry([NativeTypeName("mln_map_projection")] MlnMapProjection projection, mln_buffer_view geometry, mln_edge_insets padding);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_projection_pixel_for_lat_lng([NativeTypeName("mln_map_projection")] MlnMapProjection projection, mln_lat_lng coordinate, mln_screen_point* out_point);

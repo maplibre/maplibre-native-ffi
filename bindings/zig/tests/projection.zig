@@ -96,7 +96,7 @@ test "standalone projection converts and updates camera" {
     try testing.expect(fitted.center != null);
     try testing.expect(fitted.zoom != null);
 
-    try projection.setVisibleGeometry(testing.allocator, .{ .line_string = visible[0..] }, .{ .top = 0.0, .left = 0.0, .bottom = 0.0, .right = 0.0 });
+    try projection.setVisibleGeometry(testing.allocator, "{\"type\":\"LineString\",\"coordinates\":[[-10,-10],[10,10]]}", .{ .top = 0.0, .left = 0.0, .bottom = 0.0, .right = 0.0 });
     const geometry_fitted = try projection.getCamera();
     try testing.expect(geometry_fitted.center != null);
     try testing.expect(geometry_fitted.zoom != null);
@@ -129,8 +129,8 @@ test "projection public descriptors report invalid native arguments" {
     try testing.expectError(error.InvalidArgument, projection.setCamera(.{ .center = .{ .latitude = std.math.inf(f64), .longitude = 0.0 } }));
     try testing.expectError(error.InvalidArgument, projection.setVisibleCoordinates(testing.allocator, &.{}, .{}));
     try testing.expectError(error.InvalidArgument, projection.setVisibleCoordinates(testing.allocator, &.{center}, .{ .top = -1.0 }));
-    try testing.expectError(error.InvalidArgument, projection.setVisibleGeometry(testing.allocator, .empty, .{}));
-    try testing.expectError(error.InvalidArgument, projection.setVisibleGeometry(testing.allocator, .{ .point = .{ .latitude = std.math.inf(f64), .longitude = 0.0 } }, .{}));
+    try testing.expectError(error.InvalidArgument, projection.setVisibleGeometry(testing.allocator, "{", .{}));
+    try testing.expectError(error.InvalidArgument, projection.setVisibleGeometry(testing.allocator, "{\"type\":\"Point\",\"coordinates\":[0,1e999]}", .{}));
     try testing.expectError(error.InvalidArgument, projection.pixelForLatLng(.{ .latitude = std.math.nan(f64), .longitude = 0.0 }));
     try testing.expectError(error.InvalidArgument, projection.latLngForPixel(.{ .x = 0.0, .y = std.math.inf(f64) }));
 }

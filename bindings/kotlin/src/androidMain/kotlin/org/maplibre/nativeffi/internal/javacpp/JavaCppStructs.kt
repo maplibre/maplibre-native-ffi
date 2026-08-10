@@ -2,10 +2,7 @@ package org.maplibre.nativeffi.internal.javacpp
 
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
-import org.maplibre.nativeffi.geo.Feature
-import org.maplibre.nativeffi.geo.GeoJson
-import org.maplibre.nativeffi.geo.Geometry
-import org.maplibre.nativeffi.json.JsonValue
+import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.map.JavaCppMapStructs
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.map.ProjectionModeOptions
@@ -47,19 +44,25 @@ internal object JavaCppStructs {
   fun projectionModeOptionsRoundTrip(value: ProjectionModeOptions): ProjectionModeOptions =
     JavaCppMapStructs.projectionModeOptionsRoundTrip(value)
 
-  fun jsonRoundTrip(value: JsonValue): JsonValue = JavaCppMapStructs.jsonRoundTrip(value)
-
-  fun geometryRoundTrip(value: Geometry): Geometry = JavaCppRenderStructs.geometryRoundTrip(value)
-
-  fun featureRoundTrip(value: Feature): Feature = JavaCppRenderStructs.featureRoundTrip(value)
-
-  fun geoJsonType(value: GeoJson): Int = JavaCppMapStructs.geoJsonType(value)
-
   fun renderedQueryGeometryType(value: RenderedQueryGeometry): Int =
     JavaCppRenderStructs.renderedQueryGeometryType(value)
 
-  fun featureQueryCleanupAfterCopyFailure(): Int =
-    JavaCppRenderStructs.featureQueryCleanupAfterCopyFailure()
+  fun ownedBufferCleanupAfterCopyFailure(): Int {
+    var destroys = 0
+    try {
+      ownedBuffer(
+        1L,
+        getter = { _, bytes ->
+          bytes.size(Long.MAX_VALUE)
+          MaplibreStatus.OK.nativeCode
+        },
+        destroyer = { destroys++ },
+      )
+    } catch (_: ArithmeticException) {
+      return destroys
+    }
+    error("buffer conversion unexpectedly succeeded")
+  }
 
   fun offlineRegionDefinitionRoundTrip(value: OfflineRegionDefinition): OfflineRegionDefinition =
     JavaCppRuntimeStructs.offlineRegionDefinitionRoundTrip(value)

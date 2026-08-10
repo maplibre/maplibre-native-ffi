@@ -222,7 +222,9 @@ static void camera_fitting_rejects_invalid_arguments(void) {
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_camera_for_geometry(fixture.map, NULL, NULL, &camera)
+    mln_map_camera_for_geometry(
+      fixture.map, (mln_buffer_view){0}, NULL, &camera
+    )
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
@@ -447,8 +449,9 @@ static void standalone_projection_rejects_invalid_arguments(void) {
     mln_map_projection_set_visible_coordinates(projection, NULL, 1, padding)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_projection_set_visible_geometry(projection, NULL, padding)
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_projection_set_visible_geometry(
+                                   projection, (mln_buffer_view){0}, padding
+                                 )
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,

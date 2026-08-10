@@ -14,11 +14,8 @@ import '../internal/lifecycle/native_handles.dart';
 import '../internal/lifecycle/frame_construction.dart';
 import '../internal/memory/memory.dart';
 import '../internal/status/status.dart';
-import '../internal/struct/geometry.dart' as native_geometry;
-import '../internal/struct/json.dart' as native_json;
 import '../internal/struct/struct.dart' as native_struct;
 import '../internal/value/uint64.dart';
-import '../json/json.dart';
 import '../offline/offline.dart';
 import '../query/query.dart';
 import '../render/native_pointer.dart';
@@ -697,7 +694,10 @@ final class RuntimeEvent {
       payloadType: event.payload_type,
       payload: RuntimeEventPayload._fromNative(event, runtime),
       payloadSize: event.payload_size,
-      message: _copyNativeString(event.message, event.message_size),
+      message: _copyNativeString(
+        event.message.cast<Void>(),
+        event.message_size,
+      ),
     );
   }
 
@@ -1168,7 +1168,10 @@ sealed class RuntimeEventPayload {
           return RuntimeEventStyleImageMissing(
             rawPayloadType: rawPayloadType,
             payloadSize: payloadSize,
-            imageId: _copyNativeString(value.image_id, value.image_id_size),
+            imageId: _copyNativeString(
+              value.image_id.cast<Void>(),
+              value.image_id_size,
+            ),
           );
         },
       ),
@@ -1189,7 +1192,10 @@ sealed class RuntimeEventPayload {
               canonicalX: value.tile_id.canonical_x,
               canonicalY: value.tile_id.canonical_y,
             ),
-            sourceId: _copyNativeString(value.source_id, value.source_id_size),
+            sourceId: _copyNativeString(
+              value.source_id.cast<Void>(),
+              value.source_id_size,
+            ),
           );
         },
       ),
@@ -1659,15 +1665,10 @@ final class MapHandle {
   }
 
   /// Loads inline style JSON through MapLibre Native style APIs.
-  void setStyleJson(String json) {
+  void setStyleJson(Uint8List json) {
     withNativeArena((arena) {
-      final nativeJson = nativeUtf8CString(json, arena);
-      _check(
-        raw.mln_map_set_style_json(
-          _handle.raw,
-          nativeJson.pointer.cast<Char>(),
-        ),
-      );
+      final nativeJson = nativeBufferView(json, arena);
+      _check(raw.mln_map_set_style_json(_handle.raw, nativeJson));
     });
     _clearCustomGeometryCallbacks();
   }
@@ -1678,8 +1679,8 @@ final class MapHandle {
   /// runtime mutations do not change it, and a failed parse leaves the
   /// previously parsed document in place. The result is empty when no document
   /// has been parsed.
-  String getLoadedStyleJson() {
-    return _copyMapText(_handle, raw.mln_map_copy_loaded_style_json);
+  Uint8List getLoadedStyleJson() {
+    return _copyMapData(_handle, raw.mln_map_copy_loaded_style_json);
   }
 
   /// Returns the URL this map's style was last requested from.
@@ -2071,7 +2072,7 @@ final class MapHandle {
 
   /// Computes a camera that fits a geometry in the current viewport.
   CameraOptions cameraForGeometry(
-    Geometry geometry, {
+    Uint8List geometry, {
     CameraFitOptions fitOptions = const CameraFitOptions(),
   }) {
     return withNativeArena((arena) {
@@ -2082,11 +2083,11 @@ final class MapHandle {
         fitOptions,
         raw.mln_camera_fit_options_default(),
       );
-      final nativeGeometry = native_geometry.nativeGeometry(geometry, arena);
+      final nativeGeometry = nativeBufferView(geometry, arena);
       _check(
         raw.mln_map_camera_for_geometry(
           _handle.raw,
-          nativeGeometry.pointer,
+          nativeGeometry,
           nativeFitOptions,
           outCamera,
         ),
@@ -2374,15 +2375,15 @@ final class MapHandle {
   }
 
   /// Adds one style source from a style-spec source JSON object.
-  void addStyleSourceJson(String sourceId, JsonValue sourceJson) {
+  void addStyleSourceJson(String sourceId, Uint8List sourceJson) {
     withNativeArena((arena) {
       final nativeId = nativeStringView(sourceId, arena);
-      final nativeSourceJson = native_json.nativeJsonValue(sourceJson, arena);
+      final nativeSourceJson = nativeBufferView(sourceJson, arena);
       _check(
         raw.mln_map_add_style_source_json(
           _handle.raw,
           nativeId.value,
-          nativeSourceJson.pointer,
+          nativeSourceJson,
         ),
       );
     });
@@ -2392,12 +2393,15 @@ final class MapHandle {
   void addGeoJsonSourceUrl(
     String sourceId,
     String url, {
-    GeoJsonSourceOptions options = const GeoJsonSourceOptions(),
+    GeoJsonSourceOptions? options,
   }) {
     withNativeArena((arena) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeUrl = nativeStringView(url, arena);
-      final nativeOptions = _nativeGeoJsonSourceOptions(options, arena);
+      final nativeOptions = _nativeGeoJsonSourceOptions(
+        options ?? GeoJsonSourceOptions(),
+        arena,
+      );
       _check(
         raw.mln_map_add_geojson_source_url(
           _handle.raw,
@@ -2412,18 +2416,21 @@ final class MapHandle {
   /// Adds a GeoJSON source with inline data.
   void addGeoJsonSourceData(
     String sourceId,
-    GeoJson data, {
-    GeoJsonSourceOptions options = const GeoJsonSourceOptions(),
+    Uint8List data, {
+    GeoJsonSourceOptions? options,
   }) {
     withNativeArena((arena) {
       final nativeId = nativeStringView(sourceId, arena);
-      final nativeData = native_geometry.nativeGeoJson(data, arena);
-      final nativeOptions = _nativeGeoJsonSourceOptions(options, arena);
+      final nativeData = nativeBufferView(data, arena);
+      final nativeOptions = _nativeGeoJsonSourceOptions(
+        options ?? GeoJsonSourceOptions(),
+        arena,
+      );
       _check(
         raw.mln_map_add_geojson_source_data(
           _handle.raw,
           nativeId.value,
-          nativeData.pointer,
+          nativeData,
           nativeOptions,
         ),
       );
@@ -2446,15 +2453,15 @@ final class MapHandle {
   }
 
   /// Updates one GeoJSON source with inline data.
-  void setGeoJsonSourceData(String sourceId, GeoJson data) {
+  void setGeoJsonSourceData(String sourceId, Uint8List data) {
     withNativeArena((arena) {
       final nativeId = nativeStringView(sourceId, arena);
-      final nativeData = native_geometry.nativeGeoJson(data, arena);
+      final nativeData = nativeBufferView(data, arena);
       _check(
         raw.mln_map_set_geojson_source_data(
           _handle.raw,
           nativeId.value,
-          nativeData.pointer,
+          nativeData,
         ),
       );
     });
@@ -2729,17 +2736,17 @@ final class MapHandle {
   void setCustomGeometrySourceTileData(
     String sourceId,
     CanonicalTileId tileId,
-    GeoJson data,
+    Uint8List data,
   ) {
     withNativeArena((arena) {
       final nativeId = nativeStringView(sourceId, arena);
-      final nativeData = native_geometry.nativeGeoJson(data, arena);
+      final nativeData = nativeBufferView(data, arena);
       _check(
         raw.mln_map_set_custom_geometry_source_tile_data(
           _handle.raw,
           nativeId.value,
           _canonicalTileIdToNative(tileId),
-          nativeData.pointer,
+          nativeData,
         ),
       );
     });
@@ -3064,14 +3071,14 @@ final class MapHandle {
   }
 
   /// Adds one style layer from a full style-spec layer JSON object.
-  void addStyleLayerJson(JsonValue layerJson, {String? beforeLayerId}) {
+  void addStyleLayerJson(Uint8List layerJson, {String? beforeLayerId}) {
     withNativeArena((arena) {
-      final nativeLayerJson = native_json.nativeJsonValue(layerJson, arena);
+      final nativeLayerJson = nativeBufferView(layerJson, arena);
       final nativeBeforeLayerId = nativeStringView(beforeLayerId ?? '', arena);
       _check(
         raw.mln_map_add_style_layer_json(
           _handle.raw,
-          nativeLayerJson.pointer,
+          nativeLayerJson,
           nativeBeforeLayerId.value,
         ),
       );
@@ -3079,7 +3086,7 @@ final class MapHandle {
   }
 
   /// Copies one style layer as a full style-spec layer JSON snapshot.
-  JsonValue? getStyleLayerJson(String layerId) {
+  Uint8List? getStyleLayerJson(String layerId) {
     return withNativeArena((arena) {
       final nativeId = nativeStringView(layerId, arena);
       final outLayer = arena<Uint64>();
@@ -3096,37 +3103,35 @@ final class MapHandle {
       if (!outFound.value) {
         return null;
       }
-      return _copyJsonSnapshot(NativeJsonSnapshot(outLayer.value));
+      return copyOwnedBuffer(NativeOwnedBufferHandle(outLayer.value));
     });
   }
 
   /// Sets the style light from a style-spec light JSON object.
-  void setStyleLightJson(JsonValue lightJson) {
+  void setStyleLightJson(Uint8List lightJson) {
     withNativeArena((arena) {
-      final nativeLightJson = native_json.nativeJsonValue(lightJson, arena);
-      _check(
-        raw.mln_map_set_style_light_json(_handle.raw, nativeLightJson.pointer),
-      );
+      final nativeLightJson = nativeBufferView(lightJson, arena);
+      _check(raw.mln_map_set_style_light_json(_handle.raw, nativeLightJson));
     });
   }
 
   /// Sets one style light property by style-spec property name.
-  void setStyleLightProperty(String propertyName, JsonValue value) {
+  void setStyleLightProperty(String propertyName, Uint8List value) {
     withNativeArena((arena) {
       final nativePropertyName = nativeStringView(propertyName, arena);
-      final nativeValue = native_json.nativeJsonValue(value, arena);
+      final nativeValue = nativeBufferView(value, arena);
       _check(
         raw.mln_map_set_style_light_property(
           _handle.raw,
           nativePropertyName.value,
-          nativeValue.pointer,
+          nativeValue,
         ),
       );
     });
   }
 
   /// Copies one style light property, or null when the property is undefined.
-  JsonValue? getStyleLightProperty(String propertyName) {
+  Uint8List? getStyleLightProperty(String propertyName) {
     return withNativeArena((arena) {
       final nativePropertyName = nativeStringView(propertyName, arena);
       final outValue = arena<Uint64>();
@@ -3138,7 +3143,8 @@ final class MapHandle {
           outValue,
         ),
       );
-      return _copyJsonSnapshot(NativeJsonSnapshot(outValue.value));
+      final buffer = NativeOwnedBufferHandle(outValue.value);
+      return buffer.isNull ? null : copyOwnedBuffer(buffer);
     });
   }
 
@@ -3168,24 +3174,24 @@ final class MapHandle {
   }
 
   /// Sets one layer property by style-spec property name.
-  void setLayerProperty(String layerId, String propertyName, JsonValue value) {
+  void setLayerProperty(String layerId, String propertyName, Uint8List value) {
     withNativeArena((arena) {
       final nativeLayerId = nativeStringView(layerId, arena);
       final nativePropertyName = nativeStringView(propertyName, arena);
-      final nativeValue = native_json.nativeJsonValue(value, arena);
+      final nativeValue = nativeBufferView(value, arena);
       _check(
         raw.mln_map_set_layer_property(
           _handle.raw,
           nativeLayerId.value,
           nativePropertyName.value,
-          nativeValue.pointer,
+          nativeValue,
         ),
       );
     });
   }
 
   /// Copies one layer property, or null when the property is undefined.
-  JsonValue? getLayerProperty(String layerId, String propertyName) {
+  Uint8List? getLayerProperty(String layerId, String propertyName) {
     return withNativeArena((arena) {
       final nativeLayerId = nativeStringView(layerId, arena);
       final nativePropertyName = nativeStringView(propertyName, arena);
@@ -3199,17 +3205,19 @@ final class MapHandle {
           outValue,
         ),
       );
-      return _copyJsonSnapshot(NativeJsonSnapshot(outValue.value));
+      final buffer = NativeOwnedBufferHandle(outValue.value);
+      return buffer.isNull ? null : copyOwnedBuffer(buffer);
     });
   }
 
   /// Sets or clears one layer filter.
-  void setLayerFilter(String layerId, JsonValue? filter) {
+  void setLayerFilter(String layerId, Uint8List? filter) {
     withNativeArena((arena) {
       final nativeLayerId = nativeStringView(layerId, arena);
       final nativeFilter = filter == null
-          ? nullptr.cast<raw.mln_json_value>()
-          : native_json.nativeJsonValue(filter, arena).pointer;
+          ? nullptr.cast<raw.mln_buffer_view>()
+          : (arena<raw.mln_buffer_view>()
+              ..ref = nativeBufferView(filter, arena));
       _check(
         raw.mln_map_set_layer_filter(
           _handle.raw,
@@ -3221,7 +3229,7 @@ final class MapHandle {
   }
 
   /// Copies one layer filter, or null when the layer has no filter.
-  JsonValue? getLayerFilter(String layerId) {
+  Uint8List? getLayerFilter(String layerId) {
     return withNativeArena((arena) {
       final nativeLayerId = nativeStringView(layerId, arena);
       final outFilter = arena<Uint64>();
@@ -3233,7 +3241,8 @@ final class MapHandle {
           outFilter,
         ),
       );
-      return _copyJsonSnapshot(NativeJsonSnapshot(outFilter.value));
+      final buffer = NativeOwnedBufferHandle(outFilter.value);
+      return buffer.isNull ? null : copyOwnedBuffer(buffer);
     });
   }
 
@@ -3400,7 +3409,7 @@ final class MapHandle {
   String? getStyleLayerType(String layerId) {
     return withNativeArena((arena) {
       final nativeId = nativeStringView(layerId, arena);
-      final outLayerType = arena<raw.mln_string_view>();
+      final outLayerType = arena<raw.mln_buffer_view>();
       final outFound = arena<Bool>();
       _check(
         raw.mln_map_get_style_layer_type(

@@ -3,8 +3,8 @@
 #include <maplibre_native_c.h>
 #include <string.h>
 
-static mln_string_view sv(const char* text) {
-  return (mln_string_view){.data = text, .size = strlen(text)};
+static mln_buffer_view view(const char* text) {
+  return (mln_buffer_view){.data = text, .size = strlen(text)};
 }
 
 mln_status add_hillshading(mln_map map) {
@@ -18,11 +18,11 @@ mln_status add_hillshading(mln_map map) {
   // #endregion options
 
   // #region source
-  const mln_string_view tiles[] = {
-    sv("https://tiles.example.com/terrain/{z}/{x}/{y}.png"),
+  const mln_buffer_view tiles[] = {
+    view("https://tiles.example.com/terrain/{z}/{x}/{y}.png"),
   };
   const mln_status status = mln_map_add_raster_dem_source_tiles(
-    map, sv("terrain"), tiles, sizeof(tiles) / sizeof(tiles[0]), &options
+    map, view("terrain"), tiles, sizeof(tiles) / sizeof(tiles[0]), &options
   );
   // #endregion source
   if (status != MLN_STATUS_OK) {
@@ -32,7 +32,7 @@ mln_status add_hillshading(mln_map map) {
   // #region layer
   // An empty before-layer ID puts the layer on top of the style.
   return mln_map_add_hillshade_layer(
-    map, sv("hillshading"), sv("terrain"), sv("")
+    map, view("hillshading"), view("terrain"), view("")
   );
   // #endregion layer
 }

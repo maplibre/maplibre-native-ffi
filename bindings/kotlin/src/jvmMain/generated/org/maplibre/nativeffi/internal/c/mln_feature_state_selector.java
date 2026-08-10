@@ -17,10 +17,10 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  * struct mln_feature_state_selector {
  *     uint32_t size;
  *     uint32_t fields;
- *     mln_string_view source_id;
- *     mln_string_view source_layer_id;
- *     mln_string_view feature_id;
- *     mln_string_view state_key;
+ *     mln_buffer_view source_id;
+ *     mln_buffer_view source_layer_id;
+ *     mln_buffer_view feature_id;
+ *     mln_buffer_view state_key;
  * }
  * }
  */
@@ -33,10 +33,10 @@ public class mln_feature_state_selector {
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
         MapLibreNativeC.C_INT.withName("size"),
         MapLibreNativeC.C_INT.withName("fields"),
-        mln_string_view.layout().withName("source_id"),
-        mln_string_view.layout().withName("source_layer_id"),
-        mln_string_view.layout().withName("feature_id"),
-        mln_string_view.layout().withName("state_key")
+        mln_buffer_view.layout().withName("source_id"),
+        mln_buffer_view.layout().withName("source_layer_id"),
+        mln_buffer_view.layout().withName("feature_id"),
+        mln_buffer_view.layout().withName("state_key")
     ).withName("mln_feature_state_selector");
 
     /**
@@ -139,7 +139,7 @@ public class mln_feature_state_selector {
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * mln_string_view source_id
+     * mln_buffer_view source_id
      * }
      */
     public static final GroupLayout source_id$layout() {
@@ -151,7 +151,7 @@ public class mln_feature_state_selector {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * mln_string_view source_id
+     * mln_buffer_view source_id
      * }
      */
     public static final long source_id$offset() {
@@ -161,7 +161,7 @@ public class mln_feature_state_selector {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * mln_string_view source_id
+     * mln_buffer_view source_id
      * }
      */
     public static MemorySegment source_id(MemorySegment struct) {
@@ -171,7 +171,7 @@ public class mln_feature_state_selector {
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * mln_string_view source_id
+     * mln_buffer_view source_id
      * }
      */
     public static void source_id(MemorySegment struct, MemorySegment fieldValue) {
@@ -183,7 +183,7 @@ public class mln_feature_state_selector {
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * mln_string_view source_layer_id
+     * mln_buffer_view source_layer_id
      * }
      */
     public static final GroupLayout source_layer_id$layout() {
@@ -195,7 +195,7 @@ public class mln_feature_state_selector {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * mln_string_view source_layer_id
+     * mln_buffer_view source_layer_id
      * }
      */
     public static final long source_layer_id$offset() {
@@ -205,7 +205,7 @@ public class mln_feature_state_selector {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * mln_string_view source_layer_id
+     * mln_buffer_view source_layer_id
      * }
      */
     public static MemorySegment source_layer_id(MemorySegment struct) {
@@ -215,7 +215,7 @@ public class mln_feature_state_selector {
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * mln_string_view source_layer_id
+     * mln_buffer_view source_layer_id
      * }
      */
     public static void source_layer_id(MemorySegment struct, MemorySegment fieldValue) {
@@ -227,7 +227,7 @@ public class mln_feature_state_selector {
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * mln_string_view feature_id
+     * mln_buffer_view feature_id
      * }
      */
     public static final GroupLayout feature_id$layout() {
@@ -239,7 +239,7 @@ public class mln_feature_state_selector {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * mln_string_view feature_id
+     * mln_buffer_view feature_id
      * }
      */
     public static final long feature_id$offset() {
@@ -249,7 +249,7 @@ public class mln_feature_state_selector {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * mln_string_view feature_id
+     * mln_buffer_view feature_id
      * }
      */
     public static MemorySegment feature_id(MemorySegment struct) {
@@ -259,7 +259,7 @@ public class mln_feature_state_selector {
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * mln_string_view feature_id
+     * mln_buffer_view feature_id
      * }
      */
     public static void feature_id(MemorySegment struct, MemorySegment fieldValue) {
@@ -271,7 +271,7 @@ public class mln_feature_state_selector {
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * mln_string_view state_key
+     * mln_buffer_view state_key
      * }
      */
     public static final GroupLayout state_key$layout() {
@@ -283,7 +283,7 @@ public class mln_feature_state_selector {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * mln_string_view state_key
+     * mln_buffer_view state_key
      * }
      */
     public static final long state_key$offset() {
@@ -293,7 +293,7 @@ public class mln_feature_state_selector {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * mln_string_view state_key
+     * mln_buffer_view state_key
      * }
      */
     public static MemorySegment state_key(MemorySegment struct) {
@@ -303,7 +303,7 @@ public class mln_feature_state_selector {
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * mln_string_view state_key
+     * mln_buffer_view state_key
      * }
      */
     public static void state_key(MemorySegment struct, MemorySegment fieldValue) {

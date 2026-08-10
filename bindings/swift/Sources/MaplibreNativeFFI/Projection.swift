@@ -1,5 +1,6 @@
 
 internal import CMaplibreNativeC
+import Foundation
 
 public struct ProjectedMeters: Equatable, Sendable {
   public let northing: Double
@@ -78,14 +79,15 @@ public final class MapProjectionHandle {
   }
 
   public func setVisibleGeometry(
-    _ geometry: Geometry,
+    _ geometry: Data,
     padding: EdgeInsets = EdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_projection_set_visible_geometry(
         handle.requireLive().raw,
-        arena.allocateGeometry(geometry.nativeGeometry),
+        arena.view(geometry),
         padding.nativeInput.native
       ))
     }

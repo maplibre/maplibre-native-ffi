@@ -22,8 +22,23 @@ namespace Maplibre.NativeFfi.Internal.C
         MLN_RENDER_BACKEND_FLAG_WEBGPU = 1U << 3,
     }
 
-    internal static partial class NativeMethods
+    internal unsafe partial struct mln_buffer_view
     {
+        [NativeTypeName("const void *")]
+        public void* data;
+
+        [NativeTypeName("size_t")]
+        public nuint size;
+    }
+
+    internal static unsafe partial class NativeMethods
+    {
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_buffer_get([NativeTypeName("mln_buffer")] MlnBuffer buffer, mln_buffer_view* out_view);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void mln_buffer_destroy([NativeTypeName("mln_buffer")] MlnBuffer buffer);
+
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("uint32_t")]
         public static extern uint mln_c_version();

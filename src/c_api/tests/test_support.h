@@ -5,8 +5,18 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "maplibre_native_c.h"
+
+#define MLN_BUFFER_LITERAL(literal) \
+  ((mln_buffer_view){.data = (literal), .size = sizeof(literal) - 1})
+
+static inline mln_buffer_view mln_test_buffer_view(
+  const void* data, size_t size
+) {
+  return (mln_buffer_view){.data = data, .size = size};
+}
 
 typedef struct mln_test_render_fixture {
   mln_render_session session;

@@ -253,7 +253,7 @@ pub const OfflineTilePyramidRegionDefinition = struct {
 
 pub const OfflineGeometryRegionDefinition = struct {
     style_url: []const u8,
-    geometry: values.Geometry,
+    geometry: []const u8,
     min_zoom: f64,
     max_zoom: f64,
     pixel_ratio: f32 = 1.0,
@@ -276,7 +276,7 @@ pub const OwnedOfflineTilePyramidRegionDefinition = struct {
 
 pub const OwnedOfflineGeometryRegionDefinition = struct {
     style_url: []const u8,
-    geometry: values.OwnedGeometry,
+    geometry: []u8,
     min_zoom: f64,
     max_zoom: f64,
     pixel_ratio: f32,
@@ -292,7 +292,7 @@ pub const OwnedOfflineRegionDefinition = union(enum) {
             .tile_pyramid => |definition| allocator.free(definition.style_url),
             .geometry => |*definition| {
                 allocator.free(definition.style_url);
-                definition.geometry.deinit(allocator);
+                allocator.free(definition.geometry);
             },
         }
         self.* = .{ .tile_pyramid = .{
@@ -2297,7 +2297,12 @@ fn copyOfflineRegionDefinition(
             const definition = raw.data.geometry;
             const style_url = try allocator.dupe(u8, std.mem.span(definition.style_url));
             errdefer allocator.free(style_url);
-            const geometry = try values.ownedGeometryFromNative(allocator, definition.geometry orelse return error.NativeError);
+            const geometry = if (definition.geometry.size == 0)
+                try allocator.dupe(u8, "")
+            else blk_geometry: {
+                const data: [*]const u8 = @ptrCast(definition.geometry.data orelse return error.NativeError);
+                break :blk_geometry try allocator.dupe(u8, data[0..definition.geometry.size]);
+            };
             break :blk .{ .geometry = .{
                 .style_url = style_url,
                 .geometry = geometry,

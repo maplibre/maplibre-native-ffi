@@ -23,19 +23,12 @@ internal fun offlineRegionSnapshotHandle(value: ULong): NativeOfflineRegionSnaps
 internal fun offlineRegionListHandle(value: ULong): NativeOfflineRegionList =
   NativeOfflineRegionList(value.toLong())
 
-internal fun jsonSnapshotHandle(value: ULong): NativeJsonSnapshot =
-  NativeJsonSnapshot(value.toLong())
+internal fun ownedBufferHandle(value: ULong): NativeOwnedBuffer = NativeOwnedBuffer(value.toLong())
 
 internal fun styleIdListHandle(value: ULong): NativeStyleIdList = NativeStyleIdList(value.toLong())
 
 internal fun styleStringListHandle(value: ULong): NativeStyleStringList =
   NativeStyleStringList(value.toLong())
-
-internal fun featureQueryResultHandle(value: ULong): NativeFeatureQueryResult =
-  NativeFeatureQueryResult(value.toLong())
-
-internal fun featureExtensionResultHandle(value: ULong): NativeFeatureExtensionResult =
-  NativeFeatureExtensionResult(value.toLong())
 
 internal fun wakeSourceHandle(value: ULong): NativeWakeSource = NativeWakeSource(value.toLong())
 

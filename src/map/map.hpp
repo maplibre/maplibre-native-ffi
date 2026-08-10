@@ -44,9 +44,9 @@ auto destroy_map(mln_map map) -> mln_status;
 auto map_request_repaint(mln_map map) -> mln_status;
 auto map_request_still_image(mln_map map) -> mln_status;
 auto map_set_style_url(mln_map map, const char* url) -> mln_status;
-auto map_set_style_json(mln_map map, const char* json) -> mln_status;
+auto map_set_style_json(mln_map map, mln_buffer_view json) -> mln_status;
 auto map_copy_loaded_style_json(
-  mln_map map, char* out_json, size_t json_capacity, size_t* out_json_size
+  mln_map map, uint8_t* out_json, size_t json_capacity, size_t* out_json_size
 ) -> mln_status;
 auto map_copy_style_url(
   mln_map map, char* out_url, size_t url_capacity, size_t* out_url_size
@@ -54,199 +54,198 @@ auto map_copy_style_url(
 auto style_id_list_count(mln_style_id_list list, size_t* out_count)
   -> mln_status;
 auto style_id_list_get(
-  mln_style_id_list list, size_t index, mln_string_view* out_id
+  mln_style_id_list list, size_t index, mln_buffer_view* out_id
 ) -> mln_status;
 auto style_id_list_destroy(mln_style_id_list list) -> void;
 auto style_string_list_count(mln_style_string_list list, size_t* out_count)
   -> mln_status;
 auto style_string_list_get(
-  mln_style_string_list list, size_t index, mln_string_view* out_value
+  mln_style_string_list list, size_t index, mln_buffer_view* out_value
 ) -> mln_status;
 auto style_string_list_destroy(mln_style_string_list list) -> void;
 auto map_add_style_source_json(
-  mln_map map, mln_string_view source_id, const mln_json_value* source_json
+  mln_map map, mln_buffer_view source_id, mln_buffer_view source_json
 ) -> mln_status;
 auto map_remove_style_source(
-  mln_map map, mln_string_view source_id, bool* out_removed
+  mln_map map, mln_buffer_view source_id, bool* out_removed
 ) -> mln_status;
 auto map_style_source_exists(
-  mln_map map, mln_string_view source_id, bool* out_exists
+  mln_map map, mln_buffer_view source_id, bool* out_exists
 ) -> mln_status;
 auto map_get_style_source_type(
-  mln_map map, mln_string_view source_id, uint32_t* out_source_type,
+  mln_map map, mln_buffer_view source_id, uint32_t* out_source_type,
   bool* out_found
 ) -> mln_status;
 auto map_get_style_source_info(
-  mln_map map, mln_string_view source_id, mln_style_source_info* out_info,
+  mln_map map, mln_buffer_view source_id, mln_style_source_info* out_info,
   bool* out_found
 ) -> mln_status;
 auto map_copy_style_source_attribution(
-  mln_map map, mln_string_view source_id, char* out_attribution,
+  mln_map map, mln_buffer_view source_id, char* out_attribution,
   size_t attribution_capacity, size_t* out_attribution_size, bool* out_found
 ) -> mln_status;
 auto map_copy_style_source_url(
-  mln_map map, mln_string_view source_id, char* out_url, size_t url_capacity,
+  mln_map map, mln_buffer_view source_id, char* out_url, size_t url_capacity,
   size_t* out_url_size, bool* out_found
 ) -> mln_status;
 auto map_get_style_source_tile_urls(
-  mln_map map, mln_string_view source_id, mln_style_string_list* out_tile_urls,
+  mln_map map, mln_buffer_view source_id, mln_style_string_list* out_tile_urls,
   bool* out_found
 ) -> mln_status;
 auto map_list_style_source_ids(mln_map map, mln_style_id_list* out_source_ids)
   -> mln_status;
 auto map_add_geojson_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
   const mln_geojson_source_options* options
 ) -> mln_status;
 auto map_add_geojson_source_data(
-  mln_map map, mln_string_view source_id, const mln_geojson* data,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view data,
   const mln_geojson_source_options* options
 ) -> mln_status;
 auto map_set_geojson_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url
 ) -> mln_status;
 auto map_set_geojson_source_data(
-  mln_map map, mln_string_view source_id, const mln_geojson* data
+  mln_map map, mln_buffer_view source_id, mln_buffer_view data
 ) -> mln_status;
 auto map_add_vector_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
   const mln_style_tile_source_options* options
 ) -> mln_status;
 auto map_add_vector_source_tiles(
-  mln_map map, mln_string_view source_id, const mln_string_view* tiles,
+  mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options
 ) -> mln_status;
 auto map_add_raster_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
   const mln_style_tile_source_options* options
 ) -> mln_status;
 auto map_add_raster_source_tiles(
-  mln_map map, mln_string_view source_id, const mln_string_view* tiles,
+  mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options
 ) -> mln_status;
 auto map_add_raster_dem_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url,
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
   const mln_style_tile_source_options* options
 ) -> mln_status;
 auto map_add_raster_dem_source_tiles(
-  mln_map map, mln_string_view source_id, const mln_string_view* tiles,
+  mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options
 ) -> mln_status;
 auto map_add_custom_geometry_source(
-  mln_map map, mln_string_view source_id,
+  mln_map map, mln_buffer_view source_id,
   const mln_custom_geometry_source_options* options
 ) -> mln_status;
 auto map_set_custom_geometry_source_tile_data(
-  mln_map map, mln_string_view source_id, mln_canonical_tile_id tile_id,
-  const mln_geojson* data
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view data
 ) -> mln_status;
 auto map_invalidate_custom_geometry_source_tile(
-  mln_map map, mln_string_view source_id, mln_canonical_tile_id tile_id
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id
 ) -> mln_status;
 auto map_invalidate_custom_geometry_source_region(
-  mln_map map, mln_string_view source_id, mln_lat_lng_bounds bounds
+  mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds
 ) -> mln_status;
 auto map_set_style_image(
-  mln_map map, mln_string_view image_id,
+  mln_map map, mln_buffer_view image_id,
   const mln_premultiplied_rgba8_image* image,
   const mln_style_image_options* options
 ) -> mln_status;
 auto map_remove_style_image(
-  mln_map map, mln_string_view image_id, bool* out_removed
+  mln_map map, mln_buffer_view image_id, bool* out_removed
 ) -> mln_status;
 auto map_style_image_exists(
-  mln_map map, mln_string_view image_id, bool* out_exists
+  mln_map map, mln_buffer_view image_id, bool* out_exists
 ) -> mln_status;
 auto map_get_style_image_info(
-  mln_map map, mln_string_view image_id, mln_style_image_info* out_info,
+  mln_map map, mln_buffer_view image_id, mln_style_image_info* out_info,
   bool* out_found
 ) -> mln_status;
 auto map_copy_style_image_stretches(
-  mln_map map, mln_string_view image_id, mln_image_stretch* out_stretch_x,
+  mln_map map, mln_buffer_view image_id, mln_image_stretch* out_stretch_x,
   size_t stretch_x_capacity, size_t* out_stretch_x_count,
   mln_image_stretch* out_stretch_y, size_t stretch_y_capacity,
   size_t* out_stretch_y_count, bool* out_found
 ) -> mln_status;
 auto map_copy_style_image_premultiplied_rgba8(
-  mln_map map, mln_string_view image_id, uint8_t* out_pixels,
+  mln_map map, mln_buffer_view image_id, uint8_t* out_pixels,
   size_t pixel_capacity, size_t* out_byte_length, bool* out_found
 ) -> mln_status;
 auto map_add_image_source_url(
-  mln_map map, mln_string_view source_id, const mln_lat_lng* coordinates,
-  size_t coordinate_count, mln_string_view url
+  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
+  size_t coordinate_count, mln_buffer_view url
 ) -> mln_status;
 auto map_add_image_source_image(
-  mln_map map, mln_string_view source_id, const mln_lat_lng* coordinates,
+  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
   size_t coordinate_count, const mln_premultiplied_rgba8_image* image
 ) -> mln_status;
 auto map_set_image_source_url(
-  mln_map map, mln_string_view source_id, mln_string_view url
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url
 ) -> mln_status;
 auto map_set_image_source_image(
-  mln_map map, mln_string_view source_id,
+  mln_map map, mln_buffer_view source_id,
   const mln_premultiplied_rgba8_image* image
 ) -> mln_status;
 auto map_set_image_source_coordinates(
-  mln_map map, mln_string_view source_id, const mln_lat_lng* coordinates,
+  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
   size_t coordinate_count
 ) -> mln_status;
 auto map_get_image_source_coordinates(
-  mln_map map, mln_string_view source_id, mln_lat_lng* out_coordinates,
+  mln_map map, mln_buffer_view source_id, mln_lat_lng* out_coordinates,
   size_t coordinate_capacity, size_t* out_coordinate_count, bool* out_found
 ) -> mln_status;
 auto map_add_hillshade_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view source_id,
-  mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
+  mln_buffer_view before_layer_id
 ) -> mln_status;
 auto map_add_color_relief_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view source_id,
-  mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
+  mln_buffer_view before_layer_id
 ) -> mln_status;
 auto map_add_location_indicator_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) -> mln_status;
 auto map_set_location_indicator_location(
-  mln_map map, mln_string_view layer_id, mln_lat_lng coordinate, double altitude
+  mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude
 ) -> mln_status;
 auto map_set_location_indicator_bearing(
-  mln_map map, mln_string_view layer_id, double bearing
+  mln_map map, mln_buffer_view layer_id, double bearing
 ) -> mln_status;
 auto map_set_location_indicator_accuracy_radius(
-  mln_map map, mln_string_view layer_id, double radius
+  mln_map map, mln_buffer_view layer_id, double radius
 ) -> mln_status;
 auto map_set_location_indicator_image_name(
-  mln_map map, mln_string_view layer_id, uint32_t image_kind,
-  mln_string_view image_id
+  mln_map map, mln_buffer_view layer_id, uint32_t image_kind,
+  mln_buffer_view image_id
 ) -> mln_status;
 auto map_add_style_layer_json(
-  mln_map map, const mln_json_value* layer_json, mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_json, mln_buffer_view before_layer_id
 ) -> mln_status;
 auto map_remove_style_layer(
-  mln_map map, mln_string_view layer_id, bool* out_removed
+  mln_map map, mln_buffer_view layer_id, bool* out_removed
 ) -> mln_status;
 auto map_style_layer_exists(
-  mln_map map, mln_string_view layer_id, bool* out_exists
+  mln_map map, mln_buffer_view layer_id, bool* out_exists
 ) -> mln_status;
 auto map_get_style_layer_type(
-  mln_map map, mln_string_view layer_id, mln_string_view* out_layer_type,
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view* out_layer_type,
   bool* out_found
 ) -> mln_status;
 auto map_list_style_layer_ids(mln_map map, mln_style_id_list* out_layer_ids)
   -> mln_status;
 auto map_move_style_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view before_layer_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) -> mln_status;
 auto map_get_style_layer_json(
-  mln_map map, mln_string_view layer_id, mln_json_snapshot* out_layer,
-  bool* out_found
+  mln_map map, mln_buffer_view layer_id, mln_buffer* out_layer, bool* out_found
 ) -> mln_status;
-auto map_set_style_light_json(mln_map map, const mln_json_value* light_json)
+auto map_set_style_light_json(mln_map map, mln_buffer_view light_json)
   -> mln_status;
 auto map_set_style_light_property(
-  mln_map map, mln_string_view property_name, const mln_json_value* value
+  mln_map map, mln_buffer_view property_name, mln_buffer_view value
 ) -> mln_status;
 auto map_get_style_light_property(
-  mln_map map, mln_string_view property_name, mln_json_snapshot* out_value
+  mln_map map, mln_buffer_view property_name, mln_buffer* out_value
 ) -> mln_status;
 auto map_set_style_transition_options(
   mln_map map, const mln_style_transition_options* options
@@ -255,50 +254,50 @@ auto map_get_style_transition_options(
   mln_map map, mln_style_transition_options* out_options
 ) -> mln_status;
 auto map_set_layer_property(
-  mln_map map, mln_string_view layer_id, mln_string_view property_name,
-  const mln_json_value* value
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
+  mln_buffer_view value
 ) -> mln_status;
 auto map_get_layer_property(
-  mln_map map, mln_string_view layer_id, mln_string_view property_name,
-  mln_json_snapshot* out_value
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
+  mln_buffer* out_value
 ) -> mln_status;
 auto map_set_layer_filter(
-  mln_map map, mln_string_view layer_id, const mln_json_value* filter
+  mln_map map, mln_buffer_view layer_id, const mln_buffer_view* filter
 ) -> mln_status;
 auto map_get_layer_filter(
-  mln_map map, mln_string_view layer_id, mln_json_snapshot* out_filter
+  mln_map map, mln_buffer_view layer_id, mln_buffer* out_filter
 ) -> mln_status;
 auto map_set_layer_source_layer(
-  mln_map map, mln_string_view layer_id, mln_string_view source_layer
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer
 ) -> mln_status;
 auto map_copy_layer_source_layer(
-  mln_map map, mln_string_view layer_id, char* out_source_layer,
+  mln_map map, mln_buffer_view layer_id, char* out_source_layer,
   size_t source_layer_capacity, size_t* out_source_layer_size
 ) -> mln_status;
 auto map_set_layer_source_id(
-  mln_map map, mln_string_view layer_id, mln_string_view source_id
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id
 ) -> mln_status;
 auto map_copy_layer_source_id(
-  mln_map map, mln_string_view layer_id, char* out_source_id,
+  mln_map map, mln_buffer_view layer_id, char* out_source_id,
   size_t source_id_capacity, size_t* out_source_id_size
 ) -> mln_status;
 auto map_set_layer_min_zoom(
-  mln_map map, mln_string_view layer_id, double min_zoom
+  mln_map map, mln_buffer_view layer_id, double min_zoom
 ) -> mln_status;
 auto map_get_layer_min_zoom(
-  mln_map map, mln_string_view layer_id, double* out_min_zoom
+  mln_map map, mln_buffer_view layer_id, double* out_min_zoom
 ) -> mln_status;
 auto map_set_layer_max_zoom(
-  mln_map map, mln_string_view layer_id, double max_zoom
+  mln_map map, mln_buffer_view layer_id, double max_zoom
 ) -> mln_status;
 auto map_get_layer_max_zoom(
-  mln_map map, mln_string_view layer_id, double* out_max_zoom
+  mln_map map, mln_buffer_view layer_id, double* out_max_zoom
 ) -> mln_status;
 auto map_set_layer_visibility(
-  mln_map map, mln_string_view layer_id, uint32_t visibility
+  mln_map map, mln_buffer_view layer_id, uint32_t visibility
 ) -> mln_status;
 auto map_get_layer_visibility(
-  mln_map map, mln_string_view layer_id, uint32_t* out_visibility
+  mln_map map, mln_buffer_view layer_id, uint32_t* out_visibility
 ) -> mln_status;
 auto map_get_camera(mln_map map, mln_camera_options* out_camera) -> mln_status;
 auto map_jump_to(mln_map map, const mln_camera_options* camera) -> mln_status;
@@ -364,7 +363,7 @@ auto map_projection_set_visible_coordinates(
   size_t coordinate_count, mln_edge_insets padding
 ) -> mln_status;
 auto map_projection_set_visible_geometry(
-  mln_map_projection projection, const mln_geometry* geometry,
+  mln_map_projection projection, mln_buffer_view geometry,
   mln_edge_insets padding
 ) -> mln_status;
 auto map_projection_pixel_for_lat_lng(
@@ -415,7 +414,7 @@ auto map_camera_for_lat_lngs(
   const mln_camera_fit_options* fit_options, mln_camera_options* out_camera
 ) -> mln_status;
 auto map_camera_for_geometry(
-  mln_map map, const mln_geometry* geometry,
+  mln_map map, mln_buffer_view geometry,
   const mln_camera_fit_options* fit_options, mln_camera_options* out_camera
 ) -> mln_status;
 auto map_lat_lng_bounds_for_camera(

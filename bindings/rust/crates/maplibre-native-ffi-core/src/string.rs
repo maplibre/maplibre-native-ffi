@@ -7,10 +7,11 @@ use std::str;
 use maplibre_native_ffi_sys as sys;
 
 use crate::error::{Error, Result};
+use crate::handle::NativeHandle;
 
 #[derive(Debug, Clone, Copy)]
 pub struct StringView<'a> {
-    raw: sys::mln_string_view,
+    raw: sys::mln_buffer_view,
     _lifetime: PhantomData<&'a str>,
 }
 
@@ -20,10 +21,10 @@ impl<'a> StringView<'a> {
         let data = if bytes.is_empty() {
             ptr::null()
         } else {
-            bytes.as_ptr().cast::<c_char>()
+            bytes.as_ptr().cast()
         };
         Self {
-            raw: sys::mln_string_view {
+            raw: sys::mln_buffer_view {
                 data,
                 size: bytes.len(),
             },
@@ -31,7 +32,7 @@ impl<'a> StringView<'a> {
         }
     }
 
-    pub fn raw(&self) -> sys::mln_string_view {
+    pub fn raw(&self) -> sys::mln_buffer_view {
         self.raw
     }
 }
@@ -54,13 +55,45 @@ pub fn string_view(value: &str) -> StringView<'_> {
     StringView::new(value)
 }
 
+pub fn buffer_view(value: &[u8]) -> sys::mln_buffer_view {
+    sys::mln_buffer_view {
+        data: if value.is_empty() {
+            ptr::null()
+        } else {
+            value.as_ptr().cast()
+        },
+        size: value.len(),
+    }
+}
+
+/// Copies and releases an owned native buffer.
+///
+/// # Safety
+///
+/// `buffer` must be null or an owned buffer returned by the C API.
+pub unsafe fn copy_owned_buffer(buffer: sys::mln_buffer) -> Result<Vec<u8>> {
+    if buffer.to_raw() == 0 {
+        return Ok(Vec::new());
+    }
+    // SAFETY: The caller transfers ownership of the live buffer to this guard.
+    let buffer = unsafe { crate::handle::buffer(buffer) }?;
+    let mut view = sys::mln_buffer_view {
+        data: ptr::null(),
+        size: 0,
+    };
+    // SAFETY: buffer is live and view points to writable storage.
+    crate::check(unsafe { sys::mln_buffer_get(buffer.handle(), &mut view) })?;
+    // SAFETY: The returned view remains valid while the guard is live.
+    unsafe { copy_string_view_bytes(view) }
+}
+
 /// Copies a borrowed native string view into an owned Rust string.
 ///
 /// # Safety
 ///
 /// When `view.size` is nonzero, `view.data` must point to `view.size` bytes of
 /// storage valid for the duration of this call.
-pub unsafe fn copy_string_view(view: sys::mln_string_view) -> Result<String> {
+pub unsafe fn copy_string_view(view: sys::mln_buffer_view) -> Result<String> {
     // SAFETY: The caller promises the string view storage is valid for this
     // call; copy_string_view_bytes copies before returning.
     let bytes = unsafe { copy_string_view_bytes(view) }?;
@@ -75,7 +108,7 @@ pub unsafe fn copy_string_view(view: sys::mln_string_view) -> Result<String> {
 ///
 /// When `view.size` is nonzero, `view.data` must point to `view.size` bytes of
 /// storage valid for the duration of this call.
-pub unsafe fn copy_string_view_bytes(view: sys::mln_string_view) -> Result<Vec<u8>> {
+pub unsafe fn copy_string_view_bytes(view: sys::mln_buffer_view) -> Result<Vec<u8>> {
     if view.size == 0 {
         return Ok(Vec::new());
     }
@@ -139,7 +172,7 @@ mod tests {
 
     #[test]
     fn invalid_native_string_views_are_rejected() {
-        let view = sys::mln_string_view {
+        let view = sys::mln_buffer_view {
             data: ptr::null(),
             size: 1,
         };

@@ -8,16 +8,11 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
-import org.maplibre.nativeffi.geo.Feature
-import org.maplibre.nativeffi.geo.FeatureIdentifier
-import org.maplibre.nativeffi.geo.GeoJson
-import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.loader.NativeAccess.JvmStructs
-import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.map.ConstrainMode
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
@@ -93,34 +88,6 @@ class JvmStructsTest {
   }
 
   @Test
-  fun jsonGeometryAndFeatureTaggedValuesRoundTrip() {
-    val json =
-      JsonValue.ObjectValue(
-        listOf(
-          JsonValue.Member("key", JsonValue.Int(-1)),
-          JsonValue.Member("key", JsonValue.UInt(-1)),
-          JsonValue.Member("nested", JsonValue.Array(listOf(JsonValue.Bool(true), JsonValue.Null))),
-        )
-      )
-    assertEquals(json, JvmStructs.jsonRoundTrip(json))
-
-    val geometry = Geometry.LineString(listOf(LatLng(1.0, 2.0), LatLng(3.0, 4.0)))
-    assertEquals(geometry, JvmStructs.geometryRoundTrip(geometry))
-
-    val feature =
-      Feature(
-        geometry,
-        listOf(JsonValue.Member("name", JsonValue.StringValue("road"))),
-        FeatureIdentifier.UInt(-1),
-      )
-    assertEquals(feature, JvmStructs.featureRoundTrip(feature))
-    assertNotEquals(
-      JvmStructs.geoJsonType(GeoJson.GeometryValue(geometry)),
-      JvmStructs.geoJsonType(GeoJson.FeatureValue(feature)),
-    )
-  }
-
-  @Test
   fun queryGeometryMaterializesEachDiscriminator() {
     val point =
       JvmStructs.renderedQueryGeometryType(RenderedQueryGeometry.Point(ScreenPoint(1.0, 2.0)))
@@ -155,7 +122,7 @@ class JvmStructsTest {
     val geometry =
       OfflineRegionDefinition.GeometryRegion(
         "asset://style.json",
-        Geometry.Point(LatLng(5.0, 6.0)),
+        """{"type":"Point","coordinates":[6.0,5.0]}""".encodeToByteArray(),
         2.0,
         6.0,
         1.0f,
@@ -229,8 +196,8 @@ class JvmStructsTest {
   }
 
   @Test
-  fun queryCleanupAndRuntimePayloadCopiesUseOwnedAdapterPaths() {
-    assertEquals(1, JvmStructs.featureQueryCleanupAfterCopyFailure())
+  fun ownedBufferCleanupAndRuntimePayloadCopiesUseOwnedAdapterPaths() {
+    assertEquals(1, JvmStructs.ownedBufferCleanupAfterCopyFailure())
     assertEquals(1, JvmStructs.offlineRegionListCleanupAfterCopyFailure())
     val payload =
       JvmStructs.unknownRuntimePayload(999, byteArrayOf(1, 2, 3)) as RuntimeEventPayload.Unknown

@@ -44,14 +44,10 @@ auto handle_kind_name(std::uint8_t kind) noexcept -> const char* {
       return "mln_offline_region_snapshot";
     case HandleKind::OfflineRegionList:
       return "mln_offline_region_list";
-    case HandleKind::JsonSnapshot:
-      return "mln_json_snapshot";
+    case HandleKind::Buffer:
+      return "mln_buffer";
     case HandleKind::StyleIdList:
       return "mln_style_id_list";
-    case HandleKind::FeatureQueryResult:
-      return "mln_feature_query_result";
-    case HandleKind::FeatureExtensionResult:
-      return "mln_feature_extension_result";
     case HandleKind::WakeSource:
       return "mln_wake_source";
     case HandleKind::ResourceRequest:

@@ -376,12 +376,11 @@ Structs that C fills and returns by value become copied language values.
 
 ### Value semantics
 
-Public option types, copied result values, geometry and feature trees, and
-values wrapping copied byte buffers compare by field value using the target
-language's ordinary equality operation. Option types additionally expose a copy
-operation that produces an independent instance. Callers diff successive
-snapshots and derive modified descriptors without reaching for reference
-identity.
+Public option types, copied result values, and values wrapping copied byte
+buffers compare by field value using the target language's ordinary equality
+operation. Option types additionally expose a copy operation that produces an
+independent instance. Callers diff successive snapshots and derive modified
+values without reaching for reference identity.
 
 Equality covers every semantic field the value carries, including private copied
 storage, list-valued fields, and nested value trees, and distinguishes an absent
@@ -414,25 +413,28 @@ empty values. C field masks stay internal to C struct materializers.
 ### Strings
 
 Public string inputs use UTF-8 at the C boundary. Null-terminated `const char*`
-inputs reject embedded `NUL`. `mln_string_view` inputs pass UTF-8 bytes and byte
-length, and allow embedded `NUL` when the C contract allows it. Borrowed C
-strings and string views are copied before their native borrow window ends.
+inputs reject embedded `NUL`. The C ABI represents other borrowed strings with
+`mln_buffer_view`; each parameter documents its text encoding and accepted
+contents. Borrowed strings are copied before their native borrow window ends.
 
 ### JSON and GeoJSON
 
-Structured JSON and GeoJSON models MUST preserve MapLibre value semantics:
-object member order, repeated member names, signed and unsigned integer width,
-floating-point values, booleans, nulls, strings, arrays, and nested objects. Raw
-JSON or GeoJSON text inputs MUST pass through as text without reparsing or
-reformatting unless the public API is explicitly a structured-value API. Raw
-JSON text outputs MUST pass through the same way, so a document a binding reads
-back is byte-for-byte the document that crossed the C boundary.
+Bindings expose arbitrary JSON and GeoJSON transit as language-owned byte arrays
+containing UTF-8. They MUST NOT expose the removed recursive JSON, geometry,
+feature, or GeoJSON descriptor models. A document API accepts one complete
+document, a property API accepts one JSON value, and a geometry API accepts one
+GeoJSON Geometry.
 
-Bindings MUST preserve the full unsigned 64-bit domain for unsigned JSON and
-GeoJSON integer values. Languages without a native unsigned 64-bit integer type
-MUST expose those values through a documented representation that preserves the
-raw value. The binding documentation MUST state how callers compare and format
-representations that are not naturally unsigned.
+Input bytes stay alive through the C call and may be released or mutated after
+it returns. Output buffers are copied once into a new language-owned byte array
+and destroyed on success and failure. Bindings do not parse or reformat these
+payloads. Loaded style documents therefore round-trip byte-for-byte; values
+serialized from native state have no stable formatting or member-order contract.
+
+The low-level API exposes no parallel string overload. Callers that start with
+text encode it as UTF-8. Callers that start with a file, response, database
+blob, or serializer output can pass its bytes without an intermediate host
+string.
 
 ### Native pointers
 
@@ -474,18 +476,19 @@ storage and releases it deterministically.
 Bindings expose C outputs as language-owned values unless the result owns or
 controls native state across calls.
 
-Native snapshot, result, and list handles are internal implementation details.
-Plain value outputs with no interior borrowed pointers are copied by value.
+Native buffer, snapshot, result, and list handles are internal implementation
+details. Plain value outputs with no interior borrowed pointers are copied by
+value.
 
 Outputs backed by native storage follow this operation:
 
-1. Acquire the native snapshot, result, list, or event.
+1. Acquire the native buffer, snapshot, result, list, or event.
 2. Copy public data into language-owned values before the native borrow window
    ends.
 3. Preserve unknown event and payload domains as raw values with copied payload
    bytes when the C API exposes those bytes.
-4. Release native snapshot, result, and list handles exactly once after copying,
-   including failure paths.
+4. Release native buffer, snapshot, result, and list handles exactly once after
+   copying, including failure paths.
 
 Runtime event polling returns values independent of the next native poll.
 Map-originated events identify a live source map when identity can be proven. If
@@ -954,15 +957,15 @@ the other isolate, which makes its id stale rather than live.
 | BND-060 | Each public API family that accepts input structs has at least one test that initializes C defaults, `size` fields, field masks, and nested inputs.                                                        |
 | BND-061 | Optional field-mask inputs distinguish absent values from present zero values.                                                                                                                             |
 | BND-062 | Unknown output enum values preserve the raw native value, using an internal conversion hook when no real C call can produce one.                                                                           |
-| BND-063 | Borrowed native strings and string views are copied before their native borrow window ends.                                                                                                                |
-| BND-064 | JSON values round-trip scalar and nested container values without type loss.                                                                                                                               |
-| BND-065 | GeoJSON values copy nested geometries, features, properties, and identifiers.                                                                                                                              |
-| BND-066 | Native snapshot/list/result handles, including style tile-URL lists, are released on success and on copy failure, using fault injection for copy failure.                                                  |
-| BND-067 | Structured JSON preserves object member order, repeated member names, and signed or unsigned integer width.                                                                                                |
+| BND-063 | Borrowed native strings and buffer views are copied before their native borrow window ends.                                                                                                                |
+| BND-064 | JSON byte inputs accept scalar and nested values and reach native parsing and validation without a binding-owned parse.                                                                                    |
+| BND-065 | GeoJSON byte inputs cover geometry, feature, and feature-collection shapes, including nested geometry and properties.                                                                                      |
+| BND-066 | Native buffer, snapshot, list, and result handles, including style tile-URL lists, are released on success and on copy failure, using fault injection for copy failure.                                    |
+| BND-067 | Byte transit preserves the complete input length, including non-null-terminated storage, and loaded style documents round-trip byte-for-byte.                                                              |
 | BND-068 | Unknown enum values preserve their raw value, and public input APIs report the C API's status and diagnostic unless the binding owns a stricter pre-C invariant.                                           |
 | BND-069 | Public values and descriptors that accept caller-owned mutable storage remain unchanged after later caller mutation, and accessors do not expose mutable storage that can mutate the stored value.         |
 | BND-070 | Option types compare and hash by field value, separate absent optional fields from present empty or zero values, and copy to an independent instance; one case per option type mutates each field in turn. |
-| BND-071 | Copied result values, nested geometry and feature trees, and values wrapping copied byte buffers compare by content when built from distinct list or array instances holding equal contents.               |
+| BND-071 | Copied result values and values wrapping copied buffers compare by content when built from distinct list or array instances holding equal contents.                                                        |
 
 ### Runtime and events
 
@@ -989,7 +992,7 @@ the other isolate, which makes its id stale rather than live.
 | BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance.                                                                     |
 | BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.                                                                          |
 | BND-105 | Style source, layer, image, and feature-state workflows add, update, query/list, and remove public input values and copied IDs.                                                                         |
-| BND-106 | Query workflows return copied feature geometry, properties, feature identifiers, feature state, and optional source/layer identifiers.                                                                  |
+| BND-106 | Query workflows return one copied UTF-8 JSON envelope containing feature geometry, properties, identifiers, state, and optional source/layer identifiers.                                               |
 | BND-108 | The loaded style document reads back byte-for-byte through public map APIs, the style URL reads back the last requested URL, and both report empty when absent.                                         |
 | BND-109 | Source inspection copies a URL-backed source URL and inline tile-source metadata, including multiple tile URLs and absent fields, and the result remains valid after the map no longer owns the source. |
 
@@ -1111,9 +1114,8 @@ backend, include:
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | BND-107 | A queried cluster feature passed back to a feature-extension query resolves its unsigned `cluster_id`, and unsigned `limit` and `offset` arguments bound and shift the returned leaves. |
 
-Bindings without live render-session fixtures cover the binding-owned half of
-this behavior through BND-067, which requires JSON values to preserve unsigned
-integer width across the boundary.
+Bindings without live render-session fixtures cover byte ownership and copying
+through BND-066 and BND-067.
 
 #### Owner-thread execution adapters
 

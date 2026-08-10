@@ -1,12 +1,8 @@
-import 'dart:ffi';
 import 'dart:typed_data';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
-import 'package:maplibre_native_ffi/src/internal/memory/memory.dart';
-import 'package:maplibre_native_ffi/src/internal/struct/geometry.dart';
-import 'package:maplibre_native_ffi/src/internal/struct/json.dart';
 import 'package:maplibre_native_ffi/src/internal/struct/struct.dart';
 import 'package:maplibre_native_ffi/src/internal/value/uint64.dart';
 import 'package:test/test.dart';
@@ -35,33 +31,6 @@ void main() {
     expect(
       () => uint64ToNative(maximum + BigInt.one, 'value'),
       throwsA(isA<InvalidArgumentException>()),
-    );
-  });
-
-  test('public collection values defensively copy mutable inputs', () {
-    final jsonValues = <JsonValue>[const JsonString('before')];
-    final json = JsonArray(jsonValues);
-    jsonValues[0] = const JsonString('after');
-
-    final bytes = Uint8List.fromList([1, 2, 3]);
-    final response = ResourceResponse(
-      status: ResourceResponseStatus.ok,
-      bytes: bytes,
-    );
-    bytes[0] = 9;
-
-    final coordinates = <LatLng>[const LatLng(1, 2)];
-    final line = LineStringGeometry(coordinates);
-    coordinates[0] = const LatLng(3, 4);
-
-    expect((json.values.single as JsonString).value, 'before');
-    expect(() => json.values.add(const JsonNull()), throwsUnsupportedError);
-    expect(response.bytes, [1, 2, 3]);
-    expect(() => response.bytes![0] = 9, throwsUnsupportedError);
-    expect(line.coordinates.single, const LatLng(1, 2));
-    expect(
-      () => line.coordinates.add(const LatLng(5, 6)),
-      throwsUnsupportedError,
     );
   });
 
@@ -162,8 +131,8 @@ void main() {
     }
     expect(const CameraOptions(zoom: 3), isNot(const CameraOptions(zoom: 4)));
     expect(
-      const GeoJsonSourceOptions(cluster: true, clusterRadius: 50),
-      const GeoJsonSourceOptions(cluster: true, clusterRadius: 50),
+      GeoJsonSourceOptions(cluster: true, clusterRadius: 50),
+      GeoJsonSourceOptions(cluster: true, clusterRadius: 50),
     );
   });
 
@@ -243,168 +212,6 @@ void main() {
     );
   });
 
-  test('geometry values materialize and copy native descriptor trees', () {
-    withNativeArena((arena) {
-      final native = nativeGeometry(
-        GeometryCollection([
-          PointGeometry(LatLng(1, 2)),
-          LineStringGeometry([LatLng(3, 4), LatLng(5, 6)]),
-        ]),
-        arena,
-      );
-
-      expect(
-        native.pointer.ref.type,
-        raw.mln_geometry_type.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION.value,
-      );
-      final collection = native.pointer.ref.data.geometry_collection;
-      expect(collection.geometry_count, 2);
-      expect(collection.geometries[0].data.point.longitude, 2);
-      expect(collection.geometries[1].data.line_string.coordinate_count, 2);
-
-      final copied = geometryFromNative(native.pointer.ref);
-      expect(copied, isA<GeometryCollection>());
-      final copiedCollection = copied as GeometryCollection;
-      final copiedPoint = copiedCollection.geometries[0] as PointGeometry;
-      expect(copiedPoint.coordinate, const LatLng(1, 2));
-    });
-  });
-
-  test(
-    'GeoJSON feature descriptors materialize properties and identifiers',
-    () {
-      withNativeArena((arena) {
-        final native = nativeGeoJson(
-          FeatureGeoJson(
-            geometry: const PointGeometry(LatLng(7, 8)),
-            properties: [JsonMember('rank', JsonUInt(4))],
-            identifier: const StringFeatureIdentifier('feature-1'),
-          ),
-          arena,
-        );
-
-        expect(
-          native.pointer.ref.type,
-          raw.mln_geojson_type.MLN_GEOJSON_TYPE_FEATURE.value,
-        );
-        final feature = native.pointer.ref.data.feature.ref;
-        expect(feature.property_count, 1);
-        expect(feature.identifier_type, 4);
-        expect(feature.geometry.ref.data.point.latitude, 7);
-
-        final copied = geoJsonFromNative(native.pointer.ref);
-        expect(copied, isA<FeatureGeoJson>());
-        final copiedFeature = copied as FeatureGeoJson;
-        expect(copiedFeature.properties.single.key, 'rank');
-        expect(copiedFeature.identifier, isA<StringFeatureIdentifier>());
-      });
-    },
-  );
-
-  test('GeoJSON identifiers preserve the full unsigned 64-bit domain', () {
-    expect(
-      () => withNativeArena(
-        (arena) => nativeGeoJson(
-          FeatureGeoJson(
-            geometry: const EmptyGeometry(),
-            identifier: UIntFeatureIdentifier(-1),
-          ),
-          arena,
-        ),
-      ),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    final maximum = (BigInt.one << 64) - BigInt.one;
-    withNativeArena((arena) {
-      final native = nativeGeoJson(
-        FeatureGeoJson(
-          geometry: const EmptyGeometry(),
-          identifier: UIntFeatureIdentifier.fromBigInt(maximum),
-        ),
-        arena,
-      );
-      expect(native.pointer.ref.data.feature.ref.identifier.uint_value, -1);
-      final copied = geoJsonFromNative(native.pointer.ref) as FeatureGeoJson;
-      expect((copied.identifier as UIntFeatureIdentifier).value, maximum);
-    });
-  });
-
-  test(
-    'GeoJSON identifiers reject non-finite double values before C calls',
-    () {
-      expect(
-        () => withNativeArena(
-          (arena) => nativeGeoJson(
-            FeatureGeoJson(
-              geometry: EmptyGeometry(),
-              identifier: DoubleFeatureIdentifier(double.infinity),
-            ),
-            arena,
-          ),
-        ),
-        throwsA(isA<InvalidArgumentException>()),
-      );
-    },
-  );
-
-  test('JSON values materialize and copy native descriptor trees', () {
-    withNativeArena((arena) {
-      final native = nativeJsonValue(
-        JsonObject([
-          const JsonMember('name', JsonString('maplibre')),
-          const JsonMember('enabled', JsonBool(true)),
-          JsonMember('values', JsonArray([JsonInt(-1), JsonUInt(2)])),
-        ]),
-        arena,
-      );
-
-      expect(
-        native.pointer.ref.type,
-        raw.mln_json_value_type.MLN_JSON_VALUE_TYPE_OBJECT.value,
-      );
-      final object = native.pointer.ref.data.object_value;
-      expect(object.member_count, 3);
-      expect(object.members[0].key.size, 4);
-      expect(object.members[1].value.ref.data.bool_value, isTrue);
-
-      final copied = jsonValueFromNative(native.pointer.ref);
-      expect(copied, isA<JsonObject>());
-      final copiedObject = copied as JsonObject;
-      expect(copiedObject.members[0].key, 'name');
-      expect((copiedObject.members[2].value as JsonArray).values.length, 2);
-    });
-  });
-
-  test('JSON unsigned integer descriptors preserve all uint64 values', () {
-    expect(
-      () => withNativeArena((arena) => nativeJsonValue(JsonUInt(-1), arena)),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-    final maximum = (BigInt.one << 64) - BigInt.one;
-    withNativeArena((arena) {
-      final native = nativeJsonValue(JsonUInt.fromBigInt(maximum), arena);
-      expect(native.pointer.ref.data.uint_value, -1);
-      expect(
-        (jsonValueFromNative(native.pointer.ref) as JsonUInt).value,
-        maximum,
-      );
-    });
-    final nativeHighBit = Struct.create<raw.mln_json_value>();
-    nativeHighBit.size = sizeOf<raw.mln_json_value>();
-    nativeHighBit.type = raw.mln_json_value_type.MLN_JSON_VALUE_TYPE_UINT.value;
-    nativeHighBit.data.uint_value = -1;
-    expect((jsonValueFromNative(nativeHighBit) as JsonUInt).value, maximum);
-  });
-
-  test('JSON double descriptors reject non-finite values before C calls', () {
-    expect(
-      () => withNativeArena(
-        (arena) => nativeJsonValue(const JsonDouble(double.nan), arena),
-      ),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-  });
-
   test('query descriptors preserve public semantic fields', () {
     final geometry = RenderedQueryLineString([
       ScreenPoint(1, 2),
@@ -412,11 +219,7 @@ void main() {
     ]);
     final renderedOptions = RenderedFeatureQueryOptions(
       layerIds: ['roads'],
-      filter: JsonArray([
-        JsonString('=='),
-        JsonString('class'),
-        JsonString('primary'),
-      ]),
+      filter: Uint8List.fromList('["==","class","primary"]'.codeUnits),
     );
     final sourceOptions = SourceFeatureQueryOptions(
       sourceLayerIds: ['transportation'],
@@ -424,8 +227,54 @@ void main() {
 
     expect(geometry.points.length, 2);
     expect(renderedOptions.layerIds, ['roads']);
-    expect(renderedOptions.filter, isA<JsonArray>());
+    expect(renderedOptions.filter, '["==","class","primary"]'.codeUnits);
     expect(sourceOptions.sourceLayerIds, ['transportation']);
+  });
+
+  test('byte-backed values own storage and compare by content', () {
+    final clusterProperties = Uint8List.fromList([1, 2, 3]);
+    final filter = Uint8List.fromList([4, 5, 6]);
+    final geometry = Uint8List.fromList([7, 8, 9]);
+    final geoJsonOptions = GeoJsonSourceOptions(
+      clusterProperties: clusterProperties,
+    );
+    final queryOptions = RenderedFeatureQueryOptions(filter: filter);
+    final offlineDefinition = OfflineGeometryRegionDefinition(
+      styleUrl: 'https://example.invalid/style.json',
+      geometry: geometry,
+      minZoom: 0,
+      maxZoom: 10,
+      pixelRatio: 1,
+    );
+
+    clusterProperties[0] = 9;
+    filter[0] = 9;
+    geometry[0] = 9;
+
+    expect(
+      geoJsonOptions,
+      GeoJsonSourceOptions(clusterProperties: Uint8List.fromList([1, 2, 3])),
+    );
+    expect(
+      queryOptions,
+      RenderedFeatureQueryOptions(filter: Uint8List.fromList([4, 5, 6])),
+    );
+    expect(
+      offlineDefinition,
+      OfflineGeometryRegionDefinition(
+        styleUrl: 'https://example.invalid/style.json',
+        geometry: Uint8List.fromList([7, 8, 9]),
+        minZoom: 0,
+        maxZoom: 10,
+        pixelRatio: 1,
+      ),
+    );
+    expect(
+      () => geoJsonOptions.clusterProperties![0] = 9,
+      throwsUnsupportedError,
+    );
+    expect(() => queryOptions.filter![0] = 9, throwsUnsupportedError);
+    expect(() => offlineDefinition.geometry[0] = 9, throwsUnsupportedError);
   });
 
   test('public enum-like values preserve native raw values', () {

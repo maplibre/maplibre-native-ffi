@@ -273,7 +273,7 @@ pub const StyleGeoJsonSourceOptions = struct {
     cluster_max_zoom: ?f64 = null,
     /// Cluster aggregation expressions as a JSON object in the MapLibre Style
     /// Spec `clusterProperties` form.
-    cluster_properties: ?JsonValue = null,
+    cluster_properties: ?[]const u8 = null,
     tile_size: ?u32 = null,
     buffer: ?u32 = null,
     cluster_radius: ?u32 = null,
@@ -284,10 +284,10 @@ pub const StyleGeoJsonSourceOptions = struct {
     /// `setGeoJsonSourceData` reaches the next rendered frame.
     synchronous_update: ?bool = null,
 
-    /// Copies this descriptor and recursively owns all nested cluster-property storage.
+    /// Copies this descriptor and owns its cluster-property bytes.
     pub fn copy(self: StyleGeoJsonSourceOptions, allocator: std.mem.Allocator) std.mem.Allocator.Error!OwnedStyleGeoJsonSourceOptions {
         var copied = self;
-        copied.cluster_properties = if (self.cluster_properties) |value| try copyJsonValue(allocator, value) else null;
+        copied.cluster_properties = if (self.cluster_properties) |value| try allocator.dupe(u8, value) else null;
         return .{ .allocator = allocator, .options = copied };
     }
 };
@@ -297,7 +297,7 @@ pub const OwnedStyleGeoJsonSourceOptions = struct {
     options: StyleGeoJsonSourceOptions,
 
     pub fn deinit(self: *OwnedStyleGeoJsonSourceOptions) void {
-        if (self.options.cluster_properties) |value| deinitCopiedJsonValue(self.allocator, value);
+        if (self.options.cluster_properties) |value| self.allocator.free(value);
         self.options.cluster_properties = null;
     }
 };
@@ -428,170 +428,6 @@ pub const LocationIndicatorImageKind = enum {
     shadow,
 };
 
-pub const JsonMember = struct {
-    key: []const u8,
-    value: JsonValue,
-};
-
-pub const JsonValue = union(enum) {
-    null,
-    bool: bool,
-    uint: u64,
-    int: i64,
-    double: f64,
-    string: []const u8,
-    array: []const JsonValue,
-    object: []const JsonMember,
-};
-
-fn copyJsonValue(allocator: std.mem.Allocator, value: JsonValue) std.mem.Allocator.Error!JsonValue {
-    return switch (value) {
-        .null => .null,
-        .bool => |item| .{ .bool = item },
-        .uint => |item| .{ .uint = item },
-        .int => |item| .{ .int = item },
-        .double => |item| .{ .double = item },
-        .string => |item| .{ .string = try allocator.dupe(u8, item) },
-        .array => |items| blk: {
-            const copied = try allocator.alloc(JsonValue, items.len);
-            var initialized: usize = 0;
-            errdefer {
-                for (copied[0..initialized]) |item| deinitCopiedJsonValue(allocator, item);
-                allocator.free(copied);
-            }
-            for (items, copied) |item, *out| {
-                out.* = try copyJsonValue(allocator, item);
-                initialized += 1;
-            }
-            break :blk .{ .array = copied };
-        },
-        .object => |members| blk: {
-            const copied = try allocator.alloc(JsonMember, members.len);
-            var initialized: usize = 0;
-            errdefer {
-                for (copied[0..initialized]) |*member| {
-                    allocator.free(member.key);
-                    deinitCopiedJsonValue(allocator, member.value);
-                }
-                allocator.free(copied);
-            }
-            for (members, copied) |member, *out| {
-                out.key = try allocator.dupe(u8, member.key);
-                errdefer allocator.free(out.key);
-                out.value = try copyJsonValue(allocator, member.value);
-                initialized += 1;
-            }
-            break :blk .{ .object = copied };
-        },
-    };
-}
-
-fn deinitCopiedJsonValue(allocator: std.mem.Allocator, value: JsonValue) void {
-    switch (value) {
-        .null, .bool, .uint, .int, .double => {},
-        .string => |item| allocator.free(item),
-        .array => |items| {
-            for (items) |item| deinitCopiedJsonValue(allocator, item);
-            allocator.free(items);
-        },
-        .object => |members| {
-            for (members) |member| {
-                allocator.free(member.key);
-                deinitCopiedJsonValue(allocator, member.value);
-            }
-            allocator.free(members);
-        },
-    }
-}
-
-pub const OwnedJsonMember = struct {
-    key: []const u8,
-    value: OwnedJsonValue,
-};
-
-pub const OwnedJsonValue = union(enum) {
-    null,
-    bool: bool,
-    uint: u64,
-    int: i64,
-    double: f64,
-    string: []const u8,
-    array: []OwnedJsonValue,
-    object: []OwnedJsonMember,
-
-    pub fn deinit(self: *OwnedJsonValue, allocator: std.mem.Allocator) void {
-        switch (self.*) {
-            .null, .bool, .uint, .int, .double => {},
-            .string => |value| allocator.free(value),
-            .array => |items| {
-                for (items) |*item| item.deinit(allocator);
-                allocator.free(items);
-            },
-            .object => |members| {
-                for (members) |*member| {
-                    allocator.free(member.key);
-                    member.value.deinit(allocator);
-                }
-                allocator.free(members);
-            },
-        }
-        self.* = .null;
-    }
-};
-
-pub const JsonCopyError = std.mem.Allocator.Error || error{UnknownStatus};
-
-pub fn ownedJsonValueFromNative(allocator: std.mem.Allocator, raw: *const c.mln_json_value) JsonCopyError!OwnedJsonValue {
-    return switch (raw.type) {
-        c.MLN_JSON_VALUE_TYPE_NULL => .null,
-        c.MLN_JSON_VALUE_TYPE_BOOL => .{ .bool = raw.data.bool_value },
-        c.MLN_JSON_VALUE_TYPE_UINT => .{ .uint = raw.data.uint_value },
-        c.MLN_JSON_VALUE_TYPE_INT => .{ .int = raw.data.int_value },
-        c.MLN_JSON_VALUE_TYPE_DOUBLE => .{ .double = raw.data.double_value },
-        c.MLN_JSON_VALUE_TYPE_STRING => .{ .string = try copyStringView(allocator, raw.data.string_value) },
-        c.MLN_JSON_VALUE_TYPE_ARRAY => blk: {
-            const value_count = raw.data.array_value.value_count;
-            const copied = try allocator.alloc(OwnedJsonValue, value_count);
-            var initialized: usize = 0;
-            errdefer {
-                for (copied[0..initialized]) |*value| value.deinit(allocator);
-                allocator.free(copied);
-            }
-            if (value_count > 0) {
-                const raw_values = raw.data.array_value.values[0..value_count];
-                for (raw_values, copied) |raw_value, *out| {
-                    out.* = try ownedJsonValueFromNative(allocator, &raw_value);
-                    initialized += 1;
-                }
-            }
-            break :blk .{ .array = copied };
-        },
-        c.MLN_JSON_VALUE_TYPE_OBJECT => blk: {
-            const member_count = raw.data.object_value.member_count;
-            const copied = try allocator.alloc(OwnedJsonMember, member_count);
-            var initialized: usize = 0;
-            errdefer {
-                for (copied[0..initialized]) |*member| {
-                    allocator.free(member.key);
-                    member.value.deinit(allocator);
-                }
-                allocator.free(copied);
-            }
-            if (member_count > 0) {
-                const raw_members = raw.data.object_value.members[0..member_count];
-                for (raw_members, copied) |raw_member, *out| {
-                    out.key = try copyStringView(allocator, raw_member.key);
-                    errdefer allocator.free(out.key);
-                    out.value = try ownedJsonValueFromNative(allocator, raw_member.value);
-                    initialized += 1;
-                }
-            }
-            break :blk .{ .object = copied };
-        },
-        else => error.UnknownStatus,
-    };
-}
-
 pub const StringList = struct {
     allocator: std.mem.Allocator,
     items: []const []const u8,
@@ -601,160 +437,6 @@ pub const StringList = struct {
         self.allocator.free(self.items);
         self.items = &.{};
     }
-};
-
-pub const Geometry = union(enum) {
-    empty,
-    point: LatLng,
-    line_string: []const LatLng,
-    polygon: []const []const LatLng,
-    multi_point: []const LatLng,
-    multi_line_string: []const []const LatLng,
-    multi_polygon: []const []const []const LatLng,
-    collection: []const Geometry,
-};
-
-pub const OwnedGeometry = union(enum) {
-    empty,
-    point: LatLng,
-    line_string: []const LatLng,
-    polygon: []const []const LatLng,
-    multi_point: []const LatLng,
-    multi_line_string: []const []const LatLng,
-    multi_polygon: []const []const []const LatLng,
-    collection: []OwnedGeometry,
-
-    pub fn deinit(self: *OwnedGeometry, allocator: std.mem.Allocator) void {
-        switch (self.*) {
-            .empty, .point => {},
-            .line_string, .multi_point => |coordinates| allocator.free(coordinates),
-            .polygon, .multi_line_string => |rings| {
-                freeCoordinateSpans(allocator, rings);
-            },
-            .multi_polygon => |polygons_value| {
-                for (polygons_value) |rings| freeCoordinateSpans(allocator, rings);
-                allocator.free(polygons_value);
-            },
-            .collection => |geometries_value| {
-                for (geometries_value) |*geometry_value| geometry_value.deinit(allocator);
-                allocator.free(geometries_value);
-            },
-        }
-        self.* = .empty;
-    }
-};
-
-pub const GeometryCopyError = std.mem.Allocator.Error || error{ UnknownStatus, NativeError };
-
-pub fn ownedGeometryFromNative(allocator: std.mem.Allocator, raw: *const c.mln_geometry) GeometryCopyError!OwnedGeometry {
-    return switch (raw.type) {
-        c.MLN_GEOMETRY_TYPE_EMPTY => .empty,
-        c.MLN_GEOMETRY_TYPE_POINT => .{ .point = latLngFromNative(raw.data.point) },
-        c.MLN_GEOMETRY_TYPE_LINE_STRING => .{ .line_string = try copyCoordinateSpan(allocator, raw.data.line_string) },
-        c.MLN_GEOMETRY_TYPE_POLYGON => .{ .polygon = try copyCoordinateSpans(allocator, raw.data.polygon.rings, raw.data.polygon.ring_count) },
-        c.MLN_GEOMETRY_TYPE_MULTI_POINT => .{ .multi_point = try copyCoordinateSpan(allocator, raw.data.multi_point) },
-        c.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING => .{ .multi_line_string = try copyCoordinateSpans(allocator, raw.data.multi_line_string.lines, raw.data.multi_line_string.line_count) },
-        c.MLN_GEOMETRY_TYPE_MULTI_POLYGON => .{ .multi_polygon = try copyPolygonGeometry(allocator, raw.data.multi_polygon.polygons, raw.data.multi_polygon.polygon_count) },
-        c.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION => .{ .collection = try copyGeometryCollection(allocator, raw.data.geometry_collection.geometries, raw.data.geometry_collection.geometry_count) },
-        else => error.UnknownStatus,
-    };
-}
-
-fn freeCoordinateSpans(allocator: std.mem.Allocator, spans: []const []const LatLng) void {
-    for (spans) |coordinates| allocator.free(coordinates);
-    allocator.free(spans);
-}
-
-fn copyCoordinateSpan(allocator: std.mem.Allocator, span: c.mln_coordinate_span) std.mem.Allocator.Error![]const LatLng {
-    const copied = try allocator.alloc(LatLng, span.coordinate_count);
-    if (span.coordinate_count > 0) {
-        const coordinates = span.coordinates[0..span.coordinate_count];
-        for (coordinates, copied) |coordinate, *out| out.* = latLngFromNative(coordinate);
-    }
-    return copied;
-}
-
-fn copyCoordinateSpans(
-    allocator: std.mem.Allocator,
-    raw_spans: [*c]const c.mln_coordinate_span,
-    span_count: usize,
-) std.mem.Allocator.Error![]const []const LatLng {
-    const copied = try allocator.alloc([]const LatLng, span_count);
-    var initialized: usize = 0;
-    errdefer {
-        for (copied[0..initialized]) |coordinates| allocator.free(coordinates);
-        allocator.free(copied);
-    }
-    if (span_count > 0) {
-        const spans = raw_spans[0..span_count];
-        for (spans, copied) |span, *out| {
-            out.* = try copyCoordinateSpan(allocator, span);
-            initialized += 1;
-        }
-    }
-    return copied;
-}
-
-fn copyPolygonGeometry(
-    allocator: std.mem.Allocator,
-    raw_polygons: [*c]const c.mln_polygon_geometry,
-    polygon_count: usize,
-) std.mem.Allocator.Error![]const []const []const LatLng {
-    const copied = try allocator.alloc([]const []const LatLng, polygon_count);
-    var initialized: usize = 0;
-    errdefer {
-        for (copied[0..initialized]) |rings| freeCoordinateSpans(allocator, rings);
-        allocator.free(copied);
-    }
-    if (polygon_count > 0) {
-        const polygons_value = raw_polygons[0..polygon_count];
-        for (polygons_value, copied) |polygon, *out| {
-            out.* = try copyCoordinateSpans(allocator, polygon.rings, polygon.ring_count);
-            initialized += 1;
-        }
-    }
-    return copied;
-}
-
-fn copyGeometryCollection(
-    allocator: std.mem.Allocator,
-    raw_geometries: [*c]const c.mln_geometry,
-    geometry_count: usize,
-) GeometryCopyError![]OwnedGeometry {
-    const copied = try allocator.alloc(OwnedGeometry, geometry_count);
-    var initialized: usize = 0;
-    errdefer {
-        for (copied[0..initialized]) |*geometry_value| geometry_value.deinit(allocator);
-        allocator.free(copied);
-    }
-    if (geometry_count > 0) {
-        const geometries_value = raw_geometries[0..geometry_count];
-        for (geometries_value, copied) |geometry_value, *out| {
-            out.* = try ownedGeometryFromNative(allocator, &geometry_value);
-            initialized += 1;
-        }
-    }
-    return copied;
-}
-
-pub const FeatureIdentifier = union(enum) {
-    null,
-    uint: u64,
-    int: i64,
-    double: f64,
-    string: []const u8,
-};
-
-pub const Feature = struct {
-    geometry: Geometry,
-    properties: []const JsonMember = &.{},
-    identifier: FeatureIdentifier = .null,
-};
-
-pub const GeoJson = union(enum) {
-    geometry: Geometry,
-    feature: Feature,
-    feature_collection: []const Feature,
 };
 
 pub const StyleSourceType = union(enum) {
@@ -813,7 +495,7 @@ pub const OwnedString = struct {
     }
 };
 
-fn copyStringView(allocator: std.mem.Allocator, view: c.mln_string_view) std.mem.Allocator.Error![]const u8 {
+fn copyStringView(allocator: std.mem.Allocator, view: c.mln_buffer_view) std.mem.Allocator.Error![]const u8 {
     if (view.size == 0) return allocator.dupe(u8, "");
     return allocator.dupe(u8, view.data[0..view.size]);
 }
@@ -1351,15 +1033,6 @@ pub fn locationIndicatorImageKindToNative(value: LocationIndicatorImageKind) u32
     };
 }
 
-test "owned JSON copy rejects unknown native tags" {
-    var unknown = c.mln_json_value{
-        .size = @sizeOf(c.mln_json_value),
-        .type = 0xbeef,
-        .data = .{ .bool_value = false },
-    };
-    try std.testing.expectError(error.UnknownStatus, ownedJsonValueFromNative(std.testing.allocator, &unknown));
-}
-
 test "growable style source type preserves unknown raw values" {
     try std.testing.expect(std.meta.eql(styleSourceTypeFromNative(0xbeef), StyleSourceType{ .raw = 0xbeef }));
 }
@@ -1373,53 +1046,19 @@ test "style source metadata enums preserve unknown raw values" {
     try std.testing.expectEqual(@as(u32, 83), raster_encoding.toRaw());
 }
 
-test "owned JSON copy handles empty native arrays and objects" {
-    var empty_array = c.mln_json_value{
-        .size = @sizeOf(c.mln_json_value),
-        .type = c.MLN_JSON_VALUE_TYPE_ARRAY,
-        .data = .{ .array_value = .{ .values = null, .value_count = 0 } },
-    };
-    var copied_array = try ownedJsonValueFromNative(std.testing.allocator, &empty_array);
-    defer copied_array.deinit(std.testing.allocator);
-    try std.testing.expectEqual(@as(usize, 0), copied_array.array.len);
-
-    var empty_object = c.mln_json_value{
-        .size = @sizeOf(c.mln_json_value),
-        .type = c.MLN_JSON_VALUE_TYPE_OBJECT,
-        .data = .{ .object_value = .{ .members = null, .member_count = 0 } },
-    };
-    var copied_object = try ownedJsonValueFromNative(std.testing.allocator, &empty_object);
-    defer copied_object.deinit(std.testing.allocator);
-    try std.testing.expectEqual(@as(usize, 0), copied_object.object.len);
-}
-
 test "GeoJSON source option copy owns nested cluster properties" {
-    var property_name = [_]u8{ 't', 'o', 't', 'a', 'l' };
-    var operator = [_]u8{'+'};
-    var expression = [_]JsonValue{
-        .{ .string = operator[0..] },
-        .{ .uint = 1 },
-    };
-    var members = [_]JsonMember{.{
-        .key = property_name[0..],
-        .value = .{ .array = expression[0..] },
-    }};
+    var cluster_properties = "{\"total\":[\"+\",1]}".*;
     const original = StyleGeoJsonSourceOptions{
         .max_zoom = 18,
-        .cluster_properties = .{ .object = members[0..] },
+        .cluster_properties = cluster_properties[0..],
     };
 
     var copied = try original.copy(std.testing.allocator);
     defer copied.deinit();
     copied.options.max_zoom = 12;
-    property_name[0] = 'x';
-    operator[0] = '-';
-    expression[1] = .{ .uint = 2 };
+    cluster_properties[2] = 'x';
 
     try std.testing.expectEqual(@as(f64, 18), original.max_zoom.?);
     try std.testing.expectEqual(@as(f64, 12), copied.options.max_zoom.?);
-    const copied_member = copied.options.cluster_properties.?.object[0];
-    try std.testing.expectEqualStrings("total", copied_member.key);
-    try std.testing.expectEqualStrings("+", copied_member.value.array[0].string);
-    try std.testing.expectEqual(@as(u64, 1), copied_member.value.array[1].uint);
+    try std.testing.expectEqualStrings("{\"total\":[\"+\",1]}", copied.options.cluster_properties.?);
 }

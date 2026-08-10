@@ -49,7 +49,7 @@ struct OfflineRegionData {
   double max_zoom = 0.0;
   float pixel_ratio = 0.0F;
   bool include_ideographs = false;
-  std::unique_ptr<mln::core::OwnedGeometryDescriptor> geometry;
+  std::string geometry;
   std::vector<uint8_t> metadata;
 };
 
@@ -314,10 +314,6 @@ auto validate_geometry_definition(
     mln::core::set_thread_error("offline region style_url must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (definition.geometry == nullptr) {
-    mln::core::set_thread_error("offline region geometry must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (
     !std::isfinite(definition.min_zoom) || definition.min_zoom < 0.0 ||
     std::isnan(definition.max_zoom) || definition.max_zoom < definition.min_zoom
@@ -481,7 +477,7 @@ auto to_c_region_data(const mbgl::OfflineRegion& region)
     .max_zoom = 0.0,
     .pixel_ratio = 0.0F,
     .include_ideographs = false,
-    .geometry = nullptr,
+    .geometry = {},
     .metadata = region.getMetadata()
   };
 
@@ -518,7 +514,8 @@ auto to_c_region_data(const mbgl::OfflineRegion& region)
     data.max_zoom = geometry->maxZoom;
     data.pixel_ratio = geometry->pixelRatio;
     data.include_ideographs = geometry->includeIdeographs;
-    data.geometry = mln::core::to_c_geometry(geometry->geometry);
+    data.geometry =
+      mln::core::serialize_geojson(mbgl::GeoJSON{geometry->geometry});
     return data;
   }
 
@@ -554,14 +551,15 @@ auto fill_region_info(
       };
       break;
     case MLN_OFFLINE_REGION_DEFINITION_GEOMETRY:
-      if (!data.geometry) {
+      if (data.geometry.empty()) {
         mln::core::set_thread_error("offline region geometry is missing");
         return MLN_STATUS_NATIVE_ERROR;
       }
       definition.data.geometry = mln_offline_geometry_region_definition{
         .size = sizeof(mln_offline_geometry_region_definition),
         .style_url = data.style_url.c_str(),
-        .geometry = &data.geometry->root,
+        .geometry =
+          {.data = data.geometry.data(), .size = data.geometry.size()},
         .min_zoom = data.min_zoom,
         .max_zoom = data.max_zoom,
         .pixel_ratio = data.pixel_ratio,

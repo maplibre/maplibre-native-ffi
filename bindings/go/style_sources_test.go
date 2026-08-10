@@ -2,7 +2,6 @@ package maplibre
 
 import (
 	"errors"
-	"math"
 	stdruntime "runtime"
 	"testing"
 )
@@ -28,7 +27,7 @@ func TestStyleSourceMetadataForMissingSources(t *testing.T) {
 		}
 	}()
 
-	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	ids, err := m.StyleSourceIDs()
@@ -101,7 +100,7 @@ func TestStyleSourceURLAndTileBindings(t *testing.T) {
 		}
 	}()
 
-	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	geoJSONOptions := StyleGeoJSONSourceOptions{}.
@@ -173,7 +172,7 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 		}
 	}()
 
-	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	minZoom := 0.0
@@ -247,8 +246,8 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 	if err != nil || !removed {
 		t.Fatalf("RemoveStyleSource(inline-vector) = (%v, %v), want true and nil", removed, err)
 	}
-	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
-		t.Fatalf("SetStyleJSON(replacement): %v", err)
+	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+		t.Fatalf("SetStyleJSON([]byte(replacement)): %v", err)
 	}
 	if *info.Attribution != attribution || info.TileJSON.TileURLs[1] != tileURLs[1] || *info.TileJSON.Bounds != bounds {
 		t.Fatalf("copied source info changed after removal and style replacement: %#v", info)
@@ -269,7 +268,7 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 		t.Fatalf("StyleSourceInfo(url-vector) optional loaded fields = (%v, %v), want absent", urlInfo.TileJSON, urlInfo.Attribution)
 	}
 
-	data := GeoJSONFeatureCollection(nil)
+	data := []byte(`{"type":"FeatureCollection","features":[]}`)
 	if err := m.AddGeoJSONSourceData("inline-geojson", data, nil); err != nil {
 		t.Fatalf("AddGeoJSONSourceData(): %v", err)
 	}
@@ -282,7 +281,7 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 	}
 }
 
-func TestGeoJSONSourceDataDescriptors(t *testing.T) {
+func TestGeoJSONSourceDataBuffers(t *testing.T) {
 	lockOSThreadForTest(t)
 
 	runtime, err := NewRuntime()
@@ -303,19 +302,10 @@ func TestGeoJSONSourceDataDescriptors(t *testing.T) {
 		}
 	}()
 
-	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
-	points := []LatLng{{Latitude: 1, Longitude: 2}, {Latitude: 3, Longitude: 4}}
-	properties := JSONMembers{
-		{Name: "name", Value: JSONString("before")},
-		{Name: "rank", Value: JSONInt(7)},
-	}
-	data := GeoJSONFeatureCollection([]Feature{{
-		Geometry:   LineStringGeometry(points),
-		Properties: properties,
-		Identifier: "feature-1",
-	}})
+	data := []byte(`{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","geometry":{"type":"LineString","coordinates":[[2,1],[4,3]]},"properties":{"name":"before","rank":7}}]}`)
 	options := StyleGeoJSONSourceOptions{}.
 		WithMinZoom(1).
 		WithMaxZoom(16).
@@ -326,9 +316,8 @@ func TestGeoJSONSourceDataDescriptors(t *testing.T) {
 	if err := m.AddGeoJSONSourceData("geojson-data", data, &options); err != nil {
 		t.Fatalf("AddGeoJSONSourceData(): %v", err)
 	}
-	points[0] = LatLng{Latitude: 90, Longitude: 90}
-	properties[0].Value = JSONString("after")
-	if err := m.SetGeoJSONSourceData("geojson-data", GeoJSON{Type: GeoJSONTypeGeometry, Geometry: PointGeometry(LatLng{Latitude: 5, Longitude: 6})}); err != nil {
+	data[0] = 'x'
+	if err := m.SetGeoJSONSourceData("geojson-data", []byte(`{"type":"Point","coordinates":[6,5]}`)); err != nil {
 		t.Fatalf("SetGeoJSONSourceData(): %v", err)
 	}
 	sourceType, found, err := m.StyleSourceType("geojson-data")
@@ -338,17 +327,17 @@ func TestGeoJSONSourceDataDescriptors(t *testing.T) {
 	if !found || sourceType != StyleSourceTypeGeoJSON {
 		t.Fatalf("StyleSourceType(geojson-data) = (%v, %v), want GeoJSON true", sourceType, found)
 	}
-	badID := GeoJSONFeatureCollection([]Feature{{Geometry: PointGeometry(LatLng{}), Identifier: struct{}{}}})
+	badID := []byte(`{"type":"FeatureCollection","features":[{"type":"Feature","id":{},"geometry":{"type":"Point","coordinates":[0,0]},"properties":{}}]}`)
 	if err := m.AddGeoJSONSourceData("bad-geojson-data", badID, nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("AddGeoJSONSourceData(unsupported id) error = %v, want ErrInvalidArgument", err)
 	}
-	badGeometry := GeoJSON{Type: GeoJSONTypeGeometry, Geometry: Geometry{Type: GeometryType(999)}}
+	badGeometry := []byte(`{"type":"Unsupported","coordinates":[]}`)
 	if err := m.AddGeoJSONSourceData("bad-geometry", badGeometry, nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("AddGeoJSONSourceData(unsupported geometry) error = %v, want ErrInvalidArgument", err)
 	}
 	badClusterProperties := StyleGeoJSONSourceOptions{}.
 		WithCluster(true).
-		WithClusterProperties(JSONObject(JSONMember{Name: "total", Value: JSONDouble(math.Inf(1))}))
+		WithClusterProperties([]byte(`{"total":NaN}`))
 	if err := m.AddGeoJSONSourceData("bad-cluster-properties", data, &badClusterProperties); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("AddGeoJSONSourceData(non-finite cluster property) error = %v, want ErrInvalidArgument", err)
 	}
@@ -382,29 +371,21 @@ func TestGeoJSONSourceClusterOptions(t *testing.T) {
 		}
 	}()
 
-	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
-	points := GeoJSONFeatureCollection([]Feature{
-		{Geometry: PointGeometry(LatLng{Latitude: 0, Longitude: 0}), Properties: JSONMembers{{Name: "rank", Value: JSONInt(1)}}},
-		{Geometry: PointGeometry(LatLng{Latitude: 0.001, Longitude: 0.001}), Properties: JSONMembers{{Name: "rank", Value: JSONInt(2)}}},
-		{Geometry: PointGeometry(LatLng{Latitude: 0.002, Longitude: 0.002}), Properties: JSONMembers{{Name: "rank", Value: JSONInt(3)}}},
-	})
-	// MapLibre Native parses the aggregation expressions while the descriptor is borrowed, so a
-	// source that adds successfully proves the nested cluster property tree crossed the boundary.
-	clusterProperties := JSONMembers{
-		{Name: "total", Value: JSONArray(JSONString("+"), JSONArray(JSONString("get"), JSONString("rank")))},
-	}
+	points := []byte(`{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[0,0]},"properties":{"rank":1}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.001,0.001]},"properties":{"rank":2}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.002,0.002]},"properties":{"rank":3}}]}`)
+	clusterProperties := []byte(`{"total":["+",["get","rank"]]}`)
 	options := StyleGeoJSONSourceOptions{}.
 		WithCluster(true).
 		WithClusterRadius(50).
 		WithClusterMinPoints(2).
 		WithClusterMaxZoom(14).
-		WithClusterProperties(JSONValue{Type: JSONValueTypeObject, Object: clusterProperties})
+		WithClusterProperties(clusterProperties)
 	if err := m.AddGeoJSONSourceData("cluster-source", points, &options); err != nil {
 		t.Fatalf("AddGeoJSONSourceData(clustered): %v", err)
 	}
-	clusterProperties[0].Value = JSONString("mutated-after-call")
+	clusterProperties[0] = 'x'
 	sourceType, found, err := m.StyleSourceType("cluster-source")
 	if err != nil {
 		t.Fatalf("StyleSourceType(cluster-source): %v", err)
@@ -418,13 +399,37 @@ func TestGeoJSONSourceClusterOptions(t *testing.T) {
 	}
 	malformed := StyleGeoJSONSourceOptions{}.
 		WithCluster(true).
-		WithClusterProperties(JSONObject(JSONMember{Name: "total", Value: JSONArray(JSONString("+"))}))
+		WithClusterProperties([]byte(`{"total":["+"]}`))
 	if err := m.AddGeoJSONSourceData("malformed-cluster-source", points, &malformed); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("AddGeoJSONSourceData(malformed cluster properties) error = %v, want ErrInvalidArgument", err)
 	}
+	emptyClusterProperties := []struct {
+		name    string
+		options StyleGeoJSONSourceOptions
+	}{
+		{
+			name: "builder",
+			options: StyleGeoJSONSourceOptions{}.
+				WithCluster(true).
+				WithClusterProperties([]byte{}),
+		},
+		{
+			name: "clone",
+			options: StyleGeoJSONSourceOptions{
+				Cluster:           optionPtr(true),
+				ClusterProperties: []byte{},
+			}.Clone(),
+		},
+	}
+	for _, test := range emptyClusterProperties {
+		err := m.AddGeoJSONSourceData("empty-cluster-properties-"+test.name, points, &test.options)
+		if !errors.Is(err, ErrInvalidArgument) {
+			t.Errorf("AddGeoJSONSourceData(%s empty cluster properties) error = %v, want ErrInvalidArgument", test.name, err)
+		}
+	}
 }
 
-func TestAddStyleSourceJSONCopiesGoJSONDescriptor(t *testing.T) {
+func TestAddStyleSourceJSONCopiesGoBuffer(t *testing.T) {
 	stdruntime.LockOSThread()
 	defer stdruntime.UnlockOSThread()
 
@@ -446,21 +451,14 @@ func TestAddStyleSourceJSONCopiesGoJSONDescriptor(t *testing.T) {
 		}
 	}()
 
-	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
-	source := JSONObject(
-		JSONMember{Name: "type", Value: JSONString("geojson")},
-		JSONMember{Name: "data", Value: JSONObject(
-			JSONMember{Name: "type", Value: JSONString("FeatureCollection")},
-			JSONMember{Name: "features", Value: JSONArray()},
-		)},
-		JSONMember{Name: "attribution", Value: JSONString("unit-test")},
-	)
+	source := []byte(`{"type":"geojson","data":{"type":"FeatureCollection","features":[]},"attribution":"unit-test"}`)
 	if err := m.AddStyleSourceJSON("go-json-source", source); err != nil {
 		t.Fatalf("AddStyleSourceJSON(): %v", err)
 	}
-	source.Object[0].Value = JSONString("mutated-after-call")
+	source[0] = 'x'
 	exists, err := m.StyleSourceExists("go-json-source")
 	if err != nil {
 		t.Fatalf("StyleSourceExists(): %v", err)
@@ -482,7 +480,7 @@ func TestAddStyleSourceJSONCopiesGoJSONDescriptor(t *testing.T) {
 	if !found || info.IDSize != uint64(len("go-json-source")) {
 		t.Fatalf("StyleSourceInfo(go-json-source) = (%#v, %v), want copied ID size", info, found)
 	}
-	if err := m.AddStyleSourceJSON("bad-json-source", JSONDouble(math.Inf(1))); !errors.Is(err, ErrInvalidArgument) {
+	if err := m.AddStyleSourceJSON("bad-json-source", []byte(`NaN`)); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("AddStyleSourceJSON(non-finite JSON double) error = %v, want ErrInvalidArgument", err)
 	}
 }

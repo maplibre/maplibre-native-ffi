@@ -160,6 +160,12 @@ external mln_animation_options mln_animation_options_default();
 @ffi.Native<mln_bound_options Function()>()
 external mln_bound_options mln_bound_options_default();
 
+@ffi.Native<ffi.Void Function(mln_buffer)>()
+external void mln_buffer_destroy(int buffer);
+
+@ffi.Native<ffi.Int32 Function(mln_buffer, ffi.Pointer<mln_buffer_view>)>()
+external int mln_buffer_get(int buffer, ffi.Pointer<mln_buffer_view> out_view);
+
 @ffi.Native<ffi.Uint32 Function()>()
 external int mln_c_version();
 
@@ -172,44 +178,6 @@ external mln_camera_options mln_camera_options_default();
 @ffi.Native<mln_custom_geometry_source_options Function()>()
 external mln_custom_geometry_source_options
 mln_custom_geometry_source_options_default();
-
-@ffi.Native<ffi.Void Function(mln_feature_extension_result)>()
-external void mln_feature_extension_result_destroy(int result);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_feature_extension_result,
-    ffi.Pointer<mln_feature_extension_result_info>,
-  )
->()
-external int mln_feature_extension_result_get(
-  int result,
-  ffi.Pointer<mln_feature_extension_result_info> out_info,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_feature_query_result, ffi.Pointer<ffi.Size>)
->()
-external int mln_feature_query_result_count(
-  int result,
-  ffi.Pointer<ffi.Size> out_count,
-);
-
-@ffi.Native<ffi.Void Function(mln_feature_query_result)>()
-external void mln_feature_query_result_destroy(int result);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_feature_query_result,
-    ffi.Size,
-    ffi.Pointer<mln_queried_feature>,
-  )
->()
-external int mln_feature_query_result_get(
-  int result,
-  int index,
-  ffi.Pointer<mln_queried_feature> out_feature,
-);
 
 @ffi.Native<mln_free_camera_options Function()>()
 external mln_free_camera_options mln_free_camera_options_default();
@@ -234,20 +202,6 @@ external int mln_http_header_transform_response_set(
   int value_size,
 );
 
-@ffi.Native<ffi.Void Function(mln_json_snapshot)>()
-external void mln_json_snapshot_destroy(int snapshot);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_json_snapshot,
-    ffi.Pointer<ffi.Pointer<mln_json_value>>,
-  )
->()
-external int mln_json_snapshot_get(
-  int snapshot,
-  ffi.Pointer<ffi.Pointer<mln_json_value>> out_value,
-);
-
 @ffi.Native<
   ffi.Int32 Function(mln_projected_meters, ffi.Pointer<mln_lat_lng>)
 >()
@@ -269,72 +223,72 @@ external int mln_log_set_callback(
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, mln_string_view, mln_string_view)
+  ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view, mln_buffer_view)
 >()
 external int mln_map_add_color_relief_layer(
   int map,
-  mln_string_view layer_id,
-  mln_string_view source_id,
-  mln_string_view before_layer_id,
+  mln_buffer_view layer_id,
+  mln_buffer_view source_id,
+  mln_buffer_view before_layer_id,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
+    mln_buffer_view,
     ffi.Pointer<mln_custom_geometry_source_options>,
   )
 >()
 external int mln_map_add_custom_geometry_source(
   int map,
-  mln_string_view source_id,
+  mln_buffer_view source_id,
   ffi.Pointer<mln_custom_geometry_source_options> options,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
-    ffi.Pointer<mln_geojson>,
+    mln_buffer_view,
+    mln_buffer_view,
     ffi.Pointer<mln_geojson_source_options>,
   )
 >()
 external int mln_map_add_geojson_source_data(
   int map,
-  mln_string_view source_id,
-  ffi.Pointer<mln_geojson> data,
+  mln_buffer_view source_id,
+  mln_buffer_view data,
   ffi.Pointer<mln_geojson_source_options> options,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
-    mln_string_view,
+    mln_buffer_view,
+    mln_buffer_view,
     ffi.Pointer<mln_geojson_source_options>,
   )
 >()
 external int mln_map_add_geojson_source_url(
   int map,
-  mln_string_view source_id,
-  mln_string_view url,
+  mln_buffer_view source_id,
+  mln_buffer_view url,
   ffi.Pointer<mln_geojson_source_options> options,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, mln_string_view, mln_string_view)
+  ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view, mln_buffer_view)
 >()
 external int mln_map_add_hillshade_layer(
   int map,
-  mln_string_view layer_id,
-  mln_string_view source_id,
-  mln_string_view before_layer_id,
+  mln_buffer_view layer_id,
+  mln_buffer_view source_id,
+  mln_buffer_view before_layer_id,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
+    mln_buffer_view,
     ffi.Pointer<mln_lat_lng>,
     ffi.Size,
     ffi.Pointer<mln_premultiplied_rgba8_image>,
@@ -342,7 +296,7 @@ external int mln_map_add_hillshade_layer(
 >()
 external int mln_map_add_image_source_image(
   int map,
-  mln_string_view source_id,
+  mln_buffer_view source_id,
   ffi.Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
   ffi.Pointer<mln_premultiplied_rgba8_image> image,
@@ -351,40 +305,40 @@ external int mln_map_add_image_source_image(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
+    mln_buffer_view,
     ffi.Pointer<mln_lat_lng>,
     ffi.Size,
-    mln_string_view,
+    mln_buffer_view,
   )
 >()
 external int mln_map_add_image_source_url(
   int map,
-  mln_string_view source_id,
+  mln_buffer_view source_id,
   ffi.Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
-  mln_string_view url,
+  mln_buffer_view url,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_string_view, mln_string_view)>()
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
 external int mln_map_add_location_indicator_layer(
   int map,
-  mln_string_view layer_id,
-  mln_string_view before_layer_id,
+  mln_buffer_view layer_id,
+  mln_buffer_view before_layer_id,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
-    ffi.Pointer<mln_string_view>,
+    mln_buffer_view,
+    ffi.Pointer<mln_buffer_view>,
     ffi.Size,
     ffi.Pointer<mln_style_tile_source_options>,
   )
 >()
 external int mln_map_add_raster_dem_source_tiles(
   int map,
-  mln_string_view source_id,
-  ffi.Pointer<mln_string_view> tiles,
+  mln_buffer_view source_id,
+  ffi.Pointer<mln_buffer_view> tiles,
   int tile_count,
   ffi.Pointer<mln_style_tile_source_options> options,
 );
@@ -392,31 +346,31 @@ external int mln_map_add_raster_dem_source_tiles(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
-    mln_string_view,
+    mln_buffer_view,
+    mln_buffer_view,
     ffi.Pointer<mln_style_tile_source_options>,
   )
 >()
 external int mln_map_add_raster_dem_source_url(
   int map,
-  mln_string_view source_id,
-  mln_string_view url,
+  mln_buffer_view source_id,
+  mln_buffer_view url,
   ffi.Pointer<mln_style_tile_source_options> options,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
-    ffi.Pointer<mln_string_view>,
+    mln_buffer_view,
+    ffi.Pointer<mln_buffer_view>,
     ffi.Size,
     ffi.Pointer<mln_style_tile_source_options>,
   )
 >()
 external int mln_map_add_raster_source_tiles(
   int map,
-  mln_string_view source_id,
-  ffi.Pointer<mln_string_view> tiles,
+  mln_buffer_view source_id,
+  ffi.Pointer<mln_buffer_view> tiles,
   int tile_count,
   ffi.Pointer<mln_style_tile_source_options> options,
 );
@@ -424,49 +378,45 @@ external int mln_map_add_raster_source_tiles(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
-    mln_string_view,
+    mln_buffer_view,
+    mln_buffer_view,
     ffi.Pointer<mln_style_tile_source_options>,
   )
 >()
 external int mln_map_add_raster_source_url(
   int map,
-  mln_string_view source_id,
-  mln_string_view url,
+  mln_buffer_view source_id,
+  mln_buffer_view url,
   ffi.Pointer<mln_style_tile_source_options> options,
 );
 
-@ffi.Native<
-  ffi.Int32 Function(mln_map, ffi.Pointer<mln_json_value>, mln_string_view)
->()
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
 external int mln_map_add_style_layer_json(
   int map,
-  ffi.Pointer<mln_json_value> layer_json,
-  mln_string_view before_layer_id,
+  mln_buffer_view layer_json,
+  mln_buffer_view before_layer_id,
 );
 
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<mln_json_value>)
->()
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
 external int mln_map_add_style_source_json(
   int map,
-  mln_string_view source_id,
-  ffi.Pointer<mln_json_value> source_json,
+  mln_buffer_view source_id,
+  mln_buffer_view source_json,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
-    ffi.Pointer<mln_string_view>,
+    mln_buffer_view,
+    ffi.Pointer<mln_buffer_view>,
     ffi.Size,
     ffi.Pointer<mln_style_tile_source_options>,
   )
 >()
 external int mln_map_add_vector_source_tiles(
   int map,
-  mln_string_view source_id,
-  ffi.Pointer<mln_string_view> tiles,
+  mln_buffer_view source_id,
+  ffi.Pointer<mln_buffer_view> tiles,
   int tile_count,
   ffi.Pointer<mln_style_tile_source_options> options,
 );
@@ -474,29 +424,29 @@ external int mln_map_add_vector_source_tiles(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
-    mln_string_view,
+    mln_buffer_view,
+    mln_buffer_view,
     ffi.Pointer<mln_style_tile_source_options>,
   )
 >()
 external int mln_map_add_vector_source_url(
   int map,
-  mln_string_view source_id,
-  mln_string_view url,
+  mln_buffer_view source_id,
+  mln_buffer_view url,
   ffi.Pointer<mln_style_tile_source_options> options,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    ffi.Pointer<mln_geometry>,
+    mln_buffer_view,
     ffi.Pointer<mln_camera_fit_options>,
     ffi.Pointer<mln_camera_options>,
   )
 >()
 external int mln_map_camera_for_geometry(
   int map,
-  ffi.Pointer<mln_geometry> geometry,
+  mln_buffer_view geometry,
   ffi.Pointer<mln_camera_fit_options> fit_options,
   ffi.Pointer<mln_camera_options> out_camera,
 );
@@ -539,7 +489,7 @@ external int mln_map_cancel_transitions(int map);
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
+    mln_buffer_view,
     ffi.Pointer<ffi.Char>,
     ffi.Size,
     ffi.Pointer<ffi.Size>,
@@ -547,7 +497,7 @@ external int mln_map_cancel_transitions(int map);
 >()
 external int mln_map_copy_layer_source_id(
   int map,
-  mln_string_view layer_id,
+  mln_buffer_view layer_id,
   ffi.Pointer<ffi.Char> out_source_id,
   int source_id_capacity,
   ffi.Pointer<ffi.Size> out_source_id_size,
@@ -556,7 +506,7 @@ external int mln_map_copy_layer_source_id(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
+    mln_buffer_view,
     ffi.Pointer<ffi.Char>,
     ffi.Size,
     ffi.Pointer<ffi.Size>,
@@ -564,7 +514,7 @@ external int mln_map_copy_layer_source_id(
 >()
 external int mln_map_copy_layer_source_layer(
   int map,
-  mln_string_view layer_id,
+  mln_buffer_view layer_id,
   ffi.Pointer<ffi.Char> out_source_layer,
   int source_layer_capacity,
   ffi.Pointer<ffi.Size> out_source_layer_size,
@@ -573,14 +523,14 @@ external int mln_map_copy_layer_source_layer(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<ffi.Uint8>,
     ffi.Size,
     ffi.Pointer<ffi.Size>,
   )
 >()
 external int mln_map_copy_loaded_style_json(
   int map,
-  ffi.Pointer<ffi.Char> out_json,
+  ffi.Pointer<ffi.Uint8> out_json,
   int json_capacity,
   ffi.Pointer<ffi.Size> out_json_size,
 );
@@ -588,7 +538,7 @@ external int mln_map_copy_loaded_style_json(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
+    mln_buffer_view,
     ffi.Pointer<ffi.Uint8>,
     ffi.Size,
     ffi.Pointer<ffi.Size>,
@@ -597,7 +547,7 @@ external int mln_map_copy_loaded_style_json(
 >()
 external int mln_map_copy_style_image_premultiplied_rgba8(
   int map,
-  mln_string_view image_id,
+  mln_buffer_view image_id,
   ffi.Pointer<ffi.Uint8> out_pixels,
   int pixel_capacity,
   ffi.Pointer<ffi.Size> out_byte_length,
@@ -607,7 +557,7 @@ external int mln_map_copy_style_image_premultiplied_rgba8(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
+    mln_buffer_view,
     ffi.Pointer<mln_image_stretch>,
     ffi.Size,
     ffi.Pointer<ffi.Size>,
@@ -619,7 +569,7 @@ external int mln_map_copy_style_image_premultiplied_rgba8(
 >()
 external int mln_map_copy_style_image_stretches(
   int map,
-  mln_string_view image_id,
+  mln_buffer_view image_id,
   ffi.Pointer<mln_image_stretch> out_stretch_x,
   int stretch_x_capacity,
   ffi.Pointer<ffi.Size> out_stretch_x_count,
@@ -632,7 +582,7 @@ external int mln_map_copy_style_image_stretches(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
+    mln_buffer_view,
     ffi.Pointer<ffi.Char>,
     ffi.Size,
     ffi.Pointer<ffi.Size>,
@@ -641,7 +591,7 @@ external int mln_map_copy_style_image_stretches(
 >()
 external int mln_map_copy_style_source_attribution(
   int map,
-  mln_string_view source_id,
+  mln_buffer_view source_id,
   ffi.Pointer<ffi.Char> out_attribution,
   int attribution_capacity,
   ffi.Pointer<ffi.Size> out_attribution_size,
@@ -651,7 +601,7 @@ external int mln_map_copy_style_source_attribution(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
+    mln_buffer_view,
     ffi.Pointer<ffi.Char>,
     ffi.Size,
     ffi.Pointer<ffi.Size>,
@@ -660,7 +610,7 @@ external int mln_map_copy_style_source_attribution(
 >()
 external int mln_map_copy_style_source_url(
   int map,
-  mln_string_view source_id,
+  mln_buffer_view source_id,
   ffi.Pointer<ffi.Char> out_url,
   int url_capacity,
   ffi.Pointer<ffi.Size> out_url_size,
@@ -754,7 +704,7 @@ external int mln_map_get_free_camera_options(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
+    mln_buffer_view,
     ffi.Pointer<mln_lat_lng>,
     ffi.Size,
     ffi.Pointer<ffi.Size>,
@@ -763,7 +713,7 @@ external int mln_map_get_free_camera_options(
 >()
 external int mln_map_get_image_source_coordinates(
   int map,
-  mln_string_view source_id,
+  mln_buffer_view source_id,
   ffi.Pointer<mln_lat_lng> out_coordinates,
   int coordinate_capacity,
   ffi.Pointer<ffi.Size> out_coordinate_count,
@@ -771,53 +721,53 @@ external int mln_map_get_image_source_coordinates(
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<mln_json_snapshot>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_buffer>)
 >()
 external int mln_map_get_layer_filter(
   int map,
-  mln_string_view layer_id,
-  ffi.Pointer<mln_json_snapshot> out_filter,
+  mln_buffer_view layer_id,
+  ffi.Pointer<mln_buffer> out_filter,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<ffi.Double>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Double>)
 >()
 external int mln_map_get_layer_max_zoom(
   int map,
-  mln_string_view layer_id,
+  mln_buffer_view layer_id,
   ffi.Pointer<ffi.Double> out_max_zoom,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<ffi.Double>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Double>)
 >()
 external int mln_map_get_layer_min_zoom(
   int map,
-  mln_string_view layer_id,
+  mln_buffer_view layer_id,
   ffi.Pointer<ffi.Double> out_min_zoom,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
-    mln_string_view,
-    ffi.Pointer<mln_json_snapshot>,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_buffer>,
   )
 >()
 external int mln_map_get_layer_property(
   int map,
-  mln_string_view layer_id,
-  mln_string_view property_name,
-  ffi.Pointer<mln_json_snapshot> out_value,
+  mln_buffer_view layer_id,
+  mln_buffer_view property_name,
+  ffi.Pointer<mln_buffer> out_value,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<ffi.Uint32>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Uint32>)
 >()
 external int mln_map_get_layer_visibility(
   int map,
-  mln_string_view layer_id,
+  mln_buffer_view layer_id,
   ffi.Pointer<ffi.Uint32> out_visibility,
 );
 
@@ -851,14 +801,14 @@ external int mln_map_get_size(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
+    mln_buffer_view,
     ffi.Pointer<mln_style_image_info>,
     ffi.Pointer<ffi.Bool>,
   )
 >()
 external int mln_map_get_style_image_info(
   int map,
-  mln_string_view image_id,
+  mln_buffer_view image_id,
   ffi.Pointer<mln_style_image_info> out_info,
   ffi.Pointer<ffi.Bool> out_found,
 );
@@ -866,53 +816,53 @@ external int mln_map_get_style_image_info(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
-    ffi.Pointer<mln_json_snapshot>,
+    mln_buffer_view,
+    ffi.Pointer<mln_buffer>,
     ffi.Pointer<ffi.Bool>,
   )
 >()
 external int mln_map_get_style_layer_json(
   int map,
-  mln_string_view layer_id,
-  ffi.Pointer<mln_json_snapshot> out_layer,
+  mln_buffer_view layer_id,
+  ffi.Pointer<mln_buffer> out_layer,
   ffi.Pointer<ffi.Bool> out_found,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
-    ffi.Pointer<mln_string_view>,
+    mln_buffer_view,
+    ffi.Pointer<mln_buffer_view>,
     ffi.Pointer<ffi.Bool>,
   )
 >()
 external int mln_map_get_style_layer_type(
   int map,
-  mln_string_view layer_id,
-  ffi.Pointer<mln_string_view> out_layer_type,
+  mln_buffer_view layer_id,
+  ffi.Pointer<mln_buffer_view> out_layer_type,
   ffi.Pointer<ffi.Bool> out_found,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<mln_json_snapshot>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_buffer>)
 >()
 external int mln_map_get_style_light_property(
   int map,
-  mln_string_view property_name,
-  ffi.Pointer<mln_json_snapshot> out_value,
+  mln_buffer_view property_name,
+  ffi.Pointer<mln_buffer> out_value,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
+    mln_buffer_view,
     ffi.Pointer<mln_style_source_info>,
     ffi.Pointer<ffi.Bool>,
   )
 >()
 external int mln_map_get_style_source_info(
   int map,
-  mln_string_view source_id,
+  mln_buffer_view source_id,
   ffi.Pointer<mln_style_source_info> out_info,
   ffi.Pointer<ffi.Bool> out_found,
 );
@@ -920,14 +870,14 @@ external int mln_map_get_style_source_info(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
+    mln_buffer_view,
     ffi.Pointer<mln_style_string_list>,
     ffi.Pointer<ffi.Bool>,
   )
 >()
 external int mln_map_get_style_source_tile_urls(
   int map,
-  mln_string_view source_id,
+  mln_buffer_view source_id,
   ffi.Pointer<mln_style_string_list> out_tile_urls,
   ffi.Pointer<ffi.Bool> out_found,
 );
@@ -935,14 +885,14 @@ external int mln_map_get_style_source_tile_urls(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
+    mln_buffer_view,
     ffi.Pointer<ffi.Uint32>,
     ffi.Pointer<ffi.Bool>,
   )
 >()
 external int mln_map_get_style_source_type(
   int map,
-  mln_string_view source_id,
+  mln_buffer_view source_id,
   ffi.Pointer<ffi.Uint32> out_source_type,
   ffi.Pointer<ffi.Bool> out_found,
 );
@@ -969,19 +919,19 @@ external int mln_map_get_viewport_options(
   ffi.Pointer<mln_map_viewport_options> out_options,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_string_view, mln_lat_lng_bounds)>()
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_lat_lng_bounds)>()
 external int mln_map_invalidate_custom_geometry_source_region(
   int map,
-  mln_string_view source_id,
+  mln_buffer_view source_id,
   mln_lat_lng_bounds bounds,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, mln_canonical_tile_id)
+  ffi.Int32 Function(mln_map, mln_buffer_view, mln_canonical_tile_id)
 >()
 external int mln_map_invalidate_custom_geometry_source_tile(
   int map,
-  mln_string_view source_id,
+  mln_buffer_view source_id,
   mln_canonical_tile_id tile_id,
 );
 
@@ -1077,11 +1027,11 @@ external int mln_map_move_by_animated(
   ffi.Pointer<mln_animation_options> animation,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_string_view, mln_string_view)>()
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
 external int mln_map_move_style_layer(
   int map,
-  mln_string_view layer_id,
-  mln_string_view before_layer_id,
+  mln_buffer_view layer_id,
+  mln_buffer_view before_layer_id,
 );
 
 @ffi.Native<mln_map_options Function()>()
@@ -1190,42 +1140,38 @@ external int mln_map_projection_set_visible_coordinates(
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_map_projection,
-    ffi.Pointer<mln_geometry>,
-    mln_edge_insets,
-  )
+  ffi.Int32 Function(mln_map_projection, mln_buffer_view, mln_edge_insets)
 >()
 external int mln_map_projection_set_visible_geometry(
   int projection,
-  ffi.Pointer<mln_geometry> geometry,
+  mln_buffer_view geometry,
   mln_edge_insets padding,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<ffi.Bool>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Bool>)
 >()
 external int mln_map_remove_style_image(
   int map,
-  mln_string_view image_id,
+  mln_buffer_view image_id,
   ffi.Pointer<ffi.Bool> out_removed,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<ffi.Bool>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Bool>)
 >()
 external int mln_map_remove_style_layer(
   int map,
-  mln_string_view layer_id,
+  mln_buffer_view layer_id,
   ffi.Pointer<ffi.Bool> out_removed,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<ffi.Bool>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Bool>)
 >()
 external int mln_map_remove_style_source(
   int map,
-  mln_string_view source_id,
+  mln_buffer_view source_id,
   ffi.Pointer<ffi.Bool> out_removed,
 );
 
@@ -1290,16 +1236,16 @@ external int mln_map_set_bounds(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
+    mln_buffer_view,
     mln_canonical_tile_id,
-    ffi.Pointer<mln_geojson>,
+    mln_buffer_view,
   )
 >()
 external int mln_map_set_custom_geometry_source_tile_data(
   int map,
-  mln_string_view source_id,
+  mln_buffer_view source_id,
   mln_canonical_tile_id tile_id,
-  ffi.Pointer<mln_geojson> data,
+  mln_buffer_view data,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Uint32)>()
@@ -1311,20 +1257,18 @@ external int mln_map_set_free_camera_options(
   ffi.Pointer<mln_free_camera_options> options,
 );
 
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<mln_geojson>)
->()
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
 external int mln_map_set_geojson_source_data(
   int map,
-  mln_string_view source_id,
-  ffi.Pointer<mln_geojson> data,
+  mln_buffer_view source_id,
+  mln_buffer_view data,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_string_view, mln_string_view)>()
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
 external int mln_map_set_geojson_source_url(
   int map,
-  mln_string_view source_id,
-  mln_string_view url,
+  mln_buffer_view source_id,
+  mln_buffer_view url,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Bool)>()
@@ -1333,14 +1277,14 @@ external int mln_map_set_gesture_in_progress(int map, bool in_progress);
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
+    mln_buffer_view,
     ffi.Pointer<mln_lat_lng>,
     ffi.Size,
   )
 >()
 external int mln_map_set_image_source_coordinates(
   int map,
-  mln_string_view source_id,
+  mln_buffer_view source_id,
   ffi.Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
 );
@@ -1348,112 +1292,107 @@ external int mln_map_set_image_source_coordinates(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
+    mln_buffer_view,
     ffi.Pointer<mln_premultiplied_rgba8_image>,
   )
 >()
 external int mln_map_set_image_source_image(
   int map,
-  mln_string_view source_id,
+  mln_buffer_view source_id,
   ffi.Pointer<mln_premultiplied_rgba8_image> image,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_string_view, mln_string_view)>()
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
 external int mln_map_set_image_source_url(
   int map,
-  mln_string_view source_id,
-  mln_string_view url,
+  mln_buffer_view source_id,
+  mln_buffer_view url,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<mln_json_value>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_buffer_view>)
 >()
 external int mln_map_set_layer_filter(
   int map,
-  mln_string_view layer_id,
-  ffi.Pointer<mln_json_value> filter,
+  mln_buffer_view layer_id,
+  ffi.Pointer<mln_buffer_view> filter,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_string_view, ffi.Double)>()
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Double)>()
 external int mln_map_set_layer_max_zoom(
   int map,
-  mln_string_view layer_id,
+  mln_buffer_view layer_id,
   double max_zoom,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_string_view, ffi.Double)>()
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Double)>()
 external int mln_map_set_layer_min_zoom(
   int map,
-  mln_string_view layer_id,
+  mln_buffer_view layer_id,
   double min_zoom,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    mln_string_view,
-    mln_string_view,
-    ffi.Pointer<mln_json_value>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view, mln_buffer_view)
 >()
 external int mln_map_set_layer_property(
   int map,
-  mln_string_view layer_id,
-  mln_string_view property_name,
-  ffi.Pointer<mln_json_value> value,
+  mln_buffer_view layer_id,
+  mln_buffer_view property_name,
+  mln_buffer_view value,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_string_view, mln_string_view)>()
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
 external int mln_map_set_layer_source_id(
   int map,
-  mln_string_view layer_id,
-  mln_string_view source_id,
+  mln_buffer_view layer_id,
+  mln_buffer_view source_id,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_string_view, mln_string_view)>()
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
 external int mln_map_set_layer_source_layer(
   int map,
-  mln_string_view layer_id,
-  mln_string_view source_layer,
+  mln_buffer_view layer_id,
+  mln_buffer_view source_layer,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_string_view, ffi.Uint32)>()
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Uint32)>()
 external int mln_map_set_layer_visibility(
   int map,
-  mln_string_view layer_id,
+  mln_buffer_view layer_id,
   int visibility,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_string_view, ffi.Double)>()
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Double)>()
 external int mln_map_set_location_indicator_accuracy_radius(
   int map,
-  mln_string_view layer_id,
+  mln_buffer_view layer_id,
   double radius,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_string_view, ffi.Double)>()
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Double)>()
 external int mln_map_set_location_indicator_bearing(
   int map,
-  mln_string_view layer_id,
+  mln_buffer_view layer_id,
   double bearing,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, ffi.Uint32, mln_string_view)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Uint32, mln_buffer_view)
 >()
 external int mln_map_set_location_indicator_image_name(
   int map,
-  mln_string_view layer_id,
+  mln_buffer_view layer_id,
   int image_kind,
-  mln_string_view image_id,
+  mln_buffer_view image_id,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, mln_lat_lng, ffi.Double)
+  ffi.Int32 Function(mln_map, mln_buffer_view, mln_lat_lng, ffi.Double)
 >()
 external int mln_map_set_location_indicator_location(
   int map,
-  mln_string_view layer_id,
+  mln_buffer_view layer_id,
   mln_lat_lng coordinate,
   double altitude,
 );
@@ -1470,34 +1409,29 @@ external int mln_map_set_rendering_stats_view_enabled(int map, bool enabled);
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_string_view,
+    mln_buffer_view,
     ffi.Pointer<mln_premultiplied_rgba8_image>,
     ffi.Pointer<mln_style_image_options>,
   )
 >()
 external int mln_map_set_style_image(
   int map,
-  mln_string_view image_id,
+  mln_buffer_view image_id,
   ffi.Pointer<mln_premultiplied_rgba8_image> image,
   ffi.Pointer<mln_style_image_options> options,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Char>)>()
-external int mln_map_set_style_json(int map, ffi.Pointer<ffi.Char> json);
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view)>()
+external int mln_map_set_style_json(int map, mln_buffer_view json);
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_json_value>)>()
-external int mln_map_set_style_light_json(
-  int map,
-  ffi.Pointer<mln_json_value> light_json,
-);
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view)>()
+external int mln_map_set_style_light_json(int map, mln_buffer_view light_json);
 
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<mln_json_value>)
->()
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
 external int mln_map_set_style_light_property(
   int map,
-  mln_string_view property_name,
-  ffi.Pointer<mln_json_value> value,
+  mln_buffer_view property_name,
+  mln_buffer_view value,
 );
 
 @ffi.Native<
@@ -1526,29 +1460,29 @@ external int mln_map_set_viewport_options(
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<ffi.Bool>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Bool>)
 >()
 external int mln_map_style_image_exists(
   int map,
-  mln_string_view image_id,
+  mln_buffer_view image_id,
   ffi.Pointer<ffi.Bool> out_exists,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<ffi.Bool>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Bool>)
 >()
 external int mln_map_style_layer_exists(
   int map,
-  mln_string_view layer_id,
+  mln_buffer_view layer_id,
   ffi.Pointer<ffi.Bool> out_exists,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<ffi.Bool>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Bool>)
 >()
 external int mln_map_style_source_exists(
   int map,
-  mln_string_view source_id,
+  mln_buffer_view source_id,
   ffi.Pointer<ffi.Bool> out_exists,
 );
 
@@ -1823,34 +1757,34 @@ external int mln_render_session_dump_debug_logs(int session);
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_feature_state_selector>,
-    ffi.Pointer<mln_json_snapshot>,
+    ffi.Pointer<mln_buffer>,
   )
 >()
 external int mln_render_session_get_feature_state(
   int session,
   ffi.Pointer<mln_feature_state_selector> selector,
-  ffi.Pointer<mln_json_snapshot> out_state,
+  ffi.Pointer<mln_buffer> out_state,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_render_session,
-    mln_string_view,
-    ffi.Pointer<mln_feature>,
-    mln_string_view,
-    mln_string_view,
-    ffi.Pointer<mln_json_value>,
-    ffi.Pointer<mln_feature_extension_result>,
+    mln_buffer_view,
+    mln_buffer_view,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_buffer_view>,
+    ffi.Pointer<mln_buffer>,
   )
 >()
 external int mln_render_session_query_feature_extensions(
   int session,
-  mln_string_view source_id,
-  ffi.Pointer<mln_feature> feature,
-  mln_string_view extension,
-  mln_string_view extension_field,
-  ffi.Pointer<mln_json_value> arguments,
-  ffi.Pointer<mln_feature_extension_result> out_result,
+  mln_buffer_view source_id,
+  mln_buffer_view feature,
+  mln_buffer_view extension,
+  mln_buffer_view extension_field,
+  ffi.Pointer<mln_buffer_view> arguments,
+  ffi.Pointer<mln_buffer> out_result,
 );
 
 @ffi.Native<
@@ -1858,29 +1792,29 @@ external int mln_render_session_query_feature_extensions(
     mln_render_session,
     ffi.Pointer<mln_rendered_query_geometry>,
     ffi.Pointer<mln_rendered_feature_query_options>,
-    ffi.Pointer<mln_feature_query_result>,
+    ffi.Pointer<mln_buffer>,
   )
 >()
 external int mln_render_session_query_rendered_features(
   int session,
   ffi.Pointer<mln_rendered_query_geometry> geometry,
   ffi.Pointer<mln_rendered_feature_query_options> options,
-  ffi.Pointer<mln_feature_query_result> out_result,
+  ffi.Pointer<mln_buffer> out_result,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_render_session,
-    mln_string_view,
+    mln_buffer_view,
     ffi.Pointer<mln_source_feature_query_options>,
-    ffi.Pointer<mln_feature_query_result>,
+    ffi.Pointer<mln_buffer>,
   )
 >()
 external int mln_render_session_query_source_features(
   int session,
-  mln_string_view source_id,
+  mln_buffer_view source_id,
   ffi.Pointer<mln_source_feature_query_options> options,
-  ffi.Pointer<mln_feature_query_result> out_result,
+  ffi.Pointer<mln_buffer> out_result,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_render_session)>()
@@ -1917,13 +1851,13 @@ external int mln_render_session_resize(
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_feature_state_selector>,
-    ffi.Pointer<mln_json_value>,
+    mln_buffer_view,
   )
 >()
 external int mln_render_session_set_feature_state(
   int session,
   ffi.Pointer<mln_feature_state_selector> selector,
-  ffi.Pointer<mln_json_value> state,
+  mln_buffer_view state,
 );
 
 @ffi.Native<
@@ -2328,12 +2262,12 @@ external int mln_style_id_list_count(int list, ffi.Pointer<ffi.Size> out_count);
 external void mln_style_id_list_destroy(int list);
 
 @ffi.Native<
-  ffi.Int32 Function(mln_style_id_list, ffi.Size, ffi.Pointer<mln_string_view>)
+  ffi.Int32 Function(mln_style_id_list, ffi.Size, ffi.Pointer<mln_buffer_view>)
 >()
 external int mln_style_id_list_get(
   int list,
   int index,
-  ffi.Pointer<mln_string_view> out_id,
+  ffi.Pointer<mln_buffer_view> out_id,
 );
 
 @ffi.Native<mln_style_image_info Function()>()
@@ -2355,13 +2289,13 @@ external void mln_style_string_list_destroy(int list);
   ffi.Int32 Function(
     mln_style_string_list,
     ffi.Size,
-    ffi.Pointer<mln_string_view>,
+    ffi.Pointer<mln_buffer_view>,
   )
 >()
 external int mln_style_string_list_get(
   int list,
   int index,
-  ffi.Pointer<mln_string_view> out_value,
+  ffi.Pointer<mln_buffer_view> out_value,
 );
 
 @ffi.Native<mln_style_tile_source_options Function()>()
@@ -2596,75 +2530,12 @@ const int MLN_ADAPTER_RESOURCE_KIND_ANY = 4294967295;
 const int MLN_HANDLE_NULL = 0;
 
 final class UnnamedUnion extends ffi.Union {
-  external ffi.Pointer<mln_json_value> value;
-
-  external mln_feature_collection feature_collection;
-}
-
-final class UnnamedUnion$1 extends ffi.Union {
-  @ffi.Bool()
-  external bool bool_value;
-
-  @ffi.Uint64()
-  external int uint_value;
-
-  @ffi.Int64()
-  external int int_value;
-
-  @ffi.Double()
-  external double double_value;
-
-  external mln_string_view string_value;
-
-  external mln_json_array array_value;
-
-  external mln_json_object object_value;
-}
-
-final class UnnamedUnion$2 extends ffi.Union {
-  external mln_lat_lng point;
-
-  external mln_coordinate_span line_string;
-
-  external mln_polygon_geometry polygon;
-
-  external mln_coordinate_span multi_point;
-
-  external mln_multi_line_geometry multi_line_string;
-
-  external mln_multi_polygon_geometry multi_polygon;
-
-  external mln_geometry_collection geometry_collection;
-}
-
-final class UnnamedUnion$3 extends ffi.Union {
-  @ffi.Uint64()
-  external int uint_value;
-
-  @ffi.Int64()
-  external int int_value;
-
-  @ffi.Double()
-  external double double_value;
-
-  external mln_string_view string_value;
-}
-
-final class UnnamedUnion$4 extends ffi.Union {
-  external ffi.Pointer<mln_geometry> geometry;
-
-  external ffi.Pointer<mln_feature> feature;
-
-  external mln_feature_collection feature_collection;
-}
-
-final class UnnamedUnion$5 extends ffi.Union {
   external mln_offline_tile_pyramid_region_definition tile_pyramid;
 
   external mln_offline_geometry_region_definition geometry;
 }
 
-final class UnnamedUnion$6 extends ffi.Union {
+final class UnnamedUnion$1 extends ffi.Union {
   external mln_wgl_context_descriptor wgl;
 
   external mln_egl_context_descriptor egl;
@@ -2672,7 +2543,7 @@ final class UnnamedUnion$6 extends ffi.Union {
   external mln_webgl_context_descriptor webgl;
 }
 
-final class UnnamedUnion$7 extends ffi.Union {
+final class UnnamedUnion$2 extends ffi.Union {
   external mln_screen_point point;
 
   external mln_screen_box box;
@@ -3149,6 +3020,24 @@ final class mln_bound_options extends ffi.Struct {
   external double max_pitch;
 }
 
+typedef mln_buffer = ffi.Uint64;
+typedef Dartmln_buffer = int;
+
+final class mln_buffer_view extends ffi.Struct {
+  external ffi.Pointer<ffi.Void> data;
+
+  @ffi.Size()
+  external int size;
+
+  static ffi.Pointer<mln_buffer_view> $allocate(
+    ffi.Allocator $allocator, {
+    required ffi.Pointer<ffi.Void> data,
+    required int size,
+  }) => $allocator<mln_buffer_view>()
+    ..ref.data = data
+    ..ref.size = size;
+}
+
 enum mln_camera_change_mode {
   MLN_CAMERA_CHANGE_MODE_IMMEDIATE(0),
   MLN_CAMERA_CHANGE_MODE_ANIMATED(1);
@@ -3302,21 +3191,6 @@ enum mln_constrain_mode {
     3 => MLN_CONSTRAIN_MODE_SCREEN,
     _ => throw ArgumentError('Unknown value for mln_constrain_mode: $value'),
   };
-}
-
-final class mln_coordinate_span extends ffi.Struct {
-  external ffi.Pointer<mln_lat_lng> coordinates;
-
-  @ffi.Size()
-  external int coordinate_count;
-
-  static ffi.Pointer<mln_coordinate_span> $allocate(
-    ffi.Allocator $allocator, {
-    required ffi.Pointer<mln_lat_lng> coordinates,
-    required int coordinate_count,
-  }) => $allocator<mln_coordinate_span>()
-    ..ref.coordinates = coordinates
-    ..ref.coordinate_count = coordinate_count;
 }
 
 enum mln_custom_geometry_source_option_field {
@@ -3477,93 +3351,6 @@ final class mln_egl_context_descriptor extends ffi.Struct {
     ..ref.get_proc_address = get_proc_address;
 }
 
-final class mln_feature extends ffi.Struct {
-  @ffi.Uint32()
-  external int size;
-
-  external ffi.Pointer<mln_geometry> geometry;
-
-  external ffi.Pointer<mln_json_member> properties;
-
-  @ffi.Size()
-  external int property_count;
-
-  @ffi.Uint32()
-  external int identifier_type;
-
-  external UnnamedUnion$3 identifier;
-}
-
-final class mln_feature_collection extends ffi.Struct {
-  external ffi.Pointer<mln_feature> features;
-
-  @ffi.Size()
-  external int feature_count;
-
-  static ffi.Pointer<mln_feature_collection> $allocate(
-    ffi.Allocator $allocator, {
-    required ffi.Pointer<mln_feature> features,
-    required int feature_count,
-  }) => $allocator<mln_feature_collection>()
-    ..ref.features = features
-    ..ref.feature_count = feature_count;
-}
-
-typedef mln_feature_extension_result = ffi.Uint64;
-typedef Dartmln_feature_extension_result = int;
-
-final class mln_feature_extension_result_info extends ffi.Struct {
-  @ffi.Uint32()
-  external int size;
-
-  @ffi.Uint32()
-  external int type;
-
-  external UnnamedUnion data;
-}
-
-enum mln_feature_extension_result_type {
-  MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE(1),
-  MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION(2);
-
-  final int value;
-  const mln_feature_extension_result_type(this.value);
-
-  static mln_feature_extension_result_type fromValue(int value) =>
-      switch (value) {
-        1 => MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE,
-        2 => MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION,
-        _ => throw ArgumentError(
-          'Unknown value for mln_feature_extension_result_type: $value',
-        ),
-      };
-}
-
-enum mln_feature_identifier_type {
-  MLN_FEATURE_IDENTIFIER_TYPE_NULL(0),
-  MLN_FEATURE_IDENTIFIER_TYPE_UINT(1),
-  MLN_FEATURE_IDENTIFIER_TYPE_INT(2),
-  MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE(3),
-  MLN_FEATURE_IDENTIFIER_TYPE_STRING(4);
-
-  final int value;
-  const mln_feature_identifier_type(this.value);
-
-  static mln_feature_identifier_type fromValue(int value) => switch (value) {
-    0 => MLN_FEATURE_IDENTIFIER_TYPE_NULL,
-    1 => MLN_FEATURE_IDENTIFIER_TYPE_UINT,
-    2 => MLN_FEATURE_IDENTIFIER_TYPE_INT,
-    3 => MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE,
-    4 => MLN_FEATURE_IDENTIFIER_TYPE_STRING,
-    _ => throw ArgumentError(
-      'Unknown value for mln_feature_identifier_type: $value',
-    ),
-  };
-}
-
-typedef mln_feature_query_result = ffi.Uint64;
-typedef Dartmln_feature_query_result = int;
-
 final class mln_feature_state_selector extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -3571,13 +3358,13 @@ final class mln_feature_state_selector extends ffi.Struct {
   @ffi.Uint32()
   external int fields;
 
-  external mln_string_view source_id;
+  external mln_buffer_view source_id;
 
-  external mln_string_view source_layer_id;
+  external mln_buffer_view source_layer_id;
 
-  external mln_string_view feature_id;
+  external mln_buffer_view feature_id;
 
-  external mln_string_view state_key;
+  external mln_buffer_view state_key;
 }
 
 enum mln_feature_state_selector_field {
@@ -3625,16 +3412,6 @@ final class mln_free_camera_options extends ffi.Struct {
   external mln_vec3 position;
 
   external mln_quaternion orientation;
-}
-
-final class mln_geojson extends ffi.Struct {
-  @ffi.Uint32()
-  external int size;
-
-  @ffi.Uint32()
-  external int type;
-
-  external UnnamedUnion$4 data;
 }
 
 enum mln_geojson_source_option_field {
@@ -3693,7 +3470,7 @@ final class mln_geojson_source_options extends ffi.Struct {
   @ffi.Double()
   external double cluster_max_zoom;
 
-  external ffi.Pointer<mln_json_value> cluster_properties;
+  external mln_buffer_view cluster_properties;
 
   @ffi.Uint32()
   external int tile_size;
@@ -3715,105 +3492,6 @@ final class mln_geojson_source_options extends ffi.Struct {
 
   @ffi.Bool()
   external bool synchronous_update;
-
-  static ffi.Pointer<mln_geojson_source_options> $allocate(
-    ffi.Allocator $allocator, {
-    required int size,
-    required int fields,
-    required double min_zoom,
-    required double max_zoom,
-    required double tolerance,
-    required double cluster_max_zoom,
-    required ffi.Pointer<mln_json_value> cluster_properties,
-    required int tile_size,
-    required int buffer,
-    required int cluster_radius,
-    required int cluster_min_points,
-    required bool line_metrics,
-    required bool cluster,
-    required bool synchronous_update,
-  }) => $allocator<mln_geojson_source_options>()
-    ..ref.size = size
-    ..ref.fields = fields
-    ..ref.min_zoom = min_zoom
-    ..ref.max_zoom = max_zoom
-    ..ref.tolerance = tolerance
-    ..ref.cluster_max_zoom = cluster_max_zoom
-    ..ref.cluster_properties = cluster_properties
-    ..ref.tile_size = tile_size
-    ..ref.buffer = buffer
-    ..ref.cluster_radius = cluster_radius
-    ..ref.cluster_min_points = cluster_min_points
-    ..ref.line_metrics = line_metrics
-    ..ref.cluster = cluster
-    ..ref.synchronous_update = synchronous_update;
-}
-
-enum mln_geojson_type {
-  MLN_GEOJSON_TYPE_GEOMETRY(1),
-  MLN_GEOJSON_TYPE_FEATURE(2),
-  MLN_GEOJSON_TYPE_FEATURE_COLLECTION(3);
-
-  final int value;
-  const mln_geojson_type(this.value);
-
-  static mln_geojson_type fromValue(int value) => switch (value) {
-    1 => MLN_GEOJSON_TYPE_GEOMETRY,
-    2 => MLN_GEOJSON_TYPE_FEATURE,
-    3 => MLN_GEOJSON_TYPE_FEATURE_COLLECTION,
-    _ => throw ArgumentError('Unknown value for mln_geojson_type: $value'),
-  };
-}
-
-final class mln_geometry extends ffi.Struct {
-  @ffi.Uint32()
-  external int size;
-
-  @ffi.Uint32()
-  external int type;
-
-  external UnnamedUnion$2 data;
-}
-
-final class mln_geometry_collection extends ffi.Struct {
-  external ffi.Pointer<mln_geometry> geometries;
-
-  @ffi.Size()
-  external int geometry_count;
-
-  static ffi.Pointer<mln_geometry_collection> $allocate(
-    ffi.Allocator $allocator, {
-    required ffi.Pointer<mln_geometry> geometries,
-    required int geometry_count,
-  }) => $allocator<mln_geometry_collection>()
-    ..ref.geometries = geometries
-    ..ref.geometry_count = geometry_count;
-}
-
-enum mln_geometry_type {
-  MLN_GEOMETRY_TYPE_EMPTY(0),
-  MLN_GEOMETRY_TYPE_POINT(1),
-  MLN_GEOMETRY_TYPE_LINE_STRING(2),
-  MLN_GEOMETRY_TYPE_POLYGON(3),
-  MLN_GEOMETRY_TYPE_MULTI_POINT(4),
-  MLN_GEOMETRY_TYPE_MULTI_LINE_STRING(5),
-  MLN_GEOMETRY_TYPE_MULTI_POLYGON(6),
-  MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION(7);
-
-  final int value;
-  const mln_geometry_type(this.value);
-
-  static mln_geometry_type fromValue(int value) => switch (value) {
-    0 => MLN_GEOMETRY_TYPE_EMPTY,
-    1 => MLN_GEOMETRY_TYPE_POINT,
-    2 => MLN_GEOMETRY_TYPE_LINE_STRING,
-    3 => MLN_GEOMETRY_TYPE_POLYGON,
-    4 => MLN_GEOMETRY_TYPE_MULTI_POINT,
-    5 => MLN_GEOMETRY_TYPE_MULTI_LINE_STRING,
-    6 => MLN_GEOMETRY_TYPE_MULTI_POLYGON,
-    7 => MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION,
-    _ => throw ArgumentError('Unknown value for mln_geometry_type: $value'),
-  };
 }
 
 final class mln_http_header_transform extends ffi.Struct {
@@ -3907,81 +3585,6 @@ final class mln_image_stretch extends ffi.Struct {
   }) => $allocator<mln_image_stretch>()
     ..ref.from = from
     ..ref.to = to;
-}
-
-final class mln_json_array extends ffi.Struct {
-  external ffi.Pointer<mln_json_value> values;
-
-  @ffi.Size()
-  external int value_count;
-
-  static ffi.Pointer<mln_json_array> $allocate(
-    ffi.Allocator $allocator, {
-    required ffi.Pointer<mln_json_value> values,
-    required int value_count,
-  }) => $allocator<mln_json_array>()
-    ..ref.values = values
-    ..ref.value_count = value_count;
-}
-
-final class mln_json_member extends ffi.Struct {
-  external mln_string_view key;
-
-  external ffi.Pointer<mln_json_value> value;
-}
-
-final class mln_json_object extends ffi.Struct {
-  external ffi.Pointer<mln_json_member> members;
-
-  @ffi.Size()
-  external int member_count;
-
-  static ffi.Pointer<mln_json_object> $allocate(
-    ffi.Allocator $allocator, {
-    required ffi.Pointer<mln_json_member> members,
-    required int member_count,
-  }) => $allocator<mln_json_object>()
-    ..ref.members = members
-    ..ref.member_count = member_count;
-}
-
-typedef mln_json_snapshot = ffi.Uint64;
-typedef Dartmln_json_snapshot = int;
-
-final class mln_json_value extends ffi.Struct {
-  @ffi.Uint32()
-  external int size;
-
-  @ffi.Uint32()
-  external int type;
-
-  external UnnamedUnion$1 data;
-}
-
-enum mln_json_value_type {
-  MLN_JSON_VALUE_TYPE_NULL(0),
-  MLN_JSON_VALUE_TYPE_BOOL(1),
-  MLN_JSON_VALUE_TYPE_UINT(2),
-  MLN_JSON_VALUE_TYPE_INT(3),
-  MLN_JSON_VALUE_TYPE_DOUBLE(4),
-  MLN_JSON_VALUE_TYPE_STRING(5),
-  MLN_JSON_VALUE_TYPE_ARRAY(6),
-  MLN_JSON_VALUE_TYPE_OBJECT(7);
-
-  final int value;
-  const mln_json_value_type(this.value);
-
-  static mln_json_value_type fromValue(int value) => switch (value) {
-    0 => MLN_JSON_VALUE_TYPE_NULL,
-    1 => MLN_JSON_VALUE_TYPE_BOOL,
-    2 => MLN_JSON_VALUE_TYPE_UINT,
-    3 => MLN_JSON_VALUE_TYPE_INT,
-    4 => MLN_JSON_VALUE_TYPE_DOUBLE,
-    5 => MLN_JSON_VALUE_TYPE_STRING,
-    6 => MLN_JSON_VALUE_TYPE_ARRAY,
-    7 => MLN_JSON_VALUE_TYPE_OBJECT,
-    _ => throw ArgumentError('Unknown value for mln_json_value_type: $value'),
-  };
 }
 
 final class mln_lat_lng extends ffi.Struct {
@@ -4414,36 +4017,6 @@ final class mln_metal_surface_descriptor extends ffi.Struct {
   external ffi.Pointer<ffi.Void> layer;
 }
 
-final class mln_multi_line_geometry extends ffi.Struct {
-  external ffi.Pointer<mln_coordinate_span> lines;
-
-  @ffi.Size()
-  external int line_count;
-
-  static ffi.Pointer<mln_multi_line_geometry> $allocate(
-    ffi.Allocator $allocator, {
-    required ffi.Pointer<mln_coordinate_span> lines,
-    required int line_count,
-  }) => $allocator<mln_multi_line_geometry>()
-    ..ref.lines = lines
-    ..ref.line_count = line_count;
-}
-
-final class mln_multi_polygon_geometry extends ffi.Struct {
-  external ffi.Pointer<mln_polygon_geometry> polygons;
-
-  @ffi.Size()
-  external int polygon_count;
-
-  static ffi.Pointer<mln_multi_polygon_geometry> $allocate(
-    ffi.Allocator $allocator, {
-    required ffi.Pointer<mln_polygon_geometry> polygons,
-    required int polygon_count,
-  }) => $allocator<mln_multi_polygon_geometry>()
-    ..ref.polygons = polygons
-    ..ref.polygon_count = polygon_count;
-}
-
 enum mln_network_status {
   MLN_NETWORK_STATUS_ONLINE(1),
   MLN_NETWORK_STATUS_OFFLINE(2);
@@ -4482,7 +4055,7 @@ final class mln_offline_geometry_region_definition extends ffi.Struct {
 
   external ffi.Pointer<ffi.Char> style_url;
 
-  external ffi.Pointer<mln_geometry> geometry;
+  external mln_buffer_view geometry;
 
   @ffi.Double()
   external double min_zoom;
@@ -4495,24 +4068,6 @@ final class mln_offline_geometry_region_definition extends ffi.Struct {
 
   @ffi.Bool()
   external bool include_ideographs;
-
-  static ffi.Pointer<mln_offline_geometry_region_definition> $allocate(
-    ffi.Allocator $allocator, {
-    required int size,
-    required ffi.Pointer<ffi.Char> style_url,
-    required ffi.Pointer<mln_geometry> geometry,
-    required double min_zoom,
-    required double max_zoom,
-    required double pixel_ratio,
-    required bool include_ideographs,
-  }) => $allocator<mln_offline_geometry_region_definition>()
-    ..ref.size = size
-    ..ref.style_url = style_url
-    ..ref.geometry = geometry
-    ..ref.min_zoom = min_zoom
-    ..ref.max_zoom = max_zoom
-    ..ref.pixel_ratio = pixel_ratio
-    ..ref.include_ideographs = include_ideographs;
 }
 
 typedef mln_offline_operation_id = ffi.Uint64;
@@ -4584,7 +4139,7 @@ final class mln_offline_region_definition extends ffi.Struct {
   @ffi.Uint32()
   external int type;
 
-  external UnnamedUnion$5 data;
+  external UnnamedUnion data;
 }
 
 enum mln_offline_region_definition_type {
@@ -4755,7 +4310,7 @@ final class mln_opengl_context_descriptor extends ffi.Struct {
   set platform(mln_opengl_context_platform value) =>
       platformAsInt = value.value;
 
-  external UnnamedUnion$6 data;
+  external UnnamedUnion$1 data;
 }
 
 enum mln_opengl_context_platform {
@@ -4876,21 +4431,6 @@ final class mln_opengl_surface_descriptor extends ffi.Struct {
   external mln_opengl_context_descriptor context;
 
   external ffi.Pointer<ffi.Void> surface;
-}
-
-final class mln_polygon_geometry extends ffi.Struct {
-  external ffi.Pointer<mln_coordinate_span> rings;
-
-  @ffi.Size()
-  external int ring_count;
-
-  static ffi.Pointer<mln_polygon_geometry> $allocate(
-    ffi.Allocator $allocator, {
-    required ffi.Pointer<mln_coordinate_span> rings,
-    required int ring_count,
-  }) => $allocator<mln_polygon_geometry>()
-    ..ref.rings = rings
-    ..ref.ring_count = ring_count;
 }
 
 final class mln_premultiplied_rgba8_image extends ffi.Struct {
@@ -5019,40 +4559,6 @@ final class mln_quaternion extends ffi.Struct {
     ..ref.w = w;
 }
 
-final class mln_queried_feature extends ffi.Struct {
-  @ffi.Uint32()
-  external int size;
-
-  @ffi.Uint32()
-  external int fields;
-
-  external mln_feature feature;
-
-  external mln_string_view source_id;
-
-  external mln_string_view source_layer_id;
-
-  external ffi.Pointer<mln_json_value> state;
-}
-
-enum mln_queried_feature_field {
-  MLN_QUERIED_FEATURE_SOURCE_ID(1),
-  MLN_QUERIED_FEATURE_SOURCE_LAYER_ID(2),
-  MLN_QUERIED_FEATURE_STATE(4);
-
-  final int value;
-  const mln_queried_feature_field(this.value);
-
-  static mln_queried_feature_field fromValue(int value) => switch (value) {
-    1 => MLN_QUERIED_FEATURE_SOURCE_ID,
-    2 => MLN_QUERIED_FEATURE_SOURCE_LAYER_ID,
-    4 => MLN_QUERIED_FEATURE_STATE,
-    _ => throw ArgumentError(
-      'Unknown value for mln_queried_feature_field: $value',
-    ),
-  };
-}
-
 enum mln_render_backend_flag {
   MLN_RENDER_BACKEND_FLAG_METAL(1),
   MLN_RENDER_BACKEND_FLAG_VULKAN(2),
@@ -5138,20 +4644,20 @@ final class mln_rendered_feature_query_options extends ffi.Struct {
   @ffi.Uint32()
   external int fields;
 
-  external ffi.Pointer<mln_string_view> layer_ids;
+  external ffi.Pointer<mln_buffer_view> layer_ids;
 
   @ffi.Size()
   external int layer_id_count;
 
-  external ffi.Pointer<mln_json_value> filter;
+  external ffi.Pointer<mln_buffer_view> filter;
 
   static ffi.Pointer<mln_rendered_feature_query_options> $allocate(
     ffi.Allocator $allocator, {
     required int size,
     required int fields,
-    required ffi.Pointer<mln_string_view> layer_ids,
+    required ffi.Pointer<mln_buffer_view> layer_ids,
     required int layer_id_count,
-    required ffi.Pointer<mln_json_value> filter,
+    required ffi.Pointer<mln_buffer_view> filter,
   }) => $allocator<mln_rendered_feature_query_options>()
     ..ref.size = size
     ..ref.fields = fields
@@ -5167,7 +4673,7 @@ final class mln_rendered_query_geometry extends ffi.Struct {
   @ffi.Uint32()
   external int type;
 
-  external UnnamedUnion$7 data;
+  external UnnamedUnion$2 data;
 }
 
 enum mln_rendered_query_geometry_type {
@@ -6049,20 +5555,20 @@ final class mln_source_feature_query_options extends ffi.Struct {
   @ffi.Uint32()
   external int fields;
 
-  external ffi.Pointer<mln_string_view> source_layer_ids;
+  external ffi.Pointer<mln_buffer_view> source_layer_ids;
 
   @ffi.Size()
   external int source_layer_id_count;
 
-  external ffi.Pointer<mln_json_value> filter;
+  external ffi.Pointer<mln_buffer_view> filter;
 
   static ffi.Pointer<mln_source_feature_query_options> $allocate(
     ffi.Allocator $allocator, {
     required int size,
     required int fields,
-    required ffi.Pointer<mln_string_view> source_layer_ids,
+    required ffi.Pointer<mln_buffer_view> source_layer_ids,
     required int source_layer_id_count,
-    required ffi.Pointer<mln_json_value> filter,
+    required ffi.Pointer<mln_buffer_view> filter,
   }) => $allocator<mln_source_feature_query_options>()
     ..ref.size = size
     ..ref.fields = fields
@@ -6078,21 +5584,6 @@ sealed class mln_status {
   static const MLN_STATUS_WRONG_THREAD = -3;
   static const MLN_STATUS_UNSUPPORTED = -4;
   static const MLN_STATUS_NATIVE_ERROR = -5;
-}
-
-final class mln_string_view extends ffi.Struct {
-  external ffi.Pointer<ffi.Char> data;
-
-  @ffi.Size()
-  external int size;
-
-  static ffi.Pointer<mln_string_view> $allocate(
-    ffi.Allocator $allocator, {
-    required ffi.Pointer<ffi.Char> data,
-    required int size,
-  }) => $allocator<mln_string_view>()
-    ..ref.data = data
-    ..ref.size = size;
 }
 
 typedef mln_style_id_list = ffi.Uint64;
@@ -6412,7 +5903,7 @@ final class mln_style_tile_source_options extends ffi.Struct {
   @ffi.Double()
   external double max_zoom;
 
-  external mln_string_view attribution;
+  external mln_buffer_view attribution;
 
   @ffi.Uint32()
   external int scheme;

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import json
 import time
 from collections.abc import Callable
 
 import maplibre_native_ffi as mln
 import pytest
-from maplibre_native_ffi import camera, geo, json, query, render, style
+from maplibre_native_ffi import camera, geo, query, render, style
 
 EMPTY_STYLE_JSON = '{"version":8,"sources":{},"layers":[]}'
 
@@ -18,22 +19,24 @@ RED_BACKGROUND_STYLE_JSON = (
 
 RED_PIXEL = b"\xff\x00\x00\xff"
 
-CLUSTER_POINTS = geo.FeatureCollection(
-    tuple(
-        geo.Feature(
-            geometry=geo.Point(geo.LatLng(offset, offset)),
-            properties=(
-                json.JsonMember("name", name),
-                json.JsonMember("weight", json.JsonInt(weight)),
-            ),
-        )
-        for offset, name, weight in (
-            (0.0, "one", 1),
-            (0.001, "two", 2),
-            (0.002, "three", 3),
-        )
-    )
-)
+CLUSTER_POINTS = json.dumps(
+    {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [offset, offset]},
+                "properties": {"name": name, "weight": weight},
+            }
+            for offset, name, weight in (
+                (0.0, "one", 1),
+                (0.001, "two", 2),
+                (0.002, "three", 3),
+            )
+        ],
+    },
+    separators=(",", ":"),
+).encode()
 
 CLUSTER_STYLE_JSON = (
     '{"version":8,"name":"python-cluster-query-test",'
@@ -151,7 +154,7 @@ def wait_for_rendered_layer_feature(
     layer_id: str,
     *,
     iterations: int = 5000,
-) -> query.QueriedFeature:
+) -> dict[str, object]:
     """Render until one feature of `layer_id` covers the map center."""
     query_point = map_handle.pixel_for_lat_lng(geo.LatLng(0.0, 0.0))
     geometry = query.RenderedQueryGeometry.box_geometry(
@@ -171,7 +174,7 @@ def wait_for_rendered_layer_feature(
                 except mln.InvalidStateError:
                     pass
         try:
-            features = session.query_rendered_features(geometry, options)
+            features = json.loads(session.query_rendered_features(geometry, options))
         except mln.InvalidStateError:
             features = ()
         if features:
@@ -186,10 +189,10 @@ def wait_for_rendered_cluster(
     session: render.RenderSessionHandle,
     *,
     iterations: int = 5000,
-) -> query.QueriedFeature:
+) -> dict[str, object]:
     """Load the cluster style and return the first rendered cluster feature."""
     map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=0.0))
-    map_handle.set_style_json(CLUSTER_STYLE_JSON)
+    map_handle.set_style_json(CLUSTER_STYLE_JSON.encode())
     return wait_for_rendered_layer_feature(
         runtime,
         map_handle,
@@ -199,43 +202,37 @@ def wait_for_rendered_cluster(
     )
 
 
-def feature_member(feature: geo.Feature, key: str) -> json.JsonValue:
-    return next(member.value for member in feature.properties if member.key == key)
+def feature_member(feature: dict[str, object], key: str) -> object:
+    return feature["properties"][key]  # type: ignore[index]
 
 
 def single_cluster_leaf(
     session: render.RenderSessionHandle,
-    feature: geo.Feature,
+    feature: dict[str, object],
     *,
     offset: int,
-) -> geo.Feature:
+) -> dict[str, object]:
     """Return the one leaf at `offset` through a bounded supercluster query."""
     leaves = session.query_feature_extensions(
         "cluster-source",
-        feature,
+        json.dumps(feature, separators=(",", ":")).encode(),
         "supercluster",
         "leaves",
-        json.JsonObject(
-            (
-                json.JsonMember("limit", json.JsonUInt(1)),
-                json.JsonMember("offset", json.JsonUInt(offset)),
-            )
-        ),
+        json.dumps({"limit": 1, "offset": offset}, separators=(",", ":")).encode(),
     )
-    assert leaves.type == query.FeatureExtensionResultType.FEATURE_COLLECTION
-    assert leaves.feature_collection is not None
-    assert len(leaves.feature_collection) == 1
-    return leaves.feature_collection[0]
+    collection = json.loads(leaves)
+    assert len(collection["features"]) == 1
+    return collection["features"][0]
 
 
-def assert_typed_geojson_cluster_source(
+def assert_geojson_cluster_source(
     runtime: mln.RuntimeHandle,
     map_handle: mln.MapHandle,
     session: render.RenderSessionHandle,
 ) -> None:
-    """Cluster nearby points added through the typed GeoJSON source adder."""
+    """Cluster nearby points added through the GeoJSON source data API."""
     map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=0.0))
-    map_handle.set_style_json(EMPTY_STYLE_JSON)
+    map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
     map_handle.add_geojson_source_data(
         "typed-cluster-source",
         CLUSTER_POINTS,
@@ -245,21 +242,13 @@ def assert_typed_geojson_cluster_source(
             cluster_min_points=2,
             cluster_max_zoom=20.0,
             # ["+", <map expression>] accumulates the mapped value per cluster.
-            cluster_properties=json.from_python(
-                {"weight_sum": ["+", ["get", "weight"]]}
-            ),
+            cluster_properties=b'{"weight_sum":["+",["get","weight"]]}',
         ),
     )
     map_handle.add_style_layer_json(
-        json.from_python(
-            {
-                "id": "typed-cluster-circle",
-                "type": "circle",
-                "source": "typed-cluster-source",
-                "filter": ["has", "point_count"],
-                "paint": {"circle-color": "#2563eb", "circle-radius": 20},
-            }
-        )
+        b'{"id":"typed-cluster-circle","type":"circle",'
+        b'"source":"typed-cluster-source","filter":["has","point_count"],'
+        b'"paint":{"circle-color":"#2563eb","circle-radius":20}}'
     )
 
     queried = wait_for_rendered_layer_feature(
@@ -268,9 +257,11 @@ def assert_typed_geojson_cluster_source(
     # The three source points only collapse into one feature when the options
     # reach MapLibre Native, and weight_sum only appears with cluster
     # properties.
-    assert json.to_python(feature_member(queried.feature, "cluster")) is True
-    assert json.to_python(feature_member(queried.feature, "point_count")) == 3
-    assert json.to_python(feature_member(queried.feature, "weight_sum")) == 6
+    feature = queried["feature"]
+    assert isinstance(feature, dict)
+    assert feature_member(feature, "cluster") is True
+    assert feature_member(feature, "point_count") == 3
+    assert feature_member(feature, "weight_sum") == 6
 
 
 def assert_cluster_feature_extensions(
@@ -282,22 +273,23 @@ def assert_cluster_feature_extensions(
     cluster = wait_for_rendered_cluster(runtime, map_handle, session)
     # Native matches cluster_id by exact JSON value type, so the copied feature
     # must keep the unsigned alternative to resolve on the way back in.
-    assert isinstance(feature_member(cluster.feature, "cluster_id"), json.JsonUInt)
+    feature = cluster["feature"]
+    assert isinstance(feature, dict)
+    assert isinstance(feature_member(feature, "cluster_id"), int)
+    feature_bytes = json.dumps(feature, separators=(",", ":")).encode()
 
     children = session.query_feature_extensions(
-        "cluster-source", cluster.feature, "supercluster", "children", None
+        "cluster-source", feature_bytes, "supercluster", "children", None
     )
-    assert children.type == query.FeatureExtensionResultType.FEATURE_COLLECTION
-    assert children.feature_collection
+    assert json.loads(children)["features"]
 
     expansion_zoom = session.query_feature_extensions(
-        "cluster-source", cluster.feature, "supercluster", "expansion-zoom", None
+        "cluster-source", feature_bytes, "supercluster", "expansion-zoom", None
     )
-    assert expansion_zoom.type == query.FeatureExtensionResultType.VALUE
-    assert isinstance(expansion_zoom.value, json.JsonUInt)
+    assert isinstance(json.loads(expansion_zoom), int)
 
     # Native ignores limit and offset arguments of another type and falls back
     # to ten leaves at offset zero, so both must move the observed result.
-    first = single_cluster_leaf(session, cluster.feature, offset=0)
-    second = single_cluster_leaf(session, cluster.feature, offset=1)
+    first = single_cluster_leaf(session, feature, offset=0)
+    second = single_cluster_leaf(session, feature, offset=1)
     assert feature_member(first, "name") != feature_member(second, "name")

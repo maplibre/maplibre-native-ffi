@@ -19,7 +19,6 @@ import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreStatus
-import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
@@ -71,7 +70,7 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
         RuntimeStructs.offlineRegionDefinition(
             OfflineRegionDefinition.GeometryRegion(
               "asset://style.json",
-              Geometry.Point(LatLng(5.0, 6.0)),
+              "{\"type\":\"Point\",\"coordinates\":[6,5]}".encodeToByteArray(),
               2.0,
               6.0,
               1.0f,
@@ -81,7 +80,7 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
           )
           .pointed
       assertEquals(MLN_OFFLINE_REGION_DEFINITION_GEOMETRY, geometry.type)
-      assertNotNull(geometry.data.geometry.geometry)
+      assertEquals(36UL, geometry.data.geometry.geometry.size)
     }
   }
 

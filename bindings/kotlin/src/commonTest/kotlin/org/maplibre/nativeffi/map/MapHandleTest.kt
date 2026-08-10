@@ -19,16 +19,11 @@ import org.maplibre.nativeffi.camera.UnitBezier
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.geo.CanonicalTileId
-import org.maplibre.nativeffi.geo.Feature
-import org.maplibre.nativeffi.geo.FeatureIdentifier
-import org.maplibre.nativeffi.geo.GeoJson
-import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.Quaternion
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.geo.Vec3
-import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.runtime.CameraChangeMode
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
@@ -62,10 +57,11 @@ class MapHandleTest {
         )
         .use { map ->
           map.setStyleJson(
-            "{\"version\":8,\"sources\":{\"geo\":{\"type\":\"geojson\",\"data\":" +
-              "{\"type\":\"FeatureCollection\",\"features\":[]}}},\"layers\":[" +
-              "{\"id\":\"bg\",\"type\":\"background\"}," +
-              "{\"id\":\"fill\",\"type\":\"fill\",\"source\":\"geo\"}]}"
+            ("{\"version\":8,\"sources\":{\"geo\":{\"type\":\"geojson\",\"data\":" +
+                "{\"type\":\"FeatureCollection\",\"features\":[]}}},\"layers\":[" +
+                "{\"id\":\"bg\",\"type\":\"background\"}," +
+                "{\"id\":\"fill\",\"type\":\"fill\",\"source\":\"geo\"}]}")
+              .encodeToByteArray()
           )
 
           assertEquals("", map.layerSourceLayer("fill"))
@@ -117,12 +113,12 @@ class MapHandleTest {
           assertEquals(true, empty.enablePlacementTransitions)
 
           // The style parser supplies a 300ms default duration.
-          map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
+          map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}".encodeToByteArray())
           val parsed = map.styleTransitionOptions()
           assertEquals(300.0, parsed.durationMs)
           assertNull(parsed.delayMs)
 
-          map.setStyleJson(transitionStyleJson)
+          map.setStyleJson(transitionStyleJson.encodeToByteArray())
           val declared = map.styleTransitionOptions()
           assertEquals(750.0, declared.durationMs)
           assertEquals(100.0, declared.delayMs)
@@ -143,7 +139,7 @@ class MapHandleTest {
           assertEquals(true, map.styleTransitionOptions().enablePlacementTransitions)
 
           // Loading a style replaces the override with what that style declares.
-          map.setStyleJson(transitionStyleJson)
+          map.setStyleJson(transitionStyleJson.encodeToByteArray())
           assertEquals(declared, map.styleTransitionOptions())
 
           assertFailsWith<InvalidArgumentException> {
@@ -176,14 +172,14 @@ class MapHandleTest {
     assertSame(runtime, map.runtime())
     assertFailsWith<InvalidStateException> { runtime.close() }
 
-    map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
+    map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
     map.setStyleUrl("https://example.com/style.json")
     map.close()
     map.close()
 
     assertTrue(map.isClosed)
     assertFailsWith<InvalidStateException> {
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
     }
     runtime.close()
     assertTrue(runtime.isClosed)
@@ -227,7 +223,7 @@ class MapHandleTest {
       )
 
     try {
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
       map.addStyleSourceJson("places", geoJsonSource())
 
       assertTrue(map.styleSourceExists("places"))
@@ -262,7 +258,7 @@ class MapHandleTest {
       listOf("https://a.example.com/{z}/{x}/{y}.pbf", "https://b.example.com/{z}/{x}/{y}.pbf")
     val bounds = LatLngBounds(LatLng(-5.0, -10.0), LatLng(15.0, 20.0))
     try {
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
       map.addVectorSourceUrl("remote", "https://example.com/vector.json", null)
       val remote = assertNotNull(map.styleSourceInfo("remote"))
       assertEquals("https://example.com/vector.json", remote.url)
@@ -317,7 +313,7 @@ class MapHandleTest {
       )
 
     try {
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
       map.addGeoJsonSourceUrl("remote-places", "https://example.com/places.geojson", null)
       assertEquals(SourceType.GEOJSON, map.styleSourceType("remote-places"))
       map.setGeoJsonSourceUrl("remote-places", "https://example.com/updated.geojson")
@@ -337,7 +333,7 @@ class MapHandleTest {
       assertEquals(SourceType.GEOJSON, map.styleSourceType("inline-places"))
       map.setGeoJsonSourceData(
         "inline-places",
-        GeoJson.GeometryValue(Geometry.LineString(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0)))),
+        "{\"type\":\"LineString\",\"coordinates\":[[0,0],[1,1]]}".encodeToByteArray(),
       )
 
       map.addGeoJsonSourceData("clustered-places", nearbyPoints(), clusterOptions())
@@ -360,7 +356,7 @@ class MapHandleTest {
           "invalid-cluster-properties",
           "https://example.com/places.geojson",
           GeoJsonSourceOptions().apply {
-            clusterProperties = JsonValue.StringValue("not an object")
+            clusterProperties = "\"not an object\"".encodeToByteArray()
           },
         )
       }
@@ -384,7 +380,7 @@ class MapHandleTest {
       )
 
     try {
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
       map.addCustomGeometrySource(
         "custom-places",
         CustomGeometrySourceOptions(
@@ -436,7 +432,7 @@ class MapHandleTest {
       )
 
     try {
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
       map.addVectorSourceUrl(
         "roads",
         "https://example.com/vector.json",
@@ -489,7 +485,7 @@ class MapHandleTest {
       )
 
     try {
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
       map.addStyleLayerJson(backgroundLayer(), "")
       map.addLocationIndicatorLayer("puck", "")
       map.setLocationIndicatorLocation("puck", LatLng(12.0, 34.0), 56.0)
@@ -502,14 +498,13 @@ class MapHandleTest {
       assertTrue(map.styleLayerExists("puck"))
       assertTrue(map.styleLayerIds().contains("background"))
       assertTrue(map.styleLayerIds().contains("puck"))
-      assertEquals("background", map.styleLayerJson("background")?.objectMember("type"))
-      map.setLayerProperty("background", "background-opacity", JsonValue.DoubleValue(0.5))
-      assertEquals(
-        JsonValue.DoubleValue(0.5),
-        map.layerProperty("background", "background-opacity"),
+      assertTrue(
+        map.styleLayerJson("background")!!.decodeToString().contains("\"type\":\"background\"")
       )
-      map.setStyleLightProperty("anchor", JsonValue.StringValue("viewport"))
-      assertEquals(JsonValue.StringValue("viewport"), map.styleLightProperty("anchor"))
+      map.setLayerProperty("background", "background-opacity", "0.5".encodeToByteArray())
+      assertEquals("0.5", map.layerProperty("background", "background-opacity")?.decodeToString())
+      map.setStyleLightProperty("anchor", "\"viewport\"".encodeToByteArray())
+      assertEquals("\"viewport\"", map.styleLightProperty("anchor")?.decodeToString())
       assertTrue(map.removeStyleLayer("background"))
       assertTrue(map.removeStyleLayer("puck"))
       assertFalse(map.styleLayerExists("background"))
@@ -541,7 +536,7 @@ class MapHandleTest {
           sdf = true
         }
 
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
       map.setStyleImage("dot", image, options)
 
       assertTrue(map.styleImageExists("dot"))
@@ -582,7 +577,7 @@ class MapHandleTest {
       val coordinates = imageCoordinates()
       val moved = listOf(LatLng(1.0, 0.0), LatLng(1.0, 1.0), LatLng(0.0, 1.0), LatLng(0.0, 0.0))
 
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
       map.addImageSourceUrl("overlay", coordinates, "https://example.com/image.png")
 
       assertEquals(SourceType.IMAGE, map.styleSourceType("overlay"))
@@ -761,7 +756,7 @@ class MapHandleTest {
       assertTrue(
         map.cameraForLatLngs(listOf(bounds.southwest, bounds.northeast), null).center != null
       )
-      assertTrue(map.cameraForGeometry(Geometry.Point(LatLng(0.0, 0.0)), fit).center != null)
+      assertTrue(map.cameraForGeometry(pointGeometry(), fit).center != null)
       assertTrue(map.latLngBoundsForCamera(camera).southwest.latitude.isFinite())
       assertTrue(map.latLngBoundsForCameraUnwrapped(camera).southwest.latitude.isFinite())
 
@@ -774,7 +769,7 @@ class MapHandleTest {
           EdgeInsets.ZERO,
         )
         assertTrue(projection.camera.center != null)
-        projection.setVisibleGeometry(Geometry.Point(LatLng(0.0, 0.0)), EdgeInsets.ZERO)
+        projection.setVisibleGeometry(pointGeometry(), EdgeInsets.ZERO)
         assertTrue(projection.camera.center != null)
       } finally {
         projection.close()
@@ -1036,33 +1031,19 @@ class MapHandleTest {
     }
   }
 
-  private fun geoJsonSource(): JsonValue =
-    JsonValue.ObjectValue(
-      listOf(
-        JsonValue.Member("type", JsonValue.StringValue("geojson")),
-        JsonValue.Member(
-          "data",
-          JsonValue.ObjectValue(
-            listOf(
-              JsonValue.Member("type", JsonValue.StringValue("FeatureCollection")),
-              JsonValue.Member("features", JsonValue.Array(emptyList())),
-            )
-          ),
-        ),
-      )
-    )
+  private fun geoJsonSource(): ByteArray =
+    "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}"
+      .encodeToByteArray()
 
   /** Point features close enough together to collapse into one cluster at low zoom. */
-  private fun nearbyPoints(): GeoJson =
-    GeoJson.FeatureCollection(
-      List(4) { index ->
-        Feature(
-          Geometry.Point(LatLng(index * 0.001, index * 0.001)),
-          listOf(JsonValue.Member("weight", JsonValue.UInt(1))),
-          FeatureIdentifier.UInt(index.toLong()),
-        )
-      }
-    )
+  private fun nearbyPoints(): ByteArray =
+    ("{\"type\":\"FeatureCollection\",\"features\":[" +
+        (0..3).joinToString(",") { index ->
+          "{\"type\":\"Feature\",\"id\":$index,\"geometry\":{\"type\":\"Point\"," +
+            "\"coordinates\":[${index * 0.001},${index * 0.001}]},\"properties\":{\"weight\":1}}"
+        } +
+        "]}")
+      .encodeToByteArray()
 
   private fun clusterOptions(): GeoJsonSourceOptions =
     GeoJsonSourceOptions().apply {
@@ -1070,50 +1051,22 @@ class MapHandleTest {
       clusterRadius = 50
       clusterMaxZoom = 14.0
       clusterMinPoints = 2
-      clusterProperties =
-        JsonValue.ObjectValue(
-          listOf(
-            JsonValue.Member(
-              "total",
-              JsonValue.Array(
-                listOf(
-                  JsonValue.StringValue("+"),
-                  JsonValue.Array(
-                    listOf(JsonValue.StringValue("get"), JsonValue.StringValue("weight"))
-                  ),
-                )
-              ),
-            )
-          )
-        )
+      clusterProperties = "{\"total\":[\"+\",[\"get\",\"weight\"]]}".encodeToByteArray()
     }
 
-  private fun geoJsonData(): GeoJson =
-    GeoJson.FeatureCollection(
-      listOf(
-        Feature(
-          Geometry.Collection(
-            listOf(
-              Geometry.Point(LatLng(0.0, 0.0)),
-              Geometry.MultiLineString(listOf(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0)))),
-            )
-          ),
-          listOf(
-            JsonValue.Member("name", JsonValue.StringValue("Null Island")),
-            JsonValue.Member("rank", JsonValue.UInt(1)),
-          ),
-          FeatureIdentifier.UInt(1),
-        )
-      )
-    )
+  private fun geoJsonData(): ByteArray =
+    ("{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"id\":1," +
+        "\"geometry\":{\"type\":\"GeometryCollection\",\"geometries\":[" +
+        "{\"type\":\"Point\",\"coordinates\":[0,0]}," +
+        "{\"type\":\"MultiLineString\",\"coordinates\":[[[0,0],[1,1]]]}]}," +
+        "\"properties\":{\"name\":\"Null Island\",\"rank\":1}}]}")
+      .encodeToByteArray()
 
-  private fun backgroundLayer(): JsonValue =
-    JsonValue.ObjectValue(
-      listOf(
-        JsonValue.Member("id", JsonValue.StringValue("background")),
-        JsonValue.Member("type", JsonValue.StringValue("background")),
-      )
-    )
+  private fun backgroundLayer(): ByteArray =
+    "{\"id\":\"background\",\"type\":\"background\"}".encodeToByteArray()
+
+  private fun pointGeometry(): ByteArray =
+    "{\"type\":\"Point\",\"coordinates\":[0,0]}".encodeToByteArray()
 
   private fun imageCoordinates(): List<LatLng> =
     listOf(LatLng(0.0, 0.0), LatLng(0.0, 1.0), LatLng(1.0, 1.0), LatLng(1.0, 0.0))
@@ -1122,14 +1075,6 @@ class MapHandleTest {
     assertEquals(expected.latitude, actual.latitude, 1e-6)
     assertEquals(expected.longitude, actual.longitude, 1e-6)
   }
-
-  private fun JsonValue.objectMember(key: String): String? =
-    (this as? JsonValue.ObjectValue)
-      ?.members
-      ?.firstOrNull { it.key == key }
-      ?.value
-      ?.let { it as? JsonValue.StringValue }
-      ?.value
 
   @Test
   fun loadedStyleDocumentAndUrlReadBackWhatWasLoaded() {
@@ -1143,12 +1088,12 @@ class MapHandleTest {
           },
         )
         .use { map ->
-          assertEquals("", map.loadedStyleJson())
+          assertTrue(map.loadedStyleJson().isEmpty())
           assertEquals("", map.styleUrl())
 
           // The document reads back byte-for-byte.
-          map.setStyleJson(styleJson)
-          assertEquals(styleJson, map.loadedStyleJson())
+          map.setStyleJson(styleJson.encodeToByteArray())
+          assertEquals(styleJson, map.loadedStyleJson().decodeToString())
           // Inline JSON clears the URL.
           assertEquals("", map.styleUrl())
 
@@ -1156,7 +1101,7 @@ class MapHandleTest {
           // still reports the style that last parsed.
           map.setStyleUrl("https://example.com/style.json")
           assertEquals("https://example.com/style.json", map.styleUrl())
-          assertEquals(styleJson, map.loadedStyleJson())
+          assertEquals(styleJson, map.loadedStyleJson().decodeToString())
         }
     }
   }
