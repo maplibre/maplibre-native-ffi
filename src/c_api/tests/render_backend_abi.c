@@ -358,6 +358,91 @@ static void opengl_surface_attach_rejects_a_webgl_surface_handle(void) {
 }
 #endif
 
+// A dedicated OpenGL context names no share group and takes its client API from
+// the descriptor, so a descriptor carrying either of the shared session's
+// answers is contradictory.
+static void opengl_dedicated_context_rejects_shared_session_fields(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+
+  mln_opengl_surface_descriptor with_share = opengl_surface_descriptor();
+  with_share.context.ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
+  with_share.context.data.egl.client_api = MLN_OPENGL_CLIENT_API_GLES;
+  with_share.context.data.egl.share_context = fake_handle;
+  with_share.context.data.wgl.share_context = fake_handle;
+  mln_render_session session = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_opengl_surface_attach(map, &with_share, &session)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A texture session hands its texture to a host that samples it from the host's
+// own context, which is what the share group the descriptor names is for.
+static void opengl_owned_texture_attach_rejects_a_dedicated_context(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_opengl_owned_texture_descriptor descriptor = opengl_owned_descriptor();
+  descriptor.context.ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
+  mln_render_session session = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_opengl_owned_texture_attach(map, &descriptor, &session)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static const char dedicated_background_style_json[] =
+  "{\"version\":8,\"sources\":{},\"layers\":"
+  "[{\"id\":\"bg\",\"type\":\"background\","
+  "\"paint\":{\"background-color\":\"#ff0000\"}}]}";
+
+// The contract a dedicated session offers a host: it creates its own context
+// from a descriptor that names no share context, renders through it, and leaves
+// it current so the next render costs no EGL call.
+static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  if (!mln_test_dedicated_egl_surface_create(map, &fixture)) {
+    mln_test_destroy_map(map);
+    mln_test_destroy_runtime(runtime);
+    TEST_IGNORE_MESSAGE("this build has no EGL context provider");
+    return;
+  }
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_json(map, dedicated_background_style_json)
+  );
+  bool rendered = false;
+  // The session owns this thread, which is also the map's, so the map only
+  // reaches the style and the extent when this loop pumps the runtime.
+  for (unsigned int attempt = 0; attempt < 500 && !rendered; attempt += 1) {
+    mln_runtime_pump(runtime, 0);
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_render_session_render_update(fixture.session, &rendered)
+    );
+    if (!rendered) {
+      mln_test_sleep_millisecond();
+    }
+  }
+  TEST_ASSERT_TRUE(rendered);
+  TEST_ASSERT_TRUE(mln_test_egl_context_is_current());
+
+  mln_test_dedicated_egl_surface_destroy(&fixture);
+  // Destroying the session releases the thread it had taken over.
+  TEST_ASSERT_FALSE(mln_test_egl_context_is_current());
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void opengl_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -490,6 +575,9 @@ void run_render_backend_abi_tests(void) {
 #if defined(MLN_FFI_TEST_OPENGL_WEBGL)
   RUN_TEST(opengl_surface_attach_rejects_a_webgl_surface_handle);
 #endif
+  RUN_TEST(opengl_dedicated_context_rejects_shared_session_fields);
+  RUN_TEST(opengl_owned_texture_attach_rejects_a_dedicated_context);
+  RUN_TEST(dedicated_egl_surface_renders_and_keeps_its_context_current);
   RUN_TEST(opengl_owned_texture_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(opengl_borrowed_texture_rejects_unsafe_raw_descriptors);
   RUN_TEST(vulkan_surface_attach_rejects_unsafe_raw_inputs);

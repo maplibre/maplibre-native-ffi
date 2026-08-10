@@ -8,8 +8,10 @@
 
 namespace mln::core::opengl {
 
-EglSharedContext::EglSharedContext(mln_egl_context_descriptor descriptor)
-    : descriptor_(descriptor) {}
+EglSharedContext::EglSharedContext(
+  mln_egl_context_descriptor descriptor, mln_opengl_context_ownership ownership
+)
+    : descriptor_(descriptor), ownership_(ownership) {}
 
 EglSharedContext::~EglSharedContext() { destroy(); }
 
@@ -22,10 +24,30 @@ void EglSharedContext::activate_pbuffer() {
   activate(surface, surface);
 }
 
+// A dedicated context stays current between renders, so the thread is left
+// exactly as this session wants to find it next time.
 void EglSharedContext::deactivate() {
+  if (dedicated()) {
+    return;
+  }
   release_current_context();
   restore_previous_api();
   restore_previous_context();
+}
+
+auto EglSharedContext::dedicated() const -> bool {
+  return ownership_ == MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
+}
+
+// The API to bind before creating a context and making it current. A dedicated
+// context has no share context to ask, so the descriptor names it.
+auto EglSharedContext::requested_api() const -> EGLenum {
+  if (dedicated()) {
+    return descriptor_.client_api == MLN_OPENGL_CLIENT_API_GL
+             ? static_cast<EGLenum>(EGL_OPENGL_API)
+             : static_cast<EGLenum>(EGL_OPENGL_ES_API);
+  }
+  return share_context_api();
 }
 
 auto EglSharedContext::active_api() const -> EGLenum { return active_api_; }
@@ -76,13 +98,38 @@ auto EglSharedContext::ensure_pbuffer_surface() -> EGLSurface {
 void EglSharedContext::activate(
   EGLSurface draw_surface, EGLSurface read_surface
 ) {
-  save_previous_context();
-  try {
-    const auto requested_api = share_context_api();
-    if (eglBindAPI(requested_api) == EGL_FALSE) {
+  if (dedicated()) {
+    // Already current on this surface, so the render needs no EGL call. A
+    // replaced surface still has to be made current before the next frame.
+    if (context_ != EGL_NO_CONTEXT && current_draw_surface_ == draw_surface) {
+      return;
+    }
+    const auto api = requested_api();
+    if (eglBindAPI(api) == EGL_FALSE) {
       throw std::runtime_error("Binding EGL OpenGL API failed");
     }
-    active_api_ = requested_api;
+    active_api_ = api;
+    if (context_ == EGL_NO_CONTEXT) {
+      create_context();
+    }
+    if (
+      eglMakeCurrent(display(), draw_surface, read_surface, context_) ==
+      EGL_FALSE
+    ) {
+      current_draw_surface_ = EGL_NO_SURFACE;
+      throw std::runtime_error("Switching OpenGL EGL context failed");
+    }
+    current_draw_surface_ = draw_surface;
+    return;
+  }
+
+  save_previous_context();
+  try {
+    const auto api = requested_api();
+    if (eglBindAPI(api) == EGL_FALSE) {
+      throw std::runtime_error("Binding EGL OpenGL API failed");
+    }
+    active_api_ = api;
     if (context_ == EGL_NO_CONTEXT) {
       create_context();
     }
@@ -110,8 +157,10 @@ void EglSharedContext::create_context() {
   auto* const context_attributes = active_api_ == EGL_OPENGL_ES_API
                                      ? es_context_attributes
                                      : opengl_context_attributes;
-  context_ =
-    eglCreateContext(display(), config(), share_context(), context_attributes);
+  context_ = eglCreateContext(
+    display(), config(), dedicated() ? EGL_NO_CONTEXT : share_context(),
+    context_attributes
+  );
   if (context_ == EGL_NO_CONTEXT) {
     throw std::runtime_error("Creating OpenGL EGL context failed");
   }
@@ -157,6 +206,12 @@ void EglSharedContext::restore_previous_context() {
 }
 
 void EglSharedContext::destroy() {
+  // A dedicated context is still current on this thread, and EGL only retires
+  // it once nothing holds it.
+  if (dedicated() && context_ != EGL_NO_CONTEXT) {
+    release_current_context();
+    current_draw_surface_ = EGL_NO_SURFACE;
+  }
   if (pbuffer_surface_ != EGL_NO_SURFACE) {
     eglDestroySurface(display(), pbuffer_surface_);
     pbuffer_surface_ = EGL_NO_SURFACE;

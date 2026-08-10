@@ -243,6 +243,10 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
 
   void activate() override {
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+    if (dedicated()) {
+      activate_dedicated_wgl();
+      return;
+    }
     previous_device_context_ = wglGetCurrentDC();
     previous_render_context_ = wglGetCurrentContext();
     try {
@@ -270,7 +274,9 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
     }
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
     if (!egl_context_) {
-      egl_context_.emplace(descriptor_.context.data.egl);
+      egl_context_.emplace(
+        descriptor_.context.data.egl, descriptor_.context.ownership
+      );
     }
     if (fallback_drawable_) {
       egl_context_->activate_pbuffer();
@@ -297,6 +303,10 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
 
   void deactivate() override {
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+    // A dedicated context stays current between renders.
+    if (dedicated()) {
+      return;
+    }
     wglMakeCurrent(
       static_cast<HDC>(previous_device_context_),
       static_cast<HGLRC>(previous_render_context_)
@@ -311,7 +321,35 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
 #endif
   }
 
+  [[nodiscard]] auto dedicated() const -> bool {
+    return descriptor_.context.ownership ==
+           MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
+  }
+
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+  // Makes this session's context current and leaves it current. A render that
+  // presents through the surface the last one did makes no WGL call at all.
+  void activate_dedicated_wgl() {
+    auto* const draw_surface =
+      fallback_drawable_
+        ? static_cast<HDC>(descriptor_.context.data.wgl.device_context)
+        : static_cast<HDC>(descriptor_.surface);
+    if (render_context_ != nullptr && current_device_context_ == draw_surface) {
+      return;
+    }
+    if (render_context_ == nullptr) {
+      create_wgl_context();
+    }
+    if (
+      wglMakeCurrent(draw_surface, static_cast<HGLRC>(render_context_)) == 0
+    ) {
+      current_device_context_ = nullptr;
+      throw std::runtime_error("Switching OpenGL WGL context failed");
+    }
+    current_device_context_ = draw_surface;
+    validate_wgl_context_support();
+  }
+
   void create_wgl_context() {
     auto* const device_context =
       static_cast<HDC>(descriptor_.context.data.wgl.device_context);
@@ -335,6 +373,12 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
 
   void destroy_native_context() {
     if (render_context_ != nullptr) {
+      // A dedicated context is still current on this thread, and WGL only
+      // retires it once nothing holds it.
+      if (dedicated() && wglGetCurrentContext() == render_context_) {
+        (void)wglMakeCurrent(nullptr, nullptr);
+      }
+      current_device_context_ = nullptr;
       wglDeleteContext(static_cast<HGLRC>(render_context_));
       render_context_ = nullptr;
     }
@@ -355,6 +399,8 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
 
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
   void* render_context_ = nullptr;
+  // What a dedicated context is current on. See activate_dedicated_wgl().
+  void* current_device_context_ = nullptr;
   void* previous_device_context_ = nullptr;
   void* previous_render_context_ = nullptr;
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)

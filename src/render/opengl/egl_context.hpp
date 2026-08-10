@@ -10,7 +10,9 @@ namespace mln::core::opengl {
 
 class EglSharedContext final {
  public:
-  explicit EglSharedContext(mln_egl_context_descriptor descriptor);
+  EglSharedContext(
+    mln_egl_context_descriptor descriptor, mln_opengl_context_ownership
+  );
   EglSharedContext(const EglSharedContext&) = delete;
   auto operator=(const EglSharedContext&) -> EglSharedContext& = delete;
   EglSharedContext(EglSharedContext&&) = delete;
@@ -24,6 +26,8 @@ class EglSharedContext final {
   [[nodiscard]] auto active_api() const -> EGLenum;
 
  private:
+  [[nodiscard]] auto dedicated() const -> bool;
+  [[nodiscard]] auto requested_api() const -> EGLenum;
   [[nodiscard]] auto display() const -> EGLDisplay;
   [[nodiscard]] auto config() const -> EGLConfig;
   [[nodiscard]] auto share_context() const -> EGLContext;
@@ -39,6 +43,7 @@ class EglSharedContext final {
   void destroy();
 
   mln_egl_context_descriptor descriptor_{};
+  mln_opengl_context_ownership ownership_ = MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED;
   EGLContext context_ = EGL_NO_CONTEXT;
   EGLSurface pbuffer_surface_ = EGL_NO_SURFACE;
   EGLDisplay previous_display_ = EGL_NO_DISPLAY;
@@ -47,6 +52,9 @@ class EglSharedContext final {
   EGLContext previous_context_ = EGL_NO_CONTEXT;
   EGLenum previous_api_ = EGL_NONE;
   EGLenum active_api_ = EGL_NONE;
+  // What a dedicated context is current on, so a render that presents through
+  // the same surface as the last one makes no EGL call at all.
+  EGLSurface current_draw_surface_ = EGL_NO_SURFACE;
 };
 
 auto get_egl_proc_address(

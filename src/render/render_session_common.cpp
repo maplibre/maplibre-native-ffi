@@ -93,6 +93,7 @@ auto opengl_context_descriptor_default() noexcept
   auto result = mln_opengl_context_descriptor{
     .size = sizeof(mln_opengl_context_descriptor),
     .platform = MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED,
+    .ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
     .data = {},
   };
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
@@ -110,6 +111,7 @@ auto opengl_context_descriptor_default() noexcept
     .display = nullptr,
     .config = nullptr,
     .share_context = nullptr,
+    .client_api = MLN_OPENGL_CLIENT_API_UNSPECIFIED,
     .get_proc_address = nullptr,
   };
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
@@ -217,6 +219,15 @@ auto validate_opengl_context(
     set_thread_error("mln_opengl_context_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  if (
+    context.ownership != MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED &&
+    context.ownership != MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED
+  ) {
+    set_thread_error("mln_opengl_context_descriptor.ownership is unknown");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto dedicated =
+    context.ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
 
   if (context.platform == MLN_OPENGL_CONTEXT_PLATFORM_WGL) {
     if (
@@ -230,11 +241,22 @@ auto validate_opengl_context(
       set_thread_error("mln_wgl_context_descriptor.size is too small");
       return MLN_STATUS_INVALID_ARGUMENT;
     }
-    if (
-      context.data.wgl.device_context == nullptr ||
-      context.data.wgl.share_context == nullptr
-    ) {
-      set_thread_error("WGL device_context and share_context must not be null");
+    if (context.data.wgl.device_context == nullptr) {
+      set_thread_error("WGL device_context must not be null");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (dedicated) {
+      if (context.data.wgl.share_context != nullptr) {
+        set_thread_error(
+          "a dedicated WGL context joins no share group, so share_context must "
+          "be null"
+        );
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+      return MLN_STATUS_OK;
+    }
+    if (context.data.wgl.share_context == nullptr) {
+      set_thread_error("WGL share_context must not be null");
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     return MLN_STATUS_OK;
@@ -253,13 +275,33 @@ auto validate_opengl_context(
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     if (
-      context.data.egl.display == nullptr ||
-      context.data.egl.config == nullptr ||
-      context.data.egl.share_context == nullptr
+      context.data.egl.display == nullptr || context.data.egl.config == nullptr
     ) {
-      set_thread_error(
-        "EGL display, config, and share_context must not be null"
-      );
+      set_thread_error("EGL display and config must not be null");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (dedicated) {
+      if (context.data.egl.share_context != nullptr) {
+        set_thread_error(
+          "a dedicated EGL context joins no share group, so share_context must "
+          "be null"
+        );
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+      if (
+        context.data.egl.client_api != MLN_OPENGL_CLIENT_API_GL &&
+        context.data.egl.client_api != MLN_OPENGL_CLIENT_API_GLES
+      ) {
+        set_thread_error(
+          "a dedicated EGL context has no share context to take its client API "
+          "from, so client_api must name one"
+        );
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+      return MLN_STATUS_OK;
+    }
+    if (context.data.egl.share_context == nullptr) {
+      set_thread_error("EGL share_context must not be null");
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     return MLN_STATUS_OK;
@@ -276,6 +318,12 @@ auto validate_opengl_context(
     }
     if (context.data.webgl.size < sizeof(mln_webgl_context_descriptor)) {
       set_thread_error("mln_webgl_context_descriptor.size is too small");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (dedicated) {
+      // A browser session renders through the context the host created and
+      // still owns, so there is nothing for the session to take over.
+      set_thread_error("a WebGL context is always shared with its host");
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     if (context.data.webgl.context <= 0) {
@@ -314,13 +362,18 @@ auto opengl_context_matches(
       ) {
         return false;
       }
-      return lhs.data.wgl.share_context == rhs.data.wgl.share_context;
+      return lhs.data.wgl.share_context == rhs.data.wgl.share_context &&
+             lhs.ownership == rhs.ownership;
     case MLN_OPENGL_CONTEXT_PLATFORM_EGL:
       // EGL names its drawable in the target rather than in the context, so
       // both strictnesses ask for the same three handles.
+      // A dedicated context names no share context, so its identity rests on
+      // the display, the config, and the API it was created for.
       return lhs.data.egl.display == rhs.data.egl.display &&
              lhs.data.egl.config == rhs.data.egl.config &&
-             lhs.data.egl.share_context == rhs.data.egl.share_context;
+             lhs.data.egl.share_context == rhs.data.egl.share_context &&
+             lhs.data.egl.client_api == rhs.data.egl.client_api &&
+             lhs.ownership == rhs.ownership;
     case MLN_OPENGL_CONTEXT_PLATFORM_WEBGL:
       // A WebGL context carries its own drawable, so the handle is all there is
       // to compare under either strictness.

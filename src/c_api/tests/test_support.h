@@ -54,6 +54,18 @@ bool mln_test_render_fixture_create(
 );
 void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture);
 
+// Attaches an OpenGL surface session that owns its EGL context, presenting into
+// a pbuffer this helper creates. Returns false when the build has no EGL
+// provider or the platform cannot supply the objects, which is a skip rather
+// than a failure.
+bool mln_test_dedicated_egl_surface_create(
+  mln_map map, mln_test_render_fixture* fixture
+);
+void mln_test_dedicated_egl_surface_destroy(mln_test_render_fixture* fixture);
+// Whether an EGL context is current on the calling thread. A dedicated session
+// leaves its own current between renders; a shared one leaves none.
+bool mln_test_egl_context_is_current(void);
+
 // Pumps the runtime until `flag` is set or the deadline passes. Returns whether
 // the flag was observed.
 bool mln_test_pump_until(mln_runtime runtime, atomic_bool* flag);

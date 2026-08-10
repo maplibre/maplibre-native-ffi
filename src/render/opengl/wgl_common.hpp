@@ -86,6 +86,11 @@ inline auto create_shared_wgl_context(
     throw std::runtime_error("Creating OpenGL WGL context failed");
   }
 
+  // A dedicated context joins no share group, so it is ready as created.
+  if (share_context == nullptr) {
+    return render_context;
+  }
+
   const auto share_context_was_current =
     previous_render_context == share_context;
   if (share_context_was_current && wglMakeCurrent(nullptr, nullptr) == 0) {
