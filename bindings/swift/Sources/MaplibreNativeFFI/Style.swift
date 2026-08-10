@@ -512,6 +512,7 @@ public extension MapHandle {
   func addStyleSourceJSON(sourceId: String, sourceJSON: Data) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_add_style_source_json(
         requireLiveHandle().raw,
         arena.view(sourceId),
@@ -523,6 +524,7 @@ public extension MapHandle {
   @discardableResult func removeStyleSource(_ sourceId: String) throws -> Bool {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       let removed = try NativeStyle.removeSource(
         requireLiveHandle(),
         sourceId: arena.view(sourceId)
@@ -535,6 +537,7 @@ public extension MapHandle {
   func styleSourceExists(_ sourceId: String) throws -> Bool {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try NativeStyle.sourceExists(
         requireLiveHandle(),
         sourceId: arena.view(sourceId)
@@ -545,6 +548,7 @@ public extension MapHandle {
   func styleSourceType(_ sourceId: String) throws -> StyleSourceType? {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try NativeStyle.sourceType(
         requireLiveHandle(),
         sourceId: arena.view(sourceId)
@@ -555,6 +559,7 @@ public extension MapHandle {
   func styleSourceInfo(_ sourceId: String) throws -> StyleSourceInfo? {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try NativeStyle.sourceInfo(
         requireLiveHandle(),
         sourceId: arena.view(sourceId)
@@ -565,6 +570,7 @@ public extension MapHandle {
   func styleSourceAttribution(_ sourceId: String) throws -> String? {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try NativeStyle.sourceAttribution(
         requireLiveHandle(),
         sourceId: arena.view(sourceId)
@@ -585,6 +591,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try options.nativeOptions.withNativeOptions { options in
         try checkStatus(mln_map_add_geojson_source_url(
           requireLiveHandle().raw,
@@ -605,6 +612,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try options.nativeOptions.withNativeOptions { options in
         try checkStatus(mln_map_add_geojson_source_data(
           requireLiveHandle().raw,
@@ -619,6 +627,7 @@ public extension MapHandle {
   func setGeoJSONSourceURL(sourceId: String, url: String) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_set_geojson_source_url(
         requireLiveHandle().raw,
         arena.view(sourceId),
@@ -630,6 +639,7 @@ public extension MapHandle {
   func setGeoJSONSourceData(sourceId: String, data: Data) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_set_geojson_source_data(
         requireLiveHandle().raw,
         arena.view(sourceId),
@@ -651,6 +661,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try options.nativeOptions.withNativeOptions { options in
         try checkStatus(add(
           requireLiveHandle().raw,
@@ -676,6 +687,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       let tileViews = tiles.map { arena.view($0) }
       try tileViews.withUnsafeBufferPointer { tiles in
         try options.nativeOptions.withNativeOptions { options in
@@ -789,6 +801,7 @@ public extension MapHandle {
     )
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try options.nativeOptions(callbacks: callbacks)
         .withNativeOptions { nativeOptions in
           try checkStatus(mln_map_add_custom_geometry_source(
@@ -808,6 +821,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_set_custom_geometry_source_tile_data(
         requireLiveHandle().raw,
         arena.view(sourceId),
@@ -823,6 +837,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_invalidate_custom_geometry_source_tile(
         requireLiveHandle().raw,
         arena.view(sourceId),
@@ -837,6 +852,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_invalidate_custom_geometry_source_region(
         requireLiveHandle().raw,
         arena.view(sourceId),
@@ -852,6 +868,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try image.nativeImage.withNativeImage { image in
         try options.nativeOptions.withNativeOptions { options in
           try checkStatus(mln_map_set_style_image(
@@ -868,6 +885,7 @@ public extension MapHandle {
   @discardableResult func removeStyleImage(_ imageId: String) throws -> Bool {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try NativeStyle.removeImage(
         requireLiveHandle(),
         imageId: arena.view(imageId)
@@ -878,6 +896,7 @@ public extension MapHandle {
   func styleImageExists(_ imageId: String) throws -> Bool {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try NativeStyle.imageExists(
         requireLiveHandle(),
         imageId: arena.view(imageId)
@@ -888,6 +907,7 @@ public extension MapHandle {
   func styleImageInfo(_ imageId: String) throws -> StyleImageInfo? {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try NativeStyle.imageInfo(
         requireLiveHandle(),
         imageId: arena.view(imageId)
@@ -902,6 +922,7 @@ public extension MapHandle {
   ) throws -> (stretchX: [ImageStretch], stretchY: [ImageStretch])? {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try NativeStyle.copyImageStretches(
         requireLiveHandle(),
         imageId: arena.view(imageId)
@@ -912,6 +933,7 @@ public extension MapHandle {
   func styleImage(_ imageId: String) throws -> StyleImage? {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       let imageIdView = arena.view(imageId)
       guard let info = try NativeStyle.imageInfo(
         requireLiveHandle(),
@@ -933,6 +955,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try NativeStyle.addImageSourceURL(
         requireLiveHandle(),
         sourceId: arena.view(sourceId),
@@ -949,6 +972,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try image.nativeImage.withNativeImage { image in
         try NativeStyle.addImageSourceImage(
           requireLiveHandle(),
@@ -963,6 +987,7 @@ public extension MapHandle {
   func setImageSourceURL(sourceId: String, url: String) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_set_image_source_url(
         requireLiveHandle().raw,
         arena.view(sourceId),
@@ -974,6 +999,7 @@ public extension MapHandle {
   func setImageSourceImage(sourceId: String, image: StyleRGBA8Image) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try image.nativeImage.withNativeImage { image in
         try checkStatus(mln_map_set_image_source_image(
           requireLiveHandle().raw,
@@ -990,6 +1016,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try NativeStyle.setImageSourceCoordinates(
         requireLiveHandle(),
         sourceId: arena.view(sourceId),
@@ -1001,6 +1028,7 @@ public extension MapHandle {
   func imageSourceCoordinates(sourceId: String) throws -> [LatLng]? {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try NativeStyle.imageSourceCoordinates(
         requireLiveHandle(),
         sourceId: arena.view(sourceId)
@@ -1015,6 +1043,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_add_hillshade_layer(
         requireLiveHandle().raw,
         arena.view(layerId),
@@ -1031,6 +1060,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_add_color_relief_layer(
         requireLiveHandle().raw,
         arena.view(layerId),
@@ -1046,6 +1076,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_add_location_indicator_layer(
         requireLiveHandle().raw,
         arena.view(layerId),
@@ -1061,6 +1092,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_set_location_indicator_location(
         requireLiveHandle().raw,
         arena.view(layerId),
@@ -1073,6 +1105,7 @@ public extension MapHandle {
   func setLocationIndicatorBearing(layerId: String, bearing: Double) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_set_location_indicator_bearing(
         requireLiveHandle().raw,
         arena.view(layerId),
@@ -1087,6 +1120,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_set_location_indicator_accuracy_radius(
         requireLiveHandle().raw,
         arena.view(layerId),
@@ -1102,6 +1136,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_set_location_indicator_image_name(
         requireLiveHandle().raw,
         arena.view(layerId),
@@ -1117,6 +1152,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_add_style_layer_json(
         requireLiveHandle().raw,
         arena.view(layerJSON),
@@ -1128,6 +1164,7 @@ public extension MapHandle {
   @discardableResult func removeStyleLayer(_ layerId: String) throws -> Bool {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try NativeStyle.removeLayer(
         requireLiveHandle(),
         layerId: arena.view(layerId)
@@ -1138,6 +1175,7 @@ public extension MapHandle {
   func styleLayerExists(_ layerId: String) throws -> Bool {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try NativeStyle.layerExists(
         requireLiveHandle(),
         layerId: arena.view(layerId)
@@ -1148,6 +1186,7 @@ public extension MapHandle {
   func styleLayerType(_ layerId: String) throws -> String? {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try NativeStyle.layerType(
         requireLiveHandle(),
         layerId: arena.view(layerId)
@@ -1162,6 +1201,7 @@ public extension MapHandle {
   func moveStyleLayer(_ layerId: String, beforeLayerId: String? = nil) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_move_style_layer(
         requireLiveHandle().raw,
         arena.view(layerId),
@@ -1173,6 +1213,7 @@ public extension MapHandle {
   func styleLayerJSON(_ layerId: String) throws -> Data? {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try NativeStyle.layerJSON(
         requireLiveHandle(),
         layerId: arena.view(layerId)
@@ -1183,6 +1224,7 @@ public extension MapHandle {
   func setStyleLightJSON(_ lightJSON: Data) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_set_style_light_json(
         requireLiveHandle().raw,
         arena.view(lightJSON)
@@ -1193,6 +1235,7 @@ public extension MapHandle {
   func setStyleLightProperty(_ propertyName: String, value: Data) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_set_style_light_property(
         requireLiveHandle().raw,
         arena.view(propertyName),
@@ -1204,6 +1247,7 @@ public extension MapHandle {
   func styleLightProperty(_ propertyName: String) throws -> Data? {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try NativeStyle.lightProperty(
         requireLiveHandle(),
         propertyName: arena.view(propertyName)
@@ -1239,6 +1283,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_set_layer_property(
         requireLiveHandle().raw,
         arena.view(layerId),
@@ -1253,6 +1298,7 @@ public extension MapHandle {
   {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try NativeStyle.layerProperty(
         requireLiveHandle(),
         layerId: arena.view(layerId),
@@ -1264,6 +1310,7 @@ public extension MapHandle {
   func setLayerFilter(layerId: String, filter: Data?) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       guard let filter else {
         return try checkStatus(mln_map_set_layer_filter(
           requireLiveHandle().raw, arena.view(layerId), nil
@@ -1281,6 +1328,7 @@ public extension MapHandle {
   func layerFilter(_ layerId: String) throws -> Data? {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try NativeStyle.layerFilter(
         requireLiveHandle(),
         layerId: arena.view(layerId)
@@ -1293,6 +1341,7 @@ public extension MapHandle {
   func setLayerSourceLayer(layerId: String, sourceLayer: String) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_set_layer_source_layer(
         requireLiveHandle().raw,
         arena.view(layerId),
@@ -1305,6 +1354,7 @@ public extension MapHandle {
   func layerSourceLayer(_ layerId: String) throws -> String {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try NativeStyle.copyLayerText(
         requireLiveHandle(),
         layerId: arena.view(layerId),
@@ -1318,6 +1368,7 @@ public extension MapHandle {
   func setLayerSourceId(layerId: String, sourceId: String) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_set_layer_source_id(
         requireLiveHandle().raw,
         arena.view(layerId),
@@ -1330,6 +1381,7 @@ public extension MapHandle {
   func layerSourceId(_ layerId: String) throws -> String {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try NativeStyle.copyLayerText(
         requireLiveHandle(),
         layerId: arena.view(layerId),
@@ -1343,6 +1395,7 @@ public extension MapHandle {
   func setLayerMinZoom(layerId: String, minZoom: Double) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_set_layer_min_zoom(
         requireLiveHandle().raw,
         arena.view(layerId),
@@ -1357,6 +1410,7 @@ public extension MapHandle {
   func layerMinZoom(_ layerId: String) throws -> Double {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       let handle = try requireLiveHandle()
       let layerView = arena.view(layerId)
       return try NativeMemory.withTemporary(0.0) { outZoom in
@@ -1374,6 +1428,7 @@ public extension MapHandle {
   func setLayerMaxZoom(layerId: String, maxZoom: Double) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_set_layer_max_zoom(
         requireLiveHandle().raw,
         arena.view(layerId),
@@ -1387,6 +1442,7 @@ public extension MapHandle {
   func layerMaxZoom(_ layerId: String) throws -> Double {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       let handle = try requireLiveHandle()
       let layerView = arena.view(layerId)
       return try NativeMemory.withTemporary(0.0) { outZoom in
@@ -1406,6 +1462,7 @@ public extension MapHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_set_layer_visibility(
         requireLiveHandle().raw,
         arena.view(layerId),
@@ -1418,6 +1475,7 @@ public extension MapHandle {
   func layerVisibility(_ layerId: String) throws -> StyleLayerVisibility {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       let handle = try requireLiveHandle()
       let layerView = arena.view(layerId)
       let raw = try NativeMemory.withTemporary(UInt32(0)) { outVisibility in

@@ -110,6 +110,12 @@ typedef struct mln_buffer_view {
  *
  * The view remains valid until buffer is destroyed. The caller must not access
  * it concurrently with mln_buffer_destroy().
+ *
+ * Returns:
+ * - MLN_STATUS_OK when out_view receives the borrowed view.
+ * - MLN_STATUS_INVALID_ARGUMENT when buffer is null or not live, buffer has the
+ *   wrong handle type, or out_view is null.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status
 mln_buffer_get(mln_buffer buffer, mln_buffer_view* out_view) MLN_NOEXCEPT;

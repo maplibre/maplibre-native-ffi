@@ -499,6 +499,7 @@ public extension MapHandle {
   ) throws -> CameraOptions {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try (fitOptions?.nativeInput ?? NativeCameraFitOptionsInput())
         .withOptionalNativeOptions { fitOptions in
           try CameraOptions(native: NativeCameraOptionsInput(NativeMap

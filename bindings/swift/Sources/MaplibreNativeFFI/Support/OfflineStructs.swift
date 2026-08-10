@@ -37,6 +37,7 @@ enum NativeOfflineRegionDefinition: Equatable {
     -> Result) throws -> Result
   {
     let arena = NativeInputArena()
+    defer { withExtendedLifetime(arena) {} }
     var definition = mln_offline_region_definition()
     definition.size = UInt32(MemoryLayout<mln_offline_region_definition>.size)
     switch self {

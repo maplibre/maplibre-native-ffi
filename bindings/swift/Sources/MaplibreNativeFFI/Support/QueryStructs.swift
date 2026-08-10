@@ -53,6 +53,7 @@ struct NativeRenderedFeatureQueryOptions: Equatable {
   ) throws -> Result {
     if layerIds.isEmpty, filter == nil { return try body(nil) }
     let arena = NativeInputArena()
+    defer { withExtendedLifetime(arena) {} }
     let layerViews = layerIds.map { arena.view($0) }
     return try layerViews.withUnsafeBufferPointer { layerViews in
       if let filter {
@@ -95,6 +96,7 @@ struct NativeSourceFeatureQueryOptions: Equatable {
   ) throws -> Result {
     if sourceLayerIds.isEmpty, filter == nil { return try body(nil) }
     let arena = NativeInputArena()
+    defer { withExtendedLifetime(arena) {} }
     let layerViews = sourceLayerIds.map { arena.view($0) }
     return try layerViews.withUnsafeBufferPointer { layerViews in
       if let filter {
@@ -148,6 +150,7 @@ struct NativeFeatureStateSelector: Equatable {
     -> Result) throws -> Result
   {
     let arena = NativeInputArena()
+    defer { withExtendedLifetime(arena) {} }
     var selector = mln_feature_state_selector()
     selector.size = UInt32(MemoryLayout<mln_feature_state_selector>.size)
     selector.source_id = arena.view(sourceId)

@@ -562,10 +562,12 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
 
     /// Queries a feature extension from the latest render session state.
     ///
-    /// The `supercluster` extension reads `cluster_id`, `limit`, and `offset`
-    /// as `.uint` and treats other numeric types as absent: a non-`.uint`
-    /// `cluster_id` yields a `.value` result holding `.null`, and a non-`.uint`
-    /// `limit` or `offset` falls back to ten leaves at offset zero.
+    /// The returned string contains either a JSON value or a GeoJSON Feature
+    /// Collection. The `supercluster` extension requires `cluster_id`, `limit`,
+    /// and `offset` to be nonnegative integer JSON literals. Floating-point or
+    /// negative representations are treated as absent. An absent cluster ID
+    /// produces JSON null; absent limit and offset values use ten leaves at
+    /// offset zero.
     pub fn queryFeatureExtension(
         self: *RenderSessionHandle,
         allocator: std.mem.Allocator,

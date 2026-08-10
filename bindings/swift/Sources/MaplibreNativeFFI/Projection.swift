@@ -84,6 +84,7 @@ public final class MapProjectionHandle {
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_projection_set_visible_geometry(
         handle.requireLive().raw,
         arena.view(geometry),

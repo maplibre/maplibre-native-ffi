@@ -100,6 +100,7 @@ public extension RenderSessionHandle {
   ) throws -> Data {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       return try options.nativeOptions.withNativeOptions { nativeOptions in
         try NativeQuery.sourceFeatures(
           session: self.requireLiveHandle(),
@@ -119,6 +120,7 @@ public extension RenderSessionHandle {
   ) throws -> Data {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       let call = { (arguments: UnsafePointer<mln_buffer_view>?) throws in
         try NativeQuery.featureExtensions(
           session: self.requireLiveHandle(),
@@ -138,6 +140,7 @@ public extension RenderSessionHandle {
   func setFeatureState(selector: FeatureStateSelector, state: Data) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try selector.nativeSelector.withNativeSelector { selector in
         try checkStatus(mln_render_session_set_feature_state(
           requireLiveHandle().raw,

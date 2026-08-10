@@ -212,6 +212,7 @@ public final class MapHandle {
   public func setStyleJSON(_ json: Data) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
       try checkStatus(mln_map_set_style_json(
         handle.requireLive().raw,
         arena.view(json)

@@ -403,6 +403,30 @@ func TestGeoJSONSourceClusterOptions(t *testing.T) {
 	if err := m.AddGeoJSONSourceData("malformed-cluster-source", points, &malformed); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("AddGeoJSONSourceData(malformed cluster properties) error = %v, want ErrInvalidArgument", err)
 	}
+	emptyClusterProperties := []struct {
+		name    string
+		options StyleGeoJSONSourceOptions
+	}{
+		{
+			name: "builder",
+			options: StyleGeoJSONSourceOptions{}.
+				WithCluster(true).
+				WithClusterProperties([]byte{}),
+		},
+		{
+			name: "clone",
+			options: StyleGeoJSONSourceOptions{
+				Cluster:           optionPtr(true),
+				ClusterProperties: []byte{},
+			}.Clone(),
+		},
+	}
+	for _, test := range emptyClusterProperties {
+		err := m.AddGeoJSONSourceData("empty-cluster-properties-"+test.name, points, &test.options)
+		if !errors.Is(err, ErrInvalidArgument) {
+			t.Errorf("AddGeoJSONSourceData(%s empty cluster properties) error = %v, want ErrInvalidArgument", test.name, err)
+		}
+	}
 }
 
 func TestAddStyleSourceJSONCopiesGoBuffer(t *testing.T) {

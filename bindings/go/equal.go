@@ -21,6 +21,13 @@ func clonePointer[T any](value *T) *T {
 	return cloned
 }
 
+func cloneBytes(value []byte) []byte {
+	if value == nil {
+		return nil
+	}
+	return append([]byte{}, value...)
+}
+
 // equalStrings reports whether two optional string lists are equal. A nil list
 // marks an absent field and is never equal to an empty list.
 func equalStrings(left, right []string) bool {

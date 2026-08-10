@@ -225,9 +225,7 @@ func (options StyleGeoJSONSourceOptions) Clone() StyleGeoJSONSourceOptions {
 	cloned.MaxZoom = clonePointer(options.MaxZoom)
 	cloned.Tolerance = clonePointer(options.Tolerance)
 	cloned.ClusterMaxZoom = clonePointer(options.ClusterMaxZoom)
-	if options.ClusterProperties != nil {
-		cloned.ClusterProperties = append([]byte(nil), options.ClusterProperties...)
-	}
+	cloned.ClusterProperties = cloneBytes(options.ClusterProperties)
 	cloned.TileSize = clonePointer(options.TileSize)
 	cloned.Buffer = clonePointer(options.Buffer)
 	cloned.ClusterRadius = clonePointer(options.ClusterRadius)
@@ -273,7 +271,7 @@ func (options StyleGeoJSONSourceOptions) WithClusterMaxZoom(clusterMaxZoom float
 // WithClusterProperties returns a copy that sets cluster aggregation expressions.
 func (options StyleGeoJSONSourceOptions) WithClusterProperties(clusterProperties []byte) StyleGeoJSONSourceOptions {
 	options = options.Clone()
-	options.ClusterProperties = append([]byte(nil), clusterProperties...)
+	options.ClusterProperties = cloneBytes(clusterProperties)
 	return options
 }
 
