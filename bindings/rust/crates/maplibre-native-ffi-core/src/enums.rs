@@ -648,8 +648,7 @@ impl RenderMode {
 pub enum RenderResult {
     /// The call rendered a frame into the render target.
     Rendered,
-    /// The map has no render update yet. Wait for a render-update-available
-    /// event.
+    /// The call produced no frame. Wait for a render-update-available event.
     NoUpdate,
     /// The map has not applied the session's current size yet. Wait for the
     /// next render-update-available event.

@@ -118,7 +118,7 @@ pub const NativePointer = enum(usize) {
 pub const RenderResult = union(enum) {
     /// The call rendered a frame into the render target.
     rendered,
-    /// The map has no render update yet.
+    /// The call produced no frame.
     no_update,
     /// The map has not applied the session's current size yet.
     size_pending,

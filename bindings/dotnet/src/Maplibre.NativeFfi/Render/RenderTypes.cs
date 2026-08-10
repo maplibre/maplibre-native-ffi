@@ -21,7 +21,7 @@ public enum RenderResult : uint
     Rendered = 0,
 
     /// <summary>
-    /// The map has no render update yet. Wait for a render-update-available event.
+    /// The call produced no frame. Wait for a render-update-available event.
     /// </summary>
     NoUpdate = 1,
 

@@ -14,7 +14,7 @@ public value class RenderResult(public val nativeValue: Int) {
     /** The call rendered a frame into the render target. */
     public val RENDERED: RenderResult = RenderResult(0)
 
-    /** The map has no render update yet. Wait for a render-update-available event. */
+    /** The call produced no frame. Wait for a render-update-available event. */
     public val NO_UPDATE: RenderResult = RenderResult(1)
 
     /**

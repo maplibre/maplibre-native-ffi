@@ -56,7 +56,7 @@ const (
 	// RenderResultRendered means the call rendered a frame into the render
 	// target.
 	RenderResultRendered RenderResult = RenderResult(C.MLN_RENDER_RESULT_RENDERED)
-	// RenderResultNoUpdate means the map has no render update yet. Wait for a
+	// RenderResultNoUpdate means the call produced no frame. Wait for a
 	// render-update-available event.
 	RenderResultNoUpdate RenderResult = RenderResult(C.MLN_RENDER_RESULT_NO_UPDATE)
 	// RenderResultSizePending means the map has not applied the session's

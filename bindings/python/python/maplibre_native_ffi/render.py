@@ -621,10 +621,9 @@ class RenderSessionHandle(NativeHandleMixin):
           update, so redraw on demand after a resize or a surface expose, and
           gate a frame loop on
           ``RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE``.
-        - ``NO_UPDATE``: the map has produced no render update so far, because
-          no style is loaded or the first pass is still running, or a texture
-          session completed a pass without a drawable frame while content is
-          still loading. Wait for
+        - ``NO_UPDATE``: the call produced no frame. The map either has no
+          update yet, or the Metal backend has not created an owned texture
+          because content is not ready. Wait for
           ``RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE``.
         - ``SIZE_PENDING``: this session resized and the map, which applies its
           size on its own thread, is still behind. The map publishes an update

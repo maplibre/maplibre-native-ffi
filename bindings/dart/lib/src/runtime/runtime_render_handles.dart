@@ -132,7 +132,7 @@ final class RenderResult {
   /// The render target holds a new frame.
   static const rendered = RenderResult._(0, 'rendered');
 
-  /// The map has produced no render update so far.
+  /// The call produced no frame.
   static const noUpdate = RenderResult._(1, 'noUpdate');
 
   /// The map has not applied the session's current size yet.
@@ -341,8 +341,9 @@ final class RenderSessionHandle {
   ///   its latest update, so a host redraws on demand after a resize or a
   ///   surface expose, and gates a frame loop on
   ///   [RuntimeEventType.mapRenderUpdateAvailable].
-  /// - [RenderResult.noUpdate]: the map has produced no render update so far,
-  ///   because no style is loaded or the first pass is still running. Wait for
+  /// - [RenderResult.noUpdate]: the call produced no frame. The map either has
+  ///   no update yet, or the Metal backend has not created an owned texture
+  ///   because content is not ready. Wait for
   ///   [RuntimeEventType.mapRenderUpdateAvailable].
   /// - [RenderResult.sizePending]: this session resized and the map, which
   ///   applies its size on its own thread, is still behind. The map publishes

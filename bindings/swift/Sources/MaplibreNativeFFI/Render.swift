@@ -421,7 +421,7 @@ public struct OpenGLBorrowedTextureDescriptor: Equatable, Sendable {
 public enum RenderResult: Sendable, Hashable {
   /// The call rendered a frame into the render target.
   case rendered
-  /// The map has no render update yet.
+  /// The call produced no frame.
   case noUpdate
   /// The map has not applied the session's current size yet.
   case sizePending
@@ -609,10 +609,10 @@ public final class RenderSessionHandle {
   ///   its latest update, so a host redraws on demand after a resize or a
   ///   surface expose, and paces a frame loop on the map
   ///   render-update-available event.
-  /// - ``RenderResult/noUpdate``: the map has produced no render update so far,
-  ///   because no style is loaded or the first pass is still running, or a
-  ///   texture session completed a pass without a drawable frame while content
-  ///   is still loading. Wait for the map render-update-available event.
+  /// - ``RenderResult/noUpdate``: the call produced no frame. The map either
+  ///   has no update yet, or the Metal backend has not created an owned texture
+  ///   because content is not ready. Wait for the map render-update-available
+  ///   event.
   /// - ``RenderResult/sizePending``: the session resized and the map, which
   ///   applies its size on its own thread, is still behind. The map publishes
   ///   an update for the new size on its own, so wait for the next map
