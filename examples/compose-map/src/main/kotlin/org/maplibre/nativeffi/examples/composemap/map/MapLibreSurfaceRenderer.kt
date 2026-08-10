@@ -9,6 +9,7 @@ import org.maplibre.nativeffi.examples.composemap.surface.ProducerBackend
 import org.maplibre.nativeffi.examples.composemap.surface.SurfaceExtent
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.render.RenderResult
 import org.maplibre.nativeffi.render.RenderSessionHandle
 
 /**
@@ -81,7 +82,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     if (!renderRequest.consume()) {
       return NativeSurfaceRenderResult.Skipped
     }
-    if (attached.session.renderUpdate()) {
+    if (attached.session.renderUpdate() == RenderResult.RENDERED) {
       return NativeSurfaceRenderResult.Rendered
     }
     // The map applies a new logical size on the runtime loop's next pump, so an attach or resize

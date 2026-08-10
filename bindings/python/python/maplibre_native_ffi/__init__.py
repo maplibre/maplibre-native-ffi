@@ -25,6 +25,7 @@ from .render import (
     NativePointer,
     OpenGLContextProvider,
     RenderBackend,
+    RenderResult,
 )
 from .runtime import (
     CameraChangeMode,
@@ -69,6 +70,7 @@ __all__ = [
     "RenderFramePayload",
     "RenderMapPayload",
     "RenderMode",
+    "RenderResult",
     "RenderingStats",
     "RuntimeEvent",
     "RuntimeEventPayload",

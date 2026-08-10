@@ -91,6 +91,7 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Render.PremultipliedRgba8Image",
             "Maplibre.NativeFfi.Render.RenderBackend",
             "Maplibre.NativeFfi.Render.RenderMode",
+            "Maplibre.NativeFfi.Render.RenderResult",
             "Maplibre.NativeFfi.Render.RenderSessionHandle",
             "Maplibre.NativeFfi.Render.RenderTargetExtent",
             "Maplibre.NativeFfi.Render.TextureImageInfo",

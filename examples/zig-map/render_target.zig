@@ -57,15 +57,23 @@ pub const Session = union(enum) {
         switch (self.*) {
             .none => return false,
             .texture => |*texture| {
-                return texture.renderUpdate() catch |err| {
+                const result = texture.renderUpdate() catch |err| {
                     diagnostics.logError("texture render failed", err, diagnostic_store);
                     return types.AppError.TextureRenderFailed;
                 };
+                return switch (result) {
+                    .rendered => true,
+                    else => false,
+                };
             },
             .surface => |*surface| {
-                return surface.renderUpdate() catch |err| {
+                const result = surface.renderUpdate() catch |err| {
                     diagnostics.logError("surface render failed", err, diagnostic_store);
                     return types.AppError.SurfaceRenderFailed;
+                };
+                return switch (result) {
+                    .rendered => true,
+                    else => false,
                 };
             },
         }

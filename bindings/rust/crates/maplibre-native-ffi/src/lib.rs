@@ -48,9 +48,9 @@ pub use maplibre_core::{
     LogSeverity, LogSeverityMask, MapDebugOptions, MapMode, MapOptions, MapTileOptions,
     MapViewportOptions, NetworkStatus, NorthOrientation, OfflineOperationKind,
     OfflineOperationResultKind, OfflineRegionDownloadState, OpenGLContextProviderMask,
-    RenderBackendMask, RenderMode, ResourceErrorReason, ResourceKind, ResourceLoadingMethod,
-    ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, Result,
-    RuntimeEventType, TileLodMode, TileOperation, ViewportMode,
+    RenderBackendMask, RenderMode, RenderResult, ResourceErrorReason, ResourceKind,
+    ResourceLoadingMethod, ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy,
+    ResourceUsage, Result, RuntimeEventType, TileLodMode, TileOperation, ViewportMode,
 };
 pub use maplibre_native_ffi_core::handle::{NativeHandleLeak, set_leak_reporter};
 pub use projection::MapProjectionHandle;

@@ -311,7 +311,7 @@ def test_metal_surface_set_target_presents_through_a_new_surface() -> None:
                     "the map never took the replacement surface extent",
                 )
                 assert session.detached is False
-                assert session.render_update()
+                assert session.render_update() == render.RenderResult.RENDERED
         finally:
             session.close()
 

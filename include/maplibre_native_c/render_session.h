@@ -57,25 +57,53 @@ MLN_API mln_status mln_render_session_resize(
   double scale_factor
 ) MLN_NOEXCEPT;
 
+/** Outcome of a successful mln_render_session_render_update() call. */
+typedef enum mln_render_result : uint32_t {
+  /** The call rendered a frame into the render target. */
+  MLN_RENDER_RESULT_RENDERED = 0,
+  /** The call produced no frame. */
+  MLN_RENDER_RESULT_NO_UPDATE,
+  /** The map has not applied the session's current size yet. */
+  MLN_RENDER_RESULT_SIZE_PENDING,
+  /** The render target had no frame to draw into. */
+  MLN_RENDER_RESULT_TARGET_NOT_READY,
+} mln_render_result;
+
 /**
  * Renders the map's latest render update into the session's render target.
  *
  * A surface session presents the frame. A texture session writes it into the
  * target texture.
  *
- * *out_rendered reports whether this call rendered a frame. The map retains its
- * latest update, so a host redraws on demand after a resize or a surface expose
- * and gates a frame loop on MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE. A
- * false report is a normal transient: call again on the next frame.
+ * *out_result reports which of these outcomes the call reached, and each one
+ * names the wake that a host waits for before it calls again:
+ *
+ * - MLN_RENDER_RESULT_RENDERED means the target holds a new frame. The map
+ *   retains its latest update, so a host redraws on demand after a resize or a
+ *   surface expose and gates a frame loop on
+ *   MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
+ * - MLN_RENDER_RESULT_NO_UPDATE means the call produced no frame. The map
+ *   either has no update yet, or the Metal backend has not created an owned
+ *   texture because content is not ready. Wait for
+ *   MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
+ * - MLN_RENDER_RESULT_SIZE_PENDING means the session resized and the map,
+ *   which applies its size on its own thread, is still behind. The map
+ *   publishes an update for the new size on its own, so wait for the next
+ *   MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE.
+ * - MLN_RENDER_RESULT_TARGET_NOT_READY means the render target had no frame
+ *   available, such as a Metal surface whose next drawable is nil. No map
+ *   update resolves this, so wait for a host event that changes the target,
+ *   or back off and retry.
  *
  * In MLN_MAP_MODE_STATIC, pump a resize through the map before requesting the
  * still image. The session applies its extent on the map's owner thread, and a
- * still image requested before that lands renders nothing.
+ * still image requested before that lands reports
+ * MLN_RENDER_RESULT_SIZE_PENDING.
  *
  * Returns:
- * - MLN_STATUS_OK on success, with *out_rendered set.
+ * - MLN_STATUS_OK on success, with *out_result set.
  * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, or
- *   out_rendered is null.
+ *   out_result is null.
  * - MLN_STATUS_INVALID_STATE when the session is detached or a texture frame
  *   is currently acquired.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
@@ -84,7 +112,7 @@ MLN_API mln_status mln_render_session_resize(
  *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_render_update(
-  mln_render_session session, bool* out_rendered
+  mln_render_session session, mln_render_result* out_result
 ) MLN_NOEXCEPT;
 
 /**

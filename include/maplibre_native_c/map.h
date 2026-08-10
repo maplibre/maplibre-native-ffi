@@ -949,8 +949,8 @@ MLN_API mln_status mln_map_request_repaint(mln_map map) MLN_NOEXCEPT;
  * pending, process each MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE event
  * from this map. Render targets use mln_render_session_render_update(). Surface
  * targets present directly. A render-update
- * call can report *out_rendered as false before the next update is available;
- * keep pumping and polling in that case. After
+ * call can report a result other than MLN_RENDER_RESULT_RENDERED before the
+ * next update is available; keep pumping and polling in that case. After
  * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED, use the latest successful texture
  * update when the host needs image bytes or a backend texture.
  *

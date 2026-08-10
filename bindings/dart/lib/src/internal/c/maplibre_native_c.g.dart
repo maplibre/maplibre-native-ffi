@@ -1831,10 +1831,10 @@ external int mln_render_session_remove_feature_state(
   ffi.Pointer<mln_feature_state_selector> selector,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_render_session, ffi.Pointer<ffi.Bool>)>()
+@ffi.Native<ffi.Int32 Function(mln_render_session, ffi.Pointer<ffi.Uint32>)>()
 external int mln_render_session_render_update(
   int session,
-  ffi.Pointer<ffi.Bool> out_rendered,
+  ffi.Pointer<ffi.Uint32> out_result,
 );
 
 @ffi.Native<
@@ -4590,6 +4590,24 @@ enum mln_render_mode {
     0 => MLN_RENDER_MODE_PARTIAL,
     1 => MLN_RENDER_MODE_FULL,
     _ => throw ArgumentError('Unknown value for mln_render_mode: $value'),
+  };
+}
+
+enum mln_render_result {
+  MLN_RENDER_RESULT_RENDERED(0),
+  MLN_RENDER_RESULT_NO_UPDATE(1),
+  MLN_RENDER_RESULT_SIZE_PENDING(2),
+  MLN_RENDER_RESULT_TARGET_NOT_READY(3);
+
+  final int value;
+  const mln_render_result(this.value);
+
+  static mln_render_result fromValue(int value) => switch (value) {
+    0 => MLN_RENDER_RESULT_RENDERED,
+    1 => MLN_RENDER_RESULT_NO_UPDATE,
+    2 => MLN_RENDER_RESULT_SIZE_PENDING,
+    3 => MLN_RENDER_RESULT_TARGET_NOT_READY,
+    _ => throw ArgumentError('Unknown value for mln_render_result: $value'),
   };
 }
 

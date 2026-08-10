@@ -1,8 +1,9 @@
 use std::error::Error as StdError;
 
 use maplibre_native_ffi::{
-    Error, ErrorKind, MapAttachRef, RenderSessionHandle, VulkanBorrowedTextureDescriptor,
-    VulkanContextDescriptor, VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
+    Error, ErrorKind, MapAttachRef, RenderResult, RenderSessionHandle,
+    VulkanBorrowedTextureDescriptor, VulkanContextDescriptor, VulkanOwnedTextureDescriptor,
+    VulkanSurfaceDescriptor,
 };
 
 use crate::graphics::GraphicsContext;
@@ -117,7 +118,7 @@ impl RenderTarget {
                 session,
                 compositor,
             } => {
-                if !session.render_update()? {
+                if session.render_update()? != RenderResult::Rendered {
                     return Ok(false);
                 }
                 let frame = session.acquire_vulkan_owned_texture_frame()?;
@@ -139,14 +140,14 @@ impl RenderTarget {
                 compositor,
                 image,
             } => {
-                if !session.render_update()? {
+                if session.render_update()? != RenderResult::Rendered {
                     return Ok(false);
                 }
                 compositor.draw_image_view(image.view()).map_err(|error| {
                     compositor_error(format!("Vulkan texture compositor draw failed: {error:?}"))
                 })
             }
-            Self::Surface { session } => session.render_update(),
+            Self::Surface { session } => Ok(session.render_update()? == RenderResult::Rendered),
         }
     }
 

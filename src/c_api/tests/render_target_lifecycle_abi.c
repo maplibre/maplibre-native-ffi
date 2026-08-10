@@ -18,11 +18,11 @@ static bool render_until_frame(
   mln_runtime runtime, mln_render_session session
 ) {
   for (unsigned int attempt = 0; attempt < 200; attempt += 1) {
-    bool rendered = false;
-    if (mln_render_session_render_update(session, &rendered) != MLN_STATUS_OK) {
+    mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
+    if (mln_render_session_render_update(session, &result) != MLN_STATUS_OK) {
       return false;
     }
-    if (rendered) {
+    if (result == MLN_RENDER_RESULT_RENDERED) {
       return true;
     }
     if (mln_runtime_pump(runtime, 0) != MLN_STATUS_OK) {

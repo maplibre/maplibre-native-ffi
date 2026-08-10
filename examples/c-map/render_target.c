@@ -38,8 +38,9 @@ app_error render_session_render_update(
     return APP_OK;
   }
   const bool is_surface = session->kind == RENDER_SESSION_SURFACE;
+  mln_render_result result = MLN_RENDER_RESULT_RENDERED;
   const mln_status status =
-    mln_render_session_render_update(session->handle, out_rendered);
+    mln_render_session_render_update(session->handle, &result);
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status(
       is_surface ? "surface render failed" : "texture render failed", status
@@ -47,6 +48,7 @@ app_error render_session_render_update(
     return is_surface ? APP_ERROR_SURFACE_RENDER_FAILED
                       : APP_ERROR_TEXTURE_RENDER_FAILED;
   }
+  *out_rendered = result == MLN_RENDER_RESULT_RENDERED;
   return APP_OK;
 }
 

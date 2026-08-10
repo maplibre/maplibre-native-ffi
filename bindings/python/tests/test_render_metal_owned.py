@@ -217,10 +217,10 @@ def test_attach_returns_public_render_session_and_rejects_second_session(
     assert not session.closed
 
 
-def test_render_update_without_pending_update_reports_false_and_keeps_session_live(
+def test_render_update_without_pending_update_reports_no_update_and_keeps_session_live(
     metal_owned_session: MetalOwnedSession,
 ) -> None:
-    assert metal_owned_session.session.render_update() is False
+    assert metal_owned_session.session.render_update() == render.RenderResult.NO_UPDATE
 
     assert not metal_owned_session.session.closed
     metal_owned_session.session.resize(32, 16, 1.0)
@@ -234,7 +234,10 @@ def test_resize_updates_metal_owned_texture_frame_extent(
     metal_owned_session.session.resize(16, 8, 2.0)
     # The map applies the new logical size on its next pump, and a static map
     # renders only on request, so pump the resize through before requesting the
-    # still image.
+    # still image. A render before that pump reports the pending size.
+    assert (
+        metal_owned_session.session.render_update() == render.RenderResult.SIZE_PENDING
+    )
     metal_owned_session.runtime.pump()
     frame = wait_for_metal_frame(
         metal_owned_session,

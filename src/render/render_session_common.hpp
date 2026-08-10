@@ -551,7 +551,7 @@ auto surface_session_set_target(
   const RenderTargetReplacer& replace
 ) -> mln_status;
 auto render_session_render_update(
-  mln_render_session session, bool* out_rendered
+  mln_render_session session, mln_render_result* out_result
 ) -> mln_status;
 auto render_session_detach(mln_render_session session) -> mln_status;
 auto render_session_destroy(mln_render_session session) -> mln_status;

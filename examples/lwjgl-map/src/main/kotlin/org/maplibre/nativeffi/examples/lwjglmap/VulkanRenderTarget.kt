@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.examples.lwjglmap
 import org.lwjgl.vulkan.VK10
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.render.NativePointer
+import org.maplibre.nativeffi.render.RenderResult
 import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
@@ -110,7 +111,7 @@ internal object VulkanRenderTarget {
       session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
     }
 
-    override fun renderUpdate(): Boolean = session.renderUpdate()
+    override fun renderUpdate(): Boolean = session.renderUpdate() == RenderResult.RENDERED
 
     override fun close() {
       session.close()
@@ -127,7 +128,7 @@ internal object VulkanRenderTarget {
     }
 
     override fun renderUpdate(): Boolean {
-      if (!session.renderUpdate()) {
+      if (session.renderUpdate() != RenderResult.RENDERED) {
         return false
       }
       return session.acquireVulkanOwnedTextureFrame().use { frameHandle ->
@@ -176,7 +177,7 @@ internal object VulkanRenderTarget {
     }
 
     override fun renderUpdate(): Boolean {
-      if (!session.renderUpdate()) {
+      if (session.renderUpdate() != RenderResult.RENDERED) {
         return false
       }
       return compositor.drawImageView(image.view())

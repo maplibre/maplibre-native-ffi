@@ -823,8 +823,8 @@ The public handle exposes:
 - `resize` for session kinds that support resize;
 - `set_target` for session kinds whose target the host owns, which is surface
   sessions and caller-owned texture sessions;
-- `render_update` for the latest available map render update, reporting whether
-  an update was rendered;
+- `render_update` for the latest available map render update, reporting the
+  render result as a public enum;
 - `detach`, which keeps the public handle live after backend resources detach;
 - `close` or `destroy`, using the owned-handle release operation, on the thread
   that attached the session.
@@ -1047,7 +1047,7 @@ When the binding routes provider requests through
 | BND-161 | Render-target descriptors materialize extents and `NativePointer` backend handles without taking ownership.                                               |
 | BND-162 | Surface, session-owned texture, and caller-owned texture attach paths call the matching C session family and report the same public session handle shape. |
 | BND-163 | Attaching a second render session to the same map reports invalid state.                                                                                  |
-| BND-164 | `render_update` reports no-update-available as a false result without closing the session.                                                                |
+| BND-164 | `render_update` reports a result other than a rendered frame without closing the session.                                                                 |
 | BND-165 | Resize updates extent through the public render session API.                                                                                              |
 | BND-175 | `set_target` replaces a host-owned render target through the public render session API and updates the session's extent.                                  |
 | BND-176 | `set_target` reports unsupported for a target kind the session does not have, covering a session-owned texture and a mismatched surface/texture pairing.  |

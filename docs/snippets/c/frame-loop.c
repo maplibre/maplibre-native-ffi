@@ -34,10 +34,10 @@ void run_one_frame(
   // #region render
   if (!*pending) return;
 
-  bool rendered = false;
-  const mln_status status =
-    mln_render_session_render_update(session, &rendered);
-  if (status == MLN_STATUS_OK && rendered) {
+  mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
+  const mln_status status = mln_render_session_render_update(session, &result);
+  // Any other result keeps the frame pending for the next turn.
+  if (status == MLN_STATUS_OK && result == MLN_RENDER_RESULT_RENDERED) {
     *pending = false;
   }
   // #endregion render

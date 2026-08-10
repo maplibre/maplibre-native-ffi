@@ -37,7 +37,7 @@ internal unsafe delegate mln_status RenderSessionResize(
 
 internal unsafe delegate mln_status RenderSessionRenderUpdate(
     MlnRenderSession session,
-    bool* out_rendered
+    mln_render_result* out_result
 );
 
 internal unsafe delegate mln_status MetalOwnedTextureAcquireFrame(
@@ -74,8 +74,8 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     ) => NativeMethods.mln_render_session_resize(session, width, height, scaleFactor);
     private static readonly RenderSessionRenderUpdate DefaultRenderUpdate = static (
         session,
-        outRendered
-    ) => NativeMethods.mln_render_session_render_update(session, outRendered);
+        outResult
+    ) => NativeMethods.mln_render_session_render_update(session, outResult);
     private static readonly TextureRead DefaultTextureRead = static (session, data, length, info) =>
         NativeMethods.mln_texture_read_premultiplied_rgba8(session, data, length, info);
     private static readonly StatusDestroy<MlnRenderSession> DefaultDestroy = static session =>
@@ -448,17 +448,19 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     }
 
     /// <summary>
-    /// Renders the latest available map render update. The map retains its latest update, so
-    /// repeated calls re-render it and return true again. Returns false when no frame was
-    /// rendered, which is a normal transient: call again on the next frame rather than wait for
-    /// another render-update event.
+    /// Renders the latest available map render update into this session's render target. The map
+    /// retains its latest update, so repeated calls re-render it and report
+    /// <see cref="RenderResult.Rendered"/> again. Every other result names the wake to wait for:
+    /// <see cref="RenderResult.NoUpdate"/> and <see cref="RenderResult.SizePending"/> resolve on a
+    /// render-update-available event, and <see cref="RenderResult.TargetNotReady"/> resolves when
+    /// the host changes the render target.
     /// </summary>
-    public bool RenderUpdate()
+    public RenderResult RenderUpdate()
     {
         ThrowIfTextureFrameActive(nameof(RenderUpdate));
-        var rendered = false;
-        NativeStatus.Check(RenderUpdateNative(Handle, &rendered));
-        return rendered;
+        var result = mln_render_result.MLN_RENDER_RESULT_NO_UPDATE;
+        NativeStatus.Check(RenderUpdateNative(Handle, &result));
+        return (RenderResult)result;
     }
 
     public void Detach()

@@ -90,12 +90,14 @@ public expect class RenderSessionHandle : AutoCloseable {
   public fun setOpenGLBorrowedTextureTarget(descriptor: OpenGLBorrowedTextureDescriptor)
 
   /**
-   * Renders the latest available map render update, returning false when no frame was rendered.
+   * Renders the latest available map render update into this session's render target.
    *
-   * The map retains its latest update, so repeated calls re-render it. False is a normal transient:
-   * call again on the next frame rather than wait for another render-update event.
+   * The map retains its latest update, so repeated calls re-render it and report
+   * [RenderResult.RENDERED] again. Every other result names the wake to wait for:
+   * [RenderResult.NO_UPDATE] and [RenderResult.SIZE_PENDING] resolve on a render-update-available
+   * event, and [RenderResult.TARGET_NOT_READY] resolves when the host changes the render target.
    */
-  public fun renderUpdate(): Boolean
+  public fun renderUpdate(): RenderResult
 
   public fun detach()
 

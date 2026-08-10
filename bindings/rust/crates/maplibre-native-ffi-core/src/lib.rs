@@ -33,7 +33,7 @@ pub use enums::{
     AmbientCacheOperation, CameraChangeMode, ConstrainMode, LocationIndicatorImageKind, LogEvent,
     LogSeverity, LogSeverityMask, MapDebugOptions, MapMode, NetworkStatus, NorthOrientation,
     OfflineOperationKind, OfflineOperationResultKind, OfflineRegionDownloadState,
-    OpenGLContextProviderMask, RasterDemEncoding, RenderBackendMask, RenderMode,
+    OpenGLContextProviderMask, RasterDemEncoding, RenderBackendMask, RenderMode, RenderResult,
     ResourceErrorReason, ResourceKind, ResourceLoadingMethod, ResourcePriority,
     ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, RuntimeEventType, SourceType,
     StyleImageTextFit, StyleLayerVisibility, TileLodMode, TileOperation, TileScheme,

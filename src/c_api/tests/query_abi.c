@@ -62,18 +62,20 @@ static void feature_query_bytes_are_owned_by_one_generic_buffer(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
-  bool rendered = false;
-  for (unsigned int attempt = 0; attempt < 500 && !rendered; attempt += 1) {
+  mln_render_result render_result = MLN_RENDER_RESULT_NO_UPDATE;
+  for (unsigned int attempt = 0;
+       attempt < 500 && render_result != MLN_RENDER_RESULT_RENDERED;
+       attempt += 1) {
     TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK,
-      mln_render_session_render_update(fixture.session, &rendered)
+      mln_render_session_render_update(fixture.session, &render_result)
     );
-    if (!rendered) {
+    if (render_result != MLN_RENDER_RESULT_RENDERED) {
       mln_test_sleep_millisecond();
     }
   }
-  TEST_ASSERT_TRUE(rendered);
+  TEST_ASSERT_EQUAL_INT(MLN_RENDER_RESULT_RENDERED, render_result);
 
   const mln_rendered_query_geometry geometry =
     mln_rendered_query_geometry_point((mln_screen_point){0});

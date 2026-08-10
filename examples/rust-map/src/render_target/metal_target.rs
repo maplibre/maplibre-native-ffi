@@ -1,6 +1,6 @@
 use std::error::Error as StdError;
 
-use maplibre_native_ffi::{Error, ErrorKind, MapAttachRef, RenderSessionHandle};
+use maplibre_native_ffi::{Error, ErrorKind, MapAttachRef, RenderResult, RenderSessionHandle};
 
 use crate::graphics::GraphicsContext;
 use crate::metal::{MetalBorrowedTexture, MetalContext, MetalTextureCompositor};
@@ -82,7 +82,7 @@ impl RenderTarget {
                 session,
                 compositor,
             } => {
-                if !session.render_update()? {
+                if session.render_update()? != RenderResult::Rendered {
                     return Ok(false);
                 }
                 let frame = session.acquire_metal_owned_texture_frame()?;
@@ -104,12 +104,12 @@ impl RenderTarget {
                 compositor,
                 texture,
             } => {
-                if !session.render_update()? {
+                if session.render_update()? != RenderResult::Rendered {
                     return Ok(false);
                 }
                 compositor.draw_texture(texture.texture())
             }
-            Self::Surface { session } => session.render_update(),
+            Self::Surface { session } => Ok(session.render_update()? == RenderResult::Rendered),
         }
     }
 

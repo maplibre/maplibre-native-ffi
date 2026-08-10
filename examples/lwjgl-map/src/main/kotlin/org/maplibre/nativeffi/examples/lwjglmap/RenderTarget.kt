@@ -21,8 +21,9 @@ internal interface RenderTarget : AutoCloseable {
   fun resize(viewport: Viewport)
 
   /**
-   * Renders the latest map update, and reports whether a frame reached the screen. False means no
-   * map update was available yet, or the host had no drawable to present into.
+   * Renders the latest map update, and reports whether a frame reached the screen. It reports true
+   * only for a rendered frame, so the render loop asks for another one when the map has no update
+   * yet, the map has not applied the session's size yet, or the target had no frame to draw into.
    */
   fun renderUpdate(): Boolean
 

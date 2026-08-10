@@ -8,6 +8,7 @@ from enum import IntFlag
 from typing import Any
 
 from . import _native
+from ._enum import UnknownIntEnum
 from ._lifecycle import NativeHandleMixin
 from .query import (
     FeatureStateSelector,
@@ -40,6 +41,15 @@ class OpenGLContextProvider(IntFlag):
     WGL = 1 << 0
     EGL = 1 << 1
     WEBGL = 1 << 2
+
+
+class RenderResult(UnknownIntEnum):
+    """Outcome reported by :meth:`RenderSessionHandle.render_update`."""
+
+    RENDERED = 0
+    NO_UPDATE = 1
+    SIZE_PENDING = 2
+    TARGET_NOT_READY = 3
 
 
 class NativePointer:
@@ -601,15 +611,30 @@ class RenderSessionHandle(NativeHandleMixin):
             descriptor.target,
         )
 
-    def render_update(self) -> bool:
-        """Process the latest map render update for this target.
+    def render_update(self) -> RenderResult:
+        """Render the latest map update into this session's render target.
 
-        The map retains its latest update, so repeated calls re-render it and
-        return True again. Returns False when no frame was rendered, which is a
-        normal transient: call again on the next frame rather than wait for
-        another render-update event.
+        The returned :class:`RenderResult` names the wake to wait for before
+        calling again:
+
+        - ``RENDERED``: the target holds a new frame. The map retains its latest
+          update, so redraw on demand after a resize or a surface expose, and
+          gate a frame loop on
+          ``RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE``.
+        - ``NO_UPDATE``: the call produced no frame. The map either has no
+          update yet, or the Metal backend has not created an owned texture
+          because content is not ready. Wait for
+          ``RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE``.
+        - ``SIZE_PENDING``: this session resized and the map, which applies its
+          size on its own thread, is still behind. The map publishes an update
+          for the new size on its own, so wait for the next
+          ``RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE``.
+        - ``TARGET_NOT_READY``: the render target had no frame available, such
+          as a Metal surface whose next drawable is nil. No map update resolves
+          this, so wait for a host event that changes the target, or back off
+          and retry.
         """
-        return bool(self._native.render_update())
+        return RenderResult(self._native.render_update())
 
     def detach(self) -> DetachedRenderSessionHandle:
         """Detach backend resources and return a close-only handle.
@@ -896,6 +921,7 @@ __all__ = [
     "OpenGLSurfaceDescriptor",
     "PremultipliedRgba8Image",
     "RenderBackend",
+    "RenderResult",
     "RenderSessionHandle",
     "RenderTargetExtent",
     "TextureImageInfo",

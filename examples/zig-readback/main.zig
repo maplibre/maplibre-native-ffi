@@ -154,7 +154,10 @@ fn renderOnThisThread(
         // asks: in a still-image map the render attempts themselves advance
         // loading.
         _ = shared.consumeRenderRequest();
-        if (try session.renderUpdate()) rendered_frame = true;
+        switch (try session.renderUpdate()) {
+            .rendered => rendered_frame = true,
+            else => {},
+        }
         // The still-image completion can land before or after the frame that
         // satisfied it, so finish only once both have happened.
         if (shared.stillImageDone() and rendered_frame) break;

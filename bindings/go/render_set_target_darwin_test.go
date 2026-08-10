@@ -67,8 +67,13 @@ func TestSetTargetRejectsOtherTargetKindsDarwin(t *testing.T) {
 		t.Fatalf("SetMetalBorrowedTextureTarget() on a session-owned texture session error = %v, want ErrUnsupported", err)
 	}
 
-	// Both rejections leave the session rendering into the target it has.
-	if _, err := session.RenderUpdate(); err != nil {
+	// Both rejections leave the session rendering into the target it has, which
+	// holds no style yet.
+	result, err := session.RenderUpdate()
+	if err != nil {
 		t.Fatalf("RenderUpdate() after rejected target replacement: %v", err)
+	}
+	if result != RenderResultNoUpdate {
+		t.Fatalf("RenderUpdate() after rejected target replacement = %v, want RenderResultNoUpdate", result)
 	}
 }

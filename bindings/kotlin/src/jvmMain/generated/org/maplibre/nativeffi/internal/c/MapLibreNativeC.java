@@ -9876,7 +9876,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_render_update(mln_render_session session, bool *out_rendered)
+     * mln_status mln_render_session_render_update(mln_render_session session, mln_render_result *out_result)
      * }
      */
     public static FunctionDescriptor mln_render_session_render_update$descriptor() {
@@ -9886,7 +9886,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_render_update(mln_render_session session, bool *out_rendered)
+     * mln_status mln_render_session_render_update(mln_render_session session, mln_render_result *out_result)
      * }
      */
     public static MethodHandle mln_render_session_render_update$handle() {
@@ -9896,7 +9896,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_render_update(mln_render_session session, bool *out_rendered)
+     * mln_status mln_render_session_render_update(mln_render_session session, mln_render_result *out_result)
      * }
      */
     public static MemorySegment mln_render_session_render_update$address() {
@@ -9905,16 +9905,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_render_update(mln_render_session session, bool *out_rendered)
+     * mln_status mln_render_session_render_update(mln_render_session session, mln_render_result *out_result)
      * }
      */
-    public static int mln_render_session_render_update(long session, MemorySegment out_rendered) {
+    public static int mln_render_session_render_update(long session, MemorySegment out_result) {
         var mh$ = mln_render_session_render_update.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_render_update", session, out_rendered);
+                traceDowncall("mln_render_session_render_update", session, out_result);
             }
-            return (int)mh$.invokeExact(session, out_rendered);
+            return (int)mh$.invokeExact(session, out_result);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

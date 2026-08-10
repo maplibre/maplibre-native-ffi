@@ -47,6 +47,27 @@ func (mask RenderBackendMask) Has(backend RenderBackendMask) bool {
 	return mask&backend == backend
 }
 
+// RenderResult is the outcome of a successful render-update call. This is an
+// open domain: a value may have no named constant here, so a switch over it
+// needs a default case. Unknown values keep their raw value.
+type RenderResult uint32
+
+const (
+	// RenderResultRendered means the call rendered a frame into the render
+	// target.
+	RenderResultRendered RenderResult = RenderResult(C.MLN_RENDER_RESULT_RENDERED)
+	// RenderResultNoUpdate means the call produced no frame. Wait for a
+	// render-update-available event.
+	RenderResultNoUpdate RenderResult = RenderResult(C.MLN_RENDER_RESULT_NO_UPDATE)
+	// RenderResultSizePending means the map has not applied the session's
+	// current size yet. Wait for the next render-update-available event.
+	RenderResultSizePending RenderResult = RenderResult(C.MLN_RENDER_RESULT_SIZE_PENDING)
+	// RenderResultTargetNotReady means the render target had no frame to draw
+	// into. Wait for a host event that changes the render target, or back off
+	// and retry.
+	RenderResultTargetNotReady RenderResult = RenderResult(C.MLN_RENDER_RESULT_TARGET_NOT_READY)
+)
+
 // NativePointer is a borrowed opaque backend-native address. It grants no
 // memory access and transfers no ownership.
 type NativePointer uintptr
@@ -866,28 +887,31 @@ func (session *RenderSessionHandle) setTarget(call func(nativeRenderSession) int
 }
 
 // RenderUpdate renders the latest available map render update into the attached
-// render target and reports whether a frame was rendered. The map retains its
-// latest update, so repeated calls re-render it and report true again. A false
-// result is a normal transient; gate frame loops on render-update-available
-// events rather than on this value.
-func (session *RenderSessionHandle) RenderUpdate() (bool, error) {
+// render target.
+//
+// The map retains its latest update, so repeated calls re-render it and report
+// RenderResultRendered again. Every other result names the wake to wait for:
+// RenderResultNoUpdate and RenderResultSizePending resolve on a
+// RuntimeEventMapRenderUpdateAvailable event, and RenderResultTargetNotReady
+// resolves when the host changes the render target.
+func (session *RenderSessionHandle) RenderUpdate() (RenderResult, error) {
 	ptr, release, err := session.ptr()
 	if err != nil {
-		return false, err
+		return RenderResultNoUpdate, err
 	}
 	defer release()
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
-	var rendered C.bool
+	var result C.mln_render_result
 	err = session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
-			return int32(C.mln_render_session_render_update(C.mln_render_session(ptr), &rendered))
+			return int32(C.mln_render_session_render_update(C.mln_render_session(ptr), &result))
 		})
 	})
 	if err != nil {
-		return false, err
+		return RenderResultNoUpdate, err
 	}
-	return bool(rendered), nil
+	return RenderResult(result), nil
 }
 
 // Detach detaches the render target from the session. The session stays live

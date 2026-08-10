@@ -135,12 +135,13 @@ enum MetalRenderTarget {
   }
 
   /// Renders the latest map update, reporting whether a frame was presented.
-  /// This reports false for a few iterations after attach or resize, because
-  /// the map applies a new logical size on the runtime loop's next pump.
+  /// For a few iterations after attach or resize the session reports a pending
+  /// size, because the map applies a new logical size on the runtime loop's
+  /// next pump.
   func renderUpdate() throws -> Bool {
     switch self {
     case let .ownedTexture(session, compositor):
-      guard try session.renderUpdate() else { return false }
+      guard try session.renderUpdate() == .rendered else { return false }
       let frame = try session.acquireMetalOwnedTextureFrame()
       var presented = false
       var firstError: Error?
@@ -159,10 +160,10 @@ enum MetalRenderTarget {
       }
       return presented
     case let .borrowedTexture(session, compositor, texture):
-      guard try session.renderUpdate() else { return false }
+      guard try session.renderUpdate() == .rendered else { return false }
       return try compositor.draw(texture: texture.texture)
     case let .nativeSurface(session):
-      return try session.renderUpdate()
+      return try session.renderUpdate() == .rendered
     }
   }
 

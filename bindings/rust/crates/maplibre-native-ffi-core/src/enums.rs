@@ -642,6 +642,35 @@ impl RenderMode {
     }
 }
 
+/// Outcome of a successful render-update call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum RenderResult {
+    /// The call rendered a frame into the render target.
+    Rendered,
+    /// The call produced no frame. Wait for a render-update-available event.
+    NoUpdate,
+    /// The map has not applied the session's current size yet. Wait for the
+    /// next render-update-available event.
+    SizePending,
+    /// The render target had no frame to draw into. Wait for a host event that
+    /// changes the target, or back off and retry.
+    TargetNotReady,
+    Unknown(u32),
+}
+
+impl RenderResult {
+    pub fn from_raw(raw: u32) -> Self {
+        match raw {
+            sys::MLN_RENDER_RESULT_RENDERED => Self::Rendered,
+            sys::MLN_RENDER_RESULT_NO_UPDATE => Self::NoUpdate,
+            sys::MLN_RENDER_RESULT_SIZE_PENDING => Self::SizePending,
+            sys::MLN_RENDER_RESULT_TARGET_NOT_READY => Self::TargetNotReady,
+            _ => Self::Unknown(raw),
+        }
+    }
+}
+
 /// Tile operation reported by tile observer events.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
