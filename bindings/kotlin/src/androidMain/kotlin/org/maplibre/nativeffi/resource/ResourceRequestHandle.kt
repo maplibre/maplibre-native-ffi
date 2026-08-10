@@ -8,9 +8,22 @@ import org.maplibre.nativeffi.internal.lifecycle.UnreachableActions
 import org.maplibre.nativeffi.internal.status.Status
 
 /** Owned Android JNI handle for a resource provider request. */
-public actual class ResourceRequestHandle internal constructor(private val handleId: Long) :
-  AutoCloseable {
-  private val core = ResourceRequestHandleCore(ReleaseNativeRequest(handleId))
+public actual class ResourceRequestHandle
+internal constructor(
+  private val handleId: Long,
+  private val completer: (Long, ResourceResponse) -> Int = { handle, response ->
+    NativeResourceResponseScope(response).use {
+      MaplibreNativeC.mln_resource_request_complete(handle, it.response)
+    }
+  },
+  private val cancellationChecker: (Long) -> Boolean = { handle ->
+    val outCancelled = booleanArrayOf(false)
+    Status.check(MaplibreNativeC.mln_resource_request_cancelled(handle, outCancelled))
+    outCancelled[0]
+  },
+  releaser: (Long) -> Unit = MaplibreNativeC::mln_resource_request_release,
+) : AutoCloseable {
+  private val core = ResourceRequestHandleCore(ReleaseNativeRequest(handleId, releaser))
 
   init {
     require(handleId != 0L) { "Resource request handle is null" }
@@ -21,11 +34,7 @@ public actual class ResourceRequestHandle internal constructor(private val handl
     val operation = core.beginComplete()
     var reachedNative = false
     try {
-      val nativeStatus =
-        NativeResourceResponseScope(response).use { nativeResponse ->
-          reachedNative = true
-          MaplibreNativeC.mln_resource_request_complete(handleId, nativeResponse.response)
-        }
+      val nativeStatus = completer(handleId, response).also { reachedNative = true }
       val nativeFailure =
         if (nativeStatus == MaplibreStatus.OK.nativeCode) null else Status.exception(nativeStatus)
       operation.markCompleted()
@@ -42,11 +51,7 @@ public actual class ResourceRequestHandle internal constructor(private val handl
     }
   }
 
-  public actual fun isCancelled(): Boolean = core.withLiveHandle {
-    val outCancelled = booleanArrayOf(false)
-    Status.check(MaplibreNativeC.mln_resource_request_cancelled(handleId, outCancelled))
-    outCancelled[0]
-  }
+  public actual fun isCancelled(): Boolean = core.withLiveHandle { cancellationChecker(handleId) }
 
   public actual override fun close() {
     core.close()
@@ -58,7 +63,7 @@ public actual class ResourceRequestHandle internal constructor(private val handl
   internal fun finishProviderException(): Int =
     core.finishProviderException()?.nativeValue ?: UNKNOWN_DECISION
 
-  private class NativeResourceResponseScope(value: ResourceResponse) : AutoCloseable {
+  internal class NativeResourceResponseScope(value: ResourceResponse) : AutoCloseable {
     val response: MaplibreNativeC.mln_resource_response = MaplibreNativeC.mln_resource_response()
     private val bytes: BytePointer?
     private val errorMessage: BytePointer?
@@ -132,14 +137,40 @@ public actual class ResourceRequestHandle internal constructor(private val handl
     }
   }
 
-  /** Native release that holds the handle address alone, keeping the wrapper collectable. */
-  private class ReleaseNativeRequest(private val handleId: Long) : () -> Unit {
+  private class ReleaseNativeRequest(
+    private val handleId: Long,
+    private val releaser: (Long) -> Unit,
+  ) : () -> Unit {
     override fun invoke() {
-      MaplibreNativeC.mln_resource_request_release(handleId)
+      releaser(handleId)
     }
   }
 
   private companion object {
     private const val UNKNOWN_DECISION: Int = -1
   }
+}
+
+/** Direct test seam for the JavaCPP resource-response adapter. */
+internal object JavaCppResourceStructs {
+  fun resourceResponseSnapshot(value: ResourceResponse): ResourceResponseSnapshot =
+    ResourceRequestHandle.NativeResourceResponseScope(value).use {
+      ResourceResponseSnapshot(
+        it.response.status(),
+        JavaCppSupport.byteArray(it.response.bytes(), it.response.byte_count()),
+        it.response.must_revalidate(),
+        it.response.has_modified(),
+        it.response.has_expires(),
+        it.response.has_retry_after(),
+      )
+    }
+
+  data class ResourceResponseSnapshot(
+    val status: Int,
+    val bytes: ByteArray,
+    val mustRevalidate: Boolean,
+    val hasModified: Boolean,
+    val hasExpires: Boolean,
+    val hasRetryAfter: Boolean,
+  )
 }

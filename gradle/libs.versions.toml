@@ -12,8 +12,10 @@ android-targetSdk = "36"
 java-toolchain = "25"
 java-release = "24"
 java-android-release = "17"
+androidx-test-runner = "1.7.0"
 
 [libraries]
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
 javacpp = { module = "org.bytedeco:javacpp", version.ref = "javacpp" }
 lwjgl-bom = { module = "org.lwjgl:lwjgl-bom", version.ref = "lwjgl" }
 lwjgl = { module = "org.lwjgl:lwjgl" }

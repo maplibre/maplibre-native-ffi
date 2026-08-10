@@ -215,7 +215,8 @@ public actual class MapHandle
 private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : AutoCloseable {
   private val runtimeRetention = runtime.retainChild("MapHandle")
   private val state = HandleState("MapHandle", handle, runtime)
-  private val customGeometrySources = mutableMapOf<String, CustomGeometrySourceState>()
+  private val customGeometrySources =
+    CustomGeometrySourceRegistry<CustomGeometrySourceState> { it.close() }
 
   public actual fun setStyleUrl(url: String) {
     MemoryUtil.requireValidCString(url)
@@ -377,7 +378,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     options: CustomGeometrySourceOptions,
   ) {
     val sourceState = CustomGeometrySourceState(options)
-    try {
+    customGeometrySources.install(sourceId, sourceState) {
       memScoped {
         Status.check(
           mln_map_add_custom_geometry_source(
@@ -387,10 +388,6 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           )
         )
       }
-      customGeometrySources.put(sourceId, sourceState)?.close()
-    } catch (error: Throwable) {
-      sourceState.close()
-      throw error
     }
   }
 
@@ -438,33 +435,27 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
   internal fun customGeometrySourceCountForTesting(): Int = customGeometrySources.size
 
   private fun closeCustomGeometrySource(sourceId: String) {
-    customGeometrySources.remove(sourceId)?.close()
+    customGeometrySources.remove(sourceId)
   }
 
   private fun clearCustomGeometrySources() {
-    customGeometrySources.values.forEach { it.close() }
     customGeometrySources.clear()
   }
 
   internal fun releaseDetachedCustomGeometrySources() {
     memScoped {
-      val iterator = customGeometrySources.iterator()
-      while (iterator.hasNext()) {
-        val entry = iterator.next()
+      customGeometrySources.releaseDetached { sourceId ->
         val outType = alloc<UIntVar>()
         val outFound = alloc<BooleanVar>()
         val status =
           mln_map_get_style_source_type(
             state.requireLive().rawHandleValue,
-            CoreStructs.stringView(entry.key, this),
+            CoreStructs.stringView(sourceId, this),
             outType.ptr,
             outFound.ptr,
           )
-        if (status != org.maplibre.nativeffi.error.MaplibreStatus.OK.nativeCode) continue
-        if (!outFound.value || SourceType.fromNative(outType.value) != SourceType.CUSTOM_VECTOR) {
-          entry.value.close()
-          iterator.remove()
-        }
+        if (status != org.maplibre.nativeffi.error.MaplibreStatus.OK.nativeCode) null
+        else outFound.value && SourceType.fromNative(outType.value) == SourceType.CUSTOM_VECTOR
       }
     }
   }

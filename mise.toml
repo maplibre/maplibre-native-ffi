@@ -60,12 +60,10 @@ actionlint_version = "1.7.8"
 android_cmdline_tools_version = "22.0"
 android_cmake_version = "4.1.2"
 android_ndk_version = "28.2.13676358"
-# The system image the emulator tasks boot. It is gigabytes on its own and only
-# the x64 suites run on it, so `//:android-emulator:boot` installs it rather
-# than .mise/bin/sync-android-packages. The AOSP image carries no Google APIs,
-# which nothing here calls, and is the smallest one that still ships a full
-# graphics stack.
-android_system_image = "system-images;android-36;default;x86_64"
+# The emulator task installs one architecture of this image on demand. The AOSP
+# image carries no Google APIs and is the smallest image with a full graphics
+# stack.
+android_system_image_api = "36"
 cargo_about_version = "0.9.1"
 cmake_version = "4.3.3"
 dart_version = "3.12.2"
@@ -328,11 +326,20 @@ run = 'bash .mise/bin/sync-android-packages "{{vars.java_version}}" "{{vars.andr
 
 [tasks."android-emulator:boot"]
 description = "Boot the Android emulator and wait until it is ready."
+usage = '''
+arg "[abi]" default="x86_64" {
+  choices "arm64-v8a" "x86_64"
+}
+'''
 # sdkmanager and avdmanager run on a JVM. The emulator and its system image are
 # not part of what .mise/bin/sync-android-packages installs, so asking for a
 # boot is what accepts their licenses and pays for their download.
 tools = { "core:java" = "{{vars.java_version}}" }
-run = '"$MISE_MONOREPO_ROOT/scripts/boot-android-emulator.sh" "{{vars.android_system_image}}"'
+run = '''
+"$MISE_MONOREPO_ROOT/scripts/boot-android-emulator.sh" \
+  "{{vars.android_system_image_api}}" \
+  "$usage_abi"
+'''
 
 [tasks."android-emulator:stop"]
 description = "Stop the Android emulator started by mise."

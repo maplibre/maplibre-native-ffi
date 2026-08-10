@@ -1,6 +1,7 @@
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
@@ -53,6 +54,11 @@ kotlin {
     minSdk = libs.versions.android.minSdk.get().toInt()
 
     withJava()
+    withDeviceTestBuilder { sourceSetTreeName = "test" }
+      .configure {
+        instrumentationRunner = "org.maplibre.nativeffi.MaplibreTestRunner"
+        execution = "HOST"
+      }
 
     optimization {
       consumerKeepRules.file(
@@ -91,6 +97,14 @@ kotlin {
 
   sourceSets {
     androidMain { dependencies { implementation(libs.javacpp) } }
+
+    named("androidDeviceTest") {
+      dependencies {
+        implementation(kotlin("test"))
+        implementation(libs.androidx.test.runner)
+        implementation(project(":bindings:kotlin:runtimes:$androidBackend"))
+      }
+    }
 
     commonTest.dependencies { implementation(kotlin("test")) }
   }
@@ -182,6 +196,11 @@ tasks.named<Test>("jvmTest") {
       .withPropertyName("maplibreNativeCLoaderLibraryDirs")
     inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstallDir")
   }
+}
+
+tasks.withType<KotlinNativeSimulatorTest>().configureEach {
+  standalone.set(false)
+  providers.environmentVariable("MLN_FFI_IOS_SIMULATOR_DEVICE_ID").orNull?.let(device::set)
 }
 
 // AGP's KMP library plugin registers no lint variant, so `NewApi` never runs for

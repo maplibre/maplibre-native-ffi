@@ -834,7 +834,7 @@ class RenderSessionHandleTest {
     val encoder =
       commandBuffer.blitCommandEncoder()
         ?: error("MTLCommandBuffer.blitCommandEncoder returned nil")
-    encoder.synchronizeResource(metalTexture)
+    encoder.synchronizeTextureForCpu(metalTexture)
     encoder.endEncoding()
     commandBuffer.commit()
     commandBuffer.waitUntilCompleted()

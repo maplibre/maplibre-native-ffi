@@ -687,7 +687,17 @@ private fun setOpenGLContext(
 }
 
 private fun textureImageInfo(info: MaplibreNativeC.mln_texture_image_info): TextureImageInfo =
-  TextureImageInfo(info.width(), info.height(), info.stride(), info.byte_length())
+  TextureImageInfo(
+    info.width(),
+    info.height(),
+    info.stride(),
+    checkedSizeT(info.byte_length(), "texture image byte length"),
+  )
+
+private fun checkedSizeT(value: Long, name: String): Long {
+  require(value >= 0L) { "$name exceeds Long.MAX_VALUE" }
+  return value
+}
 
 private fun metalOwnedTextureFrame(
   frame: MaplibreNativeC.mln_metal_owned_texture_frame,
@@ -806,17 +816,29 @@ private fun pointerOrNull(pointer: NativePointer): Pointer? =
 
 private fun featureQueryResult(outResult: LongPointer): List<QueriedFeature> {
   val result = outResult.get()
+  return featureQueryResult(
+    result,
+    counter = MaplibreNativeC::mln_feature_query_result_count,
+    getter = MaplibreNativeC::mln_feature_query_result_get,
+    destroyer = MaplibreNativeC::mln_feature_query_result_destroy,
+  )
+}
+
+private fun featureQueryResult(
+  result: Long,
+  counter: (Long, SizeTPointer) -> Int,
+  getter: (Long, Long, MaplibreNativeC.mln_queried_feature) -> Int,
+  destroyer: (Long) -> Unit,
+): List<QueriedFeature> {
   return try {
     SizeTPointer(1).use { outCount ->
-      Status.check(MaplibreNativeC.mln_feature_query_result_count(result, outCount))
+      Status.check(counter(result, outCount))
       val count = Math.toIntExact(outCount.get())
       List(count) { index ->
         val outFeature = MaplibreNativeC.mln_queried_feature()
         try {
           outFeature.size(outFeature.sizeof())
-          Status.check(
-            MaplibreNativeC.mln_feature_query_result_get(result, index.toLong(), outFeature)
-          )
+          Status.check(getter(result, index.toLong(), outFeature))
           queriedFeature(outFeature)
         } finally {
           outFeature.close()
@@ -824,7 +846,7 @@ private fun featureQueryResult(outResult: LongPointer): List<QueriedFeature> {
       }
     }
   } finally {
-    MaplibreNativeC.mln_feature_query_result_destroy(result)
+    destroyer(result)
   }
 }
 
@@ -1427,4 +1449,92 @@ private class AddressPointer(address: Long) : Pointer(null as Pointer?) {
   init {
     this.address = address
   }
+}
+
+/** Direct test seam for the JavaCPP render, query, geometry, and feature adapter. */
+internal object JavaCppRenderStructs {
+  fun featureRoundTrip(value: Feature): Feature = FeatureScope(value).use { feature(it.feature) }
+
+  fun geometryRoundTrip(value: Geometry): Geometry =
+    featureRoundTrip(Feature(value, emptyList(), FeatureIdentifier.Null)).geometry
+
+  fun renderedQueryGeometryType(value: RenderedQueryGeometry): Int =
+    RenderedQueryGeometryScope(value).use { it.geometry.type() }
+
+  fun textureImageInfoSnapshot(
+    width: Int,
+    height: Int,
+    stride: Int,
+    byteLength: Long,
+  ): TextureImageInfo =
+    MaplibreNativeC.mln_texture_image_info().use {
+      it.width(width).height(height).stride(stride).byte_length(byteLength)
+      textureImageInfo(it)
+    }
+
+  fun featureQueryCleanupAfterCopyFailure(): Int {
+    var destroys = 0
+    try {
+      featureQueryResult(
+        1L,
+        counter = { _, outCount ->
+          outCount.put(1L)
+          MaplibreStatus.OK.nativeCode
+        },
+        getter = { _, _, outFeature ->
+          outFeature.feature().property_count(Int.MAX_VALUE.toLong() + 1)
+          MaplibreStatus.OK.nativeCode
+        },
+        destroyer = { destroys++ },
+      )
+    } catch (_: ArithmeticException) {
+      return destroys
+    }
+    error("feature conversion unexpectedly succeeded")
+  }
+
+  fun metalSnapshot(value: MetalBorrowedTextureDescriptor): RenderDescriptorSnapshot =
+    metalBorrowedTextureDescriptor(value).use {
+      RenderDescriptorSnapshot(
+        it.extent().width(),
+        it.extent().height(),
+        it.extent().scale_factor(),
+        address(it.texture()),
+        0L,
+        0,
+      )
+    }
+
+  fun vulkanSnapshot(value: VulkanBorrowedTextureDescriptor): RenderDescriptorSnapshot =
+    vulkanBorrowedTextureDescriptor(value).use {
+      RenderDescriptorSnapshot(
+        it.extent().width(),
+        it.extent().height(),
+        it.extent().scale_factor(),
+        address(it.image()),
+        address(it.image_view()),
+        it.final_layout(),
+      )
+    }
+
+  fun openGlSnapshot(value: OpenGLBorrowedTextureDescriptor): RenderDescriptorSnapshot =
+    openglBorrowedTextureDescriptor(value).use {
+      RenderDescriptorSnapshot(
+        it.extent().width(),
+        it.extent().height(),
+        it.extent().scale_factor(),
+        it.texture().toLong(),
+        address(it.context().data_egl().display()),
+        it.target(),
+      )
+    }
+
+  data class RenderDescriptorSnapshot(
+    val width: Int,
+    val height: Int,
+    val scaleFactor: Double,
+    val firstPointer: Long,
+    val secondPointer: Long,
+    val extra: Int,
+  )
 }

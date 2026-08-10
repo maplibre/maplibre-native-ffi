@@ -5,7 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlinx.cinterop.ExperimentalForeignApi
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
@@ -14,8 +13,7 @@ import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 
-@OptIn(ExperimentalForeignApi::class)
-class MapProjectionHandleTest : org.maplibre.nativeffi.NativeTestBase() {
+class MapProjectionHandleTest {
   // BND-043, BND-103.
 
   @Test
@@ -67,7 +65,7 @@ class MapProjectionHandleTest : org.maplibre.nativeffi.NativeTestBase() {
 
       assertTrue(projection.isClosed)
       projection.close()
-      assertFailsWith<InvalidStateException> { projection.nativeHandle() }
+      assertFailsWith<InvalidStateException> { projection.camera }
     } finally {
       runtime.close()
     }

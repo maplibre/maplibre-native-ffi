@@ -96,14 +96,14 @@ Requirements:
   rather than from a restated copy.
 - The preset selects the platform, so `test` MUST select its runner from the
   preset rather than exposing a task per platform. Host presets run the suite in
-  process, Android and OpenHarmony x64 presets cross-compile and push to an
+  process, runnable Android and OpenHarmony presets cross-compile and push to an
   emulator through the shared runners in `scripts/`
   (`run-android-emulator-test.sh`, `run-ohos-emulator-test.sh`, which boot the
   emulator on demand), iOS simulator presets build a test bundle and spawn it on
   a simulator, and Emscripten presets run in headless Chromium.
 - A preset that a binding cannot build or run MUST fail with a message that
   names what the binding supports. A device preset with no runner, such as
-  `android-arm64-*`, fails the same way and points at the x64 emulator presets.
+  `ios-arm64-metal`, fails the same way and points at a simulator preset.
 - Colon-suffixed tasks cover the axes that a preset does not encode: one
   `test:<runtime>` task per runtime when a platform maps to more than one
   (`test:jvm` and `test:native` for Kotlin; a JavaScript binding adds its

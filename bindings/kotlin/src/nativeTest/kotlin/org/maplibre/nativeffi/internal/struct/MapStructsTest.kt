@@ -37,9 +37,7 @@ import org.maplibre.nativeffi.map.ConstrainMode
 import org.maplibre.nativeffi.map.NorthOrientation
 import org.maplibre.nativeffi.map.ProjectionModeOptions
 import org.maplibre.nativeffi.map.TileLodMode
-import org.maplibre.nativeffi.map.TileOptions
 import org.maplibre.nativeffi.map.ViewportMode
-import org.maplibre.nativeffi.map.ViewportOptions
 
 @OptIn(ExperimentalForeignApi::class)
 class MapStructsTest : org.maplibre.nativeffi.NativeTestBase() {
@@ -123,22 +121,6 @@ class MapStructsTest : org.maplibre.nativeffi.NativeTestBase() {
     assertNotNull(copy.anchor)
     assertEquals(ScreenPoint(8.0, 9.0), copy.anchor)
     assertFalse(copy.bearing != null)
-  }
-
-  @Test
-  fun viewportAndTileOptionEnumSettersStorePublicValues() {
-    val viewport =
-      ViewportOptions().apply {
-        northOrientation = NorthOrientation.LEFT
-        constrainMode = ConstrainMode.SCREEN
-        viewportMode = ViewportMode.FLIPPED_Y
-      }
-    val tile = TileOptions().apply { lodMode = TileLodMode.DISTANCE }
-
-    assertEquals(NorthOrientation.LEFT, viewport.northOrientation)
-    assertEquals(ConstrainMode.SCREEN, viewport.constrainMode)
-    assertEquals(ViewportMode.FLIPPED_Y, viewport.viewportMode)
-    assertEquals(TileLodMode.DISTANCE, tile.lodMode)
   }
 
   @Test

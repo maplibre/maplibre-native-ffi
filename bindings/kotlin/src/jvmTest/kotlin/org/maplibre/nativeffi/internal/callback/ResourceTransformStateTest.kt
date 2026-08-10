@@ -60,4 +60,41 @@ class ResourceTransformStateTest {
       }
     }
   }
+
+  @Test
+  fun unknownKindsHostFailuresAndClosureDuringCallbackAreContained() {
+    var copiedKind: ResourceKind? = null
+    lateinit var state: ResourceTransformState
+    state =
+      ResourceTransformState(
+        ResourceTransformCallback { request ->
+          copiedKind = request.kind
+          state.close()
+          throw IllegalStateException("contained")
+        }
+      )
+    Arena.ofConfined().use { arena ->
+      val response = arena.allocate(24)
+      assertEquals(
+        MaplibreStatus.NATIVE_ERROR.nativeCode,
+        state.invoke(
+          MemorySegment.NULL,
+          991,
+          arena.allocateFrom("https://example.com/style.json"),
+          response,
+        ),
+      )
+      assertEquals(991, copiedKind?.nativeValue)
+      assertEquals(
+        MaplibreStatus.INVALID_ARGUMENT.nativeCode,
+        state.invoke(
+          MemorySegment.NULL,
+          991,
+          arena.allocateFrom("https://example.com/style.json"),
+          response,
+        ),
+      )
+      assertEquals(true, state.isClosedForTesting())
+    }
+  }
 }

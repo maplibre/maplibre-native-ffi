@@ -95,23 +95,20 @@ def suite_commands(source: dict[str, object], preset: str) -> list[str]:
 def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
     render_backend = "opengl" if backend(preset) == "egl" else backend(preset)
     arguments = f"{render_backend} {abi}"
-    commands = [f"mise run //bindings/kotlin:android-build {arguments} --prebuilt"]
     if preset in EMULATOR_TESTED:
         # Each device test task cross-compiles the artifact the build task
         # would, so it stands in for that command.
-        commands.extend(
-            [
-                f"mise run //bindings/go:test {preset}",
-                f"mise run //bindings/rust:test {preset}",
-            ]
-        )
+        commands = [
+            f"mise run //bindings/kotlin:test {preset}",
+            f"mise run //bindings/go:test {preset}",
+            f"mise run //bindings/rust:test {preset}",
+        ]
     else:
-        commands.extend(
-            [
-                f"mise run //bindings/go:build {preset}",
-                f"mise run //bindings/rust:build {preset}",
-            ]
-        )
+        commands = [
+            f"mise run //bindings/kotlin:android-build {arguments} --prebuilt",
+            f"mise run //bindings/go:build {preset}",
+            f"mise run //bindings/rust:build {preset}",
+        ]
     if build_map:
         commands.append(f"mise run //examples/android-map:build {arguments} --prebuilt")
     commands.append(f"mise run //bindings/dart:build:mobile {preset}")
@@ -158,7 +155,7 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
     elif target_platform == "ios-simulator":
         commands.extend(
             [
-                f"mise run //bindings/kotlin:ios-build {preset}",
+                f"mise run //bindings/kotlin:test {preset}",
                 f"mise run //bindings/swift:test {preset}",
                 f"mise run //bindings/zig:test {preset}",
                 "mise run //examples/swift-map:build:ios-simulator",
