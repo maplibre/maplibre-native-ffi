@@ -143,6 +143,7 @@ publish_apple_leaves() {
   local repository="$1"
   shift
   local opengl=(
+    -Pmaplibre.runtime.opengl.macosArm64.installDir="$install_root/macos-arm64-egl"
     -Pmaplibre.runtime.opengl.jvm.natives-linux-x64.installDir="$install_root/linux-x64-egl"
     -Pmaplibre.runtime.opengl.jvm.natives-linux-arm64.installDir="$install_root/linux-arm64-egl"
     -Pmaplibre.runtime.opengl.jvm.natives-macos-arm64.installDir="$install_root/macos-arm64-egl"
@@ -150,6 +151,7 @@ publish_apple_leaves() {
     -Pmaplibre.runtime.opengl.jvm.natives-windows-arm64.installDir="$install_root/windows-arm64-wgl"
   )
   local vulkan=(
+    -Pmaplibre.runtime.vulkan.macosArm64.installDir="$install_root/macos-arm64-vulkan"
     -Pmaplibre.runtime.vulkan.jvm.natives-linux-x64.installDir="$install_root/linux-x64-vulkan"
     -Pmaplibre.runtime.vulkan.jvm.natives-linux-arm64.installDir="$install_root/linux-arm64-vulkan"
     -Pmaplibre.runtime.vulkan.jvm.natives-macos-arm64.installDir="$install_root/macos-arm64-vulkan"
@@ -172,14 +174,14 @@ publish_apple_leaves() {
   publish_tasks \
     :bindings:kotlin:runtimes:opengl \
     "$repository" \
-    Jvm -- \
+    Jvm MacosArm64 -- \
     "$@" \
     "${opengl[@]}"
 
   publish_tasks \
     :bindings:kotlin:runtimes:vulkan \
     "$repository" \
-    Jvm -- \
+    Jvm MacosArm64 -- \
     "$@" \
     "${vulkan[@]}"
 
@@ -194,6 +196,12 @@ publish_apple_leaves() {
 publish_apple_roots() {
   local repository="$1"
   shift
+  local opengl=(
+    -Pmaplibre.runtime.opengl.macosArm64.installDir="$install_root/macos-arm64-egl"
+  )
+  local vulkan=(
+    -Pmaplibre.runtime.vulkan.macosArm64.installDir="$install_root/macos-arm64-vulkan"
+  )
   local metal=(
     -Pmaplibre.runtime.metal.iosArm64.installDir="$install_root/ios-arm64-metal"
     -Pmaplibre.runtime.metal.iosSimulatorArm64.installDir="$install_root/ios-simulator-arm64-metal"
@@ -210,13 +218,15 @@ publish_apple_roots() {
     :bindings:kotlin:runtimes:opengl \
     "$repository" \
     KotlinMultiplatform -- \
-    "$@"
+    "$@" \
+    "${opengl[@]}"
 
   publish_tasks \
     :bindings:kotlin:runtimes:vulkan \
     "$repository" \
     KotlinMultiplatform -- \
-    "$@"
+    "$@" \
+    "${vulkan[@]}"
 
   publish_tasks \
     :bindings:kotlin:runtimes:metal \
