@@ -34,6 +34,7 @@
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
 #include "maplibre_native_c/base.h"
+#include "render/opengl/context_mode.hpp"
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 #include "render/opengl/egl_context.hpp"
 #endif
@@ -190,29 +191,20 @@ class OpenGLTextureRenderableResource final
   std::optional<mbgl::gl::Framebuffer> framebuffer_;
 };
 
-// A browser session renders into the host's own context, so MapLibre must treat
-// its cached GL state as stale each frame. Every other provider gets a session
-// context of its own inside the host's share group.
-#if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
-constexpr auto session_context_mode = mbgl::gfx::ContextMode::Shared;
-#else
-constexpr auto session_context_mode = mbgl::gfx::ContextMode::Unique;
-#endif
-
 class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
                                    public mbgl::gfx::HeadlessBackend {
  public:
   OpenGLTextureBackend(
     const mln_opengl_owned_texture_descriptor& descriptor, mbgl::Size size
   )
-      : mbgl::gl::RendererBackend(session_context_mode),
+      : mbgl::gl::RendererBackend(mln::core::opengl::session_context_mode),
         mbgl::gfx::HeadlessBackend(size),
         context_(descriptor.context) {}
 
   OpenGLTextureBackend(
     const mln_opengl_borrowed_texture_descriptor& descriptor, mbgl::Size size
   )
-      : mbgl::gl::RendererBackend(session_context_mode),
+      : mbgl::gl::RendererBackend(mln::core::opengl::session_context_mode),
         mbgl::gfx::HeadlessBackend(size),
         context_(descriptor.context),
         borrowed_texture_(descriptor.texture) {}
