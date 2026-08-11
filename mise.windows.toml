@@ -27,4 +27,6 @@ run = '"C:/Program Files/Git/bin/bash.exe" .mise/bin/sync-submodules'
 
 [deps.rustls-platform-verifier]
 auto = true
-run = '"C:/Program Files/Git/bin/bash.exe" .mise/bin/sync-rustls-platform-verifier'
+# PowerShell keeps this provider native on Windows ARM64:
+# https://github.com/actions/runner-images/issues/14052
+run = 'pwsh -NoLogo -NoProfile -File .mise/bin/sync-rustls-platform-verifier.ps1'
