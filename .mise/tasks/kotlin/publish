@@ -228,9 +228,13 @@ publish_apple_roots() {
   local repository="$1"
   shift
   local opengl=(
+    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-arm64-egl"
+    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-x64-egl"
     -Pmaplibre.runtime.opengl.macosArm64.installDir="$install_root/macos-arm64-egl"
   )
   local vulkan=(
+    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-arm64-vulkan"
+    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-x64-vulkan"
     -Pmaplibre.runtime.vulkan.macosArm64.installDir="$install_root/macos-arm64-vulkan"
   )
   local metal=(
