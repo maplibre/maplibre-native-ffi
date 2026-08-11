@@ -1297,35 +1297,6 @@ url = "https://nodejs.org/dist/v24.11.0/node-v24.11.0-win-arm64.zip"
 checksum = "sha256:1054540bce22b54ec7e50ebc078ec5d090700a77657607a58f6a64df21f49fdd"
 url = "https://nodejs.org/dist/v24.11.0/node-v24.11.0-win-x64.zip"
 
-[[tools.powershell]]
-version = "7.6.4"
-backend = "aqua:PowerShell/PowerShell"
-
-[tools.powershell."platforms.linux-arm64"]
-checksum = "sha256:d4ef2382fa452f2ccbdb48a01adbbce9ed64954872123970c16be6d086d1224b"
-url = "https://github.com/PowerShell/PowerShell/releases/download/v7.6.4/powershell-7.6.4-linux-arm64.tar.gz"
-url_api = "https://api.github.com/repos/PowerShell/PowerShell/releases/assets/483874935"
-
-[tools.powershell."platforms.linux-x64"]
-checksum = "sha256:4471b5a36bfe86ec7af8525d36bb1cacba0128e7aac22d05cc064bc00e604721"
-url = "https://github.com/PowerShell/PowerShell/releases/download/v7.6.4/powershell-7.6.4-linux-x64.tar.gz"
-url_api = "https://api.github.com/repos/PowerShell/PowerShell/releases/assets/483875081"
-
-[tools.powershell."platforms.macos-arm64"]
-checksum = "sha256:fff37135307d3a57038adb44eded6c3b4dcd2e254382f4913bc253499ef3469d"
-url = "https://github.com/PowerShell/PowerShell/releases/download/v7.6.4/powershell-7.6.4-osx-arm64.tar.gz"
-url_api = "https://api.github.com/repos/PowerShell/PowerShell/releases/assets/483875170"
-
-[tools.powershell."platforms.windows-arm64"]
-checksum = "sha256:774e541334ae2b2b9f14b96a0808e8905f19a103aefc790ec5d5be2a63ae9314"
-url = "https://github.com/PowerShell/PowerShell/releases/download/v7.6.4/PowerShell-7.6.4-win-arm64.zip"
-url_api = "https://api.github.com/repos/PowerShell/PowerShell/releases/assets/483875379"
-
-[tools.powershell."platforms.windows-x64"]
-checksum = "sha256:80832551c52809301e6071c8bac977beb5a2f1ec953eb4db9f94deb953333793"
-url = "https://github.com/PowerShell/PowerShell/releases/download/v7.6.4/PowerShell-7.6.4-win-x64.zip"
-url_api = "https://api.github.com/repos/PowerShell/PowerShell/releases/assets/483875563"
-
 [[tools.python]]
 version = "3.14.4"
 backend = "core:python"

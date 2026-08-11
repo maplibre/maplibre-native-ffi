@@ -85,7 +85,6 @@ node_version = "24.11.0"
 ninja_version = "1.13.2"
 ohos_sdk_version = "6.1"
 pkl_version = "0.31.0"
-powershell_version = "7.6.4"
 pnpm_version = "10.33.2"
 python_version = "3.14.4"
 rust_version = "1.95.0"
@@ -109,7 +108,6 @@ zig_version = "0.16.0"
 "aqua:Kitware/CMake" = "{{vars.cmake_version}}"
 ninja = "{{vars.ninja_version}}"
 "github:EmbarkStudios/cargo-about" = "{{vars.cargo_about_version}}" # Rust dependency notices
-powershell = { version = "{{vars.powershell_version}}", os = ["windows"] }
 sccache = "{{vars.sccache_version}}"
 
 # Node.js ecosystem

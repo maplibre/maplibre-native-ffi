@@ -29,4 +29,4 @@ run = '"C:/Program Files/Git/bin/bash.exe" .mise/bin/sync-submodules'
 auto = true
 # PowerShell keeps this provider native on Windows ARM64:
 # https://github.com/actions/runner-images/issues/14052
-run = 'pwsh -NoLogo -NoProfile -File .mise/bin/sync-rustls-platform-verifier.ps1'
+run = 'powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .mise/bin/sync-rustls-platform-verifier.ps1'
