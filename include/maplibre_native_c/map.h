@@ -191,6 +191,21 @@ typedef struct mln_map_options {
    * and logs a tile parse warning for the FastPFOR ones.
    */
   bool fast_pfor_enabled;
+  /**
+   * Map-originated event types this map queues, as a bitwise OR of
+   * mln_runtime_event_mask values.
+   *
+   * This field is always read, so set it explicitly.
+   * MLN_RUNTIME_EVENT_MASK_ALL selects every event type this library reports
+   * and is the value mln_map_options_default() populates.
+   * MLN_RUNTIME_EVENT_MASK_NONE queues none.
+   *
+   * Set a narrow mask here to be narrow from the map's first style load, the
+   * load that produces the most tile and frame events. A map reports the two
+   * camera events of its initial sizing whatever this field selects, because
+   * MapLibre resizes the map inside its own constructor.
+   */
+  uint64_t event_mask;
 } mln_map_options;
 
 /** Screen-space point in logical map pixels. */
@@ -279,9 +294,11 @@ typedef struct mln_animation_options {
    * requested one, or tracks which transition ID is current.
    *
    * The event is queued on the runtime that owns the map and is drained by
-   * mln_runtime_poll_event(). For a transition that runs to completion, it is
+   * mln_runtime_drain_events(). For a transition that runs to completion, it is
    * queued immediately before that transition's
-   * MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE event.
+   * MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE event. A map reports the terminal
+   * outcome only while its event mask selects
+   * MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED.
    *
    * When this field is omitted, the transition emits no such event.
    */
@@ -626,7 +643,9 @@ MLN_API mln_status mln_runtime_offline_region_delete_start(
  *
  * On success, the operation entry is consumed. On failure, it remains live so
  * the caller may retry this call or discard the operation with
- * mln_runtime_offline_operation_discard().
+ * mln_runtime_offline_operation_discard(). Taking or discarding a result also
+ * removes that operation's undrained completion event. The thread diagnostic
+ * carries a failed operation's error text.
  *
  * Returns:
  * - MLN_STATUS_OK when the result was taken and out_region was set.
@@ -650,7 +669,9 @@ MLN_API mln_status mln_runtime_offline_region_create_take_result(
  *
  * On success, the operation entry is consumed. On failure, it remains live so
  * the caller may retry this call or discard the operation with
- * mln_runtime_offline_operation_discard().
+ * mln_runtime_offline_operation_discard(). Taking or discarding a result also
+ * removes that operation's undrained completion event. The thread diagnostic
+ * carries a failed operation's error text.
  *
  * Returns:
  * - MLN_STATUS_OK when the result was taken; out_found indicates whether a
@@ -675,7 +696,9 @@ MLN_API mln_status mln_runtime_offline_region_get_take_result(
  *
  * On success, the operation entry is consumed. On failure, it remains live so
  * the caller may retry this call or discard the operation with
- * mln_runtime_offline_operation_discard().
+ * mln_runtime_offline_operation_discard(). Taking or discarding a result also
+ * removes that operation's undrained completion event. The thread diagnostic
+ * carries a failed operation's error text.
  *
  * Returns:
  * - MLN_STATUS_OK when the result was taken and out_regions was set.
@@ -699,7 +722,9 @@ MLN_API mln_status mln_runtime_offline_regions_list_take_result(
  *
  * On success, the operation entry is consumed. On failure, it remains live so
  * the caller may retry this call or discard the operation with
- * mln_runtime_offline_operation_discard().
+ * mln_runtime_offline_operation_discard(). Taking or discarding a result also
+ * removes that operation's undrained completion event. The thread diagnostic
+ * carries a failed operation's error text.
  *
  * Returns:
  * - MLN_STATUS_OK when the result was taken and out_regions was set.
@@ -724,7 +749,9 @@ MLN_API mln_status mln_runtime_offline_regions_merge_database_take_result(
  *
  * On success, the operation entry is consumed. On failure, it remains live so
  * the caller may retry this call or discard the operation with
- * mln_runtime_offline_operation_discard().
+ * mln_runtime_offline_operation_discard(). Taking or discarding a result also
+ * removes that operation's undrained completion event. The thread diagnostic
+ * carries a failed operation's error text.
  *
  * Returns:
  * - MLN_STATUS_OK when the result was taken and out_region was set.
@@ -748,7 +775,9 @@ MLN_API mln_status mln_runtime_offline_region_update_metadata_take_result(
  *
  * On success, the operation entry is consumed. On failure, it remains live so
  * the caller may retry this call or discard the operation with
- * mln_runtime_offline_operation_discard().
+ * mln_runtime_offline_operation_discard(). Taking or discarding a result also
+ * removes that operation's undrained completion event. The thread diagnostic
+ * carries a failed operation's error text.
  *
  * Returns:
  * - MLN_STATUS_OK when the result was taken and out_status was filled.
@@ -887,7 +916,8 @@ MLN_API mln_map_options mln_map_options_default(void) MLN_NOEXCEPT;
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, out_map is
- *   null, *out_map is not null, or options are invalid.
+ *   null, *out_map is not null, or options are invalid, which includes an
+ *   event_mask bit outside MLN_RUNTIME_EVENT_MASK_ALL.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -925,7 +955,9 @@ MLN_API mln_status mln_map_get_size(
  *
  * Continuous maps also invalidate automatically when style data, resources,
  * camera, or transitions change. Ask attached render targets to process the
- * latest update when MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE is reported.
+ * latest update when mln_runtime_drain_events() reports
+ * MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE. That type is the map's only
+ * invalidation report, so select it in the event mask of every rendered map.
  * Repaint requests do not produce
  * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED or
  * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED events.
@@ -943,14 +975,16 @@ MLN_API mln_status mln_map_request_repaint(mln_map map) MLN_NOEXCEPT;
 /**
  * Requests one still image for a static or tile map.
  *
- * Pump the runtime and poll runtime events for this map until
+ * Pump the runtime and drain runtime events for this map until
  * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED or
- * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED is reported. While the request is
- * pending, process each MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE event
- * from this map. Render targets use mln_render_session_render_update(). Surface
- * targets present directly. A render-update
+ * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED is reported. Those two types are the
+ * only completion reports, so select both in the map's event mask. While the
+ * request is pending, process each
+ * MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE event from this map. Render
+ * targets use mln_render_session_render_update(). Surface targets present
+ * directly. A render-update
  * call can report a result other than MLN_RENDER_RESULT_RENDERED before the
- * next update is available; keep pumping and polling in that case. After
+ * next update is available; keep pumping and draining in that case. After
  * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED, use the latest successful texture
  * update when the host needs image bytes or a backend texture.
  *
@@ -974,7 +1008,8 @@ MLN_API mln_status mln_map_request_still_image(mln_map map) MLN_NOEXCEPT;
  * loading failures. There is no flush and no terminal event, so the last state
  * a host mirrored from events can stay behind the map's final state. Snapshot
  * whatever state the host needs while the map is still live, and let teardown
- * proceed without awaiting an event for this map.
+ * proceed without awaiting an event for this map. A batch that a host already
+ * drained holds copies, so it stays readable after this call.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -1097,6 +1132,77 @@ MLN_API mln_status mln_map_copy_loaded_style_json(
 MLN_API mln_status mln_map_copy_style_url(
   mln_map map, char* out_url, size_t url_capacity, size_t* out_url_size
 ) MLN_NOEXCEPT;
+
+/**
+ * Selects which map-originated event types this map queues.
+ *
+ * MapLibre Native reports map state through the observer callbacks behind these
+ * events, and this mask decides which of them become queued events. An event of
+ * an unselected type is never built and never queued, so it reaches no batch
+ * and raises no wake flag.
+ *
+ * This call reads the bits in MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS and ignores
+ * the rest, so MLN_RUNTIME_EVENT_MASK_ALL selects every map-originated type.
+ * mln_map_get_event_mask() reports the value last set, so a host reads it,
+ * changes one bit, and writes it back.
+ *
+ * A map that has not been narrowed selects every map-originated event type this
+ * library reports, which covers types a caller's header may not declare. A new
+ * mask applies to later events and keeps the events already queued.
+ *
+ * One unread render-update event covers every invalidation queued behind it,
+ * compared against the queue tail. Leaving out a type that used to arrive
+ * between two render updates makes those two updates adjacent, so they coalesce
+ * into one.
+ *
+ * Select every event type the host reads. These types carry state a host
+ * reaches no other way:
+ *
+ * - MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE is the map's only
+ *   invalidation report. See mln_map_request_repaint().
+ * - MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED and
+ *   MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED are the only reports that a
+ *   still-image request finished. See mln_map_request_still_image().
+ * - MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED carries the
+ *   transition identity a caller set on an animation, and
+ *   MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE distinguishes a completed
+ *   transition from a cancelled one. See mln_animation_options.transition_id.
+ * - MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED and
+ *   MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR carry native failure text.
+ *
+ * mln_map_set_style_url() and mln_map_set_style_json() report a style failure
+ * that MapLibre raises inside the call through their return status and a thread
+ * diagnostic, whatever this mask selects.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not a live map handle, or
+ *   mask holds a bit outside MLN_RUNTIME_EVENT_MASK_ALL.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status
+mln_map_set_event_mask(mln_map map, uint64_t mask) MLN_NOEXCEPT;
+
+/**
+ * Reports which map-originated event types this map queues.
+ *
+ * The value is the mask last set, including bits outside
+ * MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS that this map ignores. A map that has
+ * not been narrowed reports MLN_RUNTIME_EVENT_MASK_ALL as this library defines
+ * it.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not a live map handle, or
+ *   out_mask is null.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status
+mln_map_get_event_mask(mln_map map, uint64_t* out_mask) MLN_NOEXCEPT;
 
 #ifdef __cplusplus
 }

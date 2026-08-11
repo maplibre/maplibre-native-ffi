@@ -14,7 +14,7 @@ public expect class RuntimeHandle : AutoCloseable {
 
   /**
    * Advances this runtime: parks the owner thread when [timeoutMillis] allows it, then drains the
-   * owner-thread task queues. Drain the queued runtime events with [pollEvent] afterwards.
+   * owner-thread task queues. Drain the queued runtime events with [drainEvents] afterwards.
    *
    * [timeoutMillis] bounds the park. Zero drains and returns, a positive value parks for up to that
    * many milliseconds, and a negative value parks until a wake arrives. A parking call returns as
@@ -114,13 +114,26 @@ public expect class RuntimeHandle : AutoCloseable {
   public fun clearHttpHeaderTransform()
 
   /**
-   * Removes and returns one queued runtime event, or null when the queue is empty.
+   * Drains this runtime's queued events into one batch, in queue order.
    *
-   * Polling advances binding-owned state: a [RuntimeEventType.MAP_STYLE_LOADED] event releases the
-   * custom geometry sources the newly loaded style dropped, closing their upcall stubs. A host that
-   * stops polling keeps those stubs alive.
+   * [maxEvents] bounds the drain. Zero drains every queued event; a positive value drains at most
+   * that many events and reports the rest in [RuntimeEventBatch.remainingCount]. A negative value
+   * throws [org.maplibre.nativeffi.error.InvalidArgumentException].
+   *
+   * The two subscription masks decide which events reach the queue. Draining is a queue operation
+   * that runs no owner-thread work, so call [pump] first and drain what the pump produced.
    */
-  public fun pollEvent(): RuntimeEvent?
+  public fun drainEvents(maxEvents: Int = 0): RuntimeEventBatch
+
+  /**
+   * Runtime-originated event types that this runtime queues, [RuntimeEventMask.ALL] until a host
+   * narrows it.
+   *
+   * The setter reads the [RuntimeEventMask.ALL_RUNTIME_EVENTS] bits and ignores the rest, so a host
+   * reads this mask, changes one bit, and writes it back. Narrowing gates later events and keeps
+   * queued ones.
+   */
+  public var eventMask: RuntimeEventMask
 
   override fun close()
 

@@ -15,16 +15,14 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
 /**
  * {@snippet lang=c :
  * struct mln_runtime_event {
- *     uint32_t size;
  *     uint32_t type;
  *     uint32_t source_type;
  *     uint64_t source;
  *     int32_t code;
  *     uint32_t payload_type;
- *     const void *payload;
- *     size_t payload_size;
- *     const char *message;
- *     size_t message_size;
+ *     uint32_t message_offset;
+ *     uint32_t message_size;
+ *     mln_runtime_event_payload payload;
  * }
  * }
  */
@@ -35,17 +33,14 @@ public class mln_runtime_event {
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        MapLibreNativeC.C_INT.withName("size"),
         MapLibreNativeC.C_INT.withName("type"),
         MapLibreNativeC.C_INT.withName("source_type"),
-        MemoryLayout.paddingLayout(4),
         MapLibreNativeC.C_LONG.withName("source"),
         MapLibreNativeC.C_INT.withName("code"),
         MapLibreNativeC.C_INT.withName("payload_type"),
-        MapLibreNativeC.C_POINTER.withName("payload"),
-        MapLibreNativeC.C_LONG.withName("payload_size"),
-        MapLibreNativeC.C_POINTER.withName("message"),
-        MapLibreNativeC.C_LONG.withName("message_size")
+        MapLibreNativeC.C_INT.withName("message_offset"),
+        MapLibreNativeC.C_INT.withName("message_size"),
+        mln_runtime_event_payload.layout().withName("payload")
     ).withName("mln_runtime_event");
 
     /**
@@ -53,50 +48,6 @@ public class mln_runtime_event {
      */
     public static final GroupLayout layout() {
         return $LAYOUT;
-    }
-
-    private static final OfInt size$LAYOUT = (OfInt)$LAYOUT.select(groupElement("size"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * uint32_t size
-     * }
-     */
-    public static final OfInt size$layout() {
-        return size$LAYOUT;
-    }
-
-    private static final long size$OFFSET = $LAYOUT.byteOffset(groupElement("size"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * uint32_t size
-     * }
-     */
-    public static final long size$offset() {
-        return size$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * uint32_t size
-     * }
-     */
-    public static int size(MemorySegment struct) {
-        return struct.get(size$LAYOUT, size$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * uint32_t size
-     * }
-     */
-    public static void size(MemorySegment struct, int fieldValue) {
-        struct.set(size$LAYOUT, size$OFFSET, fieldValue);
     }
 
     private static final OfInt type$LAYOUT = (OfInt)$LAYOUT.select(groupElement("type"));
@@ -319,147 +270,59 @@ public class mln_runtime_event {
         struct.set(payload_type$LAYOUT, payload_type$OFFSET, fieldValue);
     }
 
-    private static final AddressLayout payload$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("payload"));
+    private static final OfInt message_offset$LAYOUT = (OfInt)$LAYOUT.select(groupElement("message_offset"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * const void *payload
+     * uint32_t message_offset
      * }
      */
-    public static final AddressLayout payload$layout() {
-        return payload$LAYOUT;
+    public static final OfInt message_offset$layout() {
+        return message_offset$LAYOUT;
     }
 
-    private static final long payload$OFFSET = $LAYOUT.byteOffset(groupElement("payload"));
+    private static final long message_offset$OFFSET = $LAYOUT.byteOffset(groupElement("message_offset"));
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * const void *payload
+     * uint32_t message_offset
      * }
      */
-    public static final long payload$offset() {
-        return payload$OFFSET;
+    public static final long message_offset$offset() {
+        return message_offset$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * const void *payload
+     * uint32_t message_offset
      * }
      */
-    public static MemorySegment payload(MemorySegment struct) {
-        return struct.get(payload$LAYOUT, payload$OFFSET);
+    public static int message_offset(MemorySegment struct) {
+        return struct.get(message_offset$LAYOUT, message_offset$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * const void *payload
+     * uint32_t message_offset
      * }
      */
-    public static void payload(MemorySegment struct, MemorySegment fieldValue) {
-        struct.set(payload$LAYOUT, payload$OFFSET, fieldValue);
+    public static void message_offset(MemorySegment struct, int fieldValue) {
+        struct.set(message_offset$LAYOUT, message_offset$OFFSET, fieldValue);
     }
 
-    private static final OfLong payload_size$LAYOUT = (OfLong)$LAYOUT.select(groupElement("payload_size"));
+    private static final OfInt message_size$LAYOUT = (OfInt)$LAYOUT.select(groupElement("message_size"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * size_t payload_size
+     * uint32_t message_size
      * }
      */
-    public static final OfLong payload_size$layout() {
-        return payload_size$LAYOUT;
-    }
-
-    private static final long payload_size$OFFSET = $LAYOUT.byteOffset(groupElement("payload_size"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * size_t payload_size
-     * }
-     */
-    public static final long payload_size$offset() {
-        return payload_size$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * size_t payload_size
-     * }
-     */
-    public static long payload_size(MemorySegment struct) {
-        return struct.get(payload_size$LAYOUT, payload_size$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * size_t payload_size
-     * }
-     */
-    public static void payload_size(MemorySegment struct, long fieldValue) {
-        struct.set(payload_size$LAYOUT, payload_size$OFFSET, fieldValue);
-    }
-
-    private static final AddressLayout message$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("message"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * const char *message
-     * }
-     */
-    public static final AddressLayout message$layout() {
-        return message$LAYOUT;
-    }
-
-    private static final long message$OFFSET = $LAYOUT.byteOffset(groupElement("message"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * const char *message
-     * }
-     */
-    public static final long message$offset() {
-        return message$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * const char *message
-     * }
-     */
-    public static MemorySegment message(MemorySegment struct) {
-        return struct.get(message$LAYOUT, message$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * const char *message
-     * }
-     */
-    public static void message(MemorySegment struct, MemorySegment fieldValue) {
-        struct.set(message$LAYOUT, message$OFFSET, fieldValue);
-    }
-
-    private static final OfLong message_size$LAYOUT = (OfLong)$LAYOUT.select(groupElement("message_size"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * size_t message_size
-     * }
-     */
-    public static final OfLong message_size$layout() {
+    public static final OfInt message_size$layout() {
         return message_size$LAYOUT;
     }
 
@@ -468,7 +331,7 @@ public class mln_runtime_event {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * size_t message_size
+     * uint32_t message_size
      * }
      */
     public static final long message_size$offset() {
@@ -478,21 +341,65 @@ public class mln_runtime_event {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * size_t message_size
+     * uint32_t message_size
      * }
      */
-    public static long message_size(MemorySegment struct) {
+    public static int message_size(MemorySegment struct) {
         return struct.get(message_size$LAYOUT, message_size$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * size_t message_size
+     * uint32_t message_size
      * }
      */
-    public static void message_size(MemorySegment struct, long fieldValue) {
+    public static void message_size(MemorySegment struct, int fieldValue) {
         struct.set(message_size$LAYOUT, message_size$OFFSET, fieldValue);
+    }
+
+    private static final GroupLayout payload$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("payload"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * mln_runtime_event_payload payload
+     * }
+     */
+    public static final GroupLayout payload$layout() {
+        return payload$LAYOUT;
+    }
+
+    private static final long payload$OFFSET = $LAYOUT.byteOffset(groupElement("payload"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * mln_runtime_event_payload payload
+     * }
+     */
+    public static final long payload$offset() {
+        return payload$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * mln_runtime_event_payload payload
+     * }
+     */
+    public static MemorySegment payload(MemorySegment struct) {
+        return struct.asSlice(payload$OFFSET, payload$LAYOUT.byteSize());
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * mln_runtime_event_payload payload
+     * }
+     */
+    public static void payload(MemorySegment struct, MemorySegment fieldValue) {
+        MemorySegment.copy(fieldValue, 0L, struct, payload$OFFSET, payload$LAYOUT.byteSize());
     }
 
     /**

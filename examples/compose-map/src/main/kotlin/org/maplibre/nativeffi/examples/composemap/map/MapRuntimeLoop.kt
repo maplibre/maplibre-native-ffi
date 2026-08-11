@@ -12,6 +12,7 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
+import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
@@ -77,6 +78,11 @@ internal class MapRuntimeLoop(
             height = extent.height
             scaleFactor = extent.scaleFactor
             mapMode = MapMode.CONTINUOUS
+            // The two event types this loop reads. A map queues no event of an
+            // unselected type, so nothing accumulates before the style load.
+            eventMask =
+              RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE +
+                RuntimeEventMask.MAP_RENDER_FRAME_FINISHED
           },
         )
       map = createdMap
@@ -183,11 +189,11 @@ internal class MapRuntimeLoop(
     }
   }
 
-  /** Drains runtime events, reporting whether the map wants another frame. */
+  /** Drains one batch of runtime events, reporting whether the map wants another frame. */
   private fun drainEvents(runtime: RuntimeHandle, map: MapHandle): Boolean {
     var renderUpdateAvailable = false
-    while (true) {
-      val event = runtime.pollEvent() ?: return renderUpdateAvailable
+    // One drain takes every event the pump produced.
+    for (event in runtime.drainEvents().events) {
       if (event.mapSource != map) {
         continue
       }
@@ -200,6 +206,7 @@ internal class MapRuntimeLoop(
         renderUpdateAvailable = true
       }
     }
+    return renderUpdateAvailable
   }
 
   private companion object {

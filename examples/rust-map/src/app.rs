@@ -124,8 +124,8 @@ impl App {
         }
     }
 
-    /// One render loop iteration. The runtime loop owns `pump` and
-    /// `poll_event`.
+    /// One render loop iteration. The runtime loop owns `pump` and the event
+    /// drain.
     pub fn step(&mut self) {
         if let Some(error) = self.shared.failure() {
             eprintln!("runtime loop failed: {error}");

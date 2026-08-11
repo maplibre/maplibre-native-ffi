@@ -56,10 +56,11 @@ internal class OfflineOperationHandleCore(
     return operationId
   }
 
-  fun markConsumed() {
-    if (closed.compareAndSet(0, 1)) {
-      leakReport.markClosed()
-      releaseRuntimeRetention()
-    }
+  /** Closes this operation, returning true for the call that closed it. */
+  fun markConsumed(): Boolean {
+    if (!closed.compareAndSet(0, 1)) return false
+    leakReport.markClosed()
+    releaseRuntimeRetention()
+    return true
   }
 }

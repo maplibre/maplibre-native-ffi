@@ -44,7 +44,9 @@ internal constructor(
     expectedResultKind: OfflineOperationResultKind,
   ): ULong = core.requireLive(expectedRuntime, expectedKind, expectedResultKind).toULong()
 
-  internal fun markConsumed() = core.markConsumed()
+  internal fun markConsumed() {
+    core.markConsumed()
+  }
 
   public actual override fun close() {
     if (!isClosed) runtime.discardOfflineOperation(this)

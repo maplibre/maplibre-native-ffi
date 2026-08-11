@@ -1,5 +1,7 @@
 using Maplibre.NativeFfi.Error;
+using Maplibre.NativeFfi.Geo;
 using Maplibre.NativeFfi.Internal.C;
+using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Offline;
 using Maplibre.NativeFfi.Runtime;
 using Xunit;
@@ -108,5 +110,62 @@ public sealed class RuntimeOfflineOperationTests
         Assert.Equal(6u, status.RequiredResourceCount);
         Assert.True(status.RequiredResourceCountIsPrecise);
         Assert.True(status.Complete);
+    }
+
+    [BindingSpecTest("BND-084", "BND-085")]
+    [Fact]
+    public void OfflineRegionsAreCreatedListedAndDeletedThroughDrainedCompletions()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions { CachePath = ":memory:" });
+        var definition = new OfflineRegionDefinition.TilePyramid(
+            "custom://offline-style.json",
+            new LatLngBounds(new LatLng(0, 0), new LatLng(1, 1)),
+            0,
+            1,
+            1,
+            true
+        );
+        using var create = runtime.StartCreateOfflineRegion(definition, [1, 2, 3]);
+        CompleteOperation(runtime, create);
+        var region = runtime.TakeCreateOfflineRegionResult(create);
+        Assert.Equal<byte[]>([1, 2, 3], region.Metadata);
+
+        using var list = runtime.StartOfflineRegions();
+        CompleteOperation(runtime, list);
+        Assert.Contains(runtime.TakeOfflineRegionsResult(list), listed => listed.Id == region.Id);
+
+        using var delete = runtime.StartDeleteOfflineRegion(region.Id);
+        CompleteOperation(runtime, delete);
+        delete.Close();
+
+        using var listAgain = runtime.StartOfflineRegions();
+        CompleteOperation(runtime, listAgain);
+        Assert.DoesNotContain(
+            runtime.TakeOfflineRegionsResult(listAgain),
+            listed => listed.Id == region.Id
+        );
+    }
+
+    // Pumps and drains until the operation reports the completion event that makes its result
+    // available, which is the only signal a host has for taking one.
+    private static void CompleteOperation(RuntimeHandle runtime, OfflineOperationHandle operation)
+    {
+        for (var attempt = 0; attempt < 1000; attempt++)
+        {
+            runtime.Pump(TimeSpan.FromMilliseconds(1));
+            foreach (var drained in runtime.DrainEvents().Events)
+            {
+                if (
+                    drained.Payload is RuntimeEventPayload.OfflineOperationCompleted completed
+                    && completed.OperationId == operation.Id
+                )
+                {
+                    Assert.Equal((int)MaplibreStatus.Ok, drained.Code);
+                    return;
+                }
+            }
+        }
+
+        throw new TimeoutException($"Offline operation {operation.Id} never completed.");
     }
 }

@@ -113,7 +113,7 @@ def wait_for_texture_info(
     request_still_image_if_needed(fixture.map)
     for _ in range(iterations):
         fixture.runtime.pump()
-        while event := fixture.runtime.poll_event():
+        for event in fixture.runtime.drain_events().events:
             if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
                 try:
                     fixture.session.render_update()
@@ -136,7 +136,7 @@ def wait_for_metal_frame(
     last_frame: render.MetalOwnedTextureFrame | None = None
     for _ in range(iterations):
         fixture.runtime.pump()
-        while event := fixture.runtime.poll_event():
+        for event in fixture.runtime.drain_events().events:
             if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
                 try:
                     fixture.session.render_update()

@@ -1,8 +1,10 @@
 #pragma once
 
+#include <atomic>
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <deque>
 #include <memory>
 #include <mutex>
@@ -10,7 +12,6 @@
 #include <shared_mutex>
 #include <string>
 #include <thread>
-#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -28,6 +29,55 @@ class DatabaseFileSource;
 namespace mln::core {
 
 struct RuntimeObject;
+
+// Read on the map owner thread by every map event producer, and on the mbgl
+// DatabaseFileSourceThread by every offline producer. Held by shared_ptr so a
+// camera transition that outlives its map still reads a live cell.
+struct MapEventState {
+  std::atomic<uint64_t> mask;
+  // Owner-thread only. The style setters clear this before a load and read it
+  // after, so a subscription mask can never change their return status.
+  std::string style_load_failure;
+  bool style_load_failed = false;
+};
+
+struct RuntimeEventState {
+  std::atomic<uint64_t> mask;
+};
+
+static_assert(
+  std::atomic<uint64_t>::is_always_lock_free,
+  "a lock-based 64-bit atomic would put a lock on the event producer hot path"
+);
+static_assert(
+  MLN_RUNTIME_EVENT_MASK_ALL == (MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS |
+                                 MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS),
+  "every event type needs a mask bit in one of the two groups"
+);
+static_assert(
+  MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED < 64,
+  "an event type value past 63 needs a wider subscription mask"
+);
+
+// One relaxed load, one shift, one test. No handle-table lock, no event_mutex.
+// Relaxed ordering is correct because the mask is policy rather than a
+// synchronisation edge: the documented semantics gate events queued after a
+// setter returns and say nothing about events already in flight.
+[[nodiscard]] inline auto event_selected(
+  const std::atomic<uint64_t>& mask, uint32_t type
+) noexcept -> bool {
+  return ((mask.load(std::memory_order_relaxed) >> type) & 1U) != 0U;
+}
+
+// A payload whose bytes are all zero. Producers write one member onto it, so an
+// event carries no indeterminate bytes past the member its payload type names,
+// and an event without a payload carries zeros.
+[[nodiscard]] inline auto zeroed_event_payload() noexcept
+  -> mln_runtime_event_payload {
+  auto payload = mln_runtime_event_payload{};
+  std::memset(&payload, 0, sizeof(payload));
+  return payload;
+}
 
 struct ResourceProvider {
   mln_resource_provider_callback callback = nullptr;
@@ -116,7 +166,7 @@ struct QueuedRuntimeEvent {
   uint64_t source;
   int32_t code;
   uint32_t payload_type;
-  std::vector<std::byte> payload;
+  mln_runtime_event_payload payload = zeroed_event_payload();
   std::string message;
   bool has_offline_region = false;
   mln_offline_region_id offline_region_id = 0;
@@ -141,14 +191,18 @@ struct RuntimeObject {
   std::shared_ptr<mln::core::HttpHeaderTransformState>
     http_header_transform_state;
   std::shared_ptr<mln::core::WakeState> wake_state;
+  std::shared_ptr<mln::core::RuntimeEventState> event_state;
   std::size_t live_maps = 0;
   mutable std::mutex event_mutex;
   std::unordered_set<mln_map> event_maps;
   std::deque<mln::core::QueuedRuntimeEvent> events;
   std::unordered_set<mln_offline_region_id> observed_offline_regions;
-  std::vector<std::byte> last_polled_event_payload;
-  std::string last_polled_event_message;
-  std::unordered_map<mln_map, std::string> map_loading_failures;
+  // Owner-thread only. A drain is the only reader and writer, and every drain
+  // is owner-thread affine, so event_mutex does not guard these three. Each
+  // keeps its capacity, so a steady-state drain allocates nothing.
+  std::vector<mln::core::QueuedRuntimeEvent> event_drain_staging;
+  std::vector<mln_runtime_event> event_batch_events;
+  std::string event_batch_messages;
 };
 
 template <>
@@ -172,9 +226,12 @@ auto destroy_wake_source(mln_wake_source source) noexcept -> void;
 // owner thread. Callers hold the `RunLoop` mutex or `event_mutex`; see
 // `WakeState`.
 auto signal_wake(const std::shared_ptr<WakeState>& state) noexcept -> void;
-auto poll_runtime_event(
-  mln_runtime runtime, mln_runtime_event* out_event, bool* out_has_event
+auto drain_runtime_events(
+  mln_runtime runtime, size_t max_events, mln_runtime_event_batch* out_batch
 ) -> mln_status;
+auto set_runtime_event_mask(mln_runtime runtime, uint64_t mask) -> mln_status;
+auto get_runtime_event_mask(mln_runtime runtime, uint64_t* out_mask)
+  -> mln_status;
 auto set_resource_provider(
   mln_runtime runtime, const mln_resource_provider* provider
 ) -> mln_status;
@@ -331,14 +388,10 @@ auto push_runtime_map_event(
 ) -> void;
 auto push_runtime_map_event_payload(
   mln_runtime runtime, mln_map map, uint32_t type, uint32_t payload_type,
-  std::vector<std::byte> payload, int32_t code = 0, std::string message = {}
+  const mln_runtime_event_payload& payload, int32_t code = 0,
+  std::string message = {}
 ) -> void;
 auto register_runtime_map_events(mln_runtime runtime, mln_map map) -> void;
-auto clear_runtime_map_loading_failure(mln_runtime runtime, mln_map map)
-  -> void;
-auto runtime_map_loading_failed(mln_runtime runtime, mln_map map) -> bool;
-auto runtime_map_loading_failure_message(mln_runtime runtime, mln_map map)
-  -> std::string;
 auto discard_runtime_map_events(mln_runtime runtime, mln_map map) -> void;
 
 }  // namespace mln::core

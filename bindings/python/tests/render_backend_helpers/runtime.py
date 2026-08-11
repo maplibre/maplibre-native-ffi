@@ -97,7 +97,7 @@ def wait_for_runtime_event(
 ) -> mln.RuntimeEvent:
     for _ in range(iterations):
         runtime.pump()
-        while event := runtime.poll_event():
+        for event in runtime.drain_events().events:
             if event.event_type == event_type:
                 return event
         time.sleep(0.001)
@@ -130,7 +130,7 @@ def render_until(
     """Pump and render until `condition` holds, failing with `description`."""
     for _ in range(iterations):
         runtime.pump()
-        while event := runtime.poll_event():
+        for event in runtime.drain_events().events:
             if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
                 session.render_update()
         if condition():
@@ -167,7 +167,7 @@ def wait_for_rendered_layer_feature(
     for _ in range(iterations):
         request_still_image_if_needed(map_handle)
         runtime.pump()
-        while event := runtime.poll_event():
+        for event in runtime.drain_events().events:
             if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
                 try:
                     session.render_update()

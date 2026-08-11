@@ -1,24 +1,19 @@
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
 use std::fmt;
 use std::marker::PhantomData;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 use std::time::Duration;
 
 use maplibre_core::AmbientCacheOperation;
 use maplibre_native_ffi_core as maplibre_core;
 use maplibre_native_ffi_sys as sys;
 
-use crate::events::{
-    MapId, OfflineRegionDownloadState, OfflineRegionStatus, RuntimeEvent, RuntimeEventSource,
-    empty_runtime_event,
-};
+use crate::events::{OfflineRegionDownloadState, OfflineRegionStatus, RuntimeEventBatch};
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
-use crate::map::MapState;
 use crate::resource::{HttpHeaderTransformState, ResourceProviderState, ResourceTransformState};
 use crate::{
     Error, ErrorKind, HandleOperationError, OfflineOperationTakeError, ResourceProviderDecision,
-    Result,
+    Result, RuntimeEventMask,
 };
 #[cfg(test)]
 use crate::{LatLngBounds, MapHandle, MapOptions};
@@ -31,7 +26,6 @@ pub(crate) use maplibre_core::runtime::{
 #[derive(Debug)]
 pub(crate) struct RuntimeState {
     handle: ThreadAffineNativeHandle<sys::mln_runtime>,
-    map_states: RefCell<HashMap<MapId, Weak<MapState>>>,
     resource_transform: RefCell<Option<Box<ResourceTransformState>>>,
     http_header_transform: RefCell<Option<Box<HttpHeaderTransformState>>>,
     resource_provider: RefCell<Option<Box<ResourceProviderState>>>,
@@ -46,7 +40,6 @@ impl RuntimeState {
         }?;
         Ok(Self {
             handle,
-            map_states: RefCell::new(HashMap::new()),
             resource_transform: RefCell::new(None),
             http_header_transform: RefCell::new(None),
             resource_provider: RefCell::new(None),
@@ -179,59 +172,6 @@ impl RuntimeState {
         self.http_header_transform.borrow_mut().take();
         Ok(())
     }
-
-    pub(crate) fn register_map(&self, native: sys::mln_map) -> MapId {
-        MapId::new(native.0)
-    }
-
-    pub(crate) fn register_map_state(&self, native: sys::mln_map, state: Weak<MapState>) {
-        if native.0 != 0 {
-            self.map_states
-                .borrow_mut()
-                .insert(MapId::new(native.0), state);
-        }
-    }
-
-    pub(crate) fn unregister_map(&self, native: sys::mln_map) {
-        if native.0 != 0 {
-            self.map_states.borrow_mut().remove(&MapId::new(native.0));
-        }
-    }
-
-    fn apply_event_side_effects(&self, raw: &sys::mln_runtime_event) {
-        if raw.source_type != sys::MLN_RUNTIME_EVENT_SOURCE_MAP {
-            return;
-        }
-        let state = self
-            .map_states
-            .borrow()
-            .get(&MapId::new(raw.source))
-            .and_then(Weak::upgrade);
-        let Some(state) = state else {
-            return;
-        };
-        if raw.type_ == sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED {
-            state.release_detached_custom_geometry_sources();
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn apply_event_side_effects_for_testing(&self, raw: &sys::mln_runtime_event) {
-        self.apply_event_side_effects(raw);
-    }
-
-    fn source_for_event(&self, raw: &sys::mln_runtime_event) -> RuntimeEventSource {
-        match raw.source_type {
-            sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME => RuntimeEventSource::Runtime,
-            // The copied id grants nothing, so it is reported whether or not
-            // this runtime still holds a wrapper for that map.
-            sys::MLN_RUNTIME_EVENT_SOURCE_MAP if raw.source != 0 => {
-                RuntimeEventSource::Map(MapId::new(raw.source))
-            }
-            sys::MLN_RUNTIME_EVENT_SOURCE_MAP => RuntimeEventSource::UnknownMap,
-            source_type => RuntimeEventSource::Unknown(source_type),
-        }
-    }
 }
 
 /// Owner-thread runtime handle for MapLibre Native work and event polling.
@@ -299,6 +239,9 @@ impl<T> OfflineOperationHandle<T> {
         self.runtime.native()
     }
 
+    /// Retires this handle after native took or discarded the operation, which
+    /// also drops the operation's undrained completion event from the native
+    /// queue.
     fn mark_consumed(&self) {
         self.live.set(false);
     }
@@ -318,7 +261,7 @@ impl<T> OfflineOperationHandle<T> {
         if let Err(error) = maplibre_core::check(status) {
             return Err(HandleOperationError::new(error, self));
         }
-        self.live.set(false);
+        self.mark_consumed();
         Ok(())
     }
 }
@@ -333,7 +276,7 @@ impl<T> Drop for OfflineOperationHandle<T> {
             let status =
                 unsafe { sys::mln_runtime_offline_operation_discard(runtime, self.operation_id) };
             if status == sys::MLN_STATUS_OK {
-                self.live.set(false);
+                self.mark_consumed();
             }
         }
     }
@@ -855,7 +798,7 @@ impl RuntimeHandle {
 
     /// Advances this runtime: parks the owner thread when `timeout` allows it,
     /// then drains the owner-thread task queues. Drain the queued runtime
-    /// events with [`Self::poll_event`] afterwards.
+    /// events with [`Self::drain_events`] afterwards.
     ///
     /// `Some(Duration::ZERO)` drains and returns, a longer `Some` parks for up
     /// to that long, and `None` parks until a wake arrives. The drain runs
@@ -895,31 +838,65 @@ impl RuntimeHandle {
         })
     }
 
-    /// Polls one queued runtime event and copies it into an owned Rust value.
+    /// Drains this runtime's queued events into one batch borrowed from
+    /// runtime-owned storage.
     ///
-    /// Polling also advances binding-owned state: a
-    /// [`crate::RuntimeEventType::MapStyleLoaded`] event releases the callback
-    /// state of custom geometry sources the new style dropped. A map whose
-    /// events go unpolled keeps that state alive.
-    pub fn poll_event(&self) -> Result<Option<RuntimeEvent>> {
+    /// `max_events` bounds the drain. Zero drains every queued event, and a
+    /// positive value drains at most that many and reports the rest through
+    /// [`RuntimeEventBatch::remaining`].
+    ///
+    /// The returned batch borrows this handle, so the next drain waits until
+    /// the batch is dropped, and an event read out of the batch borrows the
+    /// batch. Take [`crate::RuntimeEventRef::to_owned`] for a value that
+    /// outlives either.
+    ///
+    /// A drain invalidates the batch before it, which the mutable borrow turns
+    /// into a compile error:
+    ///
+    /// ```compile_fail,E0499
+    /// # use maplibre_native_ffi::{RuntimeHandle, RuntimeOptions};
+    /// let mut runtime = RuntimeHandle::with_options(&RuntimeOptions::default()).unwrap();
+    /// let batch = runtime.drain_events(0).unwrap();
+    /// let next = runtime.drain_events(0).unwrap();
+    /// let _ = batch.len();
+    /// ```
+    pub fn drain_events(&mut self, max_events: usize) -> Result<RuntimeEventBatch<'_>> {
         let runtime = self.inner.native()?;
-        let mut event = empty_runtime_event();
-        let mut has_event = false;
-
-        // SAFETY: runtime is live, event points to initialized writable storage
-        // with a valid size field, and has_event points to writable bool storage.
+        // SAFETY: The default constructor takes no arguments and fills the size
+        // field for this C ABI version.
+        let mut raw = unsafe { sys::mln_runtime_event_batch_default() };
+        // SAFETY: runtime is live, and raw points to writable batch storage
+        // whose size field this call reads.
         maplibre_core::check(unsafe {
-            sys::mln_runtime_poll_event(runtime, &mut event, &mut has_event)
+            sys::mln_runtime_drain_events(runtime, max_events, &mut raw)
         })?;
-        if !has_event {
-            return Ok(None);
-        }
+        // SAFETY: raw came from a successful drain on this runtime, so its
+        // storage stays readable until the next drain, which the returned
+        // batch's borrow of this handle keeps out of the way.
+        Ok(unsafe { RuntimeEventBatch::new(raw) })
+    }
 
-        let raw_event = event;
-        let source = self.inner.source_for_event(&raw_event);
-        let event = RuntimeEvent::from_native(&raw_event, source)?;
-        self.inner.apply_event_side_effects(&raw_event);
-        Ok(Some(event))
+    /// Selects which runtime-originated event types this runtime queues.
+    ///
+    /// A runtime reads the bits in
+    /// [`RuntimeEventMask::ALL_RUNTIME_EVENTS`](crate::RuntimeEventMask::ALL_RUNTIME_EVENTS),
+    /// so [`RuntimeEventMask::ALL`](crate::RuntimeEventMask::ALL) selects every
+    /// runtime-originated type. Narrowing gates later events and keeps queued
+    /// ones. A bit outside `ALL` is an invalid-argument error.
+    pub fn set_event_mask(&self, mask: RuntimeEventMask) -> Result<()> {
+        let runtime = self.inner.native()?;
+        // SAFETY: runtime is live. The C API validates unknown mask bits.
+        maplibre_core::check(unsafe { sys::mln_runtime_set_event_mask(runtime, mask.bits()) })
+    }
+
+    /// Reports which runtime-originated event types this runtime queues,
+    /// starting from the mask its creation options selected.
+    pub fn event_mask(&self) -> Result<RuntimeEventMask> {
+        let runtime = self.inner.native()?;
+        let mut raw = 0;
+        // SAFETY: runtime is live and out_mask points to writable u64 storage.
+        maplibre_core::check(unsafe { sys::mln_runtime_get_event_mask(runtime, &mut raw) })?;
+        Ok(RuntimeEventMask::from_bits_retain(raw))
     }
 
     /// Explicitly destroys the runtime. A failed destroy leaves the native
@@ -990,8 +967,8 @@ mod tests {
     use super::*;
     use crate::{
         ErrorKind, OfflineOperationCompletedEvent, ResourceErrorReason, ResourceKind,
-        ResourceProviderDecision, ResourceResponse, RuntimeEventPayload, RuntimeEventSource,
-        RuntimeEventType,
+        ResourceProviderDecision, ResourceResponse, RuntimeEvent, RuntimeEventPayload,
+        RuntimeEventSource, RuntimeEventType,
     };
     use maplibre_core::{OfflineOperationKind as Op, OfflineOperationResultKind as OpResult};
 
@@ -1168,7 +1145,7 @@ mod tests {
     }
 
     fn wait_for_operation<T>(
-        runtime: &RuntimeHandle,
+        runtime: &mut RuntimeHandle,
         operation: &OfflineOperationHandle<T>,
         operation_kind: Op,
         result_kind: OpResult,
@@ -1186,8 +1163,9 @@ mod tests {
                 ));
             }
             runtime.pump(Some(Duration::ZERO))?;
-            while let Some(event) = runtime.poll_event()? {
-                let RuntimeEventPayload::OfflineOperationCompleted(completed) = event.payload
+            let mut outcome = None;
+            for event in runtime.drain_events(0)?.iter() {
+                let RuntimeEventPayload::OfflineOperationCompleted(completed) = event.payload()
                 else {
                     continue;
                 };
@@ -1198,10 +1176,14 @@ mod tests {
                 assert_eq!(completed.raw_operation_kind, operation_kind.raw_value());
                 assert_eq!(completed.result_kind, result_kind);
                 assert_eq!(completed.raw_result_kind, result_kind.raw_value());
+                outcome = Some((completed, event.message()?.unwrap_or_default().to_owned()));
+                break;
+            }
+            if let Some((completed, message)) = outcome {
                 if completed.result_status != sys::MLN_STATUS_OK {
                     return Err(Error::from_status_and_diagnostic(
                         completed.result_status,
-                        event.message.unwrap_or_default(),
+                        message,
                     ));
                 }
                 return Ok(completed);
@@ -1218,7 +1200,7 @@ mod tests {
 
         let mut options = RuntimeOptions::default();
         options.cache_path = Some(cache.to_string_lossy().into_owned());
-        let runtime = RuntimeHandle::with_options(&options).unwrap();
+        let mut runtime = RuntimeHandle::with_options(&options).unwrap();
 
         for operation in [
             AmbientCacheOperation::PackDatabase,
@@ -1228,7 +1210,8 @@ mod tests {
         ] {
             let operation = runtime.start_ambient_cache_operation(operation).unwrap();
             let completed =
-                wait_for_operation(&runtime, &operation, Op::AmbientCache, OpResult::None).unwrap();
+                wait_for_operation(&mut runtime, &operation, Op::AmbientCache, OpResult::None)
+                    .unwrap();
             assert_eq!(completed.operation_id, operation.operation_id);
             operation.discard().unwrap();
         }
@@ -1244,13 +1227,13 @@ mod tests {
 
         let mut options = RuntimeOptions::default();
         options.cache_path = Some(cache.to_string_lossy().into_owned());
-        let runtime = RuntimeHandle::with_options(&options).unwrap();
+        let mut runtime = RuntimeHandle::with_options(&options).unwrap();
 
         // Raising then lowering the budget both report through the same event.
         for size in [8 * 1024 * 1024, 0] {
             let operation = runtime.start_set_maximum_ambient_cache_size(size).unwrap();
             let completed = wait_for_operation(
-                &runtime,
+                &mut runtime,
                 &operation,
                 Op::SetMaximumAmbientCacheSize,
                 OpResult::None,
@@ -1294,13 +1277,13 @@ mod tests {
     fn offline_region_apis_use_real_c_abi() {
         let mut options = RuntimeOptions::default();
         options.cache_path = Some(":memory:".into());
-        let runtime = RuntimeHandle::with_options(&options).unwrap();
+        let mut runtime = RuntimeHandle::with_options(&options).unwrap();
         let definition = test_offline_region_definition("custom://offline-style.json");
 
         let create = runtime
             .start_create_offline_region(&definition, b"abc")
             .unwrap();
-        wait_for_operation(&runtime, &create, Op::RegionCreate, OpResult::Region).unwrap();
+        wait_for_operation(&mut runtime, &create, Op::RegionCreate, OpResult::Region).unwrap();
         let created = create.take().unwrap();
         assert_eq!(created.definition, definition);
         assert_eq!(created.metadata, b"abc");
@@ -1317,7 +1300,7 @@ mod tests {
             .start_create_offline_region(&geometry_definition, b"geo")
             .unwrap();
         wait_for_operation(
-            &runtime,
+            &mut runtime,
             &create_geometry,
             Op::RegionCreate,
             OpResult::Region,
@@ -1328,12 +1311,12 @@ mod tests {
         assert_eq!(geometry_region.metadata, b"geo");
 
         let get = runtime.start_offline_region(created.id).unwrap();
-        wait_for_operation(&runtime, &get, Op::RegionGet, OpResult::OptionalRegion).unwrap();
+        wait_for_operation(&mut runtime, &get, Op::RegionGet, OpResult::OptionalRegion).unwrap();
         let fetched = get.take().unwrap().unwrap();
         assert_eq!(fetched, created);
 
         let list = runtime.start_offline_regions().unwrap();
-        wait_for_operation(&runtime, &list, Op::RegionsList, OpResult::RegionList).unwrap();
+        wait_for_operation(&mut runtime, &list, Op::RegionsList, OpResult::RegionList).unwrap();
         let listed = list.take().unwrap();
         assert!(listed.iter().any(|region| region.id == created.id));
 
@@ -1341,7 +1324,7 @@ mod tests {
             .start_update_offline_region_metadata(created.id, b"")
             .unwrap();
         wait_for_operation(
-            &runtime,
+            &mut runtime,
             &update,
             Op::RegionUpdateMetadata,
             OpResult::Region,
@@ -1353,7 +1336,7 @@ mod tests {
 
         let status_operation = runtime.start_offline_region_status(created.id).unwrap();
         wait_for_operation(
-            &runtime,
+            &mut runtime,
             &status_operation,
             Op::RegionGetStatus,
             OpResult::RegionStatus,
@@ -1372,7 +1355,7 @@ mod tests {
             )
             .unwrap();
         wait_for_operation(
-            &runtime,
+            &mut runtime,
             &set_inactive,
             Op::RegionSetDownloadState,
             OpResult::None,
@@ -1390,28 +1373,52 @@ mod tests {
         let observe = runtime
             .start_set_offline_region_observed(created.id, true)
             .unwrap();
-        wait_for_operation(&runtime, &observe, Op::RegionSetObserved, OpResult::None).unwrap();
+        wait_for_operation(
+            &mut runtime,
+            &observe,
+            Op::RegionSetObserved,
+            OpResult::None,
+        )
+        .unwrap();
         observe.discard().unwrap();
         let unobserve = runtime
             .start_set_offline_region_observed(created.id, false)
             .unwrap();
-        wait_for_operation(&runtime, &unobserve, Op::RegionSetObserved, OpResult::None).unwrap();
+        wait_for_operation(
+            &mut runtime,
+            &unobserve,
+            Op::RegionSetObserved,
+            OpResult::None,
+        )
+        .unwrap();
         unobserve.discard().unwrap();
         let invalidate = runtime.start_invalidate_offline_region(created.id).unwrap();
-        wait_for_operation(&runtime, &invalidate, Op::RegionInvalidate, OpResult::None).unwrap();
+        wait_for_operation(
+            &mut runtime,
+            &invalidate,
+            Op::RegionInvalidate,
+            OpResult::None,
+        )
+        .unwrap();
         invalidate.discard().unwrap();
         let delete = runtime.start_delete_offline_region(created.id).unwrap();
-        wait_for_operation(&runtime, &delete, Op::RegionDelete, OpResult::None).unwrap();
+        wait_for_operation(&mut runtime, &delete, Op::RegionDelete, OpResult::None).unwrap();
         delete.discard().unwrap();
         let delete_geometry = runtime
             .start_delete_offline_region(geometry_region.id)
             .unwrap();
-        wait_for_operation(&runtime, &delete_geometry, Op::RegionDelete, OpResult::None).unwrap();
+        wait_for_operation(
+            &mut runtime,
+            &delete_geometry,
+            Op::RegionDelete,
+            OpResult::None,
+        )
+        .unwrap();
         delete_geometry.discard().unwrap();
 
         let missing_created = runtime.start_offline_region(created.id).unwrap();
         wait_for_operation(
-            &runtime,
+            &mut runtime,
             &missing_created,
             Op::RegionGet,
             OpResult::OptionalRegion,
@@ -1420,7 +1427,7 @@ mod tests {
         assert!(missing_created.take().unwrap().is_none());
         let missing_geometry = runtime.start_offline_region(geometry_region.id).unwrap();
         wait_for_operation(
-            &runtime,
+            &mut runtime,
             &missing_geometry,
             Op::RegionGet,
             OpResult::OptionalRegion,
@@ -1442,23 +1449,29 @@ mod tests {
         {
             let mut side_options = RuntimeOptions::default();
             side_options.cache_path = Some(side_cache.to_string_lossy().into_owned());
-            let side_runtime = RuntimeHandle::with_options(&side_options).unwrap();
+            let mut side_runtime = RuntimeHandle::with_options(&side_options).unwrap();
             let create = side_runtime
                 .start_create_offline_region(&definition, b"merge")
                 .unwrap();
-            wait_for_operation(&side_runtime, &create, Op::RegionCreate, OpResult::Region).unwrap();
+            wait_for_operation(
+                &mut side_runtime,
+                &create,
+                Op::RegionCreate,
+                OpResult::Region,
+            )
+            .unwrap();
             create.take().unwrap();
             side_runtime.close().unwrap();
         }
 
         let mut main_options = RuntimeOptions::default();
         main_options.cache_path = Some(main_cache.to_string_lossy().into_owned());
-        let main_runtime = RuntimeHandle::with_options(&main_options).unwrap();
+        let mut main_runtime = RuntimeHandle::with_options(&main_options).unwrap();
         let merge = main_runtime
             .start_merge_offline_regions_database(&side_cache.to_string_lossy())
             .unwrap();
         wait_for_operation(
-            &main_runtime,
+            &mut main_runtime,
             &merge,
             Op::RegionsMergeDatabase,
             OpResult::RegionList,
@@ -1542,26 +1555,37 @@ mod tests {
         );
     }
 
-    fn wait_for_runtime_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
+    fn drain_holds_event_type(runtime: &mut RuntimeHandle, event_type: RuntimeEventType) -> bool {
+        runtime
+            .drain_events(0)
+            .unwrap()
+            .iter()
+            .any(|event| event.event_type() == event_type)
+    }
+
+    fn wait_for_runtime_event(runtime: &mut RuntimeHandle, event_type: RuntimeEventType) -> bool {
         for _ in 0..100 {
             let _ = runtime.pump(Some(Duration::ZERO));
-            while let Ok(Some(event)) = runtime.poll_event() {
-                if event.event_type == event_type {
-                    return true;
-                }
+            if drain_holds_event_type(runtime, event_type) {
+                return true;
             }
             std::thread::sleep(Duration::from_millis(10));
         }
         false
     }
 
-    fn wait_for_map_loading_failure(runtime: &RuntimeHandle) -> RuntimeEvent {
+    fn wait_for_map_loading_failure(runtime: &mut RuntimeHandle) -> RuntimeEvent {
         for _ in 0..100 {
             runtime.pump(Some(Duration::ZERO)).unwrap();
-            while let Some(event) = runtime.poll_event().unwrap() {
-                if event.event_type == RuntimeEventType::MapLoadingFailed {
-                    return event;
+            let mut failure = None;
+            for event in runtime.drain_events(0).unwrap().iter() {
+                if event.event_type() == RuntimeEventType::MapLoadingFailed {
+                    failure = Some(event.to_owned().unwrap());
+                    break;
                 }
+            }
+            if let Some(failure) = failure {
+                return failure;
             }
             std::thread::sleep(Duration::from_millis(10));
         }
@@ -1570,26 +1594,27 @@ mod tests {
 
     #[test]
     // Spec coverage: BND-080.
-    fn runtime_create_run_poll_drain_and_close() {
-        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    fn runtime_create_run_drain_and_close() {
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
 
         runtime.pump(Some(Duration::ZERO)).unwrap();
-        let _ = runtime.poll_event().unwrap();
-        let _ = runtime.poll_event().unwrap();
-        while runtime.poll_event().unwrap().is_some() {}
+        // A fresh runtime with no map queues nothing.
+        let batch = runtime.drain_events(0).unwrap();
+        assert!(batch.is_empty());
+        assert_eq!(batch.len(), 0);
+        assert_eq!(batch.remaining(), 0);
+        assert_eq!(batch.iter().count(), 0);
+        // A second drain of an empty queue reports the same empty batch.
+        assert!(runtime.drain_events(0).unwrap().is_empty());
         runtime.close().unwrap();
     }
 
     // Pumps until the runtime is idle, so a park that follows is released by
     // the signal the test raises.
-    fn quiesce(runtime: &RuntimeHandle) {
+    fn quiesce(runtime: &mut RuntimeHandle) {
         for _ in 0..100 {
             runtime.pump(Some(Duration::ZERO)).unwrap();
-            let mut drained = false;
-            while runtime.poll_event().unwrap().is_some() {
-                drained = true;
-            }
-            if !drained {
+            if runtime.drain_events(0).unwrap().is_empty() {
                 return;
             }
         }
@@ -1598,7 +1623,7 @@ mod tests {
 
     // Drives the runtime the way a parked host does, so a missing wake shows up
     // as an expired timeout.
-    fn park_for_runtime_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
+    fn park_for_runtime_event(runtime: &mut RuntimeHandle, event_type: RuntimeEventType) -> bool {
         let started = Instant::now();
         for _ in 0..20 {
             runtime.pump(Some(Duration::from_secs(10))).unwrap();
@@ -1606,10 +1631,8 @@ mod tests {
                 started.elapsed() < Duration::from_secs(5),
                 "parks sat out their timeouts instead of taking wakes"
             );
-            while let Some(event) = runtime.poll_event().unwrap() {
-                if event.event_type == event_type {
-                    return true;
-                }
+            if drain_holds_event_type(runtime, event_type) {
+                return true;
             }
         }
         false
@@ -1618,7 +1641,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-088.
     fn parked_owner_thread_wakes_for_native_work_and_for_a_wake_source() {
-        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         runtime
             .set_resource_provider(move |request, handle| {
                 if request.requested_url != "custom://style.json" {
@@ -1636,14 +1659,14 @@ mod tests {
         let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
         map.set_style_url("custom://style.json").unwrap();
         assert!(park_for_runtime_event(
-            &runtime,
+            &mut runtime,
             RuntimeEventType::MapStyleLoaded
         ));
 
         // A source moved to another thread matches a host's submission path,
         // and the park it releases has no other work to end it.
         let source = runtime.wake_source().unwrap();
-        quiesce(&runtime);
+        quiesce(&mut runtime);
         let signaller = std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(20));
             source.signal().unwrap();
@@ -1667,9 +1690,9 @@ mod tests {
     #[test]
     // Spec coverage: BND-089.
     fn a_pump_clears_the_wake_flag_it_returns_on() {
-        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let source = runtime.wake_source().unwrap();
-        quiesce(&runtime);
+        quiesce(&mut runtime);
 
         source.signal().unwrap();
         let started = Instant::now();
@@ -1691,40 +1714,86 @@ mod tests {
     }
 
     #[test]
-    // Spec coverage: BND-086.
-    fn map_event_source_exposes_the_copied_id_without_a_wrapper() {
-        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-        let mut raw = empty_runtime_event();
-        raw.type_ = sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED;
-        raw.source_type = sys::MLN_RUNTIME_EVENT_SOURCE_MAP;
-        // A synthetic map handle that this runtime holds no wrapper for.
-        raw.source = 0x0200_0000_0000_002a;
+    // Spec coverage: BND-090.
+    fn a_bounded_drain_reports_the_events_it_left_queued() {
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+        map.set_style_json(PROVIDER_STYLE_JSON.as_bytes()).unwrap();
+        runtime.pump(Some(Duration::ZERO)).unwrap();
 
-        let source = runtime.inner.source_for_event(&raw);
-        let event = RuntimeEvent::from_native(&raw, source).unwrap();
-
-        // The id identifies the map without granting access to it.
-        assert_eq!(
-            event.source,
-            RuntimeEventSource::Map(MapId::new(0x0200_0000_0000_002a))
+        let bounded = runtime.drain_events(1).unwrap();
+        assert_eq!(bounded.len(), 1);
+        assert!(
+            bounded.remaining() > 0,
+            "a style load should queue more than one event"
         );
-        assert_eq!(event.event_type, RuntimeEventType::MapStyleLoaded);
+        let rest = runtime.drain_events(0).unwrap();
+        assert!(rest.len() > 1, "one drain should report the whole queue");
+        assert_eq!(rest.remaining(), 0);
+        let first = rest.iter().next().unwrap();
+        assert_eq!(first.source(), RuntimeEventSource::Map(map.id()));
+
+        map.close().unwrap();
         runtime.close().unwrap();
     }
 
     #[test]
-    // Spec coverage: BND-086.
-    fn map_event_source_without_an_id_reports_an_unknown_map() {
+    // Spec coverage: BND-060 and BND-091.
+    fn a_creation_mask_narrows_a_runtime_before_its_first_operation() {
+        let mut options = crate::RuntimeOptions::default();
+        options.event_mask = RuntimeEventMask::OFFLINE_OPERATION_COMPLETED;
+        let mut runtime = RuntimeHandle::with_options(&options).unwrap();
+
+        assert_eq!(
+            runtime.event_mask().unwrap(),
+            RuntimeEventMask::OFFLINE_OPERATION_COMPLETED
+        );
+
+        // The narrowed runtime still reports the completion of the operation
+        // this test starts, and the ambient cache operation needs no database.
+        let operation = runtime
+            .start_ambient_cache_operation(AmbientCacheOperation::Clear)
+            .unwrap();
+        let completed =
+            wait_for_operation(&mut runtime, &operation, Op::AmbientCache, OpResult::None).unwrap();
+        assert_eq!(completed.operation_id, operation.operation_id);
+        operation.discard().unwrap();
+
+        runtime.close().unwrap();
+
+        // A creation mask carrying an undefined bit fails before the runtime
+        // exists.
+        options.event_mask = RuntimeEventMask::from_bits_retain(1 << 63);
+        let error = RuntimeHandle::with_options(&options).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    }
+
+    #[test]
+    // Spec coverage: BND-091.
+    fn a_runtime_mask_round_trips_and_rejects_undefined_bits() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-        let mut raw = empty_runtime_event();
-        raw.type_ = sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED;
-        raw.source_type = sys::MLN_RUNTIME_EVENT_SOURCE_MAP;
-        raw.source = 0;
 
-        let source = runtime.inner.source_for_event(&raw);
-        let event = RuntimeEvent::from_native(&raw, source).unwrap();
+        // The default options mask selects every type.
+        assert_eq!(runtime.event_mask().unwrap(), RuntimeEventMask::ALL);
 
-        assert_eq!(event.source, RuntimeEventSource::UnknownMap);
+        runtime.set_event_mask(RuntimeEventMask::ALL).unwrap();
+        assert_eq!(runtime.event_mask().unwrap(), RuntimeEventMask::ALL);
+
+        // Read, clear one bit, write back: every other bit survives.
+        let mut mask = runtime.event_mask().unwrap();
+        mask.remove(RuntimeEventMask::OFFLINE_REGION_STATUS_CHANGED);
+        runtime.set_event_mask(mask).unwrap();
+        let read_back = runtime.event_mask().unwrap();
+        assert!(!read_back.contains(RuntimeEventMask::OFFLINE_REGION_STATUS_CHANGED));
+        assert!(read_back.contains(RuntimeEventMask::OFFLINE_OPERATION_COMPLETED));
+        assert!(read_back.contains(RuntimeEventMask::MAP_STYLE_LOADED));
+
+        let undefined = RuntimeEventMask::from_bits_retain(1 << 63);
+        let error = runtime.set_event_mask(undefined).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
+        assert_eq!(runtime.event_mask().unwrap(), read_back);
+
         runtime.close().unwrap();
     }
 
@@ -1826,7 +1895,7 @@ mod tests {
     // Requests a style no file source serves, so the loading-failure event that
     // follows proves the request reached the network file source where the
     // runtime-scoped provider sits.
-    fn load_probe_style(runtime: &RuntimeHandle, map: &MapHandle, style_url: &str) {
+    fn load_probe_style(runtime: &mut RuntimeHandle, map: &MapHandle, style_url: &str) {
         map.set_style_url(style_url).unwrap();
         let event = wait_for_map_loading_failure(runtime);
         assert!(
@@ -1840,7 +1909,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-142 and BND-154.
     fn resource_provider_is_consulted_until_replaced_and_cleared_while_a_map_is_live() {
-        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
         let first_calls = Arc::new(AtomicUsize::new(0));
@@ -1851,7 +1920,7 @@ mod tests {
                 ResourceProviderDecision::PassThrough
             })
             .unwrap();
-        load_probe_style(&runtime, &map, "jar:file:/packaged/first.json");
+        load_probe_style(&mut runtime, &map, "jar:file:/packaged/first.json");
         assert!(first_calls.load(Ordering::SeqCst) > 0);
 
         let second_calls = Arc::new(AtomicUsize::new(0));
@@ -1863,7 +1932,7 @@ mod tests {
             })
             .unwrap();
         let first_calls_after_replace = first_calls.load(Ordering::SeqCst);
-        load_probe_style(&runtime, &map, "jar:file:/packaged/second.json");
+        load_probe_style(&mut runtime, &map, "jar:file:/packaged/second.json");
         assert!(second_calls.load(Ordering::SeqCst) > 0);
         assert_eq!(
             first_calls.load(Ordering::SeqCst),
@@ -1872,7 +1941,7 @@ mod tests {
 
         runtime.clear_resource_provider().unwrap();
         let second_calls_after_clear = second_calls.load(Ordering::SeqCst);
-        load_probe_style(&runtime, &map, "jar:file:/packaged/third.json");
+        load_probe_style(&mut runtime, &map, "jar:file:/packaged/third.json");
         assert_eq!(
             first_calls.load(Ordering::SeqCst),
             first_calls_after_replace
@@ -1892,7 +1961,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-143 and BND-150.
     fn resource_provider_completes_style_request_inline_through_c_abi() {
-        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let calls = Arc::new(AtomicUsize::new(0));
         let callback_calls = Arc::clone(&calls);
         runtime
@@ -1915,7 +1984,7 @@ mod tests {
         map.set_style_url("custom://style.json").unwrap();
 
         assert!(wait_for_runtime_event(
-            &runtime,
+            &mut runtime,
             RuntimeEventType::MapStyleLoaded
         ));
         assert_eq!(calls.load(Ordering::SeqCst), 1);
@@ -1926,7 +1995,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-155.
     fn resource_provider_sees_scheme_alias_and_its_resolved_url() {
-        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let resolved = Arc::new(Mutex::new(None));
         let callback_resolved = Arc::clone(&resolved);
         runtime
@@ -1948,7 +2017,7 @@ mod tests {
         map.set_style_url("maplibre://maps/style").unwrap();
 
         assert!(wait_for_runtime_event(
-            &runtime,
+            &mut runtime,
             RuntimeEventType::MapStyleLoaded
         ));
         assert_eq!(
@@ -1962,7 +2031,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-144 and BND-145.
     fn resource_provider_completes_style_request_from_another_thread() {
-        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let (sender, receiver) = std::sync::mpsc::channel();
         runtime
             .set_resource_provider(move |request, handle| {
@@ -1992,7 +2061,7 @@ mod tests {
         .unwrap();
 
         assert!(wait_for_runtime_event(
-            &runtime,
+            &mut runtime,
             RuntimeEventType::MapStyleLoaded
         ));
         map.close().unwrap();
@@ -2002,7 +2071,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-149.
     fn resource_provider_error_response_becomes_copied_loading_failure_event() {
-        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         runtime
             .set_resource_provider(move |request, handle| {
                 if request.requested_url == "custom://broken-style.json" {
@@ -2023,9 +2092,10 @@ mod tests {
         let map_id = map.id();
         map.set_style_url("custom://broken-style.json").unwrap();
 
-        let event = wait_for_map_loading_failure(&runtime);
+        let event = wait_for_map_loading_failure(&mut runtime);
         let copied_message = event.message.clone();
-        let _ = runtime.poll_event().unwrap();
+        // The copy stays intact after the drain that ends the batch's window.
+        let _ = runtime.drain_events(0).unwrap();
 
         assert_eq!(event.source, RuntimeEventSource::Map(map_id));
         assert_eq!(event.event_type, RuntimeEventType::MapLoadingFailed);
@@ -2089,7 +2159,7 @@ mod tests {
             "MLN_FFI_TEST_FIXTURE_ORIGIN is unset; run the suite through \
              `mise run //bindings/rust:test emscripten-wasm32-webgl`",
         );
-        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let transform_url = format!("{origin}/__fixture/rewritten-style.json");
         // Matches the URL loaded after the clear as well, so a transform that
         // outlived the clear rewrites that request too and the layer id says so.
@@ -2105,7 +2175,7 @@ mod tests {
         map.set_style_url(&format!("{origin}/__fixture/original-style.json"))
             .unwrap();
         assert!(wait_for_runtime_event(
-            &runtime,
+            &mut runtime,
             RuntimeEventType::MapStyleLoaded
         ));
         // Contains rather than equals: MapLibre adds its own annotation layer to
@@ -2121,7 +2191,7 @@ mod tests {
         map.set_style_url(&format!("{origin}/__fixture/original-after-clear.json"))
             .unwrap();
         assert!(wait_for_runtime_event(
-            &runtime,
+            &mut runtime,
             RuntimeEventType::MapStyleLoaded
         ));
         assert!(
@@ -2139,7 +2209,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-140.
     fn resource_transform_rewrites_style_url_and_clear_restores_original_url() {
-        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let (base_url, requests, server) = spawn_style_server(2);
         let transform_base_url = base_url.clone();
 
@@ -2162,7 +2232,7 @@ mod tests {
         map.set_style_url(&format!("{base_url}/original-style.json"))
             .unwrap();
         assert!(wait_for_runtime_event(
-            &runtime,
+            &mut runtime,
             RuntimeEventType::MapStyleLoaded
         ));
         assert_eq!(
@@ -2174,7 +2244,7 @@ mod tests {
         map.set_style_url(&format!("{base_url}/original-after-clear.json"))
             .unwrap();
         assert!(wait_for_runtime_event(
-            &runtime,
+            &mut runtime,
             RuntimeEventType::MapStyleLoaded
         ));
         assert_eq!(
@@ -2191,7 +2261,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-158 and BND-159.
     fn http_header_transform_reaches_requests_and_clear_stops_it() {
-        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let (base_url, requests, server) = spawn_recording_style_server(2);
         runtime
             .set_http_header_transform(|request| {
@@ -2204,7 +2274,7 @@ mod tests {
         map.set_style_url(&format!("{base_url}/with-header.json"))
             .unwrap();
         assert!(wait_for_runtime_event(
-            &runtime,
+            &mut runtime,
             RuntimeEventType::MapStyleLoaded
         ));
         let first = requests.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -2218,7 +2288,7 @@ mod tests {
         map.set_style_url(&format!("{base_url}/after-clear.json"))
             .unwrap();
         assert!(wait_for_runtime_event(
-            &runtime,
+            &mut runtime,
             RuntimeEventType::MapStyleLoaded
         ));
         let second = requests.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -2237,7 +2307,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-158.
     fn http_header_transform_skips_non_http_urls() {
-        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         runtime.set_resource_transform(|_| None).unwrap();
         let calls = Arc::new(AtomicUsize::new(0));
         let callback_calls = Arc::clone(&calls);
@@ -2250,7 +2320,7 @@ mod tests {
         let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
         map.set_style_url("jar:file:/packaged/style.json").unwrap();
-        let _ = wait_for_map_loading_failure(&runtime);
+        let _ = wait_for_map_loading_failure(&mut runtime);
         assert_eq!(calls.load(Ordering::SeqCst), 0);
 
         map.close().unwrap();
@@ -2261,7 +2331,7 @@ mod tests {
     #[test]
     // Spec coverage: BND-159.
     fn http_header_transform_preserves_same_origin_and_strips_cross_origin_redirects() {
-        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let (origin_url, requests, servers) = spawn_redirect_style_servers();
         runtime
             .set_http_header_transform(|_| vec![crate::HttpHeader::new("X-Map-Token", "secret")])
@@ -2271,7 +2341,7 @@ mod tests {
         map.set_style_url(&format!("{origin_url}/same-start.json"))
             .unwrap();
         assert!(wait_for_runtime_event(
-            &runtime,
+            &mut runtime,
             RuntimeEventType::MapStyleLoaded
         ));
         assert_eq!(
@@ -2286,7 +2356,7 @@ mod tests {
         map.set_style_url(&format!("{origin_url}/cross-start.json"))
             .unwrap();
         assert!(wait_for_runtime_event(
-            &runtime,
+            &mut runtime,
             RuntimeEventType::MapStyleLoaded
         ));
         assert_eq!(
@@ -2408,9 +2478,9 @@ mod tests {
     }
 
     #[test]
-    // Spec coverage: BND-081 and BND-082.
-    fn poll_event_returns_owned_map_event_and_source_id() {
-        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    // Spec coverage: BND-081, BND-090, and BND-092.
+    fn a_drain_reports_map_events_in_queue_order_and_copies_outlive_the_batch() {
+        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
         let map_id = map.id();
 
@@ -2418,26 +2488,35 @@ mod tests {
         assert_eq!(error.kind(), ErrorKind::NativeError);
         assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_NATIVE_ERROR));
 
-        let mut loading_failed = None;
-        for _ in 0..8 {
-            let Some(event) = runtime.poll_event().unwrap() else {
-                break;
-            };
-            if event.event_type == RuntimeEventType::MapLoadingFailed {
-                loading_failed = Some(event);
-                break;
-            }
-        }
-        let event = loading_failed.expect("malformed style should enqueue loading-failed event");
-        let copied_message = event.message.clone();
-
-        let _ = runtime.poll_event().unwrap();
-
-        assert_eq!(event.source, RuntimeEventSource::Map(map_id));
-        assert_eq!(event.event_type, RuntimeEventType::MapLoadingFailed);
-        assert_eq!(event.message, copied_message);
+        let batch = runtime.drain_events(0).unwrap();
+        let types = batch
+            .iter()
+            .map(|event| event.event_type())
+            .collect::<Vec<_>>();
         assert!(
-            event
+            types.len() > 1,
+            "a failed style load should queue more than one event, got {types:?}"
+        );
+        let loading_failed = batch
+            .iter()
+            .find(|event| event.event_type() == RuntimeEventType::MapLoadingFailed)
+            .expect("a malformed style should queue a loading-failed event");
+        assert_eq!(loading_failed.source(), RuntimeEventSource::Map(map_id));
+        assert!(
+            loading_failed
+                .message()
+                .unwrap()
+                .is_some_and(|message| !message.is_empty())
+        );
+        let owned = loading_failed.to_owned().unwrap();
+
+        // The next drain ends the previous batch's window; the copy is
+        // untouched.
+        assert!(runtime.drain_events(0).unwrap().is_empty());
+        assert_eq!(owned.source, RuntimeEventSource::Map(map_id));
+        assert_eq!(owned.event_type, RuntimeEventType::MapLoadingFailed);
+        assert!(
+            owned
                 .message
                 .as_deref()
                 .is_some_and(|message| !message.is_empty())

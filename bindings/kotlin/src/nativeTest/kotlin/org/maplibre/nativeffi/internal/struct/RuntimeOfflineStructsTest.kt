@@ -15,8 +15,10 @@ import kotlinx.cinterop.cstr
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
+import kotlinx.cinterop.toCValues
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.LatLng
@@ -25,16 +27,13 @@ import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
 import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED
-import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION
 import org.maplibre.nativeffi.internal.c.mln_offline_region_definition
 import org.maplibre.nativeffi.internal.c.mln_offline_region_info
 import org.maplibre.nativeffi.internal.c.mln_offline_tile_pyramid_region_definition
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
-import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_operation_completed
-import org.maplibre.nativeffi.internal.c.mln_runtime_event_render_map
-import org.maplibre.nativeffi.internal.c.mln_runtime_event_tile_action
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_payload
 import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.map.TileOperation
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
@@ -228,109 +227,95 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   }
 
   @Test
-  fun runtimePayloadPreservesKnownTypeWhenPayloadPointerIsNull() {
+  fun unknownRuntimePayloadCopiesTheWholeUnionWindow() {
     memScoped {
       val event = alloc<mln_runtime_event>()
-      event.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
-      event.payload = null
-      event.payload_size = 0UL
-
-      assertEquals(
-        RuntimeEventPayload.Unknown(MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP.toInt(), 0, ByteArray(0)),
-        RuntimeStructs.payload(event),
-      )
-    }
-  }
-
-  @Test
-  fun unknownRuntimePayloadCopiesRawBytes() {
-    memScoped {
-      val payload = allocArray<ByteVar>(3)
+      event.payload_type = 999U
+      val payload = event.payload.ptr.reinterpret<ByteVar>()
+      for (index in 0 until payloadWindowSize) {
+        payload[index] = 0
+      }
       payload[0] = 1
       payload[1] = 2
       payload[2] = 3
-      val event = alloc<mln_runtime_event>()
-      event.payload_type = 999U
-      event.payload = payload
-      event.payload_size = 3UL
 
-      val result = RuntimeStructs.payload(event) as RuntimeEventPayload.Unknown
+      val result = RuntimeStructs.payload(event, eventSize) as RuntimeEventPayload.Unknown
 
       assertEquals(999, result.rawPayloadType)
-      assertEquals(3L, result.payloadSize)
-      assertContentEquals(byteArrayOf(1, 2, 3), result.payloadBytes)
+      assertEquals(payloadWindowSize, result.payloadBytes.size)
+      assertContentEquals(byteArrayOf(1, 2, 3), result.payloadBytes.take(3).toByteArray())
 
+      // The copy survives both a write through the source and a write into a
+      // previously returned array.
       payload[0] = 9
       val firstCopy = result.payloadBytes
       firstCopy[1] = 9
-      assertContentEquals(byteArrayOf(1, 2, 3), result.payloadBytes)
+      assertContentEquals(byteArrayOf(1, 2, 3), result.payloadBytes.take(3).toByteArray())
     }
   }
 
   @Test
-  fun unknownRuntimePayloadRejectsOversizedRawBytes() {
+  fun payloadTypeSelectsWhichUnionMemberOneWindowDecodesAs() {
     memScoped {
-      val payload = alloc<ByteVar>()
       val event = alloc<mln_runtime_event>()
-      event.payload_type = 999U
-      event.payload = payload.ptr
-      event.payload_size = Int.MAX_VALUE.toULong() + 1UL
+      event.payload.camera_transition_finished.transition_id = 0x0000_0007_0000_0384UL
 
-      assertFailsWith<IllegalArgumentException> { RuntimeStructs.payload(event) }
+      event.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED
+      val transition =
+        RuntimeStructs.payload(event, eventSize) as RuntimeEventPayload.CameraTransitionFinished
+      assertEquals(0x0000_0007_0000_0384UL.toLong(), transition.transitionId)
+
+      // The same window read as another member takes that member's own field.
+      event.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
+      val renderMap = RuntimeStructs.payload(event, eventSize) as RuntimeEventPayload.RenderMap
+      assertEquals(RenderMode(900), renderMap.mode)
     }
   }
 
   @Test
-  fun typedRuntimePayloadsPreserveUnknownRawEnumsAndCopiedStrings() {
-    var tilePayload: RuntimeEventPayload.TileAction? = null
+  fun typedRuntimePayloadsPreserveUnknownRawEnums() {
     memScoped {
-      val renderMap = alloc<mln_runtime_event_render_map>()
-      renderMap.mode = 900U
       val renderMapEvent = alloc<mln_runtime_event>()
       renderMapEvent.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
-      renderMapEvent.payload = renderMap.ptr
-      renderMapEvent.payload_size = sizeOf<mln_runtime_event_render_map>().toULong()
+      renderMapEvent.payload.render_map.mode = 900U
 
-      val renderMapResult = RuntimeStructs.payload(renderMapEvent) as RuntimeEventPayload.RenderMap
+      val renderMapResult =
+        RuntimeStructs.payload(renderMapEvent, eventSize) as RuntimeEventPayload.RenderMap
       assertEquals(RenderMode(900), renderMapResult.mode)
       assertEquals(900, renderMapResult.mode.nativeValue)
 
-      val sourceId = "source"
-      val tileAction = alloc<mln_runtime_event_tile_action>()
-      tileAction.operation = 901U
-      tileAction.tile_id.overscaled_z = 1U
-      tileAction.tile_id.wrap = -1
-      tileAction.tile_id.canonical_z = 2U
-      tileAction.tile_id.canonical_x = 3U
-      tileAction.tile_id.canonical_y = 4U
-      tileAction.source_id = sourceId.cstr.getPointer(this)
-      tileAction.source_id_size = sourceId.encodeToByteArray().size.toULong()
       val tileActionEvent = alloc<mln_runtime_event>()
       tileActionEvent.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION
-      tileActionEvent.payload = tileAction.ptr
-      tileActionEvent.payload_size = sizeOf<mln_runtime_event_tile_action>().toULong()
+      tileActionEvent.payload.tile_action.operation = 901U
+      tileActionEvent.payload.tile_action.tile_id.overscaled_z = 1U
+      tileActionEvent.payload.tile_action.tile_id.wrap = -1
+      tileActionEvent.payload.tile_action.tile_id.canonical_z = 2U
+      tileActionEvent.payload.tile_action.tile_id.canonical_x = 3U
+      tileActionEvent.payload.tile_action.tile_id.canonical_y = 4U
 
-      tilePayload = RuntimeStructs.payload(tileActionEvent) as RuntimeEventPayload.TileAction
+      val tilePayload =
+        RuntimeStructs.payload(tileActionEvent, eventSize) as RuntimeEventPayload.TileAction
+      assertEquals(TileOperation(901), tilePayload.operation)
+      assertEquals(901, tilePayload.operation.nativeValue)
+      assertEquals(1L, tilePayload.tileId.overscaledZ)
+      assertEquals(-1, tilePayload.tileId.wrap)
+      assertEquals(2L, tilePayload.tileId.canonicalZ)
+      assertEquals(3L, tilePayload.tileId.canonicalX)
+      assertEquals(4L, tilePayload.tileId.canonicalY)
     }
-
-    assertEquals(TileOperation(901), tilePayload?.operation)
-    assertEquals(901, tilePayload?.operation?.nativeValue)
-    assertEquals("source", tilePayload?.sourceId)
   }
 
   @Test
   fun offlineOperationCompletedPreservesOperationIdBitPattern() {
     memScoped {
-      val payload = alloc<mln_runtime_event_offline_operation_completed>()
-      payload.operation_id = Long.MAX_VALUE.toULong() + 1UL
-      payload.operation_kind = 902U
-      payload.result_kind = 903U
       val event = alloc<mln_runtime_event>()
       event.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED
-      event.payload = payload.ptr
-      event.payload_size = sizeOf<mln_runtime_event_offline_operation_completed>().toULong()
+      event.payload.offline_operation_completed.operation_id = Long.MAX_VALUE.toULong() + 1UL
+      event.payload.offline_operation_completed.operation_kind = 902U
+      event.payload.offline_operation_completed.result_kind = 903U
 
-      val result = RuntimeStructs.payload(event) as RuntimeEventPayload.OfflineOperationCompleted
+      val result =
+        RuntimeStructs.payload(event, eventSize) as RuntimeEventPayload.OfflineOperationCompleted
 
       assertEquals((Long.MAX_VALUE.toULong() + 1UL).toLong(), result.operationId)
       assertEquals(OfflineOperationKind(902), result.operationKind)
@@ -341,30 +326,17 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   }
 
   @Test
-  fun runtimePayloadRejectsUndersizedKnownPayloads() {
+  fun runtimeEventMessageComesFromItsOffsetInTheBatchArena() {
     memScoped {
-      val payload = allocArray<ByteVar>(2)
-      payload[0] = 4
-      payload[1] = 5
+      val arena = "firstsecond".encodeToByteArray().toCValues().getPointer(this)
+      val event = alloc<mln_runtime_event>()
+      event.message_offset = 5U
+      event.message_size = 6U
 
-      listOf(
-          MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP,
-          MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
-          MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS,
-          MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
-        )
-        .forEach { payloadType ->
-          val event = alloc<mln_runtime_event>()
-          event.payload_type = payloadType
-          event.payload = payload
-          event.payload_size = 2UL
+      assertEquals("second", RuntimeStructs.message(event, arena))
 
-          val result = RuntimeStructs.payload(event) as RuntimeEventPayload.Unknown
-
-          assertEquals(payloadType.toInt(), result.rawPayloadType)
-          assertEquals(2L, result.payloadSize)
-          assertContentEquals(byteArrayOf(4, 5), result.payloadBytes)
-        }
+      event.message_size = 0U
+      assertEquals("", RuntimeStructs.message(event, arena))
     }
   }
 
@@ -417,3 +389,9 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
       true,
     )
 }
+
+/** Layout of one event record, as this binding compiled it. */
+@OptIn(ExperimentalForeignApi::class) private val eventSize: Long = sizeOf<mln_runtime_event>()
+
+@OptIn(ExperimentalForeignApi::class)
+private val payloadWindowSize: Int = sizeOf<mln_runtime_event_payload>().toInt()

@@ -9,6 +9,7 @@ import threading
 import time
 import typing
 import warnings
+from collections.abc import Callable
 from pathlib import Path
 
 import maplibre_native_ffi as mln
@@ -86,7 +87,7 @@ def _wait_for_runtime_event(
 ) -> mln.RuntimeEvent:
     for _ in range(iterations):
         runtime.pump()
-        while event := runtime.poll_event():
+        for event in runtime.drain_events().events:
             if event.event_type == event_type:
                 return event
         time.sleep(0.001)
@@ -116,7 +117,7 @@ def _wait_for_offline_operation(
     operation_id = operation._operation_id
     for _ in range(iterations):
         runtime.pump()
-        while event := runtime.poll_event():
+        for event in runtime.drain_events().events:
             if (
                 event.event_type == mln.RuntimeEventType.OFFLINE_OPERATION_COMPLETED
                 and isinstance(event.payload, offline.OfflineOperationCompleted)
@@ -297,6 +298,7 @@ def test_runtime_abi_mismatch_reports_public_error_before_handle_storage(
     def create_mismatched_runtime(
         asset_path: str | None,
         cache_path: str | None,
+        event_mask: int,
     ) -> object:
         return _native.create_runtime_with_abi_version_for_test(
             actual_abi_version,
@@ -426,10 +428,7 @@ def quiesce(runtime: mln.RuntimeHandle) -> None:
     """Pump until the runtime is idle, so a park that follows needs a fresh signal."""
     for _ in range(100):
         runtime.pump()
-        drained = False
-        while runtime.poll_event() is not None:
-            drained = True
-        if not drained:
+        if not runtime.drain_events().events:
             return
     pytest.fail("the runtime kept producing events while idle")
 
@@ -449,7 +448,7 @@ def test_parked_owner_thread_wakes_for_native_work_and_for_a_wake_source() -> No
             assert time.monotonic() - load_started < 5.0, (
                 "parks sat out their timeouts while loading was pending"
             )
-            while (event := runtime.poll_event()) is not None:
+            for event in runtime.drain_events().events:
                 if event.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED:
                     loading_failed = True
             if loading_failed:
@@ -588,7 +587,14 @@ def test_owner_thread_methods_report_wrong_thread_diagnostics() -> None:
     raised_errors: list[BaseException] = []
 
     def call_owner_thread_methods() -> None:
-        for call in (runtime.pump, runtime.poll_event, map_handle.request_repaint):
+        calls: tuple[Callable[[], object], ...] = (
+            runtime.pump,
+            runtime.drain_events,
+            map_handle.request_repaint,
+            lambda: runtime.set_event_mask(mln.RuntimeEventMask.ALL),
+            lambda: map_handle.set_event_mask(mln.RuntimeEventMask.ALL),
+        )
+        for call in calls:
             try:
                 call()
             except mln.WrongThreadError as error:
@@ -599,7 +605,7 @@ def test_owner_thread_methods_report_wrong_thread_diagnostics() -> None:
     thread.join()
 
     try:
-        assert len(raised_errors) == 3
+        assert len(raised_errors) == 5
         for error in raised_errors:
             assert_wrong_thread_error(error)
     finally:
@@ -1767,10 +1773,7 @@ def test_camera_transition_commands_accept_public_values() -> None:
 
 
 def _drain_runtime_events(runtime: mln.RuntimeHandle) -> list[mln.RuntimeEvent]:
-    events: list[mln.RuntimeEvent] = []
-    while (event := runtime.poll_event()) is not None:
-        events.append(event)
-    return events
+    return runtime.drain_events().events
 
 
 def _finished_transition_ids(events: list[mln.RuntimeEvent]) -> list[int]:
@@ -1898,103 +1901,303 @@ def test_camera_change_events_report_immediate_and_animated_modes() -> None:
     assert _camera_change_modes(eased, did_change) == [mln.CameraChangeMode.ANIMATED]
 
 
-def test_camera_transition_finished_payload_validates_native_payload_size() -> None:
-    event = mln.RuntimeEvent._from_native(
-        _native.camera_transition_finished_event_for_test(909, 0)
+def test_transition_finished_precedes_camera_did_change_in_one_batch() -> None:
+    """BND-090: one drain reports more than one event and preserves queue order."""
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        runtime.drain_events()
+        map_handle.ease_to(
+            camera.CameraOptions(center=geo.LatLng(12.0, 34.0), zoom=4.0),
+            camera.AnimationOptions(duration_ms=0.0, transition_id=707),
+        )
+        types = [event.event_type for event in runtime.drain_events().events]
+
+    finished = mln.RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED
+    assert types.count(finished) == 1
+    assert types.index(finished) < types.index(
+        mln.RuntimeEventType.MAP_CAMERA_DID_CHANGE
     )
-    assert event.event_type == mln.RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED
-    assert isinstance(event.payload, mln.CameraTransitionFinishedPayload)
-    assert event.payload.transition_id == 909
+
+
+@pytest.mark.parametrize("max_events", [-1, 2**64])
+def test_drain_events_out_of_range_bound_raises_binding_error(max_events: int) -> None:
+    # PyO3 extracts this as `usize`, so without a range check the caller would
+    # see a bare OverflowError instead of the binding's error shape.
+    with mln.RuntimeHandle() as runtime, pytest.raises(mln.InvalidArgumentError):
+        runtime.drain_events(max_events)
+
+
+def test_option_default_masks_keep_native_bits_this_build_does_not_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """BND-091: the option defaults copy the C default mask, unnamed bits included."""
+    native_default = int(mln.RuntimeEventMask.ALL) | 1 << 62
+    monkeypatch.setattr(
+        _native, "runtime_options_default_event_mask", lambda: native_default
+    )
+    monkeypatch.setattr(
+        _native, "map_options_default_event_mask", lambda: native_default
+    )
+
+    assert int(mln.RuntimeOptions().event_mask) == native_default
+    assert int(mln.MapOptions().event_mask) == native_default
+
+
+def test_narrowed_map_mask_drops_the_cleared_event_type() -> None:
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_event_mask(
+            mln.RuntimeEventMask.ALL & ~mln.RuntimeEventMask.MAP_CAMERA_DID_CHANGE
+        )
+        # MapLibre resizes a map inside its own constructor, so the camera events
+        # of the initial sizing arrive whatever the mask selects.
+        runtime.drain_events()
+        map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(1.0, 2.0), zoom=3.0))
+        types = [event.event_type for event in runtime.drain_events().events]
+
+    assert mln.RuntimeEventType.MAP_CAMERA_WILL_CHANGE in types
+    assert mln.RuntimeEventType.MAP_CAMERA_DID_CHANGE not in types
+
+
+def test_map_created_with_a_narrowed_mask_never_delivers_the_cleared_type() -> None:
+    narrowed = mln.RuntimeEventMask.ALL & ~mln.RuntimeEventMask.MAP_CAMERA_DID_CHANGE
+    options = mln.MapOptions(event_mask=narrowed)
+
+    with mln.RuntimeHandle() as runtime, runtime.create_map(options) as map_handle:
+        assert map_handle.event_mask == narrowed
+        runtime.drain_events()
+        map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(1.0, 2.0), zoom=3.0))
+        types = [event.event_type for event in runtime.drain_events().events]
+
+    assert mln.RuntimeEventType.MAP_CAMERA_WILL_CHANGE in types
+    assert mln.RuntimeEventType.MAP_CAMERA_DID_CHANGE not in types
+
+
+def test_narrowed_runtime_mask_drops_offline_completion_events(tmp_path: Path) -> None:
+    cleared = mln.RuntimeEventMask.ALL & ~(
+        mln.RuntimeEventMask.OFFLINE_OPERATION_COMPLETED
+    )
+
+    with mln.RuntimeHandle(
+        mln.RuntimeOptions(cache_path=str(tmp_path / "masked-cache.db"))
+    ) as runtime:
+        # The same drive reports a completion while the type is selected, so the
+        # narrowed phase below asserts a real negative.
+        selected = runtime.set_maximum_ambient_cache_size(8 << 20)
+        _wait_for_offline_operation(runtime, selected)
+        selected.close()
+
+        runtime.set_event_mask(cleared)
+        assert runtime.event_mask == cleared
+        operation = runtime.set_maximum_ambient_cache_size(4 << 20)
+        completions = 0
+        for _ in range(200):
+            runtime.pump(0.002)
+            completions += sum(
+                event.event_type == mln.RuntimeEventType.OFFLINE_OPERATION_COMPLETED
+                for event in runtime.drain_events().events
+            )
+        operation.close()
+
+    assert completions == 0
+
+
+def test_event_masks_round_trip_on_the_map_and_the_runtime() -> None:
+    created = mln.RuntimeEventMask.ALL & ~(
+        mln.RuntimeEventMask.OFFLINE_REGION_STATUS_CHANGED
+    )
+
+    with mln.RuntimeHandle(mln.RuntimeOptions(event_mask=created)) as runtime:
+        assert runtime.event_mask == created
+        runtime.set_event_mask(mln.RuntimeEventMask.ALL)
+        assert runtime.event_mask == mln.RuntimeEventMask.ALL
+
+        with runtime.create_map() as map_handle:
+            map_handle.set_event_mask(mln.RuntimeEventMask.ALL)
+            assert map_handle.event_mask == mln.RuntimeEventMask.ALL
+
+            # A read-modify-write of one bit keeps every other bit, including the
+            # runtime bits a map ignores.
+            map_handle.set_event_mask(
+                map_handle.event_mask & ~mln.RuntimeEventMask.MAP_IDLE
+            )
+            assert (
+                map_handle.event_mask
+                == mln.RuntimeEventMask.ALL & ~mln.RuntimeEventMask.MAP_IDLE
+            )
+            assert mln.RuntimeEventMask.MAP_TILE_ACTION in map_handle.event_mask
+            assert (
+                mln.RuntimeEventMask.OFFLINE_OPERATION_COMPLETED
+                in map_handle.event_mask
+            )
+
+            runtime.set_event_mask(
+                runtime.event_mask & ~mln.RuntimeEventMask.OFFLINE_OPERATION_COMPLETED
+            )
+            assert (
+                runtime.event_mask
+                == mln.RuntimeEventMask.ALL
+                & ~mln.RuntimeEventMask.OFFLINE_OPERATION_COMPLETED
+            )
+
+
+def test_empty_creation_mask_queues_nothing() -> None:
+    # An empty mask is a selection of no types, not an absent selection.
+    options = mln.RuntimeOptions(event_mask=mln.RuntimeEventMask.NONE)
+    map_options = mln.MapOptions(event_mask=mln.RuntimeEventMask.NONE)
+
+    with mln.RuntimeHandle(options) as runtime:
+        assert runtime.event_mask == mln.RuntimeEventMask.NONE
+        with runtime.create_map(map_options) as map_handle:
+            assert map_handle.event_mask == mln.RuntimeEventMask.NONE
+            # MapLibre resizes a map inside its own constructor, so drain the
+            # events of the initial sizing before asserting the negative.
+            runtime.drain_events()
+            map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+            for _ in range(64):
+                runtime.pump()
+                time.sleep(0.001)
+
+            assert not runtime.drain_events().events
+
+
+def test_event_mask_bit_outside_all_is_rejected() -> None:
+    outside = mln.RuntimeEventMask(1 << 40)
 
     with pytest.raises(mln.InvalidArgumentError):
-        _native.camera_transition_finished_event_for_test(909, 1)
+        mln.RuntimeHandle(mln.RuntimeOptions(event_mask=outside))
+
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        with pytest.raises(mln.InvalidArgumentError):
+            runtime.create_map(mln.MapOptions(event_mask=outside))
+        with pytest.raises(mln.InvalidArgumentError):
+            runtime.set_event_mask(outside)
+        with pytest.raises(mln.InvalidArgumentError):
+            map_handle.set_event_mask(outside)
 
 
-def test_poll_event_returns_none_when_queue_is_empty() -> None:
+def test_every_event_type_has_a_mask_bit_that_all_selects() -> None:
+    # Each bit derives from its type, but the two group lists behind `ALL` are
+    # written out by hand, so a type added without a mask member, or a member
+    # left out of both groups, would silently stop `ALL` selecting that type.
+    for event_type in mln.RuntimeEventType:
+        assert mln.RuntimeEventMask[event_type.name] in mln.RuntimeEventMask.ALL
+
+
+def test_bounded_drain_reports_remaining_count_until_the_queue_empties() -> None:
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        runtime.drain_events()
+        map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(1.0, 2.0), zoom=3.0))
+        map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(3.0, 4.0), zoom=5.0))
+
+        bounded = runtime.drain_events(1)
+        assert len(bounded.events) == 1
+        assert bounded.remaining_count > 0
+
+        # Nothing pumps between the two drains, so the rest is exactly what the
+        # bounded drain left behind.
+        rest = runtime.drain_events()
+        assert len(rest.events) == bounded.remaining_count
+        assert rest.remaining_count == 0
+        assert not runtime.drain_events().events
+
+
+def test_drained_events_stay_equal_after_the_next_drain_and_map_close() -> None:
     with mln.RuntimeHandle() as runtime:
-        assert runtime.poll_event() is None
+        map_handle = runtime.create_map()
+        map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(1.0, 2.0), zoom=3.0))
+        first = runtime.drain_events()
+        snapshot = list(first.events)
+        assert snapshot
+
+        map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(4.0, 5.0), zoom=6.0))
+        assert runtime.drain_events().events
+
+        assert first == mln.RuntimeEventBatch(events=snapshot, remaining_count=0)
+        map_handle.close()
+        assert first.events == snapshot
 
 
-def test_poll_event_returns_copied_map_event() -> None:
+def test_drain_steps_by_the_reported_event_size() -> None:
+    # The decoder indexes a batch by the stride the batch reports, so a library
+    # that widened the event record would misdecode if the two ever diverged.
+    with mln.RuntimeHandle() as runtime:
+        reported, compiled = _native.runtime_event_stride_for_test(runtime._native)
+
+    assert reported == compiled
+
+
+def test_drain_returns_a_copied_map_loading_failure() -> None:
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
         with pytest.raises((mln.InvalidArgumentError, mln.NativeError)):
             map_handle.set_style_json(b"{")
 
-        loading_failed = None
-        for _ in range(8):
-            event = runtime.poll_event()
-            if event is None:
-                break
-            if event.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED:
-                loading_failed = event
-                break
+        failures = [
+            event
+            for event in runtime.drain_events().events
+            if event.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED
+        ]
 
-        assert loading_failed is not None
-        copied_message = loading_failed.message
-        runtime.poll_event()
-
-        assert loading_failed.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED
+        assert failures
+        loading_failed = failures[0]
         assert loading_failed.source.source_type == mln.RuntimeEventSourceType.MAP
         assert loading_failed.source.map_handle is map_handle
-        assert copied_message == loading_failed.message
+        assert loading_failed.source.source_id != 0
         assert loading_failed.message
 
 
-def test_pump_and_poll_event_return_copied_style_loaded_event() -> None:
+def test_pump_and_drain_return_a_copied_style_loaded_event() -> None:
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+        style_loaded = _wait_for_runtime_event(
+            runtime, mln.RuntimeEventType.MAP_STYLE_LOADED
+        )
 
-        style_loaded = None
-        for _ in range(32):
-            runtime.pump()
-            while event := runtime.poll_event():
-                if event.event_type == mln.RuntimeEventType.MAP_STYLE_LOADED:
-                    style_loaded = event
-                    break
-            if style_loaded is not None:
-                break
-
-        assert style_loaded is not None
         assert style_loaded.source.source_type == mln.RuntimeEventSourceType.MAP
         assert style_loaded.source.map_handle is map_handle
+        assert style_loaded.payload is None
         runtime.pump()
-        assert runtime.poll_event() is None
+        assert not runtime.drain_events().events
 
 
-def test_runtime_event_payload_wire_shapes_include_native_fields() -> None:
-    events = _native.runtime_event_payload_wire_shapes_for_test()
-
-    render_frame_event = mln.RuntimeEvent._from_native(events["render_frame"])
-    assert isinstance(render_frame_event.payload, mln.RenderFramePayload)
-    assert render_frame_event.payload.mode == mln.RenderMode.FULL
-
-    render_frame_payload = events["render_frame"]["payload"]
-    render_frame = mln.RenderFramePayload._from_runtime_payload(render_frame_payload)
-    assert render_frame.mode == mln.RenderMode.FULL
-    assert render_frame.needs_repaint is True
-    assert render_frame.placement_changed is False
-    assert render_frame.stats.encoding_time == pytest.approx(1.25)
-    assert render_frame.stats.rendering_time == pytest.approx(2.5)
-    assert render_frame.stats.frame_count == 3
-    assert render_frame.stats.draw_call_count == 4
-    assert render_frame.stats.total_draw_call_count == 5
-
-    tile_action_payload = events["tile_action"]["payload"]
-    tile_action_event = mln.RuntimeEvent._from_native(events["tile_action"])
-    assert isinstance(tile_action_event.payload, mln.TileActionPayload)
-    tile_action = mln.TileActionPayload._from_runtime_payload(tile_action_payload)
-    assert tile_action.operation == mln.TileOperation.LOAD_FROM_NETWORK
-    assert tile_action.tile_id.overscaled_z == 6
-    assert tile_action.tile_id.wrap == -1
-    assert tile_action.tile_id.canonical_z == 5
-    assert tile_action.tile_id.canonical_x == 12
-    assert tile_action.tile_id.canonical_y == 34
-    assert tile_action.source_id == "source-a"
-
-    offline_status_payload = events["offline_region_status"]["payload"]
-    status_changed = offline.OfflineRegionStatusChanged._from_runtime_payload(
-        offline_status_payload
+def test_synthetic_batch_decodes_every_payload_and_preserves_unknown_domains() -> None:
+    """BND-083: unknown event, source, and payload domains keep their raw values."""
+    batch = mln.RuntimeEventBatch._from_native(
+        _native.synthetic_runtime_event_batch_for_test()
     )
+    render_frame, tile_action, image_missing, region_status, transition, unknown = (
+        batch.events
+    )
+
+    assert batch.remaining_count == 3
+
+    assert isinstance(render_frame.payload, mln.RenderFramePayload)
+    assert render_frame.payload.mode == mln.RenderMode.FULL
+    assert render_frame.payload.needs_repaint is True
+    assert render_frame.payload.placement_changed is False
+    assert render_frame.payload.stats.encoding_time == pytest.approx(1.25)
+    assert render_frame.payload.stats.rendering_time == pytest.approx(2.5)
+    assert render_frame.payload.stats.frame_count == 3
+    assert render_frame.payload.stats.draw_call_count == 4
+    assert render_frame.payload.stats.total_draw_call_count == 5
+
+    assert isinstance(tile_action.payload, mln.TileActionPayload)
+    assert tile_action.payload.operation == mln.TileOperation.LOAD_FROM_NETWORK
+    assert tile_action.payload.tile_id == mln.TileId(
+        overscaled_z=6, wrap=-1, canonical_z=5, canonical_x=12, canonical_y=34
+    )
+    # The source ID lives once, in the event message arena.
+    assert tile_action.message == "source-a"
+    # The event names a map that no live wrapper resolves, and the raw identity
+    # the C API delivered stays readable anyway.
+    assert tile_action.source.source_type == mln.RuntimeEventSourceType.MAP
+    assert tile_action.source.map_handle is None
+    assert tile_action.source.source_id == 0x0100_0000_0000_0007
+
+    assert image_missing.event_type == mln.RuntimeEventType.MAP_STYLE_IMAGE_MISSING
+    assert image_missing.payload is None
+    assert image_missing.message == "missing-image"
+
+    status_changed = region_status.payload
+    assert isinstance(status_changed, offline.OfflineRegionStatusChanged)
     assert status_changed.region_id == 42
     assert (
         status_changed.status.download_state
@@ -2008,6 +2211,23 @@ def test_runtime_event_payload_wire_shapes_include_native_fields() -> None:
     assert status_changed.status.required_resource_count == 12
     assert status_changed.status.required_resource_count_is_precise is True
     assert status_changed.status.complete is False
+
+    assert transition.payload == mln.CameraTransitionFinishedPayload(transition_id=909)
+
+    assert unknown.event_type.is_unknown
+    assert int(unknown.event_type) == 999_001
+    assert unknown.source.source_type.is_unknown
+    assert int(unknown.source.source_type) == 999_003
+    assert unknown.source.source_id == 0x0200_0000_0000_002A
+    assert unknown.source.map_handle is None
+    assert unknown.code == -7
+    assert unknown.message == "future payload"
+    assert isinstance(unknown.payload, mln.UnknownRuntimeEventPayload)
+    assert unknown.payload.raw_type == 999_002
+    # The helper overwrites its event array and arena before returning, so these
+    # bytes and this text only survive because the decode copied them.
+    assert unknown.payload.data[:4] == b"\x01\x02\x03\x04"
+    assert set(unknown.payload.data[4:]) == {0}
 
 
 def test_render_descriptors_are_public_python_values() -> None:
@@ -3241,7 +3461,7 @@ def test_resource_provider_replacement_and_clear_retire_previous_callback() -> N
         map_handle.set_style_url(style_url)
         for _ in range(5000):
             runtime.pump()
-            while event := runtime.poll_event():
+            for event in runtime.drain_events().events:
                 if (
                     event.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED
                     and event.message is not None
@@ -3670,19 +3890,88 @@ def test_custom_geometry_source_scaffolding_queues_copied_events() -> None:
         assert source.closed
 
 
-def test_set_style_url_retires_custom_geometry_callback_state() -> None:
+def test_style_url_load_releases_custom_geometry_state_when_the_style_lands() -> None:
+    handles: list[resource.ResourceRequestHandle] = []
+
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        if request.requested_url != "custom://geometry-style.json":
+            return resource.ResourceProviderDecision.PASS_THROUGH
+        handles.append(handle)
+        return resource.ResourceProviderDecision.HANDLE
+
+    with mln.RuntimeHandle() as runtime:
+        runtime.set_resource_provider(provider, max_pending_callbacks=4)
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+            source = map_handle.add_custom_geometry_source(
+                "custom",
+                style.CustomGeometrySourceOptions(max_queued_events=1),
+            )
+
+            # The inline load above queued a style-loaded event, so drain it to
+            # keep the wait below tied to the URL load.
+            _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
+
+            map_handle.set_style_url("custom://geometry-style.json")
+            handle = _wait_for_provider_handle(runtime, handles)
+            # Requesting the new style does not drop the source, so the callback
+            # state stays live until the replacement style actually lands.
+            assert source.closed is False
+
+            handle.complete(resource.ResourceResponse(bytes=_EMPTY_STYLE_BYTES))
+            _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
+
+            assert source.closed
+            source._native.push_fetch_for_test(1, 2, 3)
+            assert source.poll_event() is None
+
+
+def _load_style_and_collect_types(
+    runtime: mln.RuntimeHandle,
+    map_handle: mln.MapHandle,
+    until: mln.RuntimeEventType | None,
+) -> set[mln.RuntimeEventType]:
+    """Load the empty style, collecting event types until `until` arrives."""
+    map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+    types: set[mln.RuntimeEventType] = set()
+    for _ in range(500):
+        runtime.pump()
+        types.update(event.event_type for event in runtime.drain_events().events)
+        if until is not None and until in types:
+            break
+        time.sleep(0.001)
+    return types
+
+
+def test_style_json_load_releases_custom_geometry_state_with_style_loaded_cleared() -> (
+    None
+):
+    style_loaded = mln.RuntimeEventType.MAP_STYLE_LOADED
+
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+        # The same drive reports a style-loaded event while the type is
+        # selected, so the cleared phase below asserts a real negative.
+        assert style_loaded in _load_style_and_collect_types(
+            runtime, map_handle, style_loaded
+        )
         source = map_handle.add_custom_geometry_source(
-            "custom",
+            "custom-masked",
             style.CustomGeometrySourceOptions(max_queued_events=1),
         )
+        assert source.closed is False
 
-        map_handle.set_style_url("https://example.test/style.json")
+        map_handle.set_event_mask(
+            mln.RuntimeEventMask.ALL & ~mln.RuntimeEventMask.MAP_STYLE_LOADED
+        )
+        types = _load_style_and_collect_types(runtime, map_handle, None)
 
+        # The C API releases the dropped source itself, so the release does not
+        # depend on a style-loaded event reaching the batch.
         assert source.closed
-        source._native.push_fetch_for_test(1, 2, 3)
-        assert source.poll_event() is None
+        assert style_loaded not in types
 
 
 def test_remove_style_source_releases_custom_geometry_handle() -> None:

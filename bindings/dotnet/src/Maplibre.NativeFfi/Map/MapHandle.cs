@@ -33,7 +33,6 @@ public sealed unsafe class MapHandle : IDisposable
     private readonly RuntimeHandle runtime;
     private readonly ulong nativeId;
     private readonly NativeHandleState<MlnMap> state;
-    private readonly Dictionary<string, CustomGeometrySourceState> customGeometrySources = [];
 
     private MapHandle(RuntimeHandle runtime, MlnMap handle)
     {
@@ -616,7 +615,6 @@ public sealed unsafe class MapHandle : IDisposable
         ArgumentNullException.ThrowIfNull(json);
         using var nativeJson = NativeStringView.From(json, nameof(json));
         NativeStatus.Check(NativeMethods.mln_map_set_style_json(Handle, nativeJson.Value));
-        ClearCustomGeometrySources();
     }
 
     /// <summary>Gets the style document this map's style was last parsed from.</summary>
@@ -644,6 +642,36 @@ public sealed unsafe class MapHandle : IDisposable
                 NativeMethods.mln_map_copy_style_url(map, text, capacity, size)
         );
 
+    /// <summary>Selects which map-originated event types this map queues.</summary>
+    /// <remarks>
+    /// The mask reads the bits in <see cref="RuntimeEventMask.AllMapEvents" /> and ignores the rest,
+    /// so <see cref="RuntimeEventMask.All" /> selects every map-originated type. An event type this
+    /// mask clears is never queued, so it neither reaches a batch nor wakes a parked
+    /// <see cref="RuntimeHandle.Pump" />. Select every event type the host reads, because
+    /// <see cref="RuntimeEventType.MapRenderUpdateAvailable" />, the two still-image types, and
+    /// <see cref="RuntimeEventType.MapCameraTransitionFinished" /> carry state a host reaches no
+    /// other way. Narrowing gates later events and keeps queued ones, so a host drains what it
+    /// already caused.
+    /// </remarks>
+    public void SetEventMask(RuntimeEventMask mask)
+    {
+        NativeStatus.Check(NativeMethods.mln_map_set_event_mask(Handle, (ulong)mask));
+    }
+
+    /// <summary>Reports which map-originated event types this map queues.</summary>
+    /// <remarks>
+    /// The value is the mask last set, including bits outside
+    /// <see cref="RuntimeEventMask.AllMapEvents" /> that this map ignores. A map created with the
+    /// default <see cref="MapOptions.EventMask" /> reports every event type this library selects
+    /// by default, including any this binding does not declare.
+    /// </remarks>
+    public RuntimeEventMask GetEventMask()
+    {
+        ulong mask = 0;
+        NativeStatus.Check(NativeMethods.mln_map_get_event_mask(Handle, &mask));
+        return (RuntimeEventMask)mask;
+    }
+
     /// <summary>Adds a style source from UTF-8 JSON bytes.</summary>
     public void AddStyleSourceJson(string sourceId, byte[] sourceJson)
     {
@@ -666,10 +694,6 @@ public sealed unsafe class MapHandle : IDisposable
         NativeStatus.Check(
             NativeMethods.mln_map_remove_style_source(Handle, nativeSourceId.Value, &removed)
         );
-        if (removed && customGeometrySources.Remove(sourceId, out var state))
-        {
-            state.Dispose();
-        }
         return removed;
     }
 
@@ -936,25 +960,31 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Adds a custom geometry source with tile callbacks.</summary>
+    /// <remarks>
+    /// The upcall stubs this installs live until MapLibre stops referencing them: until the source
+    /// is removed, until a style load leaves a style without it, or until this map closes. The
+    /// binding releases them from the callback the C API invokes then, so nothing here depends on
+    /// the events <see cref="SetEventMask" /> selects.
+    /// </remarks>
     public void AddCustomGeometrySource(string sourceId, CustomGeometrySourceOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
+        AddCustomGeometrySource(sourceId, new CustomGeometrySourceState(options));
+    }
+
+    internal void AddCustomGeometrySource(string sourceId, CustomGeometrySourceState sourceState)
+    {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        var sourceState = new CustomGeometrySourceState(options);
         try
         {
             var descriptor = sourceState.Descriptor;
             NativeStatus.Check(
                 AddCustomGeometrySourceNative(Handle, nativeSourceId.Value, &descriptor)
             );
-            if (customGeometrySources.Remove(sourceId, out var previous))
-            {
-                previous.Dispose();
-            }
-            customGeometrySources[sourceId] = sourceState;
         }
         catch
         {
+            // A rejected add never referenced the state, so no release callback is owed for it.
             sourceState.Dispose();
             throw;
         }
@@ -1947,13 +1977,7 @@ public sealed unsafe class MapHandle : IDisposable
     {
         state.Close();
         runtime.UnregisterMap(this);
-        ClearCustomGeometrySources();
     }
-
-    internal int CustomGeometrySourceCountForTest => customGeometrySources.Count;
-
-    internal CustomGeometrySourceState? CustomGeometrySourceForTest(string sourceId) =>
-        customGeometrySources.GetValueOrDefault(sourceId);
 
     internal static IDisposable UseCustomGeometrySourceInstallForTest(
         MapAddCustomGeometrySource addCustomGeometrySource
@@ -1974,32 +1998,6 @@ public sealed unsafe class MapHandle : IDisposable
         {
             addCustomGeometrySourceForTest = previous;
         }
-    }
-
-    internal void ReleaseDetachedCustomGeometrySources()
-    {
-        foreach (var (sourceId, sourceState) in customGeometrySources.ToArray())
-        {
-            var sourceType = StyleSourceType(sourceId);
-            if (sourceType == SourceType.CustomVector)
-            {
-                continue;
-            }
-
-            if (customGeometrySources.Remove(sourceId))
-            {
-                sourceState.Dispose();
-            }
-        }
-    }
-
-    private void ClearCustomGeometrySources()
-    {
-        foreach (var source in customGeometrySources.Values)
-        {
-            source.Dispose();
-        }
-        customGeometrySources.Clear();
     }
 
     private static mln_lat_lng[] ToNativeCoordinates(
@@ -2078,7 +2076,6 @@ public sealed unsafe class MapHandle : IDisposable
         if (state.TryClose())
         {
             runtime.UnregisterMap(this);
-            ClearCustomGeometrySources();
         }
         GC.KeepAlive(runtime);
     }

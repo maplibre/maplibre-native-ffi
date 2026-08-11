@@ -15,7 +15,6 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
 /**
  * {@snippet lang=c :
  * struct mln_runtime_event_render_frame {
- *     uint32_t size;
  *     uint32_t mode;
  *     bool needs_repaint;
  *     bool placement_changed;
@@ -30,11 +29,10 @@ public class mln_runtime_event_render_frame {
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        MapLibreNativeC.C_INT.withName("size"),
         MapLibreNativeC.C_INT.withName("mode"),
         MapLibreNativeC.C_BOOL.withName("needs_repaint"),
         MapLibreNativeC.C_BOOL.withName("placement_changed"),
-        MemoryLayout.paddingLayout(6),
+        MemoryLayout.paddingLayout(2),
         mln_rendering_stats.layout().withName("stats")
     ).withName("mln_runtime_event_render_frame");
 
@@ -43,50 +41,6 @@ public class mln_runtime_event_render_frame {
      */
     public static final GroupLayout layout() {
         return $LAYOUT;
-    }
-
-    private static final OfInt size$LAYOUT = (OfInt)$LAYOUT.select(groupElement("size"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * uint32_t size
-     * }
-     */
-    public static final OfInt size$layout() {
-        return size$LAYOUT;
-    }
-
-    private static final long size$OFFSET = $LAYOUT.byteOffset(groupElement("size"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * uint32_t size
-     * }
-     */
-    public static final long size$offset() {
-        return size$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * uint32_t size
-     * }
-     */
-    public static int size(MemorySegment struct) {
-        return struct.get(size$LAYOUT, size$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * uint32_t size
-     * }
-     */
-    public static void size(MemorySegment struct, int fieldValue) {
-        struct.set(size$LAYOUT, size$OFFSET, fieldValue);
     }
 
     private static final OfInt mode$LAYOUT = (OfInt)$LAYOUT.select(groupElement("mode"));

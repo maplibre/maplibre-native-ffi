@@ -864,6 +864,258 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     public static int MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED() {
         return MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED;
     }
+    private static final int MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED = (int)23L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED = 23
+     * }
+     */
+    public static int MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED() {
+        return MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_NONE = 0L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_NONE = 0
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_NONE() {
+        return MLN_RUNTIME_EVENT_MASK_NONE;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE = 2L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE = 2
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING = 4L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING = 4
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE = 8L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE = 8
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED = 16L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED = 16
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED = 32L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED = 32
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED = 64L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED = 64
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED = 128L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED = 128
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_IDLE = 256L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_IDLE = 256
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_IDLE() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_IDLE;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE = 512L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE = 512
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR = 1024L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR = 1024
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED = 2048L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED = 2048
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED = 4096L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED = 4096
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED = 8192L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED = 8192
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED = 16384L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED = 16384
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED = 32768L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED = 32768
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED = 65536L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED = 65536
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING = 131072L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING = 131072
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION = 262144L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION = 262144
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED = 8388608L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED = 8388608
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED() {
+        return MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED = 524288L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED = 524288
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED() {
+        return MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR = 1048576L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR = 1048576
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR() {
+        return MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED() {
+        return MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED = 4194304L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED = 4194304
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED() {
+        return MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = 8912894L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = 8912894
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS() {
+        return MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS = 7864320L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS = 7864320
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS() {
+        return MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS;
+    }
+    private static final long MLN_RUNTIME_EVENT_MASK_ALL = 16777214L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_mask.MLN_RUNTIME_EVENT_MASK_ALL = 16777214
+     * }
+     */
+    public static long MLN_RUNTIME_EVENT_MASK_ALL() {
+        return MLN_RUNTIME_EVENT_MASK_ALL;
+    }
     private static final int MLN_RUNTIME_EVENT_SOURCE_RUNTIME = (int)0L;
     /**
      * {@snippet lang=c :
@@ -909,15 +1161,6 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     public static int MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP() {
         return MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP;
     }
-    private static final int MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING = (int)3L;
-    /**
-     * {@snippet lang=c :
-     * enum mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING = 3
-     * }
-     */
-    public static int MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING() {
-        return MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING;
-    }
     private static final int MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION = (int)4L;
     /**
      * {@snippet lang=c :
@@ -962,6 +1205,15 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
      */
     public static int MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED() {
         return MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED;
+    }
+    private static final int MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = (int)9L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = 9
+     * }
+     */
+    public static int MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED() {
+        return MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED;
     }
     private static final int MLN_RENDER_MODE_PARTIAL = (int)0L;
     /**
@@ -2719,15 +2971,11 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
-    private static class mln_runtime_poll_event {
+    private static class mln_runtime_event_batch_default {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_POINTER,
-            MapLibreNativeC.C_POINTER
-        );
+            mln_runtime_event_batch.layout()    );
 
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_runtime_poll_event");
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_runtime_event_batch_default");
 
         public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
     }
@@ -2735,45 +2983,229 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_poll_event(mln_runtime runtime, mln_runtime_event *out_event, bool *out_has_event)
+     * mln_runtime_event_batch mln_runtime_event_batch_default()
      * }
      */
-    public static FunctionDescriptor mln_runtime_poll_event$descriptor() {
-        return mln_runtime_poll_event.DESC;
+    public static FunctionDescriptor mln_runtime_event_batch_default$descriptor() {
+        return mln_runtime_event_batch_default.DESC;
     }
 
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_poll_event(mln_runtime runtime, mln_runtime_event *out_event, bool *out_has_event)
+     * mln_runtime_event_batch mln_runtime_event_batch_default()
      * }
      */
-    public static MethodHandle mln_runtime_poll_event$handle() {
-        return mln_runtime_poll_event.HANDLE;
+    public static MethodHandle mln_runtime_event_batch_default$handle() {
+        return mln_runtime_event_batch_default.HANDLE;
     }
 
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_poll_event(mln_runtime runtime, mln_runtime_event *out_event, bool *out_has_event)
+     * mln_runtime_event_batch mln_runtime_event_batch_default()
      * }
      */
-    public static MemorySegment mln_runtime_poll_event$address() {
-        return mln_runtime_poll_event.ADDR;
+    public static MemorySegment mln_runtime_event_batch_default$address() {
+        return mln_runtime_event_batch_default.ADDR;
     }
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_poll_event(mln_runtime runtime, mln_runtime_event *out_event, bool *out_has_event)
+     * mln_runtime_event_batch mln_runtime_event_batch_default()
      * }
      */
-    public static int mln_runtime_poll_event(long runtime, MemorySegment out_event, MemorySegment out_has_event) {
-        var mh$ = mln_runtime_poll_event.HANDLE;
+    public static MemorySegment mln_runtime_event_batch_default(SegmentAllocator allocator) {
+        var mh$ = mln_runtime_event_batch_default.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_poll_event", runtime, out_event, out_has_event);
+                traceDowncall("mln_runtime_event_batch_default", allocator);
             }
-            return (int)mh$.invokeExact(runtime, out_event, out_has_event);
+            return (MemorySegment)mh$.invokeExact(allocator);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_runtime_drain_events {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_runtime_drain_events");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_runtime_drain_events(mln_runtime runtime, size_t max_events, mln_runtime_event_batch *out_batch)
+     * }
+     */
+    public static FunctionDescriptor mln_runtime_drain_events$descriptor() {
+        return mln_runtime_drain_events.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_runtime_drain_events(mln_runtime runtime, size_t max_events, mln_runtime_event_batch *out_batch)
+     * }
+     */
+    public static MethodHandle mln_runtime_drain_events$handle() {
+        return mln_runtime_drain_events.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_runtime_drain_events(mln_runtime runtime, size_t max_events, mln_runtime_event_batch *out_batch)
+     * }
+     */
+    public static MemorySegment mln_runtime_drain_events$address() {
+        return mln_runtime_drain_events.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_runtime_drain_events(mln_runtime runtime, size_t max_events, mln_runtime_event_batch *out_batch)
+     * }
+     */
+    public static int mln_runtime_drain_events(long runtime, long max_events, MemorySegment out_batch) {
+        var mh$ = mln_runtime_drain_events.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_runtime_drain_events", runtime, max_events, out_batch);
+            }
+            return (int)mh$.invokeExact(runtime, max_events, out_batch);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_runtime_set_event_mask {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_LONG
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_runtime_set_event_mask");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_runtime_set_event_mask(mln_runtime runtime, uint64_t mask)
+     * }
+     */
+    public static FunctionDescriptor mln_runtime_set_event_mask$descriptor() {
+        return mln_runtime_set_event_mask.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_runtime_set_event_mask(mln_runtime runtime, uint64_t mask)
+     * }
+     */
+    public static MethodHandle mln_runtime_set_event_mask$handle() {
+        return mln_runtime_set_event_mask.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_runtime_set_event_mask(mln_runtime runtime, uint64_t mask)
+     * }
+     */
+    public static MemorySegment mln_runtime_set_event_mask$address() {
+        return mln_runtime_set_event_mask.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_runtime_set_event_mask(mln_runtime runtime, uint64_t mask)
+     * }
+     */
+    public static int mln_runtime_set_event_mask(long runtime, long mask) {
+        var mh$ = mln_runtime_set_event_mask.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_runtime_set_event_mask", runtime, mask);
+            }
+            return (int)mh$.invokeExact(runtime, mask);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_runtime_get_event_mask {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_runtime_get_event_mask");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_runtime_get_event_mask(mln_runtime runtime, uint64_t *out_mask)
+     * }
+     */
+    public static FunctionDescriptor mln_runtime_get_event_mask$descriptor() {
+        return mln_runtime_get_event_mask.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_runtime_get_event_mask(mln_runtime runtime, uint64_t *out_mask)
+     * }
+     */
+    public static MethodHandle mln_runtime_get_event_mask$handle() {
+        return mln_runtime_get_event_mask.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_runtime_get_event_mask(mln_runtime runtime, uint64_t *out_mask)
+     * }
+     */
+    public static MemorySegment mln_runtime_get_event_mask$address() {
+        return mln_runtime_get_event_mask.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_runtime_get_event_mask(mln_runtime runtime, uint64_t *out_mask)
+     * }
+     */
+    public static int mln_runtime_get_event_mask(long runtime, MemorySegment out_mask) {
+        var mh$ = mln_runtime_get_event_mask.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_runtime_get_event_mask", runtime, out_mask);
+            }
+            return (int)mh$.invokeExact(runtime, out_mask);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -5252,6 +5684,128 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
                 traceDowncall("mln_map_copy_style_url", map, out_url, url_capacity, out_url_size);
             }
             return (int)mh$.invokeExact(map, out_url, url_capacity, out_url_size);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_set_event_mask {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_LONG
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_set_event_mask");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_event_mask(mln_map map, uint64_t mask)
+     * }
+     */
+    public static FunctionDescriptor mln_map_set_event_mask$descriptor() {
+        return mln_map_set_event_mask.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_event_mask(mln_map map, uint64_t mask)
+     * }
+     */
+    public static MethodHandle mln_map_set_event_mask$handle() {
+        return mln_map_set_event_mask.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_event_mask(mln_map map, uint64_t mask)
+     * }
+     */
+    public static MemorySegment mln_map_set_event_mask$address() {
+        return mln_map_set_event_mask.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_set_event_mask(mln_map map, uint64_t mask)
+     * }
+     */
+    public static int mln_map_set_event_mask(long map, long mask) {
+        var mh$ = mln_map_set_event_mask.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_set_event_mask", map, mask);
+            }
+            return (int)mh$.invokeExact(map, mask);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_get_event_mask {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_get_event_mask");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_get_event_mask(mln_map map, uint64_t *out_mask)
+     * }
+     */
+    public static FunctionDescriptor mln_map_get_event_mask$descriptor() {
+        return mln_map_get_event_mask.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_get_event_mask(mln_map map, uint64_t *out_mask)
+     * }
+     */
+    public static MethodHandle mln_map_get_event_mask$handle() {
+        return mln_map_get_event_mask.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_get_event_mask(mln_map map, uint64_t *out_mask)
+     * }
+     */
+    public static MemorySegment mln_map_get_event_mask$address() {
+        return mln_map_get_event_mask.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_get_event_mask(mln_map map, uint64_t *out_mask)
+     * }
+     */
+    public static int mln_map_get_event_mask(long map, MemorySegment out_mask) {
+        var mh$ = mln_map_get_event_mask.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_get_event_mask", map, out_mask);
+            }
+            return (int)mh$.invokeExact(map, out_mask);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

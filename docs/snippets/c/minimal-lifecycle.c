@@ -26,6 +26,12 @@ int main(void) {
     return 1;
   }
 
+  // A map queues an event only while its subscription selects the type.
+  mln_map_set_event_mask(
+    map, MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED |
+           MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED
+  );
+
   // This call only accepts the request; the outcome arrives later as an event.
   const mln_status requested =
     mln_map_set_style_url(map, "https://tiles.openfreemap.org/styles/bright");
@@ -37,20 +43,22 @@ int main(void) {
     // A positive timeout parks the thread until work arrives or it expires.
     mln_runtime_pump(runtime, 100);
 
-    mln_runtime_event event = {.size = sizeof(event)};
-    bool has_event = false;
-    while (mln_runtime_poll_event(runtime, &event, &has_event) ==
-             MLN_STATUS_OK &&
-           has_event) {
-      if (event.source != map) continue;
-      if (event.type == MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) {
+    mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+    mln_runtime_drain_events(runtime, 0, &batch);
+
+    for (size_t index = 0; index < batch.event_count; index++) {
+      const char* bytes = (const char*)batch.events + index * batch.event_size;
+      const mln_runtime_event* event = (const mln_runtime_event*)bytes;
+      if (event->source != map) continue;
+      if (event->type == MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) {
         loaded = true;
         settled = true;
-      } else if (event.type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED) {
-        if (event.message_size > 0) {
+      } else if (event->type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED) {
+        // A message lives in the batch's arena, at the event's own offset.
+        if (event->message_size > 0) {
           fprintf(
-            stderr, "style failed: %.*s\n", (int)event.message_size,
-            event.message
+            stderr, "style failed: %.*s\n", (int)event->message_size,
+            batch.messages + event->message_offset
           );
         }
         settled = true;

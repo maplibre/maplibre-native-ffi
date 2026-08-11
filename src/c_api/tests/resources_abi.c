@@ -23,14 +23,6 @@ static const char credentialed_unsupported_scheme_style_url[] =
 static const uint8_t inline_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
-static mln_runtime_event empty_event(void) {
-  return (mln_runtime_event){
-    .size = sizeof(mln_runtime_event),
-    .source_type = MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-    .payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE,
-  };
-}
-
 static bool wait_for_offline_completion(
   mln_runtime runtime, mln_offline_operation_id operation_id
 ) {
@@ -39,30 +31,30 @@ static bool wait_for_offline_completion(
       return false;
     }
     while (true) {
-      mln_runtime_event event = empty_event();
-      bool has_event = false;
-      if (
-        mln_runtime_poll_event(runtime, &event, &has_event) != MLN_STATUS_OK
-      ) {
+      mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+      if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
         return false;
       }
-      if (!has_event) {
+      if (batch.event_count == 0) {
         break;
       }
-      if (
-        event.type != MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED ||
-        event.payload_type !=
-          MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED
-      ) {
-        continue;
-      }
-      if (event.payload == NULL) {
-        return false;
-      }
-      const mln_runtime_event_offline_operation_completed* payload =
-        event.payload;
-      if (payload->operation_id == operation_id) {
-        return true;
+      for (size_t index = 0; index < batch.event_count; index += 1) {
+        const mln_runtime_event* event =
+          (const mln_runtime_event*)((const char*)batch.events +
+                                     (index * batch.event_size));
+        if (
+          event->type != MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED ||
+          event->payload_type !=
+            MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED
+        ) {
+          continue;
+        }
+        if (
+          event->payload.offline_operation_completed.operation_id ==
+          operation_id
+        ) {
+          return true;
+        }
       }
     }
     mln_test_sleep_millisecond();
@@ -78,27 +70,14 @@ static bool wait_for_map_loading_failure(
     if (mln_runtime_pump(runtime, 0) != MLN_STATUS_OK) {
       return false;
     }
-    while (true) {
-      mln_runtime_event event = empty_event();
-      bool has_event = false;
-      if (
-        mln_runtime_poll_event(runtime, &event, &has_event) != MLN_STATUS_OK
-      ) {
-        return false;
-      }
-      if (!has_event) {
-        break;
-      }
-      if (
-        event.type != MLN_RUNTIME_EVENT_MAP_LOADING_FAILED ||
-        event.source != map || event.message == NULL ||
-        event.message_size >= out_message_capacity
-      ) {
-        continue;
-      }
-      memcpy(out_message, event.message, event.message_size);
-      out_message[event.message_size] = '\0';
-      return true;
+    mln_runtime_event event = {0};
+    if (
+      mln_test_drain_find(
+        runtime, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, map, &event, out_message,
+        out_message_capacity
+      )
+    ) {
+      return event.message_size < out_message_capacity;
     }
     mln_test_sleep_millisecond();
   }

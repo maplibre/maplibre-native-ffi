@@ -1,6 +1,9 @@
 package org.maplibre.nativeffi.runtime
 
 import java.lang.ref.WeakReference
+import java.nio.Buffer
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
 import org.bytedeco.javacpp.BoolPointer
 import org.bytedeco.javacpp.BytePointer
@@ -46,6 +49,15 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
   private var resourceTransformState: ResourceTransformState? = null
   private var httpHeaderTransformState: HttpHeaderTransformState? = null
   private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
+  // One batch struct per handle, reused by every drain and freed by close().
+  private val batch =
+    MaplibreNativeC.mln_runtime_event_batch().also {
+      Pointer.memset(it, 0, EventLayout.BATCH_SIZE.toLong())
+    }
+  private var eventBuffer: ByteBuffer? = null
+  private var eventBufferBase = 0L
+  private var messageBuffer: ByteBuffer? = null
+  private var messageBufferBase = 0L
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
@@ -456,15 +468,45 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
     releaseCallbackRoot(previous)
   }
 
-  public actual fun pollEvent(): RuntimeEvent? {
+  public actual fun drainEvents(maxEvents: Int): RuntimeEventBatch {
     NativeAccess.ensureLoaded()
-    MaplibreNativeC.mln_runtime_event().use { event ->
-      event.size(event.sizeof())
-      val hasEvent = booleanArrayOf(false)
-      Status.check(MaplibreNativeC.mln_runtime_poll_event(requireLiveHandle(), event, hasEvent))
-      return if (hasEvent[0]) runtimeEvent(event) else null
+    Status.requireArgument(maxEvents >= 0) { "maxEvents must be non-negative" }
+    val runtime = requireLiveHandle()
+    batch.size(EventLayout.BATCH_SIZE)
+    Status.check(MaplibreNativeC.mln_runtime_drain_events(runtime, maxEvents.toLong(), batch))
+    val remainingCount = batch.remaining_count()
+    val eventCount = Math.toIntExact(batch.event_count())
+    if (eventCount == 0) {
+      return RuntimeEventBatch(emptyList(), remainingCount)
     }
+    // The stride the batch reports can exceed the probed record, so index by it.
+    val eventSize = batch.event_size()
+    require(eventSize >= EventLayout.EVENT_SIZE) {
+      "Loaded native library reports a ${eventSize}-byte runtime event, " +
+        "smaller than this binding's ${EventLayout.EVENT_SIZE}-byte record"
+    }
+    val events = eventBytes(batch.events(), eventCount.toLong() * eventSize)
+    val messages = messageBytes(batch.messages(), batch.messages_size())
+    val copied =
+      List(eventCount) { index ->
+        copiedEvent(events, index * eventSize, eventSize, messages).toRuntimeEvent()
+      }
+    return RuntimeEventBatch(copied, remainingCount)
   }
+
+  public actual var eventMask: RuntimeEventMask
+    get() {
+      NativeAccess.ensureLoaded()
+      val outMask = LongArray(1)
+      Status.check(MaplibreNativeC.mln_runtime_get_event_mask(requireLiveHandle(), outMask))
+      return RuntimeEventMask(outMask[0])
+    }
+    set(value) {
+      NativeAccess.ensureLoaded()
+      Status.check(
+        MaplibreNativeC.mln_runtime_set_event_mask(requireLiveHandle(), value.nativeValue)
+      )
+    }
 
   public actual override fun close() {
     resourceProviderState?.checkCanClose()
@@ -473,6 +515,9 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
     core.closeOnce(
       destroy = { MaplibreNativeC.mln_runtime_destroy(handleId) },
       afterSuccess = {
+        batch.close()
+        eventBuffer = null
+        messageBuffer = null
         releaseCallbackRoot(resourceProviderState)
         resourceProviderState = null
         releaseCallbackRoot(resourceTransformState)
@@ -552,43 +597,76 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
     code: Int,
     payload: RuntimeEventPayload,
     message: String,
-  ): RuntimeEvent = copiedRuntimeEvent(type, sourceType, sourceId, code, payload, message)
+  ): RuntimeEvent = CopiedEvent(type, sourceType, sourceId, code, payload, message).toRuntimeEvent()
 
   private fun requireLiveHandle(): Long {
     core.requireLive()
     return handleId
   }
 
-  private fun runtimeEvent(event: MaplibreNativeC.mln_runtime_event): RuntimeEvent {
-    return copiedRuntimeEvent(
-      event.type(),
-      event.source_type(),
-      event.source(),
-      event.code(),
-      runtimeEventPayload(event),
-      byteString(event.message(), event.message_size()),
+  /**
+   * Maps a batch pointer to a reused direct buffer, re-basing only when the runtime's storage moved
+   * or grew past the mapped window.
+   */
+  private fun eventBytes(events: Pointer, byteCount: Long): ByteBuffer {
+    val cached = eventBuffer
+    if (cached != null && eventBufferBase == events.address() && cached.capacity() >= byteCount) {
+      return cached
+    }
+    val mapped = directBuffer(events, byteCount)
+    eventBuffer = mapped
+    eventBufferBase = events.address()
+    return mapped
+  }
+
+  private fun messageBytes(messages: Pointer?, byteCount: Long): ByteBuffer? {
+    if (messages == null || messages.isNull || byteCount == 0L) {
+      return null
+    }
+    val cached = messageBuffer
+    if (
+      cached != null && messageBufferBase == messages.address() && cached.capacity() >= byteCount
+    ) {
+      return cached
+    }
+    val mapped = directBuffer(messages, byteCount)
+    messageBuffer = mapped
+    messageBufferBase = messages.address()
+    return mapped
+  }
+
+  /** Reads one event record at [base] into binding-owned values. */
+  private fun copiedEvent(
+    events: ByteBuffer,
+    base: Int,
+    eventSize: Int,
+    messages: ByteBuffer?,
+  ): CopiedEvent {
+    val payloadType = events.getInt(base + EventLayout.PAYLOAD_TYPE)
+    return CopiedEvent(
+      type = events.getInt(base + EventLayout.TYPE),
+      sourceType = events.getInt(base + EventLayout.SOURCE_TYPE),
+      sourceId = events.getLong(base + EventLayout.SOURCE),
+      code = events.getInt(base + EventLayout.CODE),
+      payload = runtimeEventPayload(payloadType, events, base, eventSize),
+      message =
+        message(
+          messages,
+          events.getInt(base + EventLayout.MESSAGE_OFFSET),
+          events.getInt(base + EventLayout.MESSAGE_SIZE),
+        ),
     )
   }
 
-  private fun copiedRuntimeEvent(
-    rawType: Int,
-    rawSourceType: Int,
-    sourceId: Long,
-    code: Int,
-    payload: RuntimeEventPayload,
-    message: String,
-  ): RuntimeEvent {
-    val sourceType = RuntimeEventSourceType.fromNative(rawSourceType)
-    val mapSource = if (sourceType == RuntimeEventSourceType.MAP) mapFor(sourceId) else null
-    val eventType = RuntimeEventType.fromNative(rawType)
-    if (eventType == RuntimeEventType.MAP_STYLE_LOADED) {
-      mapSource?.releaseDetachedCustomGeometrySources()
-    }
+  /** Converts one copied event, resolving the map that queued it when it is still live. */
+  private fun CopiedEvent.toRuntimeEvent(): RuntimeEvent {
+    val sourceType = RuntimeEventSourceType.fromNative(sourceType)
     return RuntimeEvent(
-      eventType,
+      RuntimeEventType.fromNative(type),
       sourceType,
-      if (sourceType == RuntimeEventSourceType.RUNTIME) this else null,
-      mapSource,
+      sourceId,
+      if (sourceType == RuntimeEventSourceType.RUNTIME) this@RuntimeHandle else null,
+      if (sourceType == RuntimeEventSourceType.MAP) mapFor(sourceId) else null,
       code,
       payload,
       message,
@@ -604,9 +682,6 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
     }
     return map
   }
-
-  private fun runtimeEventPayload(event: MaplibreNativeC.mln_runtime_event): RuntimeEventPayload =
-    JavaCppRuntimeStructs.runtimeEventPayload(event)
 
   private fun takeOfflineRegionSnapshot(
     operationId: Long,
@@ -648,12 +723,6 @@ private fun closeAndSuppress(error: Throwable, closeable: AutoCloseable?) {
   }
 }
 
-private fun hasPayloadSize(event: MaplibreNativeC.mln_runtime_event, requiredSize: Long): Boolean =
-  event.payload() != null && !event.payload().isNull && event.payload_size() >= requiredSize
-
-private fun payloadBytes(event: MaplibreNativeC.mln_runtime_event): ByteArray =
-  byteArray(event.payload(), event.payload_size())
-
 private fun byteString(pointer: BytePointer?, byteCount: Long): String =
   String(byteArray(pointer, byteCount), StandardCharsets.UTF_8)
 
@@ -666,48 +735,146 @@ private fun byteArray(pointer: Pointer?, byteCount: Long): ByteArray {
   return bytes
 }
 
-private fun renderFramePayload(payload: Pointer): RuntimeEventPayload.RenderFrame {
-  val frame = MaplibreNativeC.mln_runtime_event_render_frame(payload)
-  return RuntimeEventPayload.RenderFrame(
-    RenderMode.fromNative(frame.mode()),
-    frame.needs_repaint(),
-    frame.placement_changed(),
+/** One event's fields, copied out of the drained batch before the drain returns. */
+private class CopiedEvent(
+  val type: Int,
+  val sourceType: Int,
+  val sourceId: Long,
+  val code: Int,
+  val payload: RuntimeEventPayload,
+  val message: String,
+)
+
+private fun directBuffer(pointer: Pointer, byteCount: Long): ByteBuffer =
+  BytePointer(pointer).capacity(byteCount).asByteBuffer().order(ByteOrder.nativeOrder())
+
+private fun message(messages: ByteBuffer?, offset: Int, size: Int): String {
+  if (messages == null || size == 0) {
+    return ""
+  }
+  val bytes = ByteArray(size)
+  readAt(messages, offset, bytes)
+  return String(bytes, StandardCharsets.UTF_8)
+}
+
+/**
+ * Copies [bytes].size bytes at [offset] out of [buffer].
+ *
+ * A duplicate keeps the reused buffer's own position untouched, and the Buffer-typed local keeps
+ * this off `ByteBuffer.position(int)`, whose covariant return the Android API floor lacks.
+ */
+private fun readAt(buffer: ByteBuffer, offset: Int, bytes: ByteArray) {
+  val view: Buffer = buffer.duplicate()
+  view.position(offset)
+  (view as ByteBuffer).get(bytes, 0, bytes.size)
+}
+
+private fun runtimeEventPayload(
+  payloadType: Int,
+  events: ByteBuffer,
+  base: Int,
+  eventSize: Int,
+): RuntimeEventPayload =
+  when (payloadType) {
+    MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_NONE -> RuntimeEventPayload.None
+    MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME -> renderFramePayload(events, base)
+    MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP ->
+      RuntimeEventPayload.RenderMap(
+        RenderMode.fromNative(events.getInt(base + EventLayout.RENDER_MAP_MODE))
+      )
+    MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION -> tileActionPayload(events, base)
+    MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS ->
+      offlineRegionStatusPayload(events, base)
+    MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR ->
+      RuntimeEventPayload.OfflineRegionResponseError(
+        events.getLong(base + EventLayout.RESPONSE_ERROR_REGION_ID),
+        ResourceErrorReason.fromNative(events.getInt(base + EventLayout.RESPONSE_ERROR_REASON)),
+      )
+    MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT ->
+      RuntimeEventPayload.OfflineRegionTileCountLimit(
+        events.getLong(base + EventLayout.TILE_COUNT_LIMIT_REGION_ID),
+        events.getLong(base + EventLayout.TILE_COUNT_LIMIT_LIMIT),
+      )
+    MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED ->
+      offlineOperationCompletedPayload(events, base)
+    MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED ->
+      RuntimeEventPayload.CameraTransitionFinished(events.getLong(base + EventLayout.TRANSITION_ID))
+    else -> unknownPayload(payloadType, events, base, eventSize)
+  }
+
+/**
+ * Copies the payload window of an event whose payload kind this version does not name, which is the
+ * batch stride minus the offset of the payload inside one event record.
+ */
+private fun unknownPayload(
+  payloadType: Int,
+  events: ByteBuffer,
+  base: Int,
+  eventSize: Int,
+): RuntimeEventPayload.Unknown {
+  val bytes = ByteArray(eventSize - EventLayout.PAYLOAD)
+  readAt(events, base + EventLayout.PAYLOAD, bytes)
+  return RuntimeEventPayload.Unknown(payloadType, bytes)
+}
+
+private fun renderFramePayload(events: ByteBuffer, base: Int): RuntimeEventPayload.RenderFrame =
+  RuntimeEventPayload.RenderFrame(
+    RenderMode.fromNative(events.getInt(base + EventLayout.RENDER_FRAME_MODE)),
+    events.get(base + EventLayout.RENDER_FRAME_NEEDS_REPAINT) != 0.toByte(),
+    events.get(base + EventLayout.RENDER_FRAME_PLACEMENT_CHANGED) != 0.toByte(),
     RenderingStats(
-      frame.stats().encoding_time(),
-      frame.stats().rendering_time(),
-      frame.stats().frame_count(),
-      frame.stats().draw_call_count(),
-      frame.stats().total_draw_call_count(),
+      events.getDouble(base + EventLayout.STATS_ENCODING_TIME),
+      events.getDouble(base + EventLayout.STATS_RENDERING_TIME),
+      events.getLong(base + EventLayout.STATS_FRAME_COUNT),
+      events.getLong(base + EventLayout.STATS_DRAW_CALL_COUNT),
+      events.getLong(base + EventLayout.STATS_TOTAL_DRAW_CALL_COUNT),
     ),
   )
-}
 
-private fun renderMapPayload(payload: Pointer): RuntimeEventPayload.RenderMap =
-  RuntimeEventPayload.RenderMap(
-    RenderMode.fromNative(MaplibreNativeC.mln_runtime_event_render_map(payload).mode())
-  )
-
-private fun styleImageMissingPayload(payload: Pointer): RuntimeEventPayload.StyleImageMissing {
-  val missing = MaplibreNativeC.mln_runtime_event_style_image_missing(payload)
-  return RuntimeEventPayload.StyleImageMissing(
-    byteString(missing.image_id(), missing.image_id_size())
-  )
-}
-
-private fun tileActionPayload(payload: Pointer): RuntimeEventPayload.TileAction {
-  val action = MaplibreNativeC.mln_runtime_event_tile_action(payload)
-  return RuntimeEventPayload.TileAction(
-    TileOperation.fromNative(action.operation()),
+private fun tileActionPayload(events: ByteBuffer, base: Int): RuntimeEventPayload.TileAction =
+  RuntimeEventPayload.TileAction(
+    TileOperation.fromNative(events.getInt(base + EventLayout.TILE_ACTION_OPERATION)),
     TileId(
-      Integer.toUnsignedLong(action.tile_id().overscaled_z()),
-      action.tile_id().wrap(),
-      Integer.toUnsignedLong(action.tile_id().canonical_z()),
-      Integer.toUnsignedLong(action.tile_id().canonical_x()),
-      Integer.toUnsignedLong(action.tile_id().canonical_y()),
+      Integer.toUnsignedLong(events.getInt(base + EventLayout.TILE_ID_OVERSCALED_Z)),
+      events.getInt(base + EventLayout.TILE_ID_WRAP),
+      Integer.toUnsignedLong(events.getInt(base + EventLayout.TILE_ID_CANONICAL_Z)),
+      Integer.toUnsignedLong(events.getInt(base + EventLayout.TILE_ID_CANONICAL_X)),
+      Integer.toUnsignedLong(events.getInt(base + EventLayout.TILE_ID_CANONICAL_Y)),
     ),
-    byteString(action.source_id(), action.source_id_size()),
   )
-}
+
+private fun offlineRegionStatusPayload(
+  events: ByteBuffer,
+  base: Int,
+): RuntimeEventPayload.OfflineRegionStatusChanged =
+  RuntimeEventPayload.OfflineRegionStatusChanged(
+    events.getLong(base + EventLayout.REGION_STATUS_REGION_ID),
+    OfflineRegionStatus(
+      OfflineRegionDownloadState.fromNative(
+        events.getInt(base + EventLayout.REGION_STATUS_DOWNLOAD_STATE)
+      ),
+      events.getLong(base + EventLayout.REGION_STATUS_COMPLETED_RESOURCE_COUNT),
+      events.getLong(base + EventLayout.REGION_STATUS_COMPLETED_RESOURCE_SIZE),
+      events.getLong(base + EventLayout.REGION_STATUS_COMPLETED_TILE_COUNT),
+      events.getLong(base + EventLayout.REGION_STATUS_REQUIRED_TILE_COUNT),
+      events.getLong(base + EventLayout.REGION_STATUS_COMPLETED_TILE_SIZE),
+      events.getLong(base + EventLayout.REGION_STATUS_REQUIRED_RESOURCE_COUNT),
+      events.get(base + EventLayout.REGION_STATUS_COUNT_IS_PRECISE) != 0.toByte(),
+      events.get(base + EventLayout.REGION_STATUS_COMPLETE) != 0.toByte(),
+    ),
+  )
+
+private fun offlineOperationCompletedPayload(
+  events: ByteBuffer,
+  base: Int,
+): RuntimeEventPayload.OfflineOperationCompleted =
+  RuntimeEventPayload.OfflineOperationCompleted(
+    events.getLong(base + EventLayout.OPERATION_ID),
+    OfflineOperationKind.fromNative(events.getInt(base + EventLayout.OPERATION_KIND)),
+    OfflineOperationResultKind.fromNative(events.getInt(base + EventLayout.OPERATION_RESULT_KIND)),
+    events.getInt(base + EventLayout.OPERATION_RESULT_STATUS),
+    events.get(base + EventLayout.OPERATION_FOUND) != 0.toByte(),
+  )
 
 private fun offlineRegionStatus(
   status: MaplibreNativeC.mln_offline_region_status
@@ -834,71 +1001,196 @@ private fun cStringLength(pointer: BytePointer?): Long {
   return length
 }
 
-private fun offlineRegionStatusPayload(
-  payload: Pointer
-): RuntimeEventPayload.OfflineRegionStatusChanged {
-  val status = MaplibreNativeC.mln_runtime_event_offline_region_status(payload)
-  return RuntimeEventPayload.OfflineRegionStatusChanged(
-    status.region_id(),
-    offlineRegionStatus(status.status()),
-  )
-}
+/**
+ * Byte offsets inside one `mln_runtime_event` record, derived once from the loaded library.
+ *
+ * Every offset comes from writing a sentinel through a generated typed setter and finding where it
+ * landed in the record's raw bytes, so a reordered or repadded field moves this table with it
+ * rather than misdecoding. A hand-written constant could not do that.
+ */
+private object EventLayout {
+  private const val INT_SENTINEL = 0x5A4B3C2D
+  private const val LONG_SENTINEL = 0x5A4B3C2D1E0F7788L
 
-private fun offlineRegionResponseErrorPayload(
-  payload: Pointer
-): RuntimeEventPayload.OfflineRegionResponseError {
-  val error = MaplibreNativeC.mln_runtime_event_offline_region_response_error(payload)
-  return RuntimeEventPayload.OfflineRegionResponseError(
-    error.region_id(),
-    ResourceErrorReason.fromNative(error.reason()),
-  )
-}
+  // Two records, so the stride comes from the distance between them.
+  private val records = MaplibreNativeC.mln_runtime_event(2)
+  private val record: MaplibreNativeC.mln_runtime_event = records.getPointer(0)
+  private val stride = records.getPointer(1).address() - records.address()
+  private val bytes =
+    BytePointer(records).capacity(2L * stride).asByteBuffer().order(ByteOrder.nativeOrder())
 
-private fun offlineRegionTileCountLimitPayload(
-  payload: Pointer
-): RuntimeEventPayload.OfflineRegionTileCountLimit {
-  val limit = MaplibreNativeC.mln_runtime_event_offline_region_tile_count_limit(payload)
-  return RuntimeEventPayload.OfflineRegionTileCountLimit(limit.region_id(), limit.limit())
-}
+  val EVENT_SIZE: Int = Math.toIntExact(stride)
+  val BATCH_SIZE: Int = MaplibreNativeC.mln_runtime_event_batch().use { it.sizeof() }
 
-private fun offlineOperationCompletedPayload(
-  payload: Pointer
-): RuntimeEventPayload.OfflineOperationCompleted {
-  val operation = MaplibreNativeC.mln_runtime_event_offline_operation_completed(payload)
-  return RuntimeEventPayload.OfflineOperationCompleted(
-    operation.operation_id(),
-    OfflineOperationKind.fromNative(operation.operation_kind()),
-    OfflineOperationResultKind.fromNative(operation.result_kind()),
-    operation.result_status(),
-    operation.found(),
-  )
-}
+  val TYPE: Int = probeInt { it.type(INT_SENTINEL) }
+  val SOURCE_TYPE: Int = probeInt { it.source_type(INT_SENTINEL) }
+  val SOURCE: Int = probeLong { it.source(LONG_SENTINEL) }
+  val CODE: Int = probeInt { it.code(INT_SENTINEL) }
+  val PAYLOAD_TYPE: Int = probeInt { it.payload_type(INT_SENTINEL) }
+  val MESSAGE_OFFSET: Int = probeInt { it.message_offset(INT_SENTINEL) }
+  val MESSAGE_SIZE: Int = probeInt { it.message_size(INT_SENTINEL) }
 
-private fun cameraTransitionFinishedPayload(
-  payload: Pointer
-): RuntimeEventPayload.CameraTransitionFinished =
-  RuntimeEventPayload.CameraTransitionFinished(
-    MaplibreNativeC.mln_runtime_event_camera_transition_finished(payload).transition_id()
-  )
+  val RENDER_FRAME_MODE: Int = probeInt { it.payload().render_frame().mode(INT_SENTINEL) }
+  val RENDER_FRAME_NEEDS_REPAINT: Int = probeFlag {
+    it.payload().render_frame().needs_repaint(true)
+  }
+  val RENDER_FRAME_PLACEMENT_CHANGED: Int = probeFlag {
+    it.payload().render_frame().placement_changed(true)
+  }
+  val STATS_ENCODING_TIME: Int = probeDouble {
+    it.payload().render_frame().stats().encoding_time(SENTINEL_DOUBLE)
+  }
+  val STATS_RENDERING_TIME: Int = probeDouble {
+    it.payload().render_frame().stats().rendering_time(SENTINEL_DOUBLE)
+  }
+  val STATS_FRAME_COUNT: Int = probeLong {
+    it.payload().render_frame().stats().frame_count(LONG_SENTINEL)
+  }
+  val STATS_DRAW_CALL_COUNT: Int = probeLong {
+    it.payload().render_frame().stats().draw_call_count(LONG_SENTINEL)
+  }
+  val STATS_TOTAL_DRAW_CALL_COUNT: Int = probeLong {
+    it.payload().render_frame().stats().total_draw_call_count(LONG_SENTINEL)
+  }
 
-private object PayloadSizes {
-  val RENDER_FRAME: Long =
-    MaplibreNativeC.mln_runtime_event_render_frame().use { it.sizeof().toLong() }
-  val RENDER_MAP: Long = MaplibreNativeC.mln_runtime_event_render_map().use { it.sizeof().toLong() }
-  val STYLE_IMAGE_MISSING: Long =
-    MaplibreNativeC.mln_runtime_event_style_image_missing().use { it.sizeof().toLong() }
-  val TILE_ACTION: Long =
-    MaplibreNativeC.mln_runtime_event_tile_action().use { it.sizeof().toLong() }
-  val OFFLINE_REGION_STATUS: Long =
-    MaplibreNativeC.mln_runtime_event_offline_region_status().use { it.sizeof().toLong() }
-  val OFFLINE_REGION_RESPONSE_ERROR: Long =
-    MaplibreNativeC.mln_runtime_event_offline_region_response_error().use { it.sizeof().toLong() }
-  val OFFLINE_REGION_TILE_COUNT_LIMIT: Long =
-    MaplibreNativeC.mln_runtime_event_offline_region_tile_count_limit().use { it.sizeof().toLong() }
-  val OFFLINE_OPERATION_COMPLETED: Long =
-    MaplibreNativeC.mln_runtime_event_offline_operation_completed().use { it.sizeof().toLong() }
-  val CAMERA_TRANSITION_FINISHED: Long =
-    MaplibreNativeC.mln_runtime_event_camera_transition_finished().use { it.sizeof().toLong() }
+  val RENDER_MAP_MODE: Int = probeInt { it.payload().render_map().mode(INT_SENTINEL) }
+
+  val TILE_ACTION_OPERATION: Int = probeInt { it.payload().tile_action().operation(INT_SENTINEL) }
+  val TILE_ID_OVERSCALED_Z: Int = probeInt {
+    it.payload().tile_action().tile_id().overscaled_z(INT_SENTINEL)
+  }
+  val TILE_ID_WRAP: Int = probeInt { it.payload().tile_action().tile_id().wrap(INT_SENTINEL) }
+  val TILE_ID_CANONICAL_Z: Int = probeInt {
+    it.payload().tile_action().tile_id().canonical_z(INT_SENTINEL)
+  }
+  val TILE_ID_CANONICAL_X: Int = probeInt {
+    it.payload().tile_action().tile_id().canonical_x(INT_SENTINEL)
+  }
+  val TILE_ID_CANONICAL_Y: Int = probeInt {
+    it.payload().tile_action().tile_id().canonical_y(INT_SENTINEL)
+  }
+
+  val REGION_STATUS_REGION_ID: Int = probeLong {
+    it.payload().offline_region_status().region_id(LONG_SENTINEL)
+  }
+  val REGION_STATUS_DOWNLOAD_STATE: Int = probeInt {
+    it.payload().offline_region_status().status().download_state(INT_SENTINEL)
+  }
+  val REGION_STATUS_COMPLETED_RESOURCE_COUNT: Int = probeLong {
+    it.payload().offline_region_status().status().completed_resource_count(LONG_SENTINEL)
+  }
+  val REGION_STATUS_COMPLETED_RESOURCE_SIZE: Int = probeLong {
+    it.payload().offline_region_status().status().completed_resource_size(LONG_SENTINEL)
+  }
+  val REGION_STATUS_COMPLETED_TILE_COUNT: Int = probeLong {
+    it.payload().offline_region_status().status().completed_tile_count(LONG_SENTINEL)
+  }
+  val REGION_STATUS_REQUIRED_TILE_COUNT: Int = probeLong {
+    it.payload().offline_region_status().status().required_tile_count(LONG_SENTINEL)
+  }
+  val REGION_STATUS_COMPLETED_TILE_SIZE: Int = probeLong {
+    it.payload().offline_region_status().status().completed_tile_size(LONG_SENTINEL)
+  }
+  val REGION_STATUS_REQUIRED_RESOURCE_COUNT: Int = probeLong {
+    it.payload().offline_region_status().status().required_resource_count(LONG_SENTINEL)
+  }
+  val REGION_STATUS_COUNT_IS_PRECISE: Int = probeFlag {
+    it.payload().offline_region_status().status().required_resource_count_is_precise(true)
+  }
+  val REGION_STATUS_COMPLETE: Int = probeFlag {
+    it.payload().offline_region_status().status().complete(true)
+  }
+
+  val RESPONSE_ERROR_REGION_ID: Int = probeLong {
+    it.payload().offline_region_response_error().region_id(LONG_SENTINEL)
+  }
+  val RESPONSE_ERROR_REASON: Int = probeInt {
+    it.payload().offline_region_response_error().reason(INT_SENTINEL)
+  }
+
+  val TILE_COUNT_LIMIT_REGION_ID: Int = probeLong {
+    it.payload().offline_region_tile_count_limit().region_id(LONG_SENTINEL)
+  }
+  // JavaCPP renames this field, because `limit` would hide Pointer.limit.
+  val TILE_COUNT_LIMIT_LIMIT: Int = probeLong {
+    it.payload().offline_region_tile_count_limit()._limit(LONG_SENTINEL)
+  }
+
+  val OPERATION_ID: Int = probeLong {
+    it.payload().offline_operation_completed().operation_id(LONG_SENTINEL)
+  }
+  val OPERATION_KIND: Int = probeInt {
+    it.payload().offline_operation_completed().operation_kind(INT_SENTINEL)
+  }
+  val OPERATION_RESULT_KIND: Int = probeInt {
+    it.payload().offline_operation_completed().result_kind(INT_SENTINEL)
+  }
+  val OPERATION_RESULT_STATUS: Int = probeInt {
+    it.payload().offline_operation_completed().result_status(INT_SENTINEL)
+  }
+  val OPERATION_FOUND: Int = probeFlag { it.payload().offline_operation_completed().found(true) }
+
+  val TRANSITION_ID: Int = probeLong {
+    it.payload().camera_transition_finished().transition_id(LONG_SENTINEL)
+  }
+
+  /**
+   * Offset of the inline payload union, taken as the lowest offset any payload member landed on.
+   * The payload is the last member of the record, so this bounds the window of a payload kind this
+   * version does not name.
+   */
+  val PAYLOAD: Int =
+    minOf(
+      RENDER_FRAME_MODE,
+      RENDER_MAP_MODE,
+      TILE_ACTION_OPERATION,
+      REGION_STATUS_REGION_ID,
+      RESPONSE_ERROR_REGION_ID,
+      TILE_COUNT_LIMIT_REGION_ID,
+      OPERATION_ID,
+      TRANSITION_ID,
+    )
+
+  private val SENTINEL_DOUBLE: Double
+    get() = Double.fromBits(LONG_SENTINEL)
+
+  private fun probeInt(write: (MaplibreNativeC.mln_runtime_event) -> Unit): Int =
+    probe(Int.SIZE_BYTES, write) { bytes.getInt(it) == INT_SENTINEL }
+
+  private fun probeLong(write: (MaplibreNativeC.mln_runtime_event) -> Unit): Int =
+    probe(Long.SIZE_BYTES, write) { bytes.getLong(it) == LONG_SENTINEL }
+
+  private fun probeDouble(write: (MaplibreNativeC.mln_runtime_event) -> Unit): Int =
+    probe(Long.SIZE_BYTES, write) { bytes.getDouble(it) == SENTINEL_DOUBLE }
+
+  private fun probeFlag(write: (MaplibreNativeC.mln_runtime_event) -> Unit): Int =
+    probe(Byte.SIZE_BYTES, write) { bytes.get(it) != 0.toByte() }
+
+  /**
+   * Writes one sentinel into a zeroed record and returns the aligned offset it landed on.
+   *
+   * The second record stays zeroed, so a write past the first record's end is caught here rather
+   * than by a misdecoded event.
+   */
+  private fun probe(
+    alignment: Int,
+    write: (MaplibreNativeC.mln_runtime_event) -> Unit,
+    matches: (Int) -> Boolean,
+  ): Int {
+    Pointer.memset(records, 0, 2L * stride)
+    write(record)
+    var offset = 0
+    var found = -1
+    while (offset + alignment <= EVENT_SIZE) {
+      if (matches(offset)) {
+        check(found < 0) { "Sentinel found at both offset $found and offset $offset" }
+        found = offset
+      }
+      offset += alignment
+    }
+    check(found >= 0) { "Sentinel landed outside the first $EVENT_SIZE-byte event record" }
+    return found
+  }
 }
 
 private class RuntimeOptionsScope(options: RuntimeOptions) : AutoCloseable {
@@ -910,6 +1202,7 @@ private class RuntimeOptionsScope(options: RuntimeOptions) : AutoCloseable {
   init {
     this.options.asset_path(assetPath)
     this.options.cache_path(cachePath)
+    this.options.event_mask(options.eventMask.nativeValue)
   }
 
   override fun close() {
@@ -1027,16 +1320,16 @@ internal object JavaCppRuntimeStructs {
       }
     }
 
-  fun unknownRuntimePayload(type: Int, bytes: ByteArray): RuntimeEventPayload =
-    BytePointer(Math.max(bytes.size, 1).toLong()).use { storage ->
-      if (bytes.isNotEmpty()) storage.put(bytes, 0, bytes.size)
-      MaplibreNativeC.mln_runtime_event().use { event ->
-        event.payload_type(type)
-        event.payload(if (bytes.isEmpty()) null else storage)
-        event.payload_size(bytes.size.toLong())
-        runtimeEventPayload(event)
-      }
-    }
+  /**
+   * Decodes a payload window of [bytes], for tests that synthesize a payload kind this version
+   * cannot queue. The synthetic record ends at the payload, so the window is [bytes] alone.
+   */
+  fun unknownRuntimePayload(type: Int, bytes: ByteArray): RuntimeEventPayload {
+    val record = ByteArray(EventLayout.PAYLOAD + bytes.size)
+    bytes.copyInto(record, EventLayout.PAYLOAD)
+    val events = ByteBuffer.wrap(record).order(ByteOrder.nativeOrder())
+    return runtimeEventPayload(type, events, 0, record.size)
+  }
 
   fun offlineRegionListCleanupAfterCopyFailure(): Int {
     var destroys = 0
@@ -1054,47 +1347,5 @@ internal object JavaCppRuntimeStructs {
       return destroys
     }
     error("offline list conversion unexpectedly succeeded")
-  }
-
-  fun runtimeEventPayload(event: MaplibreNativeC.mln_runtime_event): RuntimeEventPayload {
-    val payloadType = event.payload_type()
-    val payloadBytes = payloadBytes(event)
-    return when (payloadType) {
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_NONE -> RuntimeEventPayload.None
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME ->
-        if (hasPayloadSize(event, PayloadSizes.RENDER_FRAME)) renderFramePayload(event.payload())
-        else RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP ->
-        if (hasPayloadSize(event, PayloadSizes.RENDER_MAP)) renderMapPayload(event.payload())
-        else RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING ->
-        if (hasPayloadSize(event, PayloadSizes.STYLE_IMAGE_MISSING)) {
-          styleImageMissingPayload(event.payload())
-        } else RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION ->
-        if (hasPayloadSize(event, PayloadSizes.TILE_ACTION)) tileActionPayload(event.payload())
-        else RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS ->
-        if (hasPayloadSize(event, PayloadSizes.OFFLINE_REGION_STATUS)) {
-          offlineRegionStatusPayload(event.payload())
-        } else RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR ->
-        if (hasPayloadSize(event, PayloadSizes.OFFLINE_REGION_RESPONSE_ERROR)) {
-          offlineRegionResponseErrorPayload(event.payload())
-        } else RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT ->
-        if (hasPayloadSize(event, PayloadSizes.OFFLINE_REGION_TILE_COUNT_LIMIT)) {
-          offlineRegionTileCountLimitPayload(event.payload())
-        } else RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED ->
-        if (hasPayloadSize(event, PayloadSizes.OFFLINE_OPERATION_COMPLETED)) {
-          offlineOperationCompletedPayload(event.payload())
-        } else RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED ->
-        if (hasPayloadSize(event, PayloadSizes.CAMERA_TRANSITION_FINISHED)) {
-          cameraTransitionFinishedPayload(event.payload())
-        } else RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-      else -> RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
-    }
   }
 }

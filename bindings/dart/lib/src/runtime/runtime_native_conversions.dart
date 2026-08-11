@@ -191,7 +191,20 @@ StyleImageInfo _styleImageInfoFromNative(raw.mln_style_image_info info) {
 }
 
 final class _CustomGeometryCallbackState extends RetainedCallbackState {
-  _CustomGeometryCallbackState(CustomGeometrySourceOptions options) {
+  _CustomGeometryCallbackState(
+    CustomGeometrySourceOptions options,
+    void Function() onReleased,
+  ) {
+    // The C API invokes this once on the map owner thread, which is this
+    // isolate's thread, from inside whichever call stopped referencing the
+    // source: a removal, a style load, or the map's destruction.
+    releaseUserData =
+        NativeCallable<
+          raw.mln_custom_geometry_source_release_callbackFunction
+        >.isolateLocal((Pointer<Void> _) {
+          onReleased();
+          _retire();
+        });
     fetchTile =
         NativeCallable<
           raw.mln_custom_geometry_source_tile_callbackFunction
@@ -223,12 +236,18 @@ final class _CustomGeometryCallbackState extends RetainedCallbackState {
     raw.mln_custom_geometry_source_tile_callbackFunction
   >?
   cancelTile;
+  late final NativeCallable<
+    raw.mln_custom_geometry_source_release_callbackFunction
+  >
+  releaseUserData;
   var _retirementSignals = 0;
   var _retirementQueued = false;
 
   bool get retirementQueuedForTesting => _retirementQueued;
 
-  void retire() {
+  /// Starts retirement, which the tile callbacks finish once the native
+  /// retirement records reach this isolate behind any queued real ones.
+  void _retire() {
     if (_retirementQueued) {
       return;
     }
@@ -261,6 +280,7 @@ final class _CustomGeometryCallbackState extends RetainedCallbackState {
   void closeResources() {
     fetchTile.close();
     cancelTile?.close();
+    releaseUserData.close();
   }
 }
 
@@ -281,6 +301,7 @@ raw.mln_custom_geometry_source_options _customGeometrySourceOptionsToNative(
 ) {
   final result = raw.mln_custom_geometry_source_options_default();
   result.fetch_tile = callbackState.fetchTile.nativeFunction;
+  result.release_user_data = callbackState.releaseUserData.nativeFunction;
   result.cancel_tile =
       callbackState.cancelTile?.nativeFunction ??
       nullptr

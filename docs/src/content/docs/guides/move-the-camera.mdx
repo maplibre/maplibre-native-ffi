@@ -101,10 +101,11 @@ the command that provides the required timing.
 ## Know when a transition ends
 
 Set a transition ID on the animation options to identify its completion event.
-The runtime queues one transition-finished event with that value. The event
-arrives after completion, replacement by another camera command, or
-cancellation. Drain it from the runtime that owns the map, as described in
-[Concepts](/maplibre-native-ffi/concepts/).
+The runtime queues one transition-finished event with that value while the map's
+subscription selects that type. The event arrives after completion, replacement
+by another camera command, or cancellation. Drain
+it from the runtime that owns the map, as described in
+[Handle events](/maplibre-native-ffi/guides/handle-events/).
 
 <Code code={region(cameraSnippet, "finished")} lang="c" title="camera.c" />
 

@@ -15,6 +15,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -122,6 +123,41 @@ struct OfflineOperationEventState {
 }  // namespace mln::core
 
 namespace {
+
+// Each mask constant must be the bit of the event type it selects, written
+// against the shift rather than a literal, so an event type added without its
+// mask constant fails the build here instead of silently queueing nothing.
+#define MLN_ASSERT_EVENT_MASK_BIT(name)                                   \
+  static_assert(                                                          \
+    MLN_RUNTIME_EVENT_MASK_##name == 1ULL << MLN_RUNTIME_EVENT_##name,    \
+    "MLN_RUNTIME_EVENT_MASK_" #name " must be the bit for its event type" \
+  )
+
+MLN_ASSERT_EVENT_MASK_BIT(MAP_CAMERA_WILL_CHANGE);
+MLN_ASSERT_EVENT_MASK_BIT(MAP_CAMERA_IS_CHANGING);
+MLN_ASSERT_EVENT_MASK_BIT(MAP_CAMERA_DID_CHANGE);
+MLN_ASSERT_EVENT_MASK_BIT(MAP_STYLE_LOADED);
+MLN_ASSERT_EVENT_MASK_BIT(MAP_LOADING_STARTED);
+MLN_ASSERT_EVENT_MASK_BIT(MAP_LOADING_FINISHED);
+MLN_ASSERT_EVENT_MASK_BIT(MAP_LOADING_FAILED);
+MLN_ASSERT_EVENT_MASK_BIT(MAP_IDLE);
+MLN_ASSERT_EVENT_MASK_BIT(MAP_RENDER_UPDATE_AVAILABLE);
+MLN_ASSERT_EVENT_MASK_BIT(MAP_RENDER_ERROR);
+MLN_ASSERT_EVENT_MASK_BIT(MAP_STILL_IMAGE_FINISHED);
+MLN_ASSERT_EVENT_MASK_BIT(MAP_STILL_IMAGE_FAILED);
+MLN_ASSERT_EVENT_MASK_BIT(MAP_RENDER_FRAME_STARTED);
+MLN_ASSERT_EVENT_MASK_BIT(MAP_RENDER_FRAME_FINISHED);
+MLN_ASSERT_EVENT_MASK_BIT(MAP_RENDER_MAP_STARTED);
+MLN_ASSERT_EVENT_MASK_BIT(MAP_RENDER_MAP_FINISHED);
+MLN_ASSERT_EVENT_MASK_BIT(MAP_STYLE_IMAGE_MISSING);
+MLN_ASSERT_EVENT_MASK_BIT(MAP_TILE_ACTION);
+MLN_ASSERT_EVENT_MASK_BIT(MAP_CAMERA_TRANSITION_FINISHED);
+MLN_ASSERT_EVENT_MASK_BIT(OFFLINE_REGION_STATUS_CHANGED);
+MLN_ASSERT_EVENT_MASK_BIT(OFFLINE_REGION_RESPONSE_ERROR);
+MLN_ASSERT_EVENT_MASK_BIT(OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED);
+MLN_ASSERT_EVENT_MASK_BIT(OFFLINE_OPERATION_COMPLETED);
+
+#undef MLN_ASSERT_EVENT_MASK_BIT
 
 // Maps the pointer-width token mbgl carries as its opaque platform context back
 // to a runtime handle, which is 64 bits and does not fit in a void* on every
@@ -251,11 +287,28 @@ auto lease_resource_provider_state(void* platform_context) noexcept
   return runtime->resource_provider_state;
 }
 
-template <typename Payload>
-auto payload_bytes(const Payload& payload) -> std::vector<std::byte> {
-  auto result = std::vector<std::byte>(sizeof(Payload));
-  std::memcpy(result.data(), &payload, sizeof(Payload));
-  return result;
+// Reports why a take-result call has no result. This is the only route to a
+// failed operation's text for a host that leaves
+// MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED unselected.
+auto set_offline_result_unavailable_error(
+  const mln::core::OfflineOperation& operation
+) -> void {
+  if (operation.completed && !operation.message.empty()) {
+    mln::core::set_thread_error(operation.message.c_str());
+    return;
+  }
+  mln::core::set_thread_error("offline operation result is not available");
+}
+
+// A batch locates a message by a uint32_t offset and size, so a message is
+// clamped at push rather than at drain time. The arena starts each drain empty,
+// so the first event always fits and a bounded drain always makes progress.
+auto truncated_event_message(std::string message) -> std::string {
+  constexpr auto max_size = static_cast<size_t>(UINT32_MAX) - 1;
+  if (message.size() > max_size) {
+    message.resize(max_size);
+  }
+  return message;
 }
 
 auto valid_coordinate(const mln_lat_lng& coordinate) -> bool {
@@ -581,14 +634,38 @@ auto fill_region_info(
   return MLN_STATUS_OK;
 }
 
+// Reports whether an offline region event would reach the queue: the region
+// must be observed and the runtime's mask must select the type. The three
+// observer callbacks call this before they build anything.
+// `push_offline_region_event()` checks the region again, because the two run at
+// different times and a region can be unobserved in between.
+auto region_event_selected(
+  const std::shared_ptr<mln::core::OfflineRegionEventState>& state,
+  mln_offline_region_id region_id, uint32_t type
+) -> bool {
+  const std::scoped_lock state_lock(state->mutex);
+  auto* runtime = state->runtime;
+  if (!state->alive || runtime == nullptr) {
+    return false;
+  }
+  if (!mln::core::event_selected(runtime->event_state->mask, type)) {
+    return false;
+  }
+  const std::scoped_lock event_lock(runtime->event_mutex);
+  return runtime->observed_offline_regions.contains(region_id);
+}
+
 auto push_offline_region_event(
   const std::shared_ptr<mln::core::OfflineRegionEventState>& state,
   mln_offline_region_id region_id, uint32_t type, uint32_t payload_type,
-  std::vector<std::byte> payload, std::string message = {}
+  const mln_runtime_event_payload& payload, std::string message = {}
 ) -> void {
   const std::scoped_lock state_lock(state->mutex);
   auto* runtime = state->runtime;
   if (!state->alive || runtime == nullptr) {
+    return;
+  }
+  if (!mln::core::event_selected(runtime->event_state->mask, type)) {
     return;
   }
 
@@ -598,8 +675,8 @@ auto push_offline_region_event(
     .source = runtime->self,
     .code = 0,
     .payload_type = payload_type,
-    .payload = std::move(payload),
-    .message = std::move(message),
+    .payload = payload,
+    .message = truncated_event_message(std::move(message)),
     .has_offline_region = true,
     .offline_region_id = region_id
   };
@@ -625,41 +702,56 @@ class OfflineRegionRuntimeObserver final : public mbgl::OfflineRegionObserver {
       : state_(std::move(state)), region_id_(region_id) {}
 
   void statusChanged(mbgl::OfflineRegionStatus status) override {
-    auto payload = mln_runtime_event_offline_region_status{
-      .size = sizeof(mln_runtime_event_offline_region_status),
-      .region_id = region_id_,
-      .status = to_c_status(status)
+    if (!region_event_selected(
+          state_, region_id_, MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED
+        )) {
+      return;
+    }
+    auto payload = mln::core::zeroed_event_payload();
+    payload.offline_region_status = mln_runtime_event_offline_region_status{
+      .region_id = region_id_, .status = to_c_status(status)
     };
     push_offline_region_event(
       state_, region_id_, MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED,
-      MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS, payload_bytes(payload)
+      MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS, payload
     );
   }
 
   void responseError(mbgl::Response::Error error) override {
-    auto payload = mln_runtime_event_offline_region_response_error{
-      .size = sizeof(mln_runtime_event_offline_region_response_error),
-      .region_id = region_id_,
-      .reason = to_c_resource_error_reason(error.reason)
-    };
+    if (!region_event_selected(
+          state_, region_id_, MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR
+        )) {
+      return;
+    }
+    auto payload = mln::core::zeroed_event_payload();
+    payload.offline_region_response_error =
+      mln_runtime_event_offline_region_response_error{
+        .region_id = region_id_,
+        .reason = to_c_resource_error_reason(error.reason)
+      };
     push_offline_region_event(
       state_, region_id_, MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR,
-      MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR,
-      payload_bytes(payload), error.message
+      MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR, payload,
+      error.message
     );
   }
 
   void mapboxTileCountLimitExceeded(uint64_t limit) override {
-    auto payload = mln_runtime_event_offline_region_tile_count_limit{
-      .size = sizeof(mln_runtime_event_offline_region_tile_count_limit),
-      .region_id = region_id_,
-      .limit = limit
-    };
+    if (!region_event_selected(
+          state_, region_id_,
+          MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
+        )) {
+      return;
+    }
+    auto payload = mln::core::zeroed_event_payload();
+    payload.offline_region_tile_count_limit =
+      mln_runtime_event_offline_region_tile_count_limit{
+        .region_id = region_id_, .limit = limit
+      };
     push_offline_region_event(
       state_, region_id_,
       MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
-      MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT,
-      payload_bytes(payload)
+      MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT, payload
     );
   }
 
@@ -839,15 +931,17 @@ auto schedule_registered_offline_operation(
 
 auto make_offline_completion_payload(
   const mln::core::OfflineOperation& operation
-) -> mln_runtime_event_offline_operation_completed {
-  return mln_runtime_event_offline_operation_completed{
-    .size = sizeof(mln_runtime_event_offline_operation_completed),
-    .operation_id = operation.id,
-    .operation_kind = operation.kind,
-    .result_kind = operation.result_kind,
-    .result_status = operation.result_status,
-    .found = operation.found
-  };
+) -> mln_runtime_event_payload {
+  auto payload = mln::core::zeroed_event_payload();
+  payload.offline_operation_completed =
+    mln_runtime_event_offline_operation_completed{
+      .operation_id = operation.id,
+      .operation_kind = operation.kind,
+      .result_kind = operation.result_kind,
+      .result_status = operation.result_status,
+      .found = operation.found
+    };
+  return payload;
 }
 
 auto complete_offline_operation(
@@ -867,6 +961,8 @@ auto complete_offline_operation(
     return;
   }
 
+  // The result and its failure text are what a take-result call reports, so
+  // they are recorded whatever the mask selects. Only the event is gated.
   auto& operation = found_operation->second;
   operation.completed = true;
   operation.result_status = result_status;
@@ -874,15 +970,21 @@ auto complete_offline_operation(
   operation.message = std::move(message);
   operation.result = std::move(result);
 
-  auto payload = make_offline_completion_payload(operation);
+  if (!mln::core::event_selected(
+        runtime->event_state->mask,
+        MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED
+      )) {
+    return;
+  }
+
   auto event = mln::core::QueuedRuntimeEvent{
     .type = MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED,
     .source_type = MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
     .source = runtime->self,
     .code = result_status,
     .payload_type = MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED,
-    .payload = payload_bytes(payload),
-    .message = operation.message,
+    .payload = make_offline_completion_payload(operation),
+    .message = truncated_event_message(operation.message),
     .has_offline_region = false,
     .offline_region_id = 0,
     .has_offline_operation = true,
@@ -932,9 +1034,19 @@ auto validate_runtime_options(const mln_runtime_options* options)
     mln::core::set_thread_error("mln_runtime_options.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (options->flags != 0) {
+  if (options->flags != 0U) {
     mln::core::set_thread_error(
       "mln_runtime_options.flags contains unknown bits"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  // Validated here as well as in the setter, so a mask this library cannot
+  // honour is rejected wherever it arrives.
+  constexpr auto known_mask_bits =
+    static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL);
+  if ((options->event_mask & ~known_mask_bits) != 0U) {
+    mln::core::set_thread_error(
+      "mln_runtime_options.event_mask contains unknown bits"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -963,51 +1075,6 @@ auto database_source_for_runtime(RuntimeObject* runtime)
   auto database = std::static_pointer_cast<mbgl::DatabaseFileSource>(source);
   runtime->database_source = database;
   return runtime->database_source;
-}
-
-auto patch_polled_payload_strings(RuntimeObject* runtime, uint32_t payload_type)
-  -> void {
-  const auto* const text = runtime->last_polled_event_message.empty()
-                             ? nullptr
-                             : runtime->last_polled_event_message.c_str();
-  const auto text_size = runtime->last_polled_event_message.size();
-
-  switch (payload_type) {
-    case MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING:
-      if (
-        runtime->last_polled_event_payload.size() >=
-        sizeof(mln_runtime_event_style_image_missing)
-      ) {
-        auto payload = mln_runtime_event_style_image_missing{};
-        std::memcpy(
-          &payload, runtime->last_polled_event_payload.data(), sizeof(payload)
-        );
-        payload.image_id = text;
-        payload.image_id_size = text_size;
-        std::memcpy(
-          runtime->last_polled_event_payload.data(), &payload, sizeof(payload)
-        );
-      }
-      break;
-    case MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION:
-      if (
-        runtime->last_polled_event_payload.size() >=
-        sizeof(mln_runtime_event_tile_action)
-      ) {
-        auto payload = mln_runtime_event_tile_action{};
-        std::memcpy(
-          &payload, runtime->last_polled_event_payload.data(), sizeof(payload)
-        );
-        payload.source_id = text;
-        payload.source_id_size = text_size;
-        std::memcpy(
-          runtime->last_polled_event_payload.data(), &payload, sizeof(payload)
-        );
-      }
-      break;
-    default:
-      break;
-  }
 }
 
 }  // namespace
@@ -1060,6 +1127,15 @@ auto create_runtime(
   auto owned_runtime = std::make_shared<RuntimeObject>();
   owned_runtime->owner_thread = owner_thread;
   owned_runtime->wake_state = std::make_shared<WakeState>();
+  // The mask cell exists before the run loop, so every producer this runtime
+  // can reach reads a live cell.
+  owned_runtime->event_state = std::make_shared<RuntimeEventState>();
+  // Null options keep the library's own default, which is every event type.
+  owned_runtime->event_state->mask.store(
+    options != nullptr ? options->event_mask
+                       : static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL),
+    std::memory_order_relaxed
+  );
   owned_runtime->run_loop =
     std::make_unique<mbgl::util::RunLoop>(mbgl::util::RunLoop::Type::New);
   // `setPlatformCallback` is an unlocked assignment, so it happens while the
@@ -2321,7 +2397,7 @@ auto offline_region_create_take_result(
       operation.kind != MLN_OFFLINE_OPERATION_REGION_CREATE ||
       operation.result_status != MLN_STATUS_OK
     ) {
-      set_thread_error("offline operation result is not available");
+      set_offline_result_unavailable_error(operation);
       return MLN_STATUS_INVALID_STATE;
     }
     auto* result = std::get_if<OfflineRegionData>(&operation.result);
@@ -2386,7 +2462,7 @@ auto offline_region_get_take_result(
       operation.kind != MLN_OFFLINE_OPERATION_REGION_GET ||
       operation.result_status != MLN_STATUS_OK
     ) {
-      set_thread_error("offline operation result is not available");
+      set_offline_result_unavailable_error(operation);
       return MLN_STATUS_INVALID_STATE;
     }
     auto* result =
@@ -2454,7 +2530,7 @@ auto offline_regions_list_take_result(
       operation.kind != MLN_OFFLINE_OPERATION_REGIONS_LIST ||
       operation.result_status != MLN_STATUS_OK
     ) {
-      set_thread_error("offline operation result is not available");
+      set_offline_result_unavailable_error(operation);
       return MLN_STATUS_INVALID_STATE;
     }
     auto* result =
@@ -2515,7 +2591,7 @@ auto offline_regions_merge_database_take_result(
       operation.kind != MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE ||
       operation.result_status != MLN_STATUS_OK
     ) {
-      set_thread_error("offline operation result is not available");
+      set_offline_result_unavailable_error(operation);
       return MLN_STATUS_INVALID_STATE;
     }
     auto* result =
@@ -2576,7 +2652,7 @@ auto offline_region_update_metadata_take_result(
       operation.kind != MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA ||
       operation.result_status != MLN_STATUS_OK
     ) {
-      set_thread_error("offline operation result is not available");
+      set_offline_result_unavailable_error(operation);
       return MLN_STATUS_INVALID_STATE;
     }
     auto* result = std::get_if<OfflineRegionData>(&operation.result);
@@ -2639,7 +2715,7 @@ auto offline_region_get_status_take_result(
       operation.kind != MLN_OFFLINE_OPERATION_REGION_GET_STATUS ||
       operation.result_status != MLN_STATUS_OK
     ) {
-      set_thread_error("offline operation result is not available");
+      set_offline_result_unavailable_error(operation);
       return MLN_STATUS_INVALID_STATE;
     }
     auto* result = std::get_if<mln_offline_region_status>(&operation.result);
@@ -2847,6 +2923,12 @@ auto destroy_runtime(mln_runtime runtime) -> mln_status {
     });
   }
 
+  // The last drained batch is freed with the runtime, the documented end of its
+  // readable window.
+  owned_runtime->event_drain_staging.clear();
+  owned_runtime->event_batch_events.clear();
+  owned_runtime->event_batch_messages.clear();
+
   // Retiring the wake state before the run loop is released covers a late
   // `mln_wake_source_signal()` and the run loop teardown's final iteration.
   {
@@ -2950,8 +3032,8 @@ auto destroy_wake_source(mln_wake_source source) noexcept -> void {
   static_cast<void>(handle_table<WakeSourceObject>().remove(source));
 }
 
-auto poll_runtime_event(
-  mln_runtime runtime, mln_runtime_event* out_event, bool* out_has_event
+auto drain_runtime_events(
+  mln_runtime runtime, size_t max_events, mln_runtime_event_batch* out_batch
 ) -> mln_status {
   mln::core::RuntimeObject* live = nullptr;
   const auto status = validate_runtime(runtime, live);
@@ -2959,57 +3041,126 @@ auto poll_runtime_event(
     return status;
   }
   if (
-    out_event == nullptr || out_has_event == nullptr ||
-    out_event->size < sizeof(mln_runtime_event)
+    out_batch == nullptr || out_batch->size < sizeof(mln_runtime_event_batch)
   ) {
-    set_thread_error(
-      "out_event and out_has_event must not be null, and out_event must have a "
-      "valid size"
-    );
+    set_thread_error("out_batch must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const std::scoped_lock lock(live->event_mutex);
-  live->last_polled_event_payload.clear();
-  live->last_polled_event_message.clear();
-  *out_event = mln_runtime_event{
-    .size = sizeof(mln_runtime_event),
-    .type = 0,
-    .source_type = MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-    .source = runtime,
-    .code = 0,
-    .payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE,
-    .payload = nullptr,
-    .payload_size = 0,
-    .message = nullptr,
-    .message_size = 0
-  };
+  // Clearing first ends the previous batch's window, so an empty drain
+  // invalidates it too. Capacity survives, so a steady-state drain allocates
+  // nothing.
+  auto& staging = live->event_drain_staging;
+  auto& events = live->event_batch_events;
+  auto& messages = live->event_batch_messages;
+  staging.clear();
+  events.clear();
+  messages.clear();
 
-  if (live->events.empty()) {
-    *out_has_event = false;
-    return MLN_STATUS_OK;
+  auto remaining_count = size_t{0};
+  auto arena_size = size_t{0};
+  auto drain_count = size_t{0};
+  {
+    const std::scoped_lock lock(live->event_mutex);
+    for (const auto& queued : live->events) {
+      if (max_events != 0 && drain_count >= max_events) {
+        break;
+      }
+      // The first event always fits, so a bounded drain always makes progress.
+      // An event without a message takes no arena bytes, not even a terminator.
+      const auto& next_message = queued.message;
+      const auto next_size =
+        next_message.empty() ? size_t{0} : next_message.size() + 1;
+      if (
+        drain_count != 0 &&
+        next_size > static_cast<size_t>(UINT32_MAX) - arena_size
+      ) {
+        break;
+      }
+      arena_size += next_size;
+      drain_count += 1;
+    }
+
+    // Finish every allocation before removing an event. The reserved staging
+    // moves and batch writes below cannot allocate, so a failed reservation
+    // leaves the complete queue available to the next drain.
+    static_assert(
+      std::is_nothrow_move_constructible_v<mln::core::QueuedRuntimeEvent>
+    );
+    staging.reserve(drain_count);
+    events.reserve(drain_count);
+    messages.reserve(arena_size);
+    for (auto index = size_t{0}; index < drain_count; index += 1) {
+      staging.push_back(std::move(live->events.front()));
+      live->events.pop_front();
+    }
+    remaining_count = live->events.size();
   }
 
-  auto event = std::move(live->events.front());
-  live->events.pop_front();
-  live->last_polled_event_payload = std::move(event.payload);
-  live->last_polled_event_message = std::move(event.message);
-  patch_polled_payload_strings(live, event.payload_type);
+  // The batch is built outside the lock, so the lock hold covers only the
+  // queue moves above.
+  for (const auto& staged : staging) {
+    const auto message_size = static_cast<uint32_t>(staged.message.size());
+    const auto message_offset = static_cast<uint32_t>(messages.size());
+    events.push_back(
+      mln_runtime_event{
+        .type = staged.type,
+        .source_type = staged.source_type,
+        .source = staged.source,
+        .code = staged.code,
+        .payload_type = staged.payload_type,
+        .message_offset = message_size == 0 ? 0 : message_offset,
+        .message_size = message_size,
+        .payload = staged.payload
+      }
+    );
+    if (message_size != 0) {
+      messages.append(staged.message);
+      messages.push_back('\0');
+    }
+  }
+  staging.clear();
 
-  out_event->type = event.type;
-  out_event->source_type = event.source_type;
-  out_event->source = event.source;
-  out_event->code = event.code;
-  out_event->payload_type = event.payload_type;
-  out_event->payload = live->last_polled_event_payload.empty()
-                         ? nullptr
-                         : live->last_polled_event_payload.data();
-  out_event->payload_size = live->last_polled_event_payload.size();
-  out_event->message = live->last_polled_event_message.empty()
-                         ? nullptr
-                         : live->last_polled_event_message.c_str();
-  out_event->message_size = live->last_polled_event_message.size();
-  *out_has_event = true;
+  *out_batch = mln_runtime_event_batch{
+    .size = sizeof(mln_runtime_event_batch),
+    .event_size = sizeof(mln_runtime_event),
+    .events = events.empty() ? nullptr : events.data(),
+    .event_count = events.size(),
+    .messages = messages.empty() ? nullptr : messages.data(),
+    .messages_size = messages.size(),
+    .remaining_count = remaining_count
+  };
+  return MLN_STATUS_OK;
+}
+
+auto set_runtime_event_mask(mln_runtime runtime, uint64_t mask) -> mln_status {
+  mln::core::RuntimeObject* live = nullptr;
+  const auto status = validate_runtime(runtime, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if ((mask & ~static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL)) != 0U) {
+    set_thread_error("mask contains unknown bits");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  // The whole value is stored, including the map-event bits this runtime's own
+  // producers never test, so a getter reports what a host wrote.
+  live->event_state->mask.store(mask, std::memory_order_relaxed);
+  return MLN_STATUS_OK;
+}
+
+auto get_runtime_event_mask(mln_runtime runtime, uint64_t* out_mask)
+  -> mln_status {
+  mln::core::RuntimeObject* live = nullptr;
+  const auto status = validate_runtime(runtime, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (out_mask == nullptr) {
+    set_thread_error("out_mask must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  *out_mask = live->event_state->mask.load(std::memory_order_relaxed);
   return MLN_STATUS_OK;
 }
 
@@ -3156,14 +3307,16 @@ auto push_runtime_map_event(
   const char* message
 ) -> void {
   push_runtime_map_event_payload(
-    runtime, map, type, MLN_RUNTIME_EVENT_PAYLOAD_NONE, {}, code,
-    message == nullptr ? std::string{} : std::string{message}
+    runtime, map, type, MLN_RUNTIME_EVENT_PAYLOAD_NONE, zeroed_event_payload(),
+    code, message == nullptr ? std::string{} : std::string{message}
   );
 }
 
+// Producers test their subscription mask before they call this, so it holds no
+// mask test of its own.
 auto push_runtime_map_event_payload(
   mln_runtime runtime, mln_map map, uint32_t type, uint32_t payload_type,
-  std::vector<std::byte> payload, int32_t code, std::string message
+  const mln_runtime_event_payload& payload, int32_t code, std::string message
 ) -> void {
   // try_resolve, not resolve: this runs from map observer callbacks under a
   // pump, where writing a diagnostic would clobber the pump's own.
@@ -3178,19 +3331,14 @@ auto push_runtime_map_event_payload(
     .source = map,
     .code = code,
     .payload_type = payload_type,
-    .payload = std::move(payload),
-    .message = std::move(message)
+    .payload = payload,
+    .message = truncated_event_message(std::move(message))
   };
 
   {
     const std::scoped_lock lock(live->event_mutex);
     if (map != MLN_HANDLE_NULL && !live->event_maps.contains(map)) {
       return;
-    }
-    if (
-      type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED && map != MLN_HANDLE_NULL
-    ) {
-      live->map_loading_failures[map] = event.message;
     }
     // A render draws the latest update, so one unread render-update event
     // covers every invalidation queued behind it. Comparing against the tail
@@ -3217,40 +3365,6 @@ auto register_runtime_map_events(mln_runtime runtime, mln_map map) -> void {
   live->event_maps.insert(map);
 }
 
-auto clear_runtime_map_loading_failure(mln_runtime runtime, mln_map map)
-  -> void {
-  auto* live = handle_table<RuntimeObject>().try_resolve(runtime);
-  if (live == nullptr || map == MLN_HANDLE_NULL) {
-    return;
-  }
-
-  const std::scoped_lock lock(live->event_mutex);
-  live->map_loading_failures.erase(map);
-}
-
-auto runtime_map_loading_failed(mln_runtime runtime, mln_map map) -> bool {
-  auto* live = handle_table<RuntimeObject>().try_resolve(runtime);
-  if (live == nullptr || map == MLN_HANDLE_NULL) {
-    return false;
-  }
-
-  const std::scoped_lock lock(live->event_mutex);
-  return live->map_loading_failures.contains(map);
-}
-
-auto runtime_map_loading_failure_message(mln_runtime runtime, mln_map map)
-  -> std::string {
-  auto* live = handle_table<RuntimeObject>().try_resolve(runtime);
-  if (live == nullptr || map == MLN_HANDLE_NULL) {
-    return {};
-  }
-
-  const std::scoped_lock lock(live->event_mutex);
-  const auto found = live->map_loading_failures.find(map);
-  return found == live->map_loading_failures.end() ? std::string{}
-                                                   : found->second;
-}
-
 auto discard_runtime_map_events(mln_runtime runtime, mln_map map) -> void {
   auto* live = handle_table<RuntimeObject>().try_resolve(runtime);
   if (live == nullptr || map == MLN_HANDLE_NULL) {
@@ -3262,7 +3376,6 @@ auto discard_runtime_map_events(mln_runtime runtime, mln_map map) -> void {
   std::erase_if(live->events, [map](const auto& event) -> bool {
     return event.source == map;
   });
-  live->map_loading_failures.erase(map);
 }
 
 }  // namespace mln::core

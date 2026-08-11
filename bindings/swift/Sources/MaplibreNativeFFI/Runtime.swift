@@ -4,19 +4,25 @@ import Foundation
 public struct RuntimeOptions: Equatable, Sendable {
   public var assetPath: String?
   public var cachePath: String?
+  /// Runtime-originated event types this runtime queues, every type the
+  /// library reports unless the host narrows it.
+  public var eventMask: RuntimeEventMask
 
   public init(
     assetPath: String? = nil,
-    cachePath: String? = nil
+    cachePath: String? = nil,
+    eventMask: RuntimeEventMask = .runtimeOptionsDefault
   ) {
     self.assetPath = assetPath
     self.cachePath = cachePath
+    self.eventMask = eventMask
   }
 
   var nativeInput: NativeRuntimeOptionsInput {
     NativeRuntimeOptionsInput(
       assetPath: assetPath,
-      cachePath: cachePath
+      cachePath: cachePath,
+      eventMask: eventMask.rawValue
     )
   }
 }
@@ -74,6 +80,102 @@ public enum RuntimeEventType: Sendable, Hashable {
     case 23: .mapCameraTransitionFinished
     default: .unknown(rawValue)
     }
+  }
+}
+
+/// The event types a map or a runtime queues.
+///
+/// One bit per ``RuntimeEventType``, taken from the C API's own mask constants
+/// so the two cannot drift apart. ``MapHandle/setEventMask(_:)`` reads the
+/// map-originated bits and ``RuntimeHandle/setEventMask(_:)`` reads the
+/// runtime-originated ones, ignoring the rest, so ``all`` is a value both
+/// accept and a handle reports every bit last set.
+///
+/// An unselected event type is never built and never queued, so it neither
+/// reaches a batch nor wakes a parked ``RuntimeHandle/pump(timeout:)``.
+public struct RuntimeEventMask: OptionSet, Sendable, Hashable {
+  public let rawValue: UInt64
+
+  public init(rawValue: UInt64) {
+    self.rawValue = rawValue
+  }
+
+  private static func native(
+    _ mask: mln_runtime_event_mask
+  ) -> RuntimeEventMask {
+    RuntimeEventMask(rawValue: mask.rawValue)
+  }
+
+  /// Selecting no event type is spelled `[]`, the OptionSet empty literal.
+  public static let mapCameraWillChange =
+    native(MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE)
+  public static let mapCameraIsChanging =
+    native(MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING)
+  public static let mapCameraDidChange =
+    native(MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE)
+  public static let mapStyleLoaded =
+    native(MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED)
+  public static let mapLoadingStarted =
+    native(MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED)
+  public static let mapLoadingFinished =
+    native(MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED)
+  public static let mapLoadingFailed =
+    native(MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED)
+  public static let mapIdle = native(MLN_RUNTIME_EVENT_MASK_MAP_IDLE)
+  public static let mapRenderUpdateAvailable =
+    native(MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE)
+  public static let mapRenderError =
+    native(MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR)
+  public static let mapStillImageFinished =
+    native(MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED)
+  public static let mapStillImageFailed =
+    native(MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED)
+  public static let mapRenderFrameStarted =
+    native(MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED)
+  public static let mapRenderFrameFinished =
+    native(MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED)
+  public static let mapRenderMapStarted =
+    native(MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED)
+  public static let mapRenderMapFinished =
+    native(MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED)
+  public static let mapStyleImageMissing =
+    native(MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING)
+  public static let mapTileAction =
+    native(MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION)
+  public static let mapCameraTransitionFinished =
+    native(MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED)
+  public static let offlineRegionStatusChanged =
+    native(MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED)
+  public static let offlineRegionResponseError =
+    native(MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR)
+  public static let offlineRegionTileCountLimitExceeded =
+    native(MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
+  public static let offlineOperationCompleted =
+    native(MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED)
+
+  /// Every map-originated event type, which is what
+  /// ``MapHandle/setEventMask(_:)`` reads.
+  public static let allMapEvents =
+    native(MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS)
+  /// Every runtime-originated event type, which is what
+  /// ``RuntimeHandle/setEventMask(_:)`` reads.
+  public static let allRuntimeEvents =
+    native(MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS)
+  /// Every event type this build of the binding names.
+  public static let all = native(MLN_RUNTIME_EVENT_MASK_ALL)
+
+  /// The mask ``RuntimeOptions`` starts a runtime with: the C API's own
+  /// default, kept raw rather than replaced by ``all``, so a newer native
+  /// library's default keeps selecting event types this build does not name.
+  /// Those reach a host as unknown event and payload domains.
+  public static var runtimeOptionsDefault: RuntimeEventMask {
+    RuntimeEventMask(rawValue: mln_runtime_options_default().event_mask)
+  }
+
+  /// The mask ``MapOptions`` starts a map with, taken from the C API's own
+  /// default the way ``runtimeOptionsDefault`` is.
+  public static var mapOptionsDefault: RuntimeEventMask {
+    RuntimeEventMask(rawValue: mln_map_options_default().event_mask)
   }
 }
 
@@ -215,15 +317,15 @@ public struct TileId: Equatable, Sendable {
   }
 }
 
+/// Payload of a `.mapTileAction` event. The event message carries the source
+/// ID.
 public struct TileActionEvent: Equatable, Sendable {
   public let operation: TileOperation
   public let tileId: TileId
-  public let sourceId: String
 
   init(native: NativeTileActionEvent) {
     operation = TileOperation.fromNative(native.operation)
     tileId = TileId(native: native.tileId)
-    sourceId = native.sourceId
   }
 }
 
@@ -311,14 +413,15 @@ public enum RuntimeEventPayload: Equatable, Sendable {
   case none
   case renderFrame(RenderFrameEvent)
   case renderMap(RenderMapEvent)
-  case styleImageMissing(String)
   case tileAction(TileActionEvent)
   case offlineRegionStatus(OfflineRegionStatusEvent)
   case offlineRegionResponseError(OfflineRegionResponseErrorEvent)
   case offlineRegionTileCountLimit(OfflineRegionTileCountLimitEvent)
   case offlineOperationCompleted(OfflineOperationCompletedEvent)
   case cameraTransitionFinished(CameraTransitionFinishedEvent)
-  case unknown(type: UInt32, byteCount: Int)
+  /// A payload kind this version of the binding does not name, carrying the
+  /// payload's fixed byte window so a host forwards it unchanged.
+  case unknown(type: UInt32, bytes: [UInt8])
 
   init(native: NativeRuntimeEventPayload) {
     switch native {
@@ -328,8 +431,6 @@ public enum RuntimeEventPayload: Equatable, Sendable {
       self = .renderFrame(RenderFrameEvent(native: event))
     case let .renderMap(event):
       self = .renderMap(RenderMapEvent(native: event))
-    case let .styleImageMissing(imageId):
-      self = .styleImageMissing(imageId)
     case let .tileAction(event):
       self = .tileAction(TileActionEvent(native: event))
     case let .offlineRegionStatus(event):
@@ -354,8 +455,8 @@ public enum RuntimeEventPayload: Equatable, Sendable {
         .cameraTransitionFinished(
           CameraTransitionFinishedEvent(native: event)
         )
-    case let .unknown(type, byteCount):
-      self = .unknown(type: type, byteCount: byteCount)
+    case let .unknown(type, bytes):
+      self = .unknown(type: type, bytes: bytes)
     }
   }
 }
@@ -375,6 +476,12 @@ public struct RuntimeEvent: Equatable, Sendable {
   ///   status value, the same value the payload reports in `resultStatus`.
   /// - Every other event type leaves it 0.
   public let code: Int32
+  /// Text this event carries, empty when it carries none.
+  ///
+  /// It is the failure text of `.mapLoadingFailed`, `.mapRenderError`,
+  /// `.mapStillImageFailed`, `.offlineRegionResponseError`, and a failed
+  /// `.offlineOperationCompleted`, the image ID of `.mapStyleImageMissing`, and
+  /// the source ID of `.mapTileAction`.
   public let message: String
   public let payload: RuntimeEventPayload
 
@@ -388,6 +495,19 @@ public struct RuntimeEvent: Equatable, Sendable {
     message = native.message
     payload = RuntimeEventPayload(native: native.payload)
   }
+}
+
+/// One drained batch of runtime events.
+///
+/// The C API lends its batch until the next drain; this is a copy of it, so a
+/// host keeps events, their messages, and their payloads for as long as it
+/// likes.
+public struct RuntimeEventBatch: Equatable, Sendable {
+  /// The drained events, in queue order.
+  public let events: [RuntimeEvent]
+  /// Events still queued after this batch. A nonzero value means another drain
+  /// reports more events.
+  public let remainingCount: Int
 }
 
 public final class RuntimeHandle {
@@ -424,7 +544,7 @@ public final class RuntimeHandle {
 
   /// Advances this runtime: parks the owner thread when `timeout` allows it,
   /// then drains the owner-thread task queues. Drain queued runtime events with
-  /// ``pollEvent()`` afterwards.
+  /// ``drainEvents(maxEvents:)`` afterwards.
   ///
   /// `timeout` is in seconds. Zero drains and returns, a positive value parks
   /// for up to that long, and `nil` parks until a wake arrives. Timers and
@@ -432,7 +552,8 @@ public final class RuntimeHandle {
   /// work, so pass a bounded timeout to cap how long a call waits.
   ///
   /// A non-zero timeout blocks the calling thread. Call it outside any lock
-  /// that a thread signalling a `WakeSource` takes.
+  /// that a thread signalling a `WakeSource` takes. A call never parks while
+  /// this runtime holds undrained events.
   public func pump(timeout: TimeInterval? = 0) throws {
     try mapNativeFailure {
       let timeoutMilliseconds: Int64
@@ -464,20 +585,59 @@ public final class RuntimeHandle {
     }
   }
 
-  /// Polls and copies the next queued runtime event, returning `nil` when the
-  /// queue is empty.
+  /// Drains this runtime's queued events, copying every event out of the
+  /// runtime-owned arena before the call returns.
   ///
-  /// A polled map-style-loaded event releases the map's detached custom
-  /// geometry source callbacks, so drain the queue to keep sources the new
-  /// style dropped from lingering.
-  public func pollEvent() throws -> RuntimeEvent? {
+  /// Events arrive in queue order, from this runtime and from every map it
+  /// owns. `maxEvents` bounds the drain: zero drains everything, and a positive
+  /// value drains at most that many and reports the rest through
+  /// ``RuntimeEventBatch/remainingCount``.
+  ///
+  /// Draining is a queue operation that runs no owner-thread work. Call
+  /// ``pump(timeout:)`` to advance the runtime, then drain what it produced.
+  public func drainEvents(maxEvents: Int = 0) throws -> RuntimeEventBatch {
     try mapNativeFailure {
-      guard let event = try NativeRuntime.pollEvent(handle.requireLive()) else {
-        return nil
+      guard maxEvents >= 0 else {
+        throw NativeStatusFailure
+          .swiftInvalidArgument("maxEvents cannot be negative")
       }
-      let runtimeEvent = try RuntimeEvent(native: NativeRuntimeEvent(event))
-      MapHandle.handleRuntimeEvent(runtimeEvent)
-      return runtimeEvent
+      let batch = try NativeRuntime.drainEvents(
+        handle.requireLive(),
+        maxEvents: maxEvents
+      )
+      return RuntimeEventBatch(
+        events: batch.events.map { RuntimeEvent(native: $0) },
+        remainingCount: batch.remainingCount
+      )
+    }
+  }
+
+  /// Selects which runtime-originated event types this runtime queues.
+  ///
+  /// The call reads the bits in ``RuntimeEventMask/allRuntimeEvents`` and
+  /// ignores the rest, so ``RuntimeEventMask/all`` selects every one of them.
+  /// Narrowing gates later events and keeps queued ones, so a host drains what
+  /// it already caused.
+  ///
+  /// Region status, response error, and tile count limit events also require an
+  /// observed region, so this mask narrows that subscription rather than
+  /// replacing it.
+  public func setEventMask(_ mask: RuntimeEventMask) throws {
+    try mapNativeFailure {
+      try NativeRuntime.setEventMask(handle.requireLive(), mask: mask.rawValue)
+    }
+  }
+
+  /// The mask last set. A runtime that has not been narrowed reports
+  /// ``RuntimeEventMask/all``. Read it, change one bit, and write it back to
+  /// leave the other bits alone.
+  public var eventMask: RuntimeEventMask {
+    get throws {
+      try mapNativeFailure {
+        try RuntimeEventMask(
+          rawValue: NativeRuntime.eventMask(handle.requireLive())
+        )
+      }
     }
   }
 

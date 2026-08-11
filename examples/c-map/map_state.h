@@ -25,7 +25,8 @@ void map_state_deinit(map_state* state);
   map_state* state, command_queue* commands, command_list* batch
 );
 
-/// Drains runtime events, reporting whether the map wants another frame.
+/// Drains one batch of runtime events, reporting whether the map wants another
+/// frame.
 [[nodiscard]] app_error map_state_drain_events(
   map_state* state, bool* out_render_update
 );

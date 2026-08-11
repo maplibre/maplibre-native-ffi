@@ -11,6 +11,9 @@ namespace Maplibre.NativeFfi.Tests;
 
 public sealed class CustomGeometrySourceTests
 {
+    private static readonly byte[] EmptyStyleJson =
+        """{"version":8,"sources":{},"layers":[]}"""u8.ToArray();
+
     [BindingSpecTest("BND-121", "BND-124")]
     [Fact]
     public void CustomGeometryCallbacksCopyTileIdsAndSwallowExceptions()
@@ -112,48 +115,33 @@ public sealed class CustomGeometrySourceTests
 
     [BindingSpecTest("BND-122")]
     [Fact]
-    public unsafe void CustomGeometrySourceInstallFailurePreservesPreviousCallbacksAndReleasesReplacement()
+    public unsafe void CustomGeometrySourceInstallFailureReleasesOnlyTheRejectedState()
     {
         var failInstall = false;
-        CustomGeometrySourceState? failedReplacement = null;
         using var install = MapHandle.UseCustomGeometrySourceInstallForTest(
-            (_, _, options) =>
-            {
-                if (!failInstall)
-                {
-                    return mln_status.MLN_STATUS_OK;
-                }
-
-                failedReplacement = (CustomGeometrySourceState?)
-                    System
-                        .Runtime.InteropServices.GCHandle.FromIntPtr((nint)options->user_data)
-                        .Target;
-                return mln_status.MLN_STATUS_INVALID_STATE;
-            }
+            (_, _, _) =>
+                failInstall ? mln_status.MLN_STATUS_INVALID_STATE : mln_status.MLN_STATUS_OK
         );
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.AddCustomGeometrySource(
-            "custom",
+        var installed = new CustomGeometrySourceState(
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
         );
-        var previous = Assert.IsType<CustomGeometrySourceState>(
-            map.CustomGeometrySourceForTest("custom")
-        );
+        map.AddCustomGeometrySource("custom", installed);
 
         failInstall = true;
-        Assert.Throws<InvalidStateException>(() =>
-            map.AddCustomGeometrySource(
-                "custom",
-                new CustomGeometrySourceOptions { FetchTile = _ => { } }
-            )
+        var rejected = new CustomGeometrySourceState(
+            new CustomGeometrySourceOptions { FetchTile = _ => { } }
         );
+        Assert.Throws<InvalidStateException>(() => map.AddCustomGeometrySource("custom", rejected));
 
-        Assert.Equal(1, map.CustomGeometrySourceCountForTest);
-        Assert.Same(previous, map.CustomGeometrySourceForTest("custom"));
-        Assert.True(previous.IsHandleAllocatedForTest);
-        Assert.NotNull(failedReplacement);
-        Assert.False(failedReplacement.IsHandleAllocatedForTest);
+        // A rejected add owes no release callback, so the binding frees that state itself and
+        // leaves the state the accepted add handed over untouched.
+        Assert.False(rejected.IsHandleAllocatedForTest);
+        Assert.True(installed.IsHandleAllocatedForTest);
+
+        // The faked install never handed the state to MapLibre, so no release is owed for it.
+        installed.Dispose();
     }
 
     [BindingSpecTest("BND-105", "BND-124")]
@@ -162,7 +150,7 @@ public sealed class CustomGeometrySourceTests
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
+        map.SetStyleJson(EmptyStyleJson);
         var tile = new CanonicalTileId(0, 0, 0);
 
         map.AddCustomGeometrySource(
@@ -197,63 +185,71 @@ public sealed class CustomGeometrySourceTests
 
     [BindingSpecTest("BND-124")]
     [Fact]
-    public void DetachedCustomGeometryCleanupKeepsActiveCustomVectorSources()
+    public void RemovingACustomGeometrySourceReleasesItsCallbackState()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
-        map.AddCustomGeometrySource(
-            "custom",
+        map.SetStyleJson(EmptyStyleJson);
+        var state = new CustomGeometrySourceState(
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
         );
+        map.AddCustomGeometrySource("custom", state);
+        Assert.True(state.IsHandleAllocatedForTest);
 
-        map.ReleaseDetachedCustomGeometrySources();
+        Assert.True(map.RemoveStyleSource("custom"));
 
-        Assert.Equal(1, map.CustomGeometrySourceCountForTest);
-        Assert.Equal(SourceType.CustomVector, map.StyleSourceType("custom"));
+        Assert.False(state.IsHandleAllocatedForTest);
     }
 
     [BindingSpecTest("BND-124")]
     [Fact]
-    public void StaleStyleLoadedEventKeepsStillAttachedCustomGeometrySource()
+    public void ClosingAMapReleasesItsCustomGeometrySourceCallbackState()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
-        map.AddCustomGeometrySource(
-            "custom",
+        var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        map.SetStyleJson(EmptyStyleJson);
+        var state = new CustomGeometrySourceState(
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
         );
+        map.AddCustomGeometrySource("custom", state);
 
-        for (var attempt = 0; attempt < 8; attempt++)
-        {
-            var runtimeEvent = runtime.PollEvent();
-            if (runtimeEvent?.Type == RuntimeEventType.MapStyleLoaded)
+        map.Close();
+
+        Assert.False(state.IsHandleAllocatedForTest);
+    }
+
+    [BindingSpecTest("BND-093", "BND-124")]
+    [Fact]
+    public void AStyleReplacementReleasesADroppedSourceWithoutStyleLoadedEvents()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(
+            runtime,
+            new MapOptions
             {
-                break;
+                Width = 512,
+                Height = 512,
+                EventMask = RuntimeEventMask.All & ~RuntimeEventMask.MapStyleLoaded,
             }
-            runtime.Pump(TimeSpan.Zero);
+        );
+        map.SetStyleJson(EmptyStyleJson);
+        var state = new CustomGeometrySourceState(
+            new CustomGeometrySourceOptions { FetchTile = _ => { } }
+        );
+        map.AddCustomGeometrySource("custom", state);
+
+        // The replacement style drops the source, and the C API reports that through the release
+        // callback rather than through an event, so the host's cleared mask stays cleared.
+        map.SetStyleJson(EmptyStyleJson);
+        var drained = new List<RuntimeEventType>();
+        for (var attempt = 0; attempt < 1000 && state.IsHandleAllocatedForTest; attempt++)
+        {
+            runtime.Pump(TimeSpan.FromMilliseconds(1));
+            drained.AddRange(runtime.DrainEvents().Events.Select(polled => polled.Type));
         }
 
-        Assert.Equal(1, map.CustomGeometrySourceCountForTest);
-        Assert.Equal(SourceType.CustomVector, map.StyleSourceType("custom"));
-    }
-
-    [BindingSpecTest("BND-124")]
-    [Fact]
-    public void InlineStyleReplacementReleasesCustomGeometryCallbacks()
-    {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
-        map.AddCustomGeometrySource(
-            "custom",
-            new CustomGeometrySourceOptions { FetchTile = _ => { } }
-        );
-
-        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
-
-        Assert.Equal(0, map.CustomGeometrySourceCountForTest);
-        Assert.False(map.StyleSourceExists("custom"));
+        Assert.False(state.IsHandleAllocatedForTest);
+        Assert.DoesNotContain(RuntimeEventType.MapStyleLoaded, drained);
+        Assert.Equal(RuntimeEventMask.All & ~RuntimeEventMask.MapStyleLoaded, map.GetEventMask());
     }
 }

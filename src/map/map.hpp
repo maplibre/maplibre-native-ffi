@@ -51,6 +51,8 @@ auto map_copy_loaded_style_json(
 auto map_copy_style_url(
   mln_map map, char* out_url, size_t url_capacity, size_t* out_url_size
 ) -> mln_status;
+auto map_set_event_mask(mln_map map, uint64_t mask) -> mln_status;
+auto map_get_event_mask(mln_map map, uint64_t* out_mask) -> mln_status;
 auto style_id_list_count(mln_style_id_list list, size_t* out_count)
   -> mln_status;
 auto style_id_list_get(

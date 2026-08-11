@@ -74,13 +74,18 @@ type runtimeMapState struct {
 }
 
 func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
-	runtimeHandle, err := maplibre.NewRuntimeWithOptions(maplibre.RuntimeOptions{CachePath: ":memory:"})
+	runtimeHandle, err := maplibre.NewRuntimeWithOptions(maplibre.NewRuntimeOptions("", ":memory:"))
 	if err != nil {
 		return nil, fmt.Errorf("runtime create failed: %w", err)
 	}
 	state := &runtimeMapState{runtime: runtimeHandle}
 
-	mapHandle, err := runtimeHandle.NewMapWithOptions(maplibre.NewMapOptions(v.logicalWidth, v.logicalHeight, v.scaleFactor))
+	mapOptions := maplibre.NewMapOptions(v.logicalWidth, v.logicalHeight, v.scaleFactor)
+	// The two event types the runtime loop reads. A map queues no event of an
+	// unselected type, so the first style load already queues nothing else.
+	mapOptions.EventMask = maplibre.RuntimeEventMaskMapRenderUpdateAvailable |
+		maplibre.RuntimeEventMaskMapRenderFrameFinished
+	mapHandle, err := runtimeHandle.NewMapWithOptions(mapOptions)
 	if err != nil {
 		_ = state.Close()
 		return nil, fmt.Errorf("map create failed: %w", err)
@@ -202,14 +207,12 @@ func (state *runtimeMapState) adjustPitch(delta float64, animation *maplibre.Ani
 
 func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapID maplibre.MapID) (bool, error) {
 	renderRequested := false
-	for {
-		event, err := runtimeHandle.PollEvent()
-		if err != nil {
-			return renderRequested, fmt.Errorf("runtime event poll failed: %w", err)
-		}
-		if event == nil {
-			return renderRequested, nil
-		}
+	// One drain takes every event the pump produced.
+	batch, err := runtimeHandle.DrainEvents(0)
+	if err != nil {
+		return renderRequested, fmt.Errorf("runtime event drain failed: %w", err)
+	}
+	for _, event := range batch.Events {
 		if event.Source.Type != maplibre.RuntimeEventSourceMap || event.Source.MapID != mapID {
 			continue
 		}
@@ -223,6 +226,7 @@ func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapID maplibre.MapID) (b
 			}
 		}
 	}
+	return renderRequested, nil
 }
 
 // renderMapState owns the render target on the SDL render loop thread.

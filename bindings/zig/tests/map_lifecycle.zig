@@ -12,19 +12,6 @@ fn requestRepaintOnThread(map: *maplibre.MapHandle, out_error: *?anyerror) void 
     out_error.* = null;
 }
 
-fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
-    for (0..1000) |_| {
-        try runtime.pump(0);
-        while (try runtime.pollEvent(testing.allocator)) |event| {
-            var owned_event = event;
-            defer owned_event.deinit();
-            if (std.meta.eql(owned_event.event_type, event_type)) return true;
-        }
-        try std.Thread.yield();
-    }
-    return false;
-}
-
 fn createRuntimeAndMap() !struct { runtime: maplibre.RuntimeHandle, map: maplibre.MapHandle } {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     errdefer runtime.close() catch @panic("runtime close failed");
@@ -40,7 +27,7 @@ test "runtime and map vertical slice" {
     defer runtime.close() catch @panic("runtime close failed");
 
     try runtime.pump(0);
-    try testing.expectEqual(@as(?maplibre.OwnedRuntimeEvent, null), try runtime.pollEvent(testing.allocator));
+    try testing.expectEqual(@as(usize, 0), try support.drainEvents(&runtime));
 
     var map = try maplibre.MapHandle.create(&runtime, .{});
 
@@ -181,7 +168,7 @@ test "continuous repaint request makes render update available" {
     defer map.close() catch @panic("map close failed");
 
     try map.requestRepaint();
-    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
+    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
 }
 
 test "wrong-thread map failures propagate diagnostics" {

@@ -20,13 +20,7 @@ public sealed class RuntimeWakeTests
         for (var attempt = 0; attempt < 100; attempt++)
         {
             runtime.Pump(TimeSpan.Zero);
-            var drained = false;
-            while (runtime.PollEvent() is not null)
-            {
-                drained = true;
-            }
-
-            if (!drained)
+            if (runtime.DrainEvents().Events.Count == 0)
             {
                 return;
             }
@@ -55,9 +49,9 @@ public sealed class RuntimeWakeTests
                 loadStarted.Elapsed < PromptReturn,
                 "Parks sat out their timeouts while loading was pending."
             );
-            while (runtime.PollEvent() is { } polled)
+            foreach (var drained in runtime.DrainEvents().Events)
             {
-                if (polled.Type == RuntimeEventType.MapLoadingFailed)
+                if (drained.Type == RuntimeEventType.MapLoadingFailed)
                 {
                     loadingFailed = true;
                 }

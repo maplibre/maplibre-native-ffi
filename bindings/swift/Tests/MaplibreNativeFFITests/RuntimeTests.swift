@@ -65,11 +65,11 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
   }
 }
 
-@Test func runtimeCreateRunPollAndClose() throws {
+@Test func runtimeCreateRunDrainAndClose() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   try runtime.pump()
-  _ = try runtime.pollEvent()
+  _ = try runtime.drainEvents()
   try runtime.close()
 
   #expect(runtime.isClosed)
@@ -99,18 +99,12 @@ private func loadProbeStyle(
   styleURL: String
 ) throws -> String? {
   try map.setStyleURL(styleURL)
-  for _ in 0 ..< 5000 {
-    try runtime.pump()
-    while let event = try runtime.pollEvent() {
-      guard event.type == .mapLoadingFailed,
-            event.message.contains(styleURL)
-      else { continue }
-      return event.message
-    }
-    Thread.sleep(forTimeInterval: 0.001)
-  }
-  Issue.record("timed out waiting for a loading failure for \(styleURL)")
-  return nil
+  return try pumpUntilEvent(
+    runtime,
+    waitingFor: "a loading failure for \(styleURL)"
+  ) { event in
+    event.type == .mapLoadingFailed && event.message.contains(styleURL)
+  }?.message
 }
 
 @Test func runtimeResourceProviderIsConsultedUntilReplacedAndCleared() throws {
@@ -213,20 +207,12 @@ private final class ResolvedURLCapture: @unchecked Sendable {
   defer { try? map.close() }
 
   try map.setStyleURL("maplibre://maps/style")
-  var loaded = false
-  for _ in 0 ..< 5000 where !loaded {
-    try runtime.pump()
-    while let event = try runtime.pollEvent() {
-      if event.type == .mapStyleLoaded {
-        loaded = true
-        break
-      }
-    }
-    if loaded { break }
-    Thread.sleep(forTimeInterval: 0.001)
-  }
+  let loaded = try pumpUntilEvent(
+    runtime,
+    waitingFor: "the provider-served style to load"
+  ) { $0.type == .mapStyleLoaded }
 
-  #expect(loaded)
+  #expect(loaded != nil)
   #expect(resolved.value == "https://demotiles.maplibre.org/style.json")
 }
 

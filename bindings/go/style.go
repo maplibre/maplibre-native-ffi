@@ -973,8 +973,8 @@ func (m *MapHandle) SetGeoJSONSourceData(sourceID string, data []byte) error {
 
 // AddCustomGeometrySource adds a custom geometry source to the current style.
 // Callback state remains valid until source removal, style replacement, or map
-// close. After SetStyleURL, detached callback state is released when
-// RuntimeHandle.PollEvent observes RuntimeEventMapStyleLoaded for this map.
+// close, each of which frees it on the map owner thread. A failed add frees it
+// before returning.
 func (m *MapHandle) AddCustomGeometrySource(sourceID string, options CustomGeometrySourceOptions) error {
 	if options.FetchTile == nil {
 		return newBindingError(ErrInvalidArgument, "CustomGeometrySourceOptions.FetchTile is nil")
@@ -986,24 +986,9 @@ func (m *MapHandle) AddCustomGeometrySource(sourceID string, options CustomGeome
 	defer release()
 	defer m.state.KeepAlive()
 
-	var replacement *callback.CustomGeometrySourceState
-	if err := checkNative(func() int32 {
-		state, status := callback.AddCustomGeometrySource(uint64(ptr), sourceID, options.toCallback())
-		replacement = state
-		return status
-	}); err != nil {
-		return err
-	}
-
-	m.customGeometryMu.Lock()
-	if m.customGeometrySources == nil {
-		m.customGeometrySources = make(map[string]*callback.CustomGeometrySourceState)
-	}
-	previous := m.customGeometrySources[sourceID]
-	m.customGeometrySources[sourceID] = replacement
-	m.customGeometryMu.Unlock()
-	previous.Release()
-	return nil
+	return checkNative(func() int32 {
+		return callback.AddCustomGeometrySource(uint64(ptr), sourceID, options.toCallback())
+	})
 }
 
 // SetCustomGeometrySourceTileData sets custom geometry data for one tile.
@@ -1478,9 +1463,6 @@ func (m *MapHandle) RemoveStyleSource(sourceID string) (bool, error) {
 		return int32(C.mln_map_remove_style_source(C.mln_map(ptr), sourceView.raw(), &removed))
 	}); err != nil {
 		return false, err
-	}
-	if bool(removed) {
-		m.releaseCustomGeometrySource(sourceID)
 	}
 	return bool(removed), nil
 }

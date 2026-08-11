@@ -40,9 +40,12 @@ class LocalFileStyleJvmTest {
   private fun waitForStyleLoaded(runtime: RuntimeHandle, map: MapHandle): Boolean {
     repeat(10_000) {
       runtime.pump(1)
-      while (true) {
-        val event = runtime.pollEvent() ?: break
-        if (event.type == RuntimeEventType.MAP_STYLE_LOADED && event.mapSource == map) return true
+      if (
+        runtime.drainEvents().events.any {
+          it.type == RuntimeEventType.MAP_STYLE_LOADED && it.mapSource == map
+        }
+      ) {
+        return true
       }
     }
     return false

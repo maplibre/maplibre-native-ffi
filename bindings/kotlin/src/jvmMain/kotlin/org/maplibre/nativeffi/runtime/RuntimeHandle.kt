@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.runtime
 
+import java.lang.foreign.Arena
 import java.lang.ref.WeakReference
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.internal.callback.HttpHeaderTransformState
@@ -33,6 +34,9 @@ public actual class RuntimeHandle private constructor(private val handle: Native
   private var resourceTransformState: ResourceTransformState? = null
   private var httpHeaderTransformState: HttpHeaderTransformState? = null
   private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
+  // One batch struct per handle, reused by every drain and freed by close().
+  private val batchArena = Arena.ofShared()
+  private val batchSegment = NativeAccess.allocateRuntimeEventBatch(batchArena)
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
@@ -344,10 +348,23 @@ public actual class RuntimeHandle private constructor(private val handle: Native
     releaseCallbackRoot(previous)
   }
 
-  public actual fun pollEvent(): RuntimeEvent? {
+  public actual fun drainEvents(maxEvents: Int): RuntimeEventBatch {
     NativeAccess.ensureLoaded()
-    return NativeAccess.pollRuntimeEvent(requireLiveHandle())?.toRuntimeEvent()
+    Status.requireArgument(maxEvents >= 0) { "maxEvents must be non-negative" }
+    val batch =
+      NativeAccess.drainRuntimeEvents(requireLiveHandle(), maxEvents.toLong(), batchSegment)
+    return RuntimeEventBatch(batch.events.map { it.toRuntimeEvent() }, batch.remainingCount)
   }
+
+  public actual var eventMask: RuntimeEventMask
+    get() {
+      NativeAccess.ensureLoaded()
+      return RuntimeEventMask(NativeAccess.runtimeEventMask(requireLiveHandle()))
+    }
+    set(value) {
+      NativeAccess.ensureLoaded()
+      NativeAccess.setRuntimeEventMask(requireLiveHandle(), value.nativeValue)
+    }
 
   public actual override fun close() {
     resourceProviderState?.checkCanClose()
@@ -363,6 +380,7 @@ public actual class RuntimeHandle private constructor(private val handle: Native
         releaseCallbackRoot(httpHeaderTransformState)
         httpHeaderTransformState = null
         liveMaps.clear()
+        batchArena.close()
       },
     )
   }
@@ -424,18 +442,15 @@ public actual class RuntimeHandle private constructor(private val handle: Native
     return handle
   }
 
+  /** Converts one copied event, resolving the map that queued it when it is still live. */
   private fun NativeRuntimeEvent.toRuntimeEvent(): RuntimeEvent {
     val sourceType = RuntimeEventSourceType.fromNative(sourceType)
-    val mapSource = if (sourceType == RuntimeEventSourceType.MAP) mapFor(sourceId) else null
-    val eventType = RuntimeEventType.fromNative(type)
-    if (eventType == RuntimeEventType.MAP_STYLE_LOADED) {
-      mapSource?.releaseDetachedCustomGeometrySources()
-    }
     return RuntimeEvent(
-      eventType,
+      RuntimeEventType.fromNative(type),
       sourceType,
+      sourceId,
       if (sourceType == RuntimeEventSourceType.RUNTIME) this@RuntimeHandle else null,
-      mapSource,
+      if (sourceType == RuntimeEventSourceType.MAP) mapFor(sourceId) else null,
       code,
       payload,
       message,

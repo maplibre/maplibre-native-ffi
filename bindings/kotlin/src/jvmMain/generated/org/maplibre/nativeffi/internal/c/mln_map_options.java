@@ -21,6 +21,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     double scale_factor;
  *     uint32_t map_mode;
  *     bool fast_pfor_enabled;
+ *     uint64_t event_mask;
  * }
  * }
  */
@@ -38,7 +39,8 @@ public class mln_map_options {
         MapLibreNativeC.C_DOUBLE.withName("scale_factor"),
         MapLibreNativeC.C_INT.withName("map_mode"),
         MapLibreNativeC.C_BOOL.withName("fast_pfor_enabled"),
-        MemoryLayout.paddingLayout(3)
+        MemoryLayout.paddingLayout(3),
+        MapLibreNativeC.C_LONG.withName("event_mask")
     ).withName("mln_map_options");
 
     /**
@@ -310,6 +312,50 @@ public class mln_map_options {
      */
     public static void fast_pfor_enabled(MemorySegment struct, boolean fieldValue) {
         struct.set(fast_pfor_enabled$LAYOUT, fast_pfor_enabled$OFFSET, fieldValue);
+    }
+
+    private static final OfLong event_mask$LAYOUT = (OfLong)$LAYOUT.select(groupElement("event_mask"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * uint64_t event_mask
+     * }
+     */
+    public static final OfLong event_mask$layout() {
+        return event_mask$LAYOUT;
+    }
+
+    private static final long event_mask$OFFSET = $LAYOUT.byteOffset(groupElement("event_mask"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * uint64_t event_mask
+     * }
+     */
+    public static final long event_mask$offset() {
+        return event_mask$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * uint64_t event_mask
+     * }
+     */
+    public static long event_mask(MemorySegment struct) {
+        return struct.get(event_mask$LAYOUT, event_mask$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * uint64_t event_mask
+     * }
+     */
+    public static void event_mask(MemorySegment struct, long fieldValue) {
+        struct.set(event_mask$LAYOUT, event_mask$OFFSET, fieldValue);
     }
 
     /**

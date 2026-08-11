@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Maplibre.NativeFfi.Geo;
 using Maplibre.NativeFfi.Internal.C;
@@ -12,151 +11,146 @@ namespace Maplibre.NativeFfi.Internal.Struct;
 
 internal static unsafe class RuntimeStructs
 {
-    internal static RuntimeEvent ReadEvent(in mln_runtime_event raw) =>
-        ReadEvent(raw, null, _ => null);
+    /// <summary>
+    /// Offset of the payload union inside one event record, which every C API version keeps, so it
+    /// also bounds the opaque window of a payload kind this binding does not declare.
+    /// </summary>
+    private static readonly uint PayloadOffset = (uint)
+        Marshal.OffsetOf<mln_runtime_event>(nameof(mln_runtime_event.payload));
 
-    internal static RuntimeEvent ReadEvent(
-        in mln_runtime_event raw,
+    internal static List<RuntimeEvent> ReadBatch(in mln_runtime_event_batch batch) =>
+        ReadBatch(batch, null, static _ => null);
+
+    /// <summary>Copies every event of a borrowed batch, in queue order.</summary>
+    /// <remarks>
+    /// Events are indexed by the stride the batch reports rather than by this binding's own record
+    /// size, so a later C API version that widens the payload union stays readable.
+    /// </remarks>
+    internal static List<RuntimeEvent> ReadBatch(
+        in mln_runtime_event_batch batch,
         RuntimeHandle? runtimeSource,
         Func<ulong, MapHandle?> mapSource
     )
     {
-        var sourceType = (RuntimeEventSourceType)raw.source_type;
+        var count = checked((int)batch.event_count);
+        var events = new List<RuntimeEvent>(count);
+        var records = (byte*)batch.events;
+        for (var index = 0; index < count; index++)
+        {
+            events.Add(
+                ReadEvent(
+                    (mln_runtime_event*)(records + (nuint)index * batch.event_size),
+                    batch.event_size,
+                    batch.messages,
+                    runtimeSource,
+                    mapSource
+                )
+            );
+        }
+        return events;
+    }
+
+    private static RuntimeEvent ReadEvent(
+        mln_runtime_event* record,
+        uint eventSize,
+        sbyte* messages,
+        RuntimeHandle? runtimeSource,
+        Func<ulong, MapHandle?> mapSource
+    )
+    {
+        var sourceType = (RuntimeEventSourceType)record->source_type;
         return new RuntimeEvent(
-            (RuntimeEventType)raw.type,
-            raw.type,
+            (RuntimeEventType)record->type,
+            record->type,
             sourceType,
-            raw.source_type,
+            record->source_type,
+            record->source,
             sourceType == RuntimeEventSourceType.Runtime ? runtimeSource : null,
-            sourceType == RuntimeEventSourceType.Map ? mapSource(raw.source) : null,
-            raw.code,
-            raw.payload_type,
-            ReadPayload(raw.payload_type, raw.payload, raw.payload_size),
-            CopyUtf8(raw.message, raw.message_size)
+            sourceType == RuntimeEventSourceType.Map ? mapSource(record->source) : null,
+            record->code,
+            record->payload_type,
+            ReadPayload(record, eventSize),
+            CopyUtf8(messages + record->message_offset, record->message_size)
         );
     }
 
-    private static RuntimeEventPayload ReadPayload(
-        uint payloadType,
-        void* payload,
-        nuint payloadSize
-    )
-    {
-        if (
-            payload is null
-            || payloadType == (uint)mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_NONE
-        )
+    private static RuntimeEventPayload ReadPayload(mln_runtime_event* record, uint eventSize) =>
+        (mln_runtime_event_payload_type)record->payload_type switch
         {
-            return RuntimeEventPayload.None.Instance;
-        }
-
-        return (mln_runtime_event_payload_type)payloadType switch
-        {
-            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME
-                when HasPayload<mln_runtime_event_render_frame>(payloadSize) => ReadRenderFrame(
-                (mln_runtime_event_render_frame*)payload
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_NONE => RuntimeEventPayload
+                .None
+                .Instance,
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME =>
+                ReadRenderFrame(record->payload.render_frame),
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP => ReadRenderMap(
+                record->payload.render_map
             ),
-            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
-                when HasPayload<mln_runtime_event_render_map>(payloadSize) => ReadRenderMap(
-                (mln_runtime_event_render_map*)payload
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION => ReadTileAction(
+                record->payload.tile_action
             ),
-            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING
-                when HasPayload<mln_runtime_event_style_image_missing>(payloadSize) =>
-                ReadStyleImageMissing((mln_runtime_event_style_image_missing*)payload),
-            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION
-                when HasPayload<mln_runtime_event_tile_action>(payloadSize) => ReadTileAction(
-                (mln_runtime_event_tile_action*)payload
-            ),
-            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS
-                when HasPayload<mln_runtime_event_offline_region_status>(payloadSize) =>
-                ReadOfflineRegionStatus((mln_runtime_event_offline_region_status*)payload),
-            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR
-                when HasPayload<mln_runtime_event_offline_region_response_error>(payloadSize) =>
-                ReadOfflineRegionResponseError(
-                    (mln_runtime_event_offline_region_response_error*)payload
-                ),
-            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT
-                when HasPayload<mln_runtime_event_offline_region_tile_count_limit>(payloadSize) =>
-                ReadOfflineRegionTileCountLimit(
-                    (mln_runtime_event_offline_region_tile_count_limit*)payload
-                ),
-            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED
-                when HasPayload<mln_runtime_event_offline_operation_completed>(payloadSize) =>
-                ReadOfflineOperationCompleted(
-                    (mln_runtime_event_offline_operation_completed*)payload
-                ),
-            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED
-                when HasPayload<mln_runtime_event_camera_transition_finished>(payloadSize) =>
-                ReadCameraTransitionFinished(
-                    (mln_runtime_event_camera_transition_finished*)payload
-                ),
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS =>
+                ReadOfflineRegionStatus(record->payload.offline_region_status),
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR =>
+                ReadOfflineRegionResponseError(record->payload.offline_region_response_error),
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT =>
+                ReadOfflineRegionTileCountLimit(record->payload.offline_region_tile_count_limit),
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED =>
+                ReadOfflineOperationCompleted(record->payload.offline_operation_completed),
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED =>
+                ReadCameraTransitionFinished(record->payload.camera_transition_finished),
             _ => new RuntimeEventPayload.Unknown(
-                payloadType,
-                CopyBytes((byte*)payload, payloadSize)
+                record->payload_type,
+                CopyBytes((byte*)record + PayloadOffset, eventSize - PayloadOffset)
             ),
         };
-    }
-
-    private static bool HasPayload<T>(nuint payloadSize)
-        where T : unmanaged => payloadSize >= (nuint)sizeof(T);
 
     private static RuntimeEventPayload.RenderFrame ReadRenderFrame(
-        mln_runtime_event_render_frame* payload
+        in mln_runtime_event_render_frame payload
     ) =>
         new(
-            (RenderMode)payload->mode,
-            payload->mode,
-            payload->needs_repaint != 0,
-            payload->placement_changed != 0,
-            RenderingStats(payload->stats)
+            (RenderMode)payload.mode,
+            payload.mode,
+            payload.needs_repaint != 0,
+            payload.placement_changed != 0,
+            RenderingStats(payload.stats)
         );
 
     private static RuntimeEventPayload.RenderMap ReadRenderMap(
-        mln_runtime_event_render_map* payload
-    ) => new((RenderMode)payload->mode, payload->mode);
-
-    private static RuntimeEventPayload.StyleImageMissing ReadStyleImageMissing(
-        mln_runtime_event_style_image_missing* payload
-    ) => new(CopyUtf8(payload->image_id, payload->image_id_size));
+        in mln_runtime_event_render_map payload
+    ) => new((RenderMode)payload.mode, payload.mode);
 
     private static RuntimeEventPayload.TileAction ReadTileAction(
-        mln_runtime_event_tile_action* payload
-    ) =>
-        new(
-            (TileOperation)payload->operation,
-            payload->operation,
-            TileId(payload->tile_id),
-            CopyUtf8(payload->source_id, payload->source_id_size)
-        );
+        in mln_runtime_event_tile_action payload
+    ) => new((TileOperation)payload.operation, payload.operation, TileId(payload.tile_id));
 
     private static RuntimeEventPayload.OfflineRegionStatusChanged ReadOfflineRegionStatus(
-        mln_runtime_event_offline_region_status* payload
-    ) => new(payload->region_id, OfflineRegionStatus(payload->status));
+        in mln_runtime_event_offline_region_status payload
+    ) => new(payload.region_id, OfflineRegionStatus(payload.status));
 
     private static RuntimeEventPayload.OfflineRegionResponseError ReadOfflineRegionResponseError(
-        mln_runtime_event_offline_region_response_error* payload
-    ) => new(payload->region_id, (ResourceErrorReason)payload->reason, payload->reason);
+        in mln_runtime_event_offline_region_response_error payload
+    ) => new(payload.region_id, (ResourceErrorReason)payload.reason, payload.reason);
 
     private static RuntimeEventPayload.OfflineRegionTileCountLimit ReadOfflineRegionTileCountLimit(
-        mln_runtime_event_offline_region_tile_count_limit* payload
-    ) => new(payload->region_id, payload->limit);
+        in mln_runtime_event_offline_region_tile_count_limit payload
+    ) => new(payload.region_id, payload.limit);
 
     private static RuntimeEventPayload.OfflineOperationCompleted ReadOfflineOperationCompleted(
-        mln_runtime_event_offline_operation_completed* payload
+        in mln_runtime_event_offline_operation_completed payload
     ) =>
         new(
-            payload->operation_id,
-            (OfflineOperationKind)payload->operation_kind,
-            payload->operation_kind,
-            (OfflineOperationResultKind)payload->result_kind,
-            payload->result_kind,
-            payload->result_status,
-            payload->found != 0
+            payload.operation_id,
+            (OfflineOperationKind)payload.operation_kind,
+            payload.operation_kind,
+            (OfflineOperationResultKind)payload.result_kind,
+            payload.result_kind,
+            payload.result_status,
+            payload.found != 0
         );
 
     private static RuntimeEventPayload.CameraTransitionFinished ReadCameraTransitionFinished(
-        mln_runtime_event_camera_transition_finished* payload
-    ) => new(payload->transition_id);
+        in mln_runtime_event_camera_transition_finished payload
+    ) => new(payload.transition_id);
 
     private static RenderingStats RenderingStats(mln_rendering_stats value) =>
         new(
@@ -212,10 +206,5 @@ internal static unsafe class RuntimeStructs
         var bytes = new byte[checked((int)byteLength)];
         Marshal.Copy((nint)pointer, bytes, 0, bytes.Length);
         return bytes;
-    }
-
-    internal static mln_runtime_event EmptyNativeEvent()
-    {
-        return new mln_runtime_event { size = (uint)Unsafe.SizeOf<mln_runtime_event>() };
     }
 }

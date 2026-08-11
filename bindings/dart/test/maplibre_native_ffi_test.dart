@@ -17,6 +17,12 @@ import 'package:test/test.dart';
 
 const _emptyStyleJson = '{"version":8,"sources":{},"layers":[]}';
 
+/// Every event type but style-loaded, the type a host most plausibly clears
+/// while still expecting custom-geometry callback state to be released.
+final _maskWithoutStyleLoaded = RuntimeEventMask(
+  RuntimeEventMask.all.value & ~RuntimeEventMask.mapStyleLoaded.value,
+);
+
 Uint8List _jsonBytes(String value) => Uint8List.fromList(utf8.encode(value));
 
 /// Dispatches one record through the registered adapter log callback, the way
@@ -56,6 +62,154 @@ void main() {
     map.close();
     runtime.close();
   });
+  test('one drain takes every event a style load queued', () async {
+    final runtime = RuntimeHandle.create();
+    addTearDown(runtime.close);
+
+    // A fresh runtime has nothing queued.
+    final empty = runtime.drainEvents();
+    expect(empty.events, isEmpty);
+    expect(empty.remainingCount, 0);
+
+    // A map reports the two camera events of its initial sizing whatever the
+    // masks select, so the style load below starts from an empty queue.
+    final map = runtime.createMap();
+    addTearDown(map.close);
+    _quiesce(runtime);
+
+    map.setStyleJson(_jsonBytes(_emptyStyleJson));
+    late RuntimeEventBatch batch;
+    await _waitUntil(() {
+      runtime.pump();
+      batch = runtime.drainEvents();
+      return batch.events.any(
+        (event) => event.eventType == RuntimeEventType.mapStyleLoaded,
+      );
+    });
+
+    // A style load reports several event types, and one drain takes them all.
+    expect(batch.events.length, greaterThan(1));
+    expect(batch.remainingCount, 0);
+    expect(
+      batch.events.map((event) => event.eventType),
+      contains(RuntimeEventType.mapRenderUpdateAvailable),
+    );
+
+    // A bounded drain reports what stayed queued, and an unbounded one reaches
+    // the end of the queue.
+    map.setStyleJson(_jsonBytes(_emptyStyleJson));
+    late RuntimeEventBatch bounded;
+    await _waitUntil(() {
+      runtime.pump();
+      bounded = runtime.drainEvents(maxEvents: 1);
+      return bounded.remainingCount > 0;
+    });
+    expect(bounded.events, hasLength(1));
+    expect(runtime.drainEvents().remainingCount, 0);
+  });
+
+  test('both handles report and narrow their event masks', () {
+    final runtime = RuntimeHandle.create();
+    addTearDown(runtime.close);
+    final map = runtime.createMap();
+    addTearDown(map.close);
+
+    // The default options select every event type.
+    expect(runtime.eventMask, RuntimeEventMask.all);
+    expect(map.eventMask, RuntimeEventMask.all);
+
+    map.setEventMask(RuntimeEventMask.all);
+    runtime.setEventMask(RuntimeEventMask.all);
+    expect(map.eventMask, RuntimeEventMask.all);
+    expect(runtime.eventMask, RuntimeEventMask.all);
+
+    // A host reads the mask, clears one bit, and writes it back; every other
+    // bit survives.
+    final withoutIdle = RuntimeEventMask(
+      map.eventMask.value & ~RuntimeEventMask.mapIdle.value,
+    );
+    map.setEventMask(withoutIdle);
+    expect(map.eventMask, withoutIdle);
+    expect(map.eventMask.contains(RuntimeEventType.mapIdle), isFalse);
+    expect(map.eventMask.contains(RuntimeEventType.mapStyleLoaded), isTrue);
+
+    const outsideAll = RuntimeEventMask(1 << 40);
+    expect(
+      () => map.setEventMask(outsideAll),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+    expect(
+      () => runtime.setEventMask(outsideAll),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+    // A rejected mask leaves the installed one in place.
+    expect(map.eventMask, withoutIdle);
+  });
+
+  test(
+    'a narrowed map mask keeps cleared event types out of a batch',
+    () async {
+      final runtime = RuntimeHandle.create();
+      addTearDown(runtime.close);
+      final map = runtime.createMap();
+      addTearDown(map.close);
+      map.setEventMask(
+        RuntimeEventMask.mapStyleLoaded | RuntimeEventMask.mapLoadingFailed,
+      );
+
+      map.setStyleJson(_jsonBytes(_emptyStyleJson));
+      final types = <RuntimeEventType>{};
+      await _waitUntil(() {
+        runtime.pump();
+        types.addAll(
+          runtime.drainEvents().events.map((event) => event.eventType),
+        );
+        return types.contains(RuntimeEventType.mapStyleLoaded);
+      });
+      expect(types, isNot(contains(RuntimeEventType.mapRenderUpdateAvailable)));
+    },
+  );
+
+  // The release callback the C API invokes is what tells this binding a style
+  // replacement detached a source, so a host that reads no style-loaded events
+  // still gets its callback root retired.
+  test(
+    'a style replacement releases a source with style loads unselected',
+    () async {
+      const sourceId = 'dart-released-source';
+      final runtime = RuntimeHandle.create();
+      addTearDown(runtime.close);
+      final map = runtime.createMap(
+        options: MapOptions(eventMask: _maskWithoutStyleLoaded),
+      );
+      addTearDown(map.close);
+      map.setStyleJson(_jsonBytes(_emptyStyleJson));
+      _quiesce(runtime);
+      map.addCustomGeometrySource(
+        sourceId,
+        CustomGeometrySourceOptions(fetchTile: (_) {}),
+      );
+      final probe = customGeometryCallbackProbeForTesting(map, sourceId)!;
+
+      // The mask reads back as the host set it, because the binding selects
+      // nothing of its own.
+      expect(map.eventMask, _maskWithoutStyleLoaded);
+
+      map.setStyleJson(_jsonBytes(_emptyStyleJson));
+      final types = <RuntimeEventType>{};
+      await _waitUntil(() {
+        runtime.pump();
+        types.addAll(
+          runtime.drainEvents().events.map((event) => event.eventType),
+        );
+        return probe.retirementQueued;
+      });
+      expect(types, isNot(contains(RuntimeEventType.mapStyleLoaded)));
+      expect(customGeometryCallbackProbeForTesting(map, sourceId), isNull);
+      await _waitUntil(() => probe.closed);
+    },
+  );
+
   test('process-global APIs cross the native C ABI', () {
     expect(Maplibre.cVersion(), greaterThanOrEqualTo(0));
     final backends = Maplibre.supportedRenderBackends();
@@ -686,51 +840,31 @@ void main() {
     runtime.close();
   });
 
-  test(
-    'custom geometry callback roots retire at lifecycle boundaries',
-    () async {
-      final runtime = RuntimeHandle.create();
-      final map = runtime.createMap();
-      map.setStyleJson(_jsonBytes(_emptyStyleJson));
+  test('a removal and a map close each release a callback root', () async {
+    const sourceId = 'dart-lifecycle-source';
+    final runtime = RuntimeHandle.create();
+    final map = runtime.createMap();
+    map.setStyleJson(_jsonBytes(_emptyStyleJson));
 
-      map.addCustomGeometrySource(
-        'dart-lifecycle-source',
-        CustomGeometrySourceOptions(fetchTile: (_) {}),
-      );
-      final removedProbe = customGeometryCallbackProbeForTesting(
-        map,
-        'dart-lifecycle-source',
-      )!;
-      expect(map.removeStyleSource('dart-lifecycle-source'), isTrue);
-      expect(removedProbe.retirementQueued, isTrue);
+    map.addCustomGeometrySource(
+      sourceId,
+      CustomGeometrySourceOptions(fetchTile: (_) {}),
+    );
+    final removedProbe = customGeometryCallbackProbeForTesting(map, sourceId)!;
+    expect(map.removeStyleSource(sourceId), isTrue);
+    expect(removedProbe.retirementQueued, isTrue);
+    expect(customGeometryCallbackProbeForTesting(map, sourceId), isNull);
 
-      map.addCustomGeometrySource(
-        'dart-lifecycle-source',
-        CustomGeometrySourceOptions(fetchTile: (_) {}),
-      );
-      final reloadProbe = customGeometryCallbackProbeForTesting(
-        map,
-        'dart-lifecycle-source',
-      )!;
-      map.setStyleJson(_jsonBytes(_emptyStyleJson));
-      expect(reloadProbe.retirementQueued, isTrue);
-
-      map.addCustomGeometrySource(
-        'dart-lifecycle-source',
-        CustomGeometrySourceOptions(fetchTile: (_) {}),
-      );
-      final closeProbe = customGeometryCallbackProbeForTesting(
-        map,
-        'dart-lifecycle-source',
-      )!;
-      map.close();
-      runtime.close();
-      expect(closeProbe.retirementQueued, isTrue);
-      await _waitUntil(
-        () => removedProbe.closed && reloadProbe.closed && closeProbe.closed,
-      );
-    },
-  );
+    map.addCustomGeometrySource(
+      sourceId,
+      CustomGeometrySourceOptions(fetchTile: (_) {}),
+    );
+    final closeProbe = customGeometryCallbackProbeForTesting(map, sourceId)!;
+    map.close();
+    runtime.close();
+    expect(closeProbe.retirementQueued, isTrue);
+    await _waitUntil(() => removedProbe.closed && closeProbe.closed);
+  });
 
   test('nine-patch style images round-trip through the native C ABI', () {
     final runtime = RuntimeHandle.create();
@@ -1063,9 +1197,8 @@ void main() {
     RuntimeEventOfflineOperationCompleted? offlineCompletion;
     await _waitUntil(() {
       runtime.pump();
-      RuntimeEvent? event;
-      while ((event = runtime.pollEvent()) != null) {
-        final payload = event!.payload;
+      for (final event in runtime.drainEvents().events) {
+        final payload = event.payload;
         if (payload is RuntimeEventOfflineOperationCompleted &&
             identical(payload.operation, offlineOperation)) {
           offlineCompletion = payload;
@@ -1075,7 +1208,7 @@ void main() {
     });
     expect(offlineCompletion!.operation, same(offlineOperation));
     expect(offlineCompletion!.resultStatus, MaplibreStatus.ok);
-    expect(runtime.pollEvent(), isNull);
+    expect(runtime.drainEvents().events, isEmpty);
     offlineOperation.discard();
     expect(offlineOperation.isDiscarded, isTrue);
     final offlineListOperation = runtime.listOfflineRegions();
@@ -1153,17 +1286,13 @@ void main() {
     expect(map.removeStyleImage('dart-image'), isTrue);
     expect(map.styleImageExists('dart-image'), isFalse);
     runtime.pump();
-    final copiedEvents = <RuntimeEvent>[];
-    RuntimeEvent? copiedEvent;
-    while ((copiedEvent = runtime.pollEvent()) != null) {
-      copiedEvents.add(copiedEvent!);
-    }
+    final copiedEvents = runtime.drainEvents().events;
     final styleLoadedEvent = copiedEvents.firstWhere(
       (event) => event.eventType == RuntimeEventType.mapStyleLoaded,
     );
     expect(styleLoadedEvent.source, isA<MapRuntimeEventSource>());
     expect((styleLoadedEvent.source as MapRuntimeEventSource).map, same(map));
-    expect(runtime.pollEvent(), isNull);
+    expect(runtime.drainEvents().events, isEmpty);
     map.jumpTo(const CameraOptions(center: LatLng(0, 0), zoom: 1));
     final camera = map.camera();
     expect(camera.center, const LatLng(0, 0));
@@ -1174,11 +1303,7 @@ void main() {
       const CameraOptions(zoom: 2),
       animation: AnimationOptions(durationMs: 0, transitionId: transitionId),
     );
-    final cameraEvents = <RuntimeEvent>[];
-    RuntimeEvent? cameraEvent;
-    while ((cameraEvent = runtime.pollEvent()) != null) {
-      cameraEvents.add(cameraEvent!);
-    }
+    final cameraEvents = runtime.drainEvents().events;
     final transitionEvent = cameraEvents.firstWhere(
       (event) =>
           event.eventType == RuntimeEventType.mapCameraTransitionFinished,
@@ -1854,9 +1979,8 @@ void main() {
           lessThan(_promptReturn),
           reason: 'parks sat out their timeouts while loading was pending',
         );
-        RuntimeEvent? event;
-        while ((event = runtime.pollEvent()) != null) {
-          if (event!.eventType == RuntimeEventType.mapLoadingFailed) {
+        for (final event in runtime.drainEvents().events) {
+          if (event.eventType == RuntimeEventType.mapLoadingFailed) {
             loadingFailed = true;
           }
         }
@@ -1922,6 +2046,7 @@ void main() {
     source.close();
     runtime.close();
   });
+
   test('an attach reference reaches native from another isolate', () async {
     final runtime = RuntimeHandle.create();
     final map = runtime.createMap(
@@ -1970,11 +2095,7 @@ const _promptReturn = Duration(seconds: 5);
 void _quiesce(RuntimeHandle runtime) {
   for (var attempt = 0; attempt < 100; attempt += 1) {
     runtime.pump();
-    var drained = false;
-    while (runtime.pollEvent() != null) {
-      drained = true;
-    }
-    if (!drained) {
+    if (runtime.drainEvents().events.isEmpty) {
       return;
     }
   }
@@ -2057,9 +2178,8 @@ Future<RuntimeEvent> _pumpUntilEvent(
   RuntimeEvent? matched;
   await _waitUntil(() {
     runtime.pump();
-    RuntimeEvent? event;
-    while ((event = runtime.pollEvent()) != null) {
-      if (predicate(event!)) {
+    for (final event in runtime.drainEvents().events) {
+      if (predicate(event)) {
         matched = event;
       }
     }

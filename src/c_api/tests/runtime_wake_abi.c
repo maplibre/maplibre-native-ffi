@@ -23,46 +23,31 @@ static const int64_t idle_park_milliseconds = 200;
 static const size_t style_load_attempts = 20;
 static const unsigned int signal_delay_milliseconds = 20;
 static const size_t coalesced_repaint_count = 5;
-
-static mln_runtime_event empty_event(void) {
-  return (mln_runtime_event){
-    .size = sizeof(mln_runtime_event),
-    .source_type = MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-    .payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE,
-  };
-}
-
-static size_t drain_events(mln_runtime runtime, uint32_t counted_type) {
-  size_t counted = 0;
-  while (true) {
-    mln_runtime_event event = empty_event();
-    bool has_event = false;
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_runtime_poll_event(runtime, &event, &has_event)
-    );
-    if (!has_event) {
-      return counted;
-    }
-    if (event.type == counted_type) {
-      counted += 1;
-    }
-  }
-}
+static const size_t idle_quiesce_attempts = 100;
+// A map with a render session attached keeps producing frame and tile events
+// for many more pumps than an idle map does, so that one site gets a larger
+// budget instead of a weaker idle check.
+static const size_t session_quiesce_attempts = 500;
 
 // Pumps until the runtime is idle: the wake flag is clear and no events are
-// queued.
-static void quiesce(mln_runtime runtime) {
-  for (size_t attempt = 0; attempt < 100; attempt += 1) {
+// queued. The count is every event the runtime produced, so an idle runtime
+// that keeps producing fails here rather than passing on the first attempt.
+static void quiesce_within(mln_runtime runtime, size_t attempts) {
+  for (size_t attempt = 0; attempt < attempts; attempt += 1) {
     TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
-    if (drain_events(runtime, 0) == 0) {
+    if (mln_test_drain_all(runtime) == 0) {
       // One more zero pump clears the flag the drained events set.
       TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
-      if (drain_events(runtime, 0) == 0) {
+      if (mln_test_drain_all(runtime) == 0) {
         return;
       }
     }
   }
   TEST_FAIL_MESSAGE("The runtime kept producing events while idle.");
+}
+
+static void quiesce(mln_runtime runtime) {
+  quiesce_within(runtime, idle_quiesce_attempts);
 }
 
 typedef struct signal_probe {
@@ -205,19 +190,18 @@ static void a_style_response_wakes_a_parked_owner_thread(void) {
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds)
     );
-    while (true) {
-      mln_runtime_event event = empty_event();
-      bool has_event = false;
-      TEST_ASSERT_EQUAL_INT(
-        MLN_STATUS_OK, mln_runtime_poll_event(runtime, &event, &has_event)
-      );
-      if (!has_event) {
-        break;
-      }
+    mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_runtime_drain_events(runtime, 0, &batch)
+    );
+    for (size_t index = 0; index < batch.event_count; index += 1) {
+      const mln_runtime_event* event =
+        (const mln_runtime_event*)((const char*)batch.events +
+                                   (index * batch.event_size));
       TEST_ASSERT_NOT_EQUAL_INT(
-        MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, (int)event.type
+        MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, (int)event->type
       );
-      if (event.type == MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) {
+      if (event->type == MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) {
         style_loaded = true;
       }
     }
@@ -285,7 +269,7 @@ static void a_session_resize_releases_a_parked_owner_thread(void) {
   mln_test_thread* thread = mln_test_thread_start(resize_session_entry, &probe);
   TEST_ASSERT_TRUE(mln_test_pump_until(runtime, &probe.attached));
   TEST_ASSERT_TRUE(probe.attach_succeeded);
-  quiesce(runtime);
+  quiesce_within(runtime, session_quiesce_attempts);
   atomic_store(&probe.start_resize, true);
 
   const uint64_t started = mln_test_monotonic_milliseconds();
@@ -340,12 +324,11 @@ static void queued_events_return_from_the_pump_immediately(void) {
     "A pump parked behind unread runtime events."
   );
 
-  mln_runtime_event event = empty_event();
-  bool has_event = false;
+  mln_runtime_event_batch batch = mln_runtime_event_batch_default();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_poll_event(runtime, &event, &has_event)
+    MLN_STATUS_OK, mln_runtime_drain_events(runtime, 0, &batch)
   );
-  TEST_ASSERT_TRUE(has_event);
+  TEST_ASSERT_GREATER_THAN_size_t(0, batch.event_count);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -364,8 +347,9 @@ static void render_updates_coalesce_at_the_queue_tail(void) {
     TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_request_repaint(map));
   }
 
-  const size_t render_updates =
-    drain_events(runtime, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE);
+  const size_t render_updates = mln_test_drain_counting(
+    runtime, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
+  );
   TEST_ASSERT_EQUAL_size_t(1, render_updates);
 
   mln_test_destroy_map(map);

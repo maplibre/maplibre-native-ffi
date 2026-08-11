@@ -9,6 +9,7 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
+import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
@@ -82,11 +83,11 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
   private fun pitchCamera(delta: Double): CameraOptions =
     CameraOptions().apply { pitch = max(0.0, min(60.0, (map.camera.pitch ?: 0.0) + delta)) }
 
-  /** Drains runtime events, reporting whether the map wants another frame. */
+  /** Drains one batch of runtime events, reporting whether the map wants another frame. */
   private fun drainEvents(): Boolean {
     var renderUpdateAvailable = false
-    while (true) {
-      val event = runtime.pollEvent() ?: return renderUpdateAvailable
+    // One drain takes every event the pump produced.
+    for (event in runtime.drainEvents().events) {
       if (event.mapSource != map) {
         continue
       }
@@ -99,6 +100,7 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
         renderUpdateAvailable = true
       }
     }
+    return renderUpdateAvailable
   }
 
   override fun close() {
@@ -123,6 +125,11 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
           height = viewport.height()
           scaleFactor = viewport.scaleFactor()
           mapMode = MapMode.CONTINUOUS
+          // The two event types the runtime loop reads. A map queues no event of an
+          // unselected type, so nothing accumulates before the style load.
+          eventMask =
+            RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE +
+              RuntimeEventMask.MAP_RENDER_FRAME_FINISHED
         }
       val map =
         try {

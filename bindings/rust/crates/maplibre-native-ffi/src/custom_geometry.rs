@@ -114,6 +114,8 @@ struct CallbackLifecycle {
     closed: bool,
 }
 
+/// Callback state for one custom geometry source, owned by the C API from a
+/// successful add until it invokes the release callback that frees this box.
 pub(crate) struct CustomGeometrySourceState {
     fetch_tile: Box<TileCallback>,
     cancel_tile: Option<Box<TileCallback>>,
@@ -160,6 +162,7 @@ impl CustomGeometrySourceState {
                     .cancel_tile
                     .as_ref()
                     .map(|_| cancel_tile_trampoline as _),
+                release_user_data: Some(release_trampoline),
                 user_data: ptr::from_ref(self).cast_mut().cast::<c_void>(),
                 min_zoom: self.min_zoom,
                 max_zoom: self.max_zoom,
@@ -256,6 +259,18 @@ unsafe extern "C" fn fetch_tile_trampoline(
     // SAFETY: user_data is installed from CustomGeometrySourceState::descriptor
     // and remains valid until source/style/map teardown waits for in-flight callbacks.
     unsafe { state.as_ref() }.invoke_fetch(CanonicalTileId::from_native(tile_id));
+}
+
+unsafe extern "C" fn release_trampoline(user_data: *mut c_void) {
+    let Some(state) = ptr::NonNull::new(user_data.cast::<CustomGeometrySourceState>()) else {
+        return;
+    };
+    // SAFETY: The C API invokes this once, with the pointer
+    // add_custom_geometry_source handed it, after it stops referencing the
+    // state, so this call owns the box. Dropping it waits for in-flight tile
+    // callbacks before it frees the host's own callbacks.
+    let state = unsafe { Box::from_raw(state.as_ptr()) };
+    let _ = catch_unwind(AssertUnwindSafe(move || drop(state)));
 }
 
 unsafe extern "C" fn cancel_tile_trampoline(

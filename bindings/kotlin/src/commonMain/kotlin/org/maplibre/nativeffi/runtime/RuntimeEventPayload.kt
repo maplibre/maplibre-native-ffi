@@ -20,13 +20,9 @@ public sealed interface RuntimeEventPayload {
 
   public data class RenderMap(public val mode: RenderMode) : RuntimeEventPayload
 
-  public data class StyleImageMissing(public val imageId: String) : RuntimeEventPayload
-
-  public data class TileAction(
-    public val operation: TileOperation,
-    public val tileId: TileId,
-    public val sourceId: String,
-  ) : RuntimeEventPayload
+  /** The event message carries the source id. */
+  public data class TileAction(public val operation: TileOperation, public val tileId: TileId) :
+    RuntimeEventPayload
 
   public data class OfflineRegionStatusChanged(
     public val regionId: Long,
@@ -63,11 +59,14 @@ public sealed interface RuntimeEventPayload {
     public val transitionId: Long
   ) : RuntimeEventPayload
 
-  public class Unknown(
-    public val rawPayloadType: Int,
-    public val payloadSize: Long,
-    payloadBytes: ByteArray,
-  ) : RuntimeEventPayload {
+  /**
+   * Payload of a kind this version does not name.
+   *
+   * [payloadBytes] holds the whole payload window that the drained batch reported, which is the
+   * batch stride minus the offset of the payload inside one event record.
+   */
+  public class Unknown(public val rawPayloadType: Int, payloadBytes: ByteArray) :
+    RuntimeEventPayload {
     private val copiedPayloadBytes: ByteArray = payloadBytes.copyOf()
 
     public val payloadBytes: ByteArray
@@ -76,17 +75,15 @@ public sealed interface RuntimeEventPayload {
     override fun equals(other: Any?): Boolean =
       other is Unknown &&
         rawPayloadType == other.rawPayloadType &&
-        payloadSize == other.payloadSize &&
         copiedPayloadBytes.contentEquals(other.copiedPayloadBytes)
 
     override fun hashCode(): Int {
       var result = rawPayloadType
-      result = 31 * result + payloadSize.hashCode()
       result = 31 * result + copiedPayloadBytes.contentHashCode()
       return result
     }
 
     override fun toString(): String =
-      "Unknown(rawPayloadType=$rawPayloadType, payloadSize=$payloadSize, payloadBytes=${copiedPayloadBytes.contentToString()})"
+      "Unknown(rawPayloadType=$rawPayloadType, payloadBytes=${copiedPayloadBytes.contentToString()})"
   }
 }

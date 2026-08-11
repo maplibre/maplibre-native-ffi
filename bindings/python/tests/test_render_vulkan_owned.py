@@ -113,7 +113,7 @@ def wait_for_texture_info(
     request_still_image_if_needed(fixture.map)
     for _ in range(iterations):
         fixture.runtime.pump()
-        while event := fixture.runtime.poll_event():
+        for event in fixture.runtime.drain_events().events:
             if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
                 try:
                     fixture.session.render_update()
@@ -136,7 +136,7 @@ def wait_for_vulkan_frame(
     last_frame: render.VulkanOwnedTextureFrame | None = None
     for _ in range(iterations):
         fixture.runtime.pump()
-        while event := fixture.runtime.poll_event():
+        for event in fixture.runtime.drain_events().events:
             if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
                 try:
                     fixture.session.render_update()
@@ -297,8 +297,7 @@ def test_a_worker_thread_attaches_its_own_session_and_renders() -> None:
                 # A short park rather than zero: this waits on the worker, so
                 # spinning would burn the deadline before it made progress.
                 runtime.pump(0.002)
-                while runtime.poll_event():
-                    pass
+                runtime.drain_events()
             worker.join()
             assert not failure, failure
             assert rendered, "worker thread should render the map"

@@ -99,6 +99,16 @@ and asynchronous failures.
 Rendering observer events reach the runtime queue through the map's run loop. A
 pump after the render call makes those events available to drain.
 
+Each map and each runtime carries a subscription: the set of event types it
+queues. Default options select every event type the library reports, and a host
+narrows a subscription by naming the types it reads. An unselected event is
+never built, never queued, and never raises the wake flag that releases a parked
+pump.
+
+One drain reports a batch: every queued event in order, plus the message text
+that those events carry. Copy any value you keep, because the next drain for
+that runtime replaces the batch.
+
 Queued events belong to their source. Destroying a map discards that map's
 queued events immediately. Read any state that teardown needs synchronously
 while the map is live.

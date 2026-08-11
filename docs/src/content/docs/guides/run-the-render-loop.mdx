@@ -36,7 +36,12 @@ source.
 ## Pump from the frame callback
 
 Pass a timeout of zero. The call drains what is queued and returns, because the
-display already sets the pace.
+display already sets the pace. One drain then takes the events that the pump
+produced.
+
+This loop reads two event types, render-update-available and
+render-frame-finished. It selects them before the map loads a style, as
+[Handle events](/maplibre-native-ffi/guides/handle-events/) describes.
 
 <Code code={region(frameLoop, "pump")} lang="c" title="frame-loop.c" />
 
@@ -68,7 +73,8 @@ flag that the display thread sets to stop the loop, and a wake source.
 
 <Code code={region(pumpThread, "channel")} lang="c" title="pump-thread.c" />
 
-Acquire the wake source on the runtime owner thread before starting the loop.
+Acquire the wake source and select the event types the loop reads, both on the
+runtime owner thread before the loop starts.
 
 <Code code={region(pumpThread, "acquire")} lang="c" title="pump-thread.c" />
 
@@ -78,7 +84,7 @@ stop.
 
 <Code code={region(pumpThread, "signal")} lang="c" title="pump-thread.c" />
 
-The loop parks until owner-thread work, a runtime event, or the wake source
+The loop parks until owner-thread work, a selected event, or the wake source
 signals it. Use a positive timeout to reach the stop check even when no wake
 arrives. The runtime registers no timers of its own. This snippet parks for 100
 ms and checks for a stop at least ten times a second.

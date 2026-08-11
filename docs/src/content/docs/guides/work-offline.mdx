@@ -24,9 +24,12 @@ a network.
 
 Database operations are asynchronous. A start call validates its arguments,
 returns an operation ID, and queues the work. The runtime later queues one
-operation-completed event with the ID and result status. This result is separate
-from the start call's status. Take the result value when an operation produces
-one. Take or discard every operation to release its runtime state.
+operation-completed event with the ID and result status while its subscription
+selects that type, as
+[Handle events](/maplibre-native-ffi/guides/handle-events/) describes. This
+result is separate from the start call's status. Take the result value when an
+operation produces one. Take or discard every operation to release its runtime
+state.
 
 ## Download a region
 

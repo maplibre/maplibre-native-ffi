@@ -10,14 +10,25 @@ enum NativeRuntime {
       }
   }
 
-  static func pollEvent(_ runtime: NativeRuntimeHandle) throws
-    -> mln_runtime_event?
-  {
-    var event = mln_runtime_event()
-    event.size = UInt32(MemoryLayout<mln_runtime_event>.size)
-    let output = try NativeMemory.withTemporary(false) { hasEvent in
-      try checkStatus(mln_runtime_poll_event(runtime.raw, &event, hasEvent))
-    }
-    return output.value ? event : nil
+  static func drainEvents(
+    _ runtime: NativeRuntimeHandle,
+    maxEvents: Int
+  ) throws -> NativeRuntimeEventBatch {
+    var batch = mln_runtime_event_batch_default()
+    try checkStatus(mln_runtime_drain_events(runtime.raw, maxEvents, &batch))
+    return try NativeRuntimeEventBatch(copying: batch)
+  }
+
+  static func setEventMask(
+    _ runtime: NativeRuntimeHandle,
+    mask: UInt64
+  ) throws {
+    try checkStatus(mln_runtime_set_event_mask(runtime.raw, mask))
+  }
+
+  static func eventMask(_ runtime: NativeRuntimeHandle) throws -> UInt64 {
+    try NativeMemory.withTemporary(UInt64(0)) { mask in
+      try checkStatus(mln_runtime_get_event_mask(runtime.raw, mask))
+    }.value
   }
 }

@@ -1,4 +1,5 @@
 using Maplibre.NativeFfi.Geo;
+using Maplibre.NativeFfi.Internal;
 using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Offline;
 using Maplibre.NativeFfi.Render;
@@ -72,11 +73,120 @@ public enum RuntimeEventType : uint
     MapCameraTransitionFinished = 23,
 }
 
-/// <summary>One copied runtime event returned by <c>RuntimeHandle.PollEvent</c>.</summary>
+/// <summary>Event types a map or a runtime queues.</summary>
+/// <remarks>
+/// Each bit is <c>1</c> shifted left by the <see cref="RuntimeEventType" /> value it selects, so a
+/// mask a host computes from a decoded event type matches these constants.
+/// <para>
+/// <see cref="MapHandle.SetEventMask" /> reads the bits in <see cref="AllMapEvents" /> and
+/// <see cref="RuntimeHandle.SetEventMask" /> reads the bits in <see cref="AllRuntimeEvents" />, so
+/// both accept <see cref="All" /> and a host reads a mask, changes one bit, and writes it back.
+/// </para>
+/// </remarks>
+[Flags]
+public enum RuntimeEventMask : ulong
+{
+    /// <summary>Selects no event type.</summary>
+    None = 0,
+    MapCameraWillChange = 1UL << (int)RuntimeEventType.MapCameraWillChange,
+    MapCameraIsChanging = 1UL << (int)RuntimeEventType.MapCameraIsChanging,
+    MapCameraDidChange = 1UL << (int)RuntimeEventType.MapCameraDidChange,
+    MapStyleLoaded = 1UL << (int)RuntimeEventType.MapStyleLoaded,
+    MapLoadingStarted = 1UL << (int)RuntimeEventType.MapLoadingStarted,
+    MapLoadingFinished = 1UL << (int)RuntimeEventType.MapLoadingFinished,
+    MapLoadingFailed = 1UL << (int)RuntimeEventType.MapLoadingFailed,
+    MapIdle = 1UL << (int)RuntimeEventType.MapIdle,
+    MapRenderUpdateAvailable = 1UL << (int)RuntimeEventType.MapRenderUpdateAvailable,
+    MapRenderError = 1UL << (int)RuntimeEventType.MapRenderError,
+    MapStillImageFinished = 1UL << (int)RuntimeEventType.MapStillImageFinished,
+    MapStillImageFailed = 1UL << (int)RuntimeEventType.MapStillImageFailed,
+    MapRenderFrameStarted = 1UL << (int)RuntimeEventType.MapRenderFrameStarted,
+    MapRenderFrameFinished = 1UL << (int)RuntimeEventType.MapRenderFrameFinished,
+    MapRenderMapStarted = 1UL << (int)RuntimeEventType.MapRenderMapStarted,
+    MapRenderMapFinished = 1UL << (int)RuntimeEventType.MapRenderMapFinished,
+    MapStyleImageMissing = 1UL << (int)RuntimeEventType.MapStyleImageMissing,
+    MapTileAction = 1UL << (int)RuntimeEventType.MapTileAction,
+    MapCameraTransitionFinished = 1UL << (int)RuntimeEventType.MapCameraTransitionFinished,
+    OfflineRegionStatusChanged = 1UL << (int)RuntimeEventType.OfflineRegionStatusChanged,
+    OfflineRegionResponseError = 1UL << (int)RuntimeEventType.OfflineRegionResponseError,
+    OfflineRegionTileCountLimitExceeded =
+        1UL << (int)RuntimeEventType.OfflineRegionTileCountLimitExceeded,
+    OfflineOperationCompleted = 1UL << (int)RuntimeEventType.OfflineOperationCompleted,
+
+    /// <summary>Selects every map-originated event type this binding declares.</summary>
+    AllMapEvents =
+        MapCameraWillChange
+        | MapCameraIsChanging
+        | MapCameraDidChange
+        | MapStyleLoaded
+        | MapLoadingStarted
+        | MapLoadingFinished
+        | MapLoadingFailed
+        | MapIdle
+        | MapRenderUpdateAvailable
+        | MapRenderError
+        | MapStillImageFinished
+        | MapStillImageFailed
+        | MapRenderFrameStarted
+        | MapRenderFrameFinished
+        | MapRenderMapStarted
+        | MapRenderMapFinished
+        | MapStyleImageMissing
+        | MapTileAction
+        | MapCameraTransitionFinished,
+
+    /// <summary>Selects every runtime-originated event type this binding declares.</summary>
+    AllRuntimeEvents =
+        OfflineRegionStatusChanged
+        | OfflineRegionResponseError
+        | OfflineRegionTileCountLimitExceeded
+        | OfflineOperationCompleted,
+
+    /// <summary>Selects every event type this binding declares.</summary>
+    All = AllMapEvents | AllRuntimeEvents,
+}
+
+/// <summary>One drained batch of copied runtime events.</summary>
+/// <remarks>
+/// Every value in the batch is a copy, so it stays readable after the next drain and after the map
+/// that produced it is closed.
+/// </remarks>
+/// <param name="Events">The copied events in queue order.</param>
+/// <param name="RemainingCount">
+/// Events still queued for the runtime after this batch. A nonzero value means another drain
+/// reports more events.
+/// </param>
+public sealed record RuntimeEventBatch(IReadOnlyList<RuntimeEvent> Events, ulong RemainingCount)
+{
+    private readonly IReadOnlyList<RuntimeEvent> events = ValueEquality.Snapshot(Events);
+
+    public IReadOnlyList<RuntimeEvent> Events
+    {
+        get => events;
+        init => events = ValueEquality.Snapshot(value);
+    }
+
+    public bool Equals(RuntimeEventBatch? other) =>
+        other is not null
+        && ValueEquality.SequenceEquals(events, other.events)
+        && RemainingCount == other.RemainingCount;
+
+    public override int GetHashCode() =>
+        HashCode.Combine(ValueEquality.SequenceHashCode(events), RemainingCount);
+}
+
+/// <summary>One copied runtime event from <see cref="RuntimeHandle.DrainEvents()" />.</summary>
 /// <param name="Type">The event kind, when this binding knows the raw value.</param>
 /// <param name="RawType">The raw native event kind.</param>
 /// <param name="SourceType">The source kind, when this binding knows the raw value.</param>
 /// <param name="RawSourceType">The raw native source kind.</param>
+/// <param name="RawSource">
+/// The raw native source identity, which names one object for the life of the process. Every event
+/// carries it, including a source kind this binding does not name and a map source that resolves to
+/// no live <see cref="MapHandle" />, so a host still correlates or forwards an event whose source
+/// this binding cannot resolve. It is an identity value only: it compares and hashes, and it grants
+/// no operations on the object it names.
+/// </param>
 /// <param name="RuntimeSource">The runtime that produced a runtime-sourced event.</param>
 /// <param name="MapSource">
 /// The map that raised this event, resolved from the runtime's weak map registry.
@@ -112,12 +222,18 @@ public enum RuntimeEventType : uint
 /// </param>
 /// <param name="RawPayloadType">The raw native payload kind.</param>
 /// <param name="Payload">The copied typed payload selected by the payload kind.</param>
-/// <param name="Message">The copied event message, empty when the event carries none.</param>
+/// <param name="Message">
+/// The copied event message, empty when the event carries none. It carries the image ID for
+/// <see cref="RuntimeEventType.MapStyleImageMissing" />, the source ID for
+/// <see cref="RuntimeEventType.MapTileAction" />, and native failure text for the loading and
+/// render error kinds.
+/// </param>
 public sealed record RuntimeEvent(
     RuntimeEventType Type,
     uint RawType,
     RuntimeEventSourceType SourceType,
     uint RawSourceType,
+    ulong RawSource,
     RuntimeHandle? RuntimeSource,
     MapHandle? MapSource,
     int Code,
@@ -147,14 +263,10 @@ public abstract record RuntimeEventPayload
 
     public sealed record RenderMap(RenderMode Mode, uint RawMode) : RuntimeEventPayload;
 
-    public sealed record StyleImageMissing(string ImageId) : RuntimeEventPayload;
-
-    public sealed record TileAction(
-        TileOperation Operation,
-        uint RawOperation,
-        TileId TileId,
-        string SourceId
-    ) : RuntimeEventPayload;
+    /// <summary>Payload for a map tile action event.</summary>
+    /// <remarks>The event message carries the source ID.</remarks>
+    public sealed record TileAction(TileOperation Operation, uint RawOperation, TileId TileId)
+        : RuntimeEventPayload;
 
     public sealed record OfflineRegionStatusChanged(
         long RegionId,
@@ -188,6 +300,11 @@ public abstract record RuntimeEventPayload
     /// </param>
     public sealed record CameraTransitionFinished(ulong TransitionId) : RuntimeEventPayload;
 
+    /// <summary>Payload for a payload kind this binding does not declare.</summary>
+    /// <remarks>
+    /// <see cref="PayloadBytes" /> holds the event record's fixed payload window, copied unchanged,
+    /// so a host forwards a payload kind a later library version adds.
+    /// </remarks>
     public sealed record Unknown : RuntimeEventPayload
     {
         private readonly byte[] payloadBytes;

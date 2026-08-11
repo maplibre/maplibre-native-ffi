@@ -27,6 +27,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     uint32_t buffer;
  *     bool clip;
  *     bool wrap;
+ *     mln_custom_geometry_source_release_callback release_user_data;
  * }
  * }
  */
@@ -49,7 +50,8 @@ public class mln_custom_geometry_source_options {
         MapLibreNativeC.C_INT.withName("buffer"),
         MapLibreNativeC.C_BOOL.withName("clip"),
         MapLibreNativeC.C_BOOL.withName("wrap"),
-        MemoryLayout.paddingLayout(6)
+        MemoryLayout.paddingLayout(6),
+        MapLibreNativeC.C_POINTER.withName("release_user_data")
     ).withName("mln_custom_geometry_source_options");
 
     /**
@@ -585,6 +587,50 @@ public class mln_custom_geometry_source_options {
      */
     public static void wrap(MemorySegment struct, boolean fieldValue) {
         struct.set(wrap$LAYOUT, wrap$OFFSET, fieldValue);
+    }
+
+    private static final AddressLayout release_user_data$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("release_user_data"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * mln_custom_geometry_source_release_callback release_user_data
+     * }
+     */
+    public static final AddressLayout release_user_data$layout() {
+        return release_user_data$LAYOUT;
+    }
+
+    private static final long release_user_data$OFFSET = $LAYOUT.byteOffset(groupElement("release_user_data"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * mln_custom_geometry_source_release_callback release_user_data
+     * }
+     */
+    public static final long release_user_data$offset() {
+        return release_user_data$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * mln_custom_geometry_source_release_callback release_user_data
+     * }
+     */
+    public static MemorySegment release_user_data(MemorySegment struct) {
+        return struct.get(release_user_data$LAYOUT, release_user_data$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * mln_custom_geometry_source_release_callback release_user_data
+     * }
+     */
+    public static void release_user_data(MemorySegment struct, MemorySegment fieldValue) {
+        struct.set(release_user_data$LAYOUT, release_user_data$OFFSET, fieldValue);
     }
 
     /**

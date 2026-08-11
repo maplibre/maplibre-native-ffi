@@ -24,6 +24,7 @@ int main(void) {
   run_browser_http_abi_tests();
   run_callback_adapter_abi_tests();
   run_core_abi_tests();
+  run_custom_geometry_source_abi_tests();
   run_handles_abi_tests();
   run_map_options_abi_tests();
   run_render_backend_abi_tests();
@@ -33,6 +34,7 @@ int main(void) {
   run_query_abi_tests();
   run_mlt_decode_abi_tests();
   run_resources_abi_tests();
+  run_runtime_events_abi_tests();
   run_runtime_wake_abi_tests();
   run_style_values_abi_tests();
   const int failures = UNITY_END();

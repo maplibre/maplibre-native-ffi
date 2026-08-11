@@ -22,18 +22,8 @@ internal class CustomGeometrySourceRegistry<T : AutoCloseable>(private val relea
   }
 
   fun clear() {
-    states.values.forEach(release)
+    val pending = states.values.toList()
     states.clear()
-  }
-
-  fun releaseDetached(isAttachedCustomSource: (String) -> Boolean?) {
-    val iterator = states.iterator()
-    while (iterator.hasNext()) {
-      val entry = iterator.next()
-      if (isAttachedCustomSource(entry.key) == false) {
-        release(entry.value)
-        iterator.remove()
-      }
-    }
+    pending.forEach(release)
   }
 }

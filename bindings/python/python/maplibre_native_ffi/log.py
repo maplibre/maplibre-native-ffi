@@ -90,7 +90,12 @@ class LogReceiver:
         return int(self._native.dropped_record_count)
 
     def poll_record(self) -> LogRecord | None:
-        """Return one copied log record from the receiver queue."""
+        """Return one copied log record from the receiver queue.
+
+        This queue belongs to the binding and reports one record per call.
+        :meth:`RuntimeHandle.drain_events` takes a whole C batch instead,
+        because the C API owns that queue.
+        """
         record = self._native.poll_record()
         if record is None:
             return None

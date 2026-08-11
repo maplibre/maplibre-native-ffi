@@ -232,9 +232,10 @@ func (runtime *RuntimeHandle) StartOfflineRegionStatus(id OfflineRegionID) (*Off
 
 // StartSetOfflineRegionObserved starts setting offline event observation state.
 func (runtime *RuntimeHandle) StartSetOfflineRegionObserved(id OfflineRegionID, observed bool) (*OfflineOperationHandle[struct{}], error) {
-	return startOfflineOperation[struct{}](runtime, OfflineOperationRegionSetObserved, OfflineOperationResultNone, func(handle nativeRuntime, out *C.mln_offline_operation_id) int32 {
+	operation, err := startOfflineOperation[struct{}](runtime, OfflineOperationRegionSetObserved, OfflineOperationResultNone, func(handle nativeRuntime, out *C.mln_offline_operation_id) int32 {
 		return int32(C.mln_runtime_offline_region_set_observed_start(C.mln_runtime(handle), C.mln_offline_region_id(id), C.bool(observed), out))
 	})
+	return operation, err
 }
 
 // StartSetOfflineRegionDownloadState starts setting offline region download
@@ -259,9 +260,10 @@ func (runtime *RuntimeHandle) StartInvalidateOfflineRegion(id OfflineRegionID) (
 
 // StartDeleteOfflineRegion starts deleting an offline region.
 func (runtime *RuntimeHandle) StartDeleteOfflineRegion(id OfflineRegionID) (*OfflineOperationHandle[struct{}], error) {
-	return startOfflineOperation[struct{}](runtime, OfflineOperationRegionDelete, OfflineOperationResultNone, func(handle nativeRuntime, out *C.mln_offline_operation_id) int32 {
+	operation, err := startOfflineOperation[struct{}](runtime, OfflineOperationRegionDelete, OfflineOperationResultNone, func(handle nativeRuntime, out *C.mln_offline_operation_id) int32 {
 		return int32(C.mln_runtime_offline_region_delete_start(C.mln_runtime(handle), C.mln_offline_region_id(id), out))
 	})
+	return operation, err
 }
 
 // Take consumes a completed offline operation result and copies it into Go
@@ -311,7 +313,7 @@ func takeOfflineOperationResult[T any](runtime nativeRuntime, id C.mln_offline_o
 	rawRuntime := C.mln_runtime(runtime)
 	switch resultKind {
 	case OfflineOperationResultNone:
-		return zero, false, newBindingError(ErrInvalidState, "offline operation does not produce a take result; poll its completion event and discard it")
+		return zero, false, newBindingError(ErrInvalidState, "offline operation does not produce a take result; drain its completion event and discard it")
 	case OfflineOperationResultRegion:
 		var snapshot C.mln_offline_region_snapshot
 		var err error

@@ -10,27 +10,6 @@ const point_collection =
     "\"type\":\"Feature\",\"id\":\"sf\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[-122.4194,37.7749]}," ++
     "\"properties\":{\"name\":\"San Francisco\",\"visible\":true}}]}";
 
-fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
-    for (0..1000) |_| {
-        try runtime.pump(0);
-        while (try runtime.pollEvent(testing.allocator)) |event| {
-            var owned_event = event;
-            defer owned_event.deinit();
-            if (std.meta.eql(owned_event.event_type, event_type)) return true;
-        }
-        try std.Thread.yield();
-    }
-    return false;
-}
-
-fn createLoadedMap(runtime: *maplibre.RuntimeHandle) !maplibre.MapHandle {
-    var map = try maplibre.MapHandle.create(runtime, .{});
-    errdefer map.close() catch {};
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try waitForEvent(runtime, .map_style_loaded));
-    return map;
-}
-
 fn expectListContains(list: maplibre.StringList, expected: []const u8) !void {
     for (list.items) |item| if (std.mem.eql(u8, item, expected)) return;
     return error.MissingListEntry;
@@ -39,7 +18,7 @@ fn expectListContains(list: maplibre.StringList, expected: []const u8) !void {
 test "GeoJSON buffers add and update sources through public binding" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try createLoadedMap(&runtime);
+    var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
     try map.addGeoJsonSourceData(testing.allocator, "empty", empty_collection, null);
@@ -65,7 +44,7 @@ test "GeoJSON buffers add and update sources through public binding" {
 test "GeoJSON buffers support nested geometry collections" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try createLoadedMap(&runtime);
+    var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
     const collection = "{\"type\":\"GeometryCollection\",\"geometries\":[{\"type\":\"LineString\",\"coordinates\":[[-123,37],[-122,38]]},{\"type\":\"Polygon\",\"coordinates\":[[[-123,37],[-123,38],[-122,38],[-123,37]]]}]}";
@@ -76,7 +55,7 @@ test "GeoJSON buffers support nested geometry collections" {
 test "GeoJSON buffers reject invalid data and pass explicit-length strings" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try createLoadedMap(&runtime);
+    var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
     try testing.expectError(error.InvalidArgument, map.addGeoJsonSourceData(testing.allocator, "", empty_collection, null));
@@ -89,7 +68,7 @@ test "GeoJSON buffers reject invalid data and pass explicit-length strings" {
 test "GeoJSON source options carry serialized cluster properties" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try createLoadedMap(&runtime);
+    var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
     const features = "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]},\"properties\":{\"rank\":1}},{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0.001,0.001]},\"properties\":{\"rank\":2}}]}";

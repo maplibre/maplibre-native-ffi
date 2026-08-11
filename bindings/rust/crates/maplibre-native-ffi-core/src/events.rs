@@ -1,5 +1,7 @@
+use std::marker::PhantomData;
 use std::mem;
-use std::ptr;
+use std::slice;
+use std::str;
 
 use maplibre_native_ffi_sys as sys;
 
@@ -8,6 +10,11 @@ use crate::{
     OfflineOperationKind, OfflineOperationResultKind, OfflineRegionDownloadState, RenderMode,
     ResourceErrorReason, RuntimeEventType, TileOperation,
 };
+
+/// Byte offset of the payload union inside a native event record. Every ABI
+/// version keeps this offset, so it converts a batch stride into the payload's
+/// byte window.
+const PAYLOAD_OFFSET: usize = mem::offset_of!(sys::mln_runtime_event, payload);
 
 /// Raw source fields copied from a native runtime event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -81,13 +88,12 @@ impl TileId {
     }
 }
 
-/// Tile-action event payload.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// Tile-action event payload. The event message carries the source ID.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct TileActionEvent {
     pub operation: TileOperation,
     pub tile_id: TileId,
-    pub source_id: String,
 }
 
 /// Offline region status copied from native event payloads.
@@ -191,29 +197,24 @@ pub struct CameraTransitionFinishedEvent {
     pub transition_id: u64,
 }
 
-/// Style-image-missing event payload.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub struct StyleImageMissingEvent {
-    pub image_id: String,
-}
-
-/// Unknown event payload preserved for forward compatibility.
+/// Payload of a type this version does not define, preserved for forward
+/// compatibility.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct UnknownRuntimeEventPayload {
     pub raw_type: u32,
+    /// The payload union's byte window, copied from the batch. Its length is
+    /// the batch's event stride minus the payload's offset in an event record.
     pub bytes: Vec<u8>,
 }
 
-/// Owned event payload copied from runtime-owned native storage.
+/// Event payload decoded from the payload union that every event carries.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum RuntimeEventPayload {
     None,
     RenderFrame(RenderFrameEvent),
     RenderMap(RenderMapEvent),
-    StyleImageMissing(StyleImageMissingEvent),
     TileAction(TileActionEvent),
     OfflineRegionStatus(OfflineRegionStatusEvent),
     OfflineRegionResponseError(OfflineRegionResponseErrorEvent),
@@ -223,7 +224,7 @@ pub enum RuntimeEventPayload {
     Unknown(UnknownRuntimeEventPayload),
 }
 
-/// Owned runtime event copied from native poll storage, with raw source fields.
+/// Owned runtime event copied out of a drained batch, with raw source fields.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct CopiedRuntimeEvent {
@@ -239,113 +240,212 @@ pub struct CopiedRuntimeEvent {
     pub payload: RuntimeEventPayload,
 }
 
-/// Copies a borrowed native runtime event into owned Rust data.
+/// One event located inside a drained batch: the event record plus the arena
+/// slices it names.
+#[derive(Clone, Copy)]
+pub struct NativeEventView<'a> {
+    /// The event record, read at the batch's own event stride.
+    pub raw: sys::mln_runtime_event,
+    /// The event's message bytes, without the arena's null terminator.
+    pub message: &'a [u8],
+    /// The payload union's byte window: the batch's event stride minus the
+    /// payload's offset in an event record.
+    pub payload_window: &'a [u8],
+}
+
+/// Iterator over the events of one drained batch, in queue order.
+pub struct NativeEventViews<'a> {
+    batch: sys::mln_runtime_event_batch,
+    index: usize,
+    _storage: PhantomData<&'a [u8]>,
+}
+
+impl<'a> Iterator for NativeEventViews<'a> {
+    type Item = NativeEventView<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.batch.event_count {
+            return None;
+        }
+        // SAFETY: event_views' caller promised the batch describes storage that
+        // stays valid for 'a, and index is below event_count.
+        let view = unsafe { event_view(&self.batch, self.index) };
+        self.index += 1;
+        Some(view)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.batch.event_count - self.index;
+        (remaining, Some(remaining))
+    }
+}
+
+impl ExactSizeIterator for NativeEventViews<'_> {}
+
+/// Walks the events of one drained batch in queue order.
 ///
 /// # Safety
 ///
-/// `raw` and all event-owned payload and text pointers must remain valid for
-/// the duration of this call. The caller typically receives `raw` from
-/// `mln_runtime_poll_event` and copies it before polling again.
-pub unsafe fn runtime_event_from_native(
-    raw: &sys::mln_runtime_event,
-) -> Result<CopiedRuntimeEvent> {
-    let message = copy_optional_text(raw.message, raw.message_size)?;
-    let payload = copy_payload(raw)?;
+/// `batch` must be a batch that `mln_runtime_drain_events` filled, whose event
+/// and message storage stays valid for `'a`.
+pub unsafe fn event_views<'a>(batch: &sys::mln_runtime_event_batch) -> NativeEventViews<'a> {
+    NativeEventViews {
+        batch: *batch,
+        index: 0,
+        _storage: PhantomData,
+    }
+}
+
+/// Locates one event of a drained batch by its index.
+///
+/// Events are indexed by the batch's `event_size`, so a stride a later ABI
+/// version widens still reads every field this version defines.
+///
+/// # Safety
+///
+/// `batch` must be a batch that `mln_runtime_drain_events` filled, whose event
+/// and message storage stays valid for `'a`, and `index` must be below
+/// `batch.event_count`.
+pub unsafe fn event_view<'a>(
+    batch: &sys::mln_runtime_event_batch,
+    index: usize,
+) -> NativeEventView<'a> {
+    let stride = batch.event_size as usize;
+    debug_assert!(
+        stride >= mem::size_of::<sys::mln_runtime_event>(),
+        "a drained batch reports an event stride below the compiled event size"
+    );
+    // SAFETY: The caller promised index names an event of this batch, so the
+    // record and its payload window lie inside the event array.
+    let (raw, payload_window) = unsafe {
+        let record = batch.events.cast::<u8>().add(index * stride);
+        (
+            record.cast::<sys::mln_runtime_event>().read_unaligned(),
+            slice::from_raw_parts(
+                record.add(PAYLOAD_OFFSET),
+                stride.saturating_sub(PAYLOAD_OFFSET),
+            ),
+        )
+    };
+    let message = if raw.message_size == 0 {
+        &[][..]
+    } else {
+        // SAFETY: The C API writes message offsets and sizes that lie inside
+        // the batch's message arena.
+        unsafe {
+            slice::from_raw_parts(
+                batch.messages.cast::<u8>().add(raw.message_offset as usize),
+                raw.message_size as usize,
+            )
+        }
+    };
+    NativeEventView {
+        raw,
+        message,
+        payload_window,
+    }
+}
+
+/// Copies every event of one drained batch into owned Rust data, in queue
+/// order. An event whose message is not UTF-8 fails on its own, so the rest of
+/// the batch still decodes.
+///
+/// # Safety
+///
+/// `batch` must be a batch that `mln_runtime_drain_events` filled, whose event
+/// and message storage stays valid for the returned iterator's lifetime.
+pub unsafe fn drain_batch<'a>(
+    batch: &sys::mln_runtime_event_batch,
+) -> impl Iterator<Item = Result<CopiedRuntimeEvent>> + 'a {
+    // SAFETY: The caller promised the batch describes live storage.
+    unsafe { event_views(batch) }.map(|view|
+        // SAFETY: The view came from this batch, so its payload window matches
+        // the record it was read with.
+        unsafe { copied_event_from_view(&view) })
+}
+
+/// Copies one event of a drained batch into owned Rust data.
+///
+/// # Safety
+///
+/// `view` must come from `event_view` or `event_views` for a batch that
+/// `mln_runtime_drain_events` filled.
+pub unsafe fn copied_event_from_view(view: &NativeEventView<'_>) -> Result<CopiedRuntimeEvent> {
+    let message = message_text(view.message)?;
+    // SAFETY: The caller promised the view came from a drained batch, so the
+    // payload union holds initialized bytes for the member payload_type names.
+    let payload = unsafe { payload_from_view(view) };
     Ok(CopiedRuntimeEvent {
-        event_type: RuntimeEventType::from_raw(raw.type_),
+        event_type: RuntimeEventType::from_raw(view.raw.type_),
         source: RawRuntimeEventSource {
-            source_type: raw.source_type,
-            source_id: raw.source,
+            source_type: view.raw.source_type,
+            source_id: view.raw.source,
         },
-        code: raw.code,
+        code: view.raw.code,
         message,
         payload,
     })
 }
 
-pub fn empty_runtime_event() -> sys::mln_runtime_event {
-    sys::mln_runtime_event {
-        size: mem::size_of::<sys::mln_runtime_event>() as u32,
-        type_: 0,
-        source_type: sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-        source: 0,
-        code: 0,
-        payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_NONE,
-        payload: std::ptr::null(),
-        payload_size: 0,
-        message: std::ptr::null(),
-        message_size: 0,
-    }
-}
-
-fn copy_payload(raw: &sys::mln_runtime_event) -> Result<RuntimeEventPayload> {
-    match raw.payload_type {
-        sys::MLN_RUNTIME_EVENT_PAYLOAD_NONE => Ok(RuntimeEventPayload::None),
-        sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME => {
-            let payload = copy_payload_struct::<sys::mln_runtime_event_render_frame>(raw)?;
-            Ok(RuntimeEventPayload::RenderFrame(RenderFrameEvent {
-                mode: RenderMode::from_raw(payload.mode),
-                needs_repaint: payload.needs_repaint,
-                placement_changed: payload.placement_changed,
-                stats: RenderingStats::from_native(payload.stats),
-            }))
-        }
-        sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP => {
-            let payload = copy_payload_struct::<sys::mln_runtime_event_render_map>(raw)?;
-            Ok(RuntimeEventPayload::RenderMap(RenderMapEvent {
-                mode: RenderMode::from_raw(payload.mode),
-            }))
-        }
-        sys::MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING => {
-            let payload = copy_payload_struct::<sys::mln_runtime_event_style_image_missing>(raw)?;
-            Ok(RuntimeEventPayload::StyleImageMissing(
-                StyleImageMissingEvent {
-                    image_id: copy_required_text(payload.image_id, payload.image_id_size)?,
-                },
-            ))
-        }
-        sys::MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION => {
-            let payload = copy_payload_struct::<sys::mln_runtime_event_tile_action>(raw)?;
-            Ok(RuntimeEventPayload::TileAction(TileActionEvent {
-                operation: TileOperation::from_raw(payload.operation),
-                tile_id: TileId::from_native(payload.tile_id),
-                source_id: copy_required_text(payload.source_id, payload.source_id_size)?,
-            }))
-        }
-        sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS => {
-            let payload = copy_payload_struct::<sys::mln_runtime_event_offline_region_status>(raw)?;
-            Ok(RuntimeEventPayload::OfflineRegionStatus(
-                OfflineRegionStatusEvent {
+/// Decodes the payload union member that an event's payload type names.
+///
+/// # Safety
+///
+/// `view` must come from `event_view` or `event_views` for a batch that
+/// `mln_runtime_drain_events` filled, so the payload union holds initialized
+/// bytes and the payload window covers them.
+pub unsafe fn payload_from_view(view: &NativeEventView<'_>) -> RuntimeEventPayload {
+    let raw = &view.raw;
+    // SAFETY: The C API zeroes the payload union of every event it queues and
+    // fills the member payload_type names, so every read below is initialized.
+    unsafe {
+        match raw.payload_type {
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_NONE => RuntimeEventPayload::None,
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME => {
+                let payload = raw.payload.render_frame;
+                RuntimeEventPayload::RenderFrame(RenderFrameEvent {
+                    mode: RenderMode::from_raw(payload.mode),
+                    needs_repaint: payload.needs_repaint,
+                    placement_changed: payload.placement_changed,
+                    stats: RenderingStats::from_native(payload.stats),
+                })
+            }
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP => {
+                RuntimeEventPayload::RenderMap(RenderMapEvent {
+                    mode: RenderMode::from_raw(raw.payload.render_map.mode),
+                })
+            }
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION => {
+                let payload = raw.payload.tile_action;
+                RuntimeEventPayload::TileAction(TileActionEvent {
+                    operation: TileOperation::from_raw(payload.operation),
+                    tile_id: TileId::from_native(payload.tile_id),
+                })
+            }
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS => {
+                let payload = raw.payload.offline_region_status;
+                RuntimeEventPayload::OfflineRegionStatus(OfflineRegionStatusEvent {
                     region_id: payload.region_id,
                     status: OfflineRegionStatus::from_native(payload.status),
-                },
-            ))
-        }
-        sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR => {
-            let payload =
-                copy_payload_struct::<sys::mln_runtime_event_offline_region_response_error>(raw)?;
-            Ok(RuntimeEventPayload::OfflineRegionResponseError(
-                OfflineRegionResponseErrorEvent {
+                })
+            }
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR => {
+                let payload = raw.payload.offline_region_response_error;
+                RuntimeEventPayload::OfflineRegionResponseError(OfflineRegionResponseErrorEvent {
                     region_id: payload.region_id,
                     reason: ResourceErrorReason::from_raw(payload.reason),
-                },
-            ))
-        }
-        sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT => {
-            let payload =
-                copy_payload_struct::<sys::mln_runtime_event_offline_region_tile_count_limit>(raw)?;
-            Ok(RuntimeEventPayload::OfflineRegionTileCountLimit(
-                OfflineRegionTileCountLimitEvent {
+                })
+            }
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT => {
+                let payload = raw.payload.offline_region_tile_count_limit;
+                RuntimeEventPayload::OfflineRegionTileCountLimit(OfflineRegionTileCountLimitEvent {
                     region_id: payload.region_id,
                     limit: payload.limit,
-                },
-            ))
-        }
-        sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED => {
-            let payload =
-                copy_payload_struct::<sys::mln_runtime_event_offline_operation_completed>(raw)?;
-            Ok(RuntimeEventPayload::OfflineOperationCompleted(
-                OfflineOperationCompletedEvent {
+                })
+            }
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED => {
+                let payload = raw.payload.offline_operation_completed;
+                RuntimeEventPayload::OfflineOperationCompleted(OfflineOperationCompletedEvent {
                     operation_id: payload.operation_id,
                     operation_kind: OfflineOperationKind::from_raw(payload.operation_kind),
                     raw_operation_kind: payload.operation_kind,
@@ -353,218 +453,210 @@ fn copy_payload(raw: &sys::mln_runtime_event) -> Result<RuntimeEventPayload> {
                     raw_result_kind: payload.result_kind,
                     result_status: payload.result_status,
                     found: payload.found,
-                },
-            ))
+                })
+            }
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => {
+                RuntimeEventPayload::CameraTransitionFinished(CameraTransitionFinishedEvent {
+                    transition_id: raw.payload.camera_transition_finished.transition_id,
+                })
+            }
+            raw_type => RuntimeEventPayload::Unknown(UnknownRuntimeEventPayload {
+                raw_type,
+                bytes: view.payload_window.to_vec(),
+            }),
         }
-        sys::MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => {
-            let payload =
-                copy_payload_struct::<sys::mln_runtime_event_camera_transition_finished>(raw)?;
-            Ok(RuntimeEventPayload::CameraTransitionFinished(
-                CameraTransitionFinishedEvent {
-                    transition_id: payload.transition_id,
-                },
-            ))
-        }
-        raw_type => Ok(RuntimeEventPayload::Unknown(UnknownRuntimeEventPayload {
-            raw_type,
-            bytes: copy_payload_bytes(raw)?,
-        })),
     }
 }
 
-fn copy_payload_struct<T>(raw: &sys::mln_runtime_event) -> Result<T> {
-    if raw.payload.is_null() || raw.payload_size < mem::size_of::<T>() {
-        return Err(Error::invalid_argument(
-            "runtime event payload pointer and size do not match payload type",
-        ));
-    }
-
-    let mut value = mem::MaybeUninit::<T>::uninit();
-    // SAFETY: value points to size_of::<T>() writable bytes and the event
-    // payload is valid for payload_size bytes until the next poll. The byte
-    // copy avoids assuming the payload storage is aligned for T.
-    unsafe {
-        ptr::copy_nonoverlapping(
-            raw.payload.cast::<u8>(),
-            value.as_mut_ptr().cast::<u8>(),
-            mem::size_of::<T>(),
-        );
-        Ok(value.assume_init())
-    }
-}
-
-fn copy_payload_bytes(raw: &sys::mln_runtime_event) -> Result<Vec<u8>> {
-    if raw.payload_size == 0 {
-        return Ok(Vec::new());
-    }
-    if raw.payload.is_null() {
-        return Err(Error::invalid_argument(
-            "runtime event payload must not be null when payload_size is nonzero",
-        ));
-    }
-
-    // SAFETY: The C API says payload points to payload_size bytes until the
-    // next poll. The caller copies immediately before polling again.
-    let bytes = unsafe { std::slice::from_raw_parts(raw.payload.cast::<u8>(), raw.payload_size) };
-    Ok(bytes.to_vec())
-}
-
-fn copy_optional_text(ptr: *const std::os::raw::c_char, len: usize) -> Result<Option<String>> {
-    if len == 0 {
+/// Validates one event's message bytes as text, so a message that is not UTF-8
+/// fails on its own event.
+fn message_text(bytes: &[u8]) -> Result<Option<String>> {
+    if bytes.is_empty() {
         return Ok(None);
     }
-    Ok(Some(copy_required_text(ptr, len)?))
-}
-
-fn copy_required_text(ptr: *const std::os::raw::c_char, len: usize) -> Result<String> {
-    if len == 0 {
-        return Ok(String::new());
-    }
-    if ptr.is_null() {
-        return Err(Error::invalid_argument(
-            "runtime event text must not be null when length is nonzero",
-        ));
-    }
-
-    let view = sys::mln_buffer_view {
-        data: ptr.cast(),
-        size: len,
-    };
-    // SAFETY: The C API says event text pointers are valid until the next poll.
-    unsafe { crate::string::copy_string_view(view) }
+    str::from_utf8(bytes)
+        .map(|text| Some(text.to_owned()))
+        .map_err(|error| {
+            Error::invalid_argument(format!(
+                "runtime event message was not valid UTF-8: {error}"
+            ))
+        })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// Batch a test fills itself, so the decoder's stride and arena arithmetic
+    /// is exercised without a live runtime.
+    struct SynthesizedBatch {
+        records: Vec<u8>,
+        messages: Vec<u8>,
+        stride: usize,
+        count: usize,
+    }
+
+    impl SynthesizedBatch {
+        fn new(stride: usize) -> Self {
+            assert!(stride >= mem::size_of::<sys::mln_runtime_event>());
+            Self {
+                records: Vec::new(),
+                messages: Vec::new(),
+                stride,
+                count: 0,
+            }
+        }
+
+        fn push(&mut self, mut event: sys::mln_runtime_event, message: &[u8]) {
+            event.message_offset = u32::try_from(self.messages.len()).unwrap();
+            event.message_size = u32::try_from(message.len()).unwrap();
+            self.messages.extend_from_slice(message);
+            self.messages.push(0);
+
+            let record = self.records.len();
+            self.records.resize(record + self.stride, 0);
+            let bytes = unsafe {
+                slice::from_raw_parts(
+                    std::ptr::addr_of!(event).cast::<u8>(),
+                    mem::size_of::<sys::mln_runtime_event>(),
+                )
+            };
+            self.records[record..record + bytes.len()].copy_from_slice(bytes);
+            self.count += 1;
+        }
+
+        fn raw(&self) -> sys::mln_runtime_event_batch {
+            sys::mln_runtime_event_batch {
+                size: mem::size_of::<sys::mln_runtime_event_batch>() as u32,
+                event_size: u32::try_from(self.stride).unwrap(),
+                events: self.records.as_ptr().cast(),
+                event_count: self.count,
+                messages: self.messages.as_ptr().cast(),
+                messages_size: self.messages.len(),
+                remaining_count: 0,
+            }
+        }
+    }
+
+    fn zeroed_event(event_type: u32) -> sys::mln_runtime_event {
+        // SAFETY: Every member of an event record is plain data, and the C API
+        // queues events whose payload union is zeroed.
+        let mut event = unsafe { mem::zeroed::<sys::mln_runtime_event>() };
+        event.type_ = event_type;
+        event
+    }
+
+    fn render_map_event() -> sys::mln_runtime_event {
+        let mut event = zeroed_event(sys::MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED);
+        event.source_type = sys::MLN_RUNTIME_EVENT_SOURCE_MAP;
+        event.source = 0x0200_0000_0000_002a;
+        event.payload_type = sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP;
+        event.payload.render_map = sys::mln_runtime_event_render_map {
+            mode: sys::MLN_RENDER_MODE_FULL,
+        };
+        event
+    }
+
+    #[test]
+    // Spec coverage: BND-087.
+    fn a_batch_steps_events_by_the_reported_stride() {
+        // A stride wider than this header's event size models the next ABI
+        // version adding a payload member.
+        let stride = mem::size_of::<sys::mln_runtime_event>() + 16;
+        let mut batch = SynthesizedBatch::new(stride);
+        batch.push(zeroed_event(sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED), b"");
+        batch.push(render_map_event(), b"");
+        let mut tile_action = zeroed_event(sys::MLN_RUNTIME_EVENT_MAP_TILE_ACTION);
+        tile_action.payload_type = sys::MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION;
+        tile_action.payload.tile_action = sys::mln_runtime_event_tile_action {
+            operation: sys::MLN_TILE_OPERATION_END_PARSE,
+            tile_id: sys::mln_tile_id {
+                overscaled_z: 4,
+                wrap: -1,
+                canonical_z: 3,
+                canonical_x: 2,
+                canonical_y: 1,
+            },
+        };
+        batch.push(tile_action, b"tiles");
+        let raw = batch.raw();
+
+        let events = unsafe { drain_batch(&raw) }
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+
+        assert_eq!(events.len(), 3);
+        assert_eq!(events[0].event_type, RuntimeEventType::MapStyleLoaded);
+        assert_eq!(
+            events[1].payload,
+            RuntimeEventPayload::RenderMap(RenderMapEvent {
+                mode: RenderMode::Full,
+            })
+        );
+        assert_eq!(
+            events[1].source,
+            RawRuntimeEventSource {
+                source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
+                source_id: 0x0200_0000_0000_002a,
+            }
+        );
+        assert_eq!(events[2].message.as_deref(), Some("tiles"));
+        let RuntimeEventPayload::TileAction(tile_action) = &events[2].payload else {
+            panic!("the third event should carry a tile-action payload");
+        };
+        assert_eq!(tile_action.operation, TileOperation::EndParse);
+        assert_eq!(tile_action.tile_id.canonical_x, 2);
+    }
+
     #[test]
     // Spec coverage: BND-083.
-    fn unknown_payload_preserves_raw_type_bytes_message_and_source() {
-        let bytes = [1u8, 2, 3, 4];
-        let message = b"future payload";
-        // A synthetic map handle id that names no live map.
-        let source = 0x0200_0000_0000_002a_u64;
-        let raw = sys::mln_runtime_event {
-            size: mem::size_of::<sys::mln_runtime_event>() as u32,
-            type_: 999_001,
-            source_type: sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-            source,
-            code: -7,
-            payload_type: 999_002,
-            payload: bytes.as_ptr().cast(),
-            payload_size: bytes.len(),
-            message: message.as_ptr().cast(),
-            message_size: message.len(),
-        };
+    fn unknown_domains_preserve_raw_values_and_the_payload_window() {
+        let stride = mem::size_of::<sys::mln_runtime_event>() + 8;
+        let mut event = zeroed_event(999_001);
+        event.source_type = 999_003;
+        event.source = 7;
+        event.code = -7;
+        event.payload_type = 999_002;
+        event.payload.camera_transition_finished =
+            sys::mln_runtime_event_camera_transition_finished {
+                transition_id: 0x0102_0304_0506_0708,
+            };
+        let mut batch = SynthesizedBatch::new(stride);
+        batch.push(event, b"future payload");
+        let raw = batch.raw();
 
-        let event = unsafe { runtime_event_from_native(&raw) }.unwrap();
+        let mut events = unsafe { drain_batch(&raw) };
+        let event = events.next().unwrap().unwrap();
+        assert!(events.next().is_none());
 
         assert_eq!(event.event_type, RuntimeEventType::Unknown(999_001));
         assert_eq!(
             event.source,
             RawRuntimeEventSource {
-                source_type: sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-                source_id: source,
+                source_type: 999_003,
+                source_id: 7,
             }
         );
         assert_eq!(event.code, -7);
         assert_eq!(event.message.as_deref(), Some("future payload"));
-        assert_eq!(
-            event.payload,
-            RuntimeEventPayload::Unknown(UnknownRuntimeEventPayload {
-                raw_type: 999_002,
-                bytes: bytes.to_vec(),
-            })
-        );
-    }
-
-    #[test]
-    fn event_copy_survives_backing_buffer_mutation() {
-        let mut bytes = [1u8, 2, 3, 4];
-        let mut message = b"future payload".to_vec();
-        let raw = sys::mln_runtime_event {
-            size: mem::size_of::<sys::mln_runtime_event>() as u32,
-            type_: 999_001,
-            source_type: sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-            source: 0,
-            code: -7,
-            payload_type: 999_002,
-            payload: bytes.as_ptr().cast(),
-            payload_size: bytes.len(),
-            message: message.as_ptr().cast(),
-            message_size: message.len(),
+        let RuntimeEventPayload::Unknown(payload) = &event.payload else {
+            panic!("an undefined payload type should stay opaque");
         };
+        assert_eq!(payload.raw_type, 999_002);
+        // The window is the batch stride minus the payload's own offset, so it
+        // covers members a later version adds.
+        assert_eq!(payload.bytes.len(), stride - PAYLOAD_OFFSET);
+        assert_eq!(
+            &payload.bytes[..8],
+            &0x0102_0304_0506_0708_u64.to_ne_bytes()
+        );
 
-        let event = unsafe { runtime_event_from_native(&raw) }.unwrap();
-        bytes.fill(9);
-        message.fill(b'x');
-
+        // Spec coverage: BND-092. A copy is independent of the batch storage.
+        drop(batch);
         assert_eq!(event.message.as_deref(), Some("future payload"));
         assert_eq!(
-            event.payload,
-            RuntimeEventPayload::Unknown(UnknownRuntimeEventPayload {
-                raw_type: 999_002,
-                bytes: vec![1, 2, 3, 4],
-            })
+            &payload.bytes[..8],
+            &0x0102_0304_0506_0708_u64.to_ne_bytes()
         );
-    }
-
-    #[test]
-    fn typed_payload_copies_nested_text() {
-        let image_id = b"missing-image";
-        let payload = sys::mln_runtime_event_style_image_missing {
-            size: mem::size_of::<sys::mln_runtime_event_style_image_missing>() as u32,
-            image_id: image_id.as_ptr().cast(),
-            image_id_size: image_id.len(),
-        };
-        let raw = sys::mln_runtime_event {
-            size: mem::size_of::<sys::mln_runtime_event>() as u32,
-            type_: sys::MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING,
-            source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
-            source: 0,
-            code: 0,
-            payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING,
-            payload: ptr::addr_of!(payload).cast(),
-            payload_size: mem::size_of_val(&payload),
-            message: image_id.as_ptr().cast(),
-            message_size: image_id.len(),
-        };
-
-        let event = unsafe { runtime_event_from_native(&raw) }.unwrap();
-
-        assert_eq!(event.message.as_deref(), Some("missing-image"));
-        assert_eq!(
-            event.payload,
-            RuntimeEventPayload::StyleImageMissing(StyleImageMissingEvent {
-                image_id: "missing-image".to_owned(),
-            })
-        );
-    }
-
-    #[test]
-    // Spec coverage: BND-087.
-    fn payload_size_mismatch_is_rejected() {
-        let payload = sys::mln_runtime_event_render_map {
-            size: mem::size_of::<sys::mln_runtime_event_render_map>() as u32,
-            mode: sys::MLN_RENDER_MODE_FULL,
-        };
-        let raw = sys::mln_runtime_event {
-            size: mem::size_of::<sys::mln_runtime_event>() as u32,
-            type_: sys::MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED,
-            source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
-            source: 0,
-            code: 0,
-            payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP,
-            payload: ptr::addr_of!(payload).cast(),
-            payload_size: 1,
-            message: ptr::null(),
-            message_size: 0,
-        };
-
-        let Err(err) = (unsafe { runtime_event_from_native(&raw) }) else {
-            panic!("short typed event payload should fail");
-        };
-        assert!(err.to_string().contains("payload pointer and size"));
     }
 }

@@ -869,10 +869,13 @@ class MapHandleTest {
       map.requestStillImage()
 
       val finished = mutableListOf<Long>()
+      val cameraEventTypes = mutableListOf<RuntimeEventType>()
       var rounds = 0
       while (finished.isEmpty() && rounds < 10_000) {
         runtime.pump(0)
-        finished += drainCameraEvents(runtime).finishedTransitionIds
+        val events = drainCameraEvents(runtime)
+        finished += events.finishedTransitionIds
+        cameraEventTypes += events.cameraEventTypes
         rounds++
         runtime.pump(1)
       }
@@ -882,9 +885,18 @@ class MapHandleTest {
       // The transition reports its end once; later pumping adds nothing.
       repeat(100) {
         runtime.pump(0)
-        finished += drainCameraEvents(runtime).finishedTransitionIds
+        val events = drainCameraEvents(runtime)
+        finished += events.finishedTransitionIds
+        cameraEventTypes += events.cameraEventTypes
       }
       assertEquals(listOf(21L), finished)
+
+      // The transition reports its end ahead of the camera change that settles it.
+      val finishedIndex = cameraEventTypes.indexOf(RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED)
+      assertTrue(
+        cameraEventTypes.drop(finishedIndex + 1).contains(RuntimeEventType.MAP_CAMERA_DID_CHANGE),
+        "camera-did-change did not follow the transition: $cameraEventTypes",
+      )
     } finally {
       map.close()
       runtime.close()
@@ -900,20 +912,28 @@ class MapHandleTest {
   private class CameraEvents(
     val finishedTransitionIds: List<Long>,
     val lastChangeMode: CameraChangeMode?,
+    /** Camera event types in queue order, so a test can assert their order. */
+    val cameraEventTypes: List<RuntimeEventType>,
   )
 
   private fun drainCameraEvents(runtime: RuntimeHandle): CameraEvents {
     val finished = mutableListOf<Long>()
+    val types = mutableListOf<RuntimeEventType>()
     var lastChangeMode: CameraChangeMode? = null
-    while (true) {
-      val event = runtime.pollEvent() ?: return CameraEvents(finished, lastChangeMode)
+    for (event in runtime.drainEvents().events) {
       when (event.type) {
-        RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED ->
+        RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED -> {
           finished +=
             assertIs<RuntimeEventPayload.CameraTransitionFinished>(event.payload).transitionId
-        RuntimeEventType.MAP_CAMERA_DID_CHANGE -> lastChangeMode = CameraChangeMode(event.code)
+          types += event.type
+        }
+        RuntimeEventType.MAP_CAMERA_DID_CHANGE -> {
+          lastChangeMode = CameraChangeMode(event.code)
+          types += event.type
+        }
       }
     }
+    return CameraEvents(finished, lastChangeMode, types)
   }
 
   @Test

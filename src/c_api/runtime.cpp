@@ -15,6 +15,7 @@ auto mln_runtime_options_default(void) noexcept -> mln_runtime_options {
     .flags = 0,
     .asset_path = nullptr,
     .cache_path = nullptr,
+    .event_mask = MLN_RUNTIME_EVENT_MASK_ALL,
   };
 }
 
@@ -394,10 +395,37 @@ auto mln_wake_source_destroy(mln_wake_source source) noexcept -> void {
   mln::core::destroy_wake_source(source);
 }
 
-auto mln_runtime_poll_event(
-  mln_runtime runtime, mln_runtime_event* out_event, bool* out_has_event
+auto mln_runtime_event_batch_default(void) noexcept -> mln_runtime_event_batch {
+  return mln_runtime_event_batch{
+    .size = sizeof(mln_runtime_event_batch),
+    .event_size = 0,
+    .events = nullptr,
+    .event_count = 0,
+    .messages = nullptr,
+    .messages_size = 0,
+    .remaining_count = 0,
+  };
+}
+
+auto mln_runtime_drain_events(
+  mln_runtime runtime, size_t max_events, mln_runtime_event_batch* out_batch
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::poll_runtime_event(runtime, out_event, out_has_event);
+    return mln::core::drain_runtime_events(runtime, max_events, out_batch);
+  });
+}
+
+auto mln_runtime_set_event_mask(mln_runtime runtime, uint64_t mask) noexcept
+  -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::set_runtime_event_mask(runtime, mask);
+  });
+}
+
+auto mln_runtime_get_event_mask(
+  mln_runtime runtime, uint64_t* out_mask
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::get_runtime_event_mask(runtime, out_mask);
   });
 }

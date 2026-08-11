@@ -24,6 +24,7 @@ import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
+import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
@@ -57,6 +58,16 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
 
   public actual fun runtime(): RuntimeHandle = runtime
 
+  public actual var eventMask: RuntimeEventMask
+    get() {
+      NativeAccess.ensureLoaded()
+      return RuntimeEventMask(NativeAccess.mapEventMask(requireLiveHandle()))
+    }
+    set(value) {
+      NativeAccess.ensureLoaded()
+      NativeAccess.setMapEventMask(requireLiveHandle(), value.nativeValue)
+    }
+
   public actual fun setStyleUrl(url: String) {
     NativeAccess.ensureLoaded()
     NativeAccess.setMapStyleUrl(requireLiveHandle(), url)
@@ -65,7 +76,6 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   public actual fun setStyleJson(json: ByteArray) {
     NativeAccess.ensureLoaded()
     NativeAccess.setMapStyleJson(requireLiveHandle(), json)
-    clearCustomGeometrySources()
   }
 
   public actual fun loadedStyleJson(): ByteArray {
@@ -85,9 +95,7 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
 
   public actual fun removeStyleSource(sourceId: String): Boolean {
     NativeAccess.ensureLoaded()
-    val removed = NativeAccess.removeStyleSource(requireLiveHandle(), sourceId)
-    if (removed) closeCustomGeometrySource(sourceId)
-    return removed
+    return NativeAccess.removeStyleSource(requireLiveHandle(), sourceId)
   }
 
   public actual fun styleSourceExists(sourceId: String): Boolean {
@@ -143,8 +151,11 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     options: CustomGeometrySourceOptions,
   ) {
     NativeAccess.ensureLoaded()
-    val sourceState = CustomGeometrySourceState(options)
-    customGeometrySources.install(sourceId, sourceState) {
+    // The release callback captures the registry rather than this map, so a map a
+    // host leaks with a live source still reports as leaked.
+    val registry = customGeometrySources
+    val sourceState = CustomGeometrySourceState(options) { registry.remove(sourceId) }
+    registry.install(sourceId, sourceState) {
       NativeAccess.addCustomGeometrySource(requireLiveHandle(), sourceId, sourceState.descriptor())
       HandleLeakCleaner.retainNativeCallbackRoot(sourceState)
     }
@@ -793,7 +804,6 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     core.closeOnce(
       destroy = { NativeAccess.destroyMap(handle) },
       afterSuccess = {
-        clearCustomGeometrySources()
         runtime.unregisterMap(this)
         runtimeRetention.close()
       },
@@ -814,23 +824,11 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
     core.retainChild(childTypeName)
 
-  internal fun releaseDetachedCustomGeometrySources() {
-    customGeometrySources.releaseDetached { sourceId ->
-      styleSourceType(sourceId) == SourceType.CUSTOM_VECTOR
-    }
-  }
+  internal fun customGeometrySourceCountForTesting(): Int = customGeometrySources.size
 
   private fun requireLiveHandle(): NativeMap {
     core.requireLive()
     return handle
-  }
-
-  private fun closeCustomGeometrySource(sourceId: String) {
-    customGeometrySources.remove(sourceId)
-  }
-
-  private fun clearCustomGeometrySources() {
-    customGeometrySources.clear()
   }
 }
 

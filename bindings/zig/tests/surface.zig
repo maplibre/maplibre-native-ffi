@@ -6,19 +6,6 @@ const maplibre = @import("maplibre_native_ffi");
 const metal_support = @import("metal_support.zig");
 const support = @import("support.zig");
 
-fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
-    for (0..1000) |_| {
-        try runtime.pump(0);
-        while (try runtime.pollEvent(testing.allocator)) |event| {
-            var owned_event = event;
-            defer owned_event.deinit();
-            if (std.meta.eql(owned_event.event_type, event_type)) return true;
-        }
-        try std.Thread.yield();
-    }
-    return false;
-}
-
 fn nativePointer(ptr: *anyopaque) maplibre.NativePointer {
     return maplibre.NativePointer.fromPtr(ptr);
 }
@@ -44,7 +31,7 @@ test "Metal surface renders to window-attached layer through public binding" {
     defer surface.close() catch {};
 
     try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
+    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
     try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try surface.renderUpdate());
 }
 
@@ -69,7 +56,7 @@ test "Metal surface render acquires one drawable per frame through public bindin
     defer surface.close() catch {};
 
     try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
+    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
     try testing.expectEqual(@as(u32, 0), metal_support.nextDrawableCount(window_layer.layer.?));
     try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try surface.renderUpdate());
     try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(window_layer.layer.?));
@@ -98,7 +85,7 @@ test "Metal surface set target presents through a replacement layer" {
     defer surface.close() catch {};
 
     try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
+    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
     try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try surface.renderUpdate());
     try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(window_layer.layer.?));
 

@@ -26,7 +26,7 @@ internal unsafe delegate mln_status RuntimeTakeOfflineRegionStatusResult(
     mln_offline_region_status* outStatus
 );
 
-/// <summary>Owner-thread runtime handle for MapLibre Native work and event polling.</summary>
+/// <summary>Owner-thread runtime handle for MapLibre Native work and event draining.</summary>
 public sealed unsafe class RuntimeHandle : IDisposable
 {
     private static readonly RuntimeSetResourceProvider DefaultSetResourceProvider = static (
@@ -260,7 +260,8 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 &operationId
             )
         );
-        return OfflineOperation(
+        return new OfflineOperationHandle(
+            this,
             operationId,
             OfflineOperationKind.AmbientCache,
             OfflineOperationResultKind.None
@@ -282,7 +283,8 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 &operationId
             )
         );
-        return OfflineOperation(
+        return new OfflineOperationHandle(
+            this,
             operationId,
             OfflineOperationKind.SetMaximumAmbientCacheSize,
             OfflineOperationResultKind.None
@@ -311,7 +313,8 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 )
             );
         }
-        return OfflineOperation(
+        return new OfflineOperationHandle(
+            this,
             operationId,
             OfflineOperationKind.RegionCreate,
             OfflineOperationResultKind.Region
@@ -325,7 +328,8 @@ public sealed unsafe class RuntimeHandle : IDisposable
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_region_get_start(Handle, id, &operationId)
         );
-        return OfflineOperation(
+        return new OfflineOperationHandle(
+            this,
             operationId,
             OfflineOperationKind.RegionGet,
             OfflineOperationResultKind.OptionalRegion
@@ -339,7 +343,8 @@ public sealed unsafe class RuntimeHandle : IDisposable
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_regions_list_start(Handle, &operationId)
         );
-        return OfflineOperation(
+        return new OfflineOperationHandle(
+            this,
             operationId,
             OfflineOperationKind.RegionsList,
             OfflineOperationResultKind.RegionList
@@ -359,7 +364,8 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 &operationId
             )
         );
-        return OfflineOperation(
+        return new OfflineOperationHandle(
+            this,
             operationId,
             OfflineOperationKind.RegionsMergeDatabase,
             OfflineOperationResultKind.RegionList
@@ -383,7 +389,8 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 )
             );
         }
-        return OfflineOperation(
+        return new OfflineOperationHandle(
+            this,
             operationId,
             OfflineOperationKind.RegionUpdateMetadata,
             OfflineOperationResultKind.Region
@@ -397,7 +404,8 @@ public sealed unsafe class RuntimeHandle : IDisposable
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_region_get_status_start(Handle, id, &operationId)
         );
-        return OfflineOperation(
+        return new OfflineOperationHandle(
+            this,
             operationId,
             OfflineOperationKind.RegionGetStatus,
             OfflineOperationResultKind.RegionStatus
@@ -416,7 +424,8 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 &operationId
             )
         );
-        return OfflineOperation(
+        return new OfflineOperationHandle(
+            this,
             operationId,
             OfflineOperationKind.RegionSetObserved,
             OfflineOperationResultKind.None
@@ -438,7 +447,8 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 &operationId
             )
         );
-        return OfflineOperation(
+        return new OfflineOperationHandle(
+            this,
             operationId,
             OfflineOperationKind.RegionSetDownloadState,
             OfflineOperationResultKind.None
@@ -452,7 +462,8 @@ public sealed unsafe class RuntimeHandle : IDisposable
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_region_invalidate_start(Handle, id, &operationId)
         );
-        return OfflineOperation(
+        return new OfflineOperationHandle(
+            this,
             operationId,
             OfflineOperationKind.RegionInvalidate,
             OfflineOperationResultKind.None
@@ -466,7 +477,8 @@ public sealed unsafe class RuntimeHandle : IDisposable
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_region_delete_start(Handle, id, &operationId)
         );
-        return OfflineOperation(
+        return new OfflineOperationHandle(
+            this,
             operationId,
             OfflineOperationKind.RegionDelete,
             OfflineOperationResultKind.None
@@ -619,12 +631,6 @@ public sealed unsafe class RuntimeHandle : IDisposable
         operation.MarkConsumed();
     }
 
-    private OfflineOperationHandle OfflineOperation(
-        ulong operationId,
-        OfflineOperationKind kind,
-        OfflineOperationResultKind resultKind
-    ) => new(this, operationId, kind, resultKind);
-
     internal void RegisterMap(Map.MapHandle map)
     {
         ArgumentNullException.ThrowIfNull(map);
@@ -643,35 +649,34 @@ public sealed unsafe class RuntimeHandle : IDisposable
         }
     }
 
-    private Map.MapHandle? MapFor(ulong id)
+    // Callers hold mapGate across a whole batch, so a drain takes the registry lock once
+    // however many map-sourced events it carries.
+    private Map.MapHandle? MapForLocked(ulong id)
     {
         if (id == 0)
         {
             return null;
         }
 
-        lock (mapGate)
+        if (!liveMaps.TryGetValue(id, out var reference))
         {
-            if (!liveMaps.TryGetValue(id, out var reference))
-            {
-                return null;
-            }
-
-            if (reference.TryGetTarget(out var map))
-            {
-                return map;
-            }
-
-            liveMaps.Remove(id);
             return null;
         }
+
+        if (reference.TryGetTarget(out var map))
+        {
+            return map;
+        }
+
+        liveMaps.Remove(id);
+        return null;
     }
 
     /// <summary>Advances this runtime.</summary>
     /// <remarks>
     /// The call parks the owner thread when <paramref name="timeout" /> allows it,
     /// then drains the owner-thread task queues. Drain the queued runtime events
-    /// with <see cref="PollEvent" /> afterwards.
+    /// with <see cref="DrainEvents()" /> afterwards.
     /// <para>
     /// <see cref="TimeSpan.Zero" /> drains and returns, a positive value parks for
     /// up to that long, and a negative value parks until a wake arrives. Timers and
@@ -680,7 +685,8 @@ public sealed unsafe class RuntimeHandle : IDisposable
     /// </para>
     /// <para>
     /// A non-zero timeout blocks the calling thread. Call it outside any lock that a
-    /// thread signalling a <see cref="WakeSource" /> takes.
+    /// thread signalling a <see cref="WakeSource" /> takes. A queued event releases a
+    /// park, so a host that pumps and drains in a loop keeps making progress.
     /// </para>
     /// </remarks>
     public void Pump(TimeSpan timeout)
@@ -700,33 +706,65 @@ public sealed unsafe class RuntimeHandle : IDisposable
         return new WakeSource(source);
     }
 
-    /// <summary>
-    /// Polls and copies the next runtime event, when one is queued, and returns
-    /// <see langword="null" /> when the queue is empty.
-    /// </summary>
+    /// <summary>Drains every queued runtime event into one batch of copies.</summary>
     /// <remarks>
-    /// Polling also advances binding-owned state: a
-    /// <see cref="RuntimeEventType.MapStyleLoaded" /> event with a resolvable
-    /// <see cref="RuntimeEvent.MapSource" /> closes the upcall stubs for custom
-    /// geometry sources the new style dropped. Drain the queue to keep dropped
-    /// sources from lingering.
+    /// The batch reports the events this runtime and its maps queued under the masks they select,
+    /// in queue order, as managed copies of the borrowed native records.
     /// </remarks>
-    public RuntimeEvent? PollEvent()
+    public RuntimeEventBatch DrainEvents() => Drain(0);
+
+    /// <summary>Drains at most <paramref name="maxEvents" /> queued runtime events.</summary>
+    /// <remarks>
+    /// Zero drains every queued event. A positive value drains at most that many and reports how
+    /// many stayed queued in <see cref="RuntimeEventBatch.RemainingCount" />, so a host that takes
+    /// a bounded slice per iteration learns to come back.
+    /// </remarks>
+    public RuntimeEventBatch DrainEvents(int maxEvents)
     {
-        var raw = RuntimeStructs.EmptyNativeEvent();
-        var hasEvent = false;
-        NativeStatus.Check(NativeMethods.mln_runtime_poll_event(Handle, &raw, &hasEvent));
-        if (!hasEvent)
+        ArgumentOutOfRangeException.ThrowIfNegative(maxEvents);
+        return Drain((nuint)maxEvents);
+    }
+
+    /// <summary>Selects which runtime-originated event types this runtime queues.</summary>
+    /// <remarks>
+    /// The mask reads the bits in <see cref="RuntimeEventMask.AllRuntimeEvents" /> and ignores the
+    /// rest, so <see cref="RuntimeEventMask.All" /> selects every runtime-originated type. An event
+    /// type this mask clears is never queued, so it neither reaches a batch nor wakes a parked
+    /// <see cref="Pump" />.
+    /// </remarks>
+    public void SetEventMask(RuntimeEventMask mask)
+    {
+        NativeStatus.Check(NativeMethods.mln_runtime_set_event_mask(Handle, (ulong)mask));
+    }
+
+    /// <summary>Reports which runtime-originated event types this runtime queues.</summary>
+    /// <remarks>
+    /// The value is the mask last set, including bits outside
+    /// <see cref="RuntimeEventMask.AllRuntimeEvents" /> that this runtime ignores. A runtime created
+    /// with the default <see cref="RuntimeOptions.EventMask" /> reports every event type this
+    /// library selects by default, including any this binding does not declare.
+    /// </remarks>
+    public RuntimeEventMask GetEventMask()
+    {
+        ulong mask = 0;
+        NativeStatus.Check(NativeMethods.mln_runtime_get_event_mask(Handle, &mask));
+        return (RuntimeEventMask)mask;
+    }
+
+    private RuntimeEventBatch Drain(nuint maxEvents)
+    {
+        var batch = NativeMethods.mln_runtime_event_batch_default();
+        NativeStatus.Check(NativeMethods.mln_runtime_drain_events(Handle, maxEvents, &batch));
+
+        // The batch borrows native storage that the next drain reuses, so every event is read
+        // into managed objects before this returns.
+        List<RuntimeEvent> events;
+        lock (mapGate)
         {
-            return null;
+            events = RuntimeStructs.ReadBatch(batch, this, MapForLocked);
         }
 
-        var runtimeEvent = RuntimeStructs.ReadEvent(raw, this, MapFor);
-        if (runtimeEvent.Type == RuntimeEventType.MapStyleLoaded)
-        {
-            runtimeEvent.MapSource?.ReleaseDetachedCustomGeometrySources();
-        }
-        return runtimeEvent;
+        return new RuntimeEventBatch(events, (ulong)batch.remaining_count);
     }
 
     /// <summary>Destroys the runtime on its owner thread.</summary>

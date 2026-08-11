@@ -28,7 +28,7 @@ class CustomGeometrySourceStateTest : org.maplibre.nativeffi.NativeTestBase() {
             }
           }
         )
-      )
+      ) {}
     val tile =
       cValue<mln_canonical_tile_id> {
         z = 1U
@@ -62,7 +62,7 @@ class CustomGeometrySourceStateTest : org.maplibre.nativeffi.NativeTestBase() {
             }
           }
         )
-      )
+      ) {}
     val tile =
       cValue<mln_canonical_tile_id> {
         z = 4U

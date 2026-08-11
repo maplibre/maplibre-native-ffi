@@ -526,12 +526,10 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      let removed = try NativeStyle.removeSource(
+      return try NativeStyle.removeSource(
         requireLiveHandle(),
         sourceId: arena.view(sourceId)
       )
-      if removed { removeCustomGeometrySourceCallbacks(sourceId: sourceId) }
-      return removed
     }
   }
 
@@ -782,6 +780,13 @@ public extension MapHandle {
     )
   }
 
+  /// Adds a custom geometry source, whose tile callbacks run on native worker
+  /// threads.
+  ///
+  /// The source's callbacks stay alive until the C API stops referencing them,
+  /// which is when the source is removed, when a style load drops it, or when
+  /// the map is destroyed. The C API then releases them, waiting for any tile
+  /// callback still running, so a closure is never entered afterwards.
   func addCustomGeometrySource(
     sourceId: String,
     options: CustomGeometrySourceOptions
@@ -800,18 +805,24 @@ public extension MapHandle {
       fetchTile: fetchTile,
       cancelTile: cancelTile
     )
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      try options.nativeOptions(callbacks: callbacks)
-        .withNativeOptions { nativeOptions in
-          try checkStatus(mln_map_add_custom_geometry_source(
-            requireLiveHandle().raw,
-            arena.view(sourceId),
-            nativeOptions
-          ))
-        }
-      storeCustomGeometrySourceCallbacks(callbacks, sourceId: sourceId)
+    do {
+      try mapNativeFailure {
+        let arena = NativeInputArena()
+        defer { withExtendedLifetime(arena) {} }
+        try options.nativeOptions(callbacks: callbacks)
+          .withNativeOptions { nativeOptions in
+            try checkStatus(mln_map_add_custom_geometry_source(
+              requireLiveHandle().raw,
+              arena.view(sourceId),
+              nativeOptions
+            ))
+          }
+      }
+    } catch {
+      // A rejected add is the one case the C API never releases, because it
+      // never took the callbacks on.
+      callbacks.release()
+      throw error
     }
   }
 

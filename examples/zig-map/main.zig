@@ -57,7 +57,7 @@ fn runtimeLoopBody(args: RuntimeLoopArgs, state: *map_state.MapState) !void {
     while (!args.map_channel.shutdownRequested() and args.map_channel.failureValue() == null) {
         try state.applyCommands(args.commands, &batch);
         try state.runtime.pump(park_timeout_milliseconds);
-        if (try map_state.drainEvents(args.allocator, &state.runtime, &state.map)) {
+        if (try map_state.drainEvents(&state.runtime, &state.map)) {
             args.render_request.set();
         }
     }

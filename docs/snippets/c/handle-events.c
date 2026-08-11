@@ -1,5 +1,5 @@
-// Draining the runtime's event queue: matching an event to its source and
-// reading a typed payload safely.
+// Draining the runtime's event queue: selecting the event types a host reads,
+// matching an event to its source, and reading a typed payload.
 
 #include <maplibre_native_c.h>
 
@@ -10,36 +10,42 @@ typedef struct map_observer {
   bool load_failed;
 } map_observer;
 
+// #region subscribe
+mln_status select_map_events(mln_map map) {
+  return mln_map_set_event_mask(
+    map, MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED |
+           MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED |
+           MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE |
+           MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED
+  );
+}
+// #endregion subscribe
+
 static bool asks_for_a_repaint(const mln_runtime_event* event) {
   // #region payload
-  // Check the payload's type and size before reading it. A runtime built from
-  // a newer header can carry a longer payload than this host was compiled for.
   if (event->payload_type != MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME) {
     return false;
   }
-  if (event->payload_size < sizeof(mln_runtime_event_render_frame)) {
-    return false;
-  }
-
-  const mln_runtime_event_render_frame* frame = event->payload;
-  return frame->needs_repaint;
+  return event->payload.render_frame.needs_repaint;
   // #endregion payload
 }
 
 void drain_events(mln_runtime runtime, map_observer* observer) {
   // #region drain
-  mln_runtime_event event = {.size = sizeof(event)};
-  bool has_event = false;
+  mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+  if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) return;
 
-  while (mln_runtime_poll_event(runtime, &event, &has_event) == MLN_STATUS_OK &&
-         has_event) {
+  for (size_t index = 0; index < batch.event_count; index++) {
+    const char* bytes = (const char*)batch.events + index * batch.event_size;
+    const mln_runtime_event* event = (const mln_runtime_event*)bytes;
+
     // #region match
     // One runtime serves every map under it, and they share this queue.
-    if (event.source_type != MLN_RUNTIME_EVENT_SOURCE_MAP) continue;
-    if (event.source != observer->map) continue;
+    if (event->source_type != MLN_RUNTIME_EVENT_SOURCE_MAP) continue;
+    if (event->source != observer->map) continue;
     // #endregion match
 
-    switch (event.type) {
+    switch (event->type) {
       case MLN_RUNTIME_EVENT_MAP_STYLE_LOADED:
         observer->style_ready = true;
         break;
@@ -47,7 +53,7 @@ void drain_events(mln_runtime runtime, map_observer* observer) {
         observer->render_pending = true;
         break;
       case MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED:
-        if (asks_for_a_repaint(&event)) observer->render_pending = true;
+        if (asks_for_a_repaint(event)) observer->render_pending = true;
         break;
       case MLN_RUNTIME_EVENT_MAP_LOADING_FAILED:
         observer->load_failed = true;

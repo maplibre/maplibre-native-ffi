@@ -12,7 +12,7 @@ import (
 func TestRuntimeCreateWithOptions(t *testing.T) {
 	lockOSThreadForTest(t)
 
-	runtime, err := NewRuntimeWithOptions(RuntimeOptions{CachePath: ":memory:"})
+	runtime, err := NewRuntimeWithOptions(NewRuntimeOptions("", ":memory:"))
 	if err != nil {
 		t.Fatalf("NewRuntimeWithOptions(): %v", err)
 	}
@@ -22,7 +22,7 @@ func TestRuntimeCreateWithOptions(t *testing.T) {
 }
 
 func TestRuntimeOptionsRejectEmbeddedNUL(t *testing.T) {
-	_, err := NewRuntimeWithOptions(RuntimeOptions{AssetPath: "asset\x00root"})
+	_, err := NewRuntimeWithOptions(NewRuntimeOptions("asset\x00root", ""))
 	if !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("NewRuntimeWithOptions embedded NUL error = %v, want ErrInvalidArgument", err)
 	}
@@ -115,10 +115,10 @@ func TestRuntimeCreatePumpAndClose(t *testing.T) {
 	if err := runtime.Pump(0); err != nil {
 		t.Fatalf("Pump(): %v", err)
 	}
-	if event, err := runtime.PollEvent(); err != nil {
-		t.Fatalf("PollEvent(): %v", err)
-	} else if event != nil && event.PayloadSize > 0 && event.PayloadType == RuntimeEventPayloadNone {
-		t.Fatalf("PollEvent() payload metadata inconsistent: %#v", event)
+	if batch, err := runtime.DrainEvents(0); err != nil {
+		t.Fatalf("DrainEvents(): %v", err)
+	} else if batch.RemainingCount != 0 {
+		t.Fatalf("DrainEvents(0) left %d events queued", batch.RemainingCount)
 	}
 	if err := runtime.Close(); err != nil {
 		t.Fatalf("Close(): %v", err)
@@ -157,32 +157,6 @@ func TestRuntimeCloseWrongThreadLeavesHandleRetryable(t *testing.T) {
 	}
 }
 
-// quiesce pumps until the runtime is idle, so a park that follows is released by
-// the signal the test raises.
-func quiesce(t *testing.T, runtime *RuntimeHandle) {
-	t.Helper()
-	for i := 0; i < 100; i++ {
-		if err := runtime.Pump(0); err != nil {
-			t.Fatalf("Pump(): %v", err)
-		}
-		drained := false
-		for {
-			event, err := runtime.PollEvent()
-			if err != nil {
-				t.Fatalf("PollEvent(): %v", err)
-			}
-			if event == nil {
-				break
-			}
-			drained = true
-		}
-		if !drained {
-			return
-		}
-	}
-	t.Fatal("the runtime kept producing events while idle")
-}
-
 func TestRuntimePumpWakesForNativeWorkAndForAWakeSource(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -194,7 +168,7 @@ func TestRuntimePumpWakesForNativeWorkAndForAWakeSource(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewMap(): %v", err)
 	}
-	quiesce(t, runtime)
+	drainAllRuntimeEvents(t, runtime)
 
 	// Native reports the malformed style from its own threads; the failure has
 	// to reach the parked owner thread.
@@ -210,14 +184,11 @@ func TestRuntimePumpWakesForNativeWorkAndForAWakeSource(t *testing.T) {
 		if time.Since(loadStarted) > 5*time.Second {
 			t.Fatal("parks sat out their timeouts while the style load was pending")
 		}
-		for {
-			event, err := runtime.PollEvent()
-			if err != nil {
-				t.Fatalf("PollEvent(): %v", err)
-			}
-			if event == nil {
-				break
-			}
+		batch, err := runtime.DrainEvents(0)
+		if err != nil {
+			t.Fatalf("DrainEvents(): %v", err)
+		}
+		for _, event := range batch.Events {
 			if event.Type == RuntimeEventMapLoadingFailed {
 				loadingFailed = true
 			}
@@ -236,7 +207,7 @@ func TestRuntimePumpWakesForNativeWorkAndForAWakeSource(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WakeSource(): %v", err)
 	}
-	quiesce(t, runtime)
+	drainAllRuntimeEvents(t, runtime)
 	signalErr := make(chan error, 1)
 	go func() {
 		time.Sleep(20 * time.Millisecond)
@@ -286,7 +257,7 @@ func TestRuntimePumpConsumesOneLatchedSignal(t *testing.T) {
 		t.Fatalf("WakeSource(): %v", err)
 	}
 	defer source.Close()
-	quiesce(t, runtime)
+	drainAllRuntimeEvents(t, runtime)
 
 	if err := source.Signal(); err != nil {
 		t.Fatalf("Signal(): %v", err)

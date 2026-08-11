@@ -122,6 +122,62 @@ func TestOfflineRegionStartOperationsReturnTypedHandles(t *testing.T) {
 	requireDiscardOfflineOperation(t, deleteOperation, OfflineOperationRegionDelete, OfflineOperationResultNone)
 }
 
+func TestRuntimeOptionsEventMaskSuppressesCompletionEventsNotResults(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	options := NewRuntimeOptions("", ":memory:")
+	options.EventMask = RuntimeEventMaskAll &^ RuntimeEventMaskOfflineOperationCompleted
+	runtime, err := NewRuntimeWithOptions(options)
+	if err != nil {
+		t.Fatalf("NewRuntimeWithOptions(): %v", err)
+	}
+	defer func() {
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Close(): %v", err)
+		}
+	}()
+
+	if got, err := runtime.EventMask(); err != nil || got != options.EventMask {
+		t.Fatalf("EventMask() = (%#x, %v), want %#x", uint64(got), err, uint64(options.EventMask))
+	}
+
+	// An operation records its result before the mask is consulted, so the
+	// take-result call still reports it while the event stays out of the queue.
+	operation, err := runtime.StartOfflineRegions()
+	if err != nil {
+		t.Fatalf("StartOfflineRegions(): %v", err)
+	}
+	var completions int
+	took := false
+	for range make([]struct{}, 5000) {
+		if err := runtime.Pump(0); err != nil {
+			t.Fatalf("Pump(): %v", err)
+		}
+		batch, err := runtime.DrainEvents(0)
+		if err != nil {
+			t.Fatalf("DrainEvents(): %v", err)
+		}
+		for _, event := range batch.Events {
+			if event.Type == RuntimeEventOfflineOperationCompleted {
+				completions++
+			}
+		}
+		if _, err := operation.Take(); err == nil {
+			took = true
+			break
+		} else if !errors.Is(err, ErrInvalidState) {
+			t.Fatalf("Take(): %v", err)
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if !took {
+		t.Fatal("the offline operation never reported a result")
+	}
+	if completions != 0 {
+		t.Fatalf("drained %d offline completion events, want none", completions)
+	}
+}
+
 func waitTakeOfflineOperation[T any](t *testing.T, runtime *RuntimeHandle, operation *OfflineOperationHandle[T]) T {
 	t.Helper()
 	for range make([]struct{}, 5000) {
@@ -211,28 +267,24 @@ func TestOfflineOperationCompletedEventCopiesPayload(t *testing.T) {
 		if err := runtime.Pump(0); err != nil {
 			t.Fatalf("Pump(): %v", err)
 		}
-		event, err := runtime.PollEvent()
+		batch, err := runtime.DrainEvents(0)
 		if err != nil {
-			t.Fatalf("PollEvent(): %v", err)
+			t.Fatalf("DrainEvents(): %v", err)
 		}
-		if event == nil {
-			time.Sleep(time.Millisecond)
-			continue
+		for _, event := range batch.Events {
+			payload, ok := event.Payload.(RuntimeEventOfflineOperationCompletedPayload)
+			if !ok || payload.OperationID != operation.ID() {
+				continue
+			}
+			if payload.OperationKind != OfflineOperationRegionsList || payload.ResultKind != OfflineOperationResultRegionList || payload.ResultStatus != 0 {
+				t.Fatalf("payload = %#v", payload)
+			}
+			if err := operation.Discard(); err != nil {
+				t.Fatalf("Discard(): %v", err)
+			}
+			return
 		}
-		payload, ok := event.Payload.(RuntimeEventOfflineOperationCompletedPayload)
-		if !ok {
-			continue
-		}
-		if payload.OperationID != operation.ID() {
-			continue
-		}
-		if payload.OperationKind != OfflineOperationRegionsList || payload.ResultKind != OfflineOperationResultRegionList || payload.ResultStatus != 0 {
-			t.Fatalf("payload = %#v", payload)
-		}
-		if err := operation.Discard(); err != nil {
-			t.Fatalf("Discard(): %v", err)
-		}
-		return
+		time.Sleep(time.Millisecond)
 	}
 	t.Fatal("offline completion event was not reported")
 }
@@ -241,7 +293,7 @@ func TestSetMaximumAmbientCacheSizeReportsCompletion(t *testing.T) {
 	stdruntime.LockOSThread()
 	defer stdruntime.UnlockOSThread()
 
-	runtime, err := NewRuntimeWithOptions(RuntimeOptions{CachePath: ":memory:"})
+	runtime, err := NewRuntimeWithOptions(NewRuntimeOptions("", ":memory:"))
 	if err != nil {
 		t.Fatalf("NewRuntimeWithOptions(): %v", err)
 	}
@@ -259,25 +311,24 @@ func TestSetMaximumAmbientCacheSizeReportsCompletion(t *testing.T) {
 		if err := runtime.Pump(0); err != nil {
 			t.Fatalf("Pump(): %v", err)
 		}
-		event, err := runtime.PollEvent()
+		batch, err := runtime.DrainEvents(0)
 		if err != nil {
-			t.Fatalf("PollEvent(): %v", err)
+			t.Fatalf("DrainEvents(): %v", err)
 		}
-		if event == nil {
-			time.Sleep(time.Millisecond)
-			continue
+		for _, event := range batch.Events {
+			payload, ok := event.Payload.(RuntimeEventOfflineOperationCompletedPayload)
+			if !ok || payload.OperationID != operation.ID() {
+				continue
+			}
+			if payload.OperationKind != OfflineOperationSetMaximumAmbientCacheSize || payload.ResultKind != OfflineOperationResultNone || payload.ResultStatus != 0 {
+				t.Fatalf("payload = %#v", payload)
+			}
+			if err := operation.Discard(); err != nil {
+				t.Fatalf("Discard(): %v", err)
+			}
+			return
 		}
-		payload, ok := event.Payload.(RuntimeEventOfflineOperationCompletedPayload)
-		if !ok || payload.OperationID != operation.ID() {
-			continue
-		}
-		if payload.OperationKind != OfflineOperationSetMaximumAmbientCacheSize || payload.ResultKind != OfflineOperationResultNone || payload.ResultStatus != 0 {
-			t.Fatalf("payload = %#v", payload)
-		}
-		if err := operation.Discard(); err != nil {
-			t.Fatalf("Discard(): %v", err)
-		}
-		return
+		time.Sleep(time.Millisecond)
 	}
 	t.Fatal("maximum ambient cache size completion event was not reported")
 }

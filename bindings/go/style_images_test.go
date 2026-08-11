@@ -3,27 +3,7 @@ package maplibre
 import (
 	"errors"
 	"testing"
-	"time"
 )
-
-func waitForRuntimeEvent(t *testing.T, runtime *RuntimeHandle, eventType RuntimeEventType) *RuntimeEvent {
-	t.Helper()
-	for range make([]struct{}, 5000) {
-		if err := runtime.Pump(0); err != nil {
-			t.Fatalf("Pump(): %v", err)
-		}
-		event, err := runtime.PollEvent()
-		if err != nil {
-			t.Fatalf("PollEvent(): %v", err)
-		}
-		if event != nil && event.Type == eventType {
-			return event
-		}
-		time.Sleep(time.Millisecond)
-	}
-	t.Fatalf("timed out waiting for runtime event %v", eventType)
-	return nil
-}
 
 func TestNinePatchStyleImageRoundTripsStretchContentAndTextFit(t *testing.T) {
 	lockOSThreadForTest(t)

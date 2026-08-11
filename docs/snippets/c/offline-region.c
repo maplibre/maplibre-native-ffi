@@ -13,19 +13,19 @@ static mln_status await_operation(
   for (;;) {
     mln_runtime_pump(runtime, 100);
 
-    mln_runtime_event event = {.size = sizeof(event)};
-    bool has_event = false;
-    while (mln_runtime_poll_event(runtime, &event, &has_event) ==
-             MLN_STATUS_OK &&
-           has_event) {
-      if (
-        event.payload_type !=
-        MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED
-      ) {
+    mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+    if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
+      return MLN_STATUS_NATIVE_ERROR;
+    }
+
+    for (size_t index = 0; index < batch.event_count; index++) {
+      const char* bytes = (const char*)batch.events + index * batch.event_size;
+      const mln_runtime_event* event = (const mln_runtime_event*)bytes;
+      if (event->type != MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED) {
         continue;
       }
       const mln_runtime_event_offline_operation_completed* completed =
-        event.payload;
+        &event->payload.offline_operation_completed;
       if (completed->operation_id == operation_id) {
         return (mln_status)completed->result_status;
       }
@@ -46,6 +46,13 @@ static mln_status finish_operation(
 mln_offline_region_id download_region(
   mln_runtime runtime, mln_lat_lng_bounds bounds, const char* metadata
 ) {
+  // The wait below ends on the completion event, so the subscription has to
+  // select that type.
+  mln_runtime_set_event_mask(
+    runtime, MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED |
+               MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED
+  );
+
   // #region define
   mln_offline_tile_pyramid_region_definition pyramid = {
     .size = sizeof(pyramid),
@@ -126,14 +133,12 @@ bool region_progress(
   const mln_runtime_event* event, mln_offline_region_id region_id,
   double* out_fraction
 ) {
-  if (
-    event->type != MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED ||
-    event->payload_type != MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS
-  ) {
+  if (event->type != MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED) {
     return false;
   }
   // #region progress
-  const mln_runtime_event_offline_region_status* progress = event->payload;
+  const mln_runtime_event_offline_region_status* progress =
+    &event->payload.offline_region_status;
   if (progress->region_id != region_id) return false;
 
   // Treat the fraction as an estimate until the required count is precise.

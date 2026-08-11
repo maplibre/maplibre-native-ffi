@@ -2319,14 +2319,16 @@ fn pick_vulkan_physical_device(
     Err("no Vulkan physical device with a graphics queue was found".into())
 }
 
-fn wait_for_runtime_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
+fn wait_for_runtime_event(runtime: &mut RuntimeHandle, event_type: RuntimeEventType) -> bool {
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
         let _ = runtime.pump(Some(Duration::ZERO));
-        while let Ok(Some(event)) = runtime.poll_event() {
-            if event.event_type == event_type {
-                return true;
-            }
+        let found = runtime
+            .drain_events(0)
+            .map(|batch| batch.iter().any(|event| event.event_type() == event_type))
+            .unwrap_or(false);
+        if found {
+            return true;
         }
         std::thread::sleep(Duration::from_millis(10));
     }
@@ -2340,7 +2342,7 @@ fn static_map_options(width: u32, height: u32, scale_factor: f64) -> MapOptions 
 }
 
 fn load_feature_state_style(
-    runtime: &RuntimeHandle,
+    runtime: &mut RuntimeHandle,
     map: &MapHandle,
     session: &RenderSessionHandle,
 ) {
@@ -2353,7 +2355,7 @@ fn load_feature_state_style(
     assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
 }
 
-fn load_query_style(runtime: &RuntimeHandle, map: &MapHandle, session: &RenderSessionHandle) {
+fn load_query_style(runtime: &mut RuntimeHandle, map: &MapHandle, session: &RenderSessionHandle) {
     let mut camera = CameraOptions::default();
     camera.center = Some(LatLng::new(37.7749, -122.4194));
     camera.zoom = Some(10.0);
@@ -2372,7 +2374,7 @@ fn cluster_point(latitude: f64, longitude: f64, name: &str, weight: u64) -> Json
 
 /// Builds the clustered source through the GeoJSON data adder so the render
 /// tests exercise `GeoJsonSourceOptions`.
-fn load_cluster_style(runtime: &RuntimeHandle, map: &MapHandle, session: &RenderSessionHandle) {
+fn load_cluster_style(runtime: &mut RuntimeHandle, map: &MapHandle, session: &RenderSessionHandle) {
     let mut camera = CameraOptions::default();
     camera.center = Some(LatLng::new(0.0, 0.0));
     camera.zoom = Some(0.0);
@@ -2416,7 +2418,11 @@ fn numeric_member(value: &JsonValue, key: &str) -> Option<f64> {
     json_member(value, key)?.as_f64()
 }
 
-fn render_available_updates(runtime: &RuntimeHandle, session: &RenderSessionHandle, count: usize) {
+fn render_available_updates(
+    runtime: &mut RuntimeHandle,
+    session: &RenderSessionHandle,
+    count: usize,
+) {
     for _ in 0..count {
         if wait_for_runtime_event(runtime, RuntimeEventType::MapRenderUpdateAvailable) {
             let _ = session.render_update();
@@ -2424,20 +2430,24 @@ fn render_available_updates(runtime: &RuntimeHandle, session: &RenderSessionHand
     }
 }
 
-fn render_pending_updates(runtime: &RuntimeHandle, session: &RenderSessionHandle) {
+fn render_pending_updates(runtime: &mut RuntimeHandle, session: &RenderSessionHandle) {
     let _ = runtime.pump(Some(Duration::ZERO));
-    for _ in 0..100 {
-        let Ok(Some(event)) = runtime.poll_event() else {
-            return;
-        };
-        if event.event_type == RuntimeEventType::MapRenderUpdateAvailable {
-            let _ = session.render_update();
-        }
+    let updates = runtime
+        .drain_events(0)
+        .map(|batch| {
+            batch
+                .iter()
+                .filter(|event| event.event_type() == RuntimeEventType::MapRenderUpdateAvailable)
+                .count()
+        })
+        .unwrap_or(0);
+    for _ in 0..updates {
+        let _ = session.render_update();
     }
 }
 
 fn wait_for_rendered_feature(
-    runtime: &RuntimeHandle,
+    runtime: &mut RuntimeHandle,
     session: &RenderSessionHandle,
     geometry: &RenderedQueryGeometry,
     options: &RenderedFeatureQueryOptions,
@@ -2461,7 +2471,7 @@ fn wait_for_rendered_feature(
 }
 
 fn wait_for_source_feature(
-    runtime: &RuntimeHandle,
+    runtime: &mut RuntimeHandle,
     session: &RenderSessionHandle,
     source_id: &str,
     options: &SourceFeatureQueryOptions,
@@ -2566,7 +2576,7 @@ fn opengl_owned_texture_session_attaches_with_platform_context() {
     if !has_opengl_test_context_backend() {
         return;
     }
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
     let (_context, session) = create_opengl_owned_texture_session(
         &map.attach_ref().unwrap(),
@@ -2582,7 +2592,7 @@ fn opengl_owned_texture_session_attaches_with_platform_context() {
 
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     assert!(wait_for_runtime_event(
-        &runtime,
+        &mut runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
     assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
@@ -2638,7 +2648,7 @@ fn opengl_surface_session_renders_with_platform_context() {
     if !has_opengl_surface_test_backend() {
         return;
     }
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
 
     let (_context, session) = create_opengl_surface_session(
@@ -2649,7 +2659,7 @@ fn opengl_surface_session_renders_with_platform_context() {
 
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     assert!(wait_for_runtime_event(
-        &runtime,
+        &mut runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
     assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
@@ -2722,7 +2732,7 @@ fn webgpu_surface_session_renders_and_presents_through_a_canvas() {
     if !crate::supported_render_backends().contains(RenderBackendMask::WEBGPU) {
         return;
     }
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(128, 128, 1.0)).unwrap();
     let context = WebGpuTestContext::new().expect("a browser build reaches a WebGPU device");
     let surface = WebGpuTestSurface::new(&context, 128, 128)
@@ -2736,7 +2746,7 @@ fn webgpu_surface_session_renders_and_presents_through_a_canvas() {
 
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     assert!(wait_for_runtime_event(
-        &runtime,
+        &mut runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
     // A frame reported rendered means the surface gave up its texture and took
@@ -2764,7 +2774,7 @@ fn webgpu_surface_session_renders_and_presents_through_a_canvas() {
     map.set_style_json(CLUSTER_BASE_STYLE_JSON.as_bytes())
         .unwrap();
     assert!(wait_for_runtime_event(
-        &runtime,
+        &mut runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
     assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
@@ -2786,7 +2796,7 @@ fn webgpu_surface_session_renders_and_presents_through_a_canvas() {
         .expect("a replacement naming the same device and format is accepted");
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     assert!(wait_for_runtime_event(
-        &runtime,
+        &mut runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
     assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
@@ -2803,7 +2813,7 @@ fn webgpu_borrowed_texture_session_renders_into_a_host_texture() {
     if !crate::supported_render_backends().contains(RenderBackendMask::WEBGPU) {
         return;
     }
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(128, 128, 1.0)).unwrap();
 
     let (context, texture, session) = create_webgpu_borrowed_texture_session(
@@ -2814,7 +2824,7 @@ fn webgpu_borrowed_texture_session_renders_into_a_host_texture() {
 
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     assert!(wait_for_runtime_event(
-        &runtime,
+        &mut runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
     assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
@@ -2851,7 +2861,7 @@ fn opengl_borrowed_texture_session_renders_with_platform_context() {
     if !has_opengl_test_context_backend() {
         return;
     }
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(128, 128, 1.0)).unwrap();
 
     let (texture, session) = create_opengl_borrowed_texture_session(
@@ -2862,7 +2872,7 @@ fn opengl_borrowed_texture_session_renders_with_platform_context() {
 
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     assert!(wait_for_runtime_event(
-        &runtime,
+        &mut runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
     assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
@@ -2886,7 +2896,7 @@ fn set_target_hands_a_live_session_a_new_borrowed_texture() {
     if !has_opengl_test_context_backend() {
         return;
     }
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(128, 128, 1.0)).unwrap();
 
     let initial_extent = RenderTargetExtent::new(128, 128, 1.0);
@@ -2896,7 +2906,7 @@ fn set_target_hands_a_live_session_a_new_borrowed_texture() {
 
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     assert!(wait_for_runtime_event(
-        &runtime,
+        &mut runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
     assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
@@ -2942,7 +2952,7 @@ fn set_target_hands_a_live_session_a_new_borrowed_texture() {
     let mut rendered_into_replacement = false;
     while Instant::now() < deadline && !rendered_into_replacement {
         let _ = runtime.pump(Some(Duration::ZERO));
-        while let Ok(Some(_)) = runtime.poll_event() {}
+        let _ = runtime.drain_events(0);
         if session.render_update().unwrap() == RenderResult::Rendered {
             rendered_into_replacement = texture
                 .read_rgba()
@@ -3250,7 +3260,7 @@ fn feature_state_set_get_and_remove_copy_snapshots() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
     let (_context, session) = create_owned_texture_session(
         &map.attach_ref().unwrap(),
@@ -3263,7 +3273,7 @@ fn feature_state_set_get_and_remove_copy_snapshots() {
     let error = session.set_feature_state(&selector, state).unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidState);
 
-    load_feature_state_style(&runtime, &map, &session);
+    load_feature_state_style(&mut runtime, &map, &session);
 
     session.set_feature_state(&selector, state).unwrap();
     let copied: JsonValue =
@@ -3276,7 +3286,7 @@ fn feature_state_set_get_and_remove_copy_snapshots() {
         .with_state_key("hover")
         .unwrap();
     session.remove_feature_state(&hover_selector).unwrap();
-    let _ = wait_for_runtime_event(&runtime, RuntimeEventType::MapRenderUpdateAvailable);
+    let _ = wait_for_runtime_event(&mut runtime, RuntimeEventType::MapRenderUpdateAvailable);
     let _ = session.render_update();
 
     let after_remove: JsonValue =
@@ -3295,7 +3305,7 @@ fn rendered_and_source_queries_copy_results() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
     let (_context, session) = create_owned_texture_session(
         &map.attach_ref().unwrap(),
@@ -3311,13 +3321,13 @@ fn rendered_and_source_queries_copy_results() {
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidState);
 
-    load_query_style(&runtime, &map, &session);
+    load_query_style(&mut runtime, &map, &session);
     let state_selector = FeatureStateSelector::new("point").with_feature_id("feature-1");
     let query_state = br#"{"selected":true}"#;
     session
         .set_feature_state(&state_selector, query_state)
         .unwrap();
-    let _ = wait_for_runtime_event(&runtime, RuntimeEventType::MapRenderUpdateAvailable);
+    let _ = wait_for_runtime_event(&mut runtime, RuntimeEventType::MapRenderUpdateAvailable);
     let _ = session.render_update();
 
     let query_point = map
@@ -3332,7 +3342,7 @@ fn rendered_and_source_queries_copy_results() {
     rendered_options.layer_ids = Some(vec!["point-circle".into()]);
     rendered_options.filter = Some(filter.to_vec());
     let rendered = wait_for_rendered_feature(
-        &runtime,
+        &mut runtime,
         &session,
         &geometry,
         &rendered_options,
@@ -3354,7 +3364,7 @@ fn rendered_and_source_queries_copy_results() {
     let mut source_options = SourceFeatureQueryOptions::default();
     source_options.filter = Some(filter.to_vec());
     let source = wait_for_source_feature(
-        &runtime,
+        &mut runtime,
         &session,
         "point",
         &source_options,
@@ -3383,7 +3393,7 @@ fn rendered_box_queries_clip_to_the_viewport() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
     let (_context, session) = create_owned_texture_session(
         &map.attach_ref().unwrap(),
@@ -3391,7 +3401,7 @@ fn rendered_box_queries_clip_to_the_viewport() {
     )
     .expect("Metal or Vulkan owned texture test session should attach when supported");
 
-    load_query_style(&runtime, &map, &session);
+    load_query_style(&mut runtime, &map, &session);
     let mut options = RenderedFeatureQueryOptions::default();
     options.layer_ids = Some(vec!["point-circle".into()]);
 
@@ -3401,7 +3411,7 @@ fn rendered_box_queries_clip_to_the_viewport() {
         ScreenPoint::new(4096.0, 4096.0),
     ));
     let rendered = wait_for_rendered_feature(
-        &runtime,
+        &mut runtime,
         &session,
         &oversized,
         &options,
@@ -3447,7 +3457,7 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
     let (_context, session) = create_owned_texture_session(
         &map.attach_ref().unwrap(),
@@ -3455,7 +3465,7 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
     )
     .expect("Metal or Vulkan owned texture test session should attach when supported");
 
-    load_cluster_style(&runtime, &map, &session);
+    load_cluster_style(&mut runtime, &map, &session);
     let query_point = map.pixel_for_lat_lng(LatLng::new(0.0, 0.0)).unwrap();
     let geometry = RenderedQueryGeometry::box_(ScreenBox::new(
         ScreenPoint::new(query_point.x - 30.0, query_point.y - 30.0),
@@ -3463,8 +3473,13 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
     ));
     let mut options = RenderedFeatureQueryOptions::default();
     options.layer_ids = Some(vec!["cluster-circle".into()]);
-    let cluster =
-        wait_for_rendered_feature(&runtime, &session, &geometry, &options, "rendered cluster");
+    let cluster = wait_for_rendered_feature(
+        &mut runtime,
+        &session,
+        &geometry,
+        &options,
+        "rendered cluster",
+    );
 
     // Native matches cluster_id by exact JSON value type, so the copied feature
     // keeps the unsigned alternative to resolve on the way back in.
@@ -3532,7 +3547,7 @@ fn sustained_render_loop_outlasts_the_graphics_queue_depth() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
     let (_context, session) = create_owned_texture_session(
         &map.attach_ref().unwrap(),
@@ -3543,7 +3558,7 @@ fn sustained_render_loop_outlasts_the_graphics_queue_depth() {
     // buffers, without the tile work that would make the loop slow.
     map.set_style_json(CLUSTER_BASE_STYLE_JSON.as_bytes())
         .unwrap();
-    render_available_updates(&runtime, &session, 3);
+    render_available_updates(&mut runtime, &session, 3);
 
     // Metal allows 64 command buffers in flight per queue and a frame takes
     // several, so this many frames clears that limit many times over.
@@ -3556,10 +3571,19 @@ fn sustained_render_loop_outlasts_the_graphics_queue_depth() {
         camera.zoom = Some(10.0 + f64::from(step % 8) * 0.25);
         map.jump_to(&camera).unwrap();
         let _ = runtime.pump(Some(Duration::ZERO));
-        while let Ok(Some(event)) = runtime.poll_event() {
-            if event.event_type == RuntimeEventType::MapRenderUpdateAvailable
-                && session.render_update().unwrap() == RenderResult::Rendered
-            {
+        let updates = runtime
+            .drain_events(0)
+            .map(|batch| {
+                batch
+                    .iter()
+                    .filter(|event| {
+                        event.event_type() == RuntimeEventType::MapRenderUpdateAvailable
+                    })
+                    .count()
+            })
+            .unwrap_or(0);
+        for _ in 0..updates {
+            if session.render_update().unwrap() == RenderResult::Rendered {
                 rendered_frames += 1;
             }
         }
@@ -3641,7 +3665,7 @@ fn resize_updates_owned_texture_frame_extent() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
     let initial_extent = RenderTargetExtent::new(32, 16, 1.0);
     let resized_extent = RenderTargetExtent::new(48, 24, 1.0);
@@ -3649,7 +3673,7 @@ fn resize_updates_owned_texture_frame_extent() {
         create_owned_texture_session(&map.attach_ref().unwrap(), initial_extent)
             .expect("Metal or Vulkan owned texture test session should attach when supported");
 
-    load_query_style(&runtime, &map, &session);
+    load_query_style(&mut runtime, &map, &session);
     session
         .resize(
             resized_extent.width,
@@ -3664,13 +3688,7 @@ fn resize_updates_owned_texture_frame_extent() {
     map.request_still_image().unwrap();
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
-        let _ = runtime.pump(Some(Duration::ZERO));
-        while let Ok(Some(event)) = runtime.poll_event() {
-            if event.event_type != RuntimeEventType::MapRenderUpdateAvailable {
-                continue;
-            }
-            let _ = session.render_update();
-        }
+        render_pending_updates(&mut runtime, &session);
         if context.try_acquire_frame_extent(&session, &resized_extent) {
             session.close().unwrap();
             map.close().unwrap();
@@ -3693,7 +3711,7 @@ fn render_update_reports_size_pending_until_the_map_applies_a_resize() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
     let (_context, session) = create_owned_texture_session(
         &map.attach_ref().unwrap(),
@@ -3701,7 +3719,7 @@ fn render_update_reports_size_pending_until_the_map_applies_a_resize() {
     )
     .expect("Metal or Vulkan owned texture test session should attach when supported");
 
-    load_query_style(&runtime, &map, &session);
+    load_query_style(&mut runtime, &map, &session);
     assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
 
     session.resize(96, 48, 1.0).unwrap();
@@ -3713,7 +3731,7 @@ fn render_update_reports_size_pending_until_the_map_applies_a_resize() {
     let mut result = RenderResult::SizePending;
     while Instant::now() < deadline && result != RenderResult::Rendered {
         let _ = runtime.pump(Some(Duration::ZERO));
-        while let Ok(Some(_)) = runtime.poll_event() {}
+        let _ = runtime.drain_events(0);
         result = session.render_update().unwrap();
         if result != RenderResult::Rendered {
             std::thread::sleep(Duration::from_millis(2));
@@ -3859,7 +3877,7 @@ fn a_second_thread_attaches_a_session_and_renders() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     // Continuous mode, so the map publishes render updates without a
     // still-image request driving them.
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
@@ -3892,7 +3910,7 @@ fn a_second_thread_attaches_a_session_and_renders() {
             // A short park rather than zero: spinning would burn the deadline
             // before the worker made progress.
             runtime.pump(Some(Duration::from_millis(2))).unwrap();
-            while runtime.poll_event().unwrap().is_some() {}
+            let _ = runtime.drain_events(0).unwrap();
         }
         worker.join().expect("worker thread should not panic");
     });
@@ -4059,7 +4077,7 @@ fn texture_readback_copies_metadata_and_fills_reusable_buffers_when_supported() 
     if !has_test_owned_texture_session_backend() {
         return;
     }
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
     let (_context, session) = create_owned_texture_session(
         &map.attach_ref().unwrap(),
@@ -4067,17 +4085,12 @@ fn texture_readback_copies_metadata_and_fills_reusable_buffers_when_supported() 
     )
     .expect("Metal or Vulkan owned texture test session should attach when supported");
 
-    load_query_style(&runtime, &map, &session);
+    load_query_style(&mut runtime, &map, &session);
     map.request_still_image().unwrap();
     let mut info = None;
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
-        let _ = runtime.pump(Some(Duration::ZERO));
-        while let Ok(Some(event)) = runtime.poll_event() {
-            if event.event_type == RuntimeEventType::MapRenderUpdateAvailable {
-                let _ = session.render_update();
-            }
-        }
+        render_pending_updates(&mut runtime, &session);
         match session.texture_image_info() {
             Ok(copied) => {
                 info = Some(copied);
@@ -4120,7 +4133,7 @@ fn texture_readback_copies_metadata_and_fills_reusable_buffers_when_supported() 
     let mut rendered_the_style = false;
     while Instant::now() < content_deadline && !rendered_the_style {
         let _ = runtime.pump(Some(Duration::ZERO));
-        while let Ok(Some(_)) = runtime.poll_event() {}
+        let _ = runtime.drain_events(0);
         let _ = session.render_update();
         session
             .read_premultiplied_rgba8_into(&mut reusable)
@@ -4290,7 +4303,7 @@ fn identified_camera_transition_reports_its_end_once_when_it_runs_to_completion(
     if !has_test_owned_texture_session_backend() {
         return;
     }
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let mut options = MapOptions::new(64, 64, 1.0);
     options.mode = MapMode::Continuous;
     let map = MapHandle::with_options(&runtime, &options).unwrap();
@@ -4299,7 +4312,7 @@ fn identified_camera_transition_reports_its_end_once_when_it_runs_to_completion(
         RenderTargetExtent::new(64, 64, 1.0),
     )
     .expect("Metal or Vulkan owned texture test session should attach when supported");
-    load_query_style(&runtime, &map, &session);
+    load_query_style(&mut runtime, &map, &session);
 
     let mut animation = AnimationOptions::default();
     animation.transition_id = Some(31);
@@ -4317,10 +4330,11 @@ fn identified_camera_transition_reports_its_end_once_when_it_runs_to_completion(
     let deadline = Instant::now() + Duration::from_secs(10);
     while Instant::now() < deadline {
         let _ = runtime.pump(Some(Duration::ZERO));
-        while let Ok(Some(event)) = runtime.poll_event() {
-            match event.event_type {
+        let mut updates = 0;
+        for event in runtime.drain_events(0).unwrap().iter() {
+            match event.event_type() {
                 RuntimeEventType::MapCameraTransitionFinished => {
-                    let RuntimeEventPayload::CameraTransitionFinished(payload) = event.payload
+                    let RuntimeEventPayload::CameraTransitionFinished(payload) = event.payload()
                     else {
                         panic!("transition-finished event should carry its typed payload");
                     };
@@ -4328,14 +4342,15 @@ fn identified_camera_transition_reports_its_end_once_when_it_runs_to_completion(
                     finished_at.get_or_insert_with(Instant::now);
                 }
                 RuntimeEventType::MapCameraDidChange => {
-                    saw_animated_did_change |=
-                        CameraChangeMode::from_raw(event.code as u32) == CameraChangeMode::Animated;
+                    saw_animated_did_change |= CameraChangeMode::from_raw(event.code() as u32)
+                        == CameraChangeMode::Animated;
                 }
-                RuntimeEventType::MapRenderUpdateAvailable => {
-                    let _ = session.render_update();
-                }
+                RuntimeEventType::MapRenderUpdateAvailable => updates += 1,
                 _ => {}
             }
+        }
+        for _ in 0..updates {
+            let _ = session.render_update();
         }
         if finished_at.is_some_and(|at| at.elapsed() >= Duration::from_millis(500)) {
             break;

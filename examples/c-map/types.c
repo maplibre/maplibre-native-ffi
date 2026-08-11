@@ -38,8 +38,10 @@ const char* app_error_name(app_error error) {
       return "wake source acquire failed";
     case APP_ERROR_RUNTIME_PUMP_FAILED:
       return "runtime pump failed";
-    case APP_ERROR_EVENT_POLL_FAILED:
-      return "event poll failed";
+    case APP_ERROR_EVENT_MASK_FAILED:
+      return "event mask select failed";
+    case APP_ERROR_EVENT_DRAIN_FAILED:
+      return "event drain failed";
     case APP_ERROR_THREAD_SPAWN_FAILED:
       return "thread spawn failed";
   }

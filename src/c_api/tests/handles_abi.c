@@ -116,23 +116,22 @@ static void a_runtime_sourced_event_names_its_runtime_handle(void) {
   bool saw_completion = false;
   for (int attempt = 0; attempt < 200 && !saw_completion; ++attempt) {
     TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 50));
-    for (;;) {
-      mln_runtime_event event = {.size = sizeof(mln_runtime_event)};
-      bool has_event = false;
-      TEST_ASSERT_EQUAL_INT(
-        MLN_STATUS_OK, mln_runtime_poll_event(runtime, &event, &has_event)
-      );
-      if (!has_event) {
-        break;
-      }
-      if (event.source_type != MLN_RUNTIME_EVENT_SOURCE_RUNTIME) {
+    mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_runtime_drain_events(runtime, 0, &batch)
+    );
+    for (size_t index = 0; index < batch.event_count; index += 1) {
+      const mln_runtime_event* event =
+        (const mln_runtime_event*)((const char*)batch.events +
+                                   (index * batch.event_size));
+      if (event->source_type != MLN_RUNTIME_EVENT_SOURCE_RUNTIME) {
         continue;
       }
       TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-        runtime, event.source,
+        runtime, event->source,
         "A runtime-sourced event should carry the mln_runtime handle."
       );
-      if (event.type == MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED) {
+      if (event->type == MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED) {
         saw_completion = true;
       }
     }

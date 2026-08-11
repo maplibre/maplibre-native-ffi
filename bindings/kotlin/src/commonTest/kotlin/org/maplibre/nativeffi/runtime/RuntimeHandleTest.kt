@@ -42,8 +42,12 @@ class RuntimeHandleTest {
   }
 
   @Test
-  fun freshRuntimeHasNoQueuedEvent() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime -> assertNull(runtime.pollEvent()) }
+  fun freshRuntimeDrainsAnEmptyBatch() {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      val batch = runtime.drainEvents()
+      assertEquals(emptyList(), batch.events)
+      assertEquals(0L, batch.remainingCount)
+    }
   }
 
   @Test
@@ -200,7 +204,8 @@ class RuntimeHandleTest {
         assertEquals(map, event.mapSource)
         assertNull(event.runtimeSource)
         assertEquals(RuntimeEventPayload.None, event.payload)
-        runtime.pollEvent()
+        // A drained value stays readable after the next drain ends the batch window.
+        runtime.drainEvents()
         assertEquals(copiedMessage, event.message)
         callbackError.load()?.let { throw AssertionError("resource provider callback failed", it) }
         assertEquals(1, calls.load())
@@ -284,7 +289,8 @@ class RuntimeHandleTest {
         assertEquals(map, event.mapSource)
         assertNull(event.runtimeSource)
         assertTrue(copiedMessage.contains("custom style failed"))
-        runtime.pollEvent()
+        // A drained value stays readable after the next drain ends the batch window.
+        runtime.drainEvents()
         assertEquals(copiedMessage, event.message)
       } finally {
         map.close()
@@ -420,9 +426,8 @@ class RuntimeHandleTest {
           map.setStyleUrl("unsupported://after-clear-style.json")
           repeat(100) {
             runtime.pump(1)
-            while (runtime.pollEvent() != null) {
-              // Keep native loading moving while proving the retired transform stays retired.
-            }
+            // Keep native loading moving while proving the retired transform stays retired.
+            runtime.drainEvents()
             assertEquals(1, calls.load())
           }
         } finally {
@@ -547,8 +552,7 @@ class RuntimeHandleTest {
   ): RuntimeEventPayload.OfflineOperationCompleted {
     repeat(10_000) {
       runtime.pump(0)
-      while (true) {
-        val event = runtime.pollEvent() ?: break
+      for (event in runtime.drainEvents().events) {
         val completed = event.payload as? RuntimeEventPayload.OfflineOperationCompleted ?: continue
         if (completed.operationId != operation.id) continue
         assertEquals(RuntimeEventType.OFFLINE_OPERATION_COMPLETED, event.type)
@@ -570,10 +574,7 @@ class RuntimeHandleTest {
   ): Boolean {
     repeat(10_000) {
       runtime.pump(0)
-      while (true) {
-        val event = runtime.pollEvent() ?: break
-        if (event.type == type && event.mapSource == map) return true
-      }
+      if (runtime.drainEvents().events.any { it.type == type && it.mapSource == map }) return true
       runtime.pump(1)
       waitForAsyncTestWork()
     }
@@ -587,8 +588,7 @@ class RuntimeHandleTest {
   ): RuntimeEvent {
     repeat(10_000) {
       runtime.pump(0)
-      while (true) {
-        val event = runtime.pollEvent() ?: break
+      for (event in runtime.drainEvents().events) {
         if (event.type == type && event.mapSource == map) return event
       }
       runtime.pump(1)
@@ -640,8 +640,7 @@ class RuntimeHandleTest {
   ): String {
     repeat(10_000) {
       runtime.pump(0)
-      while (true) {
-        val event = runtime.pollEvent() ?: break
+      for (event in runtime.drainEvents().events) {
         if (
           event.type == RuntimeEventType.MAP_LOADING_FAILED &&
             event.mapSource == map &&

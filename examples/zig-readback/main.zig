@@ -47,6 +47,16 @@ fn runtimeLoopFallible(args: RuntimeLoopArgs) !void {
     });
     defer map.close() catch {};
 
+    // The five event types the runtime loop reads. A map queues no event of an
+    // unselected type, so this runs before the style load.
+    try map.setEventMask(.{
+        .map_render_update_available = true,
+        .map_still_image_finished = true,
+        .map_still_image_failed = true,
+        .map_loading_failed = true,
+        .map_render_error = true,
+    });
+
     try setInitialCamera(&map);
     try map.setStyleUrl(args.allocator, style_url);
     try map.requestStillImage();
@@ -80,12 +90,15 @@ fn pumpUntilSessionCloses(
             logLatestDiagnostic(diagnostic_store);
             return err;
         };
-        while (try runtime.pollEvent(args.allocator)) |event| {
-            var owned_event = event;
-            defer owned_event.deinit();
-            if (owned_event.source_type != .map or owned_event.source_id == null or
-                !std.meta.eql(owned_event.source_id.?, map_id)) continue;
-            switch (owned_event.event_type) {
+        // One drain takes every event the pump produced. The batch borrows
+        // runtime storage, and this loop keeps nothing from it.
+        var batch = try runtime.drainEvents(0);
+        defer batch.deinit();
+        for (0..batch.len()) |index| {
+            const event = try batch.at(index);
+            if (event.source_type != .map or event.source_id == null or
+                !std.meta.eql(event.source_id.?, map_id)) continue;
+            switch (event.event_type) {
                 .map_render_update_available => shared.requestRender(),
                 .map_still_image_finished => shared.finishStillImage(),
                 .map_loading_failed => return error.MapLoadingFailed,

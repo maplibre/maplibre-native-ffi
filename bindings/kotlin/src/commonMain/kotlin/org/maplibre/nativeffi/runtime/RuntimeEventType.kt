@@ -39,8 +39,13 @@ public value class RuntimeEventType(public val nativeValue: Int) {
     public val MAP_RENDER_FRAME_FINISHED: RuntimeEventType = RuntimeEventType(14)
     public val MAP_RENDER_MAP_STARTED: RuntimeEventType = RuntimeEventType(15)
     public val MAP_RENDER_MAP_FINISHED: RuntimeEventType = RuntimeEventType(16)
+
+    /** [RuntimeEvent.message] carries the missing image id. */
     public val MAP_STYLE_IMAGE_MISSING: RuntimeEventType = RuntimeEventType(17)
+
+    /** [RuntimeEvent.message] carries the source id. */
     public val MAP_TILE_ACTION: RuntimeEventType = RuntimeEventType(18)
+
     public val OFFLINE_REGION_STATUS_CHANGED: RuntimeEventType = RuntimeEventType(19)
     public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventType = RuntimeEventType(20)
     public val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: RuntimeEventType = RuntimeEventType(21)

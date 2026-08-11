@@ -1,6 +1,8 @@
 package org.maplibre.nativeffi.map
 
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.runtime.RuntimeEventMask
+import org.maplibre.nativeffi.runtime.defaultMapEventMask
 
 /**
  * Mutable descriptor used when creating a [MapHandle].
@@ -43,6 +45,16 @@ public class MapOptions {
    */
   public var fastPforEnabled: Boolean? = null
 
+  /**
+   * Map-originated event types this map queues, the native library's default until a host narrows
+   * it. That default selects every map-originated type the library reports, including a type this
+   * version does not name, whose events reach a host as unknown event and payload domains.
+   *
+   * [MapHandle.create] fails with [org.maplibre.nativeffi.error.InvalidArgumentException] on a bit
+   * the native library does not define.
+   */
+  public var eventMask: RuntimeEventMask = defaultMapEventMask()
+
   /** Returns an independent copy of this descriptor with [block] applied to the copy. */
   public fun copy(block: MapOptions.() -> Unit = {}): MapOptions =
     MapOptions()
@@ -52,11 +64,12 @@ public class MapOptions {
         it.scaleFactor = scaleFactor
         it.mapMode = mapMode
         it.fastPforEnabled = fastPforEnabled
+        it.eventMask = eventMask
       }
       .apply(block)
 
   private val fields: List<Any?>
-    get() = listOf(width, height, scaleFactor, mapMode, fastPforEnabled)
+    get() = listOf(width, height, scaleFactor, mapMode, fastPforEnabled, eventMask)
 
   override fun equals(other: Any?): Boolean = other is MapOptions && fields == other.fields
 

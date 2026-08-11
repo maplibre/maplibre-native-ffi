@@ -4,13 +4,16 @@ import Testing
 private struct CameraEventTally {
   var finishedTransitionIds: [UInt64] = []
   var lastDidChangeMode: CameraChangeMode?
+  /// The types this batch carried, in queue order.
+  var types: [RuntimeEventType] = []
 }
 
 private func drainCameraEvents(_ runtime: RuntimeHandle) throws
   -> CameraEventTally
 {
   var tally = CameraEventTally()
-  while let event = try runtime.pollEvent() {
+  for event in try runtime.drainEvents().events {
+    tally.types.append(event.type)
     switch event.type {
     case .mapCameraTransitionFinished:
       guard case let .cameraTransitionFinished(payload) = event.payload else {
@@ -26,6 +29,35 @@ private func drainCameraEvents(_ runtime: RuntimeHandle) throws
     }
   }
   return tally
+}
+
+/// A creation mask is in force from the map's first style load, the load that
+/// produces the most tile and frame events.
+@Test func aMapCreatedWithANarrowedMaskNeverQueuesAClearedType() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(
+      width: 64,
+      height: 64,
+      eventMask: [.mapStyleLoaded]
+    )
+  )
+  defer { try? map.close() }
+
+  #expect(try map.eventMask == [.mapStyleLoaded])
+  // MapLibre resizes the map inside its own constructor, so its two camera
+  // events arrive whatever the creation mask selects.
+  _ = try runtime.drainEvents()
+
+  try map.setStyleJSON(emptyStyleJSON)
+  try map.jump(to: CameraOptions(zoom: 6))
+  try runtime.pump()
+
+  let types = try Set(runtime.drainEvents().events.map(\.type))
+  #expect(types == [.mapStyleLoaded])
 }
 
 @Test func mapOptionsMaterializeFastPFORDecoding() throws {
@@ -136,6 +168,10 @@ private func drainCameraEvents(_ runtime: RuntimeHandle) throws
     pitch: 30
   )
 
+  // MapLibre resizes the map inside its own constructor, so drop the camera
+  // events of the initial sizing before the batch that matters.
+  _ = try runtime.drainEvents()
+
   // A zero-duration ease resolves inside the call, so its event lands ahead of
   // the immediate did-change event.
   try map.ease(
@@ -145,6 +181,16 @@ private func drainCameraEvents(_ runtime: RuntimeHandle) throws
   var tally = try drainCameraEvents(runtime)
   #expect(tally.finishedTransitionIds == [7])
   #expect(tally.lastDidChangeMode == .immediate)
+
+  // One batch keeps queue order, so a host reads the transition's own event
+  // before the camera change that ended it.
+  let finishedIndex = try #require(
+    tally.types.firstIndex(of: .mapCameraTransitionFinished)
+  )
+  let didChangeIndex = try #require(
+    tally.types.firstIndex(of: .mapCameraDidChange)
+  )
+  #expect(finishedIndex < didChangeIndex)
 
   // A running transition stays silent until it releases the camera.
   camera.zoom = 12

@@ -539,10 +539,8 @@ public sealed unsafe class ResourceProviderTests
     // failure that follows proves the request reached the network file source.
     private static void LoadProbeStyle(RuntimeHandle runtime, MapHandle map, string styleUrl)
     {
-        while (runtime.PollEvent() is not null)
-        {
-            // Drain earlier events so this probe observes its own failure.
-        }
+        // Drain earlier events so this probe observes its own failure.
+        RuntimeEventTestHelpers.DrainUntilIdle(runtime);
 
         map.SetStyleUrl(styleUrl);
         var runtimeEvent = RuntimeEventTestHelpers.WaitForMapEvent(

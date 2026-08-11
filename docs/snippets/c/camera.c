@@ -41,17 +41,23 @@ mln_status ease_downtown(mln_map map, uint64_t transition_id) {
   // #endregion ease
 }
 
+// A map reports a finished transition only while its subscription selects this
+// type.
+mln_status select_camera_events(mln_map map) {
+  return mln_map_set_event_mask(
+    map, MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED
+  );
+}
+
 bool transition_finished(
   const mln_runtime_event* event, uint64_t transition_id
 ) {
   // #region finished
-  if (
-    event->type != MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED ||
-    event->payload_type != MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED
-  ) {
+  if (event->type != MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED) {
     return false;
   }
-  const mln_runtime_event_camera_transition_finished* finished = event->payload;
+  const mln_runtime_event_camera_transition_finished* finished =
+    &event->payload.camera_transition_finished;
   return finished->transition_id == transition_id;
   // #endregion finished
 }

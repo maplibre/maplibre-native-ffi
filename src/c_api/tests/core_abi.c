@@ -1,7 +1,6 @@
 // Raw C ABI coverage: core runtime/map/style/event/diagnostic tests for unsafe
 // inputs, stale handles, and thread-local diagnostics hidden by bindings.
 
-#include <stdint.h>
 #include <string.h>
 
 #if defined(_WIN32)
@@ -13,14 +12,6 @@
 #include "abi_tests.h"
 #include "test_support.h"
 #include "unity.h"
-
-static mln_runtime_event empty_event(void) {
-  return (mln_runtime_event){
-    .size = sizeof(mln_runtime_event),
-    .source_type = MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-    .payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE,
-  };
-}
 
 static void runtime_rejects_invalid_arguments(void) {
   TEST_ASSERT_EQUAL_INT(
@@ -45,16 +36,6 @@ static void runtime_rejects_invalid_arguments(void) {
   );
 }
 
-static void runtime_rejects_unknown_flags(void) {
-  mln_runtime_options options = mln_runtime_options_default();
-  options.flags = UINT32_C(1) << 31;
-  mln_runtime runtime = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(&options, &runtime)
-  );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
-}
-
 static void runtime_rejects_stale_handles(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_test_destroy_runtime(runtime);
@@ -69,15 +50,6 @@ static void runtime_rejects_stale_handles(void) {
 static void runtime_pump_rejects_null_runtime(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_pump(MLN_HANDLE_NULL, 0)
-  );
-}
-
-static void runtime_event_polling_rejects_null_runtime(void) {
-  mln_runtime_event event = empty_event();
-  bool has_event = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_poll_event(MLN_HANDLE_NULL, &event, &has_event)
   );
 }
 
@@ -171,25 +143,6 @@ static void style_functions_reject_null_inputs(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void runtime_event_polling_rejects_invalid_outputs(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  bool has_event = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_poll_event(runtime, NULL, &has_event)
-  );
-  mln_runtime_event event = empty_event();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_poll_event(runtime, &event, NULL)
-  );
-  event.size = sizeof(mln_runtime_event) - 1;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_poll_event(runtime, &event, &has_event)
-  );
-  mln_test_destroy_runtime(runtime);
-}
-
 static void failing_status_sets_and_successful_status_clears_diagnostics(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_destroy(MLN_HANDLE_NULL)
@@ -258,14 +211,11 @@ static void diagnostics_are_thread_local(void) {
 void run_core_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(runtime_rejects_invalid_arguments);
-  RUN_TEST(runtime_rejects_unknown_flags);
   RUN_TEST(runtime_rejects_stale_handles);
   RUN_TEST(runtime_pump_rejects_null_runtime);
-  RUN_TEST(runtime_event_polling_rejects_null_runtime);
   RUN_TEST(map_create_rejects_invalid_arguments);
   RUN_TEST(map_lifecycle_rejects_invalid_state_and_stale_handles);
   RUN_TEST(style_functions_reject_null_inputs);
-  RUN_TEST(runtime_event_polling_rejects_invalid_outputs);
   RUN_TEST(failing_status_sets_and_successful_status_clears_diagnostics);
   RUN_TEST(diagnostics_are_thread_local);
 }

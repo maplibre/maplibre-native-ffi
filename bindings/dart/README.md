@@ -2,7 +2,7 @@
 
 `maplibre_native_ffi` is the low-level Dart binding for the public MapLibre
 Native C API. The package exposes explicit native handle lifetimes, copied value
-types, runtime event polling, resource callbacks, offline operations, and the
+types, runtime event batches, resource callbacks, offline operations, and the
 render backend descriptors used by host integrations.
 
 ## Build and test
@@ -75,8 +75,10 @@ operations before their parent runtime. Scoped backend values remain valid only
 until their frame or owner is closed.
 
 Runtime and map work is synchronous and owner-thread-affine. Keep a handle and
-all calls that use it on the isolate that created it. Poll queued callbacks and
-events with `RuntimeHandle.pump()` and `RuntimeHandle.pollEvent()`.
+all calls that use it on the isolate that created it. Run queued callbacks with
+`RuntimeHandle.pump()`, then take the events it produced with
+`RuntimeHandle.drainEvents()`. Narrow what a map or a runtime queues with
+`setEventMask`.
 
 A render session is the exception: it belongs to the isolate that attached it,
 which need not be the map's. A `MapHandle` cannot cross isolates, so

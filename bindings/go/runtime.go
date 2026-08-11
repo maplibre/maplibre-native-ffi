@@ -2,7 +2,8 @@ package maplibre
 
 /*
 #include <stdlib.h>
-#include "maplibre_native_c.h"
+
+#include "internal/cgo_runtime_shim.h"
 */
 import "C"
 
@@ -144,7 +145,6 @@ func (operation *OfflineOperationHandle[T]) Discard() error {
 		operation.mu.Unlock()
 		return err
 	}
-
 	operation.live = false
 	operation.discarded = true
 	child := operation.child
@@ -158,12 +158,36 @@ func (operation *OfflineOperationHandle[T]) Discard() error {
 type RuntimeOptions struct {
 	AssetPath string
 	CachePath string
+	// EventMask selects the runtime-originated event types this runtime queues.
+	// NewRuntimeOptions sets it to the native default, which selects every type.
+	// See RuntimeHandle.SetEventMask.
+	EventMask RuntimeEventMask
+}
+
+// NewRuntimeOptions returns runtime creation options for an asset root and a
+// cache path, either of which may be empty to keep the native default. The
+// returned options select every runtime-originated event type.
+func NewRuntimeOptions(assetPath, cachePath string) RuntimeOptions {
+	return RuntimeOptions{
+		AssetPath: assetPath,
+		CachePath: cachePath,
+		EventMask: defaultRuntimeEventMask(),
+	}
+}
+
+// defaultRuntimeEventMask reads the runtime default's own event mask. The bits
+// are retained rather than named, so a newer native library's default keeps
+// selecting event types this build does not define. Those reach a host as
+// unknown event and payload domains.
+func defaultRuntimeEventMask() RuntimeEventMask {
+	return RuntimeEventMask(C.mln_runtime_options_default().event_mask)
 }
 
 // Equal reports whether two descriptors hold the same field values.
 func (options RuntimeOptions) Equal(other RuntimeOptions) bool {
 	return options.AssetPath == other.AssetPath &&
-		options.CachePath == other.CachePath
+		options.CachePath == other.CachePath &&
+		options.EventMask == other.EventMask
 }
 
 func (options RuntimeOptions) validate() error {
@@ -211,6 +235,57 @@ const (
 	RuntimeEventMapCameraTransitionFinished         RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED)
 )
 
+// RuntimeEventMask selects which event types a map or a runtime queues. An event
+// whose type is unselected is never built and never queued, so it neither
+// reaches a batch nor raises the runtime's wake flag.
+//
+// Every bit value comes from the C API, so a mask cannot drift from the
+// RuntimeEventType constants. Masks combine with the bitwise operators: | adds
+// types, &^ clears them, and RuntimeEventMaskNone is the empty mask.
+type RuntimeEventMask uint64
+
+const (
+	// RuntimeEventMaskNone selects no event type.
+	RuntimeEventMaskNone                                RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_NONE)
+	RuntimeEventMaskMapCameraWillChange                 RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE)
+	RuntimeEventMaskMapCameraIsChanging                 RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING)
+	RuntimeEventMaskMapCameraDidChange                  RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE)
+	RuntimeEventMaskMapStyleLoaded                      RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED)
+	RuntimeEventMaskMapLoadingStarted                   RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED)
+	RuntimeEventMaskMapLoadingFinished                  RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED)
+	RuntimeEventMaskMapLoadingFailed                    RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED)
+	RuntimeEventMaskMapIdle                             RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_IDLE)
+	RuntimeEventMaskMapRenderUpdateAvailable            RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE)
+	RuntimeEventMaskMapRenderError                      RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR)
+	RuntimeEventMaskMapStillImageFinished               RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED)
+	RuntimeEventMaskMapStillImageFailed                 RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED)
+	RuntimeEventMaskMapRenderFrameStarted               RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED)
+	RuntimeEventMaskMapRenderFrameFinished              RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED)
+	RuntimeEventMaskMapRenderMapStarted                 RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED)
+	RuntimeEventMaskMapRenderMapFinished                RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED)
+	RuntimeEventMaskMapStyleImageMissing                RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING)
+	RuntimeEventMaskMapTileAction                       RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION)
+	RuntimeEventMaskMapCameraTransitionFinished         RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED)
+	RuntimeEventMaskOfflineRegionStatusChanged          RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED)
+	RuntimeEventMaskOfflineRegionResponseError          RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR)
+	RuntimeEventMaskOfflineRegionTileCountLimitExceeded RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
+	RuntimeEventMaskOfflineOperationCompleted           RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED)
+	// RuntimeEventMaskAllMapEvents selects every map-originated event type this
+	// binding version defines.
+	RuntimeEventMaskAllMapEvents RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS)
+	// RuntimeEventMaskAllRuntimeEvents selects every runtime-originated event
+	// type this binding version defines.
+	RuntimeEventMaskAllRuntimeEvents RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS)
+	// RuntimeEventMaskAll selects every event type this binding version defines,
+	// and both mask setters accept it.
+	RuntimeEventMaskAll RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_ALL)
+)
+
+// Has reports whether all requested event type bits are set.
+func (mask RuntimeEventMask) Has(requested RuntimeEventMask) bool {
+	return mask&requested == requested
+}
+
 // RuntimeEventSourceType identifies the native handle kind that emitted an event.
 type RuntimeEventSourceType uint32
 
@@ -226,7 +301,6 @@ const (
 	RuntimeEventPayloadNone                        RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_NONE)
 	RuntimeEventPayloadRenderFrame                 RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME)
 	RuntimeEventPayloadRenderMap                   RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP)
-	RuntimeEventPayloadStyleImageMissing           RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING)
 	RuntimeEventPayloadTileAction                  RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION)
 	RuntimeEventPayloadOfflineRegionStatus         RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS)
 	RuntimeEventPayloadOfflineRegionResponseError  RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR)
@@ -238,10 +312,18 @@ const (
 // MapID identifies a map within one RuntimeHandle.
 type MapID uint64
 
-// RuntimeEventSource identifies the runtime object that emitted an event without
-// exposing native handle addresses.
+// RuntimeEventSource identifies the runtime object that emitted an event.
 type RuntimeEventSource struct {
-	Type  RuntimeEventSourceType
+	Type RuntimeEventSourceType
+	// RawID is the native source id the C API reported, whatever Type is. It
+	// names one object for the life of the process, so a host may compare it
+	// against an id it already holds, even for a source type this binding
+	// version does not name or a map this runtime no longer tracks. It is an
+	// identity value only: no public handle comes from it.
+	RawID uint64
+	// MapID is the identity of the live map this runtime resolved RawID to, and 0
+	// when Type is not RuntimeEventSourceMap or the map is gone. Compare RawID
+	// instead to attribute an event whose map has been closed.
 	MapID MapID
 }
 
@@ -258,11 +340,25 @@ type RuntimeEvent struct {
 	// offline-operation-completed. Every other event type reports 0.
 	Code        int32
 	PayloadType RuntimeEventPayloadType
-	PayloadSize uintptr
-	Message     string
-	Payload     any
+	// Message is the event's text: a failure description, a missing style image
+	// ID, or a tile action's source ID. It is empty for an event that carries no
+	// message.
+	Message string
+	// Payload is the typed payload PayloadType selects, nil for an event without
+	// one, and a RuntimeEventUnknownPayload for a payload type this binding
+	// version does not define.
+	Payload any
+}
 
-	rawSource MapID
+// RuntimeEventBatch is one drained batch of runtime events in queue order.
+// Every field of every event is copied out of runtime-owned storage before the
+// drain returns, so a batch and the values taken out of it stay readable after
+// the next drain.
+type RuntimeEventBatch struct {
+	Events []RuntimeEvent
+	// RemainingCount is the number of events still queued after this batch. A
+	// nonzero value means another drain reports more.
+	RemainingCount uint64
 }
 
 // CameraChangeMode reports whether a camera change belongs to an animated
@@ -335,17 +431,12 @@ type RuntimeEventRenderMapPayload struct {
 	RawMode uint32
 }
 
-// RuntimeEventStyleImageMissingPayload is a copied style-image-missing event payload.
-type RuntimeEventStyleImageMissingPayload struct {
-	ImageID string
-}
-
-// RuntimeEventTileActionPayload is a copied tile-action event payload.
+// RuntimeEventTileActionPayload is a copied tile-action event payload. The
+// event message carries the source ID.
 type RuntimeEventTileActionPayload struct {
 	Operation    TileOperation
 	RawOperation uint32
 	TileID       TileID
-	SourceID     string
 }
 
 // RuntimeEventCameraTransitionFinishedPayload is a copied camera
@@ -387,7 +478,8 @@ type RuntimeEventOfflineOperationCompletedPayload struct {
 }
 
 // RuntimeEventUnknownPayload contains copied bytes for a payload type unknown to
-// this Go binding version.
+// this Go binding version. Bytes is the event's whole payload window, which is
+// the batch's event stride minus this binding's payload offset.
 type RuntimeEventUnknownPayload struct {
 	Bytes []byte
 }
@@ -471,7 +563,8 @@ func NewRuntime() (*RuntimeHandle, error) {
 }
 
 // NewRuntimeWithOptions creates a runtime on the current OS thread using
-// explicit options.
+// explicit options. Start from NewRuntimeOptions to keep every event type
+// selected; a zero-value RuntimeOptions queues no event.
 func NewRuntimeWithOptions(options RuntimeOptions) (*RuntimeHandle, error) {
 	if err := options.validate(); err != nil {
 		return nil, err
@@ -484,6 +577,7 @@ func NewRuntimeWithOptions(options RuntimeOptions) (*RuntimeHandle, error) {
 		defer C.free(unsafe.Pointer(cachePath))
 		rawOptions.asset_path = assetPath
 		rawOptions.cache_path = cachePath
+		rawOptions.event_mask = C.uint64_t(options.EventMask)
 
 		var raw C.mln_runtime
 		status := int32(C.mln_runtime_create(&rawOptions, &raw))
@@ -533,7 +627,7 @@ func (runtime *RuntimeHandle) ptr() (nativeRuntime, func(), error) {
 
 // Pump advances this runtime. It parks the owner thread when timeout allows,
 // then drains the owner-thread task queues, including tasks the drained ones
-// enqueue. Drain the queued runtime events with PollEvent afterwards.
+// enqueue. Take the queued runtime events with DrainEvents afterwards.
 //
 // timeout sets the park bound: zero drains and returns, a positive value parks
 // for up to that long, and a negative value parks until a wake arrives. A
@@ -626,70 +720,143 @@ func (source *WakeSource) Close() {
 	source.state.Close(destroyWakeSource)
 }
 
-// PollEvent polls one queued runtime event and copies it into a Go value. It
-// reports a nil event when the queue is empty.
+// DrainEvents takes this runtime's queued events as one batch of copied values.
+// Events arrive in queue order, and the batch reports how many events stayed
+// queued.
 //
-// Polling a map-style-loaded event releases that map's detached custom geometry
-// sources, so drain the queue to keep dropped sources from lingering.
-func (runtime *RuntimeHandle) PollEvent() (*RuntimeEvent, error) {
+// maxEvents bounds the drain: zero takes every queued event, and a positive
+// value takes at most that many and leaves the rest queued. A negative value
+// returns ErrInvalidArgument.
+//
+// Call Pump first to advance the runtime, then drain the events that pump
+// produced.
+func (runtime *RuntimeHandle) DrainEvents(maxEvents int) (RuntimeEventBatch, error) {
+	if maxEvents < 0 {
+		return RuntimeEventBatch{}, newBindingError(ErrInvalidArgument, "maxEvents is negative")
+	}
 	ptr, release, err := runtime.ptr()
 	if err != nil {
-		return nil, err
+		return RuntimeEventBatch{}, err
 	}
 	defer release()
 	defer runtime.state.KeepAlive()
 
-	rawEvent := C.mln_runtime_event{size: C.uint32_t(unsafe.Sizeof(C.mln_runtime_event{}))}
-	var hasEvent C.bool
+	rawBatch, err := drainRawEvents(ptr, maxEvents)
+	if err != nil {
+		return RuntimeEventBatch{}, err
+	}
+	return runtime.copyEventBatch(rawBatch), nil
+}
+
+// SetEventMask selects which runtime-originated event types this runtime queues.
+// It accepts RuntimeEventMaskAll, reads the bits in
+// RuntimeEventMaskAllRuntimeEvents, and returns ErrInvalidArgument for a bit
+// outside RuntimeEventMaskAll.
+//
+// Narrowing gates later events and keeps queued ones, so a caller drains what it
+// already caused. An offline operation records its result before this mask is
+// consulted, so the matching take-result call reports the result of an operation
+// whose completion event this mask cleared.
+func (runtime *RuntimeHandle) SetEventMask(mask RuntimeEventMask) error {
+	ptr, release, err := runtime.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer runtime.state.KeepAlive()
+
+	return checkNative(func() int32 {
+		return int32(C.mln_runtime_set_event_mask(C.mln_runtime(ptr), C.uint64_t(mask)))
+	})
+}
+
+// EventMask reports which runtime-originated event types this runtime queues. A
+// runtime that has not been narrowed reports RuntimeEventMaskAll.
+func (runtime *RuntimeHandle) EventMask() (RuntimeEventMask, error) {
+	ptr, release, err := runtime.ptr()
+	if err != nil {
+		return 0, err
+	}
+	defer release()
+	defer runtime.state.KeepAlive()
+
+	var raw C.uint64_t
 	if err := checkNative(func() int32 {
-		return int32(C.mln_runtime_poll_event(C.mln_runtime(ptr), &rawEvent, &hasEvent))
+		return int32(C.mln_runtime_get_event_mask(C.mln_runtime(ptr), &raw))
 	}); err != nil {
-		return nil, err
+		return 0, err
 	}
-	if !bool(hasEvent) {
-		return nil, nil
-	}
-	event := runtime.runtimeEventFromC(rawEvent)
-	runtime.handleEventSideEffects(event)
-	return event, nil
+	return RuntimeEventMask(raw), nil
 }
 
-func runtimeEventFromC(event C.mln_runtime_event) *RuntimeEvent {
-	return runtimeEventFromCWithSource(event, RuntimeEventSource{Type: RuntimeEventSourceType(event.source_type)})
+func drainRawEvents(ptr nativeRuntime, maxEvents int) (C.mln_runtime_event_batch, error) {
+	batch := C.mln_runtime_event_batch_default()
+	if err := checkNative(func() int32 {
+		return int32(C.mln_runtime_drain_events(C.mln_runtime(ptr), C.size_t(maxEvents), &batch))
+	}); err != nil {
+		return C.mln_runtime_event_batch{}, err
+	}
+	return batch, nil
 }
 
-func (runtime *RuntimeHandle) runtimeEventFromC(event C.mln_runtime_event) *RuntimeEvent {
-	source := RuntimeEventSource{Type: RuntimeEventSourceType(event.source_type)}
-	if source.Type == RuntimeEventSourceMap {
-		if m := runtime.mapForEventSource(MapID(event.source)); m != nil {
-			source.MapID = m.id
+// runtimeEventPayloadOffset is where the payload union starts inside an event
+// record. Every field before it keeps its offset across C API versions, and the
+// batch's event stride minus this offset is the payload window.
+var runtimeEventPayloadOffset = unsafe.Offsetof(C.mln_runtime_event{}.payload)
+
+// copyEventBatch copies a borrowed native batch into owned Go values. It takes
+// the map registry lock once for the whole batch.
+func (runtime *RuntimeHandle) copyEventBatch(raw C.mln_runtime_event_batch) RuntimeEventBatch {
+	batch := RuntimeEventBatch{RemainingCount: uint64(raw.remaining_count)}
+	count := int(raw.event_count)
+	if count <= 0 || raw.events == nil {
+		return batch
+	}
+	// The stride comes from the batch, never from this binding's own event size,
+	// so a C API version that widens the payload union stays readable.
+	stride := uintptr(raw.event_size)
+	base := unsafe.Pointer(raw.events)
+	payloadWindow := uintptr(0)
+	if stride > runtimeEventPayloadOffset {
+		payloadWindow = stride - runtimeEventPayloadOffset
+	}
+
+	events := make([]RuntimeEvent, 0, count)
+	runtime.mapsMu.Lock()
+	for index := 0; index < count; index++ {
+		eventPtr := unsafe.Add(base, uintptr(index)*stride)
+		rawEvent := (*C.mln_runtime_event)(eventPtr)
+		source := RuntimeEventSource{
+			Type:  RuntimeEventSourceType(rawEvent.source_type),
+			RawID: uint64(rawEvent.source),
 		}
+		if source.Type == RuntimeEventSourceMap {
+			if sourceMap := runtime.maps[MapID(rawEvent.source)]; sourceMap != nil {
+				source.MapID = sourceMap.id
+			}
+		}
+		events = append(events, RuntimeEvent{
+			Type:        RuntimeEventType(rawEvent._type),
+			SourceType:  source.Type,
+			Source:      source,
+			Code:        int32(rawEvent.code),
+			PayloadType: RuntimeEventPayloadType(rawEvent.payload_type),
+			Message:     runtimeEventMessage(raw, rawEvent),
+			Payload:     runtimeEventPayloadFromC(rawEvent, unsafe.Add(eventPtr, runtimeEventPayloadOffset), payloadWindow),
+		})
 	}
-	return runtimeEventFromCWithSource(event, source)
+	runtime.mapsMu.Unlock()
+
+	batch.Events = events
+	return batch
 }
 
-func runtimeEventFromCWithSource(event C.mln_runtime_event, source RuntimeEventSource) *RuntimeEvent {
-	return &RuntimeEvent{
-		Type:        RuntimeEventType(event._type),
-		SourceType:  RuntimeEventSourceType(event.source_type),
-		Source:      source,
-		Code:        int32(event.code),
-		PayloadType: RuntimeEventPayloadType(event.payload_type),
-		PayloadSize: uintptr(event.payload_size),
-		Message:     goCharBytes(unsafe.Pointer(event.message), event.message_size),
-		Payload:     runtimeEventPayloadFromC(event),
-		rawSource:   MapID(event.source),
+func runtimeEventMessage(batch C.mln_runtime_event_batch, event *C.mln_runtime_event) string {
+	if event.message_size == 0 || batch.messages == nil {
+		return ""
 	}
-}
-
-func (runtime *RuntimeHandle) handleEventSideEffects(event *RuntimeEvent) {
-	if event == nil || event.Type != RuntimeEventMapStyleLoaded || event.SourceType != RuntimeEventSourceMap {
-		return
-	}
-	m := runtime.mapForEventSource(event.rawSource)
-	if m != nil {
-		m.releaseDetachedCustomGeometrySources()
-	}
+	messages := unsafe.Add(unsafe.Pointer(batch.messages), uintptr(event.message_offset))
+	return goCharBytes(messages, C.size_t(event.message_size))
 }
 
 func (runtime *RuntimeHandle) registerMap(m *MapHandle) {
@@ -713,26 +880,16 @@ func (runtime *RuntimeHandle) unregisterMap(m *MapHandle) {
 	runtime.mapsMu.Unlock()
 }
 
-func (runtime *RuntimeHandle) mapForEventSource(source MapID) *MapHandle {
-	if runtime == nil || source == 0 {
-		return nil
-	}
-	runtime.mapsMu.Lock()
-	m := runtime.maps[source]
-	runtime.mapsMu.Unlock()
-	return m
-}
-
-func runtimeEventPayloadFromC(event C.mln_runtime_event) any {
-	if event.payload == nil {
-		return nil
-	}
+// runtimeEventPayloadFromC copies the payload member payload_type names. The
+// union member reads go through the cgo shim, because cgo lowers the payload
+// union to opaque bytes and names no member. window and windowSize describe the
+// event's payload bytes, which an unknown payload type preserves as they are.
+func runtimeEventPayloadFromC(event *C.mln_runtime_event, window unsafe.Pointer, windowSize uintptr) any {
 	switch uint32(event.payload_type) {
+	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_NONE):
+		return nil
 	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME):
-		if !runtimeEventPayloadHasSize(event, unsafe.Sizeof(C.mln_runtime_event_render_frame{})) {
-			return runtimeEventUnknownPayloadFromC(event)
-		}
-		payload := (*C.mln_runtime_event_render_frame)(event.payload)
+		payload := C.mln_go_runtime_event_render_frame(event)
 		mode := uint32(payload.mode)
 		return RuntimeEventRenderFramePayload{
 			Mode:             RenderMode(mode),
@@ -742,60 +899,32 @@ func runtimeEventPayloadFromC(event C.mln_runtime_event) any {
 			Stats:            renderingStatsFromC(payload.stats),
 		}
 	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP):
-		if !runtimeEventPayloadHasSize(event, unsafe.Sizeof(C.mln_runtime_event_render_map{})) {
-			return runtimeEventUnknownPayloadFromC(event)
-		}
-		payload := (*C.mln_runtime_event_render_map)(event.payload)
+		payload := C.mln_go_runtime_event_render_map(event)
 		mode := uint32(payload.mode)
 		return RuntimeEventRenderMapPayload{Mode: RenderMode(mode), RawMode: mode}
-	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING):
-		if !runtimeEventPayloadHasSize(event, unsafe.Sizeof(C.mln_runtime_event_style_image_missing{})) {
-			return runtimeEventUnknownPayloadFromC(event)
-		}
-		payload := (*C.mln_runtime_event_style_image_missing)(event.payload)
-		return RuntimeEventStyleImageMissingPayload{ImageID: goCharBytes(unsafe.Pointer(payload.image_id), payload.image_id_size)}
 	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION):
-		if !runtimeEventPayloadHasSize(event, unsafe.Sizeof(C.mln_runtime_event_tile_action{})) {
-			return runtimeEventUnknownPayloadFromC(event)
-		}
-		payload := (*C.mln_runtime_event_tile_action)(event.payload)
+		payload := C.mln_go_runtime_event_tile_action(event)
 		operation := uint32(payload.operation)
 		return RuntimeEventTileActionPayload{
 			Operation:    TileOperation(operation),
 			RawOperation: operation,
 			TileID:       tileIDFromC(payload.tile_id),
-			SourceID:     goCharBytes(unsafe.Pointer(payload.source_id), payload.source_id_size),
 		}
 	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED):
-		if !runtimeEventPayloadHasSize(event, unsafe.Sizeof(C.mln_runtime_event_camera_transition_finished{})) {
-			return runtimeEventUnknownPayloadFromC(event)
-		}
-		payload := (*C.mln_runtime_event_camera_transition_finished)(event.payload)
+		payload := C.mln_go_runtime_event_camera_transition_finished(event)
 		return RuntimeEventCameraTransitionFinishedPayload{TransitionID: uint64(payload.transition_id)}
 	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS):
-		if !runtimeEventPayloadHasSize(event, unsafe.Sizeof(C.mln_runtime_event_offline_region_status{})) {
-			return runtimeEventUnknownPayloadFromC(event)
-		}
-		payload := (*C.mln_runtime_event_offline_region_status)(event.payload)
+		payload := C.mln_go_runtime_event_offline_region_status(event)
 		return RuntimeEventOfflineRegionStatusPayload{RegionID: OfflineRegionID(payload.region_id), Status: offlineRegionStatusFromC(payload.status)}
 	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR):
-		if !runtimeEventPayloadHasSize(event, unsafe.Sizeof(C.mln_runtime_event_offline_region_response_error{})) {
-			return runtimeEventUnknownPayloadFromC(event)
-		}
-		payload := (*C.mln_runtime_event_offline_region_response_error)(event.payload)
+		payload := C.mln_go_runtime_event_offline_region_response_error(event)
 		reason := uint32(payload.reason)
 		return RuntimeEventOfflineRegionResponseErrorPayload{RegionID: OfflineRegionID(payload.region_id), Reason: ResourceErrorReason(reason), RawReason: reason}
 	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT):
-		if !runtimeEventPayloadHasSize(event, unsafe.Sizeof(C.mln_runtime_event_offline_region_tile_count_limit{})) {
-			return runtimeEventUnknownPayloadFromC(event)
-		}
-		payload := (*C.mln_runtime_event_offline_region_tile_count_limit)(event.payload)
+		payload := C.mln_go_runtime_event_offline_region_tile_count_limit(event)
 		return RuntimeEventOfflineRegionTileCountLimitPayload{RegionID: OfflineRegionID(payload.region_id), Limit: uint64(payload.limit)}
 	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED):
-		if !runtimeEventPayloadHasSize(event, unsafe.Sizeof(C.mln_runtime_event_offline_operation_completed{})) {
-			return runtimeEventUnknownPayloadFromC(event)
-		}
-		payload := (*C.mln_runtime_event_offline_operation_completed)(event.payload)
+		payload := C.mln_go_runtime_event_offline_operation_completed(event)
 		return RuntimeEventOfflineOperationCompletedPayload{
 			OperationID:   uint64(payload.operation_id),
 			OperationKind: OfflineOperationKind(payload.operation_kind),
@@ -804,20 +933,12 @@ func runtimeEventPayloadFromC(event C.mln_runtime_event) any {
 			Found:         bool(payload.found),
 		}
 	default:
-		return runtimeEventUnknownPayloadFromC(event)
+		bytes, ok := goByteSlice(window, C.size_t(windowSize))
+		if !ok {
+			return RuntimeEventUnknownPayload{}
+		}
+		return RuntimeEventUnknownPayload{Bytes: bytes}
 	}
-}
-
-func runtimeEventPayloadHasSize(event C.mln_runtime_event, required uintptr) bool {
-	return uintptr(event.payload_size) >= required
-}
-
-func runtimeEventUnknownPayloadFromC(event C.mln_runtime_event) RuntimeEventUnknownPayload {
-	bytes, ok := goByteSlice(event.payload, event.payload_size)
-	if !ok {
-		return RuntimeEventUnknownPayload{}
-	}
-	return RuntimeEventUnknownPayload{Bytes: bytes}
 }
 
 func renderingStatsFromC(stats C.mln_rendering_stats) RenderingStats {
@@ -1111,6 +1232,8 @@ func (runtime *RuntimeHandle) NewMap() (*MapHandle, error) {
 }
 
 // NewMapWithOptions creates a map owned by this runtime with explicit options.
+// Start from NewMapOptions to keep every map-originated event type selected; a
+// zero-value MapOptions queues no event.
 func (runtime *RuntimeHandle) NewMapWithOptions(options MapOptions) (*MapHandle, error) {
 	return runtime.createMap(func(ptr nativeRuntime, out *nativeMap) int32 {
 		rawOptions := C.mln_map_options_default()
@@ -1119,6 +1242,7 @@ func (runtime *RuntimeHandle) NewMapWithOptions(options MapOptions) (*MapHandle,
 		rawOptions.scale_factor = C.double(options.ScaleFactor)
 		rawOptions.map_mode = C.uint32_t(options.Mode)
 		rawOptions.fast_pfor_enabled = C.bool(options.FastPFOREnabled)
+		rawOptions.event_mask = C.uint64_t(options.EventMask)
 
 		var raw C.mln_map
 		status := int32(C.mln_map_create(C.mln_runtime(ptr), &rawOptions, &raw))
@@ -1145,7 +1269,12 @@ func (runtime *RuntimeHandle) createMap(create func(nativeRuntime, *nativeMap) i
 	if err != nil {
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
-	m := &MapHandle{state: state, runtime: runtime, runtimeChild: runtime.state.AddChild(), id: MapID(rawMap)}
+	m := &MapHandle{
+		state:        state,
+		runtime:      runtime,
+		runtimeChild: runtime.state.AddChild(),
+		id:           MapID(rawMap),
+	}
 	runtime.registerMap(m)
 	return m, nil
 }

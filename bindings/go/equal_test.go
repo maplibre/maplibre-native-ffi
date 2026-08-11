@@ -41,6 +41,7 @@ func TestMapOptionsEqualComparesFieldValues(t *testing.T) {
 				ScaleFactor:     2.0,
 				Mode:            MapModeContinuous,
 				FastPFOREnabled: false,
+				EventMask:       RuntimeEventMaskAllMapEvents,
 			}
 		},
 		MapOptions.Equal,
@@ -50,6 +51,7 @@ func TestMapOptionsEqualComparesFieldValues(t *testing.T) {
 			func(o *MapOptions) { o.ScaleFactor = 3.0 },
 			func(o *MapOptions) { o.Mode = MapModeStatic },
 			func(o *MapOptions) { o.FastPFOREnabled = true },
+			func(o *MapOptions) { o.EventMask = RuntimeEventMaskAll },
 		},
 	)
 }
@@ -269,12 +271,14 @@ func TestRuntimeOptionsEqualComparesFieldValues(t *testing.T) {
 			return RuntimeOptions{
 				AssetPath: "assets",
 				CachePath: "cache",
+				EventMask: RuntimeEventMaskAllRuntimeEvents,
 			}
 		},
 		RuntimeOptions.Equal,
 		[]func(*RuntimeOptions){
 			func(o *RuntimeOptions) { o.AssetPath = "other-assets" },
 			func(o *RuntimeOptions) { o.CachePath = "other-cache" },
+			func(o *RuntimeOptions) { o.EventMask = RuntimeEventMaskAll },
 		},
 	)
 }

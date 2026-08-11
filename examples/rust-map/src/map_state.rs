@@ -10,7 +10,8 @@ use std::time::Duration;
 
 use maplibre_native_ffi::{
     AnimationOptions, CameraOptions, LatLng, MapAttachRef, MapHandle, MapMode, MapOptions,
-    RuntimeEventPayload, RuntimeEventSource, RuntimeEventType, RuntimeHandle, RuntimeOptions,
+    RuntimeEventMask, RuntimeEventPayload, RuntimeEventSource, RuntimeEventType, RuntimeHandle,
+    RuntimeOptions,
 };
 
 use crate::channel::{CameraCommand, Shared};
@@ -39,7 +40,7 @@ pub fn run(
     attach: Sender<RuntimeLoopHandles>,
     shared: Arc<Shared>,
 ) {
-    let state = match MapState::new(viewport) {
+    let mut state = match MapState::new(viewport) {
         Ok(state) => state,
         Err(error) => {
             shared.fail(error.to_string());
@@ -47,7 +48,7 @@ pub fn run(
         }
     };
 
-    if let Err(error) = pump(&state, &commands, attach, &shared) {
+    if let Err(error) = pump(&mut state, &commands, attach, &shared) {
         shared.fail(error.to_string());
     }
 
@@ -62,7 +63,7 @@ pub fn run(
 }
 
 fn pump(
-    state: &MapState,
+    state: &mut MapState,
     commands: &Receiver<CameraCommand>,
     attach: Sender<RuntimeLoopHandles>,
     shared: &Shared,
@@ -194,18 +195,22 @@ impl MapState {
         Ok(self.map.camera()?.bearing.unwrap_or(0.0) + delta)
     }
 
-    /// Drains runtime events, reporting whether the map wants another frame.
-    fn drain_events(&self) -> maplibre_native_ffi::Result<bool> {
+    /// Drains one batch of runtime events, reporting whether the map wants
+    /// another frame.
+    fn drain_events(&mut self) -> maplibre_native_ffi::Result<bool> {
         let source = RuntimeEventSource::Map(self.map.id());
         let mut render_update_available = false;
-        while let Some(event) = self.runtime.poll_event()? {
-            if event.source != source {
+        // One drain takes every event the pump produced. The batch borrows
+        // runtime storage, and this loop keeps nothing from it.
+        let batch = self.runtime.drain_events(0)?;
+        for event in batch.iter() {
+            if event.source() != source {
                 continue;
             }
-            match event.event_type {
+            match event.event_type() {
                 RuntimeEventType::MapRenderUpdateAvailable => render_update_available = true,
                 RuntimeEventType::MapRenderFrameFinished => {
-                    if let RuntimeEventPayload::RenderFrame(frame) = event.payload {
+                    if let RuntimeEventPayload::RenderFrame(frame) = event.payload() {
                         render_update_available |= frame.needs_repaint;
                     }
                 }
@@ -232,6 +237,11 @@ impl MapState {
 }
 
 fn configure_map(map: &MapHandle) -> maplibre_native_ffi::Result<()> {
+    // The two event types the runtime loop reads. A map queues no event of an
+    // unselected type, so this runs before the style load.
+    map.set_event_mask(
+        RuntimeEventMask::MAP_RENDER_UPDATE_AVAILABLE | RuntimeEventMask::MAP_RENDER_FRAME_FINISHED,
+    )?;
     map.set_style_url(STYLE_URL)?;
     let mut camera = CameraOptions::default();
     camera.center = Some(LatLng::new(37.7749, -122.4194));
