@@ -32,12 +32,12 @@ pub use camera::{
 pub use enums::{
     AmbientCacheOperation, CameraChangeMode, ConstrainMode, LocationIndicatorImageKind, LogEvent,
     LogSeverity, LogSeverityMask, MapDebugOptions, MapMode, NetworkStatus, NorthOrientation,
-    OfflineOperationKind, OfflineOperationResultKind, OfflineRegionDownloadState,
-    OpenGLContextProviderMask, RasterDemEncoding, RenderBackendMask, RenderMode, RenderResult,
-    ResourceErrorReason, ResourceKind, ResourceLoadingMethod, ResourcePriority,
-    ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, RuntimeEventType, SourceType,
-    StyleImageTextFit, StyleLayerVisibility, TileLodMode, TileOperation, TileScheme,
-    VectorTileEncoding, ViewportMode,
+    OfflineOperationKind, OfflineOperationResultKind, OfflineRegionDownloadState, OpenGLClientApi,
+    OpenGLContextOwnership, OpenGLContextProviderMask, RasterDemEncoding, RenderBackendMask,
+    RenderMode, RenderResult, ResourceErrorReason, ResourceKind, ResourceLoadingMethod,
+    ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage,
+    RuntimeEventType, SourceType, StyleImageTextFit, StyleLayerVisibility, TileLodMode,
+    TileOperation, TileScheme, VectorTileEncoding, ViewportMode,
 };
 pub use error::{Error, ErrorKind, Result, check};
 pub use events::{

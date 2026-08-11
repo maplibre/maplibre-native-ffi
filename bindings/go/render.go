@@ -68,6 +68,37 @@ const (
 	RenderResultTargetNotReady RenderResult = RenderResult(C.MLN_RENDER_RESULT_TARGET_NOT_READY)
 )
 
+// OpenGLContextOwnership names how a session's OpenGL context relates to the
+// thread that attached it.
+type OpenGLContextOwnership uint32
+
+const (
+	// OpenGLContextOwnershipShared leaves the thread as the session found it:
+	// every render makes the session context current and restores whatever was
+	// current before. The session context joins the host share group named by
+	// the descriptor, so a host may hand the session a texture and sample it
+	// from its own context.
+	OpenGLContextOwnershipShared OpenGLContextOwnership = OpenGLContextOwnership(C.MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED)
+	// OpenGLContextOwnershipDedicated gives the session its thread. It makes
+	// its context current once and keeps it current between renders, and it
+	// joins no share group. Use this when a thread exists to drive one render
+	// session and runs no other graphics work.
+	OpenGLContextOwnershipDedicated OpenGLContextOwnership = OpenGLContextOwnership(C.MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED)
+)
+
+// OpenGLClientAPI names the OpenGL client API a dedicated EGL session creates
+// its context for.
+type OpenGLClientAPI uint32
+
+const (
+	// OpenGLClientAPIUnspecified names no client API.
+	OpenGLClientAPIUnspecified OpenGLClientAPI = OpenGLClientAPI(C.MLN_OPENGL_CLIENT_API_UNSPECIFIED)
+	// OpenGLClientAPIGL is desktop OpenGL, as EGL_OPENGL_API names it.
+	OpenGLClientAPIGL OpenGLClientAPI = OpenGLClientAPI(C.MLN_OPENGL_CLIENT_API_GL)
+	// OpenGLClientAPIGLES is OpenGL ES, as EGL_OPENGL_ES_API names it.
+	OpenGLClientAPIGLES OpenGLClientAPI = OpenGLClientAPI(C.MLN_OPENGL_CLIENT_API_GLES)
+)
+
 // NativePointer is a borrowed opaque backend-native address. It grants no
 // memory access and transfers no ownership.
 type NativePointer uintptr
@@ -123,16 +154,27 @@ type VulkanSurfaceDescriptor struct {
 
 // WGLContextDescriptor contains WGL context provider data for OpenGL render targets.
 type WGLContextDescriptor struct {
-	DeviceContext  NativePointer
+	DeviceContext NativePointer
+	// ShareContext is the HGLRC whose share group the session context joins.
+	// Required under shared ownership. A dedicated session joins no share
+	// group, so it must be zero there.
 	ShareContext   NativePointer
 	GetProcAddress NativePointer
 }
 
 // EGLContextDescriptor contains EGL context provider data for OpenGL render targets.
 type EGLContextDescriptor struct {
-	Display        NativePointer
-	Config         NativePointer
-	ShareContext   NativePointer
+	Display NativePointer
+	Config  NativePointer
+	// ShareContext is the EGLContext whose share group the session context
+	// joins. Required under shared ownership, where the session also takes its
+	// client API from this context. A dedicated session joins no share group,
+	// so it must be zero there and names ClientAPI instead.
+	ShareContext NativePointer
+	// ClientAPI is the client API the session creates its context for.
+	// Required under dedicated ownership. A shared session queries
+	// ShareContext for it, so this is ignored there.
+	ClientAPI      OpenGLClientAPI
 	GetProcAddress NativePointer
 }
 
@@ -140,6 +182,12 @@ type EGLContextDescriptor struct {
 type OpenGLContextDescriptor struct {
 	WGL *WGLContextDescriptor
 	EGL *EGLContextDescriptor
+	// Ownership is whether the session shares its thread with host graphics
+	// work. The zero value is OpenGLContextOwnershipShared. WGL and EGL
+	// surface sessions support both. A WebGL session renders through the
+	// host's own context and a texture session hands its texture to the host,
+	// so both are shared only.
+	Ownership OpenGLContextOwnership
 }
 
 func (context OpenGLContextDescriptor) validate() error {
@@ -458,12 +506,13 @@ func (context VulkanContextDescriptor) toC() C.mln_vulkan_context_descriptor {
 
 func (context OpenGLContextDescriptor) toC() C.mln_opengl_context_descriptor {
 	raw := C.mln_opengl_context_descriptor{size: C.uint32_t(unsafe.Sizeof(C.mln_opengl_context_descriptor{}))}
+	raw.ownership = C.mln_opengl_context_ownership(context.Ownership)
 	if context.WGL != nil {
 		C.mln_go_opengl_context_set_wgl(&raw, cPointer(context.WGL.DeviceContext), cPointer(context.WGL.ShareContext), cPointer(context.WGL.GetProcAddress))
 		return raw
 	}
 	if context.EGL != nil {
-		C.mln_go_opengl_context_set_egl(&raw, cPointer(context.EGL.Display), cPointer(context.EGL.Config), cPointer(context.EGL.ShareContext), cPointer(context.EGL.GetProcAddress))
+		C.mln_go_opengl_context_set_egl(&raw, cPointer(context.EGL.Display), cPointer(context.EGL.Config), cPointer(context.EGL.ShareContext), C.mln_opengl_client_api(context.EGL.ClientAPI), cPointer(context.EGL.GetProcAddress))
 		return raw
 	}
 	return raw

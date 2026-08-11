@@ -69,6 +69,24 @@ A host therefore attaches on the thread that owns its graphics context and draws
 frames, while another thread pumps the runtime and map. A session call from any
 other thread reports an owner-thread status.
 
+### OpenGL context ownership
+
+OpenGL binds a context to a thread, so an OpenGL render target names how the
+session and the host divide the thread's context.
+
+A shared session leaves the thread as it found it. Each render makes the
+session's context current and restores whatever was current before, and that
+context joins the host share group, so the host draws its own graphics on the
+same thread and samples session textures from its own context. Texture targets
+and WebGL work this way.
+
+A dedicated session owns the thread's context. It creates a context of its own
+from the display or device the host already presents through, joins no share
+group, and keeps that context current between renders. Choose it for a surface
+target on a thread that exists to draw one map, such as an Android host
+rendering into a `SurfaceView`. The host then builds no context of its own, and
+each frame saves and restores nothing.
+
 ## Events
 
 Events preserve MapLibre Native's observer-driven model across the FFI boundary.

@@ -19,6 +19,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     void *display;
  *     void *config;
  *     void *share_context;
+ *     mln_opengl_client_api client_api;
  *     void *get_proc_address;
  * }
  * }
@@ -35,6 +36,8 @@ public class mln_egl_context_descriptor {
         MapLibreNativeC.C_POINTER.withName("display"),
         MapLibreNativeC.C_POINTER.withName("config"),
         MapLibreNativeC.C_POINTER.withName("share_context"),
+        MapLibreNativeC.C_INT.withName("client_api"),
+        MemoryLayout.paddingLayout(4),
         MapLibreNativeC.C_POINTER.withName("get_proc_address")
     ).withName("mln_egl_context_descriptor");
 
@@ -219,6 +222,50 @@ public class mln_egl_context_descriptor {
      */
     public static void share_context(MemorySegment struct, MemorySegment fieldValue) {
         struct.set(share_context$LAYOUT, share_context$OFFSET, fieldValue);
+    }
+
+    private static final OfInt client_api$LAYOUT = (OfInt)$LAYOUT.select(groupElement("client_api"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * mln_opengl_client_api client_api
+     * }
+     */
+    public static final OfInt client_api$layout() {
+        return client_api$LAYOUT;
+    }
+
+    private static final long client_api$OFFSET = $LAYOUT.byteOffset(groupElement("client_api"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * mln_opengl_client_api client_api
+     * }
+     */
+    public static final long client_api$offset() {
+        return client_api$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * mln_opengl_client_api client_api
+     * }
+     */
+    public static int client_api(MemorySegment struct) {
+        return struct.get(client_api$LAYOUT, client_api$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * mln_opengl_client_api client_api
+     * }
+     */
+    public static void client_api(MemorySegment struct, int fieldValue) {
+        struct.set(client_api$LAYOUT, client_api$OFFSET, fieldValue);
     }
 
     private static final AddressLayout get_proc_address$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("get_proc_address"));

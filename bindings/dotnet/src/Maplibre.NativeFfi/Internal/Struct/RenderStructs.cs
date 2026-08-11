@@ -49,6 +49,7 @@ internal static unsafe class RenderStructs
         var native = new mln_opengl_context_descriptor
         {
             size = (uint)sizeof(mln_opengl_context_descriptor),
+            ownership = (mln_opengl_context_ownership)context.Ownership,
         };
 
         switch (context)
@@ -71,6 +72,7 @@ internal static unsafe class RenderStructs
                     display = (void*)egl.Display.Address,
                     config = (void*)egl.Config.Address,
                     share_context = (void*)egl.ShareContext.Address,
+                    client_api = (mln_opengl_client_api)egl.ClientApi,
                     get_proc_address = (void*)egl.GetProcAddress.Address,
                 };
                 break;

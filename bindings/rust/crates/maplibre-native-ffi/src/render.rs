@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 pub use maplibre_core::{PremultipliedRgba8Image, TextureImageInfo};
 use maplibre_native_ffi_core as maplibre_core;
-use maplibre_native_ffi_core::RenderResult;
+use maplibre_native_ffi_core::{OpenGLClientApi, OpenGLContextOwnership, RenderResult};
 use maplibre_native_ffi_sys as sys;
 
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
@@ -363,8 +363,13 @@ impl Default for WebGpuContextDescriptor {
 #[non_exhaustive]
 pub struct WglContextDescriptor {
     pub device_context: NativePointer,
+    /// Borrowed `HGLRC` whose share group the session context joins. Required
+    /// under shared ownership. A dedicated session joins no share group, so it
+    /// is null there.
     pub share_context: NativePointer,
     pub get_proc_address: NativePointer,
+    /// Whether the session shares its thread with host graphics work.
+    pub ownership: OpenGLContextOwnership,
 }
 
 impl WglContextDescriptor {
@@ -373,6 +378,7 @@ impl WglContextDescriptor {
             device_context,
             share_context,
             get_proc_address: NativePointer::NULL,
+            ownership: OpenGLContextOwnership::Shared,
         }
     }
 
@@ -381,6 +387,7 @@ impl WglContextDescriptor {
             device_context: self.device_context.as_void_ptr(),
             share_context: self.share_context.as_void_ptr(),
             get_proc_address: self.get_proc_address.as_void_ptr(),
+            ownership: self.ownership.as_raw(),
         }
     }
 }
@@ -396,8 +403,18 @@ impl Default for WglContextDescriptor {
 pub struct EglContextDescriptor {
     pub display: NativePointer,
     pub config: NativePointer,
+    /// Borrowed `EGLContext` whose share group the session context joins.
+    /// Required under shared ownership, where the session also takes its client
+    /// API from this context. A dedicated session joins no share group, so it
+    /// is null there and names [`client_api`](Self::client_api) instead.
     pub share_context: NativePointer,
+    /// Client API the session creates its context for. Required under dedicated
+    /// ownership. A shared session queries
+    /// [`share_context`](Self::share_context) for it, so this is ignored there.
+    pub client_api: OpenGLClientApi,
     pub get_proc_address: NativePointer,
+    /// Whether the session shares its thread with host graphics work.
+    pub ownership: OpenGLContextOwnership,
 }
 
 impl EglContextDescriptor {
@@ -410,7 +427,9 @@ impl EglContextDescriptor {
             display,
             config,
             share_context,
+            client_api: OpenGLClientApi::Unspecified,
             get_proc_address: NativePointer::NULL,
+            ownership: OpenGLContextOwnership::Shared,
         }
     }
 
@@ -419,7 +438,9 @@ impl EglContextDescriptor {
             display: self.display.as_void_ptr(),
             config: self.config.as_void_ptr(),
             share_context: self.share_context.as_void_ptr(),
+            client_api: self.client_api.as_raw(),
             get_proc_address: self.get_proc_address.as_void_ptr(),
+            ownership: self.ownership.as_raw(),
         }
     }
 }
@@ -458,6 +479,10 @@ impl WebGlContextDescriptor {
     }
 }
 
+/// OpenGL platform context a render session draws through.
+///
+/// Each platform descriptor carries its own thread ownership. A browser session
+/// renders through the host's own WebGL context, so it is shared only.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum OpenGLContextDescriptor {

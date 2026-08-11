@@ -1600,16 +1600,18 @@ class MapHandle(NativeHandleMixin):
         self, descriptor: OpenGLSurfaceDescriptor
     ) -> RenderSessionHandle:
         """Attach an OpenGL native surface render target to this map."""
-        platform, first, second, share, get_proc = _opengl_context_parts(
-            descriptor.context
+        platform, ownership, first, second, share, client_api, get_proc = (
+            _opengl_context_parts(descriptor.context)
         )
         return self._attach_render_session(
             _native.attach_opengl_surface,
             descriptor,
             platform,
+            ownership,
             first,
             second,
             share,
+            client_api,
             get_proc,
             descriptor.surface.address,
         )
@@ -1618,16 +1620,18 @@ class MapHandle(NativeHandleMixin):
         self, descriptor: OpenGLOwnedTextureDescriptor
     ) -> RenderSessionHandle:
         """Attach an OpenGL session-owned texture render target to this map."""
-        platform, first, second, share, get_proc = _opengl_context_parts(
-            descriptor.context
+        platform, ownership, first, second, share, client_api, get_proc = (
+            _opengl_context_parts(descriptor.context)
         )
         return self._attach_render_session(
             _native.attach_opengl_owned_texture,
             descriptor,
             platform,
+            ownership,
             first,
             second,
             share,
+            client_api,
             get_proc,
         )
 
@@ -1635,8 +1639,8 @@ class MapHandle(NativeHandleMixin):
         self, descriptor: OpenGLBorrowedTextureDescriptor
     ) -> RenderSessionHandle:
         """Attach an OpenGL caller-owned texture render target to this map."""
-        platform, first, second, share, get_proc = _opengl_context_parts(
-            descriptor.context
+        platform, ownership, first, second, share, client_api, get_proc = (
+            _opengl_context_parts(descriptor.context)
         )
         return self._attach_render_session(
             _native.attach_opengl_borrowed_texture,
@@ -1644,9 +1648,11 @@ class MapHandle(NativeHandleMixin):
             descriptor.physical_width,
             descriptor.physical_height,
             platform,
+            ownership,
             first,
             second,
             share,
+            client_api,
             get_proc,
             descriptor.texture,
             descriptor.target,

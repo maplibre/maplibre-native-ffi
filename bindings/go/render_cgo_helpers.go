@@ -24,6 +24,7 @@ type vulkanContextDescriptorFields struct {
 type wglContextDescriptorFields struct {
 	OpenGLSize     uint32
 	Platform       uint32
+	Ownership      uint32
 	WGLSize        uint32
 	DeviceContext  uintptr
 	ShareContext   uintptr
@@ -33,10 +34,12 @@ type wglContextDescriptorFields struct {
 type eglContextDescriptorFields struct {
 	OpenGLSize     uint32
 	Platform       uint32
+	Ownership      uint32
 	EGLSize        uint32
 	Display        uintptr
 	Config         uintptr
 	ShareContext   uintptr
+	ClientAPI      uint32
 	GetProcAddress uintptr
 }
 
@@ -64,6 +67,7 @@ func testWGLContextDescriptorFields(descriptor OpenGLContextDescriptor) wglConte
 	return wglContextDescriptorFields{
 		OpenGLSize:     uint32(raw.size),
 		Platform:       uint32(raw.platform),
+		Ownership:      uint32(raw.ownership),
 		WGLSize:        uint32(wgl.size),
 		DeviceContext:  uintptr(wgl.device_context),
 		ShareContext:   uintptr(wgl.share_context),
@@ -77,10 +81,12 @@ func testEGLContextDescriptorFields(descriptor OpenGLContextDescriptor) eglConte
 	return eglContextDescriptorFields{
 		OpenGLSize:     uint32(raw.size),
 		Platform:       uint32(raw.platform),
+		Ownership:      uint32(raw.ownership),
 		EGLSize:        uint32(egl.size),
 		Display:        uintptr(egl.display),
 		Config:         uintptr(egl.config),
 		ShareContext:   uintptr(egl.share_context),
+		ClientAPI:      uint32(egl.client_api),
 		GetProcAddress: uintptr(egl.get_proc_address),
 	}
 }

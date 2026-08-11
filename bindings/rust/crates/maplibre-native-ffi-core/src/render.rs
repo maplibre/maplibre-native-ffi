@@ -39,6 +39,9 @@ pub struct WglContextDescriptorFields {
     pub device_context: *mut c_void,
     pub share_context: *mut c_void,
     pub get_proc_address: *mut c_void,
+    /// Carried here rather than in the union member it belongs to, since it
+    /// constrains the share context beside it.
+    pub ownership: sys::mln_opengl_context_ownership,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -46,7 +49,11 @@ pub struct EglContextDescriptorFields {
     pub display: *mut c_void,
     pub config: *mut c_void,
     pub share_context: *mut c_void,
+    pub client_api: sys::mln_opengl_client_api,
     pub get_proc_address: *mut c_void,
+    /// Carried here rather than in the union member it belongs to, since it
+    /// constrains the share context and client API beside it.
+    pub ownership: sys::mln_opengl_context_ownership,
 }
 
 /// A browser host owns its WebGL context and hands the session its Emscripten
@@ -212,6 +219,7 @@ fn egl_context_descriptor_to_native(
         display: fields.display,
         config: fields.config,
         share_context: fields.share_context,
+        client_api: fields.client_api,
         get_proc_address: fields.get_proc_address,
     }
 }
@@ -223,6 +231,7 @@ fn opengl_context_descriptor_to_native(
         OpenGLContextDescriptorFields::Wgl(wgl) => sys::mln_opengl_context_descriptor {
             size: std::mem::size_of::<sys::mln_opengl_context_descriptor>() as u32,
             platform: sys::MLN_OPENGL_CONTEXT_PLATFORM_WGL,
+            ownership: wgl.ownership,
             data: sys::mln_opengl_context_descriptor__bindgen_ty_1 {
                 wgl: wgl_context_descriptor_to_native(wgl),
             },
@@ -230,13 +239,17 @@ fn opengl_context_descriptor_to_native(
         OpenGLContextDescriptorFields::Egl(egl) => sys::mln_opengl_context_descriptor {
             size: std::mem::size_of::<sys::mln_opengl_context_descriptor>() as u32,
             platform: sys::MLN_OPENGL_CONTEXT_PLATFORM_EGL,
+            ownership: egl.ownership,
             data: sys::mln_opengl_context_descriptor__bindgen_ty_1 {
                 egl: egl_context_descriptor_to_native(egl),
             },
         },
+        // A browser session renders through the host's own context, so it is
+        // shared only.
         OpenGLContextDescriptorFields::WebGl(webgl) => sys::mln_opengl_context_descriptor {
             size: std::mem::size_of::<sys::mln_opengl_context_descriptor>() as u32,
             platform: sys::MLN_OPENGL_CONTEXT_PLATFORM_WEBGL,
+            ownership: sys::MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
             data: sys::mln_opengl_context_descriptor__bindgen_ty_1 {
                 webgl: webgl_context_descriptor_to_native(webgl),
             },
@@ -446,6 +459,7 @@ mod tests {
             device_context: ptr(base),
             share_context: ptr(base + 1),
             get_proc_address: ptr(base + 2),
+            ownership: sys::MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
         })
     }
 
@@ -454,7 +468,22 @@ mod tests {
             display: ptr(base),
             config: ptr(base + 1),
             share_context: ptr(base + 2),
+            client_api: sys::MLN_OPENGL_CLIENT_API_UNSPECIFIED,
             get_proc_address: ptr(base + 3),
+            ownership: sys::MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
+        })
+    }
+
+    /// A dedicated EGL context, which owns its thread rather than joining a
+    /// host share group.
+    fn dedicated_egl_context(base: usize) -> OpenGLContextDescriptorFields {
+        OpenGLContextDescriptorFields::Egl(EglContextDescriptorFields {
+            display: ptr(base),
+            config: ptr(base + 1),
+            share_context: std::ptr::null_mut(),
+            client_api: sys::MLN_OPENGL_CLIENT_API_GLES,
+            get_proc_address: ptr(base + 3),
+            ownership: sys::MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED,
         })
     }
 
@@ -597,6 +626,28 @@ mod tests {
         assert_eq!(unsafe { owned.context.data.egl.config }, ptr(8));
         assert_eq!(unsafe { owned.context.data.egl.share_context }, ptr(9));
         assert_eq!(unsafe { owned.context.data.egl.get_proc_address }, ptr(10));
+        assert_eq!(
+            owned.context.ownership,
+            sys::MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED
+        );
+
+        // Ownership sits beside the union in the C descriptor, and a dedicated
+        // session names its client API rather than a share context.
+        let dedicated = opengl_surface_descriptor_to_native(OpenGLSurfaceDescriptorFields {
+            extent: extent(),
+            context: dedicated_egl_context(7),
+            surface: ptr(11),
+        });
+        assert_eq!(
+            dedicated.context.ownership,
+            sys::MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED
+        );
+        // SAFETY: platform selects the egl union field initialized above.
+        assert!(unsafe { dedicated.context.data.egl.share_context }.is_null());
+        assert_eq!(
+            unsafe { dedicated.context.data.egl.client_api },
+            sys::MLN_OPENGL_CLIENT_API_GLES
+        );
 
         let borrowed =
             opengl_borrowed_texture_descriptor_to_native(OpenGLBorrowedTextureDescriptorFields {
@@ -633,6 +684,10 @@ mod tests {
         );
         // SAFETY: platform selects the webgl union field initialized above.
         assert_eq!(unsafe { browser.context.data.webgl.context }, 13);
+        assert_eq!(
+            browser.context.ownership,
+            sys::MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED
+        );
         assert_eq!(
             unsafe { browser.context.data.webgl.size },
             std::mem::size_of::<sys::mln_webgl_context_descriptor>() as u32

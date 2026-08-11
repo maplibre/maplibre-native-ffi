@@ -368,7 +368,9 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
     }
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
     if (!egl_context_) {
-      egl_context_.emplace(context_.data.egl);
+      egl_context_.emplace(
+        context_.data.egl, MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED
+      );
     }
     egl_context_->activate_pbuffer();
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)

@@ -52,6 +52,31 @@ class RenderResult(UnknownIntEnum):
     TARGET_NOT_READY = 3
 
 
+class OpenGLContextOwnership(UnknownIntEnum):
+    """How a session's OpenGL context relates to the thread that attached it.
+
+    A shared session leaves the thread as it found it: every render makes the
+    session context current and restores whatever was current before. The
+    session context joins the share group named by the descriptor, so a host may
+    hand the session a texture and sample it from its own context.
+
+    A dedicated session owns the thread. It makes its context current once and
+    keeps it current between renders, and it joins no share group. Use this when
+    a thread exists to drive one render session and runs no other graphics work.
+    """
+
+    SHARED = 0
+    DEDICATED = 1
+
+
+class OpenGLClientApi(UnknownIntEnum):
+    """OpenGL client API a dedicated EGL session creates its context for."""
+
+    UNSPECIFIED = 0
+    GL = 1
+    GLES = 2
+
+
 class NativePointer:
     """Borrowed opaque backend-native address value."""
 
@@ -185,21 +210,35 @@ class VulkanContextDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class WglContextDescriptor:
-    """Borrowed WGL context values shared by OpenGL render targets."""
+    """Borrowed WGL context values shared by OpenGL render targets.
+
+    A shared session joins the share group named by ``share_context``, which is
+    required there. A dedicated session joins no share group, so
+    ``share_context`` must be null there.
+    """
 
     device_context: NativePointer = field(default_factory=NativePointer.null)
     share_context: NativePointer = field(default_factory=NativePointer.null)
     get_proc_address: NativePointer = field(default_factory=NativePointer.null)
+    ownership: OpenGLContextOwnership = OpenGLContextOwnership.SHARED
 
 
 @dataclass(frozen=True, slots=True)
 class EglContextDescriptor:
-    """Borrowed EGL context values shared by OpenGL render targets."""
+    """Borrowed EGL context values shared by OpenGL render targets.
+
+    A shared session joins the share group named by ``share_context`` and takes
+    its client API from that context, so ``share_context`` is required there and
+    ``client_api`` is ignored. A dedicated session joins no share group, so
+    ``share_context`` must be null there and ``client_api`` names GL or GLES.
+    """
 
     display: NativePointer = field(default_factory=NativePointer.null)
     config: NativePointer = field(default_factory=NativePointer.null)
     share_context: NativePointer = field(default_factory=NativePointer.null)
+    client_api: OpenGLClientApi = OpenGLClientApi.UNSPECIFIED
     get_proc_address: NativePointer = field(default_factory=NativePointer.null)
+    ownership: OpenGLContextOwnership = OpenGLContextOwnership.SHARED
 
 
 OpenGLContextDescriptor = WglContextDescriptor | EglContextDescriptor
@@ -520,16 +559,18 @@ class RenderSessionHandle(NativeHandleMixin):
         may hand over a replacement for one it has already destroyed, and an
         unusable surface is reported by the next :meth:`render_update`.
         """
-        platform, first, second, share, get_proc = _opengl_context_parts(
-            descriptor.context
+        platform, ownership, first, second, share, client_api, get_proc = (
+            _opengl_context_parts(descriptor.context)
         )
         self._set_target(
             self._native.set_opengl_surface_target,
             descriptor,
             platform,
+            ownership,
             first,
             second,
             share,
+            client_api,
             get_proc,
             descriptor.surface.address,
         )
@@ -594,8 +635,8 @@ class RenderSessionHandle(NativeHandleMixin):
         session attached with or one in its share group, and that context must
         be current on this thread.
         """
-        platform, first, second, share, get_proc = _opengl_context_parts(
-            descriptor.context
+        platform, ownership, first, second, share, client_api, get_proc = (
+            _opengl_context_parts(descriptor.context)
         )
         self._set_target(
             self._native.set_opengl_borrowed_texture_target,
@@ -603,9 +644,11 @@ class RenderSessionHandle(NativeHandleMixin):
             descriptor.physical_width,
             descriptor.physical_height,
             platform,
+            ownership,
             first,
             second,
             share,
+            client_api,
             get_proc,
             descriptor.texture,
             descriptor.target,
@@ -880,21 +923,25 @@ class OpenGLOwnedTextureFrameHandle(NativeHandleMixin):
 
 def _opengl_context_parts(
     context: EglContextDescriptor | WglContextDescriptor,
-) -> tuple[int, int, int, int, int]:
+) -> tuple[int, int, int, int, int, int, int]:
     if isinstance(context, WglContextDescriptor):
         return (
             1,
+            context.ownership.native_code,
             context.device_context.address,
             0,
             context.share_context.address,
+            OpenGLClientApi.UNSPECIFIED.native_code,
             context.get_proc_address.address,
         )
     if isinstance(context, EglContextDescriptor):
         return (
             2,
+            context.ownership.native_code,
             context.display.address,
             context.config.address,
             context.share_context.address,
+            context.client_api.native_code,
             context.get_proc_address.address,
         )
     msg = f"unsupported OpenGL context descriptor: {type(context)!r}"
@@ -913,7 +960,9 @@ __all__ = [
     "MetalSurfaceDescriptor",
     "NativePointer",
     "OpenGLBorrowedTextureDescriptor",
+    "OpenGLClientApi",
     "OpenGLContextDescriptor",
+    "OpenGLContextOwnership",
     "OpenGLContextProvider",
     "OpenGLOwnedTextureDescriptor",
     "OpenGLOwnedTextureFrame",

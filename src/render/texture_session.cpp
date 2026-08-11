@@ -309,6 +309,22 @@ auto validate_vulkan_borrowed_texture_descriptor(
   return MLN_STATUS_OK;
 }
 
+// A texture session exists to hand its texture to the host, which needs the
+// session context in the host's share group. Dedicated ownership names no share
+// group, so it has no meaning here.
+auto validate_shared_texture_ownership(
+  const mln_opengl_context_descriptor& context
+) -> mln_status {
+  if (context.ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED) {
+    set_thread_error(
+      "an OpenGL texture session shares its context with the host that samples "
+      "the texture"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
 auto validate_opengl_owned_texture_descriptor(
   const mln_opengl_owned_texture_descriptor* descriptor,
   bool require_supported_provider
@@ -327,9 +343,12 @@ auto validate_opengl_owned_texture_descriptor(
   if (extent_status != MLN_STATUS_OK) {
     return extent_status;
   }
-  return validate_opengl_context(
-    descriptor->context, require_supported_provider
-  );
+  const auto context_status =
+    validate_opengl_context(descriptor->context, require_supported_provider);
+  if (context_status != MLN_STATUS_OK) {
+    return context_status;
+  }
+  return validate_shared_texture_ownership(descriptor->context);
 }
 
 auto validate_opengl_borrowed_texture_descriptor(
@@ -356,6 +375,11 @@ auto validate_opengl_borrowed_texture_descriptor(
     validate_opengl_context(descriptor->context, require_supported_provider);
   if (context_status != MLN_STATUS_OK) {
     return context_status;
+  }
+  const auto ownership_status =
+    validate_shared_texture_ownership(descriptor->context);
+  if (ownership_status != MLN_STATUS_OK) {
+    return ownership_status;
   }
   if (descriptor->texture == 0 || descriptor->target == 0) {
     set_thread_error("OpenGL texture and target must be specified");

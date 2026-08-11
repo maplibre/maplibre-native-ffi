@@ -748,6 +748,67 @@ const EglAttachContext = if (supports_egl) struct {
     }
 } else struct {};
 
+/// Pbuffer fixture for a dedicated session. It creates no EGL context and makes
+/// nothing current, because naming dedicated ownership is what asks the session
+/// to create its own context and keep it current.
+const DedicatedEglSurface = if (supports_egl) struct {
+    display: egl.EGLDisplay,
+    config: egl.EGLConfig,
+    egl_surface: egl.EGLSurface,
+
+    pub fn initWithSize(width: u32, height: u32) !DedicatedEglSurface {
+        const display = try EglAttachContext.initDisplay();
+        errdefer _ = egl.eglTerminate(display);
+
+        const config_attributes = [_]egl.EGLint{
+            egl.EGL_SURFACE_TYPE,    egl.EGL_PBUFFER_BIT,
+            egl.EGL_RENDERABLE_TYPE, egl.EGL_OPENGL_ES3_BIT,
+            egl.EGL_RED_SIZE,        8,
+            egl.EGL_GREEN_SIZE,      8,
+            egl.EGL_BLUE_SIZE,       8,
+            egl.EGL_ALPHA_SIZE,      8,
+            egl.EGL_DEPTH_SIZE,      24,
+            egl.EGL_STENCIL_SIZE,    8,
+            egl.EGL_NONE,
+        };
+        var config: egl.EGLConfig = null;
+        var config_count: egl.EGLint = 0;
+        if (egl.eglChooseConfig(display, &config_attributes, &config, 1, &config_count) == egl.EGL_FALSE or
+            config_count == 0 or config == null)
+        {
+            return error.EglUnavailable;
+        }
+
+        const surface_attributes = [_]egl.EGLint{
+            egl.EGL_WIDTH,  @intCast(width),
+            egl.EGL_HEIGHT, @intCast(height),
+            egl.EGL_NONE,
+        };
+        const pbuffer = egl.eglCreatePbufferSurface(display, config, &surface_attributes);
+        if (pbuffer == egl.EGL_NO_SURFACE) return error.EglUnavailable;
+        return .{ .display = display, .config = config, .egl_surface = pbuffer };
+    }
+
+    pub fn deinit(self: *DedicatedEglSurface) void {
+        _ = egl.eglDestroySurface(self.display, self.egl_surface);
+        _ = egl.eglTerminate(self.display);
+    }
+
+    pub fn descriptor(self: *const DedicatedEglSurface) maplibre.OpenGLContextDescriptor {
+        return .{ .egl = .{
+            .display = maplibre.NativePointer.fromPtr(@ptrCast(self.display.?)),
+            .config = maplibre.NativePointer.fromPtr(@ptrCast(self.config.?)),
+            .share_context = null,
+            .client_api = .gles,
+            .ownership = .dedicated,
+        } };
+    }
+
+    pub fn surface(self: *const DedicatedEglSurface) maplibre.NativePointer {
+        return maplibre.NativePointer.fromPtr(@ptrCast(self.egl_surface.?));
+    }
+} else struct {};
+
 const OpenGLBorrowedTexture = if (supports_wgl) WglBorrowedTexture else if (supports_egl) struct {
     context: EglAttachContext,
     texture: gl.uint,
@@ -2061,6 +2122,45 @@ test "OpenGL surface renders through public bindings" {
     try testing.expectError(error.Unsupported, session.acquireOpenGLOwnedTextureFrame());
     var readback_buffer: [128 * 128 * 4]u8 = undefined;
     try testing.expectError(error.Unsupported, session.readPremultipliedRgba8Into(&readback_buffer));
+}
+
+test "dedicated OpenGL surface renders through a context it owns" {
+    if (!supports_egl) return error.SkipZigTest;
+
+    var context = try DedicatedEglSurface.initWithSize(64, 64);
+    defer context.deinit();
+
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    var session = try maplibre.attachOpenGLSurface(&map, .{
+        .extent = .{ .width = 64, .height = 64, .scale_factor = 1.0 },
+        .context = context.descriptor(),
+        .surface = context.surface(),
+    });
+    errdefer session.close() catch {};
+
+    try map.setStyleJson(testing.allocator, support.style_json);
+    // The session owns this thread, which is also the map's, so the map reaches
+    // the style and the extent only while this loop pumps the runtime.
+    var result: maplibre.RenderResult = .no_update;
+    for (0..1000) |_| {
+        try runtime.pump(0);
+        result = try session.renderUpdate();
+        if (result == .rendered) break;
+        try std.Thread.yield();
+    }
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), result);
+    // A dedicated session leaves its context current, so the next render costs
+    // no EGL call.
+    try testing.expect(egl.eglGetCurrentContext() != egl.EGL_NO_CONTEXT);
+
+    // Closing the session releases the thread it had taken over.
+    try session.close();
+    try testing.expect(egl.eglGetCurrentContext() == egl.EGL_NO_CONTEXT);
 }
 
 test "Metal owned texture frame handle scopes native pointers" {

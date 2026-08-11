@@ -91,8 +91,75 @@ public struct VulkanContextDescriptor: Equatable, Sendable {
   }
 }
 
+/// How a session's OpenGL context relates to the thread that attached it.
+///
+/// A shared session leaves the thread as it found it: every render makes the
+/// session context current and restores whatever was current before. The
+/// session context joins the host share group named by the descriptor, so a
+/// host may hand the session a texture and sample it from its own context.
+///
+/// A dedicated session owns the thread. It makes its context current once and
+/// keeps it current between renders, and it joins no share group. Use this when
+/// a thread exists to drive one render session and runs no other graphics work,
+/// such as an Android host that renders into a SurfaceView.
+public enum OpenGLContextOwnership: Sendable, Hashable {
+  /// The session shares its thread with host graphics work.
+  case shared
+  /// The session owns its thread's OpenGL context.
+  case dedicated
+  case unknown(UInt32)
+
+  public static func fromNative(_ rawValue: UInt32) -> Self {
+    switch rawValue {
+    case 0: .shared
+    case 1: .dedicated
+    default: .unknown(rawValue)
+    }
+  }
+
+  public var rawValue: UInt32 {
+    switch self {
+    case .shared: 0
+    case .dedicated: 1
+    case let .unknown(raw): raw
+    }
+  }
+}
+
+/// OpenGL client API a dedicated EGL session creates its context for.
+public enum OpenGLClientAPI: Sendable, Hashable {
+  /// No client API is named.
+  case unspecified
+  /// Desktop OpenGL, as `EGL_OPENGL_API` names it.
+  case gl
+  /// OpenGL ES, as `EGL_OPENGL_ES_API` names it.
+  case gles
+  case unknown(UInt32)
+
+  public static func fromNative(_ rawValue: UInt32) -> Self {
+    switch rawValue {
+    case 0: .unspecified
+    case 1: .gl
+    case 2: .gles
+    default: .unknown(rawValue)
+    }
+  }
+
+  public var rawValue: UInt32 {
+    switch self {
+    case .unspecified: 0
+    case .gl: 1
+    case .gles: 2
+    case let .unknown(raw): raw
+    }
+  }
+}
+
 public struct WglContextDescriptor: Equatable, Sendable {
   public var deviceContext: NativePointer
+  /// The context whose share group the session context joins. Required under
+  /// shared ownership. A dedicated session joins no share group, so it must be
+  /// ``NativePointer/null`` there.
   public var shareContext: NativePointer
   public var getProcAddress: NativePointer
 
@@ -118,18 +185,28 @@ public struct WglContextDescriptor: Equatable, Sendable {
 public struct EglContextDescriptor: Equatable, Sendable {
   public var display: NativePointer
   public var config: NativePointer
+  /// The context whose share group the session context joins. Required under
+  /// shared ownership, where the session also takes its client API from this
+  /// context. A dedicated session joins no share group, so it must be
+  /// ``NativePointer/null`` there and names ``clientAPI`` instead.
   public var shareContext: NativePointer
+  /// The client API the session creates its context for. Required under
+  /// dedicated ownership. A shared session queries ``shareContext`` for it, so
+  /// this is ignored there.
+  public var clientAPI: OpenGLClientAPI
   public var getProcAddress: NativePointer
 
   public init(
     display: NativePointer,
     config: NativePointer,
     shareContext: NativePointer,
+    clientAPI: OpenGLClientAPI = .unspecified,
     getProcAddress: NativePointer = .null
   ) {
     self.display = display
     self.config = config
     self.shareContext = shareContext
+    self.clientAPI = clientAPI
     self.getProcAddress = getProcAddress
   }
 
@@ -138,21 +215,59 @@ public struct EglContextDescriptor: Equatable, Sendable {
       displayAddress: display.addressBitPattern,
       configAddress: config.addressBitPattern,
       shareContextAddress: shareContext.addressBitPattern,
+      clientAPIRawValue: clientAPI.rawValue,
       getProcAddressAddress: getProcAddress.addressBitPattern
     )
   }
 }
 
-public enum OpenGLContextDescriptor: Equatable, Sendable {
-  case wgl(WglContextDescriptor)
-  case egl(EglContextDescriptor)
+public struct OpenGLContextDescriptor: Equatable, Sendable {
+  /// The context provider that supplies the session context.
+  public enum Platform: Equatable, Sendable {
+    case wgl(WglContextDescriptor)
+    case egl(EglContextDescriptor)
+  }
+
+  public var platform: Platform
+  /// Whether the session shares its thread with host graphics work. WGL and
+  /// EGL surface sessions support both. A texture session hands its texture to
+  /// the host, so it is shared only.
+  public var ownership: OpenGLContextOwnership
+
+  public init(
+    platform: Platform,
+    ownership: OpenGLContextOwnership = .shared
+  ) {
+    self.platform = platform
+    self.ownership = ownership
+  }
+
+  public static func wgl(
+    _ context: WglContextDescriptor,
+    ownership: OpenGLContextOwnership = .shared
+  ) -> Self {
+    Self(platform: .wgl(context), ownership: ownership)
+  }
+
+  public static func egl(
+    _ context: EglContextDescriptor,
+    ownership: OpenGLContextOwnership = .shared
+  ) -> Self {
+    Self(platform: .egl(context), ownership: ownership)
+  }
 
   var nativeInput: NativeOpenGLContextDescriptor {
-    switch self {
+    switch platform {
     case let .wgl(descriptor):
-      NativeOpenGLContextDescriptor(platform: .wgl(descriptor.nativeInput))
+      NativeOpenGLContextDescriptor(
+        platform: .wgl(descriptor.nativeInput),
+        ownershipRawValue: ownership.rawValue
+      )
     case let .egl(descriptor):
-      NativeOpenGLContextDescriptor(platform: .egl(descriptor.nativeInput))
+      NativeOpenGLContextDescriptor(
+        platform: .egl(descriptor.nativeInput),
+        ownershipRawValue: ownership.rawValue
+      )
     }
   }
 }

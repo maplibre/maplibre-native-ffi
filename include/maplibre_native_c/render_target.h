@@ -84,12 +84,46 @@ typedef enum mln_opengl_context_platform : uint32_t {
   MLN_OPENGL_CONTEXT_PLATFORM_WEBGL = 3u,
 } mln_opengl_context_platform;
 
+/**
+ * How a session's OpenGL context relates to the thread that attached it.
+ *
+ * A shared session leaves the thread as it found it: every render makes the
+ * session context current and restores whatever was current before. The session
+ * context joins the host share group named by the descriptor, so a host may
+ * hand the session a texture and sample it from its own context.
+ *
+ * A dedicated session owns the thread. It makes its context current once and
+ * keeps it current between renders, and it joins no share group. Use this when
+ * a thread exists to drive one render session and runs no other graphics work,
+ * such as an Android host that renders into a SurfaceView.
+ */
+typedef enum mln_opengl_context_ownership : uint32_t {
+  /** The session shares its thread with host graphics work. */
+  MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED = 0u,
+  /** The session owns its thread's OpenGL context. */
+  MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED = 1u,
+} mln_opengl_context_ownership;
+
+/** OpenGL client API a dedicated EGL session creates its context for. */
+typedef enum mln_opengl_client_api : uint32_t {
+  /** No client API is named. */
+  MLN_OPENGL_CLIENT_API_UNSPECIFIED = 0u,
+  /** Desktop OpenGL, as EGL_OPENGL_API names it. */
+  MLN_OPENGL_CLIENT_API_GL = 1u,
+  /** OpenGL ES, as EGL_OPENGL_ES_API names it. */
+  MLN_OPENGL_CLIENT_API_GLES = 2u,
+} mln_opengl_client_api;
+
 /** WGL context fields shared by OpenGL render targets on Windows. */
 typedef struct mln_wgl_context_descriptor {
   uint32_t size;
-  /** Borrowed HDC used to create a shared session context. Required. */
+  /** Borrowed HDC used to create the session context. Required. */
   void* device_context;
-  /** Borrowed HGLRC whose share group the session context joins. Required. */
+  /**
+   * Borrowed HGLRC whose share group the session context joins. Required under
+   * shared ownership. A dedicated session joins no share group, so it must be
+   * null there.
+   */
   void* share_context;
   /** Optional wglGetProcAddress-compatible function for the host loader. */
   void* get_proc_address;
@@ -107,9 +141,18 @@ typedef struct mln_egl_context_descriptor {
    */
   void* config;
   /**
-   * Borrowed EGLContext whose share group the session context joins. Required.
+   * Borrowed EGLContext whose share group the session context joins. Required
+   * under shared ownership, where the session also takes its client API from
+   * this context. A dedicated session joins no share group, so it must be null
+   * there and names client_api instead.
    */
   void* share_context;
+  /**
+   * Client API the session creates its context for. Required under dedicated
+   * ownership. A shared session queries share_context for it, so this is
+   * ignored there.
+   */
+  mln_opengl_client_api client_api;
   /** Optional eglGetProcAddress-compatible function for the host loader. */
   void* get_proc_address;
 } mln_egl_context_descriptor;
@@ -126,6 +169,13 @@ typedef struct mln_opengl_context_descriptor {
   uint32_t size;
   /** WGL or EGL context provider. */
   mln_opengl_context_platform platform;
+  /**
+   * Whether the session shares its thread with host graphics work. WGL and EGL
+   * surface sessions support both. A WebGL session renders through the host's
+   * own context and a texture session hands its texture to the host, so both
+   * are shared only.
+   */
+  mln_opengl_context_ownership ownership;
   union {
     mln_wgl_context_descriptor wgl;
     mln_egl_context_descriptor egl;

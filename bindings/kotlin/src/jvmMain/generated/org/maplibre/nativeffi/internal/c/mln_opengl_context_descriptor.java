@@ -17,6 +17,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  * struct mln_opengl_context_descriptor {
  *     uint32_t size;
  *     mln_opengl_context_platform platform;
+ *     mln_opengl_context_ownership ownership;
  *     union {
  *         mln_wgl_context_descriptor wgl;
  *         mln_egl_context_descriptor egl;
@@ -34,6 +35,8 @@ public class mln_opengl_context_descriptor {
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
         MapLibreNativeC.C_INT.withName("size"),
         MapLibreNativeC.C_INT.withName("platform"),
+        MapLibreNativeC.C_INT.withName("ownership"),
+        MemoryLayout.paddingLayout(4),
         mln_opengl_context_descriptor.data.layout().withName("data")
     ).withName("mln_opengl_context_descriptor");
 
@@ -132,6 +135,50 @@ public class mln_opengl_context_descriptor {
         struct.set(platform$LAYOUT, platform$OFFSET, fieldValue);
     }
 
+    private static final OfInt ownership$LAYOUT = (OfInt)$LAYOUT.select(groupElement("ownership"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * mln_opengl_context_ownership ownership
+     * }
+     */
+    public static final OfInt ownership$layout() {
+        return ownership$LAYOUT;
+    }
+
+    private static final long ownership$OFFSET = $LAYOUT.byteOffset(groupElement("ownership"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * mln_opengl_context_ownership ownership
+     * }
+     */
+    public static final long ownership$offset() {
+        return ownership$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * mln_opengl_context_ownership ownership
+     * }
+     */
+    public static int ownership(MemorySegment struct) {
+        return struct.get(ownership$LAYOUT, ownership$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * mln_opengl_context_ownership ownership
+     * }
+     */
+    public static void ownership(MemorySegment struct, int fieldValue) {
+        struct.set(ownership$LAYOUT, ownership$OFFSET, fieldValue);
+    }
+
     /**
      * {@snippet lang=c :
      * union {
@@ -151,7 +198,7 @@ public class mln_opengl_context_descriptor {
             mln_wgl_context_descriptor.layout().withName("wgl"),
             mln_egl_context_descriptor.layout().withName("egl"),
             mln_webgl_context_descriptor.layout().withName("webgl")
-        ).withName("$anon$129:3");
+        ).withName("$anon$179:3");
 
         /**
          * The layout of this union

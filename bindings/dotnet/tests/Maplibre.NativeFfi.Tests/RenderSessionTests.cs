@@ -85,6 +85,34 @@ public sealed unsafe class RenderSessionTests
         Assert.Equal(999, (nint)opengl.context.data.wgl.device_context);
         Assert.Equal(1000, (nint)opengl.context.data.wgl.share_context);
         Assert.Equal(1001, (nint)opengl.context.data.wgl.get_proc_address);
+        Assert.Equal(
+            mln_opengl_context_ownership.MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
+            opengl.context.ownership
+        );
+
+        var dedicated = RenderStructs.ToNative(
+            new OpenGLSurfaceDescriptor
+            {
+                Extent = new RenderTargetExtent(800, 600, 2),
+                Surface = NativePointer.FromBorrowedAddress(1100),
+                Context = new EglContextDescriptor
+                {
+                    Display = NativePointer.FromBorrowedAddress(1101),
+                    Config = NativePointer.FromBorrowedAddress(1102),
+                    Ownership = OpenGLContextOwnership.Dedicated,
+                    ClientApi = OpenGLClientApi.Gles,
+                },
+            }
+        );
+        Assert.Equal(
+            mln_opengl_context_ownership.MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED,
+            dedicated.context.ownership
+        );
+        Assert.Equal(
+            mln_opengl_client_api.MLN_OPENGL_CLIENT_API_GLES,
+            dedicated.context.data.egl.client_api
+        );
+        Assert.Equal(0, (nint)dedicated.context.data.egl.share_context);
     }
 
     [BindingSpecTest("BND-161")]
@@ -177,6 +205,10 @@ public sealed unsafe class RenderSessionTests
         Assert.Equal(61, (nint)openglOwned.context.data.egl.config);
         Assert.Equal(62, (nint)openglOwned.context.data.egl.share_context);
         Assert.Equal(63, (nint)openglOwned.context.data.egl.get_proc_address);
+        Assert.Equal(
+            mln_opengl_client_api.MLN_OPENGL_CLIENT_API_UNSPECIFIED,
+            openglOwned.context.data.egl.client_api
+        );
 
         var openglBorrowed = RenderStructs.ToNative(
             new OpenGLBorrowedTextureDescriptor

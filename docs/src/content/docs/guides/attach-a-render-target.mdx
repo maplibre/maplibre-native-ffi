@@ -15,8 +15,8 @@ live render session. Its style, sources, layers, and camera exist independently
 of that session and remain after the session is released.
 
 The thread that attaches a session becomes its owner thread for the session's
-lifetime. Attach on the thread that owns the graphics context and will draw the
-frames. Another thread can own the runtime and map.
+lifetime. Attach on the thread that will draw the frames. Another thread can own
+the runtime and map.
 
 ## Choose the kind of target
 
@@ -42,6 +42,11 @@ snippet uses OpenGL through EGL. The descriptor contains the logical extent,
 scale factor, graphics context, and presentation surface.
 
 <Code code={region(renderTarget, "surface")} lang="c" title="render-target.c" />
+
+An OpenGL surface target also chooses context ownership. The default shares the
+thread with the host's own context. A dedicated session instead creates its own
+context and keeps it current, for a thread that draws one map and nothing else.
+[Concepts](/maplibre-native-ffi/concepts/) explains both modes.
 
 ## Attach to a texture
 

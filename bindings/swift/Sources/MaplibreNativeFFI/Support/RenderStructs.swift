@@ -108,17 +108,20 @@ struct NativeEglContextDescriptor: Equatable {
   let displayAddress: UInt
   let configAddress: UInt
   let shareContextAddress: UInt
+  let clientAPIRawValue: UInt32
   let getProcAddressAddress: UInt
 
   init(
     displayAddress: UInt,
     configAddress: UInt,
     shareContextAddress: UInt,
+    clientAPIRawValue: UInt32 = MLN_OPENGL_CLIENT_API_UNSPECIFIED.rawValue,
     getProcAddressAddress: UInt = 0
   ) {
     self.displayAddress = displayAddress
     self.configAddress = configAddress
     self.shareContextAddress = shareContextAddress
+    self.clientAPIRawValue = clientAPIRawValue
     self.getProcAddressAddress = getProcAddressAddress
   }
 
@@ -128,6 +131,7 @@ struct NativeEglContextDescriptor: Equatable {
       display: UnsafeMutableRawPointer(bitPattern: displayAddress),
       config: UnsafeMutableRawPointer(bitPattern: configAddress),
       share_context: UnsafeMutableRawPointer(bitPattern: shareContextAddress),
+      client_api: mln_opengl_client_api(rawValue: clientAPIRawValue),
       get_proc_address: UnsafeMutableRawPointer(
         bitPattern: getProcAddressAddress
       )
@@ -142,10 +146,22 @@ struct NativeOpenGLContextDescriptor: Equatable {
   }
 
   let platform: Platform
+  let ownershipRawValue: UInt32
+
+  init(
+    platform: Platform,
+    ownershipRawValue: UInt32 = MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED.rawValue
+  ) {
+    self.platform = platform
+    self.ownershipRawValue = ownershipRawValue
+  }
 
   var native: mln_opengl_context_descriptor {
     var descriptor = mln_opengl_context_descriptor()
     descriptor.size = UInt32(MemoryLayout<mln_opengl_context_descriptor>.size)
+    descriptor.ownership = mln_opengl_context_ownership(
+      rawValue: ownershipRawValue
+    )
     switch platform {
     case let .wgl(context):
       descriptor.platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL

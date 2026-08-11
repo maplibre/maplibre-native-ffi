@@ -652,6 +652,7 @@ private fun setOpenGLContext(
   context: OpenGLContextDescriptor,
 ) {
   out.size(out.sizeof())
+  out.ownership(context.ownership.nativeValue)
   when (context) {
     is WglContextDescriptor -> {
       out.platform(MaplibreNativeC.MLN_OPENGL_CONTEXT_PLATFORM_WGL)
@@ -669,6 +670,7 @@ private fun setOpenGLContext(
         display(pointerOrNull(context.display))
         config(pointerOrNull(context.config))
         share_context(pointerOrNull(context.shareContext))
+        client_api(context.clientApi.nativeValue)
         get_proc_address(pointerOrNull(context.getProcAddress))
       }
     }
