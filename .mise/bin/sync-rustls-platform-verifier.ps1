@@ -1,6 +1,18 @@
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+# Git hooks export repository-local variables. Clear them before Git commands
+# target the staging repository.
+foreach ($variable in @(
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_PREFIX",
+    "GIT_COMMON_DIR"
+  )) {
+  Remove-Item "Env:$variable" -ErrorAction SilentlyContinue
+}
+
 function Invoke-Git {
   param(
     [Parameter(Mandatory = $true)]
