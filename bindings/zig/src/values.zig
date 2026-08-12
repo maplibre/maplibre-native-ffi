@@ -449,6 +449,7 @@ pub const StyleSourceType = union(enum) {
     video,
     annotations,
     custom_vector,
+    custom_mvt_vector,
     raw: u32,
 };
 
@@ -511,6 +512,7 @@ pub fn styleSourceTypeFromNative(raw: u32) StyleSourceType {
         c.MLN_STYLE_SOURCE_TYPE_VIDEO => .video,
         c.MLN_STYLE_SOURCE_TYPE_ANNOTATIONS => .annotations,
         c.MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR => .custom_vector,
+        c.MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR => .custom_mvt_vector,
         else => .{ .raw = raw },
     };
 }

@@ -10670,6 +10670,15 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     public static int MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR() {
         return MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR;
     }
+    private static final int MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR = (int)9L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_style_source_type.MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR = 9
+     * }
+     */
+    public static int MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR() {
+        return MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR;
+    }
     private static final int MLN_STYLE_SOURCE_INFO_URL = (int)1L;
     /**
      * {@snippet lang=c :

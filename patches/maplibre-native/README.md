@@ -5,14 +5,6 @@ worktree after checking out the pinned commit. The submodule keeps tracking
 upstream, so the pin stays honest and each patch is a change we are carrying
 only until it lands there.
 
-`0001-configurable-emdawnwebgpu-suspension.patch` turns the suspension link
-option `vendor/dawn.cmake` fixes on `mbgl-vendor-dawn` into a cache variable,
-leaving `-sASYNCIFY=1` as the default. It is an INTERFACE option, so it lands
-after a consumer's directory-level options and cannot be overridden from here;
-the browser WebGPU build needs `-sJSPI` instead. See
-`cmake/mln_ffi_emscripten.cmake` for why that matters. Upstream:
-[maplibre-native#4451](https://github.com/maplibre/maplibre-native/pull/4451).
-
 `0002-windows-local-file-urls.patch` removes the URI-only leading slash from
 canonical Windows drive paths and opens UTF-8 filenames through wide filesystem
 APIs. This lets the local file source load percent-encoded `file:///C:/...`

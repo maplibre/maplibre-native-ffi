@@ -95,6 +95,7 @@ class StyleSourceType(UnknownIntEnum):
     VIDEO = 6
     ANNOTATIONS = 7
     CUSTOM_VECTOR = 8
+    CUSTOM_MVT_VECTOR = 9
 
 
 class StyleLayerVisibility(UnknownIntEnum):

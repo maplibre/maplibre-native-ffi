@@ -176,6 +176,8 @@ auto to_c_source_type(mbgl::style::SourceType type) -> uint32_t {
       return MLN_STYLE_SOURCE_TYPE_IMAGE;
     case mbgl::style::SourceType::CustomVector:
       return MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR;
+    case mbgl::style::SourceType::CustomMVTVector:
+      return MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR;
   }
   assert(false);
   return MLN_STYLE_SOURCE_TYPE_UNKNOWN;
