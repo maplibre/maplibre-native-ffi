@@ -55,7 +55,6 @@ mlt_vendor_paths=(
 # applied to the worktree rather than tracked as a fork, so the submodule keeps
 # pointing at maplibre/maplibre-native. See patches/maplibre-native/README.md.
 mln_patches=(
-  "$repo_root/patches/maplibre-native/0001-configurable-emdawnwebgpu-suspension.patch"
   "$repo_root/patches/maplibre-native/0002-windows-local-file-urls.patch"
 )
 
