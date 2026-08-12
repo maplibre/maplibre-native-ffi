@@ -282,7 +282,7 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
             "",
             "  required:",
             "    name: ci-required",
-            "    runs-on: ubuntu-latest",
+            "    runs-on: ubuntu-slim",
             "    timeout-minutes: 5",
             *gate(always=True),
             "    needs:",

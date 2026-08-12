@@ -365,7 +365,7 @@ jobs:
       - docs-pages
     # Deploy a site that preserved a failed package feed.
     if: ${{ !cancelled() && needs.docs-pages.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 10
     permissions:
       pages: write
@@ -469,7 +469,7 @@ jobs:
 
   required:
     name: publishing-required
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 5
     # A skipped job is the gate doing its work, so only real failures are red.
     if: ${{ always() }}
