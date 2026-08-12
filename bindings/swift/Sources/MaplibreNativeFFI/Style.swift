@@ -15,6 +15,7 @@ public struct StyleSourceType: Equatable, Sendable, Hashable {
   public static let video = Self(rawValue: 6)
   public static let annotations = Self(rawValue: 7)
   public static let customVector = Self(rawValue: 8)
+  public static let customMVTVector = Self(rawValue: 9)
 
   public let rawValue: UInt32
 

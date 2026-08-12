@@ -20,6 +20,7 @@ public value class SourceType(public val nativeValue: Int) {
     public val VIDEO: SourceType = SourceType(6)
     public val ANNOTATIONS: SourceType = SourceType(7)
     public val CUSTOM_VECTOR: SourceType = SourceType(8)
+    public val CUSTOM_MVT_VECTOR: SourceType = SourceType(9)
 
     internal fun fromNative(nativeValue: UInt): SourceType = fromNative(nativeValue.toInt())
 

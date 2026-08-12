@@ -34,6 +34,7 @@ typedef enum mln_style_source_type : uint32_t {
   MLN_STYLE_SOURCE_TYPE_VIDEO = 6,
   MLN_STYLE_SOURCE_TYPE_ANNOTATIONS = 7,
   MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR = 8,
+  MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR = 9,
 } mln_style_source_type;
 
 /** Fields available in mln_style_source_info. */

@@ -21,6 +21,7 @@ final class SourceType {
     6 => video,
     7 => annotations,
     8 => customVector,
+    9 => customMvtVector,
     _ => SourceType._(rawValue, 'unknown($rawValue)'),
   };
 
@@ -50,6 +51,9 @@ final class SourceType {
 
   /// Custom vector source.
   static const customVector = SourceType._(8, 'customVector');
+
+  /// Custom MVT vector source.
+  static const customMvtVector = SourceType._(9, 'customMvtVector');
 
   /// Raw native value.
   final int rawValue;

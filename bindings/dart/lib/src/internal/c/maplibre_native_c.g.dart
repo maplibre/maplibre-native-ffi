@@ -5892,7 +5892,8 @@ enum mln_style_source_type {
   MLN_STYLE_SOURCE_TYPE_IMAGE(5),
   MLN_STYLE_SOURCE_TYPE_VIDEO(6),
   MLN_STYLE_SOURCE_TYPE_ANNOTATIONS(7),
-  MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR(8);
+  MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR(8),
+  MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR(9);
 
   final int value;
   const mln_style_source_type(this.value);
@@ -5907,6 +5908,7 @@ enum mln_style_source_type {
     6 => MLN_STYLE_SOURCE_TYPE_VIDEO,
     7 => MLN_STYLE_SOURCE_TYPE_ANNOTATIONS,
     8 => MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR,
+    9 => MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR,
     _ => throw ArgumentError('Unknown value for mln_style_source_type: $value'),
   };
 }

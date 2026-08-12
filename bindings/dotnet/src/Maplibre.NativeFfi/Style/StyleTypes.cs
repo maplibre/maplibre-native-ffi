@@ -15,6 +15,7 @@ public enum SourceType : uint
     Video = 6,
     Annotations = 7,
     CustomVector = 8,
+    CustomMvtVector = 9,
 }
 
 public enum TileScheme : uint

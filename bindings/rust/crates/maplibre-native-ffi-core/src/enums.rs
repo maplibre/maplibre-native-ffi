@@ -260,6 +260,7 @@ pub enum SourceType {
     Video,
     Annotations,
     CustomVector,
+    CustomMvtVector,
     Other(u32),
 }
 
@@ -275,6 +276,7 @@ impl SourceType {
             sys::MLN_STYLE_SOURCE_TYPE_VIDEO => Self::Video,
             sys::MLN_STYLE_SOURCE_TYPE_ANNOTATIONS => Self::Annotations,
             sys::MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR => Self::CustomVector,
+            sys::MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR => Self::CustomMvtVector,
             _ => Self::Other(raw),
         }
     }
@@ -290,6 +292,7 @@ impl SourceType {
             Self::Video => sys::MLN_STYLE_SOURCE_TYPE_VIDEO,
             Self::Annotations => sys::MLN_STYLE_SOURCE_TYPE_ANNOTATIONS,
             Self::CustomVector => sys::MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR,
+            Self::CustomMvtVector => sys::MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR,
             Self::Other(raw) => raw,
         }
     }

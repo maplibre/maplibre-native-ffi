@@ -14,6 +14,7 @@ namespace Maplibre.NativeFfi.Internal.C
         MLN_STYLE_SOURCE_TYPE_VIDEO = 6,
         MLN_STYLE_SOURCE_TYPE_ANNOTATIONS = 7,
         MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR = 8,
+        MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR = 9,
     }
 
     [NativeTypeName("uint32_t")]
