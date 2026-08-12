@@ -41,6 +41,8 @@ export CIBW_ARCHS_ANDROID=x86_64
 export CIBW_BUILD_FRONTEND='build[uv]'
 export CIBW_CONFIG_SETTINGS_ANDROID='build-args=--no-default-features'
 export CIBW_ENVIRONMENT_ANDROID="MAPLIBRE_NATIVE_C_INSTALL_DIR=$native_install_dir"
+# libGLESv3 is an Android system library, so wheel repair leaves it external.
+export CIBW_REPAIR_WHEEL_COMMAND_ANDROID='auditwheel repair --exclude libGLESv3.so --ldpaths {ldpaths} -w {dest_dir} {wheel}'
 export CIBW_TEST_COMMAND_ANDROID='python -m pytest tests'
 export CIBW_TEST_REQUIRES_ANDROID='pytest>=9,<10 pyopengl>=3.1.10,<4'
 export CIBW_TEST_RUNTIME='args: --connected emulator-5554'
