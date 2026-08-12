@@ -29,7 +29,7 @@ docs = [
   "pdoc>=16,<17",
 ]
 android = [
-  "cibuildwheel>=3.4,<4",
+  "cibuildwheel>=4.2.0,<5",
 ]
 
 [tool.maturin]
