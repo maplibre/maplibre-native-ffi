@@ -17,7 +17,7 @@ concurrency:
 jobs:
   retry:
     name: Retry one failed job
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 5
     if: >-
       github.event.workflow_run.conclusion == 'failure'
@@ -31,15 +31,30 @@ jobs:
         run: |
           set -euo pipefail
 
+          retry() {
+            local attempt=1
+            local delay=2
+
+            until "$@"; do
+              if (( attempt == 4 )); then
+                return 1
+              fi
+              echo "Command failed on attempt $attempt; retrying in $delay seconds." >&2
+              sleep "$delay"
+              ((attempt += 1))
+              ((delay *= 2))
+            done
+          }
+
           run="repos/${GITHUB_REPOSITORY}/actions/runs/${CI_RUN_ID}"
-          current_attempt="$(gh api "$run" --jq '.run_attempt')"
+          current_attempt="$(retry gh api "$run" --jq '.run_attempt')"
           if [[ "$current_attempt" != "$CI_RUN_ATTEMPT" ]]; then
             echo "CI run $CI_RUN_ID is already on attempt $current_attempt."
             exit 0
           fi
 
           jobs="$(
-            gh api \
+            retry gh api \
               "${run}/attempts/${CI_RUN_ATTEMPT}/jobs?per_page=100"
           )"
           # A primary failure also fails ci-required and can skip dependent jobs.
@@ -49,7 +64,7 @@ jobs:
               | select(.conclusion == "failure" and .name != "ci-required")
             ] | length' <<<"$jobs"
           )"
-          required_failure_count="$(
+          aggregate_failure_count="$(
             jq '[
               .jobs[]
               | select(.conclusion == "failure" and .name == "ci-required")
@@ -68,7 +83,7 @@ jobs:
 
           if ((
             primary_failure_count != 1
-            || required_failure_count != 1
+            || aggregate_failure_count != 1
             || unexpected_conclusion_count != 0
           )); then
             echo "CI run $CI_RUN_ID does not have exactly one retryable failure."
@@ -95,7 +110,7 @@ jobs:
             ' <<<"$jobs"
           )"
           printf 'Retrying %s (job %s).\n' "$job_name" "$job_id"
-          gh api \
+          retry gh api \
             --method POST \
             "repos/${GITHUB_REPOSITORY}/actions/jobs/${job_id}/rerun" \
             >/dev/null

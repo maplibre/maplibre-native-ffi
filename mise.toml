@@ -52,7 +52,7 @@ cascade = true
 shell = "bash -e -c"
 
 [vars]
-actionlint_version = "1.7.8"
+actionlint_version = "1.7.12"
 # The Android SDK tool installs the command-line tools and nothing else, so this is
 # their version; the packages below are what .mise/bin/sync-android-packages adds.
 # Gradle reads the package versions from the environment, which `[env]` sets from
