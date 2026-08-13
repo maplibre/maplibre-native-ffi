@@ -884,8 +884,18 @@ auto register_render_session(std::shared_ptr<mln_render_session_object> session)
 }
 
 void RenderSessionScheduler::schedule(std::function<void()>&& task) {
-  const auto lock = std::scoped_lock{mutex_};
-  queue_.push_back(std::move(task));
+  auto wake = std::function<void()>{};
+  {
+    const auto lock = std::scoped_lock{mutex_};
+    const auto was_empty = queue_.empty();
+    queue_.push_back(std::move(task));
+    if (was_empty && !draining_) {
+      wake = wake_;
+    }
+  }
+  if (wake) {
+    wake();
+  }
 }
 
 void RenderSessionScheduler::schedule(
@@ -909,6 +919,7 @@ auto RenderSessionScheduler::drain() -> void {
     {
       const auto lock = std::scoped_lock{mutex_};
       if (queue_.empty()) {
+        draining_ = false;
         return;
       }
       batch.swap(queue_);
@@ -923,14 +934,30 @@ auto RenderSessionScheduler::drain() -> void {
 }
 
 RenderSessionScheduler::DrainGuard::~DrainGuard() {
-  const auto lock = std::scoped_lock{scheduler_.mutex_};
-  scheduler_.draining_ = false;
+  auto wake = std::function<void()>{};
+  {
+    const auto lock = std::scoped_lock{scheduler_.mutex_};
+    if (scheduler_.draining_) {
+      scheduler_.draining_ = false;
+      if (!scheduler_.queue_.empty()) {
+        wake = scheduler_.wake_;
+      }
+    }
+  }
+  if (wake) {
+    wake();
+  }
 }
 
 auto RenderSessionScheduler::discard() -> void {
   auto batch = std::vector<std::function<void()>>{};
   const auto lock = std::scoped_lock{mutex_};
   batch.swap(queue_);
+}
+
+auto RenderSessionScheduler::set_wake(std::function<void()> wake) -> void {
+  const auto lock = std::scoped_lock{mutex_};
+  wake_ = std::move(wake);
 }
 
 // Only the attaching thread destroys a session, so the borrowed object stays
@@ -996,6 +1023,9 @@ auto attach_render_session(
   if (attach_status != MLN_STATUS_OK) {
     return attach_status;
   }
+  session->scheduler.set_wake([map]() {
+    static_cast<void>(map_post_trigger_repaint(map));
+  });
   try {
     // Set before priming: renderer_backend() dispatches on kind.
     session->kind = kind;
@@ -1012,6 +1042,7 @@ auto attach_render_session(
     const auto size_status =
       map_post_set_size(map, session->width, session->height);
     if (size_status != MLN_STATUS_OK) {
+      session->scheduler.set_wake({});
       static_cast<void>(map_detach_render_target_session(map, handle));
       return size_status;
     }
@@ -1019,6 +1050,7 @@ auto attach_render_session(
 
     *out_session = register_render_session(std::move(session));
   } catch (...) {
+    session->scheduler.set_wake({});
     static_cast<void>(map_detach_render_target_session(map, handle));
     throw;
   }
@@ -1339,6 +1371,8 @@ auto render_session_detach(mln_render_session session) -> mln_status {
     set_thread_error("cannot detach while a texture frame is acquired");
     return MLN_STATUS_INVALID_STATE;
   }
+
+  live->scheduler.set_wake({});
 
   // Tear the renderer down before releasing the map's slot. The renderer holds
   // the map's forwarding observer, which the map's frontend owns; releasing the
