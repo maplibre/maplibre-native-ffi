@@ -23,6 +23,8 @@ MODULES = set(
 API_BEARING_MODULES = {
     "maplibre-native-ffi",
     "maplibre-native-ffi-android",
+    "maplibre-native-ffi-androidnativearm64",
+    "maplibre-native-ffi-androidnativex64",
     "maplibre-native-ffi-iosarm64",
     "maplibre-native-ffi-iossimulatorarm64",
     "maplibre-native-ffi-jvm",
@@ -34,6 +36,8 @@ API_BEARING_MODULES = {
 ROOT_TARGET_MODULES = {
     "maplibre-native-ffi": {
         "android": "maplibre-native-ffi-android",
+        "androidNativeArm64": "maplibre-native-ffi-androidnativearm64",
+        "androidNativeX64": "maplibre-native-ffi-androidnativex64",
         "iosArm64": "maplibre-native-ffi-iosarm64",
         "iosSimulatorArm64": "maplibre-native-ffi-iossimulatorarm64",
         "jvm": "maplibre-native-ffi-jvm",
@@ -43,6 +47,8 @@ ROOT_TARGET_MODULES = {
     },
     "maplibre-native-ffi-runtime-opengl": {
         "android": "maplibre-native-ffi-runtime-opengl-android",
+        "androidNativeArm64": "maplibre-native-ffi-runtime-opengl-androidnativearm64",
+        "androidNativeX64": "maplibre-native-ffi-runtime-opengl-androidnativex64",
         "jvm": "maplibre-native-ffi-runtime-opengl-jvm",
         "linuxArm64": "maplibre-native-ffi-runtime-opengl-linuxarm64",
         "linuxX64": "maplibre-native-ffi-runtime-opengl-linuxx64",
@@ -50,6 +56,8 @@ ROOT_TARGET_MODULES = {
     },
     "maplibre-native-ffi-runtime-vulkan": {
         "android": "maplibre-native-ffi-runtime-vulkan-android",
+        "androidNativeArm64": "maplibre-native-ffi-runtime-vulkan-androidnativearm64",
+        "androidNativeX64": "maplibre-native-ffi-runtime-vulkan-androidnativex64",
         "jvm": "maplibre-native-ffi-runtime-vulkan-jvm",
         "linuxArm64": "maplibre-native-ffi-runtime-vulkan-linuxarm64",
         "linuxX64": "maplibre-native-ffi-runtime-vulkan-linuxx64",
@@ -411,9 +419,25 @@ def verify_jvm(root: pathlib.Path) -> None:
 
 def verify_native(root: pathlib.Path) -> None:
     modules = {
+        "maplibre-native-ffi-runtime-opengl-androidnativearm64": (
+            "opengl",
+            "android-arm64",
+        ),
+        "maplibre-native-ffi-runtime-opengl-androidnativex64": (
+            "opengl",
+            "android-x64",
+        ),
         "maplibre-native-ffi-runtime-opengl-linuxarm64": ("opengl", "linux-arm64"),
         "maplibre-native-ffi-runtime-opengl-linuxx64": ("opengl", "linux-x64"),
         "maplibre-native-ffi-runtime-opengl-macosarm64": ("opengl", "macos-arm64"),
+        "maplibre-native-ffi-runtime-vulkan-androidnativearm64": (
+            "vulkan",
+            "android-arm64",
+        ),
+        "maplibre-native-ffi-runtime-vulkan-androidnativex64": (
+            "vulkan",
+            "android-x64",
+        ),
         "maplibre-native-ffi-runtime-vulkan-linuxarm64": ("vulkan", "linux-arm64"),
         "maplibre-native-ffi-runtime-vulkan-linuxx64": ("vulkan", "linux-x64"),
         "maplibre-native-ffi-runtime-vulkan-macosarm64": ("vulkan", "macos-arm64"),
@@ -440,7 +464,7 @@ def verify_native(root: pathlib.Path) -> None:
                 for name in names
             ):
                 raise SystemExit(f"{interop} does not embed libmaplibre-native-c.a")
-            if target.startswith("linux-") and not any(
+            if target.startswith(("android-", "linux-")) and not any(
                 name.endswith("/included/libmln_ffi_platform.a") for name in names
             ):
                 raise SystemExit(f"{interop} does not embed libmln_ffi_platform.a")

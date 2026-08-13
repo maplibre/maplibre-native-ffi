@@ -100,24 +100,28 @@ publish_linux_leaves() {
   publish_tasks \
     :bindings:kotlin \
     "$repository" \
-    Android -- \
+    Android AndroidNativeArm64 AndroidNativeX64 -- \
     "$@" \
     "${common[@]}"
 
   publish_tasks \
     :bindings:kotlin:runtimes:opengl \
     "$repository" \
-    Android -- \
+    Android AndroidNativeArm64 AndroidNativeX64 -- \
     "$@" \
     "${common[@]}" \
+    -Pmaplibre.runtime.opengl.androidNativeArm64.installDir="$install_root/android-arm64-egl" \
+    -Pmaplibre.runtime.opengl.androidNativeX64.installDir="$install_root/android-x64-egl" \
     -Pmaplibre.android.backend=opengl
 
   publish_tasks \
     :bindings:kotlin:runtimes:vulkan \
     "$repository" \
-    Android -- \
+    Android AndroidNativeArm64 AndroidNativeX64 -- \
     "$@" \
     "${common[@]}" \
+    -Pmaplibre.runtime.vulkan.androidNativeArm64.installDir="$install_root/android-arm64-vulkan" \
+    -Pmaplibre.runtime.vulkan.androidNativeX64.installDir="$install_root/android-x64-vulkan" \
     -Pmaplibre.android.backend=vulkan
 
   publish_tasks \

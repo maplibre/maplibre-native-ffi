@@ -873,6 +873,9 @@ jobs:
           mise run install-native-package
           android-arm64-egl
           build/packages/native/dist/maplibre-native-c-android-arm64-egl.tar.gz
+      - run: mise run //bindings/kotlin:build android-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/kotlin:android-build opengl arm64-v8a --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"
@@ -924,6 +927,9 @@ jobs:
           mise run install-native-package
           android-arm64-vulkan
           build/packages/native/dist/maplibre-native-c-android-arm64-vulkan.tar.gz
+      - run: mise run //bindings/kotlin:build android-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/kotlin:android-build vulkan arm64-v8a --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"
@@ -972,6 +978,9 @@ jobs:
           mise run install-native-package
           android-x64-egl
           build/packages/native/dist/maplibre-native-c-android-x64-egl.tar.gz
+      - run: mise run //bindings/kotlin:build android-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/kotlin:test android-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
@@ -1026,6 +1035,9 @@ jobs:
           mise run install-native-package
           android-x64-vulkan
           build/packages/native/dist/maplibre-native-c-android-x64-vulkan.tar.gz
+      - run: mise run //bindings/kotlin:build android-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/kotlin:test android-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"

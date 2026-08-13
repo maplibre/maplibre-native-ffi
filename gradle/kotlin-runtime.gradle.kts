@@ -53,21 +53,38 @@ fun nativeTargets(backend: MaplibreRuntimeBackend): Map<String, NativeTargetConf
   when (backend) {
     MaplibreRuntimeBackend.OPENGL,
     MaplibreRuntimeBackend.VULKAN ->
-      mapOf(
-        "linuxArm64" to
+      buildMap {
+        AndroidTarget.entries.forEach { target ->
+          put(
+            target.kotlinNativeTarget,
+            NativeTargetConfiguration(
+              "android-${backend.id}.def",
+              target.targetPlatform,
+              listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
+            ),
+          )
+        }
+        put(
+          "linuxArm64",
           NativeTargetConfiguration(
             "linux-${backend.id}.def",
             "linux-arm64",
             listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
           ),
-        "linuxX64" to
+        )
+        put(
+          "linuxX64",
           NativeTargetConfiguration(
             "linux-${backend.id}.def",
             "linux-x64",
             listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
           ),
-        "macosArm64" to NativeTargetConfiguration("macos-${backend.id}.def", "macos-arm64"),
-      )
+        )
+        put(
+          "macosArm64",
+          NativeTargetConfiguration("macos-${backend.id}.def", "macos-arm64"),
+        )
+      }
 
     MaplibreRuntimeBackend.METAL ->
       mapOf(
@@ -425,6 +442,8 @@ canonicalizeKmpRootMetadata(
       MaplibreRuntimeBackend.VULKAN ->
         mapOf(
           "android" to "$mavenArtifact-android",
+          "androidNativeArm64" to "$mavenArtifact-androidnativearm64",
+          "androidNativeX64" to "$mavenArtifact-androidnativex64",
           "jvm" to "$mavenArtifact-jvm",
           "linuxArm64" to "$mavenArtifact-linuxarm64",
           "linuxX64" to "$mavenArtifact-linuxx64",
