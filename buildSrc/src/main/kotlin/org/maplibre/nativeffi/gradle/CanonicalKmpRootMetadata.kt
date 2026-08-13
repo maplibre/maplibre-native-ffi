@@ -52,7 +52,7 @@ private class CanonicalizeKmpRootMetadata(
       val availableAt = variant["available-at"] as? MutableMap<String, Any?> ?: return@forEach
       val variantName = variant["name"] as String
       val target =
-        targetModules.keys.singleOrNull(variantName::startsWith)
+        targetModules.keys.filter(variantName::startsWith).maxByOrNull(String::length)
           ?: error("No target module mapping for root variant '$variantName'")
       val targetModule = targetModules.getValue(target)
       availableAt["group"] = group

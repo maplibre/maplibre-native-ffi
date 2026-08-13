@@ -40,6 +40,8 @@ val mavenVersion = providers.gradleProperty("maplibre.maven.version").get()
 val mavenArtifact = "maplibre-native-ffi"
 
 kotlin {
+  androidNativeArm64()
+  androidNativeX64()
   iosArm64()
   iosSimulatorArm64()
   linuxArm64()
@@ -131,6 +133,8 @@ canonicalizeKmpRootMetadata(
   targetModules =
     mapOf(
       "android" to "$mavenArtifact-android",
+      "androidNativeArm64" to "$mavenArtifact-androidnativearm64",
+      "androidNativeX64" to "$mavenArtifact-androidnativex64",
       "iosArm64" to "$mavenArtifact-iosarm64",
       "iosSimulatorArm64" to "$mavenArtifact-iossimulatorarm64",
       "jvm" to "$mavenArtifact-jvm",

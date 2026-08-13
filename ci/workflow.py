@@ -99,6 +99,7 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
         # Each device test task cross-compiles the artifact the build task
         # would, so it stands in for that command.
         commands = [
+            f"mise run //bindings/kotlin:build {preset}",
             f"mise run //bindings/kotlin:test {preset}",
             f"mise run //bindings/go:test {preset}",
             f"mise run //bindings/rust:test {preset}",
@@ -107,6 +108,7 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
         commands.append(f"mise run //bindings/python:test {preset}")
     else:
         commands = [
+            f"mise run //bindings/kotlin:build {preset}",
             f"mise run //bindings/kotlin:android-build {arguments} --prebuilt",
             f"mise run //bindings/go:build {preset}",
             f"mise run //bindings/rust:build {preset}",
