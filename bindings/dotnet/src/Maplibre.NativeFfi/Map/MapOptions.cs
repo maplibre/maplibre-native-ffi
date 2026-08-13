@@ -44,7 +44,7 @@ public sealed record MapOptions
 
     /// <summary>
     /// Map-originated event types this map queues, every event type this library reports
-    /// by default. Set it to be narrow from the map's first style load. See
+    /// by default. The mask applies during construction. See
     /// <see cref="MapHandle.SetEventMask" />.
     /// </summary>
     public RuntimeEventMask EventMask { get; set; } = DefaultEventMask();

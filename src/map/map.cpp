@@ -3843,15 +3843,8 @@ auto create_map(
   owned_map->scale_factor = effective.scale_factor;
   owned_map->event_state = std::move(event_state);
   owned_map->custom_geometry_sources = std::move(source_registry);
-  const auto requested_event_mask = effective.event_mask;
-  // MapLibre reports the constructor's initial camera sizing through observer
-  // callbacks. The creation contract reports both regardless of the mask.
-  const auto initial_event_mask =
-    requested_event_mask |
-    static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE) |
-    static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE);
   owned_map->event_state->mask.store(
-    initial_event_mask, std::memory_order_relaxed
+    effective.event_mask, std::memory_order_relaxed
   );
   try {
     // Registering allocates, so it belongs inside the scope that unpublishes
@@ -3874,9 +3867,6 @@ auto create_map(
     owned_map->map = std::make_unique<mbgl::Map>(
       *owned_map->frontend, *owned_map->observer, map_options,
       resource_options_for_runtime(runtime)
-    );
-    owned_map->event_state->mask.store(
-      requested_event_mask, std::memory_order_relaxed
     );
     owned_map->custom_geometry_sources->attach(*owned_map->map);
 

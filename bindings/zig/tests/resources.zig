@@ -36,7 +36,7 @@ fn waitForOfflineOperation(
         // One event per drain, so an event this wait is not looking for stays
         // queued for the wait that is. See support.waitForEvent.
         while (true) {
-            var batch = try runtime.drainEvents(1);
+            var batch = try runtime.drainEvents(testing.allocator, 1);
             defer batch.deinit();
             if (batch.len() == 0) break;
             const event = try batch.at(0);
@@ -1433,7 +1433,7 @@ test "offline region download control emits copied status events" {
     var observed = false;
     for (0..5000) |_| {
         try runtime.pump(0);
-        var batch = try runtime.drainEvents(0);
+        var batch = try runtime.drainEvents(testing.allocator, 0);
         defer batch.deinit();
         for (0..batch.len()) |index| {
             const event = try batch.at(index);

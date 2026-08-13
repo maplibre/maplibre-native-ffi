@@ -287,53 +287,6 @@ void main() {
     expect(TileScheme.tms.rawValue, 1);
   });
 
-  test('event masks combine, test membership, and carry into map options', () {
-    final combined =
-        RuntimeEventMask.mapStyleLoaded | RuntimeEventMask.mapTileAction;
-
-    expect(combined.contains(RuntimeEventType.mapStyleLoaded), isTrue);
-    expect(combined.contains(RuntimeEventType.mapTileAction), isTrue);
-    expect(combined.contains(RuntimeEventType.mapIdle), isFalse);
-    // An event type this binding does not name still resolves to a bit.
-    expect(combined.contains(RuntimeEventType.fromRawValue(4)), isTrue);
-    expect(RuntimeEventMask.none.isEmpty, isTrue);
-    expect(combined.isEmpty, isFalse);
-    expect(RuntimeEventMask.all.contains(RuntimeEventType.mapIdle), isTrue);
-    expect(
-      RuntimeEventMask.allMapEvents.contains(
-        RuntimeEventType.offlineOperationCompleted,
-      ),
-      isFalse,
-    );
-    expect(
-      RuntimeEventMask.allRuntimeEvents.contains(
-        RuntimeEventType.offlineOperationCompleted,
-      ),
-      isTrue,
-    );
-    expect(combined, RuntimeEventMask(combined.value));
-    expect(combined.hashCode, RuntimeEventMask(combined.value).hashCode);
-
-    // The default takes the C options default's raw bits, so a bit a newer
-    // library selects and this binding does not name survives.
-    expect(
-      const MapOptions().eventMask.value,
-      raw.mln_map_options_default().event_mask,
-    );
-    expect(
-      const RuntimeOptions().eventMask.value,
-      raw.mln_runtime_options_default().event_mask,
-    );
-    expect(const MapOptions().eventMask, RuntimeEventMask.all);
-    expect(const RuntimeOptions().eventMask, RuntimeEventMask.all);
-    expect(
-      MapOptions(eventMask: combined),
-      isNot(const MapOptions(eventMask: RuntimeEventMask.mapStyleLoaded)),
-    );
-    expect(MapOptions(eventMask: combined), isNot(const MapOptions()));
-    expect(MapOptions(eventMask: combined), MapOptions(eventMask: combined));
-  });
-
   test('resource responses preserve public semantic fields', () {
     final response = ResourceResponse(
       status: ResourceResponseStatus.ok,

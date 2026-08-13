@@ -13,7 +13,7 @@ fn runRuntimeOnThread(runtime: *maplibre.RuntimeHandle, out_error: *?anyerror) v
 }
 
 fn drainRuntimeOnThread(runtime: *maplibre.RuntimeHandle, out_error: *?anyerror) void {
-    var batch = runtime.drainEvents(0) catch |err| {
+    var batch = runtime.drainEvents(testing.allocator, 0) catch |err| {
         out_error.* = err;
         return;
     };
@@ -84,7 +84,7 @@ fn expectOnlySelectedTypes(
     var saw_style_loaded = false;
     for (0..1000) |_| {
         try runtime.pump(0);
-        var batch = try runtime.drainEvents(0);
+        var batch = try runtime.drainEvents(testing.allocator, 0);
         defer batch.deinit();
         for (0..batch.len()) |index| {
             const event = try batch.at(index);
@@ -192,7 +192,7 @@ test "one drain reports the events a style load queued together" {
     var saw_style_loaded = false;
     for (0..1000) |_| {
         try runtime.pump(0);
-        var batch = try runtime.drainEvents(0);
+        var batch = try runtime.drainEvents(testing.allocator, 0);
         defer batch.deinit();
         // An unbounded drain takes the whole queue.
         try testing.expectEqual(@as(usize, 0), batch.remaining());
@@ -227,7 +227,7 @@ test "a bounded drain reports one event at a time in queue order" {
     var saw_remaining = false;
     var last = maplibre.RuntimeEventType.map_idle;
     while (true) {
-        var batch = try runtime.drainEvents(1);
+        var batch = try runtime.drainEvents(testing.allocator, 1);
         defer batch.deinit();
         if (batch.len() == 0) {
             try testing.expectEqual(@as(usize, 0), batch.remaining());
@@ -251,7 +251,7 @@ test "a bounded drain reports one event at a time in queue order" {
     try testing.expect(std.meta.eql(last, maplibre.RuntimeEventType.map_render_update_available));
 }
 
-test "a drained event copies out and outlives the batch that carried it" {
+test "a drained batch outlives its runtime" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     var runtime_open = true;
     defer if (runtime_open) runtime.close() catch @panic("runtime close failed");
@@ -263,105 +263,40 @@ test "a drained event copies out and outlives the batch that carried it" {
 
     try map.setStyleUrl(testing.allocator, "unsupported://style.json");
 
-    var owned: maplibre.OwnedRuntimeEvent = undefined;
-    var stale: maplibre.EventBatch = undefined;
-    var copied = false;
+    var kept: maplibre.EventBatch = undefined;
+    var kept_index: usize = 0;
+    var found = false;
     for (0..1000) |_| {
         try runtime.pump(0);
-        var batch = try runtime.drainEvents(0);
+        var batch = try runtime.drainEvents(testing.allocator, 0);
         for (0..batch.len()) |index| {
             const event = try batch.at(index);
             if (!std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_loading_failed)) continue;
-            owned = try event.toOwned(testing.allocator);
-            copied = true;
+            kept = batch;
+            kept_index = index;
+            found = true;
             break;
         }
-        if (copied) {
-            // The batch stays live to prove what a later drain does to it.
-            stale = batch;
-            break;
-        }
+        if (found) break;
         batch.deinit();
         try sleepOneMillisecond();
     }
-    try testing.expect(copied);
-    defer owned.deinit();
+    try testing.expect(found);
+    defer kept.deinit();
 
-    try testing.expectEqual(map_id, owned.source_id.?);
-    // A real drain reports the native identity beside the resolved map.
-    try testing.expect(owned.source != .none);
-    try testing.expect(std.meta.eql(owned.payload, maplibre.RuntimeEventPayload.none));
-    try testing.expect(owned.message.len > 0);
-    const copied_message = try testing.allocator.dupe(u8, owned.message);
-    defer testing.allocator.free(copied_message);
+    const before_close = try kept.at(kept_index);
+    try testing.expectEqual(map_id, before_close.source_id.?);
+    try testing.expect(before_close.source != .none);
+    try testing.expect(before_close.message.len > 0);
 
-    // A live batch is a borrow on the runtime.
-    try testing.expectError(error.ActiveBorrow, runtime.close());
-
-    var next = try runtime.drainEvents(0);
-    try testing.expectError(error.InvalidState, stale.at(0));
-    stale.deinit();
-    try testing.expectError(error.InvalidState, stale.at(0));
-    try testing.expectEqualSlices(u8, copied_message, owned.message);
-
-    // Every batch is deinited, so the runtime closes.
-    next.deinit();
-    try map.close();
-    map_open = false;
-    try runtime.close();
-    runtime_open = false;
-}
-
-test "deiniting an event batch invalidates every copy of it" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    var runtime_open = true;
-    defer if (runtime_open) runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    var map_open = true;
-    defer if (map_open) map.close() catch @panic("map close failed");
-
-    try map.setStyleUrl(testing.allocator, "unsupported://style.json");
-
-    var batch: maplibre.EventBatch = undefined;
-    var drained = false;
-    for (0..1000) |_| {
-        try runtime.pump(0);
-        var pending = try runtime.drainEvents(0);
-        if (pending.len() > 0) {
-            batch = pending;
-            drained = true;
-            break;
-        }
-        pending.deinit();
-        try sleepOneMillisecond();
-    }
-    try testing.expect(drained);
-
-    // A batch is a value, so nothing stops a copy from outliving the original.
-    const copy = batch;
-    try testing.expect(copy.len() > 0);
-    _ = try copy.at(0);
-
-    batch.deinit();
-
-    // The runtime owns the epoch, so the deinit invalidated the copy too instead
-    // of leaving it reading storage no lease protects.
-    try testing.expectEqual(@as(usize, 0), copy.len());
-    try testing.expectEqual(@as(usize, 0), copy.remaining());
-    try testing.expectError(error.InvalidState, copy.at(0));
-
-    // Deiniting the copy releases nothing a second time, so the runtime closes.
-    var second = copy;
-    second.deinit();
     try map.close();
     map_open = false;
     try runtime.close();
     runtime_open = false;
 
-    // A copy that outlived its runtime reports the same failure rather than
-    // reading the state the close freed.
-    try testing.expectError(error.InvalidState, copy.at(0));
+    const after_close = try kept.at(kept_index);
+    try testing.expectEqual(map_id, after_close.source_id.?);
+    try testing.expect(after_close.message.len > 0);
 }
 
 test "closing a map discards its queued runtime events" {
@@ -487,7 +422,7 @@ test "a parked owner thread wakes for native work and for a wake source" {
     for (0..20) |_| {
         try runtime.pump(10_000);
         if (elapsedMilliseconds(load_started) > 5_000) return error.ParkTimedOut;
-        var batch = try runtime.drainEvents(0);
+        var batch = try runtime.drainEvents(testing.allocator, 0);
         defer batch.deinit();
         for (0..batch.len()) |index| {
             const event = try batch.at(index);
@@ -547,7 +482,7 @@ test "an idle map drains empty batches" {
     defer map.close() catch @panic("map close failed");
 
     try quiesce(&runtime);
-    var batch = try runtime.drainEvents(0);
+    var batch = try runtime.drainEvents(testing.allocator, 0);
     defer batch.deinit();
     try testing.expectEqual(@as(usize, 0), batch.len());
     try testing.expectEqual(@as(usize, 0), batch.remaining());

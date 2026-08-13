@@ -24,10 +24,7 @@ public struct MapOptions: Equatable, Sendable {
   /// `false` logs a tile parse warning for such tiles.
   public var fastPFOREnabled: Bool
   /// Map-originated event types this map queues, every type the library
-  /// reports unless the host narrows it.
-  ///
-  /// A map reports the two camera events of its initial sizing whatever this
-  /// selects, because MapLibre resizes the map inside its own constructor.
+  /// reports unless the host narrows it. The mask applies during construction.
   public var eventMask: RuntimeEventMask
 
   public init(

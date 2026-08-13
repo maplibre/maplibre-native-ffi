@@ -71,10 +71,9 @@ void main() {
     expect(empty.events, isEmpty);
     expect(empty.remainingCount, 0);
 
-    // A map reports the two camera events of its initial sizing whatever the
-    // masks select, so the style load below starts from an empty queue.
     final map = runtime.createMap();
     addTearDown(map.close);
+    // Start the style load with an empty queue.
     _quiesce(runtime);
 
     map.setStyleJson(_jsonBytes(_emptyStyleJson));

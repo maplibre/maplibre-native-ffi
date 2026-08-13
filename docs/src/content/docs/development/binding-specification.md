@@ -490,10 +490,13 @@ Outputs backed by native storage follow this operation:
 4. Release native buffer, snapshot, result, and list handles exactly once after
    copying, including failure paths.
 
-A drained event batch borrows native storage that the next drain reuses, so a
-binding MUST copy every event and message it returns. Map-originated events
-identify a live source map when identity can be proven. If lookup misses, they
-carry no public map handle or only copied source metadata.
+A binding SHOULD copy a drained event batch into language-owned values. A
+binding MAY instead expose a borrowed view when its type system prevents the
+view from outliving the runtime borrow and prevents another drain while the view
+is live. Such a binding MUST provide an explicit operation that copies an event
+into an owned value. Map-originated events identify a live source map when
+identity can be proven. If lookup misses, they carry no public map handle or
+only copied source metadata.
 
 ### Style source metadata
 
@@ -736,6 +739,7 @@ The drain follows this operation:
    than by the size of the generated event struct.
 4. Copy each event's type, source type, status code, message bytes, and typed
    payload fields before the next drain invalidates native batch storage. A
+   lifetime-checked borrowed binding MAY expose views of these fields instead. A
    message is the batch's arena bytes at the event's own offset and length.
 5. Read a known typed payload as the union member that the payload type names,
    with no size check. Preserve an unknown event or payload domain with its raw
@@ -746,7 +750,8 @@ The drain follows this operation:
    outside the safe public API.
 7. Apply binding-owned state updates triggered by the event before returning the
    copied events.
-8. Return a language-owned sequence whose elements outlive the next drain.
+8. Return a language-owned sequence whose elements outlive the next drain, or a
+   borrowed view whose type prevents that view from surviving the next drain.
 
 ### Event subscription
 
@@ -759,12 +764,12 @@ The subscription follows this design:
    types, combines them, and tests membership without computing a bit itself. It
    uses the language's own set-of-enum idiom, such as an option set or a flags
    type, and it derives the value for a type the binding does not name.
-2. Map options and runtime options carry a required subscription, and the map
-   and runtime each expose a getter and a setter for it. A binding MUST supply
-   its default through the language's own default argument or default field
-   value, rather than through an absent or nullable field. That default selects
-   every event type the C API reports, including types the binding does not
-   name.
+2. Map options and runtime options carry a subscription, and the map and runtime
+   each expose a getter and a setter for it. A binding MUST use the language's
+   ordinary default-value idiom. A nullable or absent options field MAY mean
+   that the native default applies, but it MUST remain distinct from an explicit
+   empty subscription. The default selects every event type the C API reports,
+   including types the binding does not name.
 3. A subscription value that a host derived for an unreported type reaches C
    unchanged, and the binding surfaces the resulting invalid-argument status
    through its own error idiom.

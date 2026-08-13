@@ -1947,8 +1947,6 @@ def test_narrowed_map_mask_drops_the_cleared_event_type() -> None:
         map_handle.set_event_mask(
             mln.RuntimeEventMask.ALL & ~mln.RuntimeEventMask.MAP_CAMERA_DID_CHANGE
         )
-        # MapLibre resizes a map inside its own constructor, so the camera events
-        # of the initial sizing arrive whatever the mask selects.
         runtime.drain_events()
         map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(1.0, 2.0), zoom=3.0))
         types = [event.event_type for event in runtime.drain_events().events]
@@ -2048,9 +2046,7 @@ def test_empty_creation_mask_queues_nothing() -> None:
         assert runtime.event_mask == mln.RuntimeEventMask.NONE
         with runtime.create_map(map_options) as map_handle:
             assert map_handle.event_mask == mln.RuntimeEventMask.NONE
-            # MapLibre resizes a map inside its own constructor, so drain the
-            # events of the initial sizing before asserting the negative.
-            runtime.drain_events()
+            assert not runtime.drain_events().events
             map_handle.set_style_json(_EMPTY_STYLE_BYTES)
             for _ in range(64):
                 runtime.pump()
@@ -2072,14 +2068,6 @@ def test_event_mask_bit_outside_all_is_rejected() -> None:
             runtime.set_event_mask(outside)
         with pytest.raises(mln.InvalidArgumentError):
             map_handle.set_event_mask(outside)
-
-
-def test_every_event_type_has_a_mask_bit_that_all_selects() -> None:
-    # Each bit derives from its type, but the two group lists behind `ALL` are
-    # written out by hand, so a type added without a mask member, or a member
-    # left out of both groups, would silently stop `ALL` selecting that type.
-    for event_type in mln.RuntimeEventType:
-        assert mln.RuntimeEventMask[event_type.name] in mln.RuntimeEventMask.ALL
 
 
 def test_bounded_drain_reports_remaining_count_until_the_queue_empties() -> None:

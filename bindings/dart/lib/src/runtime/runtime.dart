@@ -98,7 +98,7 @@ final class RuntimeOptions {
       RuntimeEventMask(raw.mln_runtime_options_default().event_mask);
 }
 
-/// Owner-thread runtime handle for MapLibre Native work and event polling.
+/// Owner-thread runtime handle for MapLibre Native work and event draining.
 final class RuntimeHandle {
   RuntimeHandle._(NativeRuntime handle)
     : _state = NativeHandleState(handle, 'RuntimeHandle');
@@ -1626,7 +1626,7 @@ final class MapOptions {
 
   final RuntimeEventMask? _eventMask;
 
-  /// Map-originated event types this map queues from its first style load.
+  /// Map-originated event types this map queues during and after construction.
   ///
   /// Defaults to the C options default's selection, which is every event type
   /// the loaded library reports. A bit a newer library selects and this binding
@@ -1775,9 +1775,8 @@ final class MapHandle {
   /// Narrowing gates later events and keeps queued ones. A bit outside
   /// [RuntimeEventMask.all] reports invalid argument.
   ///
-  /// Select every event type this host reads. A map reports its initial sizing
-  /// with two camera events whatever this mask selects, because MapLibre
-  /// resizes the map inside its own constructor.
+  /// Select every event type this host reads. The mask applies during map
+  /// construction.
   void setEventMask(RuntimeEventMask mask) {
     _check(raw.mln_map_set_event_mask(_handle.raw, mask.value));
   }

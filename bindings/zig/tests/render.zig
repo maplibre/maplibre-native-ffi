@@ -201,7 +201,7 @@ fn pumpTransitionFrame(
     var result = TransitionFramePump{};
     var render_update_available = false;
     {
-        var batch = try runtime.drainEvents(0);
+        var batch = try runtime.drainEvents(testing.allocator, 0);
         defer batch.deinit();
         for (0..batch.len()) |index| {
             const event = try batch.at(index);

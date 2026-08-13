@@ -200,10 +200,8 @@ typedef struct mln_map_options {
    * and is the value mln_map_options_default() populates.
    * MLN_RUNTIME_EVENT_MASK_NONE queues none.
    *
-   * Set a narrow mask here to be narrow from the map's first style load, the
-   * load that produces the most tile and frame events. A map reports the two
-   * camera events of its initial sizing whatever this field selects, because
-   * MapLibre resizes the map inside its own constructor.
+   * The mask applies throughout construction, including the camera events that
+   * MapLibre reports while it initializes the map's size.
    */
   uint64_t event_mask;
 } mln_map_options;

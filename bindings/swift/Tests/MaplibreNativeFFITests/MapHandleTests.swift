@@ -31,8 +31,7 @@ private func drainCameraEvents(_ runtime: RuntimeHandle) throws
   return tally
 }
 
-/// A creation mask is in force from the map's first style load, the load that
-/// produces the most tile and frame events.
+/// A creation mask is in force while the map initializes.
 @Test func aMapCreatedWithANarrowedMaskNeverQueuesAClearedType() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
@@ -48,9 +47,7 @@ private func drainCameraEvents(_ runtime: RuntimeHandle) throws
   defer { try? map.close() }
 
   #expect(try map.eventMask == [.mapStyleLoaded])
-  // MapLibre resizes the map inside its own constructor, so its two camera
-  // events arrive whatever the creation mask selects.
-  _ = try runtime.drainEvents()
+  #expect(try runtime.drainEvents().events.isEmpty)
 
   try map.setStyleJSON(emptyStyleJSON)
   try map.jump(to: CameraOptions(zoom: 6))

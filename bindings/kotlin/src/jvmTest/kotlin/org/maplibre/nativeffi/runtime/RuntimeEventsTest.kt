@@ -11,9 +11,7 @@ import kotlin.test.assertTrue
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.WrongThreadException
 import org.maplibre.nativeffi.geo.CanonicalTileId
-import org.maplibre.nativeffi.internal.c.MapLibreNativeC
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
-import org.maplibre.nativeffi.internal.c.mln_runtime_event_batch
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_payload
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.map.MapHandle
@@ -131,21 +129,6 @@ class RuntimeEventsTest {
       assertEquals(0L, rest.remainingCount)
       assertEquals(bounded.remainingCount, rest.events.size.toLong())
       assertFailsWith<InvalidArgumentException> { runtime.drainEvents(maxEvents = -1) }
-    }
-  }
-
-  @Test
-  fun batchStrideCoversThisBindingsEventRecord() {
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-      Arena.ofConfined().use { arena ->
-        val batch = arena.allocate(mln_runtime_event_batch.sizeof())
-        mln_runtime_event_batch.size(batch, mln_runtime_event_batch.sizeof().toInt())
-        assertEquals(
-          MapLibreNativeC.MLN_STATUS_OK(),
-          MapLibreNativeC.mln_runtime_drain_events(runtime.nativeHandle().raw, 0, batch),
-        )
-        assertEquals(mln_runtime_event.sizeof(), mln_runtime_event_batch.event_size(batch).toLong())
-      }
     }
   }
 

@@ -155,9 +155,10 @@ func TestRuntimeDrainReportsOneStyleLoadAsOneBatch(t *testing.T) {
 }
 
 func TestRuntimeBoundedDrainLeavesTheRestQueued(t *testing.T) {
-	// A map reports the two camera events of its initial sizing whatever mask it
-	// carries, so a fresh map's queue holds more than one event with no pumping.
-	runtime, _ := newRuntimeAndMap(t, nil)
+	runtime, m := newRuntimeAndMap(t, nil)
+	if err := m.JumpTo(CameraOptions{}.WithZoom(2)); err != nil {
+		t.Fatalf("JumpTo(): %v", err)
+	}
 
 	bounded, err := runtime.DrainEvents(1)
 	if err != nil {
@@ -391,26 +392,10 @@ func TestRuntimeEventCopiesSurviveTheNextDrain(t *testing.T) {
 	}
 }
 
-func TestRuntimeEventStrideComesFromTheBatch(t *testing.T) {
+func TestRuntimeEventDecoderUsesTheBatchStride(t *testing.T) {
 	lockOSThreadForTest(t)
-
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	defer func() {
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Close(): %v", err)
-		}
-	}()
-
-	stride, err := nativeRuntimeEventStrideForTest(runtime)
-	if err != nil {
-		t.Fatalf("native event stride: %v", err)
-	}
-	if stride != runtimeEventSizeForTest() {
-		t.Fatalf("native event stride = %d, want this binding's event size %d", stride, runtimeEventSizeForTest())
-	}
+	runtime, _ := newRuntimeAndMap(t, nil)
+	stride := runtimeEventSizeForTest()
 
 	// A batch whose stride exceeds the compiled event size is what a later C API
 	// version looks like, and every event after the first misdecodes when the

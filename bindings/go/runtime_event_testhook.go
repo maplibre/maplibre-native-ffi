@@ -214,23 +214,6 @@ func runtimeEventPayloadWindowSizeForTest() uintptr {
 	return runtimeEventSizeForTest() - runtimeEventPayloadOffset
 }
 
-// nativeRuntimeEventStrideForTest drains this runtime and reports the event
-// stride the C API filled in.
-func nativeRuntimeEventStrideForTest(runtime *RuntimeHandle) (uintptr, error) {
-	ptr, release, err := runtime.ptr()
-	if err != nil {
-		return 0, err
-	}
-	defer release()
-	defer runtime.state.KeepAlive()
-
-	batch, err := drainRawEvents(ptr, 0)
-	if err != nil {
-		return 0, err
-	}
-	return uintptr(batch.event_size), nil
-}
-
 func offlineRegionStatusForTest(downloadState uint32) OfflineRegionStatus {
 	raw := C.mln_offline_region_status{
 		size:           C.uint32_t(unsafe.Sizeof(C.mln_offline_region_status{})),

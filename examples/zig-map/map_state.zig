@@ -154,14 +154,13 @@ pub fn applyCameraCommand(
 /// Drains one batch of runtime events, reporting whether the map wants another
 /// frame.
 pub fn drainEvents(
+    allocator: std.mem.Allocator,
     runtime: *maplibre.RuntimeHandle,
     map: *maplibre.MapHandle,
 ) !bool {
     const map_id = try map.id();
     var render_update_available = false;
-    // One drain takes every event the pump produced. The batch borrows runtime
-    // storage, and this loop keeps nothing from it.
-    var batch = try runtime.drainEvents(0);
+    var batch = try runtime.drainEvents(allocator, 0);
     defer batch.deinit();
     for (0..batch.len()) |index| {
         const event = try batch.at(index);

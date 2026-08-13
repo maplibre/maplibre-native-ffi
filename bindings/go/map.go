@@ -62,8 +62,7 @@ type MapOptions struct {
 	FastPFOREnabled bool
 	// EventMask selects the map-originated event types this map queues.
 	// NewMapOptions sets it to the native default, which selects every type.
-	// Narrow it here to keep the map narrow from its first style load, the load
-	// that produces the most tile and frame events. See MapHandle.SetEventMask.
+	// The mask applies during construction. See MapHandle.SetEventMask.
 	EventMask RuntimeEventMask
 }
 
@@ -151,9 +150,6 @@ func (m *MapHandle) ID() (MapID, error) {
 // a still-image request finished, and loading-failed and render-error carry
 // native failure text. Narrowing gates later events and keeps queued ones, so a
 // caller drains what it already caused.
-//
-// A map reports the two camera events of its initial sizing whatever this mask
-// selects, because MapLibre resizes the map inside its own constructor.
 func (m *MapHandle) SetEventMask(mask RuntimeEventMask) error {
 	ptr, release, err := m.ptr()
 	if err != nil {

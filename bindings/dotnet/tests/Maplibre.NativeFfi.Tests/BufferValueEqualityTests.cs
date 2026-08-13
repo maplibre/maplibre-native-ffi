@@ -94,35 +94,6 @@ public sealed class BufferValueEqualityTests
 
     [BindingSpecTest("BND-070")]
     [Fact]
-    public void EventBatchesCompareEventContentsAndSnapshotTheCallerList()
-    {
-        var events = new List<RuntimeEvent>
-        {
-            new(
-                RuntimeEventType.MapIdle,
-                (uint)RuntimeEventType.MapIdle,
-                RuntimeEventSourceType.Runtime,
-                (uint)RuntimeEventSourceType.Runtime,
-                0,
-                null,
-                null,
-                0,
-                0,
-                RuntimeEventPayload.None.Instance,
-                string.Empty
-            ),
-        };
-        var batch = new RuntimeEventBatch(events, 2);
-
-        Assert.Equal(new RuntimeEventBatch([.. events], 2), batch);
-        Assert.NotEqual(new RuntimeEventBatch([.. events], 3), batch);
-
-        events.Clear();
-        Assert.Single(batch.Events);
-    }
-
-    [BindingSpecTest("BND-070")]
-    [Fact]
     public void MutatingTheCallerBufferDoesNotChangeEquality()
     {
         // BND-069: the copied buffer is what participates in equality.

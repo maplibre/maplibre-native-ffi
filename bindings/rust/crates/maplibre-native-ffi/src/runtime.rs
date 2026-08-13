@@ -174,7 +174,7 @@ impl RuntimeState {
     }
 }
 
-/// Owner-thread runtime handle for MapLibre Native work and event polling.
+/// Owner-thread runtime handle for MapLibre Native work and event draining.
 pub struct RuntimeHandle {
     pub(crate) inner: Rc<RuntimeState>,
 }

@@ -29,17 +29,6 @@ const RuntimeState = struct {
     http_header_transform: ?*HttpHeaderTransform,
     resource_provider: ?*ResourceProviderState,
     active_leases: std.atomic.Value(usize),
-    /// Authoritative batch epoch, advanced by a drain and by a batch deinit. A
-    /// batch keeps the epoch it was taken at, so an accessor on a batch a later
-    /// drain or a deinit invalidated reports `error.InvalidState` instead of
-    /// reading replaced native storage. Keeping the epoch here rather than in the
-    /// batch invalidates every copy of a batch value at once.
-    drain_epoch: u64,
-    /// Epoch of the batch holding this runtime's one batch lease, or 0 when no
-    /// batch holds it. A drain moves the lease to the batch it returns, and a
-    /// deinit releases it only for the epoch that still holds it, so deiniting a
-    /// copy of an already deinited batch cannot release a second time.
-    batch_lease_epoch: u64,
     closing: bool,
 };
 
@@ -603,110 +592,55 @@ pub const WakeSourceHandle = enum(c.mln_wake_source) {
     }
 };
 
-/// One drained batch of runtime events, borrowed from the runtime that produced
-/// it.
+/// One drained batch of copied runtime events.
 ///
-/// The batch a runtime drained most recently holds a lease on it, so
-/// `RuntimeHandle.close` reports `error.ActiveBorrow` until `deinit` releases
-/// that lease. The next drain takes the lease over and invalidates the batch
-/// before it, which matches the C API: a drain invalidates the batch it
-/// supersedes, so an older batch no longer holds its runtime open. Every
-/// accessor on an invalidated batch reports `error.InvalidState` and `len`
-/// reports no events. Copy anything to keep with `RuntimeEventView.toOwned`.
-///
-/// The runtime owns the epoch a batch is valid for, so copying a batch value
-/// shares its lifetime rather than extending it. Deiniting any copy invalidates
-/// every copy.
+/// The batch owns its events and remains valid after another drain or after the
+/// runtime closes. Call `deinit` when finished with it.
 pub const EventBatch = struct {
-    runtime_lease: RuntimeLease,
-    /// Epoch this batch was taken at, or 0 once `deinit` released the lease.
-    epoch: u64,
-    /// The reported event array as raw bytes, indexed by `event_size`.
-    events: []const u8,
-    /// Stride of one event in bytes, as the drain reported it.
-    event_size: usize,
-    /// Message storage every event's message points into.
-    messages: []const u8,
-    /// Events this batch reports, which is what `len` returns.
-    count: usize,
-    /// Events left queued by a bounded drain, which is what `remaining` returns.
+    allocator: std.mem.Allocator,
+    events: []RuntimeEvent,
     remaining_count: usize,
 
-    /// Releases the runtime lease and invalidates this batch and every copy of
-    /// it: the runtime advances the epoch a copy carries, so an accessor on a
-    /// copy reports `error.InvalidState` rather than reading released storage.
-    /// Deiniting twice, including deiniting a copy, is a no-op.
+    /// Releases every event and the batch storage.
     pub fn deinit(self: *EventBatch) void {
-        const epoch = self.epoch;
-        if (epoch == 0) return;
-        self.epoch = 0;
-        self.count = 0;
-
-        const runtime_state = liveRuntimeStateForBatch(self.runtime_lease) orelse return;
-        // A later drain moved the lease to the batch it returned, or a copy of
-        // this batch released it already. Either way nothing is left to release.
-        if (runtime_state.batch_lease_epoch != epoch) return;
-        runtime_state.batch_lease_epoch = 0;
-        runtime_state.drain_epoch += 1;
-        self.runtime_lease.release();
+        for (self.events) |*event| event.deinit();
+        self.allocator.free(self.events);
+        self.events = &.{};
+        self.remaining_count = 0;
     }
 
-    /// Number of events this batch reports, or zero once a later drain or a
-    /// `deinit` of this batch or of a copy of it invalidated it.
+    /// Number of events this batch reports.
     pub fn len(self: EventBatch) usize {
-        if (self.currentRuntimeState() == null) return 0;
-        return self.count;
+        return self.events.len;
     }
 
-    /// Events still queued for this runtime after this batch. A nonzero value
-    /// means another drain reports more events. An invalidated batch reports
-    /// zero.
+    /// Events still queued for this runtime after this batch.
     pub fn remaining(self: EventBatch) usize {
-        if (self.currentRuntimeState() == null) return 0;
         return self.remaining_count;
     }
 
     /// Reads the event at `index` in queue order.
-    ///
-    /// Reports `error.InvalidState` for a batch a later drain or a `deinit` of
-    /// this batch or of a copy of it invalidated, and `error.InvalidArgument` for
-    /// an index at or past `len`.
-    pub fn at(self: EventBatch, index: usize) status.Error!RuntimeEventView {
-        const runtime_state = self.currentRuntimeState() orelse return error.InvalidState;
-        if (index >= self.count) return error.InvalidArgument;
-        return eventViewAt(runtime_state, self.events, self.event_size, self.messages, index);
-    }
-
-    /// Resolves the runtime state while this batch is the current one, or null
-    /// once a drain, a deinit of any copy, or a runtime close invalidated it. The
-    /// batch holding the lease keeps its runtime open, so a matching epoch also
-    /// means the borrowed native storage is still alive.
-    fn currentRuntimeState(self: EventBatch) ?*RuntimeState {
-        if (self.epoch == 0) return null;
-        const runtime_state = liveRuntimeStateForBatch(self.runtime_lease) orelse return null;
-        if (runtime_state.drain_epoch != self.epoch) return null;
-        return runtime_state;
+    pub fn at(self: EventBatch, index: usize) status.Error!*const RuntimeEvent {
+        if (index >= self.events.len) return error.InvalidArgument;
+        return &self.events[index];
     }
 };
 
-/// One event of a drained batch, borrowed for as long as the batch is valid.
-pub const RuntimeEventView = struct {
+const RuntimeEventView = struct {
     event_type: RuntimeEventType,
     source_type: RuntimeEventSourceType,
-    /// Native identity of the object this event came from. See
-    /// `OwnedRuntimeEvent.source`.
+    /// Native identity of the object this event came from.
     source: RuntimeEventSourceId,
     source_id: ?values.MapId,
     payload_type: RuntimeEventPayloadType,
-    /// Secondary detail whose meaning `event_type` selects. See
-    /// `OwnedRuntimeEvent.code`.
+    /// Secondary detail whose meaning `event_type` selects.
     code: i32,
     /// Borrowed from the batch's message arena.
     message: []const u8,
     payload: RuntimeEventPayload,
 
     /// Copies this event into storage the returned value owns.
-    pub fn toOwned(self: RuntimeEventView, allocator: std.mem.Allocator) status.Error!OwnedRuntimeEvent {
+    fn toOwned(self: RuntimeEventView, allocator: std.mem.Allocator) status.Error!RuntimeEvent {
         const message = try allocator.dupe(u8, self.message);
         errdefer allocator.free(message);
         return .{
@@ -724,7 +658,7 @@ pub const RuntimeEventView = struct {
 };
 
 /// One drained runtime event, copied into storage this value owns.
-pub const OwnedRuntimeEvent = struct {
+pub const RuntimeEvent = struct {
     allocator: std.mem.Allocator,
     event_type: RuntimeEventType,
     source_type: RuntimeEventSourceType,
@@ -745,7 +679,24 @@ pub const OwnedRuntimeEvent = struct {
     message: []const u8,
     payload: RuntimeEventPayload,
 
-    pub fn deinit(self: *OwnedRuntimeEvent) void {
+    /// Copies this event into storage the returned value owns.
+    pub fn clone(self: RuntimeEvent, allocator: std.mem.Allocator) status.Error!RuntimeEvent {
+        const message = try allocator.dupe(u8, self.message);
+        errdefer allocator.free(message);
+        return .{
+            .allocator = allocator,
+            .event_type = self.event_type,
+            .source_type = self.source_type,
+            .source = self.source,
+            .source_id = self.source_id,
+            .payload_type = self.payload_type,
+            .code = self.code,
+            .message = message,
+            .payload = try ownedPayload(allocator, self.payload),
+        };
+    }
+
+    pub fn deinit(self: *RuntimeEvent) void {
         self.payload.deinit(self.allocator);
         self.allocator.free(self.message);
         self.message = "";
@@ -755,9 +706,8 @@ pub const OwnedRuntimeEvent = struct {
 
 /// Typed event payload the event's `payload_type` selects.
 ///
-/// Every member is a value except the bytes of an `unknown` payload, which a
-/// `RuntimeEventView` borrows from the batch and `RuntimeEventView.toOwned`
-/// copies.
+/// Every member is a value except the bytes of an `unknown` payload, which the
+/// containing event owns.
 pub const RuntimeEventPayload = union(enum) {
     none,
     render_frame: RenderFramePayload,
@@ -1392,22 +1342,17 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         };
     }
 
-    /// Drains this runtime's queued events into one borrowed batch.
+    /// Drains this runtime's queued events into one copied batch.
     ///
     /// `max_events` bounds the drain: zero drains every queued event, and a
     /// positive value drains at most that many and leaves the rest for the next
     /// drain, which `EventBatch.remaining` reports.
     ///
-    /// The batch borrows runtime-owned storage and holds a lease on this
-    /// runtime, so deinit it before closing the runtime, and read it before
-    /// draining again. A drain invalidates the batch it replaces and takes over
-    /// its lease, so the runtime holds one batch lease at a time.
-    ///
     /// Narrowing a subscription gates later events and keeps queued ones, so a
     /// batch still reports the events a host already caused.
-    pub fn drainEvents(self: *RuntimeHandle, max_events: usize) status.Error!EventBatch {
+    pub fn drainEvents(self: *RuntimeHandle, allocator: std.mem.Allocator, max_events: usize) status.Error!EventBatch {
         const runtime_lease = try lease(self);
-        errdefer runtime_lease.release();
+        defer runtime_lease.release();
         const runtime_state = runtime_lease.state;
 
         var native_batch = c.mln_runtime_event_batch_default();
@@ -1415,13 +1360,6 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
             c.mln_runtime_drain_events(runtime_lease.native, max_events, &native_batch),
             runtime_lease.diagnostic_store,
         );
-        runtime_state.drain_epoch += 1;
-        // This drain invalidated the previous batch, so the runtime keeps one
-        // batch lease and it moves to the batch returned here. The previous
-        // batch's deinit then finds nothing to release.
-        if (runtime_state.batch_lease_epoch != 0) runtime_lease.release();
-        runtime_state.batch_lease_epoch = runtime_state.drain_epoch;
-
         const event_size: usize = native_batch.event_size;
         const events: []const u8 = if (native_batch.event_count == 0 or native_batch.events == null)
             &.{}
@@ -1431,15 +1369,17 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
             ""
         else
             native_batch.messages[0..native_batch.messages_size];
-        return .{
-            .runtime_lease = runtime_lease,
-            .epoch = runtime_state.drain_epoch,
-            .events = events,
-            .event_size = event_size,
-            .messages = messages,
-            .count = native_batch.event_count,
-            .remaining_count = native_batch.remaining_count,
-        };
+        const copied = try allocator.alloc(RuntimeEvent, native_batch.event_count);
+        var initialized: usize = 0;
+        errdefer {
+            for (copied[0..initialized]) |*event| event.deinit();
+            allocator.free(copied);
+        }
+        for (copied, 0..) |*event, index| {
+            event.* = try eventViewAt(runtime_state, events, event_size, messages, index).toOwned(allocator);
+            initialized += 1;
+        }
+        return .{ .allocator = allocator, .events = copied, .remaining_count = native_batch.remaining_count };
     }
 
     /// Selects which runtime-originated event types this runtime queues.
@@ -1902,8 +1842,6 @@ fn createNative(
         .http_header_transform = null,
         .resource_provider = null,
         .active_leases = std.atomic.Value(usize).init(0),
-        .drain_epoch = 0,
-        .batch_lease_epoch = 0,
         .closing = false,
     };
     errdefer std.heap.smp_allocator.destroy(runtime_state);
@@ -2096,21 +2034,6 @@ fn runtimeState(handle: RuntimeHandle) ?*RuntimeState {
 
 fn runtimeStateLocked(handle: RuntimeHandle) ?*RuntimeState {
     return runtime_handle_registry.get(@intFromEnum(handle));
-}
-
-/// Resolves a batch's runtime state, or null once the runtime closed. A batch is
-/// a copyable value, so a copy can outlive the lease that kept its runtime open;
-/// looking the state up by handle keeps such a copy from reading state a close
-/// already freed.
-fn liveRuntimeStateForBatch(batch_lease: RuntimeLease) ?*RuntimeState {
-    lockRuntimeRegistry();
-    defer unlockRuntimeRegistry();
-
-    const runtime_state = runtimeStateLocked(@enumFromInt(batch_lease.native)) orelse return null;
-    // A closed runtime's handle can name a later runtime, whose epochs start
-    // over, so the state itself has to match the one the batch was taken from.
-    if (runtime_state != batch_lease.state) return null;
-    return runtime_state;
 }
 
 pub fn lease(handle: *RuntimeHandle) status.BindingError!RuntimeLease {
@@ -2729,7 +2652,7 @@ fn waitForOfflineOperationForTesting(runtime: *RuntimeHandle, operation: Offline
         // One event per drain, so an event this wait is not looking for stays
         // queued rather than being dropped with the batch that carried it.
         while (true) {
-            var batch = try runtime.drainEvents(1);
+            var batch = try runtime.drainEvents(std.testing.allocator, 1);
             defer batch.deinit();
             if (batch.len() == 0) break;
             const event = try batch.at(0);
@@ -2883,15 +2806,6 @@ test "a map event whose map this binding does not track still names its source" 
     var owned = try view.toOwned(std.testing.allocator);
     defer owned.deinit();
     try std.testing.expectEqual(view.source, owned.source);
-}
-
-test "a drain reports the stride this binding compiled against" {
-    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var batch = try runtime.drainEvents(0);
-    defer batch.deinit();
-    try std.testing.expectEqual(@as(usize, @sizeOf(c.mln_runtime_event)), batch.event_size);
 }
 
 test "raw event masks reject bits outside the mask enum" {

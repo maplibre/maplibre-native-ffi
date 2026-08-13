@@ -23,8 +23,8 @@ pub struct MapOptions {
     /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
     /// encodings. Fixed for the lifetime of the map.
     pub fast_pfor_enabled: bool,
-    /// Map-originated event types the map queues from its first style load.
-    /// Defaults to every event type this library reports.
+    /// Map-originated event types the map queues during and after construction.
+    /// Defaults to every event type that this library reports.
     pub event_mask: RuntimeEventMask,
 }
 

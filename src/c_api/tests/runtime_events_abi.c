@@ -362,10 +362,8 @@ static void options_reject_unknown_event_mask_bits(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A creation mask is narrow from the first style load. Creation still reports
-// the initial camera sizing, because a map sizes itself before the mask can
-// suppress anything.
-static void a_creation_mask_applies_from_the_first_style_load(void) {
+// A creation mask applies before MapLibre reports constructor-time events.
+static void a_creation_mask_applies_during_construction(void) {
   mln_runtime runtime = mln_test_create_runtime();
   const mln_map_options options =
     map_options_with_event_mask(MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED);
@@ -379,15 +377,7 @@ static void a_creation_mask_applies_from_the_first_style_load(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_runtime_drain_events(runtime, 0, &batch)
   );
-  bool saw_will_change = false;
-  bool saw_did_change = false;
-  for (size_t index = 0; index < batch.event_count; index += 1) {
-    const uint32_t type = batch_event(&batch, index)->type;
-    saw_will_change |= type == MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE;
-    saw_did_change |= type == MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE;
-  }
-  TEST_ASSERT_TRUE(saw_will_change);
-  TEST_ASSERT_TRUE(saw_did_change);
+  TEST_ASSERT_EQUAL_size_t(0, batch.event_count);
 
   load_style_and_pump(runtime, map);
   TEST_ASSERT_EQUAL_size_t(
@@ -446,10 +436,6 @@ static void a_suppressed_producer_leaves_a_pump_parked(void) {
     MLN_STATUS_OK,
     mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_NONE)
   );
-  // Creation reports its initial camera sizing even under a narrowed mask.
-  // Clear those events before observing later producers.
-  mln_test_drain_all(runtime);
-
   // Two zero pumps and a drain leave the wake flag clear and the queue empty.
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
   TEST_ASSERT_EQUAL_size_t(0, mln_test_drain_all(runtime));
@@ -749,7 +735,7 @@ void run_runtime_events_abi_tests(void) {
   RUN_TEST(a_fresh_map_and_runtime_select_every_event_type);
   RUN_TEST(runtime_options_reject_unknown_flags);
   RUN_TEST(options_reject_unknown_event_mask_bits);
-  RUN_TEST(a_creation_mask_applies_from_the_first_style_load);
+  RUN_TEST(a_creation_mask_applies_during_construction);
   RUN_TEST(clearing_one_type_leaves_the_others_arriving);
   RUN_TEST(a_suppressed_producer_leaves_a_pump_parked);
   RUN_TEST(a_batch_reports_this_headers_stride_and_ends_the_previous);

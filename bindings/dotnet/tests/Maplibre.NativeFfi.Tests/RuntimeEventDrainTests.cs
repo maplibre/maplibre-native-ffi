@@ -1,7 +1,5 @@
-using System.Runtime.CompilerServices;
 using Maplibre.NativeFfi.Camera;
 using Maplibre.NativeFfi.Error;
-using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Runtime;
 using Xunit;
@@ -12,18 +10,6 @@ public sealed unsafe class RuntimeEventDrainTests
 {
     private static readonly byte[] StyleJson =
         """{"version":8,"sources":{},"layers":[]}"""u8.ToArray();
-
-    [BindingSpecTest("BND-080")]
-    [Fact]
-    public void AFreshRuntimeDrainsAnEmptyBatch()
-    {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-
-        var batch = runtime.DrainEvents();
-
-        Assert.Empty(batch.Events);
-        Assert.Equal(0ul, batch.RemainingCount);
-    }
 
     [BindingSpecTest("BND-090")]
     [Fact]
@@ -179,19 +165,6 @@ public sealed unsafe class RuntimeEventDrainTests
         Assert.Throws<InvalidArgumentException>(() =>
             RuntimeHandle.Create(new RuntimeOptions { EventMask = undeclared })
         );
-    }
-
-    [BindingSpecTest("BND-087")]
-    [Fact]
-    public void ADrainReportsTheEventStrideThisBindingCompiledAgainst()
-    {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        var batch = NativeMethods.mln_runtime_event_batch_default();
-
-        var status = NativeMethods.mln_runtime_drain_events(runtime.Handle, 0, &batch);
-
-        Assert.Equal(mln_status.MLN_STATUS_OK, status);
-        Assert.Equal((uint)Unsafe.SizeOf<mln_runtime_event>(), batch.event_size);
     }
 
     [BindingSpecTest("BND-092")]

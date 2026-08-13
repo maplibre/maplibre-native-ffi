@@ -35,7 +35,7 @@ pub fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.Runti
     for (0..1000) |_| {
         try runtime.pump(0);
         while (true) {
-            var batch = try runtime.drainEvents(1);
+            var batch = try runtime.drainEvents(testing.allocator, 1);
             defer batch.deinit();
             if (batch.len() == 0) break;
             const event = try batch.at(0);
@@ -52,15 +52,15 @@ pub fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.Runti
 pub fn waitForOwnedEvent(
     runtime: *maplibre.RuntimeHandle,
     event_type: maplibre.RuntimeEventType,
-) !maplibre.OwnedRuntimeEvent {
+) !maplibre.RuntimeEvent {
     for (0..5000) |_| {
         try runtime.pump(0);
         while (true) {
-            var batch = try runtime.drainEvents(1);
+            var batch = try runtime.drainEvents(testing.allocator, 1);
             defer batch.deinit();
             if (batch.len() == 0) break;
             const event = try batch.at(0);
-            if (std.meta.eql(event.event_type, event_type)) return try event.toOwned(testing.allocator);
+            if (std.meta.eql(event.event_type, event_type)) return try event.clone(testing.allocator);
         }
         try sleepOneMillisecond();
     }
@@ -69,7 +69,7 @@ pub fn waitForOwnedEvent(
 
 /// Drains every queued event, reporting how many the batch carried.
 pub fn drainEvents(runtime: *maplibre.RuntimeHandle) !usize {
-    var batch = try runtime.drainEvents(0);
+    var batch = try runtime.drainEvents(testing.allocator, 0);
     defer batch.deinit();
     return batch.len();
 }

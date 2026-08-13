@@ -90,9 +90,7 @@ fn pumpUntilSessionCloses(
             logLatestDiagnostic(diagnostic_store);
             return err;
         };
-        // One drain takes every event the pump produced. The batch borrows
-        // runtime storage, and this loop keeps nothing from it.
-        var batch = try runtime.drainEvents(0);
+        var batch = try runtime.drainEvents(args.allocator, 0);
         defer batch.deinit();
         for (0..batch.len()) |index| {
             const event = try batch.at(index);
