@@ -15,8 +15,8 @@ Pumping the runtime advances MapLibre Native. A pump drains queued map work and
 services network and database work. Drawing is separate: the map publishes a
 render update, and the render session draws it.
 
-Pump the runtime and drain its events on the runtime owner thread. Both
-operations report a wrong-thread status from another thread. Choose the owner
+Pump the runtime on its owner thread. Drain its event queue from the owner
+thread or another thread; a drain runs no owner-thread work. Choose the owner
 thread before creating the runtime.
 
 ## Choose the runtime owner thread

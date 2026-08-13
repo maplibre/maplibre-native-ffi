@@ -120,29 +120,59 @@ import Testing
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.close() }
 
-  let operationId = try runtime.setMaximumAmbientCacheSizeStart(8 << 20)
-  #expect(operationId != 0)
+  let operation = try runtime.setMaximumAmbientCacheSizeStart(8 << 20)
+  #expect(!operation.isClosed)
+  #expect(try operation.wait(timeoutMilliseconds: 10000))
+  #expect(try operation.poll())
+  #expect(try operation.status() == MLN_STATUS_OK.rawValue)
+  #expect(try operation.diagnostic().isEmpty)
+  try operation.discard()
+  #expect(!operation.isClosed)
+  #expect(try operation.status() == MLN_STATUS_OK.rawValue)
+  try operation.close()
+  #expect(operation.isClosed)
+}
 
-  let event = try pumpUntilEvent(
-    runtime,
-    waitingFor: "the cache size operation to complete"
-  ) { event in
-    guard case let .offlineOperationCompleted(completed) = event.payload else {
-      return false
-    }
-    return completed.operationId == operationId
+@Test func runtimeCloseRequiresOperationObserverClose() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  let operation = try runtime.setMaximumAmbientCacheSizeStart(8 << 20)
+
+  do {
+    try runtime.close()
+    Issue.record("runtime close should reject a live operation")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidState)
   }
-  guard case let .offlineOperationCompleted(completed) = try #require(event)
-    .payload
-  else {
-    Issue.record("the completion event lost its payload")
-    return
+
+  _ = try operation.wait(timeoutMilliseconds: 10000)
+  if try operation.poll() {
+    try operation.discard()
   }
-  // MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE; the public API
-  // carries operation kinds as raw C values.
-  #expect(completed.operationKind == 12)
-  #expect(completed.resultStatus == 0)
-  try runtime.discardOfflineOperation(operationId)
+  try operation.close()
+  try runtime.close()
+}
+
+@Test func typedTakeConsumesResultButKeepsObserverOpen() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let operation = try runtime.offlineRegionsListStart()
+
+  #expect(try operation.wait(timeoutMilliseconds: 10000))
+  #expect(try operation.status() == MLN_STATUS_OK.rawValue)
+  #expect(try runtime.offlineRegionsListTakeResult(operation: operation)
+    .isEmpty)
+  #expect(!operation.isClosed)
+  #expect(try operation.status() == MLN_STATUS_OK.rawValue)
+
+  do {
+    _ = try runtime.offlineRegionsListTakeResult(operation: operation)
+    Issue.record("a typed result should be consumed once")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidState)
+  }
+  try operation.close()
 }
 
 @Test func closedRuntimeRejectsOfflineCallsThroughSwiftHandleState() throws {

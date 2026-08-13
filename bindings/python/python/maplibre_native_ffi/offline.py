@@ -2,13 +2,24 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
+from threading import Condition, RLock
+from typing import Generic, TypeVar
 
 from ._enum import NativeIntEnum, UnknownIntEnum
 from ._lifecycle import ContextHandleMixin, WarnUnclosedMixin
+from .errors import (
+    InvalidStateError,
+    MaplibreStatus,
+    _from_native_status,
+    _OperationResultConsumedError,
+)
 from .geo import LatLngBounds
 from .resource import ResourceErrorReason
+
+_T = TypeVar("_T")
 
 _OPERATION_HANDLE_CREATE_KEY = object()
 
@@ -40,133 +51,185 @@ class OfflineRegionDownloadState(UnknownIntEnum):
         return self.known_native_code("offline region download state")
 
 
-class OfflineOperationKind(UnknownIntEnum):
-    """Offline database operation kinds reported by completion events."""
-
-    AMBIENT_CACHE = 1
-    REGION_CREATE = 2
-    REGION_GET = 3
-    REGIONS_LIST = 4
-    REGIONS_MERGE_DATABASE = 5
-    REGION_UPDATE_METADATA = 6
-    REGION_GET_STATUS = 7
-    REGION_SET_OBSERVED = 8
-    REGION_SET_DOWNLOAD_STATE = 9
-    REGION_INVALIDATE = 10
-    REGION_DELETE = 11
-    SET_MAXIMUM_AMBIENT_CACHE_SIZE = 12
-
-
-class OfflineOperationResultKind(UnknownIntEnum):
-    """Offline database operation result kinds reported by completion events."""
-
-    NONE = 0
-    REGION = 1
-    OPTIONAL_REGION = 2
-    REGION_LIST = 3
-    REGION_STATUS = 4
-
-
-class OfflineOperationHandle(WarnUnclosedMixin, ContextHandleMixin):
-    """Runtime-owned offline database operation token."""
-
-    _handle_name = "OfflineOperationHandle"
+class OperationHandle(
+    WarnUnclosedMixin,
+    ContextHandleMixin,
+    Generic[_T],  # noqa: UP046
+):
+    _handle_name = "OperationHandle"
 
     def __init__(
         self,
         runtime: RuntimeHandle,
-        operation_id: int,
-        *,
+        operation: int,
+        take_result: Callable[[int], object] | None,
+        adapt_result: Callable[[object], _T] | None,
         _create_key: object | None = None,
     ) -> None:
         if _create_key is not _OPERATION_HANDLE_CREATE_KEY:
-            msg = "OfflineOperationHandle instances are created by RuntimeHandle"
+            msg = "OperationHandle instances are created by RuntimeHandle"
             raise TypeError(msg)
         self._runtime = runtime
-        self._operation_id = operation_id
+        self._operation = operation
+        self._take_result = take_result
+        self._adapt_result = adapt_result
+        self._state_lock = RLock()
+        self._idle = Condition(self._state_lock)
+        self._active_uses = 0
+        self._closing = False
         self._closed = False
-        runtime._register_offline_operation(self)
+        self._result_consumed = False
+        self._result_in_use = False
+        runtime._register_operation(self)
 
-    @classmethod
-    def _from_native(
-        cls, runtime: RuntimeHandle, operation_id: int
-    ) -> OfflineOperationHandle:
-        return cls(
+    @staticmethod
+    def _from_native[U](
+        runtime: RuntimeHandle,
+        operation: int,
+        take_result: Callable[[int], object] | None = None,
+        adapt_result: Callable[[object], U] | None = None,
+    ) -> OperationHandle[U]:
+        return OperationHandle(
             runtime,
-            operation_id,
+            operation,
+            take_result,
+            adapt_result,
             _create_key=_OPERATION_HANDLE_CREATE_KEY,
         )
 
     @property
     def closed(self) -> bool:
-        """Return whether this operation token has been discarded."""
-        return self._closed
+        """Return whether this operation observer has been released."""
+        with self._state_lock:
+            return self._closed
+
+    @contextmanager
+    def _use(self, *, allow_while_closing: bool = False) -> Iterator[int]:
+        with self._state_lock:
+            if self._closed or (self._closing and not allow_while_closing):
+                from .errors import InvalidStateError
+
+                raise InvalidStateError(None, "operation handle is already closed")
+            self._active_uses += 1
+            operation = self._operation
+        try:
+            yield operation
+        finally:
+            with self._state_lock:
+                self._active_uses -= 1
+                if self._active_uses == 0:
+                    self._idle.notify_all()
 
     def close(self) -> None:
-        """Discard runtime-owned state for this operation."""
-        if self._closed:
-            return
-        self._runtime._native.offline_operation_discard(self._operation_id)
-        self._mark_closed()
+        """Release the public observer after in-flight calls return."""
+        with self._state_lock:
+            if self._closed:
+                return
+            if self._closing:
+                while not self._closed:
+                    self._idle.wait()
+                return
+            self._closing = True
+            while self._active_uses:
+                self._idle.wait()
+            self._runtime._native.operation_release(self._operation)
+            self._closed = True
+            self._closing = False
+            self._idle.notify_all()
+        self._runtime._unregister_operation(self)
 
-    def _mark_closed(self) -> None:
-        if self._closed:
-            return
-        self._closed = True
-        self._runtime._unregister_offline_operation(self)
+    def __del__(self) -> None:
+        super().__del__()
+        with suppress(BaseException):
+            self.close()
 
-    def _mark_runtime_closed(self) -> None:
-        self._mark_closed()
+    def poll(self) -> bool:
+        """Return whether this operation has completed."""
+        with self._use() as operation:
+            return self._runtime._native.operation_poll(operation)
 
-    def _ensure_open(self) -> None:
-        if self._closed:
-            from .errors import InvalidStateError
+    def wait(self, timeout_ms: int = -1) -> bool:
+        """Wait for completion, or until the timeout expires."""
+        with self._use() as operation:
+            return self._runtime._native.operation_wait(operation, timeout_ms)
 
-            raise InvalidStateError(None, "offline operation handle is already closed")
+    def cancel(self) -> None:
+        """Request cancellation of this operation."""
+        with self._use(allow_while_closing=True) as operation:
+            self._runtime._native.operation_cancel(operation)
 
-    def _take(self, take: Callable[[int], object]) -> object:
-        self._ensure_open()
-        raw = take(self._operation_id)
-        self._mark_closed()
-        return raw
+    def _status_and_diagnostic(self) -> tuple[int, str]:
+        with self._use() as operation:
+            return self._runtime._native.operation_status(operation)
 
-    def take_region(self) -> OfflineRegionInfo:
-        """Take a completed region snapshot result."""
-        return OfflineRegionInfo._from_native(
-            self._take(self._runtime._native.offline_region_create_take_result)
-        )
+    @property
+    def status(self) -> MaplibreStatus:
+        """Return the terminal status category."""
+        raw_status, _ = self._status_and_diagnostic()
+        return MaplibreStatus._from_native(raw_status)
 
-    def take_optional_region(self) -> OfflineRegionInfo | None:
-        """Take a completed optional region snapshot result."""
-        raw = self._take(self._runtime._native.offline_region_get_take_result)
-        return OfflineRegionInfo._from_native(raw) if raw is not None else None
+    @property
+    def diagnostic(self) -> str:
+        """Return a copy of the terminal diagnostic."""
+        _, diagnostic = self._status_and_diagnostic()
+        return diagnostic
 
-    def take_region_list(
-        self,
-        *,
-        merge_result: bool = False,
-    ) -> tuple[OfflineRegionInfo, ...]:
-        """Take a completed region-list result."""
-        take = (
-            self._runtime._native.offline_regions_merge_database_take_result
-            if merge_result
-            else self._runtime._native.offline_regions_list_take_result
-        )
-        return tuple(
-            OfflineRegionInfo._from_native(region) for region in self._take(take)
-        )
+    def raise_for_status(self) -> None:
+        """Raise the terminal operation error, if any."""
+        raw_status, diagnostic = self._status_and_diagnostic()
+        if raw_status != MaplibreStatus.OK.native_code:
+            raise _from_native_status(raw_status, diagnostic)
 
-    def take_updated_region(self) -> OfflineRegionInfo:
-        """Take a completed updated region snapshot result."""
-        return OfflineRegionInfo._from_native(
-            self._take(self._runtime._native.offline_region_update_metadata_take_result)
-        )
+    def discard(self) -> None:
+        """Discard the completed result while keeping the observer live."""
+        with self._use() as operation:
+            with self._state_lock:
+                if self._result_consumed or self._result_in_use:
+                    from .errors import InvalidStateError
 
-    def take_status(self) -> OfflineRegionStatus:
-        """Take a completed offline region status result."""
-        return OfflineRegionStatus._from_native(
-            self._take(self._runtime._native.offline_region_get_status_take_result)
-        )
+                    raise InvalidStateError(
+                        None, "operation result is already consumed"
+                    )
+                self._result_in_use = True
+            try:
+                self._runtime._native.operation_discard(operation)
+            except BaseException:
+                with self._state_lock:
+                    self._result_in_use = False
+                raise
+            with self._state_lock:
+                self._result_in_use = False
+                self._result_consumed = True
+
+    def take(self) -> _T:
+        """Take this operation's typed result while keeping the observer live."""
+        with self._use() as operation:
+            with self._state_lock:
+                if self._result_consumed or self._result_in_use:
+                    raise InvalidStateError(
+                        None, "operation result is already consumed"
+                    )
+                take_result = self._take_result
+                adapt_result = self._adapt_result
+                if take_result is None or adapt_result is None:
+                    raise InvalidStateError(None, "operation has no typed result")
+                self._result_in_use = True
+            try:
+                self.raise_for_status()
+                raw = take_result(operation)
+            except _OperationResultConsumedError:
+                with self._state_lock:
+                    self._result_in_use = False
+                    self._result_consumed = True
+                raise
+            except BaseException:
+                with self._state_lock:
+                    self._result_in_use = False
+                raise
+            with self._state_lock:
+                self._result_in_use = False
+                self._result_consumed = True
+            return adapt_result(raw)
 
 
 @dataclass(frozen=True, slots=True)
@@ -309,31 +372,20 @@ class OfflineRegionTileCountLimitExceeded:
         )
 
 
-@dataclass(frozen=True, slots=True)
-class OfflineOperationCompleted:
-    """Offline operation completion event payload."""
+def _adapt_region_result(raw: object) -> OfflineRegionInfo:
+    return OfflineRegionInfo._from_native(raw)
 
-    operation_id: int
-    operation_kind: OfflineOperationKind
-    result_kind: OfflineOperationResultKind
-    result_status: int
-    found: bool
 
-    @classmethod
-    def _from_runtime_payload(
-        cls, payload: dict[str, object]
-    ) -> OfflineOperationCompleted:
-        return cls(
-            operation_id=_payload_int(payload, "operation_id"),
-            operation_kind=OfflineOperationKind(
-                _payload_int(payload, "operation_kind")
-            ),
-            result_kind=OfflineOperationResultKind(
-                _payload_int(payload, "result_kind")
-            ),
-            result_status=_payload_int(payload, "result_status"),
-            found=_payload_bool(payload, "found"),
-        )
+def _adapt_optional_region_result(raw: object) -> OfflineRegionInfo | None:
+    return OfflineRegionInfo._from_native(raw) if raw is not None else None
+
+
+def _adapt_region_list_result(raw: object) -> tuple[OfflineRegionInfo, ...]:
+    return tuple(OfflineRegionInfo._from_native(region) for region in raw)
+
+
+def _adapt_status_result(raw: object) -> OfflineRegionStatus:
+    return OfflineRegionStatus._from_native(raw)
 
 
 def _definition_from_native_wire(raw: dict[str, object]) -> OfflineRegionDefinition:
@@ -378,21 +430,9 @@ def _payload_int(payload: dict[str, object], key: str) -> int:
     return value
 
 
-def _payload_bool(payload: dict[str, object], key: str) -> bool:
-    value = payload[key]
-    if not isinstance(value, bool):
-        msg = f"offline payload {key} must be a bool"
-        raise TypeError(msg)
-    return value
-
-
 __all__ = [
     "AmbientCacheOperation",
     "OfflineGeometryRegionDefinition",
-    "OfflineOperationCompleted",
-    "OfflineOperationHandle",
-    "OfflineOperationKind",
-    "OfflineOperationResultKind",
     "OfflineRegionDefinition",
     "OfflineRegionDefinitionType",
     "OfflineRegionDownloadState",
@@ -402,6 +442,7 @@ __all__ = [
     "OfflineRegionStatusChanged",
     "OfflineRegionTileCountLimitExceeded",
     "OfflineTilePyramidRegionDefinition",
+    "OperationHandle",
 ]
 
 from .runtime import RuntimeHandle

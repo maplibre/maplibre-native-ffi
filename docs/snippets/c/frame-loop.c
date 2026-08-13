@@ -25,13 +25,19 @@ void run_one_frame(
   // #region pump
   mln_runtime_pump(runtime, 0);
 
-  mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+  mln_event_batch batch = MLN_HANDLE_NULL;
   if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) return;
+  mln_runtime_event_batch_view view = {0};
+  if (mln_event_batch_get(batch, &view) != MLN_STATUS_OK) {
+    mln_event_batch_release(batch);
+    return;
+  }
 
-  for (size_t index = 0; index < batch.event_count; index++) {
-    const char* bytes = (const char*)batch.events + index * batch.event_size;
+  for (size_t index = 0; index < view.event_count; index++) {
+    const char* bytes = (const char*)view.events + index * view.event_size;
     if (wants_a_frame((const mln_runtime_event*)bytes, map)) *pending = true;
   }
+  mln_event_batch_release(batch);
   // #endregion pump
 
   // #region render

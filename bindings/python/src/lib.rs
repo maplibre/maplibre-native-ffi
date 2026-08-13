@@ -30,6 +30,7 @@ type AnimationParts = (
 
 mod py_errors {
     pyo3::import_exception!(maplibre_native_ffi.errors, InvalidArgumentError);
+    pyo3::import_exception!(maplibre_native_ffi.errors, _OperationResultConsumedError);
     pyo3::import_exception!(maplibre_native_ffi.errors, InvalidStateError);
     pyo3::import_exception!(maplibre_native_ffi.errors, NativeError);
     pyo3::import_exception!(maplibre_native_ffi.errors, UnknownStatusError);
@@ -40,6 +41,7 @@ mod py_errors {
 #[pyclass(name = "_RuntimeHandle")]
 struct RuntimeHandle {
     state: Mutex<maplibre_core::handle::NativeHandleState<sys::mln_runtime>>,
+    notification_source: Mutex<sys::mln_notification_source>,
     operation_gate: RuntimeOperationGate,
     resource_provider: Mutex<Option<Box<PyResourceProviderState>>>,
     resource_transform: Mutex<Option<Box<PyResourceTransformState>>>,
@@ -388,12 +390,12 @@ impl Drop for RuntimeDetachedOperationGuard<'_> {
 
 fn start_offline_operation<F>(runtime: &RuntimeHandle, start: F) -> PyResult<u64>
 where
-    F: FnOnce(sys::mln_runtime, *mut u64) -> i32,
+    F: FnOnce(sys::mln_runtime, *mut sys::mln_operation) -> i32,
 {
     let state = runtime.state_for_operation()?;
-    let mut operation_id = 0;
-    maplibre_core::check(start(state.handle(), &mut operation_id)).map_err(map_error)?;
-    Ok(operation_id)
+    let mut operation = sys::mln_operation(0);
+    maplibre_core::check(start(state.handle(), &mut operation)).map_err(map_error)?;
+    Ok(operation.0)
 }
 
 fn leak_optional_box<T>(slot: &Mutex<Option<Box<T>>>) {
@@ -788,6 +790,9 @@ impl RenderSessionState {
         }
     }
 }
+fn operation_result_consumed(error: PyErr) -> PyErr {
+    py_errors::_OperationResultConsumedError::new_err(error.to_string())
+}
 
 #[pymethods]
 impl RuntimeHandle {
@@ -797,21 +802,23 @@ impl RuntimeHandle {
         }
         let runtime_handle = {
             let state = self.state();
-            let Some(runtime_handle) = state.live_handle() else {
-                self.operation_gate.finish_successful_close();
-                return Ok(());
-            };
-            state.mark_closed();
+            let runtime_handle = state.live_handle();
+            if runtime_handle.is_some() {
+                state.mark_closed();
+            }
             runtime_handle
         };
-        // SAFETY: state owns an mln_runtime handle created by mln_runtime_create
-        // and pairs it with the matching destroy function. Destroy can wait for
-        // in-flight callbacks, so it runs without the GIL or the state mutex.
-        let status = py.detach(move || unsafe { sys::mln_runtime_destroy(runtime_handle) });
-        if let Err(error) = maplibre_core::check(status) {
-            self.state().restore_handle_for_retry(runtime_handle);
-            self.operation_gate.finish_failed_close();
-            return Err(map_error(error));
+        if let Some(runtime_handle) = runtime_handle {
+            // SAFETY: state owns an mln_runtime handle created by
+            // mln_runtime_create and pairs it with the matching destroy
+            // function. Destroy can wait for in-flight callbacks, so it runs
+            // without the GIL or the state mutex.
+            let status = py.detach(move || unsafe { sys::mln_runtime_destroy(runtime_handle) });
+            if let Err(error) = maplibre_core::check(status) {
+                self.state().restore_handle_for_retry(runtime_handle);
+                self.operation_gate.finish_failed_close();
+                return Err(map_error(error));
+            }
         }
         self.resource_provider
             .lock()
@@ -825,6 +832,25 @@ impl RuntimeHandle {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .take();
+        let source = std::mem::replace(
+            &mut *self
+                .notification_source
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            sys::mln_notification_source(0),
+        );
+        if source.0 != 0 {
+            if let Err(error) =
+                maplibre_core::check(unsafe { sys::mln_notification_source_close(source) })
+            {
+                *self
+                    .notification_source
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner()) = source;
+                self.operation_gate.finish_failed_close();
+                return Err(map_error(error));
+            }
+        }
         self.operation_gate.finish_successful_close();
         Ok(())
     }
@@ -862,36 +888,36 @@ impl RuntimeHandle {
         })
     }
 
-    fn run_ambient_cache_operation_start(&self, operation: u32) -> PyResult<u64> {
+    fn run_ambient_cache_operation_start(&self, ambient_operation: u32) -> PyResult<u64> {
         let state = self.state_for_operation()?;
-        let mut operation_id = 0;
+        let mut operation = sys::mln_operation(0);
         // SAFETY: The C API validates the runtime handle, operation enum value,
-        // owner-thread affinity, and writable operation_id pointer.
+        // owner-thread affinity, and writable operation pointer.
         maplibre_core::check(unsafe {
             sys::mln_runtime_run_ambient_cache_operation_start(
                 state.handle(),
-                operation,
-                &mut operation_id,
+                ambient_operation,
+                &mut operation,
             )
         })
         .map_err(map_error)?;
-        Ok(operation_id)
+        Ok(operation.0)
     }
 
     fn set_maximum_ambient_cache_size_start(&self, size: u64) -> PyResult<u64> {
         let state = self.state_for_operation()?;
-        let mut operation_id = 0;
+        let mut operation = sys::mln_operation(0);
         // SAFETY: The C API validates the runtime handle, owner-thread
-        // affinity, and writable operation_id pointer.
+        // affinity, and writable operation pointer.
         maplibre_core::check(unsafe {
             sys::mln_runtime_set_maximum_ambient_cache_size_start(
                 state.handle(),
                 size,
-                &mut operation_id,
+                &mut operation,
             )
         })
         .map_err(map_error)?;
-        Ok(operation_id)
+        Ok(operation.0)
     }
 
     fn offline_region_create_start(
@@ -904,7 +930,7 @@ impl RuntimeHandle {
         let definition = maplibre_core::runtime::offline_region_definition_to_native(&definition)
             .map_err(map_error)?;
         let raw = definition.to_raw();
-        let mut operation_id = 0;
+        let mut operation = sys::mln_operation(0);
         // SAFETY: The C API validates the runtime, definition, metadata pointer/length, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_create_start(
@@ -912,11 +938,11 @@ impl RuntimeHandle {
                 &raw,
                 maplibre_core::runtime::metadata_ptr(&metadata),
                 metadata.len(),
-                &mut operation_id,
+                &mut operation,
             )
         })
         .map_err(map_error)?;
-        Ok(operation_id)
+        Ok(operation.0)
     }
 
     fn offline_region_get_start(&self, region_id: i64) -> PyResult<u64> {
@@ -984,29 +1010,89 @@ impl RuntimeHandle {
         })
     }
 
+    fn operation_poll(&self, operation: u64) -> PyResult<bool> {
+        let mut completed = false;
+        maplibre_core::check(unsafe {
+            sys::mln_operation_poll(sys::mln_operation(operation), &mut completed)
+        })
+        .map_err(map_error)?;
+        Ok(completed)
+    }
+
+    fn operation_wait(&self, py: Python<'_>, operation: u64, timeout_ms: i64) -> PyResult<bool> {
+        let mut completed = false;
+        let status = py.detach(|| unsafe {
+            sys::mln_operation_wait(sys::mln_operation(operation), timeout_ms, &mut completed)
+        });
+        maplibre_core::check(status).map_err(map_error)?;
+        Ok(completed)
+    }
+
+    fn operation_cancel(&self, operation: u64) -> PyResult<()> {
+        maplibre_core::check(unsafe { sys::mln_operation_cancel(sys::mln_operation(operation)) })
+            .map_err(map_error)
+    }
+
+    fn operation_status(&self, operation: u64) -> PyResult<(sys::mln_status, String)> {
+        let mut operation_status = sys::MLN_STATUS_OK;
+        maplibre_core::check(unsafe {
+            sys::mln_operation_get_status(sys::mln_operation(operation), &mut operation_status)
+        })
+        .map_err(map_error)?;
+
+        let mut diagnostic_size = 0;
+        maplibre_core::check(unsafe {
+            sys::mln_operation_copy_diagnostic(
+                sys::mln_operation(operation),
+                ptr::null_mut(),
+                0,
+                &mut diagnostic_size,
+            )
+        })
+        .map_err(map_error)?;
+        let mut diagnostic = vec![0u8; diagnostic_size];
+        maplibre_core::check(unsafe {
+            sys::mln_operation_copy_diagnostic(
+                sys::mln_operation(operation),
+                diagnostic.as_mut_ptr().cast(),
+                diagnostic.len(),
+                &mut diagnostic_size,
+            )
+        })
+        .map_err(map_error)?;
+        diagnostic.truncate(diagnostic_size);
+        Ok((
+            operation_status,
+            String::from_utf8_lossy(&diagnostic).into_owned(),
+        ))
+    }
+
+    fn operation_release(&self, operation: u64) {
+        unsafe { sys::mln_operation_release(sys::mln_operation(operation)) };
+    }
+
     fn offline_region_create_take_result(
         &self,
         py: Python<'_>,
         operation_id: u64,
     ) -> PyResult<Py<PyAny>> {
-        let state = self.state_for_operation()?;
         let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_snapshot>::new();
-        // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_create_take_result(
-                state.handle(),
-                operation_id,
+                sys::mln_operation(operation_id),
                 out.as_mut_ptr(),
             )
         })
         .map_err(map_error)?;
-        let native = out
-            .into_live("mln_offline_region_snapshot")
-            .map_err(map_error)?;
-        // SAFETY: native is an owned offline-region snapshot returned by the C API.
-        let info = unsafe { maplibre_core::runtime::copy_offline_region_snapshot(native) }
-            .map_err(map_error)?;
-        offline_region_info_to_py(py, &info)
+        (|| {
+            let native = out
+                .into_live("mln_offline_region_snapshot")
+                .map_err(map_error)?;
+            let info = unsafe { maplibre_core::runtime::copy_offline_region_snapshot(native) }
+                .map_err(map_error)?;
+            offline_region_info_to_py(py, &info)
+        })()
+        .map_err(operation_result_consumed)
     }
 
     fn offline_region_get_take_result(
@@ -1014,14 +1100,11 @@ impl RuntimeHandle {
         py: Python<'_>,
         operation_id: u64,
     ) -> PyResult<Option<Py<PyAny>>> {
-        let state = self.state_for_operation()?;
         let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_snapshot>::new();
         let mut found = false;
-        // SAFETY: The C API validates the runtime handle, operation ID, output pointer, and found pointer.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_get_take_result(
-                state.handle(),
-                operation_id,
+                sys::mln_operation(operation_id),
                 out.as_mut_ptr(),
                 &mut found,
             )
@@ -1030,13 +1113,15 @@ impl RuntimeHandle {
         if !found {
             return Ok(None);
         }
-        let native = out
-            .into_live("mln_offline_region_snapshot")
-            .map_err(map_error)?;
-        // SAFETY: native is an owned offline-region snapshot returned by the C API.
-        let info = unsafe { maplibre_core::runtime::copy_offline_region_snapshot(native) }
-            .map_err(map_error)?;
-        offline_region_info_to_py(py, &info).map(Some)
+        (|| {
+            let native = out
+                .into_live("mln_offline_region_snapshot")
+                .map_err(map_error)?;
+            let info = unsafe { maplibre_core::runtime::copy_offline_region_snapshot(native) }
+                .map_err(map_error)?;
+            offline_region_info_to_py(py, &info).map(Some)
+        })()
+        .map_err(operation_result_consumed)
     }
 
     fn offline_regions_list_take_result(
@@ -1044,24 +1129,23 @@ impl RuntimeHandle {
         py: Python<'_>,
         operation_id: u64,
     ) -> PyResult<Py<PyAny>> {
-        let state = self.state_for_operation()?;
         let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_list>::new();
-        // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_regions_list_take_result(
-                state.handle(),
-                operation_id,
+                sys::mln_operation(operation_id),
                 out.as_mut_ptr(),
             )
         })
         .map_err(map_error)?;
-        let native = out
-            .into_live("mln_offline_region_list")
-            .map_err(map_error)?;
-        // SAFETY: native is an owned offline-region list returned by the C API.
-        let regions = unsafe { maplibre_core::runtime::copy_offline_region_list(native) }
-            .map_err(map_error)?;
-        offline_region_list_to_py(py, &regions)
+        (|| {
+            let native = out
+                .into_live("mln_offline_region_list")
+                .map_err(map_error)?;
+            let regions = unsafe { maplibre_core::runtime::copy_offline_region_list(native) }
+                .map_err(map_error)?;
+            offline_region_list_to_py(py, &regions)
+        })()
+        .map_err(operation_result_consumed)
     }
 
     fn offline_regions_merge_database_take_result(
@@ -1069,24 +1153,23 @@ impl RuntimeHandle {
         py: Python<'_>,
         operation_id: u64,
     ) -> PyResult<Py<PyAny>> {
-        let state = self.state_for_operation()?;
         let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_list>::new();
-        // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_regions_merge_database_take_result(
-                state.handle(),
-                operation_id,
+                sys::mln_operation(operation_id),
                 out.as_mut_ptr(),
             )
         })
         .map_err(map_error)?;
-        let native = out
-            .into_live("mln_offline_region_list")
-            .map_err(map_error)?;
-        // SAFETY: native is an owned offline-region list returned by the C API.
-        let regions = unsafe { maplibre_core::runtime::copy_offline_region_list(native) }
-            .map_err(map_error)?;
-        offline_region_list_to_py(py, &regions)
+        (|| {
+            let native = out
+                .into_live("mln_offline_region_list")
+                .map_err(map_error)?;
+            let regions = unsafe { maplibre_core::runtime::copy_offline_region_list(native) }
+                .map_err(map_error)?;
+            offline_region_list_to_py(py, &regions)
+        })()
+        .map_err(operation_result_consumed)
     }
 
     fn offline_region_update_metadata_take_result(
@@ -1094,24 +1177,23 @@ impl RuntimeHandle {
         py: Python<'_>,
         operation_id: u64,
     ) -> PyResult<Py<PyAny>> {
-        let state = self.state_for_operation()?;
         let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_snapshot>::new();
-        // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_update_metadata_take_result(
-                state.handle(),
-                operation_id,
+                sys::mln_operation(operation_id),
                 out.as_mut_ptr(),
             )
         })
         .map_err(map_error)?;
-        let native = out
-            .into_live("mln_offline_region_snapshot")
-            .map_err(map_error)?;
-        // SAFETY: native is an owned offline-region snapshot returned by the C API.
-        let info = unsafe { maplibre_core::runtime::copy_offline_region_snapshot(native) }
-            .map_err(map_error)?;
-        offline_region_info_to_py(py, &info)
+        (|| {
+            let native = out
+                .into_live("mln_offline_region_snapshot")
+                .map_err(map_error)?;
+            let info = unsafe { maplibre_core::runtime::copy_offline_region_snapshot(native) }
+                .map_err(map_error)?;
+            offline_region_info_to_py(py, &info)
+        })()
+        .map_err(operation_result_consumed)
     }
 
     fn offline_region_get_status_take_result(
@@ -1119,26 +1201,20 @@ impl RuntimeHandle {
         py: Python<'_>,
         operation_id: u64,
     ) -> PyResult<Py<PyAny>> {
-        let state = self.state_for_operation()?;
         let mut status = empty_offline_region_status();
-        // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_get_status_take_result(
-                state.handle(),
-                operation_id,
+                sys::mln_operation(operation_id),
                 &mut status,
             )
         })
         .map_err(map_error)?;
-        offline_region_status_to_py(py, &status)
+        offline_region_status_to_py(py, &status).map_err(operation_result_consumed)
     }
 
-    fn offline_operation_discard(&self, operation_id: u64) -> PyResult<()> {
-        let state = self.state_for_operation()?;
-        // SAFETY: The C API validates the runtime handle, owner-thread affinity,
-        // and operation ID.
+    fn operation_discard(&self, operation_id: u64) -> PyResult<()> {
         maplibre_core::check(unsafe {
-            sys::mln_runtime_offline_operation_discard(state.handle(), operation_id)
+            sys::mln_operation_discard_result(sys::mln_operation(operation_id))
         })
         .map_err(map_error)
     }
@@ -1346,25 +1422,24 @@ impl RuntimeHandle {
 
     fn drain_events(&self, py: Python<'_>, max_events: usize) -> PyResult<Py<PyAny>> {
         let state = self.state_for_operation()?;
-        // SAFETY: The default constructor takes no arguments and fills in the
-        // size field for this C ABI version.
-        let mut batch = unsafe { sys::mln_runtime_event_batch_default() };
-        // SAFETY: The C API validates that the pointer is a live runtime handle.
-        // batch carries this header's size field and is writable for one batch.
+        let mut batch = sys::mln_event_batch(0);
         maplibre_core::check(unsafe {
             sys::mln_runtime_drain_events(state.handle(), max_events, &mut batch)
         })
         .map_err(map_error)?;
-
-        // SAFETY: The batch borrows runtime-owned storage that stays readable
-        // until the next drain for this runtime, which the still-held state
-        // mutex prevents. The decoder walks it by the reported event_size and
-        // every event is copied before the borrow ends here.
-        let mut copied = Vec::with_capacity(batch.event_count);
-        for event in unsafe { maplibre_core::events::drain_batch(&batch) } {
-            copied.push(event.map_err(map_error)?);
-        }
-        event_batch_to_py(py, copied, batch.remaining_count)
+        let result = (|| {
+            let mut view: sys::mln_runtime_event_batch_view = unsafe { std::mem::zeroed() };
+            view.size = std::mem::size_of::<sys::mln_runtime_event_batch_view>() as u32;
+            maplibre_core::check(unsafe { sys::mln_event_batch_get(batch, &mut view) })
+                .map_err(map_error)?;
+            let mut copied = Vec::with_capacity(view.event_count);
+            for event in unsafe { maplibre_core::events::drain_batch(&view) } {
+                copied.push(event.map_err(map_error)?);
+            }
+            event_batch_to_py(py, copied, view.remaining_count)
+        })();
+        unsafe { sys::mln_event_batch_release(batch) };
+        result
     }
 
     fn set_event_mask(&self, mask: u64) -> PyResult<()> {
@@ -4978,14 +5053,6 @@ fn payload_to_py(py: Python<'_>, payload: RuntimeEventPayload) -> PyResult<Py<Py
             dict.set_item("region_id", payload.region_id)?;
             dict.set_item("limit", payload.limit)?;
         }
-        RuntimeEventPayload::OfflineOperationCompleted(payload) => {
-            dict.set_item("kind", "offline_operation_completed")?;
-            dict.set_item("operation_id", payload.operation_id)?;
-            dict.set_item("operation_kind", payload.raw_operation_kind)?;
-            dict.set_item("result_kind", payload.raw_result_kind)?;
-            dict.set_item("result_status", payload.result_status)?;
-            dict.set_item("found", payload.found)?;
-        }
         RuntimeEventPayload::CameraTransitionFinished(payload) => {
             dict.set_item("kind", "camera_transition_finished")?;
             dict.set_item("transition_id", payload.transition_id)?;
@@ -5121,9 +5188,6 @@ fn event_type_raw(event_type: RuntimeEventType) -> u32 {
         }
         RuntimeEventType::OfflineRegionTileCountLimitExceeded => {
             sys::MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
-        }
-        RuntimeEventType::OfflineOperationCompleted => {
-            sys::MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED
         }
         RuntimeEventType::Unknown(raw) => raw,
         _ => 0,
@@ -7231,14 +7295,13 @@ fn synthetic_runtime_event_batch_for_test(py: Python<'_>) -> PyResult<Py<PyAny>>
     ];
 
     let (mut events, mut messages) = synthetic_event_storage(&specs);
-    let batch = sys::mln_runtime_event_batch {
-        size: std::mem::size_of::<sys::mln_runtime_event_batch>() as u32,
+    let batch = sys::mln_runtime_event_batch_view {
+        size: std::mem::size_of::<sys::mln_runtime_event_batch_view>() as u32,
         event_size: std::mem::size_of::<sys::mln_runtime_event>() as u32,
         events: events.as_ptr(),
         event_count: events.len(),
         messages: messages.as_ptr().cast(),
         messages_size: messages.len(),
-        // A bounded drain would report a rest, so carry one through the wire.
         remaining_count: 3,
     };
 
@@ -7269,18 +7332,19 @@ fn synthetic_runtime_event_batch_for_test(py: Python<'_>) -> PyResult<Py<PyAny>>
 #[pyfunction]
 fn runtime_event_stride_for_test(runtime: &RuntimeHandle) -> PyResult<(u32, u32)> {
     let state = runtime.state_for_operation()?;
-    // SAFETY: The default constructor takes no arguments and fills in size.
-    let mut batch = unsafe { sys::mln_runtime_event_batch_default() };
-    // SAFETY: The C API validates the runtime handle and owner-thread affinity,
-    // and batch carries this header's size field.
+    let mut batch = sys::mln_event_batch(0);
     maplibre_core::check(unsafe { sys::mln_runtime_drain_events(state.handle(), 0, &mut batch) })
         .map_err(map_error)?;
+    let mut view: sys::mln_runtime_event_batch_view = unsafe { std::mem::zeroed() };
+    view.size = std::mem::size_of::<sys::mln_runtime_event_batch_view>() as u32;
+    let status = unsafe { sys::mln_event_batch_get(batch, &mut view) };
+    unsafe { sys::mln_event_batch_release(batch) };
+    maplibre_core::check(status).map_err(map_error)?;
     Ok((
-        batch.event_size,
+        view.event_size,
         std::mem::size_of::<sys::mln_runtime_event>() as u32,
     ))
 }
-
 /// Probes the required byte length, then copies the layer text into a `String`.
 ///
 /// # Safety
@@ -7367,32 +7431,30 @@ fn create_runtime(
 ) -> PyResult<RuntimeHandle> {
     maplibre_core::validate_abi_version().map_err(map_error)?;
     let mut options = maplibre_core::RuntimeOptions::default();
-    if let Some(asset_path) = asset_path {
-        options.asset_path = Some(asset_path);
-    }
-    if let Some(cache_path) = cache_path {
-        options.cache_path = Some(cache_path);
-    }
+    options.asset_path = asset_path;
+    options.cache_path = cache_path;
     let native_options =
         maplibre_core::runtime::runtime_options_to_native(&options).map_err(map_error)?;
     let mut raw_options = native_options.to_raw();
-    // The Python layer always selects a mask, defaulting to every type. The C
-    // API validates the bits.
     raw_options.event_mask = event_mask;
-    let mut out = maplibre_core::ptr::OutHandle::<sys::mln_runtime>::new();
-    // SAFETY: raw_options points to a materialized mln_runtime_options whose
-    // backing strings live for this call, and out is a null-initialized
-    // out-pointer owned by this call.
-    maplibre_core::check(unsafe { sys::mln_runtime_create(&raw_options, out.as_mut_ptr()) })
+    let mut source = sys::mln_notification_source(0);
+    maplibre_core::check(unsafe { sys::mln_notification_source_create(&mut source) })
         .map_err(map_error)?;
+    raw_options.notification_source = source;
+    let mut out = maplibre_core::ptr::OutHandle::<sys::mln_runtime>::new();
+    if let Err(error) =
+        maplibre_core::check(unsafe { sys::mln_runtime_create(&raw_options, out.as_mut_ptr()) })
+    {
+        let _ = unsafe { sys::mln_notification_source_close(source) };
+        return Err(map_error(error));
+    }
     let native = out.into_live("mln_runtime").map_err(map_error)?;
-    // SAFETY: native came from successful mln_runtime_create and is paired with
-    // the matching status-returning destroy function in RuntimeHandle.close.
     let state =
         unsafe { maplibre_core::handle::NativeHandleState::from_handle(native, "mln_runtime") }
             .map_err(map_error)?;
     Ok(RuntimeHandle {
         state: Mutex::new(state),
+        notification_source: Mutex::new(source),
         operation_gate: RuntimeOperationGate::new(),
         resource_provider: Mutex::new(None),
         resource_transform: Mutex::new(None),
@@ -7411,8 +7473,6 @@ fn create_map(
     fast_pfor_enabled: Option<bool>,
     event_mask: u64,
 ) -> PyResult<MapHandle> {
-    // Default() reads mln_map_options_default(), so an unset argument keeps the
-    // C creation default.
     let mut options = maplibre_core::MapOptions::default();
     if let Some(width) = width {
         options.width = width;
@@ -7431,21 +7491,14 @@ fn create_map(
     }
     let mut raw_options =
         maplibre_core::options::map_options_to_native(&options).map_err(map_error)?;
-    // The Python layer always selects a mask, defaulting to every type. The C
-    // API validates the bits.
     raw_options.event_mask = event_mask;
     let runtime_state = runtime.state_for_operation()?;
     let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map>::new();
-    // SAFETY: runtime_state owns a runtime pointer that passed the binding
-    // lifecycle gate and the C API validates that it is live. raw_options is
-    // fully initialized, and out is a null-initialized out-pointer.
     maplibre_core::check(unsafe {
         sys::mln_map_create(runtime_state.handle(), &raw_options, out.as_mut_ptr())
     })
     .map_err(map_error)?;
     let native = out.into_live("mln_map").map_err(map_error)?;
-    // SAFETY: native came from successful mln_map_create and is paired with the
-    // matching status-returning destroy function in MapHandle.close.
     let state = unsafe { maplibre_core::handle::NativeHandleState::from_handle(native, "mln_map") }
         .map_err(map_error)?;
     Ok(MapHandle {

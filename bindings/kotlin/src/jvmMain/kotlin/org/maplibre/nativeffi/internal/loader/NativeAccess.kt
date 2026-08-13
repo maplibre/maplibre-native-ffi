@@ -72,9 +72,8 @@ import org.maplibre.nativeffi.internal.c.mln_rendering_stats
 import org.maplibre.nativeffi.internal.c.mln_resource_request
 import org.maplibre.nativeffi.internal.c.mln_resource_response
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
-import org.maplibre.nativeffi.internal.c.mln_runtime_event_batch
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_batch_view
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_camera_transition_finished
-import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_operation_completed
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_response_error
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_status
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_tile_count_limit
@@ -167,8 +166,6 @@ import org.maplibre.nativeffi.resource.ResourceRequest
 import org.maplibre.nativeffi.resource.ResourceResponse
 import org.maplibre.nativeffi.resource.ResourceStoragePolicy
 import org.maplibre.nativeffi.resource.ResourceUsage
-import org.maplibre.nativeffi.runtime.OfflineOperationKind
-import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
@@ -332,9 +329,23 @@ internal object NativeAccess {
       )
     }
 
-  internal fun createRuntime(options: RuntimeOptions): NativeRuntime =
+  internal fun createNotificationSource(): Long =
     Arena.ofConfined().use { arena ->
-      val nativeOptions = runtimeOptions(options, arena)
+      val outSource = arena.allocate(ValueLayout.JAVA_LONG)
+      outSource.set(ValueLayout.JAVA_LONG, 0, 0L)
+      Status.check(MapLibreNativeC.mln_notification_source_create(outSource))
+      outSource.get(ValueLayout.JAVA_LONG, 0).also { source ->
+        require(source != 0L) { "mln_notification_source_create returned the null handle" }
+      }
+    }
+
+  internal fun closeNotificationSource(source: Long) {
+    Status.check(MapLibreNativeC.mln_notification_source_close(source))
+  }
+
+  internal fun createRuntime(options: RuntimeOptions, notificationSource: Long): NativeRuntime =
+    Arena.ofConfined().use { arena ->
+      val nativeOptions = runtimeOptions(options, notificationSource, arena)
       val outRuntime = arena.allocate(ValueLayout.JAVA_LONG)
       outRuntime.set(ValueLayout.JAVA_LONG, 0, 0L)
       Status.check(runtimeCreateFunction().invokeNative(nativeOptions, outRuntime) as Int)
@@ -489,8 +500,49 @@ internal object NativeAccess {
   internal fun startDeleteOfflineRegion(runtime: NativeRuntime, regionId: Long): Long =
     startRuntimeLongOperation("mln_runtime_offline_region_delete_start", runtime, regionId)
 
-  internal fun discardOfflineOperation(runtime: NativeRuntime, operationId: Long): Int =
-    runtimeOfflineOperationDiscardFunction().invokeNative(runtime, operationId) as Int
+  internal fun discardOfflineOperation(operationId: Long): Int =
+    MapLibreNativeC.mln_operation_discard_result(operationId)
+
+  internal fun releaseOfflineOperation(operationId: Long) {
+    MapLibreNativeC.mln_operation_release(operationId)
+  }
+
+  internal fun pollOfflineOperation(operationId: Long): Boolean =
+    Arena.ofConfined().use { arena ->
+      val completed = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(MapLibreNativeC.mln_operation_poll(operationId, completed))
+      completed.get(ValueLayout.JAVA_BOOLEAN, 0)
+    }
+
+  internal fun waitOfflineOperation(operationId: Long, timeoutMillis: Long): Boolean =
+    Arena.ofConfined().use { arena ->
+      val completed = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(MapLibreNativeC.mln_operation_wait(operationId, timeoutMillis, completed))
+      completed.get(ValueLayout.JAVA_BOOLEAN, 0)
+    }
+
+  internal fun offlineOperationTerminalStatus(operationId: Long): Int =
+    Arena.ofConfined().use { arena ->
+      val outStatus = arena.allocate(ValueLayout.JAVA_INT)
+      Status.check(MapLibreNativeC.mln_operation_get_status(operationId, outStatus))
+      outStatus.get(ValueLayout.JAVA_INT, 0)
+    }
+
+  internal fun offlineOperationDiagnostic(operationId: Long): String =
+    Arena.ofConfined().use { arena ->
+      val outSize = arena.allocate(ValueLayout.JAVA_LONG)
+      Status.check(
+        MapLibreNativeC.mln_operation_copy_diagnostic(operationId, MemorySegment.NULL, 0, outSize)
+      )
+      val size = outSize.get(ValueLayout.JAVA_LONG, 0)
+      if (size == 0L) return@use ""
+      val bytes = arena.allocate(size)
+      Status.check(MapLibreNativeC.mln_operation_copy_diagnostic(operationId, bytes, size, outSize))
+      String(bytes.toArray(ValueLayout.JAVA_BYTE), StandardCharsets.UTF_8)
+    }
+
+  internal fun cancelOfflineOperation(operationId: Long): Int =
+    MapLibreNativeC.mln_operation_cancel(operationId)
 
   internal fun setResourceTransform(runtime: NativeRuntime, descriptor: MemorySegment): Int =
     runtimeSetResourceTransformFunction().invokeNative(runtime, descriptor) as Int
@@ -2977,7 +3029,6 @@ internal object NativeAccess {
     else NativePointer.scoped(pointer.address(), scope)
 
   internal fun takeOfflineRegionStatusResult(
-    runtime: NativeRuntime,
     operationId: Long,
     markTaken: () -> Unit,
   ): OfflineRegionStatus =
@@ -2989,30 +3040,23 @@ internal object NativeAccess {
         OFFLINE_REGION_STATUS_SIZE.toInt(),
       )
       Status.check(
-        runtimeOfflineRegionStatusTakeResultFunction().invokeNative(runtime, operationId, status)
-          as Int
+        runtimeOfflineRegionStatusTakeResultFunction().invokeNative(operationId, status) as Int
       )
-      try {
-        offlineRegionStatus(status)
-      } finally {
-        markTaken()
-      }
+      markTaken()
+      offlineRegionStatus(status)
     }
 
   internal fun takeCreateOfflineRegionResult(
-    runtime: NativeRuntime,
     operationId: Long,
     markTaken: () -> Unit,
   ): OfflineRegionInfo =
     takeOfflineRegionSnapshot(
-      runtime,
       operationId,
       runtimeOfflineRegionCreateTakeResultFunction(),
       markTaken,
     )
 
   internal fun takeOfflineRegionResult(
-    runtime: NativeRuntime,
     operationId: Long,
     markTaken: () -> Unit,
   ): OfflineRegionInfo? =
@@ -3022,123 +3066,120 @@ internal object NativeAccess {
       outSnapshot.set(ValueLayout.JAVA_LONG, 0, 0L)
       outFound.set(ValueLayout.JAVA_BOOLEAN, 0, false)
       Status.check(
-        runtimeOfflineRegionGetTakeResultFunction()
-          .invokeNative(runtime, operationId, outSnapshot, outFound) as Int
+        runtimeOfflineRegionGetTakeResultFunction().invokeNative(operationId, outSnapshot, outFound)
+          as Int
       )
+      markTaken()
       if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
-        markTaken()
         return@use null
       }
-      try {
-        offlineRegionSnapshot(
-          NativeOfflineRegionSnapshot(outSnapshot.get(ValueLayout.JAVA_LONG, 0))
-        )
-      } finally {
-        markTaken()
-      }
+      offlineRegionSnapshot(NativeOfflineRegionSnapshot(outSnapshot.get(ValueLayout.JAVA_LONG, 0)))
     }
 
   internal fun takeOfflineRegionsResult(
-    runtime: NativeRuntime,
     operationId: Long,
     markTaken: () -> Unit,
   ): List<OfflineRegionInfo> =
-    takeOfflineRegionList(
-      runtime,
-      operationId,
-      runtimeOfflineRegionsListTakeResultFunction(),
-      markTaken,
-    )
+    takeOfflineRegionList(operationId, runtimeOfflineRegionsListTakeResultFunction(), markTaken)
 
   internal fun takeMergeOfflineRegionsDatabaseResult(
-    runtime: NativeRuntime,
     operationId: Long,
     markTaken: () -> Unit,
   ): List<OfflineRegionInfo> =
     takeOfflineRegionList(
-      runtime,
       operationId,
       runtimeOfflineRegionsMergeDatabaseTakeResultFunction(),
       markTaken,
     )
 
   internal fun takeUpdateOfflineRegionMetadataResult(
-    runtime: NativeRuntime,
     operationId: Long,
     markTaken: () -> Unit,
   ): OfflineRegionInfo =
     takeOfflineRegionSnapshot(
-      runtime,
       operationId,
       runtimeOfflineRegionUpdateMetadataTakeResultFunction(),
       markTaken,
     )
 
-  /** Allocates the reused batch struct that [drainRuntimeEvents] fills. */
-  internal fun allocateRuntimeEventBatch(arena: Arena): MemorySegment =
-    arena.allocate(RUNTIME_EVENT_BATCH_SIZE)
-
   /**
-   * Drains at most [maxEvents] events into [batch], zero draining every queued event, and copies
-   * every field of every event out of the runtime-owned arena before returning.
+   * Drains at most [maxEvents] events, zero draining every queued event, and copies every field of
+   * every event out of the owned batch before releasing it.
    */
   internal fun drainRuntimeEvents(
     runtime: NativeRuntime,
     maxEvents: Long,
-    batch: MemorySegment,
-  ): NativeRuntimeEventBatch {
-    batch.set(
-      ValueLayout.JAVA_INT,
-      RUNTIME_EVENT_BATCH_SIZE_OFFSET,
-      RUNTIME_EVENT_BATCH_SIZE.toInt(),
-    )
-    Status.check(MapLibreNativeC.mln_runtime_drain_events(runtime.raw, maxEvents, batch))
-    val eventCount = batch.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_BATCH_EVENT_COUNT_OFFSET)
-    val remainingCount = batch.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_BATCH_REMAINING_OFFSET)
-    if (eventCount == 0L) {
-      return NativeRuntimeEventBatch(emptyList(), remainingCount)
-    }
-    // The stride the batch reports can exceed this binding's compiled event
-    // record, so index by it rather than by mln_runtime_event.sizeof().
-    val eventSize =
-      Integer.toUnsignedLong(batch.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_BATCH_EVENT_SIZE_OFFSET))
-    val payloadExtent = eventSize - RUNTIME_EVENT_PAYLOAD_OFFSET
-    val events =
-      batch
-        .get(ValueLayout.ADDRESS, RUNTIME_EVENT_BATCH_EVENTS_OFFSET)
-        .reinterpret(eventCount * eventSize)
-    val messagesSize = batch.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_BATCH_MESSAGES_SIZE_OFFSET)
-    val messages =
-      batch.get(ValueLayout.ADDRESS, RUNTIME_EVENT_BATCH_MESSAGES_OFFSET).reinterpret(messagesSize)
-    return NativeRuntimeEventBatch(
-      List(Math.toIntExact(eventCount)) { index ->
-        val base = index * eventSize
-        val payloadType = events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_PAYLOAD_TYPE_OFFSET)
-        NativeRuntimeEvent(
-          type = events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_TYPE_OFFSET),
-          sourceType = events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_SOURCE_TYPE_OFFSET),
-          sourceId = events.get(ValueLayout.JAVA_LONG, base + RUNTIME_EVENT_SOURCE_OFFSET),
-          code = events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_CODE_OFFSET),
-          payload =
-            runtimeEventPayload(
-              payloadType,
-              events.asSlice(base + RUNTIME_EVENT_PAYLOAD_OFFSET, payloadExtent),
-            ),
-          message =
-            copyMessage(
-              messages,
-              Integer.toUnsignedLong(
-                events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_MESSAGE_OFFSET_OFFSET)
-              ),
-              Integer.toUnsignedLong(
-                events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_MESSAGE_SIZE_OFFSET)
-              ),
-            ),
+  ): NativeRuntimeEventBatch =
+    Arena.ofConfined().use { arena ->
+      val batch = arena.allocate(RUNTIME_EVENT_BATCH_SIZE)
+      val outBatch = arena.allocate(ValueLayout.JAVA_LONG)
+      outBatch.set(ValueLayout.JAVA_LONG, 0, 0L)
+      Status.check(MapLibreNativeC.mln_runtime_drain_events(runtime.raw, maxEvents, outBatch))
+      val batchHandle = outBatch.get(ValueLayout.JAVA_LONG, 0)
+      require(batchHandle != 0L) { "mln_runtime_drain_events returned the null handle" }
+      try {
+        batch.set(
+          ValueLayout.JAVA_INT,
+          RUNTIME_EVENT_BATCH_SIZE_OFFSET,
+          RUNTIME_EVENT_BATCH_SIZE.toInt(),
         )
-      },
-      remainingCount,
-    )
-  }
+        Status.check(MapLibreNativeC.mln_event_batch_get(batchHandle, batch))
+        val eventCount = batch.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_BATCH_EVENT_COUNT_OFFSET)
+        val remainingCount = batch.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_BATCH_REMAINING_OFFSET)
+        if (eventCount == 0L) {
+          return@use NativeRuntimeEventBatch(emptyList(), remainingCount)
+        }
+        // The stride the batch reports can exceed this binding's compiled event
+        // record, so index by it rather than by mln_runtime_event.sizeof().
+        val eventSize =
+          Integer.toUnsignedLong(
+            batch.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_BATCH_EVENT_SIZE_OFFSET)
+          )
+        val payloadExtent = eventSize - RUNTIME_EVENT_PAYLOAD_OFFSET
+        val events =
+          batch
+            .get(ValueLayout.ADDRESS, RUNTIME_EVENT_BATCH_EVENTS_OFFSET)
+            .reinterpret(eventCount * eventSize)
+        val messagesSize =
+          batch.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_BATCH_MESSAGES_SIZE_OFFSET)
+        val messages =
+          batch
+            .get(ValueLayout.ADDRESS, RUNTIME_EVENT_BATCH_MESSAGES_OFFSET)
+            .reinterpret(messagesSize)
+        NativeRuntimeEventBatch(
+          List(Math.toIntExact(eventCount)) { index ->
+            val base = index * eventSize
+            val payloadType =
+              events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_PAYLOAD_TYPE_OFFSET)
+            NativeRuntimeEvent(
+              type = events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_TYPE_OFFSET),
+              sourceType =
+                events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_SOURCE_TYPE_OFFSET),
+              sourceId = events.get(ValueLayout.JAVA_LONG, base + RUNTIME_EVENT_SOURCE_OFFSET),
+              code = events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_CODE_OFFSET),
+              payload =
+                runtimeEventPayload(
+                  payloadType,
+                  events.asSlice(base + RUNTIME_EVENT_PAYLOAD_OFFSET, payloadExtent),
+                ),
+              message =
+                copyMessage(
+                  messages,
+                  Integer.toUnsignedLong(
+                    events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_MESSAGE_OFFSET_OFFSET)
+                  ),
+                  Integer.toUnsignedLong(
+                    events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_MESSAGE_SIZE_OFFSET)
+                  ),
+                ),
+            )
+          },
+          remainingCount,
+        )
+      } finally {
+        MapLibreNativeC.mln_event_batch_release(batchHandle)
+      }
+    }
 
   internal fun setRuntimeEventMask(runtime: NativeRuntime, mask: Long) {
     Status.check(MapLibreNativeC.mln_runtime_set_event_mask(runtime.raw, mask))
@@ -3206,9 +3247,6 @@ internal object NativeAccess {
 
   private fun runtimeOfflineRegionCreateStartFunction(): MethodHandle =
     downcall("mln_runtime_offline_region_create_start")
-
-  private fun runtimeOfflineOperationDiscardFunction(): MethodHandle =
-    downcall("mln_runtime_offline_operation_discard")
 
   private fun runtimeSetResourceProviderFunction(): MethodHandle =
     downcall("mln_runtime_set_resource_provider")
@@ -3532,11 +3570,16 @@ internal object NativeAccess {
     }
   }
 
-  private fun runtimeOptions(options: RuntimeOptions, arena: Arena): MemorySegment {
+  private fun runtimeOptions(
+    options: RuntimeOptions,
+    notificationSource: Long,
+    arena: Arena,
+  ): MemorySegment {
     val nativeOptions = MapLibreNativeC.mln_runtime_options_default(arena)
     mln_runtime_options.asset_path(nativeOptions, optionalCString(arena, options.assetPath))
     mln_runtime_options.cache_path(nativeOptions, optionalCString(arena, options.cachePath))
     mln_runtime_options.event_mask(nativeOptions, options.eventMask.nativeValue)
+    mln_runtime_options.notification_source(nativeOptions, notificationSource)
     return nativeOptions
   }
 
@@ -4960,7 +5003,6 @@ internal object NativeAccess {
   }
 
   private fun takeOfflineRegionSnapshot(
-    runtime: NativeRuntime,
     operationId: Long,
     function: MethodHandle,
     markTaken: () -> Unit,
@@ -4968,18 +5010,12 @@ internal object NativeAccess {
     Arena.ofConfined().use { arena ->
       val outSnapshot = arena.allocate(ValueLayout.JAVA_LONG)
       outSnapshot.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(function.invokeNative(runtime, operationId, outSnapshot) as Int)
-      try {
-        offlineRegionSnapshot(
-          NativeOfflineRegionSnapshot(outSnapshot.get(ValueLayout.JAVA_LONG, 0))
-        )
-      } finally {
-        markTaken()
-      }
+      Status.check(function.invokeNative(operationId, outSnapshot) as Int)
+      markTaken()
+      offlineRegionSnapshot(NativeOfflineRegionSnapshot(outSnapshot.get(ValueLayout.JAVA_LONG, 0)))
     }
 
   private fun takeOfflineRegionList(
-    runtime: NativeRuntime,
     operationId: Long,
     function: MethodHandle,
     markTaken: () -> Unit,
@@ -4987,12 +5023,9 @@ internal object NativeAccess {
     Arena.ofConfined().use { arena ->
       val outList = arena.allocate(ValueLayout.JAVA_LONG)
       outList.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(function.invokeNative(runtime, operationId, outList) as Int)
-      try {
-        offlineRegionList(NativeOfflineRegionList(outList.get(ValueLayout.JAVA_LONG, 0)))
-      } finally {
-        markTaken()
-      }
+      Status.check(function.invokeNative(operationId, outList) as Int)
+      markTaken()
+      offlineRegionList(NativeOfflineRegionList(outList.get(ValueLayout.JAVA_LONG, 0)))
     }
 
   private fun offlineRegionInfo(info: MemorySegment): OfflineRegionInfo =
@@ -5088,7 +5121,6 @@ internal object NativeAccess {
       PAYLOAD_OFFLINE_REGION_STATUS -> offlineRegionStatusPayload(payload)
       PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR -> offlineRegionResponseErrorPayload(payload)
       PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT -> offlineRegionTileCountLimitPayload(payload)
-      PAYLOAD_OFFLINE_OPERATION_COMPLETED -> offlineOperationCompletedPayload(payload)
       PAYLOAD_CAMERA_TRANSITION_FINISHED -> cameraTransitionFinishedPayload(payload)
       else -> unknownPayload(payloadType, payload)
     }
@@ -5172,27 +5204,6 @@ internal object NativeAccess {
         RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_REGION_ID_OFFSET,
       ),
       payload.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_LIMIT_OFFSET),
-    )
-
-  private fun offlineOperationCompletedPayload(
-    payload: MemorySegment
-  ): RuntimeEventPayload.OfflineOperationCompleted =
-    RuntimeEventPayload.OfflineOperationCompleted(
-      payload.get(
-        ValueLayout.JAVA_LONG,
-        RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_OPERATION_ID_OFFSET,
-      ),
-      OfflineOperationKind.fromNative(
-        payload.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_KIND_OFFSET)
-      ),
-      OfflineOperationResultKind.fromNative(
-        payload.get(
-          ValueLayout.JAVA_INT,
-          RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_RESULT_KIND_OFFSET,
-        )
-      ),
-      payload.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_STATUS_OFFSET),
-      payload.get(ValueLayout.JAVA_BOOLEAN, RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET),
     )
 
   private fun cameraTransitionFinishedPayload(
@@ -5582,19 +5593,20 @@ internal object NativeAccess {
     mln_runtime_event.`message_offset$offset`()
   private val RUNTIME_EVENT_MESSAGE_SIZE_OFFSET: Long = mln_runtime_event.`message_size$offset`()
 
-  private val RUNTIME_EVENT_BATCH_SIZE: Long = mln_runtime_event_batch.sizeof()
-  private val RUNTIME_EVENT_BATCH_SIZE_OFFSET: Long = mln_runtime_event_batch.`size$offset`()
+  private val RUNTIME_EVENT_BATCH_SIZE: Long = mln_runtime_event_batch_view.sizeof()
+  private val RUNTIME_EVENT_BATCH_SIZE_OFFSET: Long = mln_runtime_event_batch_view.`size$offset`()
   private val RUNTIME_EVENT_BATCH_EVENT_SIZE_OFFSET: Long =
-    mln_runtime_event_batch.`event_size$offset`()
-  private val RUNTIME_EVENT_BATCH_EVENTS_OFFSET: Long = mln_runtime_event_batch.`events$offset`()
+    mln_runtime_event_batch_view.`event_size$offset`()
+  private val RUNTIME_EVENT_BATCH_EVENTS_OFFSET: Long =
+    mln_runtime_event_batch_view.`events$offset`()
   private val RUNTIME_EVENT_BATCH_EVENT_COUNT_OFFSET: Long =
-    mln_runtime_event_batch.`event_count$offset`()
+    mln_runtime_event_batch_view.`event_count$offset`()
   private val RUNTIME_EVENT_BATCH_MESSAGES_OFFSET: Long =
-    mln_runtime_event_batch.`messages$offset`()
+    mln_runtime_event_batch_view.`messages$offset`()
   private val RUNTIME_EVENT_BATCH_MESSAGES_SIZE_OFFSET: Long =
-    mln_runtime_event_batch.`messages_size$offset`()
+    mln_runtime_event_batch_view.`messages_size$offset`()
   private val RUNTIME_EVENT_BATCH_REMAINING_OFFSET: Long =
-    mln_runtime_event_batch.`remaining_count$offset`()
+    mln_runtime_event_batch_view.`remaining_count$offset`()
 
   private val RESOURCE_REQUEST_REQUESTED_URL_OFFSET: Long =
     mln_resource_request.`requested_url$offset`()
@@ -5660,8 +5672,6 @@ internal object NativeAccess {
     MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR()
   private val PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT: Int =
     MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT()
-  private val PAYLOAD_OFFLINE_OPERATION_COMPLETED: Int =
-    MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED()
   private val PAYLOAD_CAMERA_TRANSITION_FINISHED: Int =
     MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED()
 
@@ -5734,17 +5744,6 @@ internal object NativeAccess {
     mln_runtime_event_offline_region_tile_count_limit.`region_id$offset`()
   private val RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_LIMIT_OFFSET: Long =
     mln_runtime_event_offline_region_tile_count_limit.`limit$offset`()
-
-  private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_OPERATION_ID_OFFSET: Long =
-    mln_runtime_event_offline_operation_completed.`operation_id$offset`()
-  private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_KIND_OFFSET: Long =
-    mln_runtime_event_offline_operation_completed.`operation_kind$offset`()
-  private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_RESULT_KIND_OFFSET: Long =
-    mln_runtime_event_offline_operation_completed.`result_kind$offset`()
-  private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_STATUS_OFFSET: Long =
-    mln_runtime_event_offline_operation_completed.`result_status$offset`()
-  private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET: Long =
-    mln_runtime_event_offline_operation_completed.`found$offset`()
 
   private val RUNTIME_EVENT_CAMERA_TRANSITION_FINISHED_TRANSITION_ID_OFFSET: Long =
     mln_runtime_event_camera_transition_finished.`transition_id$offset`()

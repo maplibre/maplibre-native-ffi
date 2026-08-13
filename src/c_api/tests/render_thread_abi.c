@@ -389,12 +389,18 @@ static void render_then_create_runtime(void* argument) {
   // Rendering installs a scheduler as this thread's current one; a scheduler or
   // a lazily created run loop left behind would keep the thread from hosting a
   // runtime.
+  mln_notification_source source = MLN_HANDLE_NULL;
+  probe->create_status = mln_notification_source_create(&source);
   mln_runtime runtime = MLN_HANDLE_NULL;
-  const mln_runtime_options options = mln_runtime_options_default();
-  probe->create_status = mln_runtime_create(&options, &runtime);
+  mln_runtime_options options = mln_runtime_options_default();
+  options.notification_source = source;
+  if (probe->create_status == MLN_STATUS_OK) {
+    probe->create_status = mln_runtime_create(&options, &runtime);
+  }
   if (probe->create_status == MLN_STATUS_OK) {
     (void)mln_runtime_destroy(runtime);
   }
+  (void)mln_notification_source_close(source);
   atomic_store(&probe->finished, true);
 }
 

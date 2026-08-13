@@ -32,7 +32,6 @@ public data class RuntimeEvent(
    *   a [CameraChangeMode], read as `CameraChangeMode(event.code)`.
    * - [RuntimeEventType.MAP_LOADING_FAILED] carries the ordinal of an unnamed internal map load
    *   error kind.
-   * - [RuntimeEventType.OFFLINE_OPERATION_COMPLETED] carries a native status value.
    */
   public val code: Int,
   public val payload: RuntimeEventPayload,

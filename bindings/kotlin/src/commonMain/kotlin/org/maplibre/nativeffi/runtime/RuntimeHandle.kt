@@ -33,72 +33,67 @@ public expect class RuntimeHandle : AutoCloseable {
    */
   public fun acquireWakeSource(): WakeSource
 
-  public fun startAmbientCacheOperation(
-    operation: AmbientCacheOperation
-  ): OfflineOperationHandle<Unit>
+  public fun startAmbientCacheOperation(operation: AmbientCacheOperation): OperationHandle<Unit>
 
   /**
    * Starts a change to this runtime's maximum ambient cache size. Lowering it evicts cached ambient
    * resources; offline regions are unaffected.
    */
-  public fun startSetMaximumAmbientCacheSize(size: Long): OfflineOperationHandle<Unit>
+  public fun startSetMaximumAmbientCacheSize(size: Long): OperationHandle<Unit>
 
   public fun startCreateOfflineRegion(
     definition: OfflineRegionDefinition,
     metadata: ByteArray,
-  ): OfflineOperationHandle<OfflineRegionInfo>
+  ): OperationHandle<OfflineRegionInfo>
 
-  public fun startOfflineRegion(id: Long): OfflineOperationHandle<OfflineRegionInfo?>
+  public fun startOfflineRegion(id: Long): OperationHandle<OfflineRegionInfo?>
 
-  public fun startOfflineRegions(): OfflineOperationHandle<List<OfflineRegionInfo>>
+  public fun startOfflineRegions(): OperationHandle<List<OfflineRegionInfo>>
 
   public fun startMergeOfflineRegionsDatabase(
     path: String
-  ): OfflineOperationHandle<List<OfflineRegionInfo>>
+  ): OperationHandle<List<OfflineRegionInfo>>
 
   public fun startUpdateOfflineRegionMetadata(
     id: Long,
     metadata: ByteArray,
-  ): OfflineOperationHandle<OfflineRegionInfo>
+  ): OperationHandle<OfflineRegionInfo>
 
-  public fun startOfflineRegionStatus(id: Long): OfflineOperationHandle<OfflineRegionStatus>
+  public fun startOfflineRegionStatus(id: Long): OperationHandle<OfflineRegionStatus>
 
-  public fun startSetOfflineRegionObserved(
-    id: Long,
-    observed: Boolean,
-  ): OfflineOperationHandle<Unit>
+  public fun startSetOfflineRegionObserved(id: Long, observed: Boolean): OperationHandle<Unit>
 
   public fun startSetOfflineRegionDownloadState(
     id: Long,
     downloadState: OfflineRegionDownloadState,
-  ): OfflineOperationHandle<Unit>
+  ): OperationHandle<Unit>
 
-  public fun startInvalidateOfflineRegion(id: Long): OfflineOperationHandle<Unit>
+  public fun startInvalidateOfflineRegion(id: Long): OperationHandle<Unit>
 
-  public fun startDeleteOfflineRegion(id: Long): OfflineOperationHandle<Unit>
+  public fun startDeleteOfflineRegion(id: Long): OperationHandle<Unit>
 
   public fun takeCreateOfflineRegionResult(
-    operation: OfflineOperationHandle<OfflineRegionInfo>
+    operation: OperationHandle<OfflineRegionInfo>
   ): OfflineRegionInfo
 
   public fun takeOfflineRegionResult(
-    operation: OfflineOperationHandle<OfflineRegionInfo?>
+    operation: OperationHandle<OfflineRegionInfo?>
   ): OfflineRegionInfo?
 
   public fun takeOfflineRegionsResult(
-    operation: OfflineOperationHandle<List<OfflineRegionInfo>>
+    operation: OperationHandle<List<OfflineRegionInfo>>
   ): List<OfflineRegionInfo>
 
   public fun takeMergeOfflineRegionsDatabaseResult(
-    operation: OfflineOperationHandle<List<OfflineRegionInfo>>
+    operation: OperationHandle<List<OfflineRegionInfo>>
   ): List<OfflineRegionInfo>
 
   public fun takeUpdateOfflineRegionMetadataResult(
-    operation: OfflineOperationHandle<OfflineRegionInfo>
+    operation: OperationHandle<OfflineRegionInfo>
   ): OfflineRegionInfo
 
   public fun takeOfflineRegionStatusResult(
-    operation: OfflineOperationHandle<OfflineRegionStatus>
+    operation: OperationHandle<OfflineRegionStatus>
   ): OfflineRegionStatus
 
   public fun setResourceProvider(callback: ResourceProviderCallback)

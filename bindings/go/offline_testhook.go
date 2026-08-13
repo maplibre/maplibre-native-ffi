@@ -5,12 +5,12 @@ package maplibre
 */
 import "C"
 
-func startOfflineOperationZeroIDForTest(runtime *RuntimeHandle) (*OfflineOperationHandle[struct{}], error) {
-	return startOfflineOperation[struct{}](
+func startOperationZeroIDForTest(runtime *RuntimeHandle) (*OperationHandle[struct{}], error) {
+	return startOperation[struct{}](
 		runtime,
-		OfflineOperationRegionSetObserved,
-		OfflineOperationResultNone,
-		func(handle nativeRuntime, out *C.mln_offline_operation_id) int32 {
+		operationRegionSetObserved,
+		operationResultNone,
+		func(handle nativeRuntime, out *C.mln_operation) int32 {
 			*out = 0
 			return 0
 		},

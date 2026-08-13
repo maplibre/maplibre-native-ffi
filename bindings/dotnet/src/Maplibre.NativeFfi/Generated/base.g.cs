@@ -11,6 +11,7 @@ namespace Maplibre.NativeFfi.Internal.C
         MLN_STATUS_WRONG_THREAD = -3,
         MLN_STATUS_UNSUPPORTED = -4,
         MLN_STATUS_NATIVE_ERROR = -5,
+        MLN_STATUS_CANCELLED = -6,
     }
 
     [NativeTypeName("uint32_t")]

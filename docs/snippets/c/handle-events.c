@@ -32,11 +32,16 @@ static bool asks_for_a_repaint(const mln_runtime_event* event) {
 
 void drain_events(mln_runtime runtime, map_observer* observer) {
   // #region drain
-  mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+  mln_event_batch batch = MLN_HANDLE_NULL;
   if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) return;
+  mln_runtime_event_batch_view view = {0};
+  if (mln_event_batch_get(batch, &view) != MLN_STATUS_OK) {
+    mln_event_batch_release(batch);
+    return;
+  }
 
-  for (size_t index = 0; index < batch.event_count; index++) {
-    const char* bytes = (const char*)batch.events + index * batch.event_size;
+  for (size_t index = 0; index < view.event_count; index++) {
+    const char* bytes = (const char*)view.events + index * view.event_size;
     const mln_runtime_event* event = (const mln_runtime_event*)bytes;
 
     // #region match
@@ -62,5 +67,6 @@ void drain_events(mln_runtime runtime, map_observer* observer) {
         break;
     }
   }
+  mln_event_batch_release(batch);
   // #endregion drain
 }

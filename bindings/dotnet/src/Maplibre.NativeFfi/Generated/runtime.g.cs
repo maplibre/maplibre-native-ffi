@@ -33,33 +33,6 @@ namespace Maplibre.NativeFfi.Internal.C
         MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE = 1,
     }
 
-    [NativeTypeName("uint32_t")]
-    internal enum mln_offline_operation_kind : uint
-    {
-        MLN_OFFLINE_OPERATION_AMBIENT_CACHE = 1,
-        MLN_OFFLINE_OPERATION_REGION_CREATE = 2,
-        MLN_OFFLINE_OPERATION_REGION_GET = 3,
-        MLN_OFFLINE_OPERATION_REGIONS_LIST = 4,
-        MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE = 5,
-        MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA = 6,
-        MLN_OFFLINE_OPERATION_REGION_GET_STATUS = 7,
-        MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED = 8,
-        MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE = 9,
-        MLN_OFFLINE_OPERATION_REGION_INVALIDATE = 10,
-        MLN_OFFLINE_OPERATION_REGION_DELETE = 11,
-        MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE = 12,
-    }
-
-    [NativeTypeName("uint32_t")]
-    internal enum mln_offline_operation_result_kind : uint
-    {
-        MLN_OFFLINE_OPERATION_RESULT_NONE = 0,
-        MLN_OFFLINE_OPERATION_RESULT_REGION = 1,
-        MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION = 2,
-        MLN_OFFLINE_OPERATION_RESULT_REGION_LIST = 3,
-        MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS = 4,
-    }
-
     internal partial struct mln_offline_region_status
     {
         [NativeTypeName("uint32_t")]
@@ -117,7 +90,6 @@ namespace Maplibre.NativeFfi.Internal.C
         MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 19,
         MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20,
         MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21,
-        MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED = 22,
         MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED = 23,
     }
 
@@ -147,9 +119,8 @@ namespace Maplibre.NativeFfi.Internal.C
         MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED = 1UL << (int)(MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED),
         MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR = 1UL << (int)(MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR),
         MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 1UL << (int)(MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED),
-        MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED = 1UL << (int)(MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED),
         MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE | MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING | MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE | MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED | MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED | MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED | MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED | MLN_RUNTIME_EVENT_MASK_MAP_IDLE | MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE | MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR | MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED | MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED | MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED | MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED | MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED | MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED | MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING | MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION | MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED,
-        MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS = MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED | MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR | MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED | MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED,
+        MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS = MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED | MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR | MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
         MLN_RUNTIME_EVENT_MASK_ALL = MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS | MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS,
     }
 
@@ -170,7 +141,6 @@ namespace Maplibre.NativeFfi.Internal.C
         MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 5,
         MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 6,
         MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 7,
-        MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED = 8,
         MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = 9,
     }
 
@@ -287,6 +257,9 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [NativeTypeName("uint64_t")]
         public ulong event_mask;
+
+        [NativeTypeName("mln_notification_source")]
+        public MlnNotificationSource notification_source;
     }
 
     internal partial struct mln_rendering_stats
@@ -383,24 +356,6 @@ namespace Maplibre.NativeFfi.Internal.C
         public ulong limit;
     }
 
-    internal partial struct mln_runtime_event_offline_operation_completed
-    {
-        [NativeTypeName("mln_offline_operation_id")]
-        public ulong operation_id;
-
-        [NativeTypeName("uint32_t")]
-        public uint operation_kind;
-
-        [NativeTypeName("uint32_t")]
-        public uint result_kind;
-
-        [NativeTypeName("int32_t")]
-        public int result_status;
-
-        [NativeTypeName("bool")]
-        public byte found;
-    }
-
     [StructLayout(LayoutKind.Explicit)]
     internal partial struct mln_runtime_event_payload
     {
@@ -421,9 +376,6 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [FieldOffset(0)]
         public mln_runtime_event_offline_region_tile_count_limit offline_region_tile_count_limit;
-
-        [FieldOffset(0)]
-        public mln_runtime_event_offline_operation_completed offline_operation_completed;
 
         [FieldOffset(0)]
         public mln_runtime_event_camera_transition_finished camera_transition_finished;
@@ -455,7 +407,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public mln_runtime_event_payload payload;
     }
 
-    internal unsafe partial struct mln_runtime_event_batch
+    internal unsafe partial struct mln_runtime_event_batch_view
     {
         [NativeTypeName("uint32_t")]
         public uint size;
@@ -684,13 +636,10 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_runtime_clear_http_header_transform([NativeTypeName("mln_runtime")] MlnRuntime runtime);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_run_ambient_cache_operation_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("uint32_t")] uint operation, [NativeTypeName("mln_offline_operation_id *")] ulong* out_operation_id);
+        public static extern mln_status mln_runtime_run_ambient_cache_operation_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("uint32_t")] uint operation, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_set_maximum_ambient_cache_size_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("uint64_t")] ulong size, [NativeTypeName("mln_offline_operation_id *")] ulong* out_operation_id);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_offline_operation_discard([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_offline_operation_id")] ulong operation_id);
+        public static extern mln_status mln_runtime_set_maximum_ambient_cache_size_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("uint64_t")] ulong size, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_runtime_destroy([NativeTypeName("mln_runtime")] MlnRuntime runtime);
@@ -708,10 +657,13 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern void mln_wake_source_destroy([NativeTypeName("mln_wake_source")] MlnWakeSource source);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_runtime_event_batch mln_runtime_event_batch_default();
+        public static extern mln_status mln_runtime_drain_events([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("size_t")] nuint max_events, [NativeTypeName("mln_event_batch *")] MlnEventBatch* out_batch);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_drain_events([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("size_t")] nuint max_events, mln_runtime_event_batch* out_batch);
+        public static extern mln_status mln_event_batch_get([NativeTypeName("mln_event_batch")] MlnEventBatch batch, mln_runtime_event_batch_view* out_view);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void mln_event_batch_release([NativeTypeName("mln_event_batch")] MlnEventBatch batch);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_runtime_set_event_mask([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("uint64_t")] ulong mask);

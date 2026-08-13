@@ -1,3 +1,4 @@
+using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Callback;
 using Maplibre.NativeFfi.Internal.Loader;
@@ -22,11 +23,11 @@ internal unsafe delegate mln_status RuntimeSetResourceTransform(
 
 internal unsafe delegate mln_status RuntimeTakeOfflineRegionStatusResult(
     MlnRuntime runtime,
-    ulong operationId,
+    MlnOperation operationId,
     mln_offline_region_status* outStatus
 );
 
-/// <summary>Owner-thread runtime handle for MapLibre Native work and event draining.</summary>
+/// <summary>Runtime handle for owner-thread work and any-thread event draining.</summary>
 public sealed unsafe class RuntimeHandle : IDisposable
 {
     private static readonly RuntimeSetResourceProvider DefaultSetResourceProvider = static (
@@ -38,12 +39,8 @@ public sealed unsafe class RuntimeHandle : IDisposable
         transform
     ) => NativeMethods.mln_runtime_set_resource_transform(runtime, transform);
     private static readonly RuntimeTakeOfflineRegionStatusResult DefaultTakeOfflineRegionStatus =
-        static (runtime, operationId, outStatus) =>
-            NativeMethods.mln_runtime_offline_region_get_status_take_result(
-                runtime,
-                operationId,
-                outStatus
-            );
+        static (_, operationId, outStatus) =>
+            NativeMethods.mln_runtime_offline_region_get_status_take_result(operationId, outStatus);
 
     [ThreadStatic]
     private static RuntimeSetResourceProvider? setResourceProviderForTest;
@@ -56,14 +53,18 @@ public sealed unsafe class RuntimeHandle : IDisposable
 
     private readonly Lock callbackGate = new();
     private readonly Lock mapGate = new();
+    private readonly Lock operationGate = new();
+    private readonly HashSet<OperationHandle> liveOperations = [];
     private readonly Dictionary<ulong, WeakReference<Map.MapHandle>> liveMaps = [];
     private readonly NativeHandleState<MlnRuntime> state;
+    private MlnNotificationSource notificationSource;
     private ResourceProviderState? resourceProviderState;
     private ResourceTransformState? resourceTransformState;
     private HttpHeaderTransformState? httpHeaderTransformState;
 
-    private RuntimeHandle(MlnRuntime handle)
+    private RuntimeHandle(MlnRuntime handle, MlnNotificationSource notificationSource)
     {
+        this.notificationSource = notificationSource;
         state = new NativeHandleState<MlnRuntime>(
             handle,
             static handle => NativeMethods.mln_runtime_destroy(handle),
@@ -78,10 +79,20 @@ public sealed unsafe class RuntimeHandle : IDisposable
         NativeLibraryLoader.EnsureLoaded();
         using var nativeOptions = options.ToNative();
         var value = nativeOptions.Value;
+        MlnNotificationSource source = default;
+        NativeStatus.Check(NativeMethods.mln_notification_source_create(&source));
+        value.notification_source = source;
         MlnRuntime runtime = default;
-
-        NativeStatus.Check(NativeMethods.mln_runtime_create(&value, &runtime));
-        return new RuntimeHandle(runtime);
+        try
+        {
+            NativeStatus.Check(NativeMethods.mln_runtime_create(&value, &runtime));
+            return new RuntimeHandle(runtime, source);
+        }
+        catch
+        {
+            _ = NativeMethods.mln_notification_source_close(source);
+            throw;
+        }
     }
 
     internal MlnRuntime Handle => state.Handle;
@@ -250,9 +261,9 @@ public sealed unsafe class RuntimeHandle : IDisposable
     }
 
     /// <summary>Starts an ambient cache maintenance operation.</summary>
-    public OfflineOperationHandle StartAmbientCacheOperation(AmbientCacheOperation operation)
+    public OperationHandle StartAmbientCacheOperation(AmbientCacheOperation operation)
     {
-        ulong operationId = 0;
+        MlnOperation operationId = default;
         NativeStatus.Check(
             NativeMethods.mln_runtime_run_ambient_cache_operation_start(
                 Handle,
@@ -260,12 +271,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 &operationId
             )
         );
-        return new OfflineOperationHandle(
-            this,
-            operationId,
-            OfflineOperationKind.AmbientCache,
-            OfflineOperationResultKind.None
-        );
+        return new OperationHandle(this, operationId, OperationResultKind.None);
     }
 
     /// <summary>Starts a change to this runtime's maximum ambient cache size.</summary>
@@ -273,9 +279,9 @@ public sealed unsafe class RuntimeHandle : IDisposable
     /// MapLibre evicts ambient resources to fit the new budget, so lowering it discards cached
     /// resources. Offline regions are unaffected.
     /// </remarks>
-    public OfflineOperationHandle StartSetMaximumAmbientCacheSize(ulong size)
+    public OperationHandle StartSetMaximumAmbientCacheSize(ulong size)
     {
-        ulong operationId = 0;
+        MlnOperation operationId = default;
         NativeStatus.Check(
             NativeMethods.mln_runtime_set_maximum_ambient_cache_size_start(
                 Handle,
@@ -283,16 +289,11 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 &operationId
             )
         );
-        return new OfflineOperationHandle(
-            this,
-            operationId,
-            OfflineOperationKind.SetMaximumAmbientCacheSize,
-            OfflineOperationResultKind.None
-        );
+        return new OperationHandle(this, operationId, OperationResultKind.None);
     }
 
     /// <summary>Starts an offline region creation operation.</summary>
-    public OfflineOperationHandle StartCreateOfflineRegion(
+    public OperationHandle StartCreateOfflineRegion(
         OfflineRegionDefinition definition,
         byte[] metadata
     )
@@ -300,7 +301,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
         ArgumentNullException.ThrowIfNull(metadata);
         using var nativeDefinition = NativeOfflineRegionDefinition.From(definition);
         var definitionValue = nativeDefinition.Value;
-        ulong operationId = 0;
+        MlnOperation operationId = default;
         fixed (byte* metadataPointer = metadata)
         {
             NativeStatus.Check(
@@ -313,50 +314,35 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 )
             );
         }
-        return new OfflineOperationHandle(
-            this,
-            operationId,
-            OfflineOperationKind.RegionCreate,
-            OfflineOperationResultKind.Region
-        );
+        return new OperationHandle(this, operationId, OperationResultKind.CreateRegion);
     }
 
     /// <summary>Starts an offline region lookup operation.</summary>
-    public OfflineOperationHandle StartOfflineRegion(long id)
+    public OperationHandle StartOfflineRegion(long id)
     {
-        ulong operationId = 0;
+        MlnOperation operationId = default;
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_region_get_start(Handle, id, &operationId)
         );
-        return new OfflineOperationHandle(
-            this,
-            operationId,
-            OfflineOperationKind.RegionGet,
-            OfflineOperationResultKind.OptionalRegion
-        );
+        return new OperationHandle(this, operationId, OperationResultKind.GetRegion);
     }
 
     /// <summary>Starts an offline region list operation.</summary>
-    public OfflineOperationHandle StartOfflineRegions()
+    public OperationHandle StartOfflineRegions()
     {
-        ulong operationId = 0;
+        MlnOperation operationId = default;
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_regions_list_start(Handle, &operationId)
         );
-        return new OfflineOperationHandle(
-            this,
-            operationId,
-            OfflineOperationKind.RegionsList,
-            OfflineOperationResultKind.RegionList
-        );
+        return new OperationHandle(this, operationId, OperationResultKind.ListRegions);
     }
 
     /// <summary>Starts an offline region database merge operation.</summary>
-    public OfflineOperationHandle StartMergeOfflineRegionsDatabase(string path)
+    public OperationHandle StartMergeOfflineRegionsDatabase(string path)
     {
         ArgumentNullException.ThrowIfNull(path);
         using var nativePath = NativeUtf8String.FromNullableString(path, nameof(path));
-        ulong operationId = 0;
+        MlnOperation operationId = default;
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_regions_merge_database_start(
                 Handle,
@@ -364,19 +350,14 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 &operationId
             )
         );
-        return new OfflineOperationHandle(
-            this,
-            operationId,
-            OfflineOperationKind.RegionsMergeDatabase,
-            OfflineOperationResultKind.RegionList
-        );
+        return new OperationHandle(this, operationId, OperationResultKind.MergeRegions);
     }
 
     /// <summary>Starts an offline region metadata update operation.</summary>
-    public OfflineOperationHandle StartUpdateOfflineRegionMetadata(long id, byte[] metadata)
+    public OperationHandle StartUpdateOfflineRegionMetadata(long id, byte[] metadata)
     {
         ArgumentNullException.ThrowIfNull(metadata);
-        ulong operationId = 0;
+        MlnOperation operationId = default;
         fixed (byte* metadataPointer = metadata)
         {
             NativeStatus.Check(
@@ -389,33 +370,23 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 )
             );
         }
-        return new OfflineOperationHandle(
-            this,
-            operationId,
-            OfflineOperationKind.RegionUpdateMetadata,
-            OfflineOperationResultKind.Region
-        );
+        return new OperationHandle(this, operationId, OperationResultKind.UpdateRegionMetadata);
     }
 
     /// <summary>Starts an offline region status lookup operation.</summary>
-    public OfflineOperationHandle StartOfflineRegionStatus(long id)
+    public OperationHandle StartOfflineRegionStatus(long id)
     {
-        ulong operationId = 0;
+        MlnOperation operationId = default;
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_region_get_status_start(Handle, id, &operationId)
         );
-        return new OfflineOperationHandle(
-            this,
-            operationId,
-            OfflineOperationKind.RegionGetStatus,
-            OfflineOperationResultKind.RegionStatus
-        );
+        return new OperationHandle(this, operationId, OperationResultKind.RegionStatus);
     }
 
     /// <summary>Starts an offline region observed-state update operation.</summary>
-    public OfflineOperationHandle StartSetOfflineRegionObserved(long id, bool observed)
+    public OperationHandle StartSetOfflineRegionObserved(long id, bool observed)
     {
-        ulong operationId = 0;
+        MlnOperation operationId = default;
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_region_set_observed_start(
                 Handle,
@@ -424,21 +395,16 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 &operationId
             )
         );
-        return new OfflineOperationHandle(
-            this,
-            operationId,
-            OfflineOperationKind.RegionSetObserved,
-            OfflineOperationResultKind.None
-        );
+        return new OperationHandle(this, operationId, OperationResultKind.None);
     }
 
     /// <summary>Starts an offline region download-state update operation.</summary>
-    public OfflineOperationHandle StartSetOfflineRegionDownloadState(
+    public OperationHandle StartSetOfflineRegionDownloadState(
         long id,
         OfflineRegionDownloadState downloadState
     )
     {
-        ulong operationId = 0;
+        MlnOperation operationId = default;
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_region_set_download_state_start(
                 Handle,
@@ -447,188 +413,122 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 &operationId
             )
         );
-        return new OfflineOperationHandle(
-            this,
-            operationId,
-            OfflineOperationKind.RegionSetDownloadState,
-            OfflineOperationResultKind.None
-        );
+        return new OperationHandle(this, operationId, OperationResultKind.None);
     }
 
     /// <summary>Starts an offline region invalidation operation.</summary>
-    public OfflineOperationHandle StartInvalidateOfflineRegion(long id)
+    public OperationHandle StartInvalidateOfflineRegion(long id)
     {
-        ulong operationId = 0;
+        MlnOperation operationId = default;
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_region_invalidate_start(Handle, id, &operationId)
         );
-        return new OfflineOperationHandle(
-            this,
-            operationId,
-            OfflineOperationKind.RegionInvalidate,
-            OfflineOperationResultKind.None
-        );
+        return new OperationHandle(this, operationId, OperationResultKind.None);
     }
 
     /// <summary>Starts an offline region delete operation.</summary>
-    public OfflineOperationHandle StartDeleteOfflineRegion(long id)
+    public OperationHandle StartDeleteOfflineRegion(long id)
     {
-        ulong operationId = 0;
+        MlnOperation operationId = default;
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_region_delete_start(Handle, id, &operationId)
         );
-        return new OfflineOperationHandle(
-            this,
-            operationId,
-            OfflineOperationKind.RegionDelete,
-            OfflineOperationResultKind.None
-        );
+        return new OperationHandle(this, operationId, OperationResultKind.None);
     }
 
-    public OfflineRegionInfo TakeCreateOfflineRegionResult(OfflineOperationHandle operation)
+    public OfflineRegionInfo TakeCreateOfflineRegionResult(OperationHandle operation)
     {
         ArgumentNullException.ThrowIfNull(operation);
-        var operationId = operation.RequireLive(
-            this,
-            OfflineOperationKind.RegionCreate,
-            OfflineOperationResultKind.Region
-        );
+        using var use = operation.AcquireResultUse(this, OperationResultKind.CreateRegion);
         MlnOfflineRegionSnapshot snapshot = default;
         NativeStatus.Check(
-            NativeMethods.mln_runtime_offline_region_create_take_result(
-                Handle,
-                operationId,
-                &snapshot
-            )
+            NativeMethods.mln_runtime_offline_region_create_take_result(use.Handle, &snapshot)
         );
-        operation.MarkConsumed();
+        operation.MarkResultConsumed(use);
         return OfflineStructs.ReadSnapshot(snapshot);
     }
 
-    public OfflineRegionInfo? TakeOfflineRegionResult(OfflineOperationHandle operation)
+    public OfflineRegionInfo? TakeOfflineRegionResult(OperationHandle operation)
     {
         ArgumentNullException.ThrowIfNull(operation);
-        var operationId = operation.RequireLive(
-            this,
-            OfflineOperationKind.RegionGet,
-            OfflineOperationResultKind.OptionalRegion
-        );
+        using var use = operation.AcquireResultUse(this, OperationResultKind.GetRegion);
         MlnOfflineRegionSnapshot snapshot = default;
         bool found = false;
         NativeStatus.Check(
-            NativeMethods.mln_runtime_offline_region_get_take_result(
-                Handle,
-                operationId,
-                &snapshot,
-                &found
-            )
+            NativeMethods.mln_runtime_offline_region_get_take_result(use.Handle, &snapshot, &found)
         );
-        operation.MarkConsumed();
+        operation.MarkResultConsumed(use);
         return found ? OfflineStructs.ReadSnapshot(snapshot) : null;
     }
 
-    public IReadOnlyList<OfflineRegionInfo> TakeOfflineRegionsResult(
-        OfflineOperationHandle operation
-    )
+    public IReadOnlyList<OfflineRegionInfo> TakeOfflineRegionsResult(OperationHandle operation)
     {
         ArgumentNullException.ThrowIfNull(operation);
-        var operationId = operation.RequireLive(
-            this,
-            OfflineOperationKind.RegionsList,
-            OfflineOperationResultKind.RegionList
-        );
+        using var use = operation.AcquireResultUse(this, OperationResultKind.ListRegions);
         MlnOfflineRegionList list = default;
         NativeStatus.Check(
-            NativeMethods.mln_runtime_offline_regions_list_take_result(Handle, operationId, &list)
+            NativeMethods.mln_runtime_offline_regions_list_take_result(use.Handle, &list)
         );
-        operation.MarkConsumed();
+        operation.MarkResultConsumed(use);
         return OfflineStructs.ReadList(list);
     }
 
     public IReadOnlyList<OfflineRegionInfo> TakeMergeOfflineRegionsDatabaseResult(
-        OfflineOperationHandle operation
+        OperationHandle operation
     )
     {
         ArgumentNullException.ThrowIfNull(operation);
-        var operationId = operation.RequireLive(
-            this,
-            OfflineOperationKind.RegionsMergeDatabase,
-            OfflineOperationResultKind.RegionList
-        );
+        using var use = operation.AcquireResultUse(this, OperationResultKind.MergeRegions);
         MlnOfflineRegionList list = default;
         NativeStatus.Check(
-            NativeMethods.mln_runtime_offline_regions_merge_database_take_result(
-                Handle,
-                operationId,
-                &list
-            )
+            NativeMethods.mln_runtime_offline_regions_merge_database_take_result(use.Handle, &list)
         );
-        operation.MarkConsumed();
+        operation.MarkResultConsumed(use);
         return OfflineStructs.ReadList(list);
     }
 
-    public OfflineRegionInfo TakeUpdateOfflineRegionMetadataResult(OfflineOperationHandle operation)
+    public OfflineRegionInfo TakeUpdateOfflineRegionMetadataResult(OperationHandle operation)
     {
         ArgumentNullException.ThrowIfNull(operation);
-        var operationId = operation.RequireLive(
-            this,
-            OfflineOperationKind.RegionUpdateMetadata,
-            OfflineOperationResultKind.Region
-        );
+        using var use = operation.AcquireResultUse(this, OperationResultKind.UpdateRegionMetadata);
         MlnOfflineRegionSnapshot snapshot = default;
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_region_update_metadata_take_result(
-                Handle,
-                operationId,
+                use.Handle,
                 &snapshot
             )
         );
-        operation.MarkConsumed();
+        operation.MarkResultConsumed(use);
         return OfflineStructs.ReadSnapshot(snapshot);
     }
 
-    public OfflineRegionStatus TakeOfflineRegionStatusResult(OfflineOperationHandle operation)
+    public OfflineRegionStatus TakeOfflineRegionStatusResult(OperationHandle operation)
     {
         ArgumentNullException.ThrowIfNull(operation);
-        var operationId = operation.RequireLive(
-            this,
-            OfflineOperationKind.RegionGetStatus,
-            OfflineOperationResultKind.RegionStatus
-        );
+        using var use = operation.AcquireResultUse(this, OperationResultKind.RegionStatus);
         var status = new mln_offline_region_status
         {
             size = (uint)sizeof(mln_offline_region_status),
         };
-        NativeStatus.Check(TakeOfflineRegionStatusNative(Handle, operationId, &status));
-        operation.MarkConsumed();
+        NativeStatus.Check(TakeOfflineRegionStatusNative(Handle, use.Handle, &status));
+        operation.MarkResultConsumed(use);
         return OfflineStructs.ReadStatus(status);
     }
 
-    internal void DiscardOfflineOperation(OfflineOperationHandle operation)
+    internal void RegisterOperation(OperationHandle operation)
     {
-        ArgumentNullException.ThrowIfNull(operation);
-        if (operation.IsClosed)
+        lock (operationGate)
         {
-            return;
+            liveOperations.Add(operation);
         }
+    }
 
-        var operationId = operation.RequireLive(this);
-        MlnRuntime runtime;
-        try
+    internal void UnregisterOperation(OperationHandle operation)
+    {
+        lock (operationGate)
         {
-            runtime = Handle;
+            liveOperations.Remove(operation);
         }
-        catch (Error.InvalidStateException) when (IsClosed)
-        {
-            // The runtime already owns cleanup for its pending operations.
-            operation.MarkConsumed();
-            return;
-        }
-
-        NativeStatus.Check(
-            NativeMethods.mln_runtime_offline_operation_discard(runtime, operationId)
-        );
-        operation.MarkConsumed();
     }
 
     internal void RegisterMap(Map.MapHandle map)
@@ -708,8 +608,8 @@ public sealed unsafe class RuntimeHandle : IDisposable
 
     /// <summary>Drains every queued runtime event into one batch of copies.</summary>
     /// <remarks>
-    /// The batch reports the events this runtime and its maps queued under the masks they select,
-    /// in queue order, as managed copies of the borrowed native records.
+    /// The batch reports the events that this runtime and its maps queued under their masks.
+    /// Managed copies preserve queue order after the owned native batch is released.
     /// </remarks>
     public RuntimeEventBatch DrainEvents() => Drain(0);
 
@@ -751,35 +651,129 @@ public sealed unsafe class RuntimeHandle : IDisposable
         return (RuntimeEventMask)mask;
     }
 
+    /// <summary>Drains and copies the endpoints that are ready for this runtime's receiver.</summary>
+    public IReadOnlyList<ReadyEndpoint> DrainReadyEndpoints()
+    {
+        _ = Handle;
+        MlnReadyBatch batch = default;
+        NativeStatus.Check(
+            NativeMethods.mln_notification_source_drain_ready(notificationSource, &batch)
+        );
+        try
+        {
+            var view = new mln_ready_batch_view { size = (uint)sizeof(mln_ready_batch_view) };
+            NativeStatus.Check(NativeMethods.mln_ready_batch_get(batch, &view));
+            if (view.endpoint_size < sizeof(mln_ready_endpoint))
+            {
+                throw new InvalidStateException(
+                    MaplibreStatus.InvalidState,
+                    null,
+                    "The native ready endpoint stride is smaller than the known endpoint layout.",
+                    null
+                );
+            }
+            if (view.endpoint_count != 0 && view.endpoints is null)
+            {
+                throw new InvalidStateException(
+                    MaplibreStatus.InvalidState,
+                    null,
+                    "The native ready batch has a null endpoint pointer.",
+                    null
+                );
+            }
+
+            var endpoints = new List<ReadyEndpoint>(checked((int)view.endpoint_count));
+            var cursor = (byte*)view.endpoints;
+            for (nuint index = 0; index < view.endpoint_count; index++)
+            {
+                var endpoint = (mln_ready_endpoint*)cursor;
+                endpoints.Add(
+                    new ReadyEndpoint(
+                        Enum.IsDefined(typeof(NotificationEndpointKind), endpoint->kind)
+                            ? (NotificationEndpointKind)endpoint->kind
+                            : 0,
+                        endpoint->kind,
+                        endpoint->id
+                    )
+                );
+                cursor += view.endpoint_size;
+            }
+            return endpoints;
+        }
+        finally
+        {
+            NativeMethods.mln_ready_batch_release(batch);
+        }
+    }
+
     private RuntimeEventBatch Drain(nuint maxEvents)
     {
-        var batch = NativeMethods.mln_runtime_event_batch_default();
+        MlnEventBatch batch = default;
         NativeStatus.Check(NativeMethods.mln_runtime_drain_events(Handle, maxEvents, &batch));
-
-        // The batch borrows native storage that the next drain reuses, so every event is read
-        // into managed objects before this returns.
-        List<RuntimeEvent> events;
-        lock (mapGate)
+        try
         {
-            events = RuntimeStructs.ReadBatch(batch, this, MapForLocked);
-        }
+            var view = new mln_runtime_event_batch_view
+            {
+                size = (uint)sizeof(mln_runtime_event_batch_view),
+            };
+            NativeStatus.Check(NativeMethods.mln_event_batch_get(batch, &view));
+            List<RuntimeEvent> events;
+            lock (mapGate)
+            {
+                events = RuntimeStructs.ReadBatch(view, this, MapForLocked);
+            }
 
-        return new RuntimeEventBatch(events, (ulong)batch.remaining_count);
+            return new RuntimeEventBatch(events, (ulong)view.remaining_count);
+        }
+        finally
+        {
+            NativeMethods.mln_event_batch_release(batch);
+        }
     }
 
     /// <summary>Destroys the runtime on its owner thread.</summary>
     public void Close()
     {
+        PreflightNoLiveOperations();
         state.Close();
         DisposeCallbackState();
+        CloseNotificationSource();
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
+        PreflightNoLiveOperations();
         if (state.TryClose())
         {
             DisposeCallbackState();
+            CloseNotificationSource();
+        }
+    }
+
+    private void PreflightNoLiveOperations()
+    {
+        lock (operationGate)
+        {
+            if (liveOperations.Count != 0)
+            {
+                throw new InvalidStateException(
+                    MaplibreStatus.InvalidState,
+                    null,
+                    "RuntimeHandle cannot close while an OperationHandle is live.",
+                    null
+                );
+            }
+        }
+    }
+
+    private void CloseNotificationSource()
+    {
+        var source = notificationSource;
+        if (!source.IsNull)
+        {
+            NativeStatus.Check(NativeMethods.mln_notification_source_close(source));
+            notificationSource = default;
         }
     }
 

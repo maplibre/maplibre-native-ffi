@@ -14,9 +14,13 @@ enum NativeRuntime {
     _ runtime: NativeRuntimeHandle,
     maxEvents: Int
   ) throws -> NativeRuntimeEventBatch {
-    var batch = mln_runtime_event_batch_default()
+    var batch: mln_event_batch = 0
     try checkStatus(mln_runtime_drain_events(runtime.raw, maxEvents, &batch))
-    return try NativeRuntimeEventBatch(copying: batch)
+    defer { mln_event_batch_release(batch) }
+    var view = mln_runtime_event_batch_view()
+    view.size = UInt32(MemoryLayout<mln_runtime_event_batch_view>.size)
+    try checkStatus(mln_event_batch_get(batch, &view))
+    return try NativeRuntimeEventBatch(copying: view)
   }
 
   static func setEventMask(

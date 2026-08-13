@@ -195,25 +195,15 @@ typedef struct mln_adapter_queued_resource_provider_route {
 } mln_adapter_queued_resource_provider_route;
 
 /**
- * Receives a queued request as a native-owned
- * mln_adapter_queued_resource_request, or null when the provider retires.
- *
- * The listener returns void and may be invoked from any MapLibre thread. It
- * takes ownership of the record and releases it with
- * mln_adapter_resource_provider_request_destroy() once the host has read it.
- */
-typedef void (*mln_adapter_queued_resource_request_listener)(void* request);
-
-/**
- * A provider that hands matching requests to a host listener.
+ * A provider that copies matching requests into a native queue.
  *
  * The routes pointer is borrowed and must stay valid while the provider is
- * registered.
+ * registered. queue identifies the queue that receives each copied request.
  */
 typedef struct mln_adapter_queued_resource_provider {
   const mln_adapter_queued_resource_provider_route* routes;
   size_t route_count;
-  mln_adapter_queued_resource_request_listener listener;
+  mln_adapter_resource_request_queue queue;
 } mln_adapter_queued_resource_provider;
 
 /**
@@ -255,28 +245,6 @@ typedef struct mln_adapter_queued_resource_request {
 } mln_adapter_queued_resource_request;
 
 /**
- * Receives a log record as a native-owned mln_adapter_log_record, or null when
- * the callback retires.
- *
- * The listener returns void and may be invoked from any MapLibre logging or
- * worker thread. It takes ownership of the record and releases it with
- * mln_adapter_log_record_destroy() once the host has read it.
- */
-typedef void (*mln_adapter_log_record_listener)(void* record);
-
-/**
- * Registration state for an adapted log callback.
- *
- * The consume field is the value reported to MapLibre for every dispatched
- * record. The address of this struct identifies the registration; it is
- * borrowed and must stay valid until the callback is replaced or cleared.
- */
-typedef struct mln_adapter_log_callback_state {
-  mln_adapter_log_record_listener listener;
-  uint32_t consume;
-} mln_adapter_log_callback_state;
-
-/**
  * A native-owned copy of a log record.
  *
  * The message pointer is owned by this record and stays valid until
@@ -284,12 +252,23 @@ typedef struct mln_adapter_log_callback_state {
  */
 typedef struct mln_adapter_log_record {
   void* owner;
-  bool retire_callback;
   uint32_t severity;
   uint32_t event;
   int64_t code;
   const char* message;
 } mln_adapter_log_record;
+
+/**
+ * Registration state for an adapted log callback.
+ *
+ * The callback copies records into queue and reports consume to MapLibre. The
+ * address of this struct identifies the registration and remains borrowed until
+ * the callback is replaced or cleared.
+ */
+typedef struct mln_adapter_log_callback_state {
+  mln_adapter_log_queue queue;
+  uint32_t consume;
+} mln_adapter_log_callback_state;
 
 /**
  * Creates a token describing a handle the host has not closed yet.
@@ -311,11 +290,73 @@ MLN_API void mln_adapter_handle_leak_token_destroy(void* token) MLN_NOEXCEPT;
 MLN_API void mln_adapter_handle_leak_report(void* token) MLN_NOEXCEPT;
 
 /**
- * The mln_log_callback implementation this layer registers.
+ * Creates a resource-request queue associated with one notification source.
  *
- * Copies the record, hands it to the registered listener, and reports the
- * registration's fixed consume value. The user_data pointer is the
- * mln_adapter_log_callback_state passed to mln_adapter_log_set_callback().
+ * out_queue must point to the null handle. The association remains immutable
+ * until the queue is closed.
+ */
+MLN_API mln_status mln_adapter_resource_request_queue_create(
+  mln_notification_source source, mln_adapter_resource_request_queue* out_queue
+) MLN_NOEXCEPT;
+
+/**
+ * Acquires the oldest queued request, or null when the queue is empty.
+ *
+ * out_request must point to null. The caller owns a returned record and
+ * releases it with mln_adapter_resource_provider_request_destroy(). The queue
+ * remains ready until this drain confirms it is empty.
+ */
+MLN_API mln_status mln_adapter_resource_request_queue_acquire(
+  mln_adapter_resource_request_queue queue,
+  mln_adapter_queued_resource_request** out_request
+) MLN_NOEXCEPT;
+
+/**
+ * Closes a resource-request queue.
+ *
+ * Pending records and their request handles are released, and the notification
+ * endpoint is detached before this function returns. A null or already
+ * released queue is a no-op.
+ */
+MLN_API void mln_adapter_resource_request_queue_close(
+  mln_adapter_resource_request_queue queue
+) MLN_NOEXCEPT;
+
+/**
+ * Creates a log-record queue associated with one notification source.
+ *
+ * out_queue must point to the null handle. The association remains immutable
+ * until the queue is closed.
+ */
+MLN_API mln_status mln_adapter_log_queue_create(
+  mln_notification_source source, mln_adapter_log_queue* out_queue
+) MLN_NOEXCEPT;
+
+/**
+ * Acquires the oldest copied log record, or null when the queue is empty.
+ *
+ * out_record must point to null. The caller owns a returned record and releases
+ * it with mln_adapter_log_record_destroy().
+ */
+MLN_API mln_status mln_adapter_log_queue_acquire(
+  mln_adapter_log_queue queue, mln_adapter_log_record** out_record
+) MLN_NOEXCEPT;
+
+/**
+ * Closes a log queue.
+ *
+ * Pending records are released, and the notification endpoint is detached
+ * before this function returns. A null or already released queue is a no-op.
+ */
+MLN_API void mln_adapter_log_queue_close(
+  mln_adapter_log_queue queue
+) MLN_NOEXCEPT;
+
+/**
+ * The mln_log_callback implementation for a log queue.
+ *
+ * user_data points to an mln_adapter_log_callback_state. Each record is copied
+ * into its queue, and the callback reports the state's fixed consume value.
  */
 MLN_API uint32_t mln_adapter_log_callback(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
@@ -325,19 +366,12 @@ MLN_API uint32_t mln_adapter_log_callback(
 /**
  * Installs state as the process-global log callback, or clears the current
  * callback when state is null.
- *
- * A registration this call replaces receives one final null record through its
- * listener once its in-flight dispatches finish.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - The status reported by mln_log_set_callback() or mln_log_clear_callback().
  */
 MLN_API mln_status mln_adapter_log_set_callback(
   mln_adapter_log_callback_state* state
 ) MLN_NOEXCEPT;
 
-/** Releases a log record delivered to a listener. */
+/** Releases a log record acquired from a log queue. */
 MLN_API void mln_adapter_log_record_destroy(void* record) MLN_NOEXCEPT;
 
 /**
@@ -390,31 +424,24 @@ MLN_API uint32_t mln_adapter_resource_provider_rules_callback(
 /**
  * The mln_resource_provider_callback implementation for queued providers.
  *
- * The user_data pointer is an mln_adapter_queued_resource_provider. A request
- * matching one of the provider's routes is copied and handed to the listener,
- * and reports MLN_RESOURCE_PROVIDER_DECISION_HANDLE. Other requests pass
- * through unchanged and continue through the native loader. A request that
- * cannot be copied is completed with an error response rather than left
- * outstanding.
+ * user_data points to an mln_adapter_queued_resource_provider. A request
+ * matching one route is copied into the provider's queue and reports
+ * MLN_RESOURCE_PROVIDER_DECISION_HANDLE. Other requests pass through. A request
+ * that cannot be copied is completed with an error response.
  */
 MLN_API uint32_t mln_adapter_queued_resource_provider_callback(
   void* user_data, const mln_resource_request* request,
   mln_resource_request_handle handle
 ) MLN_NOEXCEPT;
 
-/** Releases a queued request record delivered to a listener. */
+/**
+ * Releases the copied payload of a resource request acquired from a queue.
+ *
+ * Acquiring the record transfers its request handle to the host. The host
+ * completes or releases that handle independently.
+ */
 MLN_API void mln_adapter_resource_provider_request_destroy(
   void* request
-) MLN_NOEXCEPT;
-
-/**
- * Delivers one null record to a queued provider's listener.
- *
- * Hosts call this after the provider is no longer registered so the listener
- * can release the host-side state that backed it.
- */
-MLN_API void mln_adapter_queued_resource_provider_retire(
-  mln_adapter_queued_resource_provider* provider
 ) MLN_NOEXCEPT;
 
 /**

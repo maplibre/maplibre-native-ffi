@@ -7,11 +7,16 @@
 #include <time.h>
 
 int main(void) {
+  mln_notification_source notifications = MLN_HANDLE_NULL;
+  if (mln_notification_source_create(&notifications) != MLN_STATUS_OK) return 1;
+
   mln_runtime_options runtime_options = mln_runtime_options_default();
   runtime_options.cache_path = ":memory:";
+  runtime_options.notification_source = notifications;
 
   mln_runtime runtime = MLN_HANDLE_NULL;
   if (mln_runtime_create(&runtime_options, &runtime) != MLN_STATUS_OK) {
+    mln_notification_source_close(notifications);
     return 1;
   }
 
@@ -23,6 +28,7 @@ int main(void) {
   mln_map map = MLN_HANDLE_NULL;
   if (mln_map_create(runtime, &map_options, &map) != MLN_STATUS_OK) {
     mln_runtime_destroy(runtime);
+    mln_notification_source_close(notifications);
     return 1;
   }
 
@@ -43,11 +49,16 @@ int main(void) {
     // A positive timeout parks the thread until work arrives or it expires.
     mln_runtime_pump(runtime, 100);
 
-    mln_runtime_event_batch batch = mln_runtime_event_batch_default();
-    mln_runtime_drain_events(runtime, 0, &batch);
+    mln_event_batch batch = MLN_HANDLE_NULL;
+    if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) continue;
+    mln_runtime_event_batch_view view = {0};
+    if (mln_event_batch_get(batch, &view) != MLN_STATUS_OK) {
+      mln_event_batch_release(batch);
+      continue;
+    }
 
-    for (size_t index = 0; index < batch.event_count; index++) {
-      const char* bytes = (const char*)batch.events + index * batch.event_size;
+    for (size_t index = 0; index < view.event_count; index++) {
+      const char* bytes = (const char*)view.events + index * view.event_size;
       const mln_runtime_event* event = (const mln_runtime_event*)bytes;
       if (event->source != map) continue;
       if (event->type == MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) {
@@ -58,16 +69,18 @@ int main(void) {
         if (event->message_size > 0) {
           fprintf(
             stderr, "style failed: %.*s\n", (int)event->message_size,
-            batch.messages + event->message_offset
+            view.messages + event->message_offset
           );
         }
         settled = true;
       }
     }
+    mln_event_batch_release(batch);
   }
 
   // mln_runtime_destroy returns MLN_STATUS_INVALID_STATE while a map is live.
   mln_map_destroy(map);
   mln_runtime_destroy(runtime);
+  mln_notification_source_close(notifications);
   return loaded ? 0 : 1;
 }

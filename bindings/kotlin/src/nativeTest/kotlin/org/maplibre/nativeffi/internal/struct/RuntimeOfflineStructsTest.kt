@@ -26,7 +26,6 @@ import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
 import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED
-import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION
 import org.maplibre.nativeffi.internal.c.mln_offline_region_definition
@@ -38,8 +37,6 @@ import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.map.TileOperation
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.render.RenderMode
-import org.maplibre.nativeffi.runtime.OfflineOperationKind
-import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 
 @OptIn(ExperimentalForeignApi::class)
@@ -302,26 +299,6 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(2L, tilePayload.tileId.canonicalZ)
       assertEquals(3L, tilePayload.tileId.canonicalX)
       assertEquals(4L, tilePayload.tileId.canonicalY)
-    }
-  }
-
-  @Test
-  fun offlineOperationCompletedPreservesOperationIdBitPattern() {
-    memScoped {
-      val event = alloc<mln_runtime_event>()
-      event.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED
-      event.payload.offline_operation_completed.operation_id = Long.MAX_VALUE.toULong() + 1UL
-      event.payload.offline_operation_completed.operation_kind = 902U
-      event.payload.offline_operation_completed.result_kind = 903U
-
-      val result =
-        RuntimeStructs.payload(event, eventSize) as RuntimeEventPayload.OfflineOperationCompleted
-
-      assertEquals((Long.MAX_VALUE.toULong() + 1UL).toLong(), result.operationId)
-      assertEquals(OfflineOperationKind(902), result.operationKind)
-      assertEquals(902, result.operationKind.nativeValue)
-      assertEquals(OfflineOperationResultKind(903), result.resultKind)
-      assertEquals(903, result.resultKind.nativeValue)
     }
   }
 

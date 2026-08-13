@@ -43,34 +43,6 @@ typedef enum mln_offline_region_download_state : uint32_t {
   MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE = 1,
 } mln_offline_region_download_state;
 
-/** Offline database operation token. Zero is never a valid operation ID. */
-typedef uint64_t mln_offline_operation_id;
-
-/** Offline database operation kinds reported by completion events. */
-typedef enum mln_offline_operation_kind : uint32_t {
-  MLN_OFFLINE_OPERATION_AMBIENT_CACHE = 1,
-  MLN_OFFLINE_OPERATION_REGION_CREATE = 2,
-  MLN_OFFLINE_OPERATION_REGION_GET = 3,
-  MLN_OFFLINE_OPERATION_REGIONS_LIST = 4,
-  MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE = 5,
-  MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA = 6,
-  MLN_OFFLINE_OPERATION_REGION_GET_STATUS = 7,
-  MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED = 8,
-  MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE = 9,
-  MLN_OFFLINE_OPERATION_REGION_INVALIDATE = 10,
-  MLN_OFFLINE_OPERATION_REGION_DELETE = 11,
-  MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE = 12,
-} mln_offline_operation_kind;
-
-/** Offline database operation result kinds reported by completion events. */
-typedef enum mln_offline_operation_result_kind : uint32_t {
-  MLN_OFFLINE_OPERATION_RESULT_NONE = 0,
-  MLN_OFFLINE_OPERATION_RESULT_REGION = 1,
-  MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION = 2,
-  MLN_OFFLINE_OPERATION_RESULT_REGION_LIST = 3,
-  MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS = 4,
-} mln_offline_operation_result_kind;
-
 /** Offline region status snapshot. */
 typedef struct mln_offline_region_status {
   uint32_t size;
@@ -127,10 +99,6 @@ typedef struct mln_offline_region_status {
  *   error text; payload OFFLINE_REGION_RESPONSE_ERROR.
  * - OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: code is 0; payload
  *   OFFLINE_REGION_TILE_COUNT_LIMIT.
- * - OFFLINE_OPERATION_COMPLETED: code is the operation result as an mln_status
- *   value, the same value the payload reports in result_status; message carries
- *   the failure text when the operation failed; payload
- *   OFFLINE_OPERATION_COMPLETED.
  */
 typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE = 1,
@@ -154,7 +122,6 @@ typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 19,
   MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20,
   MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21,
-  MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED = 22,
   MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED = 23,
 } mln_runtime_event_type;
 
@@ -217,8 +184,6 @@ typedef enum mln_runtime_event_mask : uint64_t {
     1ULL << MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR,
   MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED =
     1ULL << MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
-  MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED =
-    1ULL << MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED,
   /** Selects every map-originated event type this version defines. */
   MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS =
     MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE |
@@ -244,8 +209,7 @@ typedef enum mln_runtime_event_mask : uint64_t {
   MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS =
     MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED |
     MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR |
-    MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED |
-    MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED,
+    MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
   /** Selects every event type this version defines. */
   MLN_RUNTIME_EVENT_MASK_ALL = MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS |
                                MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS,
@@ -260,8 +224,10 @@ typedef enum mln_runtime_event_source_type : uint32_t {
 /**
  * Payload kinds used by mln_runtime_event.payload_type.
  *
- * Value 3 is retired and no version reuses it. It was a style-image-missing
- * payload whose only content was the image ID that the event message carries.
+ * Values 3 and 8 are retired and no version reuses them. Value 3 was a
+ * style-image-missing payload whose only content was the image ID that the
+ * event message carries. Value 8 was an offline-operation completion payload;
+ * operations now report completion through notification sources.
  */
 typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0,
@@ -271,7 +237,6 @@ typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 5,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 6,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 7,
-  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED = 8,
   MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = 9,
 } mln_runtime_event_payload_type;
 
@@ -402,13 +367,18 @@ typedef struct mln_runtime_options {
    * mln_runtime_set_event_mask().
    */
   uint64_t event_mask;
+  /**
+   * Receiver-scoped source for runtime-event readiness and inherited operation
+   * completion. The runtime retains the source association until destruction.
+   */
+  mln_notification_source notification_source;
 } mln_runtime_options;
 
 /**
  * Rendering statistics reported in MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME.
  *
  * This struct has no size field, because it is a member of
- * mln_runtime_event_payload. mln_runtime_event_batch.event_size covers the
+ * mln_runtime_event_payload. mln_runtime_event_batch_view.event_size covers the
  * whole event, including its payload.
  */
 typedef struct mln_rendering_stats {
@@ -499,19 +469,6 @@ typedef struct mln_runtime_event_offline_region_tile_count_limit {
   uint64_t limit;
 } mln_runtime_event_offline_region_tile_count_limit;
 
-/** Payload for MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED. */
-typedef struct mln_runtime_event_offline_operation_completed {
-  mln_offline_operation_id operation_id;
-  /** One of mln_offline_operation_kind. */
-  uint32_t operation_kind;
-  /** One of mln_offline_operation_result_kind. */
-  uint32_t result_kind;
-  /** Async result status as a mln_status value. */
-  int32_t result_status;
-  /** Meaningful for MLN_OFFLINE_OPERATION_REGION_GET. */
-  bool found;
-} mln_runtime_event_offline_operation_completed;
-
 /**
  * Typed event payload carried inline by every event.
  *
@@ -521,7 +478,7 @@ typedef struct mln_runtime_event_offline_operation_completed {
  * A host that decodes a payload type this version does not define treats the
  * payload as opaque bytes and forwards them unchanged. Those bytes run from the
  * payload's offset within mln_runtime_event to
- * mln_runtime_event_batch.event_size.
+ * mln_runtime_event_batch_view.event_size.
  */
 typedef union mln_runtime_event_payload {
   mln_runtime_event_render_frame render_frame;
@@ -531,7 +488,6 @@ typedef union mln_runtime_event_payload {
   mln_runtime_event_offline_region_response_error offline_region_response_error;
   mln_runtime_event_offline_region_tile_count_limit
     offline_region_tile_count_limit;
-  mln_runtime_event_offline_operation_completed offline_operation_completed;
   mln_runtime_event_camera_transition_finished camera_transition_finished;
 } mln_runtime_event_payload;
 
@@ -541,8 +497,9 @@ typedef union mln_runtime_event_payload {
  * Events have a fixed stride and hold no pointers, so a host can copy a whole
  * batch with one memory copy.
  *
- * Step through an array of these by mln_runtime_event_batch.event_size rather
- * than by the size of this struct: a later version may add a member to
+ * Step through an array of these by
+ * mln_runtime_event_batch_view.event_size rather than by the size of this
+ * struct: a later version may add a member to
  * mln_runtime_event_payload and widen the stride. Every field below, payload
  * included, keeps its offset across versions.
  */
@@ -570,7 +527,7 @@ typedef struct mln_runtime_event {
   uint32_t payload_type;
   /**
    * Byte offset of this event's message inside
-   * mln_runtime_event_batch.messages. Zero when message_size is 0.
+   * mln_runtime_event_batch_view.messages. Zero when message_size is 0.
    */
   uint32_t message_offset;
   /**
@@ -583,23 +540,19 @@ typedef struct mln_runtime_event {
 } mln_runtime_event;
 
 /**
- * A drained batch of runtime events.
+ * A borrowed view of one owned runtime-event batch.
  *
- * A caller zero-initializes this struct, sets size, and passes it to
- * mln_runtime_drain_events(). mln_runtime_event_batch_default() returns such a
- * struct.
+ * Step through events by event_size. The event and message pointers remain
+ * valid until the event-batch handle is released.
  */
-typedef struct mln_runtime_event_batch {
+typedef struct mln_runtime_event_batch_view {
   uint32_t size;
   /**
    * Stride of one event in bytes, at least sizeof(mln_runtime_event) in the
    * header a caller compiled against. Index events with this value.
    */
   uint32_t event_size;
-  /**
-   * Borrowed array of event_count events in queue order. Null when event_count
-   * is 0.
-   */
+  /** Borrowed array of event_count events in queue order. */
   const mln_runtime_event* events;
   /** Number of events in events. */
   size_t event_count;
@@ -610,12 +563,9 @@ typedef struct mln_runtime_event_batch {
   const char* messages;
   /** Number of bytes in messages, including every terminator. */
   size_t messages_size;
-  /**
-   * Events still queued for this runtime after this batch. A nonzero value
-   * means another drain reports more events.
-   */
+  /** Events still queued after this batch was drained. */
   size_t remaining_count;
-} mln_runtime_event_batch;
+} mln_runtime_event_batch_view;
 
 typedef struct mln_resource_transform_response {
   uint32_t size;
@@ -1054,20 +1004,11 @@ mln_runtime_clear_http_header_transform(mln_runtime runtime) MLN_NOEXCEPT;
  *
  * When runtime options omit cache_path, this operates on MapLibre's default
  * in-memory database and its effects are not durable beyond the native database
- * lifetime. Completion is reported through
- * MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
- *
- * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or operation
- *   is not a mln_ambient_cache_operation value, or out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * lifetime. The returned operation uses the runtime's notification source.
+ * out_operation must point to the null handle.
  */
 MLN_API mln_status mln_runtime_run_ambient_cache_operation_start(
-  mln_runtime runtime, uint32_t operation,
-  mln_offline_operation_id* out_operation_id
+  mln_runtime runtime, uint32_t operation, mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
 /**
@@ -1079,38 +1020,11 @@ MLN_API mln_status mln_runtime_run_ambient_cache_operation_start(
  *
  * When runtime options omit cache_path, this operates on MapLibre's default
  * in-memory database and its effects are not durable beyond the native database
- * lifetime. Completion is reported through
- * MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
- *
- * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * lifetime. The returned operation uses the runtime's notification source.
+ * out_operation must point to the null handle.
  */
 MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size_start(
-  mln_runtime runtime, uint64_t size, mln_offline_operation_id* out_operation_id
-) MLN_NOEXCEPT;
-
-/**
- * Discards runtime-owned state for an offline database operation.
- *
- * Discarding does not cancel native database work. It drops stored results,
- * removes queued completion events for the operation, and suppresses later
- * completion delivery when the native operation is still pending.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   operation_id is zero or unknown.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_runtime_offline_operation_discard(
-  mln_runtime runtime, mln_offline_operation_id operation_id
+  mln_runtime runtime, uint64_t size, mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
 /**
@@ -1238,65 +1152,43 @@ MLN_API mln_status mln_wake_source_signal(mln_wake_source source) MLN_NOEXCEPT;
  */
 MLN_API void mln_wake_source_destroy(mln_wake_source source) MLN_NOEXCEPT;
 
-/** Returns a zeroed mln_runtime_event_batch with size filled in. */
-MLN_API mln_runtime_event_batch
-mln_runtime_event_batch_default(void) MLN_NOEXCEPT;
-
 /**
- * Drains this runtime's queued runtime events into one borrowed batch.
+ * Drains this runtime's queued events into a new owned batch.
  *
- * Events arrive in queue order. Map-originated events set source_type to
- * MLN_RUNTIME_EVENT_SOURCE_MAP and source to the source map;
- * runtime-originated events set source_type to
- * MLN_RUNTIME_EVENT_SOURCE_RUNTIME and source to this runtime.
+ * Events arrive in queue order. max_events bounds the drain; zero drains every
+ * queued event. A positive value drains at most that many events. The batch
+ * view reports how many events remained queued.
  *
- * max_events bounds the drain. Zero drains every queued event. A positive value
- * drains at most that many events and reports the number that stayed queued in
- * out_batch->remaining_count. A drain also stops when one more message would
- * take the message arena past 4 GiB, so read out_batch->remaining_count after
- * an unbounded drain too.
+ * The returned handle owns copied event records and their message arena. Later
+ * drains and runtime destruction leave the batch readable. Release each batch
+ * with mln_event_batch_release().
  *
- * Read a payload as the mln_runtime_event_payload member that
- * event.payload_type selects. Read a message as event.message_size bytes at
- * out_batch->messages plus event.message_offset. Every offset and size pair
- * this call writes lies inside the arena.
+ * This queue operation may be called from any thread. One drain lease may be
+ * active for a runtime event queue. A concurrent second drain returns
+ * MLN_STATUS_INVALID_STATE.
  *
- * Copy any value a host keeps, because out_batch->events and
- * out_batch->messages point at runtime-owned storage that stays readable only
- * until the next mln_runtime_drain_events() call for the same runtime or until
- * the runtime is destroyed. Every other C API call leaves the batch readable,
- * including calls on the maps this runtime owns and mln_map_destroy() for a map
- * whose events the batch carries. Every drain invalidates the batch before it,
- * including a drain that finds no events.
- *
- * Destroying a map discards that map's queued events, so this call reports
- * events only for maps that were live when the events were queued. Read the
- * state a host mirrors from events before destroying the map that produces
- * them.
- *
- * The map and runtime subscription masks decide which events reach the queue.
- * An event of an unselected type is never built and never queued, so it reaches
- * no batch and raises no wake flag. See mln_map_set_event_mask() and
- * mln_runtime_set_event_mask().
- *
- * Draining is a queue operation: it runs no owner-thread work and never parks.
- * Call mln_runtime_pump() to advance the runtime, then drain the events that
- * pump produced.
- *
- * This function clears the calling thread's diagnostic message, so read
- * mln_thread_last_error_message() for a failed call before draining.
+ * The map and runtime subscription masks suppress unselected events before
+ * their payloads, messages, queue records, and notification are produced.
  *
  * Returns:
- * - MLN_STATUS_OK when the drain completed, including when it found no events.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
- *   handle, out_batch is null, or out_batch->size is too small.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
+ * - MLN_STATUS_OK when out_batch receives an owned batch, including an empty
+ *   batch.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or out_batch
+ *   is null or does not point to the null handle.
+ * - MLN_STATUS_INVALID_STATE when another drain is active.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_drain_events(
-  mln_runtime runtime, size_t max_events, mln_runtime_event_batch* out_batch
+  mln_runtime runtime, size_t max_events, mln_event_batch* out_batch
 ) MLN_NOEXCEPT;
+
+/** Borrows the event and message view stored by an owned event batch. */
+MLN_API mln_status mln_event_batch_get(
+  mln_event_batch batch, mln_runtime_event_batch_view* out_view
+) MLN_NOEXCEPT;
+
+/** Releases an owned event batch. A null handle is a no-op. */
+MLN_API void mln_event_batch_release(mln_event_batch batch) MLN_NOEXCEPT;
 
 /**
  * Selects which runtime-originated event types this runtime queues.

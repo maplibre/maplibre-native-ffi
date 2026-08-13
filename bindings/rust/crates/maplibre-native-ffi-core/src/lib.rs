@@ -32,18 +32,17 @@ pub use camera::{
 pub use enums::{
     AmbientCacheOperation, CameraChangeMode, ConstrainMode, LocationIndicatorImageKind, LogEvent,
     LogSeverity, LogSeverityMask, MapDebugOptions, MapMode, NetworkStatus, NorthOrientation,
-    OfflineOperationKind, OfflineOperationResultKind, OfflineRegionDownloadState, OpenGLClientApi,
-    OpenGLContextOwnership, OpenGLContextProviderMask, RasterDemEncoding, RenderBackendMask,
-    RenderMode, RenderResult, ResourceErrorReason, ResourceKind, ResourceLoadingMethod,
-    ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage,
-    RuntimeEventMask, RuntimeEventType, SourceType, StyleImageTextFit, StyleLayerVisibility,
-    TileLodMode, TileOperation, TileScheme, VectorTileEncoding, ViewportMode,
+    OfflineRegionDownloadState, OpenGLClientApi, OpenGLContextOwnership, OpenGLContextProviderMask,
+    RasterDemEncoding, RenderBackendMask, RenderMode, RenderResult, ResourceErrorReason,
+    ResourceKind, ResourceLoadingMethod, ResourcePriority, ResourceResponseStatus,
+    ResourceStoragePolicy, ResourceUsage, RuntimeEventMask, RuntimeEventType, SourceType,
+    StyleImageTextFit, StyleLayerVisibility, TileLodMode, TileOperation, TileScheme,
+    VectorTileEncoding, ViewportMode,
 };
 pub use error::{Error, ErrorKind, Result, check};
 pub use events::{
     CameraTransitionFinishedEvent, CopiedRuntimeEvent, NativeEventView, NativeEventViews,
-    OfflineOperationCompletedEvent, OfflineRegionResponseErrorEvent, OfflineRegionStatus,
-    OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent, RawRuntimeEventSource,
+    OfflineRegionResponseErrorEvent, OfflineRegionStatus, OfflineRegionStatusEvent,
     RenderFrameEvent, RenderMapEvent, RenderingStats, RuntimeEventPayload, TileActionEvent, TileId,
     UnknownRuntimeEventPayload,
 };

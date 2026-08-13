@@ -1,0 +1,66 @@
+package org.maplibre.nativeffi.runtime
+
+import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
+import org.maplibre.nativeffi.internal.loader.NativeAccess
+import org.maplibre.nativeffi.internal.status.Status
+
+/** Common operation observer backed by the JVM FFM bridge. */
+public actual class OperationHandle<T>
+internal constructor(
+  private val runtime: RuntimeHandle,
+  id: Long,
+  kind: OperationKind,
+  resultKind: OperationResultKind,
+) : AutoCloseable {
+  private val runtimeRetention = runtime.retainChild("OperationHandle")
+  private val core = OperationHandleCore(runtime, id, kind, resultKind, runtimeRetention::close)
+
+  init {
+    HandleLeakCleaner.registerOperation(this, core.leakReport)
+  }
+
+  public actual val isClosed: Boolean
+    get() = core.isClosed
+
+  internal fun <R> withUse(block: (Long) -> R): R = core.withUse(runtime, block)
+
+  internal fun <R> withResultUse(
+    expectedKind: OperationKind,
+    expectedResultKind: OperationResultKind,
+    block: (Long) -> R,
+  ): R = core.withUse(runtime, expectedKind, expectedResultKind, block)
+
+  internal fun markResultConsumed() {
+    core.markResultConsumed()
+  }
+
+  public actual fun poll(): Boolean = withUse(NativeAccess::pollOfflineOperation)
+
+  public actual fun waitForCompletion(timeoutMillis: Long): Boolean = withUse {
+    NativeAccess.waitOfflineOperation(it, timeoutMillis)
+  }
+
+  public actual fun cancel() {
+    withUse { Status.check(NativeAccess.cancelOfflineOperation(it)) }
+  }
+
+  public actual fun terminalStatus(): MaplibreStatus = withUse {
+    MaplibreStatus.fromNative(NativeAccess.offlineOperationTerminalStatus(it))
+  }
+
+  public actual fun diagnostic(): String = withUse(NativeAccess::offlineOperationDiagnostic)
+
+  public actual fun discard() {
+    withUse {
+      Status.check(NativeAccess.discardOfflineOperation(it))
+      core.markResultConsumed()
+    }
+  }
+
+  public actual override fun close() {
+    if (!core.beginClose()) return
+    NativeAccess.releaseOfflineOperation(core.id)
+    core.finishClose()
+  }
+}

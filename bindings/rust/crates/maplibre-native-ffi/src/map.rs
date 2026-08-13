@@ -39,10 +39,10 @@ use crate::{
 
 mod style;
 pub use style::{
-    GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind,
-    RasterDemEncoding, SourceInfo, SourceType, StyleImage, StyleImageInfo, StyleImageOptions,
-    StyleImageTextFit, StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo, TileScheme,
-    TileSourceOptions, VectorTileEncoding,
+    GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, SourceInfo,
+    SourceType, StyleImage, StyleImageInfo, StyleImageOptions, StyleImageTextFit,
+    StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo, TileScheme, TileSourceOptions,
+    VectorTileEncoding,
 };
 
 #[derive(Debug)]

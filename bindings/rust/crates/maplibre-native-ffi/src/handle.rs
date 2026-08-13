@@ -51,6 +51,14 @@ impl<T: NativeHandle> ThreadAffineNativeHandle<T> {
         // destroy function for its owned native handle.
         unsafe { self.state.close_status(self.destroy) }
     }
+    pub(crate) fn leak_for_report(&self) {
+        if let Some(id) = self.state.leak_for_report() {
+            maplibre_core::handle::report_leak(maplibre_core::handle::NativeHandleLeak {
+                type_name: self.state.type_name(),
+                id,
+            });
+        }
+    }
 }
 
 impl<T: NativeHandle> Drop for ThreadAffineNativeHandle<T> {

@@ -20,6 +20,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     const char *asset_path;
  *     const char *cache_path;
  *     uint64_t event_mask;
+ *     mln_notification_source notification_source;
  * }
  * }
  */
@@ -34,7 +35,8 @@ public class mln_runtime_options {
         MapLibreNativeC.C_INT.withName("flags"),
         MapLibreNativeC.C_POINTER.withName("asset_path"),
         MapLibreNativeC.C_POINTER.withName("cache_path"),
-        MapLibreNativeC.C_LONG.withName("event_mask")
+        MapLibreNativeC.C_LONG.withName("event_mask"),
+        MapLibreNativeC.C_LONG.withName("notification_source")
     ).withName("mln_runtime_options");
 
     /**
@@ -262,6 +264,50 @@ public class mln_runtime_options {
      */
     public static void event_mask(MemorySegment struct, long fieldValue) {
         struct.set(event_mask$LAYOUT, event_mask$OFFSET, fieldValue);
+    }
+
+    private static final OfLong notification_source$LAYOUT = (OfLong)$LAYOUT.select(groupElement("notification_source"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * mln_notification_source notification_source
+     * }
+     */
+    public static final OfLong notification_source$layout() {
+        return notification_source$LAYOUT;
+    }
+
+    private static final long notification_source$OFFSET = $LAYOUT.byteOffset(groupElement("notification_source"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * mln_notification_source notification_source
+     * }
+     */
+    public static final long notification_source$offset() {
+        return notification_source$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * mln_notification_source notification_source
+     * }
+     */
+    public static long notification_source(MemorySegment struct) {
+        return struct.get(notification_source$LAYOUT, notification_source$OFFSET);
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * mln_notification_source notification_source
+     * }
+     */
+    public static void notification_source(MemorySegment struct, long fieldValue) {
+        struct.set(notification_source$LAYOUT, notification_source$OFFSET, fieldValue);
     }
 
     /**

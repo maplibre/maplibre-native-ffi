@@ -190,9 +190,9 @@ static void a_style_response_wakes_a_parked_owner_thread(void) {
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds)
     );
-    mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+    mln_test_event_batch batch = mln_test_event_batch_default();
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_runtime_drain_events(runtime, 0, &batch)
+      MLN_STATUS_OK, mln_test_drain_events(runtime, 0, &batch)
     );
     for (size_t index = 0; index < batch.event_count; index += 1) {
       const mln_runtime_event* event =
@@ -324,9 +324,9 @@ static void queued_events_return_from_the_pump_immediately(void) {
     "A pump parked behind unread runtime events."
   );
 
-  mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+  mln_test_event_batch batch = mln_test_event_batch_default();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_drain_events(runtime, 0, &batch)
+    MLN_STATUS_OK, mln_test_drain_events(runtime, 0, &batch)
   );
   TEST_ASSERT_GREATER_THAN_size_t(0, batch.event_count);
 

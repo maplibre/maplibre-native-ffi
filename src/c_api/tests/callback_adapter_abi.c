@@ -18,24 +18,13 @@ static const char alias_url[] = "maplibre://maps/style";
 static const char normalized_url[] =
   "https://demotiles.maplibre.org/style.json";
 
-// A handle the loader never issued: the listener below releases the copied
-// record without completing or releasing the handle it carries.
+// A handle the loader never issued. Releasing it after inspecting the copied
+// record is a no-op.
 static const mln_resource_request_handle unissued_handle = 1;
 
 static size_t queued_requests;
-// The record's strings die with the record, so the listener stores what it saw
-// rather than pointers into it.
 static bool last_requested_url_null;
 static bool last_requested_url_empty;
-
-static void count_queued_request(void* request) {
-  const mln_adapter_queued_resource_request* record = request;
-  queued_requests += 1;
-  last_requested_url_null = record->requested_url == NULL;
-  last_requested_url_empty =
-    !last_requested_url_null && record->requested_url[0] == '\0';
-  mln_adapter_resource_provider_request_destroy(request);
-}
 
 static mln_resource_request style_request(void) {
   return (mln_resource_request){
@@ -50,20 +39,40 @@ static mln_resource_request style_request(void) {
   };
 }
 
-// Reports the decision one route produces for one request, and increments
-// queued_requests when the route claimed it.
+// Reports the decision one route produces for one request, and drains the
+// copied record when the route claimed it.
 static uint32_t route_decision(
   mln_adapter_queued_resource_provider_route route,
   const mln_resource_request* request
 ) {
+  mln_notification_source source = MLN_HANDLE_NULL;
+  mln_adapter_resource_request_queue queue = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_create(&source));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_adapter_resource_request_queue_create(source, &queue)
+  );
   mln_adapter_queued_resource_provider provider = {
     .routes = &route,
     .route_count = 1,
-    .listener = count_queued_request,
+    .queue = queue,
   };
-  return mln_adapter_queued_resource_provider_callback(
+  const uint32_t decision = mln_adapter_queued_resource_provider_callback(
     &provider, request, unissued_handle
   );
+  mln_adapter_queued_resource_request* record = NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_adapter_resource_request_queue_acquire(queue, &record)
+  );
+  if (record != NULL) {
+    queued_requests += 1;
+    last_requested_url_null = record->requested_url == NULL;
+    last_requested_url_empty =
+      !last_requested_url_null && record->requested_url[0] == '\0';
+    mln_adapter_resource_provider_request_destroy(record);
+  }
+  mln_adapter_resource_request_queue_close(queue);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_close(source));
+  return decision;
 }
 
 static void assert_claims(

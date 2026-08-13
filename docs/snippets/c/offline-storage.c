@@ -5,56 +5,43 @@
 #include <stdbool.h>
 #include <string.h>
 
-// Pumps until the completion event for this operation arrives, and returns the
-// operation's own result status.
+// Pumps until the operation completes, then returns its terminal status.
 static mln_status await_operation(
-  mln_runtime runtime, mln_offline_operation_id operation_id
+  mln_runtime runtime, mln_operation operation
 ) {
-  for (;;) {
+  bool completed = false;
+  while (!completed) {
     mln_runtime_pump(runtime, 100);
-
-    mln_runtime_event_batch batch = mln_runtime_event_batch_default();
-    if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
+    if (mln_operation_poll(operation, &completed) != MLN_STATUS_OK) {
       return MLN_STATUS_NATIVE_ERROR;
     }
-
-    for (size_t index = 0; index < batch.event_count; index++) {
-      const char* bytes = (const char*)batch.events + index * batch.event_size;
-      const mln_runtime_event* event = (const mln_runtime_event*)bytes;
-      if (event->type != MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED) {
-        continue;
-      }
-      const mln_runtime_event_offline_operation_completed* completed =
-        &event->payload.offline_operation_completed;
-      if (completed->operation_id == operation_id) {
-        return (mln_status)completed->result_status;
-      }
-    }
   }
+
+  mln_status status = MLN_STATUS_NATIVE_ERROR;
+  return mln_operation_get_status(operation, &status) == MLN_STATUS_OK
+           ? status
+           : MLN_STATUS_NATIVE_ERROR;
 }
 
-// An operation with no result still holds runtime state until a discard.
 static mln_status finish_operation(
-  mln_runtime runtime, mln_offline_operation_id operation_id
+  mln_runtime runtime, mln_operation operation
 ) {
-  const mln_status status = await_operation(runtime, operation_id);
-  mln_runtime_offline_operation_discard(runtime, operation_id);
+  const mln_status status = await_operation(runtime, operation);
+  mln_operation_discard_result(operation);
+  mln_operation_release(operation);
   return status;
 }
 
 // Deletes every stored region whose metadata differs from keep_metadata, and
 // returns how many it deleted.
 size_t delete_other_regions(mln_runtime runtime, const char* keep_metadata) {
-  // The wait below ends on the completion event, so the subscription has to
-  // select that type.
-  mln_runtime_set_event_mask(
-    runtime, MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED
-  );
+  // Operation readiness comes from the runtime's notification source.
 
   // #region list
-  mln_offline_operation_id list_id = 0;
+  mln_operation list_operation = MLN_HANDLE_NULL;
   if (
-    mln_runtime_offline_regions_list_start(runtime, &list_id) != MLN_STATUS_OK
+    mln_runtime_offline_regions_list_start(runtime, &list_operation) !=
+    MLN_STATUS_OK
   ) {
     return 0;
   }
@@ -62,13 +49,15 @@ size_t delete_other_regions(mln_runtime runtime, const char* keep_metadata) {
 
   // #region result
   mln_offline_region_list list = MLN_HANDLE_NULL;
-  if (await_operation(runtime, list_id) == MLN_STATUS_OK) {
-    mln_runtime_offline_regions_list_take_result(runtime, list_id, &list);
+  if (await_operation(runtime, list_operation) == MLN_STATUS_OK) {
+    mln_runtime_offline_regions_list_take_result(list_operation, &list);
   }
   if (list == MLN_HANDLE_NULL) {
-    mln_runtime_offline_operation_discard(runtime, list_id);
+    mln_operation_discard_result(list_operation);
+    mln_operation_release(list_operation);
     return 0;
   }
+  mln_operation_release(list_operation);
   // #endregion result
 
   size_t deleted = 0;
@@ -92,11 +81,12 @@ size_t delete_other_regions(mln_runtime runtime, const char* keep_metadata) {
     }
 
     // #region delete
-    mln_offline_operation_id delete_id = 0;
+    mln_operation delete_operation = MLN_HANDLE_NULL;
     if (
-      mln_runtime_offline_region_delete_start(runtime, info.id, &delete_id) ==
-        MLN_STATUS_OK &&
-      finish_operation(runtime, delete_id) == MLN_STATUS_OK
+      mln_runtime_offline_region_delete_start(
+        runtime, info.id, &delete_operation
+      ) == MLN_STATUS_OK &&
+      finish_operation(runtime, delete_operation) == MLN_STATUS_OK
     ) {
       deleted++;
     }

@@ -30,6 +30,12 @@ enum class HandleKind : std::uint8_t {
   WakeSource = 11,
   ResourceRequest = 12,
   StyleStringList = 13,
+  Operation = 14,
+  NotificationSource = 15,
+  EventBatch = 16,
+  ReadyBatch = 17,
+  AdapterResourceRequestQueue = 18,
+  AdapterLogQueue = 19,
 };
 
 inline constexpr auto handle_generation_bits = std::uint32_t{36};

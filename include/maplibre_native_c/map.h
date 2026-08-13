@@ -443,133 +443,86 @@ typedef struct mln_offline_region_info {
  * Starts creating an offline region.
  *
  * Input strings, GeoJSON geometry bytes, and metadata are copied before this
- * call returns. Completion is reported through
- * MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED. On successful completion, call
+ * call returns. The returned operation uses the runtime's notification source.
+ * After successful completion, call
  * mln_runtime_offline_region_create_take_result() to take the snapshot.
  *
- * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, definition is
- *   null or invalid, metadata is null with a non-zero size, or
- *   out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * out_operation must point to the null handle. The caller releases the
+ * operation with mln_operation_release().
  */
 MLN_API mln_status mln_runtime_offline_region_create_start(
   mln_runtime runtime, const mln_offline_region_definition* definition,
-  const uint8_t* metadata, size_t metadata_size,
-  mln_offline_operation_id* out_operation_id
+  const uint8_t* metadata, size_t metadata_size, mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
 /**
  * Starts getting an offline region snapshot by ID.
  *
- * Completion is reported through MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
- * On successful completion, call
- * mln_runtime_offline_region_get_take_result().
- *
- * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * The returned operation uses the runtime's notification source. After
+ * successful completion, call mln_runtime_offline_region_get_take_result().
+ * out_operation must point to the null handle.
  */
 MLN_API mln_status mln_runtime_offline_region_get_start(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
 /**
  * Starts listing offline region snapshots in the runtime database.
  *
- * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * The returned operation uses the runtime's notification source.
+ * out_operation must point to the null handle.
  */
 MLN_API mln_status mln_runtime_offline_regions_list_start(
-  mln_runtime runtime, mln_offline_operation_id* out_operation_id
+  mln_runtime runtime, mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
 /**
  * Starts merging offline regions from another database path.
  *
  * The side database may be upgraded in place by native code and must be
- * writable when native merge requires it.
- *
- * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live,
- *   side_database_path is null, or out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * writable when native merge requires it. The returned operation uses the
+ * runtime's notification source. out_operation must point to the null handle.
  */
 MLN_API mln_status mln_runtime_offline_regions_merge_database_start(
   mln_runtime runtime, const char* side_database_path,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
 /**
  * Starts updating opaque binary metadata for an offline region.
  *
- * On successful completion, call
- * mln_runtime_offline_region_update_metadata_take_result().
- *
- * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, metadata is
- *   null with a non-zero size, or out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * After successful completion, call
+ * mln_runtime_offline_region_update_metadata_take_result(). The returned
+ * operation uses the runtime's notification source. out_operation must point
+ * to the null handle.
  */
 MLN_API mln_status mln_runtime_offline_region_update_metadata_start(
   mln_runtime runtime, mln_offline_region_id region_id, const uint8_t* metadata,
-  size_t metadata_size, mln_offline_operation_id* out_operation_id
+  size_t metadata_size, mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
 /**
- * Starts getting the current completed/download status for an offline region.
+ * Starts getting the current download status for an offline region.
  *
- * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * The returned operation uses the runtime's notification source.
+ * out_operation must point to the null handle.
  */
 MLN_API mln_status mln_runtime_offline_region_get_status_start(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
 /**
  * Enables or disables runtime events for an offline region.
  *
  * Observer callbacks are copied into runtime events. Disabling observation also
- * discards queued events for this region.
- *
- * Completion is reported through MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
- *
- * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * discards queued events for this region. The returned operation uses the
+ * runtime's notification source. out_operation must point to the null handle.
  */
 MLN_API mln_status mln_runtime_offline_region_set_observed_start(
   mln_runtime runtime, mln_offline_region_id region_id, bool observed,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
 /**
@@ -577,216 +530,102 @@ MLN_API mln_status mln_runtime_offline_region_set_observed_start(
  *
  * Register observation separately with
  * mln_runtime_offline_region_set_observed_start() to receive progress and error
- * events.
- *
- * Completion is reported through MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
- *
- * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, state is not
- *   a mln_offline_region_download_state value, or out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * events. The returned operation uses the runtime's notification source.
+ * out_operation must point to the null handle.
  */
 MLN_API mln_status mln_runtime_offline_region_set_download_state_start(
   mln_runtime runtime, mln_offline_region_id region_id, uint32_t state,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
 /**
  * Invalidates cached resources for an offline region.
  *
- * Completion is reported through MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
- *
- * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * The returned operation uses the runtime's notification source.
+ * out_operation must point to the null handle.
  */
 MLN_API mln_status mln_runtime_offline_region_invalidate_start(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
 /**
  * Deletes an offline region.
  *
- * Completion is reported through MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
- *
- * Returns:
- * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   out_operation_id is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * The returned operation uses the runtime's notification source.
+ * out_operation must point to the null handle.
  */
 MLN_API mln_status mln_runtime_offline_region_delete_start(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
 /**
- * Takes the snapshot result from a completed offline region create operation.
+ * Takes the snapshot from a completed create operation.
  *
- * Must only be called after the matching
- * mln_runtime_offline_region_create_start() operation has completed
- * successfully (MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED with result
- * status MLN_STATUS_OK). The caller owns the returned snapshot handle and must
- * destroy it with mln_offline_region_snapshot_destroy().
- *
- * On success, the operation entry is consumed. On failure, it remains live so
- * the caller may retry this call or discard the operation with
- * mln_runtime_offline_operation_discard(). Taking or discarding a result also
- * removes that operation's undrained completion event. The thread diagnostic
- * carries a failed operation's error text.
- *
- * Returns:
- * - MLN_STATUS_OK when the result was taken and out_region was set.
- * - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
- *   kind does not match a region snapshot.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or out_region
- *   is null.
+ * A successful take transfers the snapshot exactly once. A failed take leaves
+ * the operation result available for retry. The caller destroys the snapshot
+ * with mln_offline_region_snapshot_destroy(). This function may be called from
+ * any thread.
  */
 MLN_API mln_status mln_runtime_offline_region_create_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_snapshot* out_region
+  mln_operation operation, mln_offline_region_snapshot* out_region
 ) MLN_NOEXCEPT;
 
 /**
- * Takes the snapshot result from a completed offline region get operation.
+ * Takes the optional snapshot from a completed get operation.
  *
- * Must only be called after the matching
- * mln_runtime_offline_region_get_start() operation has completed successfully.
- * The caller owns the returned snapshot handle and must destroy it with
- * mln_offline_region_snapshot_destroy().
- *
- * On success, the operation entry is consumed. On failure, it remains live so
- * the caller may retry this call or discard the operation with
- * mln_runtime_offline_operation_discard(). Taking or discarding a result also
- * removes that operation's undrained completion event. The thread diagnostic
- * carries a failed operation's error text.
- *
- * Returns:
- * - MLN_STATUS_OK when the result was taken; out_found indicates whether a
- *   region existed for the requested ID.
- * - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
- *   kind does not match an optional region snapshot.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, out_region is
- *   null, or out_found is null.
+ * out_found reports whether the requested region existed. A successful take
+ * transfers the result exactly once. This function may be called from any
+ * thread.
  */
 MLN_API mln_status mln_runtime_offline_region_get_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_snapshot* out_region, bool* out_found
+  mln_operation operation, mln_offline_region_snapshot* out_region,
+  bool* out_found
 ) MLN_NOEXCEPT;
 
 /**
- * Takes the region list from a completed offline regions list operation.
+ * Takes the list from a completed regions-list operation.
  *
- * Must only be called after the matching
- * mln_runtime_offline_regions_list_start() operation has completed
- * successfully. The caller owns the returned list handle and must destroy it
- * with mln_offline_region_list_destroy().
- *
- * On success, the operation entry is consumed. On failure, it remains live so
- * the caller may retry this call or discard the operation with
- * mln_runtime_offline_operation_discard(). Taking or discarding a result also
- * removes that operation's undrained completion event. The thread diagnostic
- * carries a failed operation's error text.
- *
- * Returns:
- * - MLN_STATUS_OK when the result was taken and out_regions was set.
- * - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
- *   kind does not match a region list.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   out_regions is null.
+ * A successful take transfers the list exactly once. The caller destroys the
+ * list with mln_offline_region_list_destroy(). This function may be called from
+ * any thread.
  */
 MLN_API mln_status mln_runtime_offline_regions_list_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_list* out_regions
+  mln_operation operation, mln_offline_region_list* out_regions
 ) MLN_NOEXCEPT;
 
 /**
- * Takes the region list from a completed offline database merge operation.
+ * Takes the list from a completed database-merge operation.
  *
- * Must only be called after the matching
- * mln_runtime_offline_regions_merge_database_start() operation has completed
- * successfully. The caller owns the returned list handle and must destroy it
- * with mln_offline_region_list_destroy().
- *
- * On success, the operation entry is consumed. On failure, it remains live so
- * the caller may retry this call or discard the operation with
- * mln_runtime_offline_operation_discard(). Taking or discarding a result also
- * removes that operation's undrained completion event. The thread diagnostic
- * carries a failed operation's error text.
- *
- * Returns:
- * - MLN_STATUS_OK when the result was taken and out_regions was set.
- * - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
- *   kind does not match a region list.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- *   out_regions is null.
+ * A successful take transfers the list exactly once. The caller destroys the
+ * list with mln_offline_region_list_destroy(). This function may be called from
+ * any thread.
  */
 MLN_API mln_status mln_runtime_offline_regions_merge_database_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_list* out_regions
+  mln_operation operation, mln_offline_region_list* out_regions
 ) MLN_NOEXCEPT;
 
 /**
- * Takes the snapshot result from a completed offline region update-metadata
- * operation.
+ * Takes the snapshot from a completed metadata-update operation.
  *
- * Must only be called after the matching
- * mln_runtime_offline_region_update_metadata_start() operation has completed
- * successfully. The caller owns the returned snapshot handle and must destroy
- * it with mln_offline_region_snapshot_destroy().
- *
- * On success, the operation entry is consumed. On failure, it remains live so
- * the caller may retry this call or discard the operation with
- * mln_runtime_offline_operation_discard(). Taking or discarding a result also
- * removes that operation's undrained completion event. The thread diagnostic
- * carries a failed operation's error text.
- *
- * Returns:
- * - MLN_STATUS_OK when the result was taken and out_region was set.
- * - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
- *   kind does not match a region snapshot.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or out_region
- *   is null.
+ * A successful take transfers the snapshot exactly once. The caller destroys
+ * the snapshot with mln_offline_region_snapshot_destroy(). This function may be
+ * called from any thread.
  */
 MLN_API mln_status mln_runtime_offline_region_update_metadata_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_snapshot* out_region
+  mln_operation operation, mln_offline_region_snapshot* out_region
 ) MLN_NOEXCEPT;
 
 /**
- * Takes the status struct from a completed offline region get-status operation.
+ * Takes the status from a completed get-status operation.
  *
- * Must only be called after the matching
- * mln_runtime_offline_region_get_status_start() operation has completed
- * successfully. The caller provides a pre-allocated mln_offline_region_status
- * struct which is filled by this function.
- *
- * On success, the operation entry is consumed. On failure, it remains live so
- * the caller may retry this call or discard the operation with
- * mln_runtime_offline_operation_discard(). Taking or discarding a result also
- * removes that operation's undrained completion event. The thread diagnostic
- * carries a failed operation's error text.
- *
- * Returns:
- * - MLN_STATUS_OK when the result was taken and out_status was filled.
- * - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
- *   kind does not match a region status.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or out_status
- *   is null.
+ * A successful take copies the status exactly once. out_status->size must cover
+ * this version of mln_offline_region_status. This function may be called from
+ * any thread.
  */
 MLN_API mln_status mln_runtime_offline_region_get_status_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_status* out_status
+  mln_operation operation, mln_offline_region_status* out_status
 ) MLN_NOEXCEPT;
 
 /**

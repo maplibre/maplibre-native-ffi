@@ -23,6 +23,8 @@ HEADERS = (
     "diagnostics",
     "logging",
     "runtime",
+    "operation",
+    "notification",
     "map",
     "camera",
     "projection",

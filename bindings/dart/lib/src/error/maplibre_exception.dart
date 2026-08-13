@@ -20,6 +20,9 @@ final class MaplibreStatus {
   /// A native MapLibre error or C++ exception was converted to status.
   static const nativeError = MaplibreStatus._('nativeError', -5);
 
+  /// The operation completed after cancellation was requested.
+  static const cancelled = MaplibreStatus._('cancelled', -6);
+
   /// An unknown status value returned by a newer or incompatible native build.
   static MaplibreStatus unknown(int nativeStatusCode) =>
       MaplibreStatus._('unknown', nativeStatusCode);
@@ -39,6 +42,7 @@ final class MaplibreStatus {
         -3 => wrongThread,
         -4 => unsupported,
         -5 => nativeError,
+        -6 => cancelled,
         _ => unknown(nativeStatusCode),
       };
 

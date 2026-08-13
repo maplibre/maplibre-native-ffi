@@ -84,9 +84,9 @@ class RuntimeEventsTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(RuntimeEventMask.ALL - RuntimeEventMask.MAP_TILE_ACTION, map.eventMask)
       assertTrue(RuntimeEventType.MAP_STYLE_LOADED in map.eventMask)
 
-      runtime.eventMask = runtime.eventMask - RuntimeEventMask.OFFLINE_OPERATION_COMPLETED
+      runtime.eventMask = runtime.eventMask - RuntimeEventMask.OFFLINE_REGION_STATUS_CHANGED
       assertEquals(
-        RuntimeEventMask.ALL - RuntimeEventMask.OFFLINE_OPERATION_COMPLETED,
+        RuntimeEventMask.ALL - RuntimeEventMask.OFFLINE_REGION_STATUS_CHANGED,
         runtime.eventMask,
       )
     }
@@ -199,7 +199,7 @@ class RuntimeEventsTest : org.maplibre.nativeffi.NativeTestBase() {
   }
 
   @Test
-  fun drainAndBothMaskSettersReportTheWrongThread() {
+  fun drainIsAnyThreadAndBothMaskSettersReportTheWrongThread() {
     withMap { runtime, map ->
       val failure = AtomicReference<Throwable?>(null)
       runOnNativeThread(BackgroundEventCalls(runtime, map, failure))
@@ -274,7 +274,7 @@ private class BackgroundEventCalls(
 ) {
   fun run() {
     try {
-      assertFailsWith<WrongThreadException> { runtime.drainEvents() }
+      runtime.drainEvents()
       assertFailsWith<WrongThreadException> { runtime.eventMask = RuntimeEventMask.ALL }
       assertFailsWith<WrongThreadException> { map.eventMask = RuntimeEventMask.ALL }
     } catch (throwable: Throwable) {

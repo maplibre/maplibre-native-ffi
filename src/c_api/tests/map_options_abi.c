@@ -101,9 +101,9 @@ typedef struct transition_event_tally {
 static transition_event_tally drain_transition_events(mln_runtime runtime) {
   transition_event_tally tally = {0, 0, false, -1};
   for (;;) {
-    mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+    mln_test_event_batch batch = mln_test_event_batch_default();
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_runtime_drain_events(runtime, 0, &batch)
+      MLN_STATUS_OK, mln_test_drain_events(runtime, 0, &batch)
     );
     if (batch.event_count == 0) {
       return tally;

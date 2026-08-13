@@ -132,9 +132,9 @@ public sealed unsafe class RuntimeEventDrainTests
         map.SetEventMask(map.GetEventMask() & ~RuntimeEventMask.MapIdle);
         Assert.Equal(RuntimeEventMask.All & ~RuntimeEventMask.MapIdle, map.GetEventMask());
 
-        runtime.SetEventMask(runtime.GetEventMask() & ~RuntimeEventMask.OfflineOperationCompleted);
+        runtime.SetEventMask(runtime.GetEventMask() & ~RuntimeEventMask.OfflineRegionStatusChanged);
         Assert.Equal(
-            RuntimeEventMask.All & ~RuntimeEventMask.OfflineOperationCompleted,
+            RuntimeEventMask.All & ~RuntimeEventMask.OfflineRegionStatusChanged,
             runtime.GetEventMask()
         );
     }
@@ -169,7 +169,7 @@ public sealed unsafe class RuntimeEventDrainTests
 
     [BindingSpecTest("BND-092")]
     [Fact]
-    public void TheDrainAndBothMaskSettersRejectAThreadThatDoesNotOwnTheRuntime()
+    public void TheDrainIsAnyThreadAndBothMaskSettersRejectAForeignThread()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
@@ -184,8 +184,9 @@ public sealed unsafe class RuntimeEventDrainTests
         thread.Start();
         thread.Join();
 
+        Assert.Null(thrown[0]);
         Assert.All(
-            thrown,
+            thrown.Skip(1),
             error =>
                 Assert.Equal(
                     MaplibreStatus.WrongThread,

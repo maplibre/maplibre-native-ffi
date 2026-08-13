@@ -17,6 +17,11 @@ that will pump them.
 One runtime serves any number of maps and holds the shared work: the scheduler,
 the event queue, the network stack, and one cache database.
 
+Create one notification source for each host receiver and pass it in the runtime
+options. Runtime events and operations publish readiness through that source.
+The host can register a callback or drain ready endpoints from the source. A
+ready drain returns an owned batch; release it after reading its endpoint view.
+
 <Code code={region(createMap, "runtime")} lang="c" title="create-map.c" />
 
 ## Choose the options that outlive the call
@@ -46,7 +51,8 @@ Enable it at creation when your tile sets use that encoding.
 
 ## Release in order
 
-Destroy a map before the runtime that owns it. A runtime with live maps reports
-an invalid-state status.
+Destroy a map before the runtime that owns it. Destroy the runtime before
+closing its notification source. A runtime with live maps reports an
+invalid-state status.
 
 <Code code={region(createMap, "release")} lang="c" title="create-map.c" />

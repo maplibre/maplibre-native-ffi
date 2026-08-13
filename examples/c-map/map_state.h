@@ -10,6 +10,7 @@
 #include "types.h"
 
 typedef struct map_state {
+  mln_notification_source notification_source;
   mln_runtime runtime;
   mln_map map;
 } map_state;
@@ -19,8 +20,7 @@ typedef struct map_state {
 );
 void map_state_deinit(map_state* state);
 
-/// Applies every queued camera command on the map's owner thread. `batch` is
-/// owned by the runtime loop and reused across drains.
+/// Applies every queued camera command on the map's owner thread.
 [[nodiscard]] app_error map_state_apply_commands(
   map_state* state, command_queue* commands, command_list* batch
 );

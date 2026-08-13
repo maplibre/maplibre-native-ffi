@@ -8,6 +8,9 @@
 #include <string.h>
 
 #include "maplibre_native_c.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define MLN_BUFFER_LITERAL(literal) \
   ((mln_buffer_view){.data = (literal), .size = sizeof(literal) - 1})
@@ -32,6 +35,40 @@ void mln_test_sleep_milliseconds(unsigned int milliseconds);
 // Monotonic milliseconds, for tests that assert a pump returned promptly rather
 // than sat out its timeout.
 uint64_t mln_test_monotonic_milliseconds(void);
+// Synthetic operation and endpoint controls exercise completion and
+// notification races without depending on one MapLibre file-source schedule.
+typedef struct mln_test_operation_control mln_test_operation_control;
+typedef struct mln_test_endpoint_control mln_test_endpoint_control;
+
+mln_status mln_test_operation_create(
+  mln_notification_source source, bool cancellable,
+  mln_operation* out_operation, mln_test_operation_control** out_control
+);
+void mln_test_operation_complete(
+  mln_test_operation_control* control, mln_status status, const char* diagnostic
+);
+unsigned int mln_test_operation_cancel_count(
+  const mln_test_operation_control* control
+);
+void mln_test_operation_block_cancel(
+  mln_test_operation_control* control, atomic_bool* entered,
+  const atomic_bool* release
+);
+void mln_test_operation_control_destroy(mln_test_operation_control* control);
+
+mln_status mln_test_endpoint_create(
+  mln_notification_source source, uint64_t id, uint32_t kind, bool sticky,
+  mln_test_endpoint_control** out_control
+);
+void mln_test_endpoint_mark_ready(mln_test_endpoint_control* control);
+void mln_test_endpoint_clear_ready(mln_test_endpoint_control* control);
+void mln_test_endpoint_control_destroy(mln_test_endpoint_control* control);
+
+// Holds the source's real ready-drain lease until release is set.
+void mln_test_hold_notification_ready_drain(
+  mln_notification_source source, atomic_bool* entered,
+  const atomic_bool* release
+);
 
 // These helpers track what they create per calling thread so the suite can
 // reclaim handles a test left behind. The matching destroy helpers untrack.
@@ -76,6 +113,20 @@ bool mln_test_egl_context_is_current(void);
 // the flag was observed.
 bool mln_test_pump_until(mln_runtime runtime, atomic_bool* flag);
 
+typedef struct mln_test_event_batch {
+  uint32_t size;
+  uint32_t event_size;
+  const mln_runtime_event* events;
+  size_t event_count;
+  const char* messages;
+  size_t messages_size;
+  size_t remaining_count;
+} mln_test_event_batch;
+
+mln_test_event_batch mln_test_event_batch_default(void);
+mln_status mln_test_drain_events(
+  mln_runtime runtime, size_t max_events, mln_test_event_batch* out_batch
+);
 // Drains until a batch reports no events, and returns how many it discarded. A
 // bounded batch still empties the queue, because each drain reports what stayed
 // behind.
@@ -93,6 +144,11 @@ bool mln_test_drain_find(
   mln_runtime_event* out_event, char* out_message, size_t message_capacity
 );
 
+// Holds the runtime event queue's real drain lease until `release` is set.
+void mln_test_hold_runtime_event_drain(
+  mln_runtime runtime, atomic_bool* entered, const atomic_bool* release
+);
+
 // Destroys everything this thread still has tracked, render session first, then
 // map, then runtime, and reports whether it reclaimed anything. Reports through
 // its return value rather than assertions, which would longjmp out of teardown.
@@ -103,5 +159,9 @@ bool mln_test_reclaim_thread_resources(void);
 // Emscripten keepalive and pthread_join on that thread blocks forever. A no-op
 // where the backend caches nothing per thread.
 void mln_test_release_thread_gpu_resources(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

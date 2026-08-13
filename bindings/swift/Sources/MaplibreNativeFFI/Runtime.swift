@@ -49,7 +49,6 @@ public enum RuntimeEventType: Sendable, Hashable {
   case offlineRegionStatusChanged
   case offlineRegionResponseError
   case offlineRegionTileCountLimitExceeded
-  case offlineOperationCompleted
   case mapCameraTransitionFinished
   case unknown(UInt32)
 
@@ -76,7 +75,6 @@ public enum RuntimeEventType: Sendable, Hashable {
     case 19: .offlineRegionStatusChanged
     case 20: .offlineRegionResponseError
     case 21: .offlineRegionTileCountLimitExceeded
-    case 22: .offlineOperationCompleted
     case 23: .mapCameraTransitionFinished
     default: .unknown(rawValue)
     }
@@ -150,8 +148,6 @@ public struct RuntimeEventMask: OptionSet, Sendable, Hashable {
     native(MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR)
   public static let offlineRegionTileCountLimitExceeded =
     native(MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
-  public static let offlineOperationCompleted =
-    native(MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED)
 
   /// Every map-originated event type, which is what
   /// ``MapHandle/setEventMask(_:)`` reads.
@@ -383,22 +379,6 @@ public struct OfflineRegionTileCountLimitEvent: Equatable, Sendable {
   }
 }
 
-public struct OfflineOperationCompletedEvent: Equatable, Sendable {
-  public let operationId: UInt64
-  public let operationKind: UInt32
-  public let resultKind: UInt32
-  public let resultStatus: Int32
-  public let found: Bool
-
-  init(native: NativeOfflineOperationCompletedEvent) {
-    operationId = native.operationId
-    operationKind = native.operationKind
-    resultKind = native.resultKind
-    resultStatus = native.resultStatus
-    found = native.found
-  }
-}
-
 /// Payload of a `.mapCameraTransitionFinished` event.
 public struct CameraTransitionFinishedEvent: Equatable, Sendable {
   /// The `AnimationOptions.transitionId` that started the finished transition.
@@ -417,7 +397,6 @@ public enum RuntimeEventPayload: Equatable, Sendable {
   case offlineRegionStatus(OfflineRegionStatusEvent)
   case offlineRegionResponseError(OfflineRegionResponseErrorEvent)
   case offlineRegionTileCountLimit(OfflineRegionTileCountLimitEvent)
-  case offlineOperationCompleted(OfflineOperationCompletedEvent)
   case cameraTransitionFinished(CameraTransitionFinishedEvent)
   /// A payload kind this version of the binding does not name, carrying the
   /// payload's fixed byte window so a host forwards it unchanged.
@@ -445,11 +424,6 @@ public enum RuntimeEventPayload: Equatable, Sendable {
         .offlineRegionTileCountLimit(
           OfflineRegionTileCountLimitEvent(native: event)
         )
-    case let .offlineOperationCompleted(event):
-      self =
-        .offlineOperationCompleted(
-          OfflineOperationCompletedEvent(native: event)
-        )
     case let .cameraTransitionFinished(event):
       self =
         .cameraTransitionFinished(
@@ -472,16 +446,13 @@ public struct RuntimeEvent: Equatable, Sendable {
   /// - `.mapLoadingFailed` carries the ordinal of MapLibre Native's internal
   ///   map load error kind, which this API leaves unnamed; `message` holds the
   ///   failure text.
-  /// - `.offlineOperationCompleted` carries the operation result as a native
-  ///   status value, the same value the payload reports in `resultStatus`.
   /// - Every other event type leaves it 0.
   public let code: Int32
   /// Text this event carries, empty when it carries none.
   ///
   /// It is the failure text of `.mapLoadingFailed`, `.mapRenderError`,
-  /// `.mapStillImageFailed`, `.offlineRegionResponseError`, and a failed
-  /// `.offlineOperationCompleted`, the image ID of `.mapStyleImageMissing`, and
-  /// the source ID of `.mapTileAction`.
+  /// `.mapStillImageFailed`, and `.offlineRegionResponseError`, the image ID of
+  /// `.mapStyleImageMissing`, and the source ID of `.mapTileAction`.
   public let message: String
   public let payload: RuntimeEventPayload
 
@@ -499,9 +470,8 @@ public struct RuntimeEvent: Equatable, Sendable {
 
 /// One drained batch of runtime events.
 ///
-/// The C API lends its batch until the next drain; this is a copy of it, so a
-/// host keeps events, their messages, and their payloads for as long as it
-/// likes.
+/// This is a copy of an owned C event batch, so a host keeps events, their
+/// messages, and their payloads for as long as it likes.
 public struct RuntimeEventBatch: Equatable, Sendable {
   /// The drained events, in queue order.
   public let events: [RuntimeEvent]
@@ -512,17 +482,32 @@ public struct RuntimeEventBatch: Equatable, Sendable {
 
 public final class RuntimeHandle {
   private let handle: NativeHandleBox<NativeRuntimeHandle>
+  private var notificationSource: mln_notification_source
+  private let operationLock = NSLock()
+  private var operationCount = 0
   private var resourceTransform: NativeResourceTransformState?
   private var httpHeaderTransform: NativeHttpHeaderTransformState?
   private var resourceProvider: NativeResourceProviderState?
 
   public init(options: RuntimeOptions = RuntimeOptions()) throws {
-    let runtime = try mapNativeFailure {
-      try options.nativeInput.withNativeOptions { nativeOptions in
-        try NativeRuntime.create(nativeOptions)
-      }
+    var source: mln_notification_source = 0
+    try mapNativeFailure {
+      try checkStatus(mln_notification_source_create(&source))
     }
-    handle = try NativeHandleBox(typeName: "RuntimeHandle", handle: runtime)
+    do {
+      let runtime = try mapNativeFailure {
+        try options.nativeInput.withNativeOptions(
+          notificationSource: source
+        ) { nativeOptions in
+          try NativeRuntime.create(nativeOptions)
+        }
+      }
+      handle = try NativeHandleBox(typeName: "RuntimeHandle", handle: runtime)
+      notificationSource = source
+    } catch {
+      _ = mln_notification_source_close(source)
+      throw error
+    }
   }
 
   public var isClosed: Bool {
@@ -530,8 +515,22 @@ public final class RuntimeHandle {
   }
 
   public func close() throws {
-    try handle.closeOnce { handle in
-      try checkStatus(mln_runtime_destroy(handle.raw))
+    try operationLock.withLock {
+      guard operationCount == 0 else {
+        throw MaplibreError(
+          kind: .invalidState,
+          rawStatus: nil,
+          diagnostic: "RuntimeHandle has open operations"
+        )
+      }
+      try handle.closeOnce { handle in
+        try checkStatus(mln_runtime_destroy(handle.raw))
+      }
+    }
+    let source = notificationSource
+    if source != 0 {
+      try checkStatus(mln_notification_source_close(source))
+      notificationSource = 0
     }
     resourceTransform = nil
     httpHeaderTransform = nil
@@ -540,6 +539,25 @@ public final class RuntimeHandle {
 
   func requireLiveHandle() throws -> NativeRuntimeHandle {
     try handle.requireLive()
+  }
+
+  func registerOperation() throws {
+    try operationLock.withLock {
+      guard !handle.isClosed else {
+        throw MaplibreError(
+          kind: .invalidState,
+          rawStatus: nil,
+          diagnostic: "RuntimeHandle is closed"
+        )
+      }
+      operationCount += 1
+    }
+  }
+
+  func unregisterOperation() {
+    operationLock.withLock {
+      operationCount -= 1
+    }
   }
 
   /// Advances this runtime: parks the owner thread when `timeout` allows it,
@@ -585,8 +603,8 @@ public final class RuntimeHandle {
     }
   }
 
-  /// Drains this runtime's queued events, copying every event out of the
-  /// runtime-owned arena before the call returns.
+  /// Drains this runtime's queued events, copying every event out of the owned
+  /// native batch before the call returns.
   ///
   /// Events arrive in queue order, from this runtime and from every map it
   /// owns. `maxEvents` bounds the drain: zero drains everything, and a positive

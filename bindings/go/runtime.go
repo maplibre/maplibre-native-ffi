@@ -37,121 +37,258 @@ const (
 	AmbientCacheOperationClear         AmbientCacheOperation = AmbientCacheOperation(C.MLN_AMBIENT_CACHE_OPERATION_CLEAR)
 )
 
-// OfflineOperationKind identifies a native offline operation kind.
-type OfflineOperationKind uint32
+type operationKind uint8
 
 const (
-	OfflineOperationAmbientCache               OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_AMBIENT_CACHE)
-	OfflineOperationRegionCreate               OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_CREATE)
-	OfflineOperationRegionGet                  OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_GET)
-	OfflineOperationRegionsList                OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGIONS_LIST)
-	OfflineOperationRegionsMergeDatabase       OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE)
-	OfflineOperationRegionUpdateMetadata       OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA)
-	OfflineOperationRegionGetStatus            OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_GET_STATUS)
-	OfflineOperationRegionSetObserved          OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED)
-	OfflineOperationRegionSetDownloadState     OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE)
-	OfflineOperationRegionInvalidate           OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_INVALIDATE)
-	OfflineOperationRegionDelete               OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_DELETE)
-	OfflineOperationSetMaximumAmbientCacheSize OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE)
+	operationAmbientCache operationKind = iota + 1
+	operationRegionCreate
+	operationRegionGet
+	operationRegionsList
+	operationRegionsMergeDatabase
+	operationRegionUpdateMetadata
+	operationRegionGetStatus
+	operationRegionSetObserved
+	operationRegionSetDownloadState
+	operationRegionInvalidate
+	operationRegionDelete
+	operationSetMaximumAmbientCacheSize
 )
 
-// OfflineOperationResultKind identifies the expected result shape for an
-// offline operation.
-type OfflineOperationResultKind uint32
+type operationResultKind uint8
 
 const (
-	OfflineOperationResultNone           OfflineOperationResultKind = OfflineOperationResultKind(C.MLN_OFFLINE_OPERATION_RESULT_NONE)
-	OfflineOperationResultRegion         OfflineOperationResultKind = OfflineOperationResultKind(C.MLN_OFFLINE_OPERATION_RESULT_REGION)
-	OfflineOperationResultOptionalRegion OfflineOperationResultKind = OfflineOperationResultKind(C.MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION)
-	OfflineOperationResultRegionList     OfflineOperationResultKind = OfflineOperationResultKind(C.MLN_OFFLINE_OPERATION_RESULT_REGION_LIST)
-	OfflineOperationResultRegionStatus   OfflineOperationResultKind = OfflineOperationResultKind(C.MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS)
+	operationResultNone operationResultKind = iota
+	operationResultRegion
+	operationResultOptionalRegion
+	operationResultRegionList
+	operationResultRegionStatus
 )
 
-// OfflineOperationHandle owns a runtime-scoped offline operation token.
-type OfflineOperationHandle[T any] struct {
-	runtime    *RuntimeHandle
-	child      *handle.Child
-	id         uint64
-	kind       OfflineOperationKind
-	resultKind OfflineOperationResultKind
-	mu         sync.Mutex
-	live       bool
-	discarded  bool
+// OperationHandle owns a common asynchronous native operation.
+type OperationHandle[T any] struct {
+	child          *handle.Child
+	id             uint64
+	kind           operationKind
+	resultKind     operationResultKind
+	mu             sync.Mutex
+	cond           *sync.Cond
+	activeUses     int
+	live           bool
+	releasing      bool
+	consuming      bool
+	resultConsumed bool
 }
 
-func newOfflineOperationHandle[T any](runtime *RuntimeHandle, id uint64, kind OfflineOperationKind, resultKind OfflineOperationResultKind) *OfflineOperationHandle[T] {
+func newOperationHandle[T any](runtime *RuntimeHandle, id uint64, kind operationKind, resultKind operationResultKind) *OperationHandle[T] {
 	var child *handle.Child
 	if runtime != nil && runtime.state != nil {
 		child = runtime.state.AddChild()
 	}
-	return &OfflineOperationHandle[T]{runtime: runtime, child: child, id: id, kind: kind, resultKind: resultKind, live: true}
+	operation := &OperationHandle[T]{child: child, id: id, kind: kind, resultKind: resultKind, live: true}
+	operation.cond = sync.NewCond(&operation.mu)
+	return operation
 }
 
-// ID returns the native offline operation ID.
-func (operation *OfflineOperationHandle[T]) ID() uint64 {
+func (operation *OperationHandle[T]) beginUse() (uint64, error) {
 	if operation == nil {
-		return 0
+		return 0, newBindingError(ErrInvalidArgument, "OperationHandle is nil")
 	}
 	operation.mu.Lock()
 	defer operation.mu.Unlock()
-	return operation.id
+	if !operation.live || operation.releasing {
+		return 0, newBindingError(ErrInvalidArgument, "OperationHandle is closed")
+	}
+	operation.activeUses++
+	return operation.id, nil
 }
 
-// Kind returns the native offline operation kind.
-func (operation *OfflineOperationHandle[T]) Kind() OfflineOperationKind {
+func (operation *OperationHandle[T]) endUse() {
+	operation.mu.Lock()
+	operation.activeUses--
+	operation.cond.Broadcast()
+	operation.mu.Unlock()
+}
+
+func (operation *OperationHandle[T]) beginResultUse() (uint64, operationKind, operationResultKind, bool, error) {
 	if operation == nil {
-		return 0
+		return 0, 0, 0, false, newBindingError(ErrInvalidArgument, "OperationHandle is nil")
 	}
 	operation.mu.Lock()
 	defer operation.mu.Unlock()
-	return operation.kind
+	for operation.consuming && operation.live && !operation.releasing {
+		operation.cond.Wait()
+	}
+	if !operation.live || operation.releasing {
+		return 0, 0, 0, false, newBindingError(ErrInvalidArgument, "OperationHandle is closed")
+	}
+	if operation.resultConsumed {
+		return operation.id, operation.kind, operation.resultKind, true, nil
+	}
+	operation.consuming = true
+	operation.activeUses++
+	return operation.id, operation.kind, operation.resultKind, false, nil
 }
 
-// ResultKind returns the expected native result shape.
-func (operation *OfflineOperationHandle[T]) ResultKind() OfflineOperationResultKind {
+func (operation *OperationHandle[T]) endResultUse(consumed bool) {
+	operation.mu.Lock()
+	if consumed {
+		operation.resultConsumed = true
+	}
+	operation.consuming = false
+	operation.activeUses--
+	operation.cond.Broadcast()
+	operation.mu.Unlock()
+}
+
+// Poll reports whether this operation reached a terminal disposition.
+func (operation *OperationHandle[T]) Poll() (bool, error) {
+	id, err := operation.beginUse()
+	if err != nil {
+		return false, err
+	}
+	defer operation.endUse()
+	var completed C.bool
+	err = checkNative(func() int32 {
+		return int32(C.mln_operation_poll(C.mln_operation(id), &completed))
+	})
+	return bool(completed), err
+}
+
+// Wait waits up to timeout for this operation to complete. A negative timeout
+// waits without a deadline. Cancel may run concurrently with Wait.
+func (operation *OperationHandle[T]) Wait(timeout time.Duration) (bool, error) {
+	id, err := operation.beginUse()
+	if err != nil {
+		return false, err
+	}
+	defer operation.endUse()
+	timeoutMillis := int64(timeout / time.Millisecond)
+	if timeout < 0 {
+		timeoutMillis = -1
+	}
+	var completed C.bool
+	err = checkNative(func() int32 {
+		return int32(C.mln_operation_wait(C.mln_operation(id), C.int64_t(timeoutMillis), &completed))
+	})
+	return bool(completed), err
+}
+
+// Cancel requests cancellation of this operation.
+func (operation *OperationHandle[T]) Cancel() error {
+	id, err := operation.beginUse()
+	if err != nil {
+		return err
+	}
+	defer operation.endUse()
+	return checkNative(func() int32 {
+		return int32(C.mln_operation_cancel(C.mln_operation(id)))
+	})
+}
+
+// Status returns the terminal native status of this completed operation.
+func (operation *OperationHandle[T]) Status() (int32, error) {
+	id, err := operation.beginUse()
+	if err != nil {
+		return 0, err
+	}
+	defer operation.endUse()
+	var result C.mln_status
+	err = checkNative(func() int32 {
+		return int32(C.mln_operation_get_status(C.mln_operation(id), &result))
+	})
+	return int32(result), err
+}
+
+// Diagnostic returns a copy of this completed operation's diagnostic text.
+func (operation *OperationHandle[T]) Diagnostic() (string, error) {
+	rawID, err := operation.beginUse()
+	if err != nil {
+		return "", err
+	}
+	defer operation.endUse()
+	id := C.mln_operation(rawID)
+	var size C.size_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_operation_copy_diagnostic(id, nil, 0, &size))
+	}); err != nil {
+		return "", err
+	}
+	if size == 0 {
+		return "", nil
+	}
+	if uint64(size) > uint64(^uint(0)>>1) {
+		return "", newBindingError(ErrInvalidState, "operation diagnostic is too large")
+	}
+	buffer := make([]byte, int(size))
+	if err := checkNative(func() int32 {
+		return int32(C.mln_operation_copy_diagnostic(
+			id,
+			(*C.char)(unsafe.Pointer(&buffer[0])),
+			C.size_t(len(buffer)),
+			&size,
+		))
+	}); err != nil {
+		return "", err
+	}
+	if uint64(size) > uint64(len(buffer)) {
+		return "", newBindingError(ErrInvalidState, "operation diagnostic size changed while copying")
+	}
+	return string(buffer[:int(size)]), nil
+}
+
+// Discard destroys an untaken result from a completed operation. The operation
+// remains live for status and diagnostic inspection until Release is called.
+func (operation *OperationHandle[T]) Discard() error {
+	id, _, _, consumed, err := operation.beginResultUse()
+	if err != nil {
+		return err
+	}
+	if consumed {
+		return newBindingError(ErrInvalidState, "operation result was already consumed")
+	}
+	success := false
+	defer func() { operation.endResultUse(success) }()
+	if err := checkNative(func() int32 { return operationDiscard(id) }); err != nil {
+		return err
+	}
+	success = true
+	return nil
+}
+
+// Release detaches this observer and releases any untaken result. Releasing a
+// pending operation requests cancellation when supported. Release waits for
+// every native call that already started.
+func (operation *OperationHandle[T]) Release() {
 	if operation == nil {
-		return 0
+		return
 	}
 	operation.mu.Lock()
-	defer operation.mu.Unlock()
-	return operation.resultKind
-}
-
-// Discard drops runtime-owned state for this operation. The operation remains
-// retryable when native discard fails.
-func (operation *OfflineOperationHandle[T]) Discard() error {
-	if operation == nil || operation.runtime == nil {
-		return newBindingError(ErrInvalidArgument, "OfflineOperationHandle is nil")
+	for operation.releasing {
+		operation.cond.Wait()
 	}
-	operation.mu.Lock()
 	if !operation.live {
-		discarded := operation.discarded
 		operation.mu.Unlock()
-		if discarded {
-			return nil
-		}
-		return newBindingError(ErrInvalidArgument, "OfflineOperationHandle is closed")
+		return
+	}
+	operation.releasing = true
+	for operation.activeUses > 0 {
+		operation.cond.Wait()
 	}
 	id := operation.id
-
-	ptr, release, err := operation.runtime.ptr()
-	if err != nil {
-		operation.mu.Unlock()
-		return err
-	}
-	defer release()
-	defer operation.runtime.state.KeepAlive()
-	if err := checkNative(func() int32 { return offlineOperationDiscard(ptr, id) }); err != nil {
-		operation.mu.Unlock()
-		return err
-	}
-	operation.live = false
-	operation.discarded = true
 	child := operation.child
 	operation.child = nil
+	operation.live = false
 	operation.mu.Unlock()
-	child.Release()
-	return nil
+
+	C.mln_operation_release(C.mln_operation(id))
+	if child != nil {
+		child.Release()
+	}
+
+	operation.mu.Lock()
+	operation.releasing = false
+	operation.cond.Broadcast()
+	operation.mu.Unlock()
 }
 
 // RuntimeOptions configures runtime creation.
@@ -231,7 +368,6 @@ const (
 	RuntimeEventOfflineRegionStatusChanged          RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED)
 	RuntimeEventOfflineRegionResponseError          RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR)
 	RuntimeEventOfflineRegionTileCountLimitExceeded RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
-	RuntimeEventOfflineOperationCompleted           RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED)
 	RuntimeEventMapCameraTransitionFinished         RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED)
 )
 
@@ -269,7 +405,6 @@ const (
 	RuntimeEventMaskOfflineRegionStatusChanged          RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED)
 	RuntimeEventMaskOfflineRegionResponseError          RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR)
 	RuntimeEventMaskOfflineRegionTileCountLimitExceeded RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
-	RuntimeEventMaskOfflineOperationCompleted           RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED)
 	// RuntimeEventMaskAllMapEvents selects every map-originated event type this
 	// binding version defines.
 	RuntimeEventMaskAllMapEvents RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS)
@@ -305,7 +440,6 @@ const (
 	RuntimeEventPayloadOfflineRegionStatus         RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS)
 	RuntimeEventPayloadOfflineRegionResponseError  RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR)
 	RuntimeEventPayloadOfflineRegionTileCountLimit RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT)
-	RuntimeEventPayloadOfflineOperationCompleted   RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED)
 	RuntimeEventPayloadCameraTransitionFinished    RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED)
 )
 
@@ -335,9 +469,8 @@ type RuntimeEvent struct {
 	Source     RuntimeEventSource
 	// Code is a secondary event detail whose meaning Type selects: a
 	// CameraChangeMode for the camera-will-change and camera-did-change events,
-	// the ordinal of MapLibre Native's internal map load error kind for
-	// map-loading-failed, and the result status for
-	// offline-operation-completed. Every other event type reports 0.
+	// or the ordinal of MapLibre Native's internal map load error kind for
+	// map-loading-failed. Every other event type reports 0.
 	Code        int32
 	PayloadType RuntimeEventPayloadType
 	// Message is the event's text: a failure description, a missing style image
@@ -467,16 +600,6 @@ type RuntimeEventOfflineRegionTileCountLimitPayload struct {
 	Limit    uint64
 }
 
-// RuntimeEventOfflineOperationCompletedPayload is a copied offline operation
-// completion event payload.
-type RuntimeEventOfflineOperationCompletedPayload struct {
-	OperationID   uint64
-	OperationKind OfflineOperationKind
-	ResultKind    OfflineOperationResultKind
-	ResultStatus  int32
-	Found         bool
-}
-
 // RuntimeEventUnknownPayload contains copied bytes for a payload type unknown to
 // this Go binding version. Bytes is the event's whole payload window, which is
 // the batch's event stride minus this binding's payload offset.
@@ -486,7 +609,8 @@ type RuntimeEventUnknownPayload struct {
 
 // RuntimeHandle owns scheduler state and event storage for one owner thread.
 type RuntimeHandle struct {
-	state *handle.State[nativeRuntime]
+	state              *handle.State[nativeRuntime]
+	notificationSource nativeNotificationSource
 
 	resourceTransformMu   sync.Mutex
 	resourceTransform     *callback.ResourceTransformState
@@ -503,8 +627,8 @@ var destroyRuntimeHandle = func(native nativeRuntime) int32 {
 	return int32(C.mln_runtime_destroy(C.mln_runtime(native)))
 }
 
-var offlineOperationDiscard = func(ptr nativeRuntime, id uint64) int32 {
-	return int32(C.mln_runtime_offline_operation_discard(C.mln_runtime(ptr), C.mln_offline_operation_id(id)))
+var operationDiscard = func(id uint64) int32 {
+	return int32(C.mln_operation_discard_result(C.mln_operation(id)))
 }
 
 // String returns a diagnostic name for the status.
@@ -552,14 +676,7 @@ func rawNetworkStatusForSet(status NetworkStatus) (uint32, error) {
 
 // NewRuntime creates a runtime on the current OS thread using native defaults.
 func NewRuntime() (*RuntimeHandle, error) {
-	return createRuntime(CVersion(), func(out *nativeRuntime) int32 {
-		var raw C.mln_runtime
-		status := int32(C.mln_runtime_create(nil, &raw))
-		if status == int32(C.MLN_STATUS_OK) {
-			*out = nativeRuntime(raw)
-		}
-		return status
-	})
+	return NewRuntimeWithOptions(NewRuntimeOptions("", ""))
 }
 
 // NewRuntimeWithOptions creates a runtime on the current OS thread using
@@ -569,7 +686,13 @@ func NewRuntimeWithOptions(options RuntimeOptions) (*RuntimeHandle, error) {
 	if err := options.validate(); err != nil {
 		return nil, err
 	}
-	return createRuntime(CVersion(), func(out *nativeRuntime) int32 {
+	var source C.mln_notification_source
+	if err := checkNative(func() int32 {
+		return int32(C.mln_notification_source_create(&source))
+	}); err != nil {
+		return nil, err
+	}
+	runtime, err := createRuntime(CVersion(), func(out *nativeRuntime) int32 {
 		rawOptions := C.mln_runtime_options_default()
 		assetPath := C.CString(options.AssetPath)
 		defer C.free(unsafe.Pointer(assetPath))
@@ -578,6 +701,7 @@ func NewRuntimeWithOptions(options RuntimeOptions) (*RuntimeHandle, error) {
 		rawOptions.asset_path = assetPath
 		rawOptions.cache_path = cachePath
 		rawOptions.event_mask = C.uint64_t(options.EventMask)
+		rawOptions.notification_source = source
 
 		var raw C.mln_runtime
 		status := int32(C.mln_runtime_create(&rawOptions, &raw))
@@ -586,6 +710,12 @@ func NewRuntimeWithOptions(options RuntimeOptions) (*RuntimeHandle, error) {
 		}
 		return status
 	})
+	if err != nil {
+		_ = C.mln_notification_source_close(source)
+		return nil, err
+	}
+	runtime.notificationSource = nativeNotificationSource(source)
+	return runtime, nil
 }
 
 type runtimeStateFactory func(nativeRuntime) (*handle.State[nativeRuntime], error)
@@ -605,6 +735,7 @@ func createRuntimeWithStateFactory(actualCABI uint32, create func(*nativeRuntime
 	}
 	state, err := newState(runtime)
 	if err != nil {
+		_ = destroyRuntimeHandle(runtime)
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
 	return &RuntimeHandle{state: state}, nil
@@ -741,10 +872,11 @@ func (runtime *RuntimeHandle) DrainEvents(maxEvents int) (RuntimeEventBatch, err
 	defer release()
 	defer runtime.state.KeepAlive()
 
-	rawBatch, err := drainRawEvents(ptr, maxEvents)
+	rawBatch, ownedBatch, err := drainRawEvents(ptr, maxEvents)
 	if err != nil {
 		return RuntimeEventBatch{}, err
 	}
+	defer C.mln_event_batch_release(ownedBatch)
 	return runtime.copyEventBatch(rawBatch), nil
 }
 
@@ -754,9 +886,7 @@ func (runtime *RuntimeHandle) DrainEvents(maxEvents int) (RuntimeEventBatch, err
 // outside RuntimeEventMaskAll.
 //
 // Narrowing gates later events and keeps queued ones, so a caller drains what it
-// already caused. An offline operation records its result before this mask is
-// consulted, so the matching take-result call reports the result of an operation
-// whose completion event this mask cleared.
+// already caused.
 func (runtime *RuntimeHandle) SetEventMask(mask RuntimeEventMask) error {
 	ptr, release, err := runtime.ptr()
 	if err != nil {
@@ -789,14 +919,19 @@ func (runtime *RuntimeHandle) EventMask() (RuntimeEventMask, error) {
 	return RuntimeEventMask(raw), nil
 }
 
-func drainRawEvents(ptr nativeRuntime, maxEvents int) (C.mln_runtime_event_batch, error) {
-	batch := C.mln_runtime_event_batch_default()
+func drainRawEvents(ptr nativeRuntime, maxEvents int) (C.mln_runtime_event_batch_view, C.mln_event_batch, error) {
+	var batch C.mln_event_batch
 	if err := checkNative(func() int32 {
 		return int32(C.mln_runtime_drain_events(C.mln_runtime(ptr), C.size_t(maxEvents), &batch))
 	}); err != nil {
-		return C.mln_runtime_event_batch{}, err
+		return C.mln_runtime_event_batch_view{}, 0, err
 	}
-	return batch, nil
+	view := C.mln_runtime_event_batch_view{size: C.uint32_t(C.sizeof_mln_runtime_event_batch_view)}
+	if err := checkNative(func() int32 { return int32(C.mln_event_batch_get(batch, &view)) }); err != nil {
+		C.mln_event_batch_release(batch)
+		return C.mln_runtime_event_batch_view{}, 0, err
+	}
+	return view, batch, nil
 }
 
 // runtimeEventPayloadOffset is where the payload union starts inside an event
@@ -804,9 +939,9 @@ func drainRawEvents(ptr nativeRuntime, maxEvents int) (C.mln_runtime_event_batch
 // batch's event stride minus this offset is the payload window.
 var runtimeEventPayloadOffset = unsafe.Offsetof(C.mln_runtime_event{}.payload)
 
-// copyEventBatch copies a borrowed native batch into owned Go values. It takes
-// the map registry lock once for the whole batch.
-func (runtime *RuntimeHandle) copyEventBatch(raw C.mln_runtime_event_batch) RuntimeEventBatch {
+// copyEventBatch copies an owned native batch view into owned Go values. It
+// takes the map registry lock once for the whole batch.
+func (runtime *RuntimeHandle) copyEventBatch(raw C.mln_runtime_event_batch_view) RuntimeEventBatch {
 	batch := RuntimeEventBatch{RemainingCount: uint64(raw.remaining_count)}
 	count := int(raw.event_count)
 	if count <= 0 || raw.events == nil {
@@ -851,7 +986,7 @@ func (runtime *RuntimeHandle) copyEventBatch(raw C.mln_runtime_event_batch) Runt
 	return batch
 }
 
-func runtimeEventMessage(batch C.mln_runtime_event_batch, event *C.mln_runtime_event) string {
+func runtimeEventMessage(batch C.mln_runtime_event_batch_view, event *C.mln_runtime_event) string {
 	if event.message_size == 0 || batch.messages == nil {
 		return ""
 	}
@@ -923,15 +1058,6 @@ func runtimeEventPayloadFromC(event *C.mln_runtime_event, window unsafe.Pointer,
 	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT):
 		payload := C.mln_go_runtime_event_offline_region_tile_count_limit(event)
 		return RuntimeEventOfflineRegionTileCountLimitPayload{RegionID: OfflineRegionID(payload.region_id), Limit: uint64(payload.limit)}
-	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED):
-		payload := C.mln_go_runtime_event_offline_operation_completed(event)
-		return RuntimeEventOfflineOperationCompletedPayload{
-			OperationID:   uint64(payload.operation_id),
-			OperationKind: OfflineOperationKind(payload.operation_kind),
-			ResultKind:    OfflineOperationResultKind(payload.result_kind),
-			ResultStatus:  int32(payload.result_status),
-			Found:         bool(payload.found),
-		}
 	default:
 		bytes, ok := goByteSlice(window, C.size_t(windowSize))
 		if !ok {
@@ -978,7 +1104,7 @@ func offlineRegionStatusFromC(status C.mln_offline_region_status) OfflineRegionS
 
 // StartAmbientCacheOperation starts a native ambient cache maintenance
 // operation.
-func (runtime *RuntimeHandle) StartAmbientCacheOperation(operation AmbientCacheOperation) (*OfflineOperationHandle[struct{}], error) {
+func (runtime *RuntimeHandle) StartAmbientCacheOperation(operation AmbientCacheOperation) (*OperationHandle[struct{}], error) {
 	ptr, release, err := runtime.ptr()
 	if err != nil {
 		return nil, err
@@ -986,7 +1112,7 @@ func (runtime *RuntimeHandle) StartAmbientCacheOperation(operation AmbientCacheO
 	defer release()
 	defer runtime.state.KeepAlive()
 
-	var id C.mln_offline_operation_id
+	var id C.mln_operation
 	if err := checkNative(func() int32 {
 		return int32(C.mln_runtime_run_ambient_cache_operation_start(C.mln_runtime(ptr), C.uint32_t(operation), &id))
 	}); err != nil {
@@ -995,13 +1121,13 @@ func (runtime *RuntimeHandle) StartAmbientCacheOperation(operation AmbientCacheO
 	if id == 0 {
 		return nil, newBindingError(ErrInvalidState, "ambient cache operation did not return an ID")
 	}
-	return newOfflineOperationHandle[struct{}](runtime, uint64(id), OfflineOperationAmbientCache, OfflineOperationResultNone), nil
+	return newOperationHandle[struct{}](runtime, uint64(id), operationAmbientCache, operationResultNone), nil
 }
 
 // StartSetMaximumAmbientCacheSize starts a change to this runtime's maximum
 // ambient cache size. Lowering it evicts ambient resources to fit the new
 // budget; offline regions are unaffected.
-func (runtime *RuntimeHandle) StartSetMaximumAmbientCacheSize(size uint64) (*OfflineOperationHandle[struct{}], error) {
+func (runtime *RuntimeHandle) StartSetMaximumAmbientCacheSize(size uint64) (*OperationHandle[struct{}], error) {
 	ptr, release, err := runtime.ptr()
 	if err != nil {
 		return nil, err
@@ -1009,7 +1135,7 @@ func (runtime *RuntimeHandle) StartSetMaximumAmbientCacheSize(size uint64) (*Off
 	defer release()
 	defer runtime.state.KeepAlive()
 
-	var id C.mln_offline_operation_id
+	var id C.mln_operation
 	if err := checkNative(func() int32 {
 		return int32(C.mln_runtime_set_maximum_ambient_cache_size_start(C.mln_runtime(ptr), C.uint64_t(size), &id))
 	}); err != nil {
@@ -1018,7 +1144,7 @@ func (runtime *RuntimeHandle) StartSetMaximumAmbientCacheSize(size uint64) (*Off
 	if id == 0 {
 		return nil, newBindingError(ErrInvalidState, "maximum ambient cache size operation did not return an ID")
 	}
-	return newOfflineOperationHandle[struct{}](runtime, uint64(id), OfflineOperationSetMaximumAmbientCacheSize, OfflineOperationResultNone), nil
+	return newOperationHandle[struct{}](runtime, uint64(id), operationSetMaximumAmbientCacheSize, operationResultNone), nil
 }
 
 // SetResourceProvider installs or replaces the runtime-scoped network resource
@@ -1309,6 +1435,15 @@ func (runtime *RuntimeHandle) Close() error {
 	runtime.releaseResourceTransform()
 	runtime.releaseHttpHeaderTransform()
 	runtime.releaseResourceProvider()
+	source := runtime.notificationSource
+	if source != 0 {
+		if err := checkNative(func() int32 {
+			return int32(C.mln_notification_source_close(C.mln_notification_source(source)))
+		}); err != nil {
+			return err
+		}
+		runtime.notificationSource = 0
+	}
 	runtime.mapsMu.Lock()
 	runtime.maps = nil
 	runtime.mapsMu.Unlock()

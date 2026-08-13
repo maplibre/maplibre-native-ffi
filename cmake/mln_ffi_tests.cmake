@@ -129,8 +129,10 @@ function(mln_ffi_add_c_api_test)
   # here; CONFIGURE_DEPENDS reruns the glob when the directory changes.
   file(GLOB test_abi_sources CONFIGURE_DEPENDS
        ${PROJECT_SOURCE_DIR}/src/c_api/tests/*_abi.c)
-  set(test_sources ${PROJECT_SOURCE_DIR}/src/c_api/tests/main.c
-      ${PROJECT_SOURCE_DIR}/src/c_api/tests/test_support.c ${test_abi_sources})
+  set(test_sources
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/main.c
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/test_support.c
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/test_support.cpp ${test_abi_sources})
 
   # Each *_abi.c reaches the runner through one run_<file>_tests() call in
   # main.c. main.c carries no preprocessor guards, so a plain text match is
@@ -160,15 +162,34 @@ function(mln_ffi_add_c_api_test)
   add_executable(mln_ffi_c_api_tests ${test_sources})
   set_target_properties(
     mln_ffi_c_api_tests
-    PROPERTIES C_STANDARD 23 C_STANDARD_REQUIRED YES C_EXTENSIONS OFF)
+    PROPERTIES
+      C_STANDARD
+      23
+      C_STANDARD_REQUIRED
+      YES
+      C_EXTENSIONS
+      OFF
+      CXX_STANDARD
+      23
+      CXX_STANDARD_REQUIRED
+      YES
+      CXX_EXTENSIONS
+      OFF)
+  if(TARGET maplibre_native_c_static)
+    set(MLN_FFI_TEST_C_API_TARGET maplibre_native_c_static)
+  else()
+    set(MLN_FFI_TEST_C_API_TARGET maplibre_native_c)
+  endif()
   target_link_libraries(
     mln_ffi_c_api_tests
     PRIVATE
-      maplibre_native_c unity::framework MLN_FFI::RenderDependencies
+      ${MLN_FFI_TEST_C_API_TARGET} unity::framework MLN_FFI::RenderDependencies
       ${dependency_test_libraries})
   target_include_directories(
     mln_ffi_c_api_tests
-    PRIVATE ${PROJECT_SOURCE_DIR}/src/c_api/tests ${dependency_include_dirs})
+    PRIVATE
+      ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/src/c_api/tests
+      ${dependency_include_dirs})
 
   # Enforce the registration contract at compile time. A test that no RUN_TEST
   # references is an unused static function, and dropping `static` to dodge that

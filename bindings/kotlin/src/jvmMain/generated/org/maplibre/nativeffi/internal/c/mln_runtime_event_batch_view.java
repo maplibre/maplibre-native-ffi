@@ -14,7 +14,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
 
 /**
  * {@snippet lang=c :
- * struct mln_runtime_event_batch {
+ * struct mln_runtime_event_batch_view {
  *     uint32_t size;
  *     uint32_t event_size;
  *     const mln_runtime_event *events;
@@ -25,9 +25,9 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  * }
  * }
  */
-public class mln_runtime_event_batch {
+public class mln_runtime_event_batch_view {
 
-    mln_runtime_event_batch() {
+    mln_runtime_event_batch_view() {
         // Should not be called directly
     }
 
@@ -39,7 +39,7 @@ public class mln_runtime_event_batch {
         MapLibreNativeC.C_POINTER.withName("messages"),
         MapLibreNativeC.C_LONG.withName("messages_size"),
         MapLibreNativeC.C_LONG.withName("remaining_count")
-    ).withName("mln_runtime_event_batch");
+    ).withName("mln_runtime_event_batch_view");
 
     /**
      * The layout of this struct

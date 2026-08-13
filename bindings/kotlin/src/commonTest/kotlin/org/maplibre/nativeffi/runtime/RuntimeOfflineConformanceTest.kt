@@ -6,7 +6,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
@@ -27,6 +26,7 @@ class RuntimeOfflineConformanceTest {
       createMetadata[0] = 9
       waitForOperation(runtime, createOperation)
       val created = runtime.takeCreateOfflineRegionResult(createOperation)
+      createOperation.close()
       assertTrue(created.id > 0)
       assertEquals(definition, created.definition)
       assertContentEquals(byteArrayOf(1, 2, 3), created.metadata)
@@ -42,6 +42,7 @@ class RuntimeOfflineConformanceTest {
       updateMetadata[0] = 9
       waitForOperation(runtime, updateOperation)
       val updated = runtime.takeUpdateOfflineRegionMetadataResult(updateOperation)
+      updateOperation.close()
       assertEquals(created.id, updated.id)
       assertContentEquals(byteArrayOf(4, 5), updated.metadata)
 
@@ -76,53 +77,50 @@ class RuntimeOfflineConformanceTest {
     }
   }
 
-  private fun waitForOperation(
-    runtime: RuntimeHandle,
-    operation: OfflineOperationHandle<*>,
-  ): RuntimeEventPayload.OfflineOperationCompleted {
+  private fun waitForOperation(runtime: RuntimeHandle, operation: OperationHandle<*>) {
     repeat(10_000) {
-      drain(runtime)
-      for (event in drained) {
-        val completed = event.payload as? RuntimeEventPayload.OfflineOperationCompleted
-        if (completed == null || completed.operationId != operation.id) {
-          continue
-        }
-        assertEquals(operation.kind, completed.operationKind)
-        assertEquals(operation.resultKind, completed.resultKind)
-        if (completed.resultStatus != MaplibreStatus.OK.nativeCode) {
-          error("offline operation failed: ${event.message}")
-        }
-        return completed
+      if (operation.poll()) {
+        return
       }
       runtime.pump(1)
     }
-    error("offline operation did not complete: ${operation.id}")
+    error("operation did not complete")
   }
 
-  private fun completeVoidOperation(
-    runtime: RuntimeHandle,
-    operation: OfflineOperationHandle<Unit>,
-  ) {
+  private fun completeVoidOperation(runtime: RuntimeHandle, operation: OperationHandle<Unit>) {
     waitForOperation(runtime, operation)
+    operation.discard()
     operation.close()
   }
 
   private fun offlineRegion(runtime: RuntimeHandle, id: Long): OfflineRegionInfo? {
     val operation = runtime.startOfflineRegion(id)
     waitForOperation(runtime, operation)
-    return runtime.takeOfflineRegionResult(operation)
+    return try {
+      runtime.takeOfflineRegionResult(operation)
+    } finally {
+      operation.close()
+    }
   }
 
   private fun offlineRegions(runtime: RuntimeHandle): List<OfflineRegionInfo> {
     val operation = runtime.startOfflineRegions()
     waitForOperation(runtime, operation)
-    return runtime.takeOfflineRegionsResult(operation)
+    return try {
+      runtime.takeOfflineRegionsResult(operation)
+    } finally {
+      operation.close()
+    }
   }
 
   private fun offlineRegionStatus(runtime: RuntimeHandle, id: Long): OfflineRegionStatus {
     val operation = runtime.startOfflineRegionStatus(id)
     waitForOperation(runtime, operation)
-    return runtime.takeOfflineRegionStatusResult(operation)
+    return try {
+      runtime.takeOfflineRegionStatusResult(operation)
+    } finally {
+      operation.close()
+    }
   }
 
   private fun waitForObservedOfflineRegionEvent(

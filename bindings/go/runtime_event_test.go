@@ -315,7 +315,7 @@ func TestMapOptionsEventMaskSuppressesClearedTypesFromCreation(t *testing.T) {
 	}
 }
 
-func TestRuntimeDrainAndMaskSettersReportWrongThread(t *testing.T) {
+func TestRuntimeDrainIsAnyThreadAndMaskSettersRemainOwnerThread(t *testing.T) {
 	runtime, m := newRuntimeAndMap(t, nil)
 
 	type result struct {
@@ -331,7 +331,11 @@ func TestRuntimeDrainAndMaskSettersReportWrongThread(t *testing.T) {
 	}()
 	for range make([]struct{}, 3) {
 		got := <-results
-		if !errors.Is(got.err, ErrWrongThread) {
+		if got.name == "DrainEvents" {
+			if got.err != nil {
+				t.Fatalf("DrainEvents from another thread: %v", got.err)
+			}
+		} else if !errors.Is(got.err, ErrWrongThread) {
 			t.Fatalf("%s from another thread error = %v, want ErrWrongThread", got.name, got.err)
 		}
 	}
@@ -409,14 +413,9 @@ func TestRuntimeEventDecoderUsesTheBatchStride(t *testing.T) {
 				RawOperation: uint32(TileOperationLoadFromCache),
 				TileID:       TileID{OverscaledZ: 9, Wrap: -1, CanonicalZ: 8, CanonicalX: 7, CanonicalY: 6},
 			}),
-		newRuntimeEventForTest(RuntimeEventOfflineOperationCompleted, RuntimeEventSourceRuntime, 0, 3).
-			withMessage("operation failed").
-			withOfflineOperationCompleted(RuntimeEventOfflineOperationCompletedPayload{
-				OperationID:   7,
-				OperationKind: OfflineOperationRegionGet,
-				ResultKind:    OfflineOperationResultOptionalRegion,
-				ResultStatus:  3,
-				Found:         true,
+		newRuntimeEventForTest(RuntimeEventMapCameraTransitionFinished, RuntimeEventSourceMap, 0, 0).
+			withCameraTransitionFinished(RuntimeEventCameraTransitionFinishedPayload{
+				TransitionID: 7,
 			}),
 	})
 	defer batch.free()
@@ -436,12 +435,9 @@ func TestRuntimeEventDecoderUsesTheBatchStride(t *testing.T) {
 	if decoded.Events[1].Message != "roads" {
 		t.Fatalf("tile action message = %q, want the source ID", decoded.Events[1].Message)
 	}
-	completion, ok := decoded.Events[2].Payload.(RuntimeEventOfflineOperationCompletedPayload)
-	if !ok || completion.OperationID != 7 || completion.ResultStatus != 3 || !completion.Found {
-		t.Fatalf("offline completion payload = %+v", decoded.Events[2].Payload)
-	}
-	if decoded.Events[2].Message != "operation failed" || decoded.Events[2].Code != 3 {
-		t.Fatalf("offline completion event = %+v", decoded.Events[2])
+	transition, ok := decoded.Events[2].Payload.(RuntimeEventCameraTransitionFinishedPayload)
+	if !ok || transition.TransitionID != 7 {
+		t.Fatalf("camera transition payload = %+v", decoded.Events[2].Payload)
 	}
 }
 

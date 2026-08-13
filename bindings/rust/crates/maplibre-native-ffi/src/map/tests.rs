@@ -7,8 +7,8 @@ use std::time::Duration;
 use crate::events::{RuntimeEventPayload, RuntimeEventSource, RuntimeEventType};
 use crate::{
     BoundsConstraint, CameraChangeMode, CustomGeometrySourceOptions, EdgeInsets, ErrorKind,
-    MapMode, ResourceKind, ResourceProviderDecision, ResourceResponse, RuntimeEventMask,
-    TextureImageInfo,
+    MapMode, RasterDemEncoding, ResourceKind, ResourceProviderDecision, ResourceResponse,
+    RuntimeEventMask, TextureImageInfo,
 };
 
 const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
@@ -868,7 +868,6 @@ fn a_map_mask_round_trips_and_rejects_undefined_bits() {
     let read_back = map.event_mask().unwrap();
     assert!(!read_back.contains(RuntimeEventMask::MAP_TILE_ACTION));
     assert!(read_back.contains(RuntimeEventMask::MAP_STYLE_LOADED));
-    assert!(read_back.contains(RuntimeEventMask::OFFLINE_OPERATION_COMPLETED));
 
     let error = map
         .set_event_mask(RuntimeEventMask::from_bits_retain(1 << 63))

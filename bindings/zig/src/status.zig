@@ -104,8 +104,13 @@ test "diagnostic store copies thread-local native message" {
     const copied = try std.testing.allocator.dupe(u8, first.message);
     defer std.testing.allocator.free(copied);
 
+    var source: c.mln_notification_source = 0;
+    try checkStatus(c.mln_notification_source_create(&source), null);
+    defer checkStatus(c.mln_notification_source_close(source), null) catch
+        @panic("notification source close failed");
     var runtime: c.mln_runtime = 0;
     var options = c.mln_runtime_options_default();
+    options.notification_source = source;
     try checkStatus(c.mln_runtime_create(&options, &runtime), null);
     defer checkStatus(c.mln_runtime_destroy(runtime), null) catch @panic("runtime destroy failed");
 

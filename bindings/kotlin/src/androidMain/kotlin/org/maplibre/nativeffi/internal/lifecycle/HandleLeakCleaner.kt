@@ -2,7 +2,7 @@ package org.maplibre.nativeffi.internal.lifecycle
 
 import java.util.concurrent.ConcurrentHashMap
 import org.maplibre.nativeffi.render.OwnedTextureFrameHandleCore
-import org.maplibre.nativeffi.runtime.OfflineOperationLeakReport
+import org.maplibre.nativeffi.runtime.OperationLeakReport
 
 /**
  * Reports owner-thread-affine native handles that become unreachable before explicit release.
@@ -42,9 +42,9 @@ internal object HandleLeakCleaner {
     leakReportActions.register(handle, FrameLeakAction(frameCore))
   }
 
-  /** Reports [leakReport] when an offline operation becomes unreachable. */
-  fun registerOfflineOperation(handle: Any, leakReport: OfflineOperationLeakReport) {
-    leakReportActions.register(handle, OfflineOperationLeakAction(leakReport))
+  /** Reports [leakReport] when an operation becomes unreachable. */
+  fun registerOperation(handle: Any, leakReport: OperationLeakReport) {
+    leakReportActions.register(handle, OperationLeakAction(leakReport))
   }
 
   private class LeakReportAction(private val leakReport: HandleStateCore.LeakReport) : Runnable {
@@ -59,8 +59,7 @@ internal object HandleLeakCleaner {
     }
   }
 
-  private class OfflineOperationLeakAction(private val leakReport: OfflineOperationLeakReport) :
-    Runnable {
+  private class OperationLeakAction(private val leakReport: OperationLeakReport) : Runnable {
     override fun run() {
       leakReport.report()
     }

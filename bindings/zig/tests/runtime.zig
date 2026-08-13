@@ -111,7 +111,7 @@ test "runtime rejects second runtime on same owner and permits distinct owner" {
     try testing.expect(thread_error == null);
 }
 
-test "wrong-thread runtime failures propagate diagnostics" {
+test "runtime calls enforce their documented thread policies" {
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
     defer diagnostics.deinit();
 
@@ -128,8 +128,7 @@ test "wrong-thread runtime failures propagate diagnostics" {
     var drain_error: ?anyerror = null;
     const drain_thread = try std.Thread.spawn(.{}, drainRuntimeOnThread, .{ &runtime, &drain_error });
     drain_thread.join();
-    try testing.expectEqual(error.WrongThread, drain_error.?);
-    try testing.expect(diagnostics.get().?.message.len > 0);
+    try testing.expect(drain_error == null);
 
     var close_error: ?anyerror = null;
     const close_thread = try std.Thread.spawn(.{}, closeRuntimeOnThread, .{ &runtime, &close_error });
@@ -208,6 +207,35 @@ test "one drain reports the events a style load queued together" {
     }
     try testing.expect(saw_style_loaded);
     try testing.expect(largest_batch > 1);
+}
+test "notification ready batches are copied before native release" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    try map.setStyleJson(testing.allocator, support.style_json);
+    try runtime.pump(0);
+
+    var ready = try runtime.drainReady(testing.allocator);
+    defer ready.deinit();
+    try testing.expect(ready.endpoints.len > 0);
+    try testing.expect(std.meta.eql(
+        maplibre.NotificationEndpointKind.runtime_events,
+        ready.endpoints[0].kind,
+    ));
+
+    var events = try runtime.drainEvents(testing.allocator, 0);
+    defer events.deinit();
+    try testing.expect(events.len() > 0);
+
+    // The copied ready endpoint remains valid after draining and releasing a
+    // later owned event batch.
+    try testing.expect(std.meta.eql(
+        maplibre.NotificationEndpointKind.runtime_events,
+        ready.endpoints[0].kind,
+    ));
 }
 
 test "a bounded drain reports one event at a time in queue order" {
@@ -318,7 +346,7 @@ test "event masks round-trip through both handles" {
     defer map.close() catch @panic("map close failed");
 
     var runtime_mask = try runtime.eventMask();
-    runtime_mask.offline_operation_completed = false;
+    runtime_mask.offline_region_status_changed = false;
     try runtime.setEventMask(runtime_mask);
     const read_runtime_mask = try runtime.eventMask();
     try testing.expectEqual(runtime_mask, read_runtime_mask);
@@ -330,7 +358,7 @@ test "event masks round-trip through both handles" {
     try map.setEventMask(map_mask);
     const read_map_mask = try map.eventMask();
     try testing.expectEqual(map_mask, read_map_mask);
-    try testing.expect(read_map_mask.offline_operation_completed);
+    try testing.expect(read_map_mask.offline_region_status_changed);
 }
 
 // A newer native library can report an event type this binding does not name,
@@ -360,7 +388,7 @@ test "a narrowed map mask drops the type it clears and keeps the rest" {
 }
 
 test "masks passed as create options narrow both handles" {
-    const narrowed_runtime_mask = maskWithout("offline_operation_completed");
+    const narrowed_runtime_mask = maskWithout("offline_region_status_changed");
     var runtime = try maplibre.RuntimeHandle.create(
         testing.allocator,
         .{ .event_mask = narrowed_runtime_mask },

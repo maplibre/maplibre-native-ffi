@@ -90,9 +90,9 @@ class RuntimeEventsTest {
       assertEquals(RuntimeEventMask.ALL - RuntimeEventMask.MAP_TILE_ACTION, map.eventMask)
       assertTrue(RuntimeEventType.MAP_STYLE_LOADED in map.eventMask)
 
-      runtime.eventMask = runtime.eventMask - RuntimeEventMask.OFFLINE_OPERATION_COMPLETED
+      runtime.eventMask = runtime.eventMask - RuntimeEventMask.OFFLINE_REGION_STATUS_CHANGED
       assertEquals(
-        RuntimeEventMask.ALL - RuntimeEventMask.OFFLINE_OPERATION_COMPLETED,
+        RuntimeEventMask.ALL - RuntimeEventMask.OFFLINE_REGION_STATUS_CHANGED,
         runtime.eventMask,
       )
     }
@@ -228,18 +228,18 @@ class RuntimeEventsTest {
   }
 
   @Test
-  fun drainAndBothMaskSettersReportTheWrongThread() {
+  fun drainIsAnyThreadAndBothMaskSettersReportTheWrongThread() {
     withMap { runtime, map ->
       val failures = mutableListOf<Throwable>()
       val thread = Thread {
-        failures += assertFailsWith<WrongThreadException> { runtime.drainEvents() }
+        runtime.drainEvents()
         failures +=
           assertFailsWith<WrongThreadException> { runtime.eventMask = RuntimeEventMask.ALL }
         failures += assertFailsWith<WrongThreadException> { map.eventMask = RuntimeEventMask.ALL }
       }
       thread.start()
       thread.join()
-      assertEquals(3, failures.size)
+      assertEquals(2, failures.size)
     }
   }
 

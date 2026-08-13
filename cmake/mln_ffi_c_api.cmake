@@ -96,6 +96,8 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/c_api/logging.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/map.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/network.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/notification.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/operation.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/render_session.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/runtime.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/surface.cpp
@@ -105,6 +107,8 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/geojson/geojson.cpp
       ${PROJECT_SOURCE_DIR}/src/handles/handle_table.cpp
       ${PROJECT_SOURCE_DIR}/src/logging/logging.cpp
+      ${PROJECT_SOURCE_DIR}/src/notification/notification.cpp
+      ${PROJECT_SOURCE_DIR}/src/operation/operation.cpp
       ${PROJECT_SOURCE_DIR}/src/map/map.cpp
       ${PROJECT_SOURCE_DIR}/src/render/render_session_common.cpp
       ${PROJECT_SOURCE_DIR}/src/render/surface_session.cpp

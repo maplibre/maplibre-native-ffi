@@ -306,21 +306,30 @@ void main() {
     final events = calloc<Uint8>(eventSize * 3);
     final messageBytes = utf8.encode('copied message tile-source ');
     final messages = calloc<Uint8>(messageBytes.length);
-    final batch = calloc<raw.mln_runtime_event_batch>();
+    final batch = calloc<raw.mln_runtime_event_batch_view>();
     try {
       // The library this binding runs against reports the record size this
       // binding compiled, so a later mismatch is an ABI change rather than a
       // decode bug.
-      batch.ref = raw.mln_runtime_event_batch_default();
-      expect(
-        raw.mln_runtime_drain_events(
-          runtimeHandleIdForTesting(runtime),
-          0,
-          batch,
-        ),
-        nativeStatusOk,
-      );
-      expect(batch.ref.event_size, sizeOf<raw.mln_runtime_event>());
+      withNativeArena((arena) {
+        final outBatch = arena<Uint64>();
+        final view = arena<raw.mln_runtime_event_batch_view>();
+        view.ref.size = sizeOf<raw.mln_runtime_event_batch_view>();
+        expect(
+          raw.mln_runtime_drain_events(
+            runtimeHandleIdForTesting(runtime),
+            0,
+            outBatch,
+          ),
+          nativeStatusOk,
+        );
+        try {
+          expect(raw.mln_event_batch_get(outBatch.value, view), nativeStatusOk);
+          expect(view.ref.event_size, sizeOf<raw.mln_runtime_event>());
+        } finally {
+          raw.mln_event_batch_release(outBatch.value);
+        }
+      });
 
       messages.asTypedList(messageBytes.length).setAll(0, messageBytes);
 
@@ -361,7 +370,7 @@ void main() {
       transition.message_offset = 15;
       transition.message_size = 11;
 
-      batch.ref.size = sizeOf<raw.mln_runtime_event_batch>();
+      batch.ref.size = sizeOf<raw.mln_runtime_event_batch_view>();
       batch.ref.event_size = eventSize;
       batch.ref.events = events.cast<raw.mln_runtime_event>();
       batch.ref.event_count = 3;

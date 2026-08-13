@@ -1,16 +1,11 @@
 part of 'runtime.dart';
 
-final class OfflineOperationHandle implements Finalizable {
-  OfflineOperationHandle._(
-    this._runtime,
-    this._id,
-    this._kind,
-    this._resultKind,
-  ) {
-    _runtime._registerOfflineOperation(this);
+final class OperationHandle implements Finalizable {
+  OperationHandle._(this._runtime, this._id, this._kind, this._resultKind) {
+    _runtime._registerOperation(this);
     _leakReporter = NativeLeakReporter(
       this,
-      'OfflineOperationHandle',
+      'OperationHandle',
       NativeHandle(_id == 0 ? 1 : _id),
     );
   }
@@ -22,10 +17,82 @@ final class OfflineOperationHandle implements Finalizable {
   final int _id;
   late final NativeLeakReporter _leakReporter;
 
-  var _discarded = false;
+  var _resultConsumed = false;
+  var _released = false;
 
-  /// Whether this operation has been discarded by Dart.
-  bool get isDiscarded => _discarded;
+  /// Whether the operation observer has been released.
+  bool get isReleased => _released;
+
+  /// Whether a typed take or discard consumed this operation's result.
+  bool get isResultConsumed => _resultConsumed;
+
+  /// Reports whether this operation has reached a terminal disposition.
+  bool poll() {
+    _requireLive();
+    return withNativeArena((arena) {
+      final outCompleted = arena<Bool>();
+      _check(raw.mln_operation_poll(_id, outCompleted));
+      return outCompleted.value;
+    });
+  }
+
+  /// Waits for this operation to reach a terminal disposition.
+  ///
+  /// A null or negative [timeout] waits without a deadline. A zero timeout
+  /// performs a nonblocking check. A positive timeout waits for at most that
+  /// duration and returns false when the deadline expires.
+  bool wait({Duration? timeout}) {
+    _requireLive();
+    final timeoutMilliseconds = switch (timeout) {
+      null => -1,
+      final value when value.isNegative => -1,
+      final value => value.inMilliseconds,
+    };
+    return withNativeArena((arena) {
+      final outCompleted = arena<Bool>();
+      _check(raw.mln_operation_wait(_id, timeoutMilliseconds, outCompleted));
+      return outCompleted.value;
+    });
+  }
+
+  /// Requests cancellation of this operation.
+  void cancel() {
+    _requireLive();
+    _check(raw.mln_operation_cancel(_id));
+  }
+
+  /// Reports the completed operation's terminal status.
+  MaplibreStatus get terminalStatus {
+    _requireLive();
+    return withNativeArena((arena) {
+      final outStatus = arena<Int32>();
+      _check(raw.mln_operation_get_status(_id, outStatus));
+      return MaplibreStatus.fromNativeStatusCode(outStatus.value);
+    });
+  }
+
+  /// Copies the completed operation's diagnostic.
+  String get diagnostic {
+    _requireLive();
+    return withNativeArena((arena) {
+      final outSize = arena<Size>();
+      _check(raw.mln_operation_copy_diagnostic(_id, nullptr, 0, outSize));
+      final size = outSize.value;
+      if (size == 0) {
+        return '';
+      }
+      final bytes = arena<Uint8>(size);
+      _check(
+        raw.mln_operation_copy_diagnostic(
+          _id,
+          bytes.cast<Char>(),
+          size,
+          outSize,
+        ),
+      );
+      return utf8.decode(bytes.asTypedList(outSize.value));
+    });
+  }
 
   /// Takes a completed offline region create result.
   OfflineRegionInfo takeCreatedRegion() {
@@ -37,14 +104,8 @@ final class OfflineOperationHandle implements Finalizable {
     return withNativeArena((arena) {
       final outRegion = arena<Uint64>();
       outRegion.value = 0;
-      _check(
-        raw.mln_runtime_offline_region_create_take_result(
-          _runtime._handle.raw,
-          _id,
-          outRegion,
-        ),
-      );
-      _markDiscarded();
+      _check(raw.mln_runtime_offline_region_create_take_result(_id, outRegion));
+      _markResultConsumed();
       return _copyOfflineRegionSnapshot(
         NativeOfflineRegionSnapshot(outRegion.value),
       );
@@ -64,13 +125,12 @@ final class OfflineOperationHandle implements Finalizable {
       final outFound = arena<Bool>();
       _check(
         raw.mln_runtime_offline_region_get_take_result(
-          _runtime._handle.raw,
           _id,
           outRegion,
           outFound,
         ),
       );
-      _markDiscarded();
+      _markResultConsumed();
       return outFound.value
           ? _copyOfflineRegionSnapshot(
               NativeOfflineRegionSnapshot(outRegion.value),
@@ -89,14 +149,8 @@ final class OfflineOperationHandle implements Finalizable {
     return withNativeArena((arena) {
       final outRegions = arena<Uint64>();
       outRegions.value = 0;
-      _check(
-        raw.mln_runtime_offline_regions_list_take_result(
-          _runtime._handle.raw,
-          _id,
-          outRegions,
-        ),
-      );
-      _markDiscarded();
+      _check(raw.mln_runtime_offline_regions_list_take_result(_id, outRegions));
+      _markResultConsumed();
       return _copyOfflineRegionList(NativeOfflineRegionList(outRegions.value));
     });
   }
@@ -113,12 +167,11 @@ final class OfflineOperationHandle implements Finalizable {
       outRegions.value = 0;
       _check(
         raw.mln_runtime_offline_regions_merge_database_take_result(
-          _runtime._handle.raw,
           _id,
           outRegions,
         ),
       );
-      _markDiscarded();
+      _markResultConsumed();
       return _copyOfflineRegionList(NativeOfflineRegionList(outRegions.value));
     });
   }
@@ -135,12 +188,11 @@ final class OfflineOperationHandle implements Finalizable {
       outRegion.value = 0;
       _check(
         raw.mln_runtime_offline_region_update_metadata_take_result(
-          _runtime._handle.raw,
           _id,
           outRegion,
         ),
       );
-      _markDiscarded();
+      _markResultConsumed();
       return _copyOfflineRegionSnapshot(
         NativeOfflineRegionSnapshot(outRegion.value),
       );
@@ -158,32 +210,36 @@ final class OfflineOperationHandle implements Finalizable {
       final outStatus = arena<raw.mln_offline_region_status>();
       outStatus.ref.size = sizeOf<raw.mln_offline_region_status>();
       _check(
-        raw.mln_runtime_offline_region_get_status_take_result(
-          _runtime._handle.raw,
-          _id,
-          outStatus,
-        ),
+        raw.mln_runtime_offline_region_get_status_take_result(_id, outStatus),
       );
-      _markDiscarded();
+      _markResultConsumed();
       return _offlineRegionStatusFromNative(outStatus.ref);
     });
   }
 
-  /// Discards runtime-owned state for this operation.
-  void discard() {
-    if (_discarded) {
-      return;
+  /// Discards the completed operation's untaken result.
+  void discardResult() {
+    _requireLive();
+    if (_resultConsumed) {
+      throwInvalidState('offline operation result has already been consumed');
     }
-    _check(
-      raw.mln_runtime_offline_operation_discard(_runtime._handle.raw, _id),
-    );
-    _markDiscarded();
+    _check(raw.mln_operation_discard_result(_id));
+    _markResultConsumed();
   }
 
-  void _markDiscarded() {
-    _discarded = true;
-    _runtime._unregisterOfflineOperationId(_id);
+  /// Releases this operation observer and any untaken result.
+  void release() {
+    if (_released) {
+      return;
+    }
+    _released = true;
+    _runtime._unregisterOperationId(_id);
     _leakReporter.close();
+    raw.mln_operation_release(_id);
+  }
+
+  void _markResultConsumed() {
+    _resultConsumed = true;
   }
 
   void _requireResult(
@@ -191,8 +247,9 @@ final class OfflineOperationHandle implements Finalizable {
     _OfflineOperationResultKind expected,
     String accessorName,
   ) {
-    if (_discarded) {
-      throwInvalidState('offline operation has been discarded');
+    _requireLive();
+    if (_resultConsumed) {
+      throwInvalidState('offline operation result has already been consumed');
     }
     if (_kind != expectedKind || _resultKind != expected) {
       throwInvalidState(
@@ -200,6 +257,12 @@ final class OfflineOperationHandle implements Finalizable {
         '${_kind.name} operation; expected ${expected.name} result from '
         '${expectedKind.name}',
       );
+    }
+  }
+
+  void _requireLive() {
+    if (_released) {
+      throwInvalidState('offline operation has been released');
     }
   }
 }

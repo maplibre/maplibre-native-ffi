@@ -70,7 +70,7 @@ internal static unsafe class NativeStatus
         return new RestoreDiagnosticProvider(previous);
     }
 
-    private static MaplibreStatus StatusFromRaw(int rawStatus) =>
+    internal static MaplibreStatus StatusFromRaw(int rawStatus) =>
         rawStatus switch
         {
             0 => MaplibreStatus.Ok,
@@ -79,6 +79,7 @@ internal static unsafe class NativeStatus
             -3 => MaplibreStatus.WrongThread,
             -4 => MaplibreStatus.Unsupported,
             -5 => MaplibreStatus.NativeError,
+            -6 => MaplibreStatus.Cancelled,
             _ => MaplibreStatus.Unknown,
         };
 

@@ -6,9 +6,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.runtime.OfflineOperationKind
-import org.maplibre.nativeffi.runtime.OfflineOperationLeakReport
-import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
+import org.maplibre.nativeffi.runtime.OperationLeakReport
 
 class HandleLeakCleanerTest {
   // BND-044. Destruction is owner-thread-bound, so the cleaner thread only reports.
@@ -41,22 +39,13 @@ class HandleLeakCleanerTest {
   }
 
   @Test
-  fun unreachableOfflineOperationReportsLeak() {
+  fun unreachableOperationReportsLeak() {
     val reports = CopyOnWriteArrayList<String>()
-    val kind = OfflineOperationKind.AMBIENT_CACHE
-    val resultKind = OfflineOperationResultKind.NONE
 
-    HandleLeakCleaner.registerOfflineOperation(
-      Any(),
-      OfflineOperationLeakReport(42L, kind, resultKind, reports::add),
-    )
+    HandleLeakCleaner.registerOperation(Any(), OperationLeakReport(reports::add))
 
-    assertTrue(awaitReport(reports), "expected the cleaner to report the offline operation")
-    assertEquals(
-      "Leaked OfflineOperationHandle id=42 kind=$kind resultKind=$resultKind; " +
-        "take or discard operations explicitly on the runtime owner thread.",
-      reports.single(),
-    )
+    assertTrue(awaitReport(reports), "expected the cleaner to report the operation")
+    assertEquals("Leaked OperationHandle; close the operation explicitly.", reports.single())
   }
 
   @Test

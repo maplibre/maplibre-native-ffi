@@ -30,15 +30,21 @@ static bool wants_a_frame(const mln_runtime_event* event, mln_map map) {
 static void drain_events(
   mln_runtime runtime, mln_map map, pump_channel* channel
 ) {
-  mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+  mln_event_batch batch = MLN_HANDLE_NULL;
   if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) return;
+  mln_runtime_event_batch_view view = {0};
+  if (mln_event_batch_get(batch, &view) != MLN_STATUS_OK) {
+    mln_event_batch_release(batch);
+    return;
+  }
 
-  for (size_t index = 0; index < batch.event_count; index++) {
-    const char* bytes = (const char*)batch.events + index * batch.event_size;
+  for (size_t index = 0; index < view.event_count; index++) {
+    const char* bytes = (const char*)view.events + index * view.event_size;
     if (wants_a_frame((const mln_runtime_event*)bytes, map)) {
       atomic_store(&channel->render_pending, true);
     }
   }
+  mln_event_batch_release(batch);
 }
 
 void pump_until_stopped(

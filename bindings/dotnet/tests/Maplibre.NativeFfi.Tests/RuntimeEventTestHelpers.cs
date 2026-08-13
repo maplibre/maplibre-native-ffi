@@ -88,9 +88,9 @@ internal static unsafe class RuntimeEventTestHelpers
         fixed (byte* recordBytes = records)
         fixed (byte* messageBytes = messages)
         {
-            var batch = new mln_runtime_event_batch
+            var batch = new mln_runtime_event_batch_view
             {
-                size = (uint)Unsafe.SizeOf<mln_runtime_event_batch>(),
+                size = (uint)Unsafe.SizeOf<mln_runtime_event_batch_view>(),
                 event_size = eventSize,
                 events = (mln_runtime_event*)recordBytes,
                 event_count = eventCount,

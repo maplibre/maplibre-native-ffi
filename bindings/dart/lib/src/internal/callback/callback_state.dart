@@ -41,6 +41,23 @@ abstract base class RetainedCallbackState {
     _scheduleCloseIfReady();
   }
 
+  /// Retires and releases callback resources before this call returns.
+  ///
+  /// The caller must first detach the native callback so that no new upcall can
+  /// start. An active upcall keeps the ordinary deferred close behavior.
+  void closeSynchronously() {
+    if (_closed) {
+      return;
+    }
+    _retired = true;
+    if (_activeUpcalls != 0) {
+      _scheduleCloseIfReady();
+      return;
+    }
+    _closed = true;
+    closeResources();
+  }
+
   void _scheduleCloseIfReady() {
     if (!_retired || _closed || _closeScheduled || _activeUpcalls != 0) {
       return;

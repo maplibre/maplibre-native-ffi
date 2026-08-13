@@ -23,13 +23,19 @@ ambient budget. Download a region when the host must draw a known area without
 a network.
 
 Database operations are asynchronous. A start call validates its arguments,
-returns an operation ID, and queues the work. The runtime later queues one
-operation-completed event with the ID and result status while its subscription
-selects that type, as
-[Handle events](/maplibre-native-ffi/guides/handle-events/) describes. This
-result is separate from the start call's status. Take the result value when an
-operation produces one. Take or discard every operation to release its runtime
-state.
+returns an operation handle, and queues the work. Poll or wait on that common
+handle to detect completion. The operation's terminal status is separate from
+the start call's status, and its diagnostic bytes describe a terminal failure.
+Copy diagnostic bytes that the host keeps.
+
+An operation publishes readiness through the notification source that the
+runtime received at creation. Cancellation is available through the common
+operation API when the underlying work supports it. Take a typed result or
+discard an unneeded result after completion. Either action consumes the result,
+while the operation handle remains live for terminal status and diagnostic
+inspection. Release the operation handle explicitly when inspection is
+complete. Releasing a pending operation requests cancellation when supported
+and detaches its notification endpoint.
 
 ## Download a region
 
@@ -52,8 +58,9 @@ call returns.
 <Code code={region(offlineRegion, "create")} lang="c" title="offline-region.c" />
 
 Taking the result produces a snapshot handle that contains the region record. A
-failed take leaves the operation live. Discard the operation after the host
-stops retrying.
+failed take before ownership transfers leaves the result available to retry.
+After a successful take or discard, the operation remains available for status
+and diagnostic inspection until the host releases it.
 
 <Code code={region(offlineRegion, "result")} lang="c" title="offline-region.c" />
 

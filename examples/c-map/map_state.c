@@ -191,14 +191,24 @@ static app_error set_camera(mln_map map) {
 app_error map_state_init(map_state* out_state, viewport initial_viewport) {
   *out_state = (map_state){
     .runtime = MLN_HANDLE_NULL,
+    .notification_source = MLN_HANDLE_NULL,
     .map = MLN_HANDLE_NULL,
   };
 
   mln_runtime_options runtime_options = mln_runtime_options_default();
+  mln_status status =
+    mln_notification_source_create(&out_state->notification_source);
+  if (status != MLN_STATUS_OK) {
+    diagnostics_log_status("notification source create failed", status);
+    return APP_ERROR_RUNTIME_CREATE_FAILED;
+  }
+  runtime_options.notification_source = out_state->notification_source;
   runtime_options.cache_path = ":memory:";
-  mln_status status = mln_runtime_create(&runtime_options, &out_state->runtime);
+  status = mln_runtime_create(&runtime_options, &out_state->runtime);
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("runtime create failed", status);
+    mln_notification_source_close(out_state->notification_source);
+    out_state->notification_source = MLN_HANDLE_NULL;
     return APP_ERROR_RUNTIME_CREATE_FAILED;
   }
 
@@ -238,6 +248,10 @@ void map_state_deinit(map_state* state) {
     mln_runtime_destroy(state->runtime);
     state->runtime = MLN_HANDLE_NULL;
   }
+  if (state->notification_source != MLN_HANDLE_NULL) {
+    mln_notification_source_close(state->notification_source);
+    state->notification_source = MLN_HANDLE_NULL;
+  }
 }
 
 app_error map_state_apply_commands(
@@ -255,17 +269,24 @@ app_error map_state_apply_commands(
 
 app_error map_state_drain_events(map_state* state, bool* out_render_update) {
   *out_render_update = false;
-  // One drain takes every event the pump produced. The batch borrows runtime
-  // storage, and this loop keeps nothing from it.
-  mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+  mln_event_batch batch = MLN_HANDLE_NULL;
   const mln_status status = mln_runtime_drain_events(state->runtime, 0, &batch);
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("event drain failed", status);
     return APP_ERROR_EVENT_DRAIN_FAILED;
   }
-  for (size_t index = 0; index < batch.event_count; index += 1) {
+  mln_runtime_event_batch_view view = {
+    .size = sizeof(mln_runtime_event_batch_view)
+  };
+  const mln_status view_status = mln_event_batch_get(batch, &view);
+  if (view_status != MLN_STATUS_OK) {
+    mln_event_batch_release(batch);
+    diagnostics_log_status("event batch read failed", view_status);
+    return APP_ERROR_EVENT_DRAIN_FAILED;
+  }
+  for (size_t index = 0; index < view.event_count; index += 1) {
     // Step by the batch's stride: a newer runtime reports a wider event.
-    const char* bytes = (const char*)batch.events + index * batch.event_size;
+    const char* bytes = (const char*)view.events + index * view.event_size;
     const mln_runtime_event* event = (const mln_runtime_event*)bytes;
     if (
       event->source_type != MLN_RUNTIME_EVENT_SOURCE_MAP ||
@@ -286,5 +307,6 @@ app_error map_state_drain_events(map_state* state, bool* out_render_update) {
         break;
     }
   }
+  mln_event_batch_release(batch);
   return APP_OK;
 }

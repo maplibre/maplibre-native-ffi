@@ -51,7 +51,7 @@ class RuntimeHandleTest {
   }
 
   @Test
-  fun ambientCacheOperationRetainsRuntimeUntilDiscarded() {
+  fun ambientCacheOperationRetainsRuntimeUntilClosed() {
     val runtime = RuntimeHandle.create(RuntimeOptions())
     val operation = runtime.startAmbientCacheOperation(AmbientCacheOperation.INVALIDATE)
 
@@ -71,7 +71,6 @@ class RuntimeHandleTest {
     val runtime = RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
     val operation = runtime.startSetMaximumAmbientCacheSize(8L shl 20)
 
-    assertEquals(OfflineOperationKind.SET_MAXIMUM_AMBIENT_CACHE_SIZE, operation.kind)
     assertFalse(operation.isClosed)
     operation.close()
 
@@ -104,8 +103,6 @@ class RuntimeHandleTest {
           ),
           ByteArray(0),
         )
-      assertEquals(OfflineOperationKind.REGION_CREATE, operation.kind)
-      assertEquals(OfflineOperationResultKind.REGION, operation.resultKind)
       operation.close()
       assertTrue(operation.isClosed)
     }
@@ -116,13 +113,16 @@ class RuntimeHandleTest {
     RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" }).use { runtime ->
       val operation = runtime.startOfflineRegions()
 
-      val completed = waitForOperation(runtime, operation)
-      assertEquals(OfflineOperationKind.REGIONS_LIST, completed.operationKind)
-      assertEquals(OfflineOperationResultKind.REGION_LIST, completed.resultKind)
+      waitForOperation(runtime, operation)
+      assertTrue(operation.waitForCompletion(0))
+      assertEquals(MaplibreStatus.OK, operation.terminalStatus())
+      assertEquals("", operation.diagnostic())
 
       assertTrue(runtime.takeOfflineRegionsResult(operation).isEmpty())
-      assertTrue(operation.isClosed)
+      assertFalse(operation.isClosed)
       assertFailsWith<InvalidStateException> { runtime.takeOfflineRegionsResult(operation) }
+      operation.close()
+      assertTrue(operation.isClosed)
     }
   }
 
@@ -546,25 +546,15 @@ class RuntimeHandleTest {
     }
   }
 
-  private fun waitForOperation(
-    runtime: RuntimeHandle,
-    operation: OfflineOperationHandle<*>,
-  ): RuntimeEventPayload.OfflineOperationCompleted {
+  private fun waitForOperation(runtime: RuntimeHandle, operation: OperationHandle<*>) {
     repeat(10_000) {
-      runtime.pump(0)
-      for (event in runtime.drainEvents().events) {
-        val completed = event.payload as? RuntimeEventPayload.OfflineOperationCompleted ?: continue
-        if (completed.operationId != operation.id) continue
-        assertEquals(RuntimeEventType.OFFLINE_OPERATION_COMPLETED, event.type)
-        assertEquals(operation.kind, completed.operationKind)
-        assertEquals(operation.resultKind, completed.resultKind)
-        assertEquals(MaplibreStatus.OK.nativeCode, completed.resultStatus)
-        return completed
+      if (operation.poll()) {
+        return
       }
       runtime.pump(1)
       waitForAsyncTestWork()
     }
-    error("offline operation did not complete: ${operation.id}")
+    error("operation did not complete")
   }
 
   private fun waitForMapEvent(

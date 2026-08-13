@@ -105,9 +105,9 @@ narrows a subscription by naming the types it reads. An unselected event is
 never built, never queued, and never raises the wake flag that releases a parked
 pump.
 
-One drain reports a batch: every queued event in order, plus the message text
-that those events carry. Copy any value you keep, because the next drain for
-that runtime replaces the batch.
+One drain creates an owned batch: every queued event in order, plus the message
+text that those events carry. A batch remains readable across later drains and
+runtime destruction. Copy values that must outlive the batch, then release it.
 
 Queued events belong to their source. Destroying a map discards that map's
 queued events immediately. Read any state that teardown needs synchronously

@@ -13,46 +13,121 @@ import 'log/log.dart';
 import 'render/targets.dart';
 
 final class _LogCallbackState extends RetainedCallbackState {
-  _LogCallbackState(LogCallback callback, {required bool consume}) {
-    listener =
-        NativeCallable<raw.mln_adapter_log_record_listenerFunction>.listener((
-          Pointer<Void> record,
-        ) {
-          if (record == nullptr) {
-            close();
-            return;
-          }
-          final ran = runUpcall(() {
-            try {
-              final copied = record.cast<raw.mln_adapter_log_record>().ref;
-              if (copied.retire_callback) {
-                close();
-                return;
-              }
-              try {
-                callback(_copyLogRecord(copied));
-              } catch (_) {
-                // An exception must not escape into native callback delivery.
-              }
-            } finally {
-              Maplibre._c.adapterLogRecordDestroy(record);
-            }
-          });
-          if (!ran) {
-            Maplibre._c.adapterLogRecordDestroy(record);
-          }
-        });
+  _LogCallbackState(LogCallback callback, {required bool consume})
+    : _callback = callback {
+    final outSource = calloc<Uint64>();
+    final outQueue = calloc<Uint64>();
+    try {
+      Maplibre._checkStatus(raw.mln_notification_source_create(outSource));
+      source = outSource.value;
+      Maplibre._checkStatus(raw.mln_adapter_log_queue_create(source, outQueue));
+      queue = outQueue.value;
+    } catch (_) {
+      if (queue != 0) {
+        raw.mln_adapter_log_queue_close(queue);
+      }
+      if (source != 0) {
+        raw.mln_notification_source_close(source);
+      }
+      rethrow;
+    } finally {
+      calloc.free(outQueue);
+      calloc.free(outSource);
+    }
     pointer = calloc<raw.mln_adapter_log_callback_state>();
-    pointer.ref.listener = listener.nativeFunction;
+    pointer.ref.queue = queue;
     pointer.ref.consume = consume ? 1 : 0;
+    listener = NativeCallable<raw.mln_notification_callbackFunction>.listener((
+      Pointer<Void> _,
+    ) {
+      runUpcall(_drain);
+    });
+    try {
+      Maplibre._checkStatus(
+        raw.mln_notification_source_set_callback(
+          source,
+          listener.nativeFunction,
+          nullptr,
+        ),
+      );
+    } catch (_) {
+      listener.close();
+      calloc.free(pointer);
+      raw.mln_adapter_log_queue_close(queue);
+      raw.mln_notification_source_close(source);
+      rethrow;
+    }
   }
 
+  final LogCallback _callback;
   late final Pointer<raw.mln_adapter_log_callback_state> pointer;
-  late final NativeCallable<raw.mln_adapter_log_record_listenerFunction>
-  listener;
+  late final NativeCallable<raw.mln_notification_callbackFunction> listener;
+  var source = 0;
+  var queue = 0;
+
+  void _drain() {
+    final queueReady = withNativeArena((arena) {
+      final outBatch = arena<Uint64>();
+      outBatch.value = 0;
+      Maplibre._checkStatus(
+        raw.mln_notification_source_drain_ready(source, outBatch),
+      );
+      final batch = outBatch.value;
+      final view = arena<raw.mln_ready_batch_view>();
+      view.ref.size = sizeOf<raw.mln_ready_batch_view>();
+      try {
+        Maplibre._checkStatus(raw.mln_ready_batch_get(batch, view));
+        final first = view.ref.endpoints.cast<Uint8>();
+        for (var index = 0; index < view.ref.endpoint_count; index += 1) {
+          final endpoint = (first + index * view.ref.endpoint_size)
+              .cast<raw.mln_ready_endpoint>()
+              .ref;
+          if (endpoint.kind ==
+                  raw
+                      .mln_notification_endpoint_kind
+                      .MLN_NOTIFICATION_ENDPOINT_ADAPTER_LOG_RECORDS
+                      .value &&
+              endpoint.id == queue) {
+            return true;
+          }
+        }
+        return false;
+      } finally {
+        raw.mln_ready_batch_release(batch);
+      }
+    });
+    if (!queueReady) {
+      return;
+    }
+    withNativeArena((arena) {
+      final outRecord = arena<Pointer<raw.mln_adapter_log_record>>();
+      while (true) {
+        outRecord.value = nullptr;
+        Maplibre._checkStatus(
+          raw.mln_adapter_log_queue_acquire(queue, outRecord),
+        );
+        final record = outRecord.value;
+        if (record == nullptr) {
+          return;
+        }
+        try {
+          try {
+            _callback(_copyLogRecord(record.ref));
+          } catch (_) {
+            // An exception must not escape into notification delivery.
+          }
+        } finally {
+          raw.mln_adapter_log_record_destroy(record.cast<Void>());
+        }
+      }
+    });
+  }
 
   @override
   void closeResources() {
+    raw.mln_notification_source_clear_callback(source);
+    raw.mln_adapter_log_queue_close(queue);
+    raw.mln_notification_source_close(source);
     calloc.free(pointer);
     listener.close();
   }
@@ -124,10 +199,12 @@ final class Maplibre {
     // Before the registration: the failure path frees state that an installed
     // native callback would still point at.
     ensureAbiVersion();
+    final previous = _logCallbackState;
     final state = _LogCallbackState(callback, consume: consume);
     try {
       _checkStatus(raw.mln_adapter_log_set_callback(state.pointer));
       _logCallbackState = state;
+      previous?.close();
     } catch (_) {
       state.close();
       rethrow;
@@ -138,7 +215,9 @@ final class Maplibre {
   static void clearLogCallback() {
     ensureAbiVersion();
     _checkStatus(raw.mln_adapter_log_set_callback(nullptr));
+    final previous = _logCallbackState;
     _logCallbackState = null;
+    previous?.close();
   }
 
   /// Sets which log severities MapLibre Native may dispatch asynchronously.

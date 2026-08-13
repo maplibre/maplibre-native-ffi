@@ -58,7 +58,34 @@ func TestRuntimeCreationRejectsABIMismatchBeforeNativeCreateOrHandleStore(t *tes
 	}
 }
 
-func TestRuntimeAmbientCacheOperationDiscard(t *testing.T) {
+func TestRuntimeCreationDestroysNativeRuntimeWhenHandleStoreFails(t *testing.T) {
+	const raw = nativeRuntime(42)
+	var destroyed nativeRuntime
+	restore := replaceRuntimeDestroyForTest(func(runtime nativeRuntime) int32 {
+		destroyed = runtime
+		return 0
+	})
+	defer restore()
+
+	runtime, err := createRuntimeWithStateFactory(
+		ExpectedCABIVersion,
+		func(out *nativeRuntime) int32 {
+			*out = raw
+			return 0
+		},
+		func(nativeRuntime) (*handle.State[nativeRuntime], error) {
+			return nil, errors.New("handle store failed")
+		},
+	)
+	if runtime != nil || !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("createRuntimeWithStateFactory() = (%v, %v), want (nil, ErrInvalidArgument)", runtime, err)
+	}
+	if destroyed != raw {
+		t.Fatalf("destroyed runtime = %d, want %d", destroyed, raw)
+	}
+}
+
+func TestRuntimeAmbientCacheOperationRelease(t *testing.T) {
 	lockOSThreadForTest(t)
 
 	runtime, err := NewRuntime()
@@ -75,14 +102,16 @@ func TestRuntimeAmbientCacheOperationDiscard(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StartAmbientCacheOperation(): %v", err)
 	}
-	if operation.ID() == 0 {
-		t.Fatal("operation ID is zero")
+	operation.Release()
+	operation.Release()
+	if _, err := operation.Poll(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("Poll() after Release() error = %v, want ErrInvalidArgument", err)
 	}
-	if err := operation.Discard(); err != nil {
-		t.Fatalf("Discard(): %v", err)
+	if err := operation.Cancel(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("Cancel() after Release() error = %v, want ErrInvalidArgument", err)
 	}
-	if err := operation.Discard(); err != nil {
-		t.Fatalf("second Discard(): %v", err)
+	if _, err := operation.Diagnostic(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("Diagnostic() after Release() error = %v, want ErrInvalidArgument", err)
 	}
 }
 

@@ -200,8 +200,7 @@ impl MapState {
     fn drain_events(&mut self) -> maplibre_native_ffi::Result<bool> {
         let source = RuntimeEventSource::Map(self.map.id());
         let mut render_update_available = false;
-        // One drain takes every event the pump produced. The batch borrows
-        // runtime storage, and this loop keeps nothing from it.
+        // One drain takes every event that the pump produced.
         let batch = self.runtime.drain_events(0)?;
         for event in batch.iter() {
             if event.source() != source {

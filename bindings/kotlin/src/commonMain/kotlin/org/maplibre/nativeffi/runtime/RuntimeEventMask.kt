@@ -71,8 +71,6 @@ public value class RuntimeEventMask(public val nativeValue: Long) {
       of(RuntimeEventType.OFFLINE_REGION_RESPONSE_ERROR)
     public val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: RuntimeEventMask =
       of(RuntimeEventType.OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
-    public val OFFLINE_OPERATION_COMPLETED: RuntimeEventMask =
-      of(RuntimeEventType.OFFLINE_OPERATION_COMPLETED)
 
     /** Selects every map-originated event type this version defines. */
     public val ALL_MAP_EVENTS: RuntimeEventMask =
@@ -100,8 +98,7 @@ public value class RuntimeEventMask(public val nativeValue: Long) {
     public val ALL_RUNTIME_EVENTS: RuntimeEventMask =
       OFFLINE_REGION_STATUS_CHANGED +
         OFFLINE_REGION_RESPONSE_ERROR +
-        OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED +
-        OFFLINE_OPERATION_COMPLETED
+        OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
 
     /** Selects every event type this version defines. */
     public val ALL: RuntimeEventMask = ALL_MAP_EVENTS + ALL_RUNTIME_EVENTS

@@ -261,8 +261,8 @@ Event payloads use plain data with documented lifetimes. Each event identifies
 its source kind and source handle. Queued events never outlive the source handle
 they reference: map teardown discards queued events for that map, and runtime
 teardown discards runtime-owned event streams before the runtime handle becomes
-invalid. A drained batch holds copies, and it stays readable until the next
-drain for its runtime.
+invalid. A drain returns an owned batch of copies. The batch stays readable
+across later drains and runtime destruction until the caller releases it.
 
 Classify each operation as one of:
 

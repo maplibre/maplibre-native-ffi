@@ -49,6 +49,8 @@ typedef enum mln_status : int32_t {
   MLN_STATUS_UNSUPPORTED = -4,
   /** A native MapLibre error or C++ exception was converted to status. */
   MLN_STATUS_NATIVE_ERROR = -5,
+  /** The operation reached its terminal cancelled disposition. */
+  MLN_STATUS_CANCELLED = -6,
 } mln_status;
 
 /** Render backend support flags reported by this native library build. */
@@ -92,6 +94,12 @@ typedef uint64_t mln_buffer;
 typedef uint64_t mln_resource_request_handle;
 typedef uint64_t mln_render_session;
 typedef uint64_t mln_wake_source;
+typedef uint64_t mln_operation;
+typedef uint64_t mln_notification_source;
+typedef uint64_t mln_event_batch;
+typedef uint64_t mln_ready_batch;
+typedef uint64_t mln_adapter_resource_request_queue;
+typedef uint64_t mln_adapter_log_queue;
 
 /**
  * Borrowed data. The data pointer may be null only when size is zero.

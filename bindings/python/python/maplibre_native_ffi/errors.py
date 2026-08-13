@@ -11,6 +11,7 @@ class MaplibreStatus(Enum):
     INVALID_STATE = -2
     WRONG_THREAD = -3
     UNSUPPORTED = -4
+    CANCELLED = -6
     NATIVE_ERROR = -5
     UNKNOWN = None
 
@@ -91,6 +92,15 @@ class NativeError(MaplibreError):
         super().__init__(MaplibreStatus.NATIVE_ERROR, native_status_code, diagnostic)
 
 
+class CancelledError(MaplibreError):
+    """Error for an operation that reached its cancelled disposition."""
+
+    def __init__(
+        self, native_status_code: int | None = -6, diagnostic: str = ""
+    ) -> None:
+        super().__init__(MaplibreStatus.CANCELLED, native_status_code, diagnostic)
+
+
 class UnknownStatusError(MaplibreError):
     """Error for future native status values unknown to this binding."""
 
@@ -98,7 +108,28 @@ class UnknownStatusError(MaplibreError):
         super().__init__(MaplibreStatus.UNKNOWN, native_status_code, diagnostic)
 
 
+class _OperationResultConsumedError(Exception):
+    """Internal marker for a failed adaptation after native result transfer."""
+
+
+def _from_native_status(native_status_code: int, diagnostic: str) -> MaplibreError:
+    error_types: dict[MaplibreStatus, type[MaplibreError]] = {
+        MaplibreStatus.INVALID_ARGUMENT: InvalidArgumentError,
+        MaplibreStatus.INVALID_STATE: InvalidStateError,
+        MaplibreStatus.WRONG_THREAD: WrongThreadError,
+        MaplibreStatus.UNSUPPORTED: UnsupportedFeatureError,
+        MaplibreStatus.NATIVE_ERROR: NativeError,
+        MaplibreStatus.CANCELLED: CancelledError,
+    }
+    status = MaplibreStatus._from_native(native_status_code)
+    error_type = error_types.get(status)
+    if error_type is None:
+        return UnknownStatusError(native_status_code, diagnostic)
+    return error_type(native_status_code, diagnostic)
+
+
 __all__ = [
+    "CancelledError",
     "InvalidArgumentError",
     "InvalidStateError",
     "MaplibreError",

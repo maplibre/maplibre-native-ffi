@@ -11,15 +11,12 @@ namespace Maplibre.NativeFfi.Tests;
 public sealed class RuntimeOfflineOperationTests
 {
     [Fact]
-    public void AmbientCacheOperationCanBeStartedAndDiscarded()
+    public void AmbientCacheOperationCanBeStartedAndReleased()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
 
         using var operation = runtime.StartAmbientCacheOperation(AmbientCacheOperation.Invalidate);
 
-        Assert.NotEqual(0u, operation.Id);
-        Assert.Equal(OfflineOperationKind.AmbientCache, operation.Kind);
-        Assert.Equal(OfflineOperationResultKind.None, operation.ResultKind);
         Assert.False(operation.IsClosed);
 
         operation.Close();
@@ -29,31 +26,29 @@ public sealed class RuntimeOfflineOperationTests
     }
 
     [Fact]
-    public void SetMaximumAmbientCacheSizeCanBeStartedAndDiscarded()
+    public void SetMaximumAmbientCacheSizeCanBeStartedAndReleased()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions { CachePath = ":memory:" });
 
         using var operation = runtime.StartSetMaximumAmbientCacheSize(8UL << 20);
-
-        Assert.NotEqual(0u, operation.Id);
-        Assert.Equal(OfflineOperationKind.SetMaximumAmbientCacheSize, operation.Kind);
-        Assert.Equal(OfflineOperationResultKind.None, operation.ResultKind);
 
         operation.Close();
         Assert.True(operation.IsClosed);
     }
 
     [Fact]
-    public void OperationCloseAfterRuntimeCloseMarksOperationClosed()
+    public void RuntimeCloseFailsWhileOperationIsLiveAndCanRetryAfterOperationClose()
     {
-        var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var operation = runtime.StartAmbientCacheOperation(AmbientCacheOperation.Invalidate);
 
-        runtime.Close();
+        var error = Assert.Throws<InvalidStateException>(runtime.Close);
+        Assert.Equal(MaplibreStatus.InvalidState, error.Status);
+        Assert.False(runtime.IsClosed);
 
         operation.Close();
-        Assert.True(operation.IsClosed);
-        operation.Close();
+        runtime.Close();
+        Assert.True(runtime.IsClosed);
     }
 
     [BindingSpecTest("BND-084")]
@@ -64,7 +59,7 @@ public sealed class RuntimeOfflineOperationTests
         using var take = RuntimeHandle.UseOfflineTakeResultMethodsForTest(
             (_, operationId, status) =>
             {
-                Assert.Equal(77u, operationId);
+                Assert.Equal(77u, operationId.Value);
                 calls++;
                 if (calls == 1)
                 {
@@ -88,11 +83,10 @@ public sealed class RuntimeOfflineOperationTests
             }
         );
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var operation = new OfflineOperationHandle(
+        using var operation = new OperationHandle(
             runtime,
-            77,
-            OfflineOperationKind.RegionGetStatus,
-            OfflineOperationResultKind.RegionStatus
+            new MlnOperation(77),
+            OperationResultKind.RegionStatus
         );
 
         var error = Assert.Throws<InvalidStateException>(() =>
@@ -104,7 +98,7 @@ public sealed class RuntimeOfflineOperationTests
 
         var status = runtime.TakeOfflineRegionStatusResult(operation);
 
-        Assert.True(operation.IsClosed);
+        Assert.False(operation.IsClosed);
         Assert.Equal(2, calls);
         Assert.Equal(OfflineRegionDownloadState.Active, status.DownloadState);
         Assert.Equal(6u, status.RequiredResourceCount);
@@ -114,7 +108,7 @@ public sealed class RuntimeOfflineOperationTests
 
     [BindingSpecTest("BND-084", "BND-085")]
     [Fact]
-    public void OfflineRegionsAreCreatedListedAndDeletedThroughDrainedCompletions()
+    public void OfflineRegionsAreCreatedListedAndDeletedThroughOperationHandles()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions { CachePath = ":memory:" });
         var definition = new OfflineRegionDefinition.TilePyramid(
@@ -136,6 +130,9 @@ public sealed class RuntimeOfflineOperationTests
 
         using var delete = runtime.StartDeleteOfflineRegion(region.Id);
         CompleteOperation(runtime, delete);
+        delete.DiscardResult();
+        Assert.Equal(MaplibreStatus.Ok, delete.GetCompletion().Status);
+        Assert.False(delete.IsClosed);
         delete.Close();
 
         using var listAgain = runtime.StartOfflineRegions();
@@ -146,26 +143,27 @@ public sealed class RuntimeOfflineOperationTests
         );
     }
 
-    // Pumps and drains until the operation reports the completion event that makes its result
-    // available, which is the only signal a host has for taking one.
-    private static void CompleteOperation(RuntimeHandle runtime, OfflineOperationHandle operation)
+    // The runtime pump advances offline work until the common handle reaches a terminal state.
+    private static void CompleteOperation(RuntimeHandle runtime, OperationHandle operation)
     {
         for (var attempt = 0; attempt < 1000; attempt++)
         {
             runtime.Pump(TimeSpan.FromMilliseconds(1));
-            foreach (var drained in runtime.DrainEvents().Events)
+            if (operation.Poll())
             {
-                if (
-                    drained.Payload is RuntimeEventPayload.OfflineOperationCompleted completed
-                    && completed.OperationId == operation.Id
-                )
-                {
-                    Assert.Equal((int)MaplibreStatus.Ok, drained.Code);
-                    return;
-                }
+                Assert.Contains(
+                    runtime.DrainReadyEndpoints(),
+                    endpoint =>
+                        endpoint.Kind == NotificationEndpointKind.Operation
+                        && endpoint.Id == operation.NativeId
+                );
+                var completion = operation.GetCompletion();
+                Assert.Equal(MaplibreStatus.Ok, completion.Status);
+                Assert.Equal((int)MaplibreStatus.Ok, completion.RawStatus);
+                return;
             }
         }
 
-        throw new TimeoutException($"Offline operation {operation.Id} never completed.");
+        throw new TimeoutException("Operation never completed.");
     }
 }

@@ -86,6 +86,9 @@ typedef struct tracked_session {
 } tracked_session;
 
 static MLN_FFI_TEST_THREAD_LOCAL mln_runtime tracked_runtime;
+static MLN_FFI_TEST_THREAD_LOCAL mln_notification_source
+  tracked_notification_source;
+static MLN_FFI_TEST_THREAD_LOCAL mln_event_batch compatibility_batch_handle;
 static MLN_FFI_TEST_THREAD_LOCAL mln_map
   tracked_maps[MLN_FFI_TEST_TRACKED_CAPACITY];
 static MLN_FFI_TEST_THREAD_LOCAL size_t tracked_map_count;
@@ -149,9 +152,13 @@ static void untrack_session(mln_render_session session) {
 
 mln_runtime mln_test_create_runtime(void) {
   mln_runtime runtime = MLN_HANDLE_NULL;
-  const mln_runtime_options options = mln_runtime_options_default();
+  mln_notification_source source = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_create(&source));
+  mln_runtime_options options = mln_runtime_options_default();
+  options.notification_source = source;
   const mln_status status = mln_runtime_create(&options, &runtime);
   if (status == MLN_STATUS_INVALID_STATE) {
+    mln_notification_source_close(source);
     TEST_FAIL_MESSAGE(
       "This thread already owns a live runtime, so an earlier test leaked one. "
       "Look for the first failing test above and destroy the runtime it "
@@ -161,6 +168,7 @@ mln_runtime mln_test_create_runtime(void) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, status);
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
   tracked_runtime = runtime;
+  tracked_notification_source = source;
   return runtime;
 }
 
@@ -185,13 +193,23 @@ mln_map mln_test_create_map(mln_runtime runtime) {
 // Untracking happens only after the destroy succeeds, so a handle whose destroy
 // is rejected for now stays tracked for teardown to reclaim.
 void mln_test_destroy_runtime(mln_runtime runtime) {
+  mln_event_batch_release(compatibility_batch_handle);
+  compatibility_batch_handle = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_destroy(runtime));
   if (tracked_runtime == runtime) {
     tracked_runtime = MLN_HANDLE_NULL;
   }
+  if (tracked_notification_source != MLN_HANDLE_NULL) {
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_notification_source_close(tracked_notification_source)
+    );
+    tracked_notification_source = MLN_HANDLE_NULL;
+  }
 }
 
 void mln_test_destroy_map(mln_map map) {
+  mln_event_batch_release(compatibility_batch_handle);
+  compatibility_batch_handle = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_destroy(map));
   untrack_map(map);
 }
@@ -1249,6 +1267,46 @@ bool mln_test_render_fixture_create(
   return true;
 }
 
+mln_test_event_batch mln_test_event_batch_default(void) {
+  mln_event_batch_release(compatibility_batch_handle);
+  compatibility_batch_handle = MLN_HANDLE_NULL;
+  return (mln_test_event_batch){.size = sizeof(mln_test_event_batch)};
+}
+
+mln_status mln_test_drain_events(
+  mln_runtime runtime, size_t max_events, mln_test_event_batch* out_batch
+) {
+  if (out_batch == NULL || out_batch->size < sizeof(mln_test_event_batch)) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  mln_event_batch_release(compatibility_batch_handle);
+  compatibility_batch_handle = MLN_HANDLE_NULL;
+  mln_event_batch batch = MLN_HANDLE_NULL;
+  mln_status status = mln_runtime_drain_events(runtime, max_events, &batch);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  mln_runtime_event_batch_view view = {
+    .size = sizeof(mln_runtime_event_batch_view)
+  };
+  status = mln_event_batch_get(batch, &view);
+  if (status != MLN_STATUS_OK) {
+    mln_event_batch_release(batch);
+    return status;
+  }
+  compatibility_batch_handle = batch;
+  *out_batch = (mln_test_event_batch){
+    .size = sizeof(mln_test_event_batch),
+    .event_size = view.event_size,
+    .events = view.events,
+    .event_count = view.event_count,
+    .messages = view.messages,
+    .messages_size = view.messages_size,
+    .remaining_count = view.remaining_count,
+  };
+  return MLN_STATUS_OK;
+}
+
 size_t mln_test_drain_all(mln_runtime runtime) {
   return mln_test_drain_counting(runtime, 0);
 }
@@ -1256,8 +1314,8 @@ size_t mln_test_drain_all(mln_runtime runtime) {
 size_t mln_test_drain_counting(mln_runtime runtime, uint32_t type) {
   size_t total = 0;
   for (;;) {
-    mln_runtime_event_batch batch = mln_runtime_event_batch_default();
-    if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
+    mln_test_event_batch batch = mln_test_event_batch_default();
+    if (mln_test_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
       return total;
     }
     if (batch.event_count == 0) {
@@ -1281,8 +1339,8 @@ bool mln_test_drain_find(
 ) {
   bool found = false;
   for (;;) {
-    mln_runtime_event_batch batch = mln_runtime_event_batch_default();
-    if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
+    mln_test_event_batch batch = mln_test_event_batch_default();
+    if (mln_test_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
       return found;
     }
     if (batch.event_count == 0) {
@@ -1337,6 +1395,8 @@ bool mln_test_pump_until(mln_runtime runtime, atomic_bool* flag) {
 }
 
 void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {
+  mln_event_batch_release(compatibility_batch_handle);
+  compatibility_batch_handle = MLN_HANDLE_NULL;
   if (fixture == NULL) {
     return;
   }
@@ -1351,6 +1411,8 @@ void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {
 }
 
 bool mln_test_reclaim_thread_resources(void) {
+  mln_event_batch_release(compatibility_batch_handle);
+  compatibility_batch_handle = MLN_HANDLE_NULL;
   bool reclaimed = false;
   // Render session before map before runtime: the C API keeps a map with a live
   // session and a runtime with live maps alive on purpose.
@@ -1371,6 +1433,11 @@ bool mln_test_reclaim_thread_resources(void) {
   if (tracked_runtime != MLN_HANDLE_NULL) {
     mln_runtime_destroy(tracked_runtime);
     tracked_runtime = MLN_HANDLE_NULL;
+    reclaimed = true;
+  }
+  if (tracked_notification_source != MLN_HANDLE_NULL) {
+    mln_notification_source_close(tracked_notification_source);
+    tracked_notification_source = MLN_HANDLE_NULL;
     reclaimed = true;
   }
   return reclaimed;

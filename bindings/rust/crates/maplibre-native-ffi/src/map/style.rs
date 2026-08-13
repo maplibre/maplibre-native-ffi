@@ -6,10 +6,10 @@ pub(crate) use maplibre_core::style::{
     TileSourceOptionsNativeExt,
 };
 pub use maplibre_core::{
-    GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind,
-    RasterDemEncoding, SourceInfo, SourceType, StyleImage, StyleImageInfo, StyleImageOptions,
-    StyleImageTextFit, StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo, TileScheme,
-    TileSourceOptions, VectorTileEncoding,
+    GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, SourceInfo,
+    SourceType, StyleImage, StyleImageInfo, StyleImageOptions, StyleImageTextFit,
+    StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo, TileScheme, TileSourceOptions,
+    VectorTileEncoding,
 };
 use maplibre_native_ffi_core as maplibre_core;
 use maplibre_native_ffi_core::ptr::const_ptr_or_null;

@@ -32,8 +32,8 @@ static bool wait_for_style_loaded(
       return false;
     }
     while (true) {
-      mln_runtime_event_batch batch = mln_runtime_event_batch_default();
-      if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
+      mln_test_event_batch batch = mln_test_event_batch_default();
+      if (mln_test_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
         return false;
       }
       if (batch.event_count == 0) {

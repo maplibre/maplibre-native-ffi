@@ -50,12 +50,6 @@ public value class RuntimeEventType(public val nativeValue: Int) {
     public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventType = RuntimeEventType(20)
     public val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: RuntimeEventType = RuntimeEventType(21)
 
-    /**
-     * [RuntimeEvent.code] carries the operation result as a native status value, the same value
-     * [RuntimeEventPayload.OfflineOperationCompleted.resultStatus] reports.
-     */
-    public val OFFLINE_OPERATION_COMPLETED: RuntimeEventType = RuntimeEventType(22)
-
     /** [RuntimeEvent.payload] carries [RuntimeEventPayload.CameraTransitionFinished]. */
     public val MAP_CAMERA_TRANSITION_FINISHED: RuntimeEventType = RuntimeEventType(23)
 

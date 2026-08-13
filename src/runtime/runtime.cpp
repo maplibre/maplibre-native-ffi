@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -40,6 +41,8 @@
 #include "geojson/geojson.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
+#include "notification/notification.hpp"
+#include "operation/operation.hpp"
 
 struct OfflineRegionData {
   mln_offline_region_id id = 0;
@@ -76,6 +79,12 @@ struct HandleTraits<OfflineRegionListObject> {
   static constexpr auto leasable = false;
 };
 
+template <>
+struct HandleTraits<EventBatchObject> {
+  static constexpr auto kind = HandleKind::EventBatch;
+  static constexpr auto leasable = true;
+};
+
 }  // namespace mln::core
 
 namespace mln::core {
@@ -97,32 +106,31 @@ struct HandleTraits<WakeSourceObject> {
   static constexpr auto leasable = true;
 };
 
-using OfflineOperationResult = std::variant<
-  std::monostate, OfflineRegionData, std::optional<OfflineRegionData>,
-  std::vector<OfflineRegionData>, mln_offline_region_status>;
-
-struct OfflineOperation {
-  mln_offline_operation_id id = 0;
-  uint32_t kind = 0;
-  uint32_t result_kind = MLN_OFFLINE_OPERATION_RESULT_NONE;
-  bool completed = false;
-  int32_t result_status = MLN_STATUS_OK;
-  bool found = false;
-  std::string message;
-  OfflineOperationResult result;
-};
-
-struct OfflineOperationEventState {
-  std::mutex mutex;
-  mln::core::RuntimeObject* runtime = nullptr;
-  bool alive = false;
-  mln_offline_operation_id next_id = 1;
-  std::unordered_map<mln_offline_operation_id, OfflineOperation> operations;
-};
-
 }  // namespace mln::core
 
 namespace {
+enum : std::uint32_t {
+  MLN_OFFLINE_OPERATION_AMBIENT_CACHE = 1,
+  MLN_OFFLINE_OPERATION_REGION_CREATE = 2,
+  MLN_OFFLINE_OPERATION_REGION_GET = 3,
+  MLN_OFFLINE_OPERATION_REGIONS_LIST = 4,
+  MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE = 5,
+  MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA = 6,
+  MLN_OFFLINE_OPERATION_REGION_GET_STATUS = 7,
+  MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED = 8,
+  MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE = 9,
+  MLN_OFFLINE_OPERATION_REGION_INVALIDATE = 10,
+  MLN_OFFLINE_OPERATION_REGION_DELETE = 11,
+  MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE = 12,
+};
+
+enum : std::uint32_t {
+  MLN_OFFLINE_OPERATION_RESULT_NONE = 0,
+  MLN_OFFLINE_OPERATION_RESULT_REGION = 1,
+  MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION = 2,
+  MLN_OFFLINE_OPERATION_RESULT_REGION_LIST = 3,
+  MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS = 4,
+};
 
 // Each mask constant must be the bit of the event type it selects, written
 // against the shift rather than a literal, so an event type added without its
@@ -155,7 +163,6 @@ MLN_ASSERT_EVENT_MASK_BIT(MAP_CAMERA_TRANSITION_FINISHED);
 MLN_ASSERT_EVENT_MASK_BIT(OFFLINE_REGION_STATUS_CHANGED);
 MLN_ASSERT_EVENT_MASK_BIT(OFFLINE_REGION_RESPONSE_ERROR);
 MLN_ASSERT_EVENT_MASK_BIT(OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED);
-MLN_ASSERT_EVENT_MASK_BIT(OFFLINE_OPERATION_COMPLETED);
 
 #undef MLN_ASSERT_EVENT_MASK_BIT
 
@@ -285,19 +292,6 @@ auto lease_resource_provider_state(void* platform_context) noexcept
     return nullptr;
   }
   return runtime->resource_provider_state;
-}
-
-// Reports why a take-result call has no result. This is the only route to a
-// failed operation's text for a host that leaves
-// MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED unselected.
-auto set_offline_result_unavailable_error(
-  const mln::core::OfflineOperation& operation
-) -> void {
-  if (operation.completed && !operation.message.empty()) {
-    mln::core::set_thread_error(operation.message.c_str());
-    return;
-  }
-  mln::core::set_thread_error("offline operation result is not available");
 }
 
 // A batch locates a message by a uint32_t offset and size, so a message is
@@ -651,8 +645,8 @@ auto region_event_selected(
   if (!mln::core::event_selected(runtime->event_state->mask, type)) {
     return false;
   }
-  const std::scoped_lock event_lock(runtime->event_mutex);
-  return runtime->observed_offline_regions.contains(region_id);
+  const std::scoped_lock event_lock(runtime->event_queue->mutex);
+  return runtime->event_queue->observed_offline_regions.contains(region_id);
 }
 
 auto push_offline_region_event(
@@ -682,15 +676,16 @@ auto push_offline_region_event(
   };
 
   {
-    const std::scoped_lock event_lock(runtime->event_mutex);
-    if (!runtime->observed_offline_regions.contains(region_id)) {
+    const std::scoped_lock event_lock(runtime->event_queue->mutex);
+    if (!runtime->event_queue->observed_offline_regions.contains(region_id)) {
       return;
     }
-    runtime->events.push_back(std::move(event));
+    runtime->event_queue->events.push_back(std::move(event));
   }
   // The offline region observer runs off the owner-thread run loop, so this
   // signal releases a parked owner thread.
   mln::core::signal_wake(runtime->wake_state);
+  runtime->event_queue->notification_endpoint->mark_ready();
 }
 
 class OfflineRegionRuntimeObserver final : public mbgl::OfflineRegionObserver {
@@ -764,14 +759,16 @@ auto set_offline_region_observed_flag(
   mln::core::RuntimeObject* runtime, mln_offline_region_id region_id,
   bool observed
 ) -> void {
-  const std::scoped_lock lock(runtime->event_mutex);
+  const std::scoped_lock lock(runtime->event_queue->mutex);
   if (observed) {
-    runtime->observed_offline_regions.insert(region_id);
+    runtime->event_queue->observed_offline_regions.insert(region_id);
   } else {
-    runtime->observed_offline_regions.erase(region_id);
-    std::erase_if(runtime->events, [region_id](const auto& event) -> bool {
-      return event.has_offline_region && event.offline_region_id == region_id;
-    });
+    runtime->event_queue->observed_offline_regions.erase(region_id);
+    std::erase_if(
+      runtime->event_queue->events, [region_id](const auto& event) -> bool {
+        return event.has_offline_region && event.offline_region_id == region_id;
+      }
+    );
   }
 }
 
@@ -824,183 +821,48 @@ auto exception_message(std::exception_ptr exception, const char* fallback)
   }
 }
 
-auto validate_offline_operation_output(
-  mln_runtime runtime, mln::core::RuntimeObject*& out_runtime,
-  mln_offline_operation_id* out_operation_id
-) -> mln_status {
-  const auto status = mln::core::validate_runtime(runtime, out_runtime);
-  if (status != MLN_STATUS_OK) {
-    if (out_operation_id != nullptr) {
-      *out_operation_id = 0;
-    }
-    return status;
-  }
-  if (out_operation_id == nullptr) {
-    mln::core::set_thread_error("out_operation_id must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_operation_id = 0;
-  return MLN_STATUS_OK;
-}
-
-auto register_offline_operation(
-  mln_runtime runtime_handle, uint32_t kind, uint32_t result_kind,
-  mln_offline_operation_id* out_operation_id
-) -> mln_status {
-  mln::core::RuntimeObject* runtime = nullptr;
-  const auto status = validate_offline_operation_output(
-    runtime_handle, runtime, out_operation_id
-  );
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-
-  const std::scoped_lock lock(runtime->offline_operation_state->mutex);
-  auto& state = *runtime->offline_operation_state;
-  if (!state.alive || state.runtime != runtime || state.next_id == 0) {
-    mln::core::set_thread_error("offline operation state is unavailable");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  const auto id = state.next_id++;
-  state.operations.emplace(
-    id, mln::core::OfflineOperation{
-          .id = id,
-          .kind = kind,
-          .result_kind = result_kind,
-          .completed = false,
-          .result_status = MLN_STATUS_OK,
-          .found = false,
-          .message = {},
-          .result = std::monostate{}
-        }
-  );
-  *out_operation_id = id;
-  return MLN_STATUS_OK;
-}
-
-auto erase_queued_offline_operation_events(
-  mln::core::RuntimeObject* runtime, mln_offline_operation_id operation_id
-) -> void {
-  const std::scoped_lock event_lock(runtime->event_mutex);
-  std::erase_if(runtime->events, [operation_id](const auto& event) -> bool {
-    return event.has_offline_operation &&
-           event.offline_operation_id == operation_id;
-  });
-}
-
-auto erase_offline_operation_registration(
-  mln::core::RuntimeObject* runtime, mln_offline_operation_id operation_id
-) -> void {
-  if (runtime == nullptr || operation_id == 0) {
-    return;
-  }
-  auto state = runtime->offline_operation_state;
-  if (!state) {
-    return;
-  }
-  {
-    const std::scoped_lock state_lock(state->mutex);
-    state->operations.erase(operation_id);
-  }
-
-  erase_queued_offline_operation_events(runtime, operation_id);
-}
-
 template <typename Schedule>
 auto schedule_registered_offline_operation(
   mln::core::RuntimeObject* runtime, uint32_t kind, uint32_t result_kind,
-  mln_offline_operation_id* out_operation_id, Schedule&& schedule
+  mln_operation* out_operation_id, Schedule&& schedule
 ) -> mln_status {
-  auto register_status = register_offline_operation(
-    runtime->self, kind, result_kind, out_operation_id
+  static_cast<void>(result_kind);
+  auto state = std::shared_ptr<mln::core::OperationObject>{};
+  const auto status = mln::core::register_operation(
+    runtime->event_queue->notification_source, kind, false, {},
+    out_operation_id, state
   );
-  if (register_status != MLN_STATUS_OK) {
-    return register_status;
+  if (status != MLN_STATUS_OK) {
+    return status;
   }
   const auto operation_id = *out_operation_id;
-  auto state = runtime->offline_operation_state;
   try {
     std::forward<Schedule>(schedule)(state, operation_id);
   } catch (...) {
-    erase_offline_operation_registration(runtime, operation_id);
-    *out_operation_id = 0;
+    mln::core::abandon_operation(operation_id);
+    *out_operation_id = MLN_HANDLE_NULL;
     throw;
   }
   return MLN_STATUS_OK;
 }
 
-auto make_offline_completion_payload(
-  const mln::core::OfflineOperation& operation
-) -> mln_runtime_event_payload {
-  auto payload = mln::core::zeroed_event_payload();
-  payload.offline_operation_completed =
-    mln_runtime_event_offline_operation_completed{
-      .operation_id = operation.id,
-      .operation_kind = operation.kind,
-      .result_kind = operation.result_kind,
-      .result_status = operation.result_status,
-      .found = operation.found
-    };
-  return payload;
-}
-
+template <typename Result>
 auto complete_offline_operation(
-  const std::shared_ptr<mln::core::OfflineOperationEventState>& state,
-  mln_offline_operation_id operation_id, int32_t result_status,
-  mln::core::OfflineOperationResult result, bool found = false,
-  std::string message = {}
+  const std::shared_ptr<mln::core::OperationObject>& state,
+  mln_operation operation_id, int32_t result_status, Result result,
+  bool found = false, std::string message = {}
 ) -> void {
-  const std::scoped_lock state_lock(state->mutex);
-  auto* runtime = state->runtime;
-  if (!state->alive || runtime == nullptr) {
-    return;
-  }
-
-  auto found_operation = state->operations.find(operation_id);
-  if (found_operation == state->operations.end()) {
-    return;
-  }
-
-  // The result and its failure text are what a take-result call reports, so
-  // they are recorded whatever the mask selects. Only the event is gated.
-  auto& operation = found_operation->second;
-  operation.completed = true;
-  operation.result_status = result_status;
-  operation.found = found;
-  operation.message = std::move(message);
-  operation.result = std::move(result);
-
-  if (!mln::core::event_selected(
-        runtime->event_state->mask,
-        MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED
-      )) {
-    return;
-  }
-
-  auto event = mln::core::QueuedRuntimeEvent{
-    .type = MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED,
-    .source_type = MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-    .source = runtime->self,
-    .code = result_status,
-    .payload_type = MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED,
-    .payload = make_offline_completion_payload(operation),
-    .message = truncated_event_message(operation.message),
-    .has_offline_region = false,
-    .offline_region_id = 0,
-    .has_offline_operation = true,
-    .offline_operation_id = operation_id
-  };
-
-  {
-    const std::scoped_lock event_lock(runtime->event_mutex);
-    runtime->events.push_back(std::move(event));
-  }
-  mln::core::signal_wake(runtime->wake_state);
+  static_cast<void>(operation_id);
+  static_cast<void>(found);
+  state->complete(
+    static_cast<mln_status>(result_status), std::move(message),
+    std::any{std::move(result)}
+  );
 }
 
 auto complete_offline_operation_error(
-  const std::shared_ptr<mln::core::OfflineOperationEventState>& state,
-  mln_offline_operation_id operation_id, int32_t status, std::string message
+  const std::shared_ptr<mln::core::OperationObject>& state,
+  mln_operation operation_id, int32_t status, std::string message
 ) -> void {
   complete_offline_operation(
     state, operation_id, status, std::monostate{}, false, std::move(message)
@@ -1008,9 +870,8 @@ auto complete_offline_operation_error(
 }
 
 auto complete_from_exception(
-  const std::shared_ptr<mln::core::OfflineOperationEventState>& state,
-  mln_offline_operation_id operation_id, std::exception_ptr exception,
-  const char* fallback
+  const std::shared_ptr<mln::core::OperationObject>& state,
+  mln_operation operation_id, std::exception_ptr exception, const char* fallback
 ) -> void {
   if (exception) {
     complete_offline_operation_error(
@@ -1027,7 +888,8 @@ auto complete_from_exception(
 auto validate_runtime_options(const mln_runtime_options* options)
   -> mln_status {
   if (options == nullptr) {
-    return MLN_STATUS_OK;
+    mln::core::set_thread_error("runtime options must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   if (options->size < sizeof(mln_runtime_options)) {
@@ -1047,6 +909,12 @@ auto validate_runtime_options(const mln_runtime_options* options)
   if ((options->event_mask & ~known_mask_bits) != 0U) {
     mln::core::set_thread_error(
       "mln_runtime_options.event_mask contains unknown bits"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (options->notification_source == MLN_HANDLE_NULL) {
+    mln::core::set_thread_error(
+      "mln_runtime_options.notification_source must be live"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1113,6 +981,11 @@ auto create_runtime(
     set_thread_error("out_runtime must point to the null handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  const auto notification_source =
+    notification_source_from_handle(options->notification_source);
+  if (notification_source == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
 
   const auto owner_thread = std::this_thread::get_id();
   if (owner_thread_has_live_runtime(owner_thread)) {
@@ -1130,12 +1003,11 @@ auto create_runtime(
   // The mask cell exists before the run loop, so every producer this runtime
   // can reach reads a live cell.
   owned_runtime->event_state = std::make_shared<RuntimeEventState>();
-  // Null options keep the library's own default, which is every event type.
   owned_runtime->event_state->mask.store(
-    options != nullptr ? options->event_mask
-                       : static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL),
-    std::memory_order_relaxed
+    options->event_mask, std::memory_order_relaxed
   );
+  owned_runtime->event_queue = std::make_shared<RuntimeEventQueueState>();
+  owned_runtime->event_queue->notification_source = notification_source;
   owned_runtime->run_loop =
     std::make_unique<mbgl::util::RunLoop>(mbgl::util::RunLoop::Type::New);
   // `setPlatformCallback` is an unlocked assignment, so it happens while the
@@ -1143,22 +1015,16 @@ auto create_runtime(
   owned_runtime->run_loop->setPlatformCallback(
     [state = owned_runtime->wake_state]() -> void { signal_wake(state); }
   );
-  owned_runtime->asset_path =
-    options == nullptr || options->asset_path == nullptr
-      ? std::string{}
-      : std::string{options->asset_path};
-  owned_runtime->cache_path =
-    options == nullptr || options->cache_path == nullptr
-      ? std::string{}
-      : std::string{options->cache_path};
+  owned_runtime->asset_path = options->asset_path == nullptr
+                                ? std::string{}
+                                : std::string{options->asset_path};
+  owned_runtime->cache_path = options->cache_path == nullptr
+                                ? std::string{}
+                                : std::string{options->cache_path};
   owned_runtime->offline_event_state =
     std::make_shared<OfflineRegionEventState>();
   owned_runtime->offline_event_state->runtime = owned_runtime.get();
   owned_runtime->offline_event_state->alive = true;
-  owned_runtime->offline_operation_state =
-    std::make_shared<OfflineOperationEventState>();
-  owned_runtime->offline_operation_state->runtime = owned_runtime.get();
-  owned_runtime->offline_operation_state->alive = true;
   owned_runtime->resource_transform_state =
     std::make_shared<ResourceTransformState>();
   owned_runtime->http_header_transform_state =
@@ -1179,10 +1045,26 @@ auto create_runtime(
   try {
     *out_runtime =
       handle_table<RuntimeObject>().insert(std::move(owned_runtime));
+    published->self = *out_runtime;
+    published->event_queue->notification_endpoint =
+      notification_source->associate(
+        *out_runtime, MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS, true
+      );
+    if (published->event_queue->notification_endpoint == nullptr) {
+      static_cast<void>(handle_table<RuntimeObject>().remove(*out_runtime));
+      *out_runtime = MLN_HANDLE_NULL;
+      {
+        const std::scoped_lock lock(live_runtime_threads_mutex());
+        live_runtime_threads().erase(owner_thread);
+      }
+      unregister_platform_context(platform_context);
+      return MLN_STATUS_INVALID_STATE;
+    }
   } catch (...) {
-    // The caller receives no handle, so it has no way to give the owner thread
-    // back. Releasing it here keeps a failed creation from rejecting every
-    // later one on the same thread.
+    if (*out_runtime != MLN_HANDLE_NULL) {
+      static_cast<void>(handle_table<RuntimeObject>().remove(*out_runtime));
+      *out_runtime = MLN_HANDLE_NULL;
+    }
     {
       const std::scoped_lock lock(live_runtime_threads_mutex());
       live_runtime_threads().erase(owner_thread);
@@ -1190,7 +1072,6 @@ auto create_runtime(
     unregister_platform_context(platform_context);
     throw;
   }
-  published->self = *out_runtime;
   bind_platform_context(platform_context, *out_runtime);
   return MLN_STATUS_OK;
 }
@@ -1543,12 +1424,8 @@ auto clear_http_header_transform(mln_runtime runtime) -> mln_status {
 }
 
 auto run_ambient_cache_operation_start(
-  mln_runtime runtime, uint32_t operation,
-  mln_offline_operation_id* out_operation_id
+  mln_runtime runtime, uint32_t operation, mln_operation* out_operation_id
 ) -> mln_status {
-  if (out_operation_id != nullptr) {
-    *out_operation_id = 0;
-  }
   mln::core::RuntimeObject* live = nullptr;
   const auto runtime_status = validate_runtime(runtime, live);
   if (runtime_status != MLN_STATUS_OK) {
@@ -1608,12 +1485,8 @@ auto run_ambient_cache_operation_start(
 }
 
 auto set_maximum_ambient_cache_size_start(
-  mln_runtime runtime, std::uint64_t size,
-  mln_offline_operation_id* out_operation_id
+  mln_runtime runtime, std::uint64_t size, mln_operation* out_operation_id
 ) -> mln_status {
-  if (out_operation_id != nullptr) {
-    *out_operation_id = 0;
-  }
   mln::core::RuntimeObject* live = nullptr;
   const auto runtime_status = validate_runtime(runtime, live);
   if (runtime_status != MLN_STATUS_OK) {
@@ -1645,40 +1518,10 @@ auto set_maximum_ambient_cache_size_start(
   );
 }
 
-auto offline_operation_discard(
-  mln_runtime runtime, mln_offline_operation_id operation_id
-) -> mln_status {
-  mln::core::RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (operation_id == 0) {
-    set_thread_error("offline operation ID is invalid");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto state = live->offline_operation_state;
-  const std::scoped_lock state_lock(state->mutex);
-  auto found = state->operations.find(operation_id);
-  if (found == state->operations.end()) {
-    set_thread_error("offline operation is unknown");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  state->operations.erase(found);
-
-  erase_queued_offline_operation_events(live, operation_id);
-  return MLN_STATUS_OK;
-}
-
 auto offline_region_create_start(
   mln_runtime runtime, const mln_offline_region_definition* definition,
-  const uint8_t* metadata, size_t metadata_size,
-  mln_offline_operation_id* out_operation_id
+  const uint8_t* metadata, size_t metadata_size, mln_operation* out_operation_id
 ) -> mln_status {
-  if (out_operation_id != nullptr) {
-    *out_operation_id = 0;
-  }
   mln::core::RuntimeObject* live = nullptr;
   const auto runtime_status = validate_runtime(runtime, live);
   if (runtime_status != MLN_STATUS_OK) {
@@ -1747,11 +1590,8 @@ auto offline_region_create_start(
 
 auto offline_region_get_start(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation_id
 ) -> mln_status {
-  if (out_operation_id != nullptr) {
-    *out_operation_id = 0;
-  }
   mln::core::RuntimeObject* live = nullptr;
   const auto runtime_status = validate_runtime(runtime, live);
   if (runtime_status != MLN_STATUS_OK) {
@@ -1811,11 +1651,8 @@ auto offline_region_get_start(
 }
 
 auto offline_regions_list_start(
-  mln_runtime runtime, mln_offline_operation_id* out_operation_id
+  mln_runtime runtime, mln_operation* out_operation_id
 ) -> mln_status {
-  if (out_operation_id != nullptr) {
-    *out_operation_id = 0;
-  }
   mln::core::RuntimeObject* live = nullptr;
   const auto runtime_status = validate_runtime(runtime, live);
   if (runtime_status != MLN_STATUS_OK) {
@@ -1866,11 +1703,8 @@ auto offline_regions_list_start(
 
 auto offline_regions_merge_database_start(
   mln_runtime runtime, const char* side_database_path,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation_id
 ) -> mln_status {
-  if (out_operation_id != nullptr) {
-    *out_operation_id = 0;
-  }
   mln::core::RuntimeObject* live = nullptr;
   const auto runtime_status = validate_runtime(runtime, live);
   if (runtime_status != MLN_STATUS_OK) {
@@ -1929,11 +1763,8 @@ auto offline_regions_merge_database_start(
 
 auto offline_region_update_metadata_start(
   mln_runtime runtime, mln_offline_region_id region_id, const uint8_t* metadata,
-  size_t metadata_size, mln_offline_operation_id* out_operation_id
+  size_t metadata_size, mln_operation* out_operation_id
 ) -> mln_status {
-  if (out_operation_id != nullptr) {
-    *out_operation_id = 0;
-  }
   mln::core::RuntimeObject* live = nullptr;
   const auto runtime_status = validate_runtime(runtime, live);
   if (runtime_status != MLN_STATUS_OK) {
@@ -2020,11 +1851,8 @@ auto offline_region_update_metadata_start(
 
 auto offline_region_get_status_start(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation_id
 ) -> mln_status {
-  if (out_operation_id != nullptr) {
-    *out_operation_id = 0;
-  }
   mln::core::RuntimeObject* live = nullptr;
   const auto runtime_status = validate_runtime(runtime, live);
   if (runtime_status != MLN_STATUS_OK) {
@@ -2095,11 +1923,8 @@ auto offline_region_get_status_start(
 
 auto offline_region_set_observed_start(
   mln_runtime runtime, mln_offline_region_id region_id, bool observed,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation_id
 ) -> mln_status {
-  if (out_operation_id != nullptr) {
-    *out_operation_id = 0;
-  }
   mln::core::RuntimeObject* live = nullptr;
   const auto runtime_status = validate_runtime(runtime, live);
   if (runtime_status != MLN_STATUS_OK) {
@@ -2115,14 +1940,16 @@ auto offline_region_set_observed_start(
     set_thread_error("database file source is unavailable");
     return MLN_STATUS_NATIVE_ERROR;
   }
+  auto offline_event_state = live->offline_event_state;
 
   return schedule_registered_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED,
     MLN_OFFLINE_OPERATION_RESULT_NONE, out_operation_id,
-    [&](auto state, auto operation_id) -> void {
+    [&, offline_event_state](auto state, auto operation_id) -> void {
       database->getOfflineRegion(
         region_id,
-        [database, state, operation_id, region_id, observed](
+        [database, state, operation_id, region_id, observed,
+         offline_event_state](
           mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>
             result
         ) -> void {
@@ -2141,20 +1968,24 @@ auto offline_region_set_observed_start(
             );
             return;
           }
-          auto event_state = std::shared_ptr<OfflineRegionEventState>{};
           {
-            const std::scoped_lock state_lock(state->mutex);
-            if (!state->alive || state->runtime == nullptr) {
+            const std::scoped_lock event_state_lock(offline_event_state->mutex);
+            if (
+              !offline_event_state->alive ||
+              offline_event_state->runtime == nullptr
+            ) {
+              complete_offline_operation(
+                state, operation_id, MLN_STATUS_OK, std::monostate{}
+              );
               return;
             }
             set_offline_region_observed_flag(
-              state->runtime, region_id, observed
+              offline_event_state->runtime, region_id, observed
             );
-            event_state = state->runtime->offline_event_state;
           }
           auto observer = observed
                             ? std::make_unique<OfflineRegionRuntimeObserver>(
-                                std::move(event_state), region_id
+                                offline_event_state, region_id
                               )
                             : nullptr;
           database->setOfflineRegionObserver(
@@ -2171,11 +2002,8 @@ auto offline_region_set_observed_start(
 
 auto offline_region_set_download_state_start(
   mln_runtime runtime, OfflineRegionDownloadStateRequest request,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation_id
 ) -> mln_status {
-  if (out_operation_id != nullptr) {
-    *out_operation_id = 0;
-  }
   mln::core::RuntimeObject* live = nullptr;
   const auto runtime_status = validate_runtime(runtime, live);
   if (runtime_status != MLN_STATUS_OK) {
@@ -2236,11 +2064,8 @@ auto offline_region_set_download_state_start(
 
 auto offline_region_invalidate_start(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation_id
 ) -> mln_status {
-  if (out_operation_id != nullptr) {
-    *out_operation_id = 0;
-  }
   mln::core::RuntimeObject* live = nullptr;
   const auto runtime_status = validate_runtime(runtime, live);
   if (runtime_status != MLN_STATUS_OK) {
@@ -2299,11 +2124,8 @@ auto offline_region_invalidate_start(
 
 auto offline_region_delete_start(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation_id
 ) -> mln_status {
-  if (out_operation_id != nullptr) {
-    *out_operation_id = 0;
-  }
   mln::core::RuntimeObject* live = nullptr;
   const auto runtime_status = validate_runtime(runtime, live);
   if (runtime_status != MLN_STATUS_OK) {
@@ -2319,14 +2141,15 @@ auto offline_region_delete_start(
     set_thread_error("database file source is unavailable");
     return MLN_STATUS_NATIVE_ERROR;
   }
+  auto offline_event_state = live->offline_event_state;
 
   return schedule_registered_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGION_DELETE,
     MLN_OFFLINE_OPERATION_RESULT_NONE, out_operation_id,
-    [&](auto state, auto operation_id) -> void {
+    [&, offline_event_state](auto state, auto operation_id) -> void {
       database->getOfflineRegion(
         region_id,
-        [database, state, operation_id, region_id](
+        [database, state, operation_id, region_id, offline_event_state](
           mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>
             result
         ) -> void {
@@ -2346,11 +2169,15 @@ auto offline_region_delete_start(
             return;
           }
           {
-            const std::scoped_lock state_lock(state->mutex);
-            if (!state->alive || state->runtime == nullptr) {
-              return;
+            const std::scoped_lock event_state_lock(offline_event_state->mutex);
+            if (
+              offline_event_state->alive &&
+              offline_event_state->runtime != nullptr
+            ) {
+              set_offline_region_observed_flag(
+                offline_event_state->runtime, region_id, false
+              );
             }
-            set_offline_region_observed_flag(state->runtime, region_id, false);
           }
           database->setOfflineRegionObserver(region.value(), nullptr);
           database->setOfflineRegionDownloadState(
@@ -2371,73 +2198,29 @@ auto offline_region_delete_start(
 }
 
 auto offline_region_create_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_snapshot* out_region
+  mln_operation operation, mln_offline_region_snapshot* out_region
 ) -> mln_status {
-  mln::core::RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (out_region == nullptr || *out_region != MLN_HANDLE_NULL) {
     set_thread_error("out_region must point to the null handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto state = live->offline_operation_state;
-  {
-    const std::scoped_lock lock(state->mutex);
-    auto found = state->operations.find(operation_id);
-    if (found == state->operations.end()) {
-      set_thread_error("offline operation is unknown");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    auto& operation = found->second;
-    if (
-      !operation.completed ||
-      operation.kind != MLN_OFFLINE_OPERATION_REGION_CREATE ||
-      operation.result_status != MLN_STATUS_OK
-    ) {
-      set_offline_result_unavailable_error(operation);
-      return MLN_STATUS_INVALID_STATE;
-    }
-    auto* result = std::get_if<OfflineRegionData>(&operation.result);
-    if (result == nullptr) {
-      set_thread_error("offline operation result kind is invalid");
-      return MLN_STATUS_INVALID_STATE;
-    }
-  }
-  auto snapshot = register_offline_region_snapshot_from_result(
-    [state, operation_id](OfflineRegionData& data) -> void {
-      const std::scoped_lock lock(state->mutex);
-      auto found = state->operations.find(operation_id);
-      if (found == state->operations.end()) {
-        throw std::logic_error(
-          "offline operation disappeared while taking result"
-        );
-      }
-      auto* result = std::get_if<OfflineRegionData>(&found->second.result);
-      if (result == nullptr) {
-        throw std::logic_error(
-          "offline operation result kind changed while taking result"
-        );
-      }
-      data = std::move(*result);
+  return take_operation_result<OfflineRegionData>(
+    operation, MLN_OFFLINE_OPERATION_REGION_CREATE,
+    [out_region](OfflineRegionData& result) -> mln_status {
+      *out_region = register_offline_region_snapshot_from_result(
+        [&result](OfflineRegionData& destination) -> void {
+          destination = std::move(result);
+        }
+      );
+      return MLN_STATUS_OK;
     }
   );
-  erase_offline_operation_registration(live, operation_id);
-  *out_region = snapshot;
-  return MLN_STATUS_OK;
 }
 
 auto offline_region_get_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_snapshot* out_region, bool* out_found
+  mln_operation operation, mln_offline_region_snapshot* out_region,
+  bool* out_found
 ) -> mln_status {
-  mln::core::RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (
     out_region == nullptr || *out_region != MLN_HANDLE_NULL ||
     out_found == nullptr
@@ -2447,252 +2230,88 @@ auto offline_region_get_take_result(
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto state = live->offline_operation_state;
-  auto has_region = false;
-  {
-    const std::scoped_lock lock(state->mutex);
-    auto found = state->operations.find(operation_id);
-    if (found == state->operations.end()) {
-      set_thread_error("offline operation is unknown");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    auto& operation = found->second;
-    if (
-      !operation.completed ||
-      operation.kind != MLN_OFFLINE_OPERATION_REGION_GET ||
-      operation.result_status != MLN_STATUS_OK
-    ) {
-      set_offline_result_unavailable_error(operation);
-      return MLN_STATUS_INVALID_STATE;
-    }
-    auto* result =
-      std::get_if<std::optional<OfflineRegionData>>(&operation.result);
-    if (result == nullptr) {
-      set_thread_error("offline operation result kind is invalid");
-      return MLN_STATUS_INVALID_STATE;
-    }
-    has_region = result->has_value();
-  }
-  if (!has_region) {
-    erase_offline_operation_registration(live, operation_id);
-    *out_found = false;
-    return MLN_STATUS_OK;
-  }
-  auto snapshot = register_offline_region_snapshot_from_result(
-    [state, operation_id](OfflineRegionData& data) -> void {
-      const std::scoped_lock lock(state->mutex);
-      auto found = state->operations.find(operation_id);
-      if (found == state->operations.end()) {
-        throw std::logic_error(
-          "offline operation disappeared while taking result"
-        );
+  return take_operation_result<std::optional<OfflineRegionData>>(
+    operation, MLN_OFFLINE_OPERATION_REGION_GET,
+    [out_region,
+     out_found](std::optional<OfflineRegionData>& result) -> mln_status {
+      if (!result.has_value()) {
+        *out_found = false;
+        return MLN_STATUS_OK;
       }
-      auto* result =
-        std::get_if<std::optional<OfflineRegionData>>(&found->second.result);
-      if (result == nullptr || !result->has_value()) {
-        throw std::logic_error(
-          "offline operation result kind changed while taking result"
-        );
-      }
-      data = std::move(**result);
+      *out_region = register_offline_region_snapshot_from_result(
+        [&result](OfflineRegionData& destination) -> void {
+          destination = std::move(*result);
+        }
+      );
+      *out_found = true;
+      return MLN_STATUS_OK;
     }
   );
-  erase_offline_operation_registration(live, operation_id);
-  *out_region = snapshot;
-  *out_found = true;
-  return MLN_STATUS_OK;
 }
 
 auto offline_regions_list_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_list* out_regions
+  mln_operation operation, mln_offline_region_list* out_regions
 ) -> mln_status {
-  mln::core::RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (out_regions == nullptr || *out_regions != MLN_HANDLE_NULL) {
     set_thread_error("out_regions must point to the null handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto state = live->offline_operation_state;
-  {
-    const std::scoped_lock lock(state->mutex);
-    auto found = state->operations.find(operation_id);
-    if (found == state->operations.end()) {
-      set_thread_error("offline operation is unknown");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    auto& operation = found->second;
-    if (
-      !operation.completed ||
-      operation.kind != MLN_OFFLINE_OPERATION_REGIONS_LIST ||
-      operation.result_status != MLN_STATUS_OK
-    ) {
-      set_offline_result_unavailable_error(operation);
-      return MLN_STATUS_INVALID_STATE;
-    }
-    auto* result =
-      std::get_if<std::vector<OfflineRegionData>>(&operation.result);
-    if (result == nullptr) {
-      set_thread_error("offline operation result kind is invalid");
-      return MLN_STATUS_INVALID_STATE;
-    }
-  }
-  auto regions = register_offline_region_list_from_result(
-    [state, operation_id](std::vector<OfflineRegionData>& destination) -> void {
-      const std::scoped_lock lock(state->mutex);
-      auto found = state->operations.find(operation_id);
-      if (found == state->operations.end()) {
-        throw std::logic_error(
-          "offline operation disappeared while taking result"
-        );
-      }
-      auto* result =
-        std::get_if<std::vector<OfflineRegionData>>(&found->second.result);
-      if (result == nullptr) {
-        throw std::logic_error(
-          "offline operation result kind changed while taking result"
-        );
-      }
-      destination = std::move(*result);
+  return take_operation_result<std::vector<OfflineRegionData>>(
+    operation, MLN_OFFLINE_OPERATION_REGIONS_LIST,
+    [out_regions](std::vector<OfflineRegionData>& result) -> mln_status {
+      *out_regions = register_offline_region_list_from_result(
+        [&result](std::vector<OfflineRegionData>& destination) -> void {
+          destination = std::move(result);
+        }
+      );
+      return MLN_STATUS_OK;
     }
   );
-  erase_offline_operation_registration(live, operation_id);
-  *out_regions = regions;
-  return MLN_STATUS_OK;
 }
 
 auto offline_regions_merge_database_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_list* out_regions
+  mln_operation operation, mln_offline_region_list* out_regions
 ) -> mln_status {
-  mln::core::RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (out_regions == nullptr || *out_regions != MLN_HANDLE_NULL) {
     set_thread_error("out_regions must point to the null handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto state = live->offline_operation_state;
-  {
-    const std::scoped_lock lock(state->mutex);
-    auto found = state->operations.find(operation_id);
-    if (found == state->operations.end()) {
-      set_thread_error("offline operation is unknown");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    auto& operation = found->second;
-    if (
-      !operation.completed ||
-      operation.kind != MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE ||
-      operation.result_status != MLN_STATUS_OK
-    ) {
-      set_offline_result_unavailable_error(operation);
-      return MLN_STATUS_INVALID_STATE;
-    }
-    auto* result =
-      std::get_if<std::vector<OfflineRegionData>>(&operation.result);
-    if (result == nullptr) {
-      set_thread_error("offline operation result kind is invalid");
-      return MLN_STATUS_INVALID_STATE;
-    }
-  }
-  auto regions = register_offline_region_list_from_result(
-    [state, operation_id](std::vector<OfflineRegionData>& destination) -> void {
-      const std::scoped_lock lock(state->mutex);
-      auto found = state->operations.find(operation_id);
-      if (found == state->operations.end()) {
-        throw std::logic_error(
-          "offline operation disappeared while taking result"
-        );
-      }
-      auto* result =
-        std::get_if<std::vector<OfflineRegionData>>(&found->second.result);
-      if (result == nullptr) {
-        throw std::logic_error(
-          "offline operation result kind changed while taking result"
-        );
-      }
-      destination = std::move(*result);
+  return take_operation_result<std::vector<OfflineRegionData>>(
+    operation, MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE,
+    [out_regions](std::vector<OfflineRegionData>& result) -> mln_status {
+      *out_regions = register_offline_region_list_from_result(
+        [&result](std::vector<OfflineRegionData>& destination) -> void {
+          destination = std::move(result);
+        }
+      );
+      return MLN_STATUS_OK;
     }
   );
-  erase_offline_operation_registration(live, operation_id);
-  *out_regions = regions;
-  return MLN_STATUS_OK;
 }
 
 auto offline_region_update_metadata_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_snapshot* out_region
+  mln_operation operation, mln_offline_region_snapshot* out_region
 ) -> mln_status {
-  mln::core::RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (out_region == nullptr || *out_region != MLN_HANDLE_NULL) {
     set_thread_error("out_region must point to the null handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto state = live->offline_operation_state;
-  {
-    const std::scoped_lock lock(state->mutex);
-    auto found = state->operations.find(operation_id);
-    if (found == state->operations.end()) {
-      set_thread_error("offline operation is unknown");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    auto& operation = found->second;
-    if (
-      !operation.completed ||
-      operation.kind != MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA ||
-      operation.result_status != MLN_STATUS_OK
-    ) {
-      set_offline_result_unavailable_error(operation);
-      return MLN_STATUS_INVALID_STATE;
-    }
-    auto* result = std::get_if<OfflineRegionData>(&operation.result);
-    if (result == nullptr) {
-      set_thread_error("offline operation result kind is invalid");
-      return MLN_STATUS_INVALID_STATE;
-    }
-  }
-  auto snapshot = register_offline_region_snapshot_from_result(
-    [state, operation_id](OfflineRegionData& data) -> void {
-      const std::scoped_lock lock(state->mutex);
-      auto found = state->operations.find(operation_id);
-      if (found == state->operations.end()) {
-        throw std::logic_error(
-          "offline operation disappeared while taking result"
-        );
-      }
-      auto* result = std::get_if<OfflineRegionData>(&found->second.result);
-      if (result == nullptr) {
-        throw std::logic_error(
-          "offline operation result kind changed while taking result"
-        );
-      }
-      data = std::move(*result);
+  return take_operation_result<OfflineRegionData>(
+    operation, MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA,
+    [out_region](OfflineRegionData& result) -> mln_status {
+      *out_region = register_offline_region_snapshot_from_result(
+        [&result](OfflineRegionData& destination) -> void {
+          destination = std::move(result);
+        }
+      );
+      return MLN_STATUS_OK;
     }
   );
-  erase_offline_operation_registration(live, operation_id);
-  *out_region = snapshot;
-  return MLN_STATUS_OK;
 }
 
 auto offline_region_get_status_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_status* out_status
+  mln_operation operation, mln_offline_region_status* out_status
 ) -> mln_status {
-  mln::core::RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   if (
     out_status == nullptr ||
     out_status->size < sizeof(mln_offline_region_status)
@@ -2700,34 +2319,13 @@ auto offline_region_get_status_take_result(
     set_thread_error("out_status must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto state = live->offline_operation_state;
-  auto result_status = mln_offline_region_status{};
-  {
-    const std::scoped_lock lock(state->mutex);
-    auto found = state->operations.find(operation_id);
-    if (found == state->operations.end()) {
-      set_thread_error("offline operation is unknown");
-      return MLN_STATUS_INVALID_ARGUMENT;
+  return take_operation_result<mln_offline_region_status>(
+    operation, MLN_OFFLINE_OPERATION_REGION_GET_STATUS,
+    [out_status](mln_offline_region_status& result) -> mln_status {
+      *out_status = result;
+      return MLN_STATUS_OK;
     }
-    auto& operation = found->second;
-    if (
-      !operation.completed ||
-      operation.kind != MLN_OFFLINE_OPERATION_REGION_GET_STATUS ||
-      operation.result_status != MLN_STATUS_OK
-    ) {
-      set_offline_result_unavailable_error(operation);
-      return MLN_STATUS_INVALID_STATE;
-    }
-    auto* result = std::get_if<mln_offline_region_status>(&operation.result);
-    if (result == nullptr) {
-      set_thread_error("offline operation result kind is invalid");
-      return MLN_STATUS_INVALID_STATE;
-    }
-    result_status = *result;
-  }
-  *out_status = result_status;
-  erase_offline_operation_registration(live, operation_id);
-  return MLN_STATUS_OK;
+  );
 }
 
 auto offline_region_snapshot_get(
@@ -2903,31 +2501,31 @@ auto destroy_runtime(mln_runtime runtime) -> mln_status {
     );
     owned_runtime->offline_event_state->alive = false;
     owned_runtime->offline_event_state->runtime = nullptr;
-    const std::scoped_lock event_lock(owned_runtime->event_mutex);
-    owned_runtime->observed_offline_regions.clear();
-    std::erase_if(owned_runtime->events, [](const auto& event) -> bool {
-      return event.has_offline_region;
-    });
-  }
-
-  {
-    const std::scoped_lock state_lock(
-      owned_runtime->offline_operation_state->mutex
+    const std::scoped_lock event_lock(owned_runtime->event_queue->mutex);
+    owned_runtime->event_queue->observed_offline_regions.clear();
+    std::erase_if(
+      owned_runtime->event_queue->events,
+      [](const auto& event) -> bool { return event.has_offline_region; }
     );
-    owned_runtime->offline_operation_state->alive = false;
-    owned_runtime->offline_operation_state->runtime = nullptr;
-    owned_runtime->offline_operation_state->operations.clear();
-    const std::scoped_lock event_lock(owned_runtime->event_mutex);
-    std::erase_if(owned_runtime->events, [](const auto& event) -> bool {
-      return event.has_offline_operation;
-    });
   }
 
-  // The last drained batch is freed with the runtime, the documented end of its
-  // readable window.
-  owned_runtime->event_drain_staging.clear();
-  owned_runtime->event_batch_events.clear();
-  owned_runtime->event_batch_messages.clear();
+  auto event_endpoint = std::shared_ptr<NotificationEndpoint>{};
+  {
+    auto event_lock = std::unique_lock{owned_runtime->event_queue->mutex};
+    owned_runtime->event_queue->drain_condition.wait(
+      event_lock, [&]() noexcept -> bool {
+        return !owned_runtime->event_queue->drain_active;
+      }
+    );
+    owned_runtime->event_queue->alive = false;
+    owned_runtime->event_queue->events.clear();
+    owned_runtime->event_queue->event_maps.clear();
+    owned_runtime->event_queue->observed_offline_regions.clear();
+    event_endpoint =
+      std::move(owned_runtime->event_queue->notification_endpoint);
+  }
+  event_endpoint.reset();
+  owned_runtime->event_queue->notification_source.reset();
 
   // Retiring the wake state before the run loop is released covers a late
   // `mln_wake_source_signal()` and the run loop teardown's final iteration.
@@ -2970,8 +2568,8 @@ auto pump_runtime(mln_runtime runtime, int64_t timeout_ms) -> mln_status {
   // stopped polling before the queue emptied keeps making progress.
   auto queued_events = false;
   {
-    const std::scoped_lock event_lock(live->event_mutex);
-    queued_events = !live->events.empty();
+    const std::scoped_lock event_lock(live->event_queue->mutex);
+    queued_events = !live->event_queue->events.empty();
   }
 
   {
@@ -3033,104 +2631,167 @@ auto destroy_wake_source(mln_wake_source source) noexcept -> void {
 }
 
 auto drain_runtime_events(
-  mln_runtime runtime, size_t max_events, mln_runtime_event_batch* out_batch
+  mln_runtime runtime, size_t max_events, mln_event_batch* out_batch
 ) -> mln_status {
-  mln::core::RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    out_batch == nullptr || out_batch->size < sizeof(mln_runtime_event_batch)
-  ) {
-    set_thread_error("out_batch must not be null and must have a valid size");
+  if (out_batch == nullptr || *out_batch != MLN_HANDLE_NULL) {
+    set_thread_error("out_batch must point to the null handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  // Clearing first ends the previous batch's window, so an empty drain
-  // invalidates it too. Capacity survives, so a steady-state drain allocates
-  // nothing.
-  auto& staging = live->event_drain_staging;
-  auto& events = live->event_batch_events;
-  auto& messages = live->event_batch_messages;
-  staging.clear();
-  events.clear();
-  messages.clear();
-
-  auto remaining_count = size_t{0};
-  auto arena_size = size_t{0};
-  auto drain_count = size_t{0};
+  auto queue = std::shared_ptr<RuntimeEventQueueState>{};
   {
-    const std::scoped_lock lock(live->event_mutex);
-    for (const auto& queued : live->events) {
-      if (max_events != 0 && drain_count >= max_events) {
-        break;
-      }
-      // The first event always fits, so a bounded drain always makes progress.
-      // An event without a message takes no arena bytes, not even a terminator.
-      const auto& next_message = queued.message;
-      const auto next_size =
-        next_message.empty() ? size_t{0} : next_message.size() + 1;
-      if (
-        drain_count != 0 &&
-        next_size > static_cast<size_t>(UINT32_MAX) - arena_size
-      ) {
-        break;
-      }
-      arena_size += next_size;
-      drain_count += 1;
+    auto& table = handle_table<RuntimeObject>();
+    const std::scoped_lock table_lock(table.mutex());
+    auto* live = table.resolve_locked(runtime);
+    if (live == nullptr) {
+      return MLN_STATUS_INVALID_ARGUMENT;
     }
-
-    // Finish every allocation before removing an event. The reserved staging
-    // moves and batch writes below cannot allocate, so a failed reservation
-    // leaves the complete queue available to the next drain.
-    static_assert(
-      std::is_nothrow_move_constructible_v<mln::core::QueuedRuntimeEvent>
-    );
-    staging.reserve(drain_count);
-    events.reserve(drain_count);
-    messages.reserve(arena_size);
-    for (auto index = size_t{0}; index < drain_count; index += 1) {
-      staging.push_back(std::move(live->events.front()));
-      live->events.pop_front();
+    queue = live->event_queue;
+    const std::scoped_lock queue_lock(queue->mutex);
+    if (queue->drain_active) {
+      set_thread_error("runtime event queue already has an active drain");
+      return MLN_STATUS_INVALID_STATE;
     }
-    remaining_count = live->events.size();
+    queue->drain_active = true;
   }
 
-  // The batch is built outside the lock, so the lock hold covers only the
-  // queue moves above.
-  for (const auto& staged : staging) {
-    const auto message_size = static_cast<uint32_t>(staged.message.size());
-    const auto message_offset = static_cast<uint32_t>(messages.size());
-    events.push_back(
-      mln_runtime_event{
-        .type = staged.type,
-        .source_type = staged.source_type,
-        .source = staged.source,
-        .code = staged.code,
-        .payload_type = staged.payload_type,
-        .message_offset = message_size == 0 ? 0 : message_offset,
-        .message_size = message_size,
-        .payload = staged.payload
+  struct DrainLease {
+    std::shared_ptr<RuntimeEventQueueState> queue;
+    ~DrainLease() {
+      {
+        const std::scoped_lock lock(queue->mutex);
+        queue->drain_active = false;
       }
-    );
-    if (message_size != 0) {
-      messages.append(staged.message);
-      messages.push_back('\0');
+      queue->drain_condition.notify_all();
     }
-  }
-  staging.clear();
+  };
+  auto lease = DrainLease{.queue = queue};
+  auto owned = std::make_shared<EventBatchObject>();
+  const auto batch_handle = handle_table<EventBatchObject>().insert(owned);
+  try {
+    auto staging = std::vector<QueuedRuntimeEvent>{};
+    auto arena_size = size_t{0};
+    auto drain_count = size_t{0};
+    {
+      const std::scoped_lock lock(queue->mutex);
+      for (const auto& queued : queue->events) {
+        if (max_events != 0 && drain_count >= max_events) {
+          break;
+        }
+        const auto next_size =
+          queued.message.empty() ? size_t{0} : queued.message.size() + 1;
+        if (
+          drain_count != 0 &&
+          next_size > static_cast<size_t>(UINT32_MAX) - arena_size
+        ) {
+          break;
+        }
+        arena_size += next_size;
+        drain_count += 1;
+      }
 
-  *out_batch = mln_runtime_event_batch{
-    .size = sizeof(mln_runtime_event_batch),
+      static_assert(std::is_nothrow_move_constructible_v<QueuedRuntimeEvent>);
+      staging.reserve(drain_count);
+      owned->events.reserve(drain_count);
+      owned->messages.reserve(arena_size);
+      for (auto index = size_t{0}; index < drain_count; index += 1) {
+        staging.push_back(std::move(queue->events.front()));
+        queue->events.pop_front();
+      }
+      owned->remaining_count = queue->events.size();
+      for (const auto& staged : staging) {
+        const auto message_size = static_cast<uint32_t>(staged.message.size());
+        const auto message_offset =
+          static_cast<uint32_t>(owned->messages.size());
+        owned->events.push_back(
+          mln_runtime_event{
+            .type = staged.type,
+            .source_type = staged.source_type,
+            .source = staged.source,
+            .code = staged.code,
+            .payload_type = staged.payload_type,
+            .message_offset = message_size == 0 ? 0 : message_offset,
+            .message_size = message_size,
+            .payload = staged.payload
+          }
+        );
+        if (message_size != 0) {
+          owned->messages.append(staged.message);
+          owned->messages.push_back('\0');
+        }
+      }
+      if (queue->events.empty()) {
+        queue->notification_endpoint->clear_ready();
+      }
+    }
+  } catch (...) {
+    static_cast<void>(handle_table<EventBatchObject>().remove(batch_handle));
+    throw;
+  }
+  *out_batch = batch_handle;
+  return MLN_STATUS_OK;
+}
+
+extern "C" void mln_test_hold_runtime_event_drain(
+  mln_runtime runtime, std::atomic_bool* entered,
+  const std::atomic_bool* release
+) {
+  auto queue = std::shared_ptr<RuntimeEventQueueState>{};
+  {
+    auto& table = handle_table<RuntimeObject>();
+    const std::scoped_lock table_lock(table.mutex());
+    const auto* live = table.resolve_locked(runtime);
+    if (live == nullptr) {
+      entered->store(true, std::memory_order_release);
+      return;
+    }
+    queue = live->event_queue;
+    const std::scoped_lock queue_lock(queue->mutex);
+    if (queue->drain_active) {
+      entered->store(true, std::memory_order_release);
+      return;
+    }
+    queue->drain_active = true;
+  }
+
+  entered->store(true, std::memory_order_release);
+  while (!release->load(std::memory_order_acquire)) {
+    std::this_thread::yield();
+  }
+  {
+    const std::scoped_lock queue_lock(queue->mutex);
+    queue->drain_active = false;
+  }
+  queue->drain_condition.notify_all();
+}
+
+auto get_event_batch(
+  mln_event_batch batch, mln_runtime_event_batch_view* out_view
+) -> mln_status {
+  const auto live = handle_table<EventBatchObject>().lease(batch);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    out_view == nullptr || out_view->size < sizeof(mln_runtime_event_batch_view)
+  ) {
+    set_thread_error("out_view must not be null and must have a valid size");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  *out_view = mln_runtime_event_batch_view{
+    .size = sizeof(mln_runtime_event_batch_view),
     .event_size = sizeof(mln_runtime_event),
-    .events = events.empty() ? nullptr : events.data(),
-    .event_count = events.size(),
-    .messages = messages.empty() ? nullptr : messages.data(),
-    .messages_size = messages.size(),
-    .remaining_count = remaining_count
+    .events = live->events.empty() ? nullptr : live->events.data(),
+    .event_count = live->events.size(),
+    .messages = live->messages.empty() ? nullptr : live->messages.data(),
+    .messages_size = live->messages.size(),
+    .remaining_count = live->remaining_count
   };
   return MLN_STATUS_OK;
+}
+
+auto release_event_batch(mln_event_batch batch) noexcept -> void {
+  static_cast<void>(handle_table<EventBatchObject>().remove(batch));
 }
 
 auto set_runtime_event_mask(mln_runtime runtime, uint64_t mask) -> mln_status {
@@ -3336,8 +2997,10 @@ auto push_runtime_map_event_payload(
   };
 
   {
-    const std::scoped_lock lock(live->event_mutex);
-    if (map != MLN_HANDLE_NULL && !live->event_maps.contains(map)) {
+    const std::scoped_lock lock(live->event_queue->mutex);
+    if (
+      map != MLN_HANDLE_NULL && !live->event_queue->event_maps.contains(map)
+    ) {
       return;
     }
     // A render draws the latest update, so one unread render-update event
@@ -3345,14 +3008,16 @@ auto push_runtime_map_event_payload(
     // alone preserves the order of every other event.
     if (
       type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE &&
-      map != MLN_HANDLE_NULL && !live->events.empty() &&
-      live->events.back().type == type && live->events.back().source == map
+      map != MLN_HANDLE_NULL && !live->event_queue->events.empty() &&
+      live->event_queue->events.back().type == type &&
+      live->event_queue->events.back().source == map
     ) {
       return;
     }
-    live->events.push_back(std::move(event));
+    live->event_queue->events.push_back(std::move(event));
   }
   signal_wake(live->wake_state);
+  live->event_queue->notification_endpoint->mark_ready();
 }
 
 auto register_runtime_map_events(mln_runtime runtime, mln_map map) -> void {
@@ -3361,8 +3026,8 @@ auto register_runtime_map_events(mln_runtime runtime, mln_map map) -> void {
     return;
   }
 
-  const std::scoped_lock lock(live->event_mutex);
-  live->event_maps.insert(map);
+  const std::scoped_lock lock(live->event_queue->mutex);
+  live->event_queue->event_maps.insert(map);
 }
 
 auto discard_runtime_map_events(mln_runtime runtime, mln_map map) -> void {
@@ -3371,9 +3036,9 @@ auto discard_runtime_map_events(mln_runtime runtime, mln_map map) -> void {
     return;
   }
 
-  const std::scoped_lock lock(live->event_mutex);
-  live->event_maps.erase(map);
-  std::erase_if(live->events, [map](const auto& event) -> bool {
+  const std::scoped_lock lock(live->event_queue->mutex);
+  live->event_queue->event_maps.erase(map);
+  std::erase_if(live->event_queue->events, [map](const auto& event) -> bool {
     return event.source == map;
   });
 }

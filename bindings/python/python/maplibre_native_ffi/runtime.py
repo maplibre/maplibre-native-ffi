@@ -54,7 +54,6 @@ class RuntimeEventType(UnknownIntEnum):
     OFFLINE_REGION_STATUS_CHANGED = 19
     OFFLINE_REGION_RESPONSE_ERROR = 20
     OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21
-    OFFLINE_OPERATION_COMPLETED = 22
     MAP_CAMERA_TRANSITION_FINISHED = 23
 
 
@@ -100,7 +99,6 @@ class RuntimeEventMask(IntFlag):
     OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = (
         1 << RuntimeEventType.OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
     )
-    OFFLINE_OPERATION_COMPLETED = 1 << RuntimeEventType.OFFLINE_OPERATION_COMPLETED
     ALL_MAP_EVENTS = (
         MAP_CAMERA_WILL_CHANGE
         | MAP_CAMERA_IS_CHANGING
@@ -126,7 +124,6 @@ class RuntimeEventMask(IntFlag):
         OFFLINE_REGION_STATUS_CHANGED
         | OFFLINE_REGION_RESPONSE_ERROR
         | OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
-        | OFFLINE_OPERATION_COMPLETED
     )
     ALL = ALL_MAP_EVENTS | ALL_RUNTIME_EVENTS
 
@@ -465,24 +462,22 @@ class RuntimeHandle(NativeHandleMixin):
             options.cache_path,
             int(options.event_mask),
         )
-        self._offline_operations: weakref.WeakSet[OfflineOperationHandle] = (
-            weakref.WeakSet()
-        )
+        self._operations: weakref.WeakSet[OperationHandle] = weakref.WeakSet()
         self._maps: dict[int, weakref.ReferenceType[MapHandle]] = {}
 
     def close(self) -> None:
         """Release this runtime handle exactly once."""
-        if self._offline_operations:
+        if self._operations:
             from .errors import InvalidStateError
 
-            raise InvalidStateError(None, "runtime has live offline operation handles")
+            raise InvalidStateError(None, "runtime has live operation handles")
         self._native.close()
 
-    def _register_offline_operation(self, operation: OfflineOperationHandle) -> None:
-        self._offline_operations.add(operation)
+    def _register_operation(self, operation: OperationHandle) -> None:
+        self._operations.add(operation)
 
-    def _unregister_offline_operation(self, operation: OfflineOperationHandle) -> None:
-        self._offline_operations.discard(operation)
+    def _unregister_operation(self, operation: OperationHandle) -> None:
+        self._operations.discard(operation)
 
     def _register_map(self, map_handle: MapHandle) -> None:
         self._maps[map_handle._native_id()] = weakref.ref(map_handle)
@@ -525,25 +520,33 @@ class RuntimeHandle(NativeHandleMixin):
         """Acquire a wake source for this runtime, usable from any thread."""
         return WakeSource._from_native(self._native.wake_source())
 
-    def _offline_operation(
-        self, start: Callable[..., int], *args: object
-    ) -> OfflineOperationHandle:
-        from .offline import OfflineOperationHandle
+    def _operation(
+        self,
+        start: Callable[..., int],
+        take_result: Callable[[int], object] | None,
+        adapt_result: Callable[[object], object] | None,
+        *args: object,
+    ) -> OperationHandle:
+        from .offline import OperationHandle
 
-        return OfflineOperationHandle._from_native(self, start(*args))
+        return OperationHandle._from_native(
+            self, start(*args), take_result, adapt_result
+        )
 
     def run_ambient_cache_operation(
         self, operation: AmbientCacheOperation
-    ) -> OfflineOperationHandle:
+    ) -> OperationHandle[None]:
         """Start an ambient cache maintenance operation."""
         from .offline import AmbientCacheOperation
 
-        return self._offline_operation(
+        return self._operation(
             self._native.run_ambient_cache_operation_start,
+            None,
+            None,
             AmbientCacheOperation(operation).native_code,
         )
 
-    def set_maximum_ambient_cache_size(self, size: int) -> OfflineOperationHandle:
+    def set_maximum_ambient_cache_size(self, size: int) -> OperationHandle[None]:
         """Start a change to this runtime's maximum ambient cache size.
 
         MapLibre evicts ambient resources to fit the new budget, so lowering it
@@ -555,35 +558,52 @@ class RuntimeHandle(NativeHandleMixin):
             raise InvalidArgumentError(
                 f"maximum ambient cache size must fit in 64 unsigned bits, not {size}"
             )
-        return self._offline_operation(
+        return self._operation(
             self._native.set_maximum_ambient_cache_size_start,
+            None,
+            None,
             size,
         )
 
     def create_offline_region(
         self, definition: OfflineRegionDefinition, metadata: bytes = b""
-    ) -> OfflineOperationHandle:
+    ) -> OperationHandle[OfflineRegionInfo]:
         """Start creating an offline region."""
-        return self._offline_operation(
+        return self._operation(
             self._native.offline_region_create_start,
+            self._native.offline_region_create_take_result,
+            _adapt_region_result,
             definition,
             metadata,
         )
 
-    def get_offline_region(self, region_id: int) -> OfflineOperationHandle:
+    def get_offline_region(
+        self, region_id: int
+    ) -> OperationHandle[OfflineRegionInfo | None]:
         """Start getting an offline region snapshot by ID."""
-        return self._offline_operation(self._native.offline_region_get_start, region_id)
+        return self._operation(
+            self._native.offline_region_get_start,
+            self._native.offline_region_get_take_result,
+            _adapt_optional_region_result,
+            region_id,
+        )
 
-    def list_offline_regions(self) -> OfflineOperationHandle:
+    def list_offline_regions(self) -> OperationHandle[tuple[OfflineRegionInfo, ...]]:
         """Start listing offline region snapshots."""
-        return self._offline_operation(self._native.offline_regions_list_start)
+        return self._operation(
+            self._native.offline_regions_list_start,
+            self._native.offline_regions_list_take_result,
+            _adapt_region_list_result,
+        )
 
     def merge_offline_regions_database(
         self, side_database_path: str
-    ) -> OfflineOperationHandle:
+    ) -> OperationHandle[tuple[OfflineRegionInfo, ...]]:
         """Start merging offline regions from another database path."""
-        return self._offline_operation(
+        return self._operation(
             self._native.offline_regions_merge_database_start,
+            self._native.offline_regions_merge_database_take_result,
+            _adapt_region_list_result,
             side_database_path,
         )
 
@@ -591,26 +611,35 @@ class RuntimeHandle(NativeHandleMixin):
         self,
         region_id: int,
         metadata: bytes,
-    ) -> OfflineOperationHandle:
+    ) -> OperationHandle[OfflineRegionInfo]:
         """Start updating opaque binary metadata for an offline region."""
-        return self._offline_operation(
+        return self._operation(
             self._native.offline_region_update_metadata_start,
+            self._native.offline_region_update_metadata_take_result,
+            _adapt_region_result,
             region_id,
             metadata,
         )
 
-    def get_offline_region_status(self, region_id: int) -> OfflineOperationHandle:
+    def get_offline_region_status(
+        self, region_id: int
+    ) -> OperationHandle[OfflineRegionStatus]:
         """Start getting completed/download status for an offline region."""
-        return self._offline_operation(
-            self._native.offline_region_get_status_start, region_id
+        return self._operation(
+            self._native.offline_region_get_status_start,
+            self._native.offline_region_get_status_take_result,
+            _adapt_status_result,
+            region_id,
         )
 
     def set_offline_region_observed(
         self, region_id: int, observed: bool
-    ) -> OfflineOperationHandle:
+    ) -> OperationHandle[None]:
         """Start enabling or disabling runtime events for an offline region."""
-        return self._offline_operation(
+        return self._operation(
             self._native.offline_region_set_observed_start,
+            None,
+            None,
             region_id,
             observed,
         )
@@ -619,26 +648,28 @@ class RuntimeHandle(NativeHandleMixin):
         self,
         region_id: int,
         state: OfflineRegionDownloadState,
-    ) -> OfflineOperationHandle:
+    ) -> OperationHandle[None]:
         """Start setting an offline region's native download state."""
         from .offline import OfflineRegionDownloadState
 
-        return self._offline_operation(
+        return self._operation(
             self._native.offline_region_set_download_state_start,
+            None,
+            None,
             region_id,
             OfflineRegionDownloadState(state).native_code_for_set(),
         )
 
-    def invalidate_offline_region(self, region_id: int) -> OfflineOperationHandle:
+    def invalidate_offline_region(self, region_id: int) -> OperationHandle[None]:
         """Start invalidating cached resources for an offline region."""
-        return self._offline_operation(
-            self._native.offline_region_invalidate_start, region_id
+        return self._operation(
+            self._native.offline_region_invalidate_start, None, None, region_id
         )
 
-    def delete_offline_region(self, region_id: int) -> OfflineOperationHandle:
+    def delete_offline_region(self, region_id: int) -> OperationHandle[None]:
         """Start deleting an offline region."""
-        return self._offline_operation(
-            self._native.offline_region_delete_start, region_id
+        return self._operation(
+            self._native.offline_region_delete_start, None, None, region_id
         )
 
     def set_resource_transform(
@@ -737,11 +768,8 @@ class RuntimeHandle(NativeHandleMixin):
         runtime-originated type. Narrowing gates later events and keeps queued
         ones, so a host drains what it already caused.
 
-        Region status, response error, and tile count limit events also need an
-        observed region, so this mask narrows that subscription rather than
-        replacing it. An offline operation records its result before the mask is
-        read, so an :class:`offline.OfflineOperationHandle` still reports its
-        result with the completion type unselected.
+        Region status, response error, and tile count limit events also require
+        an observed region. This mask narrows that subscription.
         """
         self._native.set_event_mask(int(mask))
 
@@ -777,8 +805,6 @@ def _runtime_payload_from_native(payload: dict[str, object]) -> RuntimeEventPayl
         return OfflineRegionResponseError._from_runtime_payload(payload)
     if kind == "offline_region_tile_count_limit":
         return OfflineRegionTileCountLimitExceeded._from_runtime_payload(payload)
-    if kind == "offline_operation_completed":
-        return OfflineOperationCompleted._from_runtime_payload(payload)
     if kind == "camera_transition_finished":
         return CameraTransitionFinishedPayload._from_runtime_payload(payload)
     return UnknownRuntimeEventPayload._from_runtime_payload(payload)
@@ -810,13 +836,18 @@ __all__ = [
 from .map import MapHandle, MapOptions
 from .offline import (
     AmbientCacheOperation,
-    OfflineOperationCompleted,
-    OfflineOperationHandle,
     OfflineRegionDefinition,
     OfflineRegionDownloadState,
+    OfflineRegionInfo,
     OfflineRegionResponseError,
+    OfflineRegionStatus,
     OfflineRegionStatusChanged,
     OfflineRegionTileCountLimitExceeded,
+    OperationHandle,
+    _adapt_optional_region_result,
+    _adapt_region_list_result,
+    _adapt_region_result,
+    _adapt_status_result,
 )
 
 RuntimeEventPayload = (
@@ -827,7 +858,6 @@ RuntimeEventPayload = (
     | OfflineRegionStatusChanged
     | OfflineRegionResponseError
     | OfflineRegionTileCountLimitExceeded
-    | OfflineOperationCompleted
     | CameraTransitionFinishedPayload
     | UnknownRuntimeEventPayload
 )

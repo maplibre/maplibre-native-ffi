@@ -80,6 +80,31 @@ external int mln_adapter_log_callback(
   ffi.Pointer<ffi.Char> message,
 );
 
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_adapter_log_queue,
+    ffi.Pointer<ffi.Pointer<mln_adapter_log_record>>,
+  )
+>()
+external int mln_adapter_log_queue_acquire(
+  int queue,
+  ffi.Pointer<ffi.Pointer<mln_adapter_log_record>> out_record,
+);
+
+@ffi.Native<ffi.Void Function(mln_adapter_log_queue)>()
+external void mln_adapter_log_queue_close(int queue);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_notification_source,
+    ffi.Pointer<mln_adapter_log_queue>,
+  )
+>()
+external int mln_adapter_log_queue_create(
+  int source,
+  ffi.Pointer<mln_adapter_log_queue> out_queue,
+);
+
 @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.Void>)>()
 external void mln_adapter_log_record_destroy(ffi.Pointer<ffi.Void> record);
 
@@ -101,13 +126,6 @@ external int mln_adapter_queued_resource_provider_callback(
   int handle,
 );
 
-@ffi.Native<
-  ffi.Void Function(ffi.Pointer<mln_adapter_queued_resource_provider>)
->()
-external void mln_adapter_queued_resource_provider_retire(
-  ffi.Pointer<mln_adapter_queued_resource_provider> provider,
-);
-
 @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.Void>)>()
 external void mln_adapter_resource_provider_request_destroy(
   ffi.Pointer<ffi.Void> request,
@@ -124,6 +142,31 @@ external int mln_adapter_resource_provider_rules_callback(
   ffi.Pointer<ffi.Void> user_data,
   ffi.Pointer<mln_resource_request> request,
   int handle,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_adapter_resource_request_queue,
+    ffi.Pointer<ffi.Pointer<mln_adapter_queued_resource_request>>,
+  )
+>()
+external int mln_adapter_resource_request_queue_acquire(
+  int queue,
+  ffi.Pointer<ffi.Pointer<mln_adapter_queued_resource_request>> out_request,
+);
+
+@ffi.Native<ffi.Void Function(mln_adapter_resource_request_queue)>()
+external void mln_adapter_resource_request_queue_close(int queue);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_notification_source,
+    ffi.Pointer<mln_adapter_resource_request_queue>,
+  )
+>()
+external int mln_adapter_resource_request_queue_create(
+  int source,
+  ffi.Pointer<mln_adapter_resource_request_queue> out_queue,
 );
 
 @ffi.Native<
@@ -178,6 +221,17 @@ external mln_camera_options mln_camera_options_default();
 @ffi.Native<mln_custom_geometry_source_options Function()>()
 external mln_custom_geometry_source_options
 mln_custom_geometry_source_options_default();
+
+@ffi.Native<
+  ffi.Int32 Function(mln_event_batch, ffi.Pointer<mln_runtime_event_batch_view>)
+>()
+external int mln_event_batch_get(
+  int batch,
+  ffi.Pointer<mln_runtime_event_batch_view> out_view,
+);
+
+@ffi.Native<ffi.Void Function(mln_event_batch)>()
+external void mln_event_batch_release(int batch);
 
 @ffi.Native<mln_free_camera_options Function()>()
 external mln_free_camera_options mln_free_camera_options_default();
@@ -1598,6 +1652,38 @@ external int mln_network_status_get(ffi.Pointer<ffi.Uint32> out_status);
 @ffi.Native<ffi.Int32 Function(ffi.Uint32)>()
 external int mln_network_status_set(int status);
 
+@ffi.Native<ffi.Int32 Function(mln_notification_source)>()
+external int mln_notification_source_clear_callback(int source);
+
+@ffi.Native<ffi.Int32 Function(mln_notification_source)>()
+external int mln_notification_source_close(int source);
+
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<mln_notification_source>)>()
+external int mln_notification_source_create(
+  ffi.Pointer<mln_notification_source> out_source,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_notification_source, ffi.Pointer<mln_ready_batch>)
+>()
+external int mln_notification_source_drain_ready(
+  int source,
+  ffi.Pointer<mln_ready_batch> out_batch,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_notification_source,
+    mln_notification_callback,
+    ffi.Pointer<ffi.Void>,
+  )
+>()
+external int mln_notification_source_set_callback(
+  int source,
+  mln_notification_callback callback,
+  ffi.Pointer<ffi.Void> user_data,
+);
+
 @ffi.Native<
   ffi.Int32 Function(mln_offline_region_list, ffi.Pointer<ffi.Size>)
 >()
@@ -1733,6 +1819,51 @@ external int mln_opengl_surface_set_target(
   ffi.Pointer<mln_opengl_surface_descriptor> descriptor,
 );
 
+@ffi.Native<ffi.Int32 Function(mln_operation)>()
+external int mln_operation_cancel(int operation);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_operation,
+    ffi.Pointer<ffi.Char>,
+    ffi.Size,
+    ffi.Pointer<ffi.Size>,
+  )
+>()
+external int mln_operation_copy_diagnostic(
+  int operation,
+  ffi.Pointer<ffi.Char> out_diagnostic,
+  int diagnostic_capacity,
+  ffi.Pointer<ffi.Size> out_diagnostic_size,
+);
+
+@ffi.Native<ffi.Int32 Function(mln_operation)>()
+external int mln_operation_discard_result(int operation);
+
+@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<ffi.Int32>)>()
+external int mln_operation_get_status(
+  int operation,
+  ffi.Pointer<ffi.Int32> out_status,
+);
+
+@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<ffi.Bool>)>()
+external int mln_operation_poll(
+  int operation,
+  ffi.Pointer<ffi.Bool> out_completed,
+);
+
+@ffi.Native<ffi.Void Function(mln_operation)>()
+external void mln_operation_release(int operation);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_operation, ffi.Int64, ffi.Pointer<ffi.Bool>)
+>()
+external int mln_operation_wait(
+  int operation,
+  int timeout_ms,
+  ffi.Pointer<ffi.Bool> out_completed,
+);
+
 @ffi.Native<mln_premultiplied_rgba8_image Function()>()
 external mln_premultiplied_rgba8_image mln_premultiplied_rgba8_image_default();
 
@@ -1746,6 +1877,17 @@ external int mln_projected_meters_for_lat_lng(
 
 @ffi.Native<mln_projection_mode Function()>()
 external mln_projection_mode mln_projection_mode_default();
+
+@ffi.Native<
+  ffi.Int32 Function(mln_ready_batch, ffi.Pointer<mln_ready_batch_view>)
+>()
+external int mln_ready_batch_get(
+  int batch,
+  ffi.Pointer<mln_ready_batch_view> out_view,
+);
+
+@ffi.Native<ffi.Void Function(mln_ready_batch)>()
+external void mln_ready_batch_release(int batch);
 
 @ffi.Native<ffi.Int32 Function(mln_render_session)>()
 external int mln_render_session_clear_data(int session);
@@ -1960,31 +2102,18 @@ external int mln_runtime_create(
 external int mln_runtime_destroy(int runtime);
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_runtime,
-    ffi.Size,
-    ffi.Pointer<mln_runtime_event_batch>,
-  )
+  ffi.Int32 Function(mln_runtime, ffi.Size, ffi.Pointer<mln_event_batch>)
 >()
 external int mln_runtime_drain_events(
   int runtime,
   int max_events,
-  ffi.Pointer<mln_runtime_event_batch> out_batch,
+  ffi.Pointer<mln_event_batch> out_batch,
 );
-
-@ffi.Native<mln_runtime_event_batch Function()>()
-external mln_runtime_event_batch mln_runtime_event_batch_default();
 
 @ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<ffi.Uint64>)>()
 external int mln_runtime_get_event_mask(
   int runtime,
   ffi.Pointer<ffi.Uint64> out_mask,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_runtime, mln_offline_operation_id)>()
-external int mln_runtime_offline_operation_discard(
-  int runtime,
-  int operation_id,
 );
 
 @ffi.Native<
@@ -1993,7 +2122,7 @@ external int mln_runtime_offline_operation_discard(
     ffi.Pointer<mln_offline_region_definition>,
     ffi.Pointer<ffi.Uint8>,
     ffi.Size,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_operation>,
   )
 >()
 external int mln_runtime_offline_region_create_start(
@@ -2001,19 +2130,14 @@ external int mln_runtime_offline_region_create_start(
   ffi.Pointer<mln_offline_region_definition> definition,
   ffi.Pointer<ffi.Uint8> metadata,
   int metadata_size,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_runtime,
-    mln_offline_operation_id,
-    ffi.Pointer<mln_offline_region_snapshot>,
-  )
+  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_offline_region_snapshot>)
 >()
 external int mln_runtime_offline_region_create_take_result(
-  int runtime,
-  int operation_id,
+  int operation,
   ffi.Pointer<mln_offline_region_snapshot> out_region,
 );
 
@@ -2021,65 +2145,58 @@ external int mln_runtime_offline_region_create_take_result(
   ffi.Int32 Function(
     mln_runtime,
     mln_offline_region_id,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_operation>,
   )
 >()
 external int mln_runtime_offline_region_delete_start(
   int runtime,
   int region_id,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_runtime,
     mln_offline_region_id,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_operation>,
   )
 >()
 external int mln_runtime_offline_region_get_start(
   int runtime,
   int region_id,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_runtime,
     mln_offline_region_id,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_operation>,
   )
 >()
 external int mln_runtime_offline_region_get_status_start(
   int runtime,
   int region_id,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_runtime,
-    mln_offline_operation_id,
-    ffi.Pointer<mln_offline_region_status>,
-  )
+  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_offline_region_status>)
 >()
 external int mln_runtime_offline_region_get_status_take_result(
-  int runtime,
-  int operation_id,
+  int operation,
   ffi.Pointer<mln_offline_region_status> out_status,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
-    mln_runtime,
-    mln_offline_operation_id,
+    mln_operation,
     ffi.Pointer<mln_offline_region_snapshot>,
     ffi.Pointer<ffi.Bool>,
   )
 >()
 external int mln_runtime_offline_region_get_take_result(
-  int runtime,
-  int operation_id,
+  int operation,
   ffi.Pointer<mln_offline_region_snapshot> out_region,
   ffi.Pointer<ffi.Bool> out_found,
 );
@@ -2088,13 +2205,13 @@ external int mln_runtime_offline_region_get_take_result(
   ffi.Int32 Function(
     mln_runtime,
     mln_offline_region_id,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_operation>,
   )
 >()
 external int mln_runtime_offline_region_invalidate_start(
   int runtime,
   int region_id,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
@@ -2102,14 +2219,14 @@ external int mln_runtime_offline_region_invalidate_start(
     mln_runtime,
     mln_offline_region_id,
     ffi.Uint32,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_operation>,
   )
 >()
 external int mln_runtime_offline_region_set_download_state_start(
   int runtime,
   int region_id,
   int state,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
@@ -2117,14 +2234,14 @@ external int mln_runtime_offline_region_set_download_state_start(
     mln_runtime,
     mln_offline_region_id,
     ffi.Bool,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_operation>,
   )
 >()
 external int mln_runtime_offline_region_set_observed_start(
   int runtime,
   int region_id,
   bool observed,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
@@ -2133,7 +2250,7 @@ external int mln_runtime_offline_region_set_observed_start(
     mln_offline_region_id,
     ffi.Pointer<ffi.Uint8>,
     ffi.Size,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_operation>,
   )
 >()
 external int mln_runtime_offline_region_update_metadata_start(
@@ -2141,40 +2258,28 @@ external int mln_runtime_offline_region_update_metadata_start(
   int region_id,
   ffi.Pointer<ffi.Uint8> metadata,
   int metadata_size,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_runtime,
-    mln_offline_operation_id,
-    ffi.Pointer<mln_offline_region_snapshot>,
-  )
+  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_offline_region_snapshot>)
 >()
 external int mln_runtime_offline_region_update_metadata_take_result(
-  int runtime,
-  int operation_id,
+  int operation,
   ffi.Pointer<mln_offline_region_snapshot> out_region,
 );
 
-@ffi.Native<
-  ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_offline_operation_id>)
->()
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_operation>)>()
 external int mln_runtime_offline_regions_list_start(
   int runtime,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_runtime,
-    mln_offline_operation_id,
-    ffi.Pointer<mln_offline_region_list>,
-  )
+  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_offline_region_list>)
 >()
 external int mln_runtime_offline_regions_list_take_result(
-  int runtime,
-  int operation_id,
+  int operation,
   ffi.Pointer<mln_offline_region_list> out_regions,
 );
 
@@ -2182,25 +2287,20 @@ external int mln_runtime_offline_regions_list_take_result(
   ffi.Int32 Function(
     mln_runtime,
     ffi.Pointer<ffi.Char>,
-    ffi.Pointer<mln_offline_operation_id>,
+    ffi.Pointer<mln_operation>,
   )
 >()
 external int mln_runtime_offline_regions_merge_database_start(
   int runtime,
   ffi.Pointer<ffi.Char> side_database_path,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_runtime,
-    mln_offline_operation_id,
-    ffi.Pointer<mln_offline_region_list>,
-  )
+  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_offline_region_list>)
 >()
 external int mln_runtime_offline_regions_merge_database_take_result(
-  int runtime,
-  int operation_id,
+  int operation,
   ffi.Pointer<mln_offline_region_list> out_regions,
 );
 
@@ -2211,16 +2311,12 @@ external mln_runtime_options mln_runtime_options_default();
 external int mln_runtime_pump(int runtime, int timeout_ms);
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_runtime,
-    ffi.Uint32,
-    ffi.Pointer<mln_offline_operation_id>,
-  )
+  ffi.Int32 Function(mln_runtime, ffi.Uint32, ffi.Pointer<mln_operation>)
 >()
 external int mln_runtime_run_ambient_cache_operation_start(
   int runtime,
   int operation,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Uint64)>()
@@ -2235,16 +2331,12 @@ external int mln_runtime_set_http_header_transform(
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_runtime,
-    ffi.Uint64,
-    ffi.Pointer<mln_offline_operation_id>,
-  )
+  ffi.Int32 Function(mln_runtime, ffi.Uint64, ffi.Pointer<mln_operation>)
 >()
 external int mln_runtime_set_maximum_ambient_cache_size_start(
   int runtime,
   int size,
-  ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
@@ -2628,25 +2720,26 @@ final class mln_adapter_http_header_transform_rules extends ffi.Struct {
 }
 
 final class mln_adapter_log_callback_state extends ffi.Struct {
-  external mln_adapter_log_record_listener listener;
+  @mln_adapter_log_queue()
+  external int queue;
 
   @ffi.Uint32()
   external int consume;
 
   static ffi.Pointer<mln_adapter_log_callback_state> $allocate(
     ffi.Allocator $allocator, {
-    required mln_adapter_log_record_listener listener,
+    required int queue,
     required int consume,
   }) => $allocator<mln_adapter_log_callback_state>()
-    ..ref.listener = listener
+    ..ref.queue = queue
     ..ref.consume = consume;
 }
 
+typedef mln_adapter_log_queue = ffi.Uint64;
+typedef Dartmln_adapter_log_queue = int;
+
 final class mln_adapter_log_record extends ffi.Struct {
   external ffi.Pointer<ffi.Void> owner;
-
-  @ffi.Bool()
-  external bool retire_callback;
 
   @ffi.Uint32()
   external int severity;
@@ -2662,26 +2755,17 @@ final class mln_adapter_log_record extends ffi.Struct {
   static ffi.Pointer<mln_adapter_log_record> $allocate(
     ffi.Allocator $allocator, {
     required ffi.Pointer<ffi.Void> owner,
-    required bool retire_callback,
     required int severity,
     required int event,
     required int code,
     required ffi.Pointer<ffi.Char> message,
   }) => $allocator<mln_adapter_log_record>()
     ..ref.owner = owner
-    ..ref.retire_callback = retire_callback
     ..ref.severity = severity
     ..ref.event = event
     ..ref.code = code
     ..ref.message = message;
 }
-
-typedef mln_adapter_log_record_listener =
-    ffi.Pointer<ffi.NativeFunction<mln_adapter_log_record_listenerFunction>>;
-typedef mln_adapter_log_record_listenerFunction =
-    ffi.Void Function(ffi.Pointer<ffi.Void> record);
-typedef Dartmln_adapter_log_record_listenerFunction =
-    void Function(ffi.Pointer<ffi.Void> record);
 
 final class mln_adapter_queued_resource_provider extends ffi.Struct {
   external ffi.Pointer<mln_adapter_queued_resource_provider_route> routes;
@@ -2689,17 +2773,18 @@ final class mln_adapter_queued_resource_provider extends ffi.Struct {
   @ffi.Size()
   external int route_count;
 
-  external mln_adapter_queued_resource_request_listener listener;
+  @mln_adapter_resource_request_queue()
+  external int queue;
 
   static ffi.Pointer<mln_adapter_queued_resource_provider> $allocate(
     ffi.Allocator $allocator, {
     required ffi.Pointer<mln_adapter_queued_resource_provider_route> routes,
     required int route_count,
-    required mln_adapter_queued_resource_request_listener listener,
+    required int queue,
   }) => $allocator<mln_adapter_queued_resource_provider>()
     ..ref.routes = routes
     ..ref.route_count = route_count
-    ..ref.listener = listener;
+    ..ref.queue = queue;
 }
 
 final class mln_adapter_queued_resource_provider_route extends ffi.Struct {
@@ -2818,15 +2903,6 @@ final class mln_adapter_queued_resource_request extends ffi.Struct {
     ..ref.prior_data_size = prior_data_size;
 }
 
-typedef mln_adapter_queued_resource_request_listener =
-    ffi.Pointer<
-      ffi.NativeFunction<mln_adapter_queued_resource_request_listenerFunction>
-    >;
-typedef mln_adapter_queued_resource_request_listenerFunction =
-    ffi.Void Function(ffi.Pointer<ffi.Void> request);
-typedef Dartmln_adapter_queued_resource_request_listenerFunction =
-    void Function(ffi.Pointer<ffi.Void> request);
-
 final class mln_adapter_resource_provider_rule extends ffi.Struct {
   @ffi.Uint32()
   external int kind;
@@ -2853,6 +2929,9 @@ final class mln_adapter_resource_provider_rules extends ffi.Struct {
     ..ref.rules = rules
     ..ref.count = count;
 }
+
+typedef mln_adapter_resource_request_queue = ffi.Uint64;
+typedef Dartmln_adapter_resource_request_queue = int;
 
 final class mln_adapter_resource_rewrite_rule extends ffi.Struct {
   @ffi.Uint32()
@@ -3389,6 +3468,9 @@ final class mln_egl_context_descriptor extends ffi.Struct {
     ..ref.client_api = client_api
     ..ref.get_proc_address = get_proc_address;
 }
+
+typedef mln_event_batch = ffi.Uint64;
+typedef Dartmln_event_batch = int;
 
 final class mln_feature_state_selector extends ffi.Struct {
   @ffi.Uint32()
@@ -4093,6 +4175,40 @@ enum mln_north_orientation {
   };
 }
 
+typedef mln_notification_callback =
+    ffi.Pointer<ffi.NativeFunction<mln_notification_callbackFunction>>;
+typedef mln_notification_callbackFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> user_data);
+typedef Dartmln_notification_callbackFunction =
+    void Function(ffi.Pointer<ffi.Void> user_data);
+
+enum mln_notification_endpoint_kind {
+  MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS(1),
+  MLN_NOTIFICATION_ENDPOINT_OPERATION(2),
+  MLN_NOTIFICATION_ENDPOINT_ADAPTER_RESOURCE_REQUESTS(3),
+  MLN_NOTIFICATION_ENDPOINT_ADAPTER_LOG_RECORDS(4),
+  MLN_NOTIFICATION_ENDPOINT_RENDER_FRAMES(5),
+  MLN_NOTIFICATION_ENDPOINT_DRIVER_WORK(6);
+
+  final int value;
+  const mln_notification_endpoint_kind(this.value);
+
+  static mln_notification_endpoint_kind fromValue(int value) => switch (value) {
+    1 => MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS,
+    2 => MLN_NOTIFICATION_ENDPOINT_OPERATION,
+    3 => MLN_NOTIFICATION_ENDPOINT_ADAPTER_RESOURCE_REQUESTS,
+    4 => MLN_NOTIFICATION_ENDPOINT_ADAPTER_LOG_RECORDS,
+    5 => MLN_NOTIFICATION_ENDPOINT_RENDER_FRAMES,
+    6 => MLN_NOTIFICATION_ENDPOINT_DRIVER_WORK,
+    _ => throw ArgumentError(
+      'Unknown value for mln_notification_endpoint_kind: $value',
+    ),
+  };
+}
+
+typedef mln_notification_source = ffi.Uint64;
+typedef Dartmln_notification_source = int;
+
 final class mln_offline_geometry_region_definition extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -4112,68 +4228,6 @@ final class mln_offline_geometry_region_definition extends ffi.Struct {
 
   @ffi.Bool()
   external bool include_ideographs;
-}
-
-typedef mln_offline_operation_id = ffi.Uint64;
-typedef Dartmln_offline_operation_id = int;
-
-enum mln_offline_operation_kind {
-  MLN_OFFLINE_OPERATION_AMBIENT_CACHE(1),
-  MLN_OFFLINE_OPERATION_REGION_CREATE(2),
-  MLN_OFFLINE_OPERATION_REGION_GET(3),
-  MLN_OFFLINE_OPERATION_REGIONS_LIST(4),
-  MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE(5),
-  MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA(6),
-  MLN_OFFLINE_OPERATION_REGION_GET_STATUS(7),
-  MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED(8),
-  MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE(9),
-  MLN_OFFLINE_OPERATION_REGION_INVALIDATE(10),
-  MLN_OFFLINE_OPERATION_REGION_DELETE(11),
-  MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE(12);
-
-  final int value;
-  const mln_offline_operation_kind(this.value);
-
-  static mln_offline_operation_kind fromValue(int value) => switch (value) {
-    1 => MLN_OFFLINE_OPERATION_AMBIENT_CACHE,
-    2 => MLN_OFFLINE_OPERATION_REGION_CREATE,
-    3 => MLN_OFFLINE_OPERATION_REGION_GET,
-    4 => MLN_OFFLINE_OPERATION_REGIONS_LIST,
-    5 => MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE,
-    6 => MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA,
-    7 => MLN_OFFLINE_OPERATION_REGION_GET_STATUS,
-    8 => MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED,
-    9 => MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE,
-    10 => MLN_OFFLINE_OPERATION_REGION_INVALIDATE,
-    11 => MLN_OFFLINE_OPERATION_REGION_DELETE,
-    12 => MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE,
-    _ => throw ArgumentError(
-      'Unknown value for mln_offline_operation_kind: $value',
-    ),
-  };
-}
-
-enum mln_offline_operation_result_kind {
-  MLN_OFFLINE_OPERATION_RESULT_NONE(0),
-  MLN_OFFLINE_OPERATION_RESULT_REGION(1),
-  MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION(2),
-  MLN_OFFLINE_OPERATION_RESULT_REGION_LIST(3),
-  MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS(4);
-
-  final int value;
-  const mln_offline_operation_result_kind(this.value);
-
-  static mln_offline_operation_result_kind fromValue(int value) =>
-      switch (value) {
-        0 => MLN_OFFLINE_OPERATION_RESULT_NONE,
-        1 => MLN_OFFLINE_OPERATION_RESULT_REGION,
-        2 => MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION,
-        3 => MLN_OFFLINE_OPERATION_RESULT_REGION_LIST,
-        4 => MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS,
-        _ => throw ArgumentError(
-          'Unknown value for mln_offline_operation_result_kind: $value',
-        ),
-      };
 }
 
 final class mln_offline_region_definition extends ffi.Struct {
@@ -4517,6 +4571,9 @@ final class mln_opengl_surface_descriptor extends ffi.Struct {
   external ffi.Pointer<ffi.Void> surface;
 }
 
+typedef mln_operation = ffi.Uint64;
+typedef Dartmln_operation = int;
+
 final class mln_premultiplied_rgba8_image extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -4641,6 +4698,55 @@ final class mln_quaternion extends ffi.Struct {
     ..ref.y = y
     ..ref.z = z
     ..ref.w = w;
+}
+
+typedef mln_ready_batch = ffi.Uint64;
+typedef Dartmln_ready_batch = int;
+
+final class mln_ready_batch_view extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int endpoint_size;
+
+  external ffi.Pointer<mln_ready_endpoint> endpoints;
+
+  @ffi.Size()
+  external int endpoint_count;
+
+  static ffi.Pointer<mln_ready_batch_view> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int endpoint_size,
+    required ffi.Pointer<mln_ready_endpoint> endpoints,
+    required int endpoint_count,
+  }) => $allocator<mln_ready_batch_view>()
+    ..ref.size = size
+    ..ref.endpoint_size = endpoint_size
+    ..ref.endpoints = endpoints
+    ..ref.endpoint_count = endpoint_count;
+}
+
+final class mln_ready_endpoint extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int kind;
+
+  @ffi.Uint64()
+  external int id;
+
+  static ffi.Pointer<mln_ready_endpoint> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int kind,
+    required int id,
+  }) => $allocator<mln_ready_endpoint>()
+    ..ref.size = size
+    ..ref.kind = kind
+    ..ref.id = id;
 }
 
 enum mln_render_backend_flag {
@@ -5261,7 +5367,7 @@ final class mln_runtime_event extends ffi.Struct {
   external mln_runtime_event_payload payload;
 }
 
-final class mln_runtime_event_batch extends ffi.Struct {
+final class mln_runtime_event_batch_view extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
@@ -5281,7 +5387,7 @@ final class mln_runtime_event_batch extends ffi.Struct {
   @ffi.Size()
   external int remaining_count;
 
-  static ffi.Pointer<mln_runtime_event_batch> $allocate(
+  static ffi.Pointer<mln_runtime_event_batch_view> $allocate(
     ffi.Allocator $allocator, {
     required int size,
     required int event_size,
@@ -5290,7 +5396,7 @@ final class mln_runtime_event_batch extends ffi.Struct {
     required ffi.Pointer<ffi.Char> messages,
     required int messages_size,
     required int remaining_count,
-  }) => $allocator<mln_runtime_event_batch>()
+  }) => $allocator<mln_runtime_event_batch_view>()
     ..ref.size = size
     ..ref.event_size = event_size
     ..ref.events = events
@@ -5336,10 +5442,9 @@ enum mln_runtime_event_mask {
   MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED(524288),
   MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR(1048576),
   MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED(2097152),
-  MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED(4194304),
   MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS(8912894),
-  MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS(7864320),
-  MLN_RUNTIME_EVENT_MASK_ALL(16777214);
+  MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS(3670016),
+  MLN_RUNTIME_EVENT_MASK_ALL(12582910);
 
   final int value;
   const mln_runtime_event_mask(this.value);
@@ -5368,45 +5473,13 @@ enum mln_runtime_event_mask {
     524288 => MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED,
     1048576 => MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR,
     2097152 => MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
-    4194304 => MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED,
     8912894 => MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS,
-    7864320 => MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS,
-    16777214 => MLN_RUNTIME_EVENT_MASK_ALL,
+    3670016 => MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS,
+    12582910 => MLN_RUNTIME_EVENT_MASK_ALL,
     _ => throw ArgumentError(
       'Unknown value for mln_runtime_event_mask: $value',
     ),
   };
-}
-
-final class mln_runtime_event_offline_operation_completed extends ffi.Struct {
-  @mln_offline_operation_id()
-  external int operation_id;
-
-  @ffi.Uint32()
-  external int operation_kind;
-
-  @ffi.Uint32()
-  external int result_kind;
-
-  @ffi.Int32()
-  external int result_status;
-
-  @ffi.Bool()
-  external bool found;
-
-  static ffi.Pointer<mln_runtime_event_offline_operation_completed> $allocate(
-    ffi.Allocator $allocator, {
-    required int operation_id,
-    required int operation_kind,
-    required int result_kind,
-    required int result_status,
-    required bool found,
-  }) => $allocator<mln_runtime_event_offline_operation_completed>()
-    ..ref.operation_id = operation_id
-    ..ref.operation_kind = operation_kind
-    ..ref.result_kind = result_kind
-    ..ref.result_status = result_status
-    ..ref.found = found;
 }
 
 final class mln_runtime_event_offline_region_response_error extends ffi.Struct {
@@ -5465,9 +5538,6 @@ final class mln_runtime_event_payload extends ffi.Union {
   external mln_runtime_event_offline_region_tile_count_limit
   offline_region_tile_count_limit;
 
-  external mln_runtime_event_offline_operation_completed
-  offline_operation_completed;
-
   external mln_runtime_event_camera_transition_finished
   camera_transition_finished;
 }
@@ -5480,7 +5550,6 @@ enum mln_runtime_event_payload_type {
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS(5),
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR(6),
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT(7),
-  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED(8),
   MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED(9);
 
   final int value;
@@ -5494,7 +5563,6 @@ enum mln_runtime_event_payload_type {
     5 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS,
     6 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR,
     7 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT,
-    8 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED,
     9 => MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
     _ => throw ArgumentError(
       'Unknown value for mln_runtime_event_payload_type: $value',
@@ -5570,7 +5638,6 @@ enum mln_runtime_event_type {
   MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED(19),
   MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR(20),
   MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED(21),
-  MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED(22),
   MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED(23);
 
   final int value;
@@ -5598,7 +5665,6 @@ enum mln_runtime_event_type {
     19 => MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED,
     20 => MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR,
     21 => MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
-    22 => MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED,
     23 => MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
     _ => throw ArgumentError(
       'Unknown value for mln_runtime_event_type: $value',
@@ -5620,6 +5686,9 @@ final class mln_runtime_options extends ffi.Struct {
   @ffi.Uint64()
   external int event_mask;
 
+  @mln_notification_source()
+  external int notification_source;
+
   static ffi.Pointer<mln_runtime_options> $allocate(
     ffi.Allocator $allocator, {
     required int size,
@@ -5627,12 +5696,14 @@ final class mln_runtime_options extends ffi.Struct {
     required ffi.Pointer<ffi.Char> asset_path,
     required ffi.Pointer<ffi.Char> cache_path,
     required int event_mask,
+    required int notification_source,
   }) => $allocator<mln_runtime_options>()
     ..ref.size = size
     ..ref.flags = flags
     ..ref.asset_path = asset_path
     ..ref.cache_path = cache_path
-    ..ref.event_mask = event_mask;
+    ..ref.event_mask = event_mask
+    ..ref.notification_source = notification_source;
 }
 
 final class mln_screen_box extends ffi.Struct {
@@ -5723,6 +5794,7 @@ sealed class mln_status {
   static const MLN_STATUS_WRONG_THREAD = -3;
   static const MLN_STATUS_UNSUPPORTED = -4;
   static const MLN_STATUS_NATIVE_ERROR = -5;
+  static const MLN_STATUS_CANCELLED = -6;
 }
 
 typedef mln_style_id_list = ffi.Uint64;

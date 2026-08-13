@@ -111,7 +111,7 @@ func packMessageArena(
 
 /// One batch a test built over storage it owns.
 struct SynthesizedEventBatch {
-  let batch: mln_runtime_event_batch
+  let batch: mln_runtime_event_batch_view
   /// The event records, for a test that overwrites them after a decode.
   let records: UnsafeMutableRawBufferPointer
   /// The message arena, for the same reason.
@@ -133,8 +133,8 @@ func withSynthesizedEventBatch<Result>(
   let payloadOffset = try #require(
     MemoryLayout<mln_runtime_event>.offset(of: \.payload)
   )
-  // The C API lends an array of event records, so the storage behind one has to
-  // carry the record alignment; a `UInt64` element buffer does. An empty
+  // The view borrows an array of event records, so the storage behind one has
+  // to carry the record alignment; a `UInt64` element buffer does. An empty
   // allocation has no base address, and the C API spells an empty array or
   // arena as a null pointer, so one spare element keeps both in one code path.
   var recordStorage = [UInt64](
@@ -157,7 +157,8 @@ func withSynthesizedEventBatch<Result>(
         }
       }
 
-      var batch = mln_runtime_event_batch_default()
+      var batch = mln_runtime_event_batch_view()
+      batch.size = UInt32(MemoryLayout<mln_runtime_event_batch_view>.size)
       batch.event_size = UInt32(stride)
       batch.events = events.isEmpty
         ? nil

@@ -110,22 +110,16 @@ def _wait_for_provider_handle(
 
 def _wait_for_offline_operation(
     runtime: mln.RuntimeHandle,
-    operation: offline.OfflineOperationHandle,
+    operation: offline.OperationHandle,
     *,
     iterations: int = 5000,
-) -> mln.RuntimeEvent:
-    operation_id = operation._operation_id
+) -> None:
     for _ in range(iterations):
         runtime.pump()
-        for event in runtime.drain_events().events:
-            if (
-                event.event_type == mln.RuntimeEventType.OFFLINE_OPERATION_COMPLETED
-                and isinstance(event.payload, offline.OfflineOperationCompleted)
-                and event.payload.operation_id == operation_id
-            ):
-                return event
+        if operation.poll():
+            return
         time.sleep(0.001)
-    raise AssertionError(f"offline operation {operation_id!r} did not complete")
+    raise AssertionError("offline operation did not complete")
 
 
 def test_c_version_matches_expected_abi_version() -> None:
@@ -344,7 +338,7 @@ def test_public_type_hints_are_resolvable() -> None:
         mln.RuntimeHandle.create_offline_region,
         mln.RuntimeHandle.set_resource_transform,
         mln.RuntimeHandle.set_resource_provider,
-        offline.OfflineOperationHandle.__init__,
+        offline.OperationHandle.__init__,
         offline.OfflineRegionResponseError.__init__,
     )
 
@@ -376,9 +370,7 @@ def test_public_type_hints_are_resolvable() -> None:
     assert create_map_hints["options"] == map_module.MapOptions | None
     assert create_map_hints["return"] is map_module.MapHandle
 
-    offline_handle_hints = typing.get_type_hints(
-        offline.OfflineOperationHandle.__init__
-    )
+    offline_handle_hints = typing.get_type_hints(offline.OperationHandle.__init__)
     assert offline_handle_hints["runtime"] is mln.RuntimeHandle
 
     provider_hints = typing.get_type_hints(mln.RuntimeHandle.set_resource_provider)
@@ -581,15 +573,19 @@ def assert_wrong_thread_error(
         assert error.diagnostic == diagnostic
 
 
-def test_owner_thread_methods_report_wrong_thread_diagnostics() -> None:
+def test_drain_is_any_thread_and_owner_thread_methods_report_wrong_thread() -> None:
     runtime = mln.RuntimeHandle()
     map_handle = runtime.create_map()
     raised_errors: list[BaseException] = []
+    drain_errors: list[mln.MaplibreError] = []
 
     def call_owner_thread_methods() -> None:
+        try:
+            runtime.drain_events()
+        except mln.MaplibreError as error:
+            drain_errors.append(error)
         calls: tuple[Callable[[], object], ...] = (
             runtime.pump,
-            runtime.drain_events,
             map_handle.request_repaint,
             lambda: runtime.set_event_mask(mln.RuntimeEventMask.ALL),
             lambda: map_handle.set_event_mask(mln.RuntimeEventMask.ALL),
@@ -605,7 +601,8 @@ def test_owner_thread_methods_report_wrong_thread_diagnostics() -> None:
     thread.join()
 
     try:
-        assert len(raised_errors) == 5
+        assert not drain_errors
+        assert len(raised_errors) == 4
         for error in raised_errors:
             assert_wrong_thread_error(error)
     finally:
@@ -1969,35 +1966,6 @@ def test_map_created_with_a_narrowed_mask_never_delivers_the_cleared_type() -> N
     assert mln.RuntimeEventType.MAP_CAMERA_DID_CHANGE not in types
 
 
-def test_narrowed_runtime_mask_drops_offline_completion_events(tmp_path: Path) -> None:
-    cleared = mln.RuntimeEventMask.ALL & ~(
-        mln.RuntimeEventMask.OFFLINE_OPERATION_COMPLETED
-    )
-
-    with mln.RuntimeHandle(
-        mln.RuntimeOptions(cache_path=str(tmp_path / "masked-cache.db"))
-    ) as runtime:
-        # The same drive reports a completion while the type is selected, so the
-        # narrowed phase below asserts a real negative.
-        selected = runtime.set_maximum_ambient_cache_size(8 << 20)
-        _wait_for_offline_operation(runtime, selected)
-        selected.close()
-
-        runtime.set_event_mask(cleared)
-        assert runtime.event_mask == cleared
-        operation = runtime.set_maximum_ambient_cache_size(4 << 20)
-        completions = 0
-        for _ in range(200):
-            runtime.pump(0.002)
-            completions += sum(
-                event.event_type == mln.RuntimeEventType.OFFLINE_OPERATION_COMPLETED
-                for event in runtime.drain_events().events
-            )
-        operation.close()
-
-    assert completions == 0
-
-
 def test_event_masks_round_trip_on_the_map_and_the_runtime() -> None:
     created = mln.RuntimeEventMask.ALL & ~(
         mln.RuntimeEventMask.OFFLINE_REGION_STATUS_CHANGED
@@ -2023,17 +1991,17 @@ def test_event_masks_round_trip_on_the_map_and_the_runtime() -> None:
             )
             assert mln.RuntimeEventMask.MAP_TILE_ACTION in map_handle.event_mask
             assert (
-                mln.RuntimeEventMask.OFFLINE_OPERATION_COMPLETED
+                mln.RuntimeEventMask.OFFLINE_REGION_STATUS_CHANGED
                 in map_handle.event_mask
             )
 
             runtime.set_event_mask(
-                runtime.event_mask & ~mln.RuntimeEventMask.OFFLINE_OPERATION_COMPLETED
+                runtime.event_mask & ~mln.RuntimeEventMask.OFFLINE_REGION_STATUS_CHANGED
             )
             assert (
                 runtime.event_mask
                 == mln.RuntimeEventMask.ALL
-                & ~mln.RuntimeEventMask.OFFLINE_OPERATION_COMPLETED
+                & ~mln.RuntimeEventMask.OFFLINE_REGION_STATUS_CHANGED
             )
 
 
@@ -2645,7 +2613,7 @@ def test_offline_region_operation_starts_return_public_handles(tmp_path: Path) -
         ]
 
         for operation in operations:
-            assert isinstance(operation, offline.OfflineOperationHandle)
+            assert isinstance(operation, offline.OperationHandle)
             assert not operation.closed
             operation.close()
             assert operation.closed
@@ -2655,6 +2623,12 @@ def test_offline_operation_take_results_convert_public_values() -> None:
     class FakeNativeRuntime:
         def __init__(self) -> None:
             self.discarded = []
+
+        def operation_status(self, operation_id: int) -> tuple[int, str]:
+            return (0, "")
+
+        def operation_release(self, operation_id: int) -> None:
+            self.discarded.append(operation_id)
 
         def offline_region_create_take_result(
             self, operation_id: int
@@ -2704,22 +2678,18 @@ def test_offline_operation_take_results_convert_public_values() -> None:
                 "complete": False,
             }
 
-        def offline_operation_discard(self, operation_id: int) -> None:
+        def operation_discard(self, operation_id: int) -> None:
             self.discarded.append(operation_id)
 
     class FakeRuntime:
         def __init__(self) -> None:
             self._native = FakeNativeRuntime()
-            self.operations: set[offline.OfflineOperationHandle] = set()
+            self.operations: set[offline.OperationHandle] = set()
 
-        def _register_offline_operation(
-            self, operation: offline.OfflineOperationHandle
-        ) -> None:
+        def _register_operation(self, operation: offline.OperationHandle) -> None:
             self.operations.add(operation)
 
-        def _unregister_offline_operation(
-            self, operation: offline.OfflineOperationHandle
-        ) -> None:
+        def _unregister_operation(self, operation: offline.OperationHandle) -> None:
             self.operations.discard(operation)
 
     def region_wire(metadata: bytes) -> dict[str, object]:
@@ -2743,20 +2713,50 @@ def test_offline_operation_take_results_convert_public_values() -> None:
     runtime = FakeRuntime()
 
     with pytest.raises(TypeError, match="created by RuntimeHandle"):
-        offline.OfflineOperationHandle(runtime, 99)
+        offline.OperationHandle(runtime, 99, None, None)
 
-    region = offline.OfflineOperationHandle._from_native(runtime, 1).take_region()
-    optional = offline.OfflineOperationHandle._from_native(
-        runtime, 2
-    ).take_optional_region()
-    listed = offline.OfflineOperationHandle._from_native(runtime, 3).take_region_list()
-    merged = offline.OfflineOperationHandle._from_native(runtime, 4).take_region_list(
-        merge_result=True,
-    )
-    updated = offline.OfflineOperationHandle._from_native(
-        runtime, 5
-    ).take_updated_region()
-    status = offline.OfflineOperationHandle._from_native(runtime, 6).take_status()
+    with offline.OperationHandle._from_native(
+        runtime,
+        1,
+        runtime._native.offline_region_create_take_result,
+        offline._adapt_region_result,
+    ) as operation:
+        region = operation.take()
+    with offline.OperationHandle._from_native(
+        runtime,
+        2,
+        runtime._native.offline_region_get_take_result,
+        offline._adapt_optional_region_result,
+    ) as operation:
+        optional = operation.take()
+    with offline.OperationHandle._from_native(
+        runtime,
+        3,
+        runtime._native.offline_regions_list_take_result,
+        offline._adapt_region_list_result,
+    ) as operation:
+        listed = operation.take()
+    with offline.OperationHandle._from_native(
+        runtime,
+        4,
+        runtime._native.offline_regions_merge_database_take_result,
+        offline._adapt_region_list_result,
+    ) as operation:
+        merged = operation.take()
+    with offline.OperationHandle._from_native(
+        runtime,
+        5,
+        runtime._native.offline_region_update_metadata_take_result,
+        offline._adapt_region_result,
+    ) as operation:
+        updated = operation.take()
+    with offline.OperationHandle._from_native(
+        runtime,
+        6,
+        runtime._native.offline_region_get_status_take_result,
+        offline._adapt_status_result,
+    ) as operation:
+        status = operation.take()
 
     assert region.id == 42
     assert isinstance(region.definition, offline.OfflineTilePyramidRegionDefinition)
@@ -2771,13 +2771,118 @@ def test_offline_operation_take_results_convert_public_values() -> None:
     assert runtime.operations == set()
 
 
+def test_offline_operation_exposes_common_lifecycle_and_copied_diagnostic() -> None:
+    class FakeNativeRuntime:
+        def __init__(self) -> None:
+            self.cancelled: list[int] = []
+            self.released: list[int] = []
+
+        def operation_poll(self, operation: int) -> bool:
+            return False
+
+        def operation_wait(self, operation: int, timeout_ms: int) -> bool:
+            assert timeout_ms == 25
+            return True
+
+        def operation_cancel(self, operation: int) -> None:
+            self.cancelled.append(operation)
+
+        def operation_status(self, operation: int) -> tuple[int, str]:
+            return (-6, "copied cancellation diagnostic")
+
+        def operation_release(self, operation: int) -> None:
+            self.released.append(operation)
+
+    class FakeRuntime:
+        def __init__(self) -> None:
+            self._native = FakeNativeRuntime()
+            self.operations: set[offline.OperationHandle] = set()
+
+        def _register_operation(self, operation: offline.OperationHandle) -> None:
+            self.operations.add(operation)
+
+        def _unregister_operation(self, operation: offline.OperationHandle) -> None:
+            self.operations.discard(operation)
+
+    runtime = FakeRuntime()
+    operation = offline.OperationHandle._from_native(runtime, 42)
+
+    assert operation.poll() is False
+    assert operation.wait(25) is True
+    operation.cancel()
+    assert operation.status == mln.MaplibreStatus.CANCELLED
+    assert operation.diagnostic == "copied cancellation diagnostic"
+    with pytest.raises(mln.CancelledError) as raised:
+        operation.raise_for_status()
+    assert raised.value.diagnostic == "copied cancellation diagnostic"
+
+    operation.close()
+    assert operation.closed
+    assert runtime._native.cancelled == [42]
+    assert runtime._native.released == [42]
+    assert runtime.operations == set()
+
+
+def test_operation_close_waits_for_active_wait_and_allows_concurrent_cancel() -> None:
+    wait_started = threading.Event()
+    cancelled = threading.Event()
+    released: list[int] = []
+
+    class FakeNativeRuntime:
+        def operation_wait(self, operation: int, timeout_ms: int) -> bool:
+            wait_started.set()
+            assert cancelled.wait(1)
+            return True
+
+        def operation_cancel(self, operation: int) -> None:
+            cancelled.set()
+
+        def operation_release(self, operation: int) -> None:
+            released.append(operation)
+
+    class FakeRuntime:
+        def __init__(self) -> None:
+            self._native = FakeNativeRuntime()
+            self.operations: set[offline.OperationHandle[object]] = set()
+
+        def _register_operation(
+            self, operation: offline.OperationHandle[object]
+        ) -> None:
+            self.operations.add(operation)
+
+        def _unregister_operation(
+            self, operation: offline.OperationHandle[object]
+        ) -> None:
+            self.operations.discard(operation)
+
+    runtime = FakeRuntime()
+    operation = offline.OperationHandle._from_native(runtime, 42)
+    wait_thread = threading.Thread(target=operation.wait)
+    close_thread = threading.Thread(target=operation.close)
+    wait_thread.start()
+    assert wait_started.wait(1)
+    close_thread.start()
+    operation.cancel()
+    wait_thread.join()
+    close_thread.join()
+
+    assert operation.closed
+    assert released == [42]
+
+
 def test_offline_operation_take_rejects_closed_handles() -> None:
     class FakeNativeRuntime:
         def __init__(self) -> None:
             self.discarded: list[int] = []
             self.status_takes = 0
 
-        def offline_operation_discard(self, operation_id: int) -> None:
+        def operation_status(self, operation_id: int) -> tuple[int, str]:
+            return (0, "")
+
+        def operation_release(self, operation_id: int) -> None:
+            self.discarded.append(operation_id)
+
+        def operation_discard(self, operation_id: int) -> None:
             self.discarded.append(operation_id)
 
         def offline_region_get_status_take_result(
@@ -2816,42 +2921,40 @@ def test_offline_operation_take_rejects_closed_handles() -> None:
     class FakeRuntime:
         def __init__(self) -> None:
             self._native = FakeNativeRuntime()
-            self.operations: set[offline.OfflineOperationHandle] = set()
+            self.operations: set[offline.OperationHandle] = set()
 
-        def _register_offline_operation(
-            self, operation: offline.OfflineOperationHandle
-        ) -> None:
+        def _register_operation(self, operation: offline.OperationHandle) -> None:
             self.operations.add(operation)
 
-        def _unregister_offline_operation(
-            self, operation: offline.OfflineOperationHandle
-        ) -> None:
+        def _unregister_operation(self, operation: offline.OperationHandle) -> None:
             self.operations.discard(operation)
 
     runtime = FakeRuntime()
 
-    status_handle = offline.OfflineOperationHandle._from_native(runtime, 10)
-    assert status_handle.take_status().complete is True
-    with pytest.raises(mln.InvalidStateError, match="offline operation handle"):
-        status_handle.take_status()
-    assert runtime._native.status_takes == 1
-
-    closed_takes = (
-        lambda handle: handle.take_region(),
-        lambda handle: handle.take_optional_region(),
-        lambda handle: handle.take_region_list(),
-        lambda handle: handle.take_region_list(merge_result=True),
-        lambda handle: handle.take_updated_region(),
-        lambda handle: handle.take_status(),
+    status_handle = offline.OperationHandle._from_native(
+        runtime,
+        10,
+        runtime._native.offline_region_get_status_take_result,
+        offline._adapt_status_result,
     )
-    for offset, take in enumerate(closed_takes, start=20):
-        handle = offline.OfflineOperationHandle._from_native(runtime, offset)
-        handle.close()
-        with pytest.raises(mln.InvalidStateError, match="offline operation handle"):
-            take(handle)
-
-    assert runtime._native.discarded == list(range(20, 26))
+    assert status_handle.take().complete is True
+    with pytest.raises(mln.InvalidStateError, match="already consumed"):
+        status_handle.take()
+    assert status_handle.status == mln.MaplibreStatus.OK
+    status_handle.close()
     assert runtime._native.status_takes == 1
+
+    closed = offline.OperationHandle._from_native(
+        runtime,
+        20,
+        runtime._native.offline_region_create_take_result,
+        offline._adapt_region_result,
+    )
+    closed.close()
+    with pytest.raises(mln.InvalidStateError, match="operation handle"):
+        closed.take()
+
+    assert runtime._native.discarded == [10, 20]
     assert runtime.operations == set()
 
 
@@ -2860,7 +2963,7 @@ def test_runtime_close_rejects_live_offline_operations(tmp_path: Path) -> None:
     operation = runtime.run_ambient_cache_operation(offline.AmbientCacheOperation.CLEAR)
     try:
         assert not operation.closed
-        with pytest.raises(mln.InvalidStateError, match="offline operation"):
+        with pytest.raises(mln.InvalidStateError, match="live operation"):
             runtime.close()
 
         assert not runtime.closed
@@ -2878,7 +2981,7 @@ def test_ambient_cache_operation_starts_and_discards_through_public_api(
             offline.AmbientCacheOperation.CLEAR,
         )
 
-        assert isinstance(operation, offline.OfflineOperationHandle)
+        assert isinstance(operation, offline.OperationHandle)
         assert not operation.closed
         operation.close()
         assert operation.closed
@@ -2888,22 +2991,19 @@ def test_ambient_cache_operation_starts_and_discards_through_public_api(
 def test_set_maximum_ambient_cache_size_starts_and_discards_through_public_api(
     tmp_path: Path,
 ) -> None:
-    with mln.RuntimeHandle(mln.RuntimeOptions(cache_path=str(tmp_path))) as runtime:
+    with mln.RuntimeHandle(
+        mln.RuntimeOptions(cache_path=str(tmp_path / "ambient-cache.db"))
+    ) as runtime:
         operation = runtime.set_maximum_ambient_cache_size(8 << 20)
 
-        assert isinstance(operation, offline.OfflineOperationHandle)
+        assert isinstance(operation, offline.OperationHandle)
         assert not operation.closed
 
-        event = _wait_for_offline_operation(runtime, operation)
-        completed = event.payload
-        assert isinstance(completed, offline.OfflineOperationCompleted)
-        # The completion reports a named kind rather than an unknown value.
-        assert (
-            completed.operation_kind
-            == offline.OfflineOperationKind.SET_MAXIMUM_AMBIENT_CACHE_SIZE
-        )
-        assert not completed.operation_kind.is_unknown
-
+        _wait_for_offline_operation(runtime, operation)
+        assert operation.status == mln.MaplibreStatus.OK
+        assert operation.diagnostic == ""
+        operation.discard()
+        assert not operation.closed
         operation.close()
         assert operation.closed
 
@@ -2935,15 +3035,6 @@ def test_offline_values_wrap_runtime_event_payload_shape() -> None:
         required_resource_count_is_precise=True,
         complete=False,
     )
-    completed = offline.OfflineOperationCompleted._from_runtime_payload(
-        {
-            "operation_id": 7,
-            "operation_kind": offline.OfflineOperationKind.REGION_CREATE.native_code,
-            "result_kind": offline.OfflineOperationResultKind.REGION,
-            "result_status": mln.MaplibreStatus.OK.native_code,
-            "found": True,
-        }
-    )
     response_error = offline.OfflineRegionResponseError._from_runtime_payload(
         {
             "region_id": 8,
@@ -2961,8 +3052,6 @@ def test_offline_values_wrap_runtime_event_payload_shape() -> None:
         definition.definition_type == offline.OfflineRegionDefinitionType.TILE_PYRAMID
     )
     assert status.download_state == offline.OfflineRegionDownloadState.ACTIVE
-    assert completed.operation_kind == offline.OfflineOperationKind.REGION_CREATE
-    assert completed.result_kind == offline.OfflineOperationResultKind.REGION
     unknown_state = offline.OfflineRegionDownloadState(999_001)
     assert unknown_state.native_code == 999_001
     with pytest.raises(mln.InvalidArgumentError, match="cannot be set"):
@@ -3678,7 +3767,8 @@ def test_resource_provider_error_response_reports_offline_response_error_event(
         runtime.set_resource_provider(provider, max_pending_callbacks=4)
         create = runtime.create_offline_region(definition, b"metadata")
         _wait_for_offline_operation(runtime, create)
-        region = create.take_region()
+        region = create.take()
+        create.close()
 
         observe = runtime.set_offline_region_observed(region.id, True)
         _wait_for_offline_operation(runtime, observe)

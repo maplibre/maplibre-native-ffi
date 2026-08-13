@@ -1,6 +1,6 @@
 ---
 title: Handle events
-description: Select the event types a host reads, drain them as a batch, and read borrowed values before they expire.
+description: Select the event types a host reads, drain them into an owned batch, and release the batch after reading it.
 sidebar:
   order: 5
 ---
@@ -12,7 +12,7 @@ import handleEvents from "../../../../snippets/c/handle-events.c?raw";
 
 Events report completed style loads, available frames, download progress, and
 resource failures. The runtime copies each event into a queue, and the host
-drains that queue on the runtime owner thread.
+drains that queue from any thread.
 
 A host decides which event types it reads. A map and a runtime each carry a
 subscription, and an event of an unselected type is never built, never queued,
@@ -32,9 +32,9 @@ keeps that default.
 
 ## Drain a batch
 
-One drain reports every queued event, in queue order, together with the message
-text that those events carry. The batch belongs to the runtime, and the next
-drain for that runtime replaces it.
+One drain creates an owned batch that contains every queued event in queue order,
+together with the message text that those events carry. The batch remains
+readable across later drains and runtime destruction.
 
 <Code code={region(handleEvents, "drain")} lang="c" title="handle-events.c" />
 
@@ -42,9 +42,10 @@ In C, step through the events by the stride that the batch reports rather than b
 the size of the event struct. A later library version reports a wider event to a
 host compiled against an earlier header.
 
-Copy any value you keep, because the next drain replaces the batch. A message is
-the arena bytes at the event's own offset: a failed style load carries its
-failure text there, and a missing-image event carries the image ID.
+Copy any event or message value that must outlive the batch, then release the
+batch. A message is the arena bytes at the event's own offset: a failed style
+load carries its failure text there, and a missing-image event carries the image
+ID.
 
 Pass a maximum event count to take a bounded slice instead of the whole queue.
 The batch then reports how many events stayed queued.

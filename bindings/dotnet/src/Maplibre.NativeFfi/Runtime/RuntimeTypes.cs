@@ -1,3 +1,4 @@
+using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Geo;
 using Maplibre.NativeFfi.Internal;
 using Maplibre.NativeFfi.Map;
@@ -15,30 +16,22 @@ public enum AmbientCacheOperation : uint
     Clear = 4,
 }
 
-public enum OfflineOperationKind : uint
+/// <summary>The terminal state copied from a completed operation.</summary>
+public sealed record OperationCompletion(MaplibreStatus Status, int RawStatus, string Diagnostic);
+
+public enum NotificationEndpointKind : uint
 {
-    AmbientCache = 1,
-    RegionCreate = 2,
-    RegionGet = 3,
-    RegionsList = 4,
-    RegionsMergeDatabase = 5,
-    RegionUpdateMetadata = 6,
-    RegionGetStatus = 7,
-    RegionSetObserved = 8,
-    RegionSetDownloadState = 9,
-    RegionInvalidate = 10,
-    RegionDelete = 11,
-    SetMaximumAmbientCacheSize = 12,
+    Unknown = 0,
+    RuntimeEvents = 1,
+    Operation = 2,
+    AdapterResourceRequests = 3,
+    AdapterLogRecords = 4,
+    RenderFrames = 5,
+    DriverWork = 6,
 }
 
-public enum OfflineOperationResultKind : uint
-{
-    None = 0,
-    Region = 1,
-    OptionalRegion = 2,
-    RegionList = 3,
-    RegionStatus = 4,
-}
+/// <summary>One copied endpoint from a notification-source ready batch.</summary>
+public sealed record ReadyEndpoint(NotificationEndpointKind Kind, uint RawKind, ulong Id);
 
 public enum RuntimeEventSourceType : uint
 {
@@ -69,7 +62,6 @@ public enum RuntimeEventType : uint
     OfflineRegionStatusChanged = 19,
     OfflineRegionResponseError = 20,
     OfflineRegionTileCountLimitExceeded = 21,
-    OfflineOperationCompleted = 22,
     MapCameraTransitionFinished = 23,
 }
 
@@ -111,7 +103,6 @@ public enum RuntimeEventMask : ulong
     OfflineRegionResponseError = 1UL << (int)RuntimeEventType.OfflineRegionResponseError,
     OfflineRegionTileCountLimitExceeded =
         1UL << (int)RuntimeEventType.OfflineRegionTileCountLimitExceeded,
-    OfflineOperationCompleted = 1UL << (int)RuntimeEventType.OfflineOperationCompleted,
 
     /// <summary>Selects every map-originated event type this binding declares.</summary>
     AllMapEvents =
@@ -139,8 +130,7 @@ public enum RuntimeEventMask : ulong
     AllRuntimeEvents =
         OfflineRegionStatusChanged
         | OfflineRegionResponseError
-        | OfflineRegionTileCountLimitExceeded
-        | OfflineOperationCompleted,
+        | OfflineRegionTileCountLimitExceeded,
 
     /// <summary>Selects every event type this binding declares.</summary>
     All = AllMapEvents | AllRuntimeEvents,
@@ -211,12 +201,6 @@ public sealed record RuntimeEventBatch(IReadOnlyList<RuntimeEvent> Events, ulong
 /// <paramref name="Message" /> for the failure text.
 /// </description>
 /// </item>
-/// <item>
-/// <description>
-/// <see cref="RuntimeEventType.OfflineOperationCompleted" />: the operation result as a
-/// <c>MaplibreStatus</c> value.
-/// </description>
-/// </item>
 /// <item><description>Every other event kind: 0.</description></item>
 /// </list>
 /// </param>
@@ -281,16 +265,6 @@ public abstract record RuntimeEventPayload
 
     public sealed record OfflineRegionTileCountLimit(long RegionId, ulong Limit)
         : RuntimeEventPayload;
-
-    public sealed record OfflineOperationCompleted(
-        ulong OperationId,
-        OfflineOperationKind OperationKind,
-        uint RawOperationKind,
-        OfflineOperationResultKind ResultKind,
-        uint RawResultKind,
-        int ResultStatus,
-        bool Found
-    ) : RuntimeEventPayload;
 
     /// <summary>Payload for a map camera transition-finished event.</summary>
     /// <param name="TransitionId">

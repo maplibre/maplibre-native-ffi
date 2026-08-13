@@ -3,42 +3,57 @@
 
 #include <maplibre_native_c.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-// Pumps until the completion event for this operation arrives, and returns the
-// operation's own result status.
-static mln_status await_operation(
-  mln_runtime runtime, mln_offline_operation_id operation_id
-) {
-  for (;;) {
-    mln_runtime_pump(runtime, 100);
-
-    mln_runtime_event_batch batch = mln_runtime_event_batch_default();
-    if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
-      return MLN_STATUS_NATIVE_ERROR;
-    }
-
-    for (size_t index = 0; index < batch.event_count; index++) {
-      const char* bytes = (const char*)batch.events + index * batch.event_size;
-      const mln_runtime_event* event = (const mln_runtime_event*)bytes;
-      if (event->type != MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED) {
-        continue;
-      }
-      const mln_runtime_event_offline_operation_completed* completed =
-        &event->payload.offline_operation_completed;
-      if (completed->operation_id == operation_id) {
-        return (mln_status)completed->result_status;
-      }
-    }
+static void print_operation_diagnostic(mln_operation operation) {
+  size_t size = 0;
+  if (
+    mln_operation_copy_diagnostic(operation, NULL, 0, &size) != MLN_STATUS_OK ||
+    size == 0
+  ) {
+    return;
   }
+
+  char* diagnostic = malloc(size);
+  if (diagnostic == NULL) return;
+  if (
+    mln_operation_copy_diagnostic(operation, diagnostic, size, &size) ==
+    MLN_STATUS_OK
+  ) {
+    fprintf(stderr, "offline operation failed: %.*s\n", (int)size, diagnostic);
+  }
+  free(diagnostic);
 }
 
-// An operation with no result still holds runtime state until a discard.
-static mln_status finish_operation(
-  mln_runtime runtime, mln_offline_operation_id operation_id
+// Pumps until the operation completes, then returns its terminal status.
+static mln_status await_operation(
+  mln_runtime runtime, mln_operation operation
 ) {
-  const mln_status status = await_operation(runtime, operation_id);
-  mln_runtime_offline_operation_discard(runtime, operation_id);
+  bool completed = false;
+  while (!completed) {
+    mln_runtime_pump(runtime, 100);
+    if (mln_operation_poll(operation, &completed) != MLN_STATUS_OK) {
+      return MLN_STATUS_NATIVE_ERROR;
+    }
+  }
+
+  mln_status status = MLN_STATUS_NATIVE_ERROR;
+  if (mln_operation_get_status(operation, &status) != MLN_STATUS_OK) {
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  if (status != MLN_STATUS_OK) print_operation_diagnostic(operation);
+  return status;
+}
+
+// An operation with no typed result still requires result disposal and release.
+static mln_status finish_operation(
+  mln_runtime runtime, mln_operation operation
+) {
+  const mln_status status = await_operation(runtime, operation);
+  mln_operation_discard_result(operation);
+  mln_operation_release(operation);
   return status;
 }
 
@@ -46,11 +61,8 @@ static mln_status finish_operation(
 mln_offline_region_id download_region(
   mln_runtime runtime, mln_lat_lng_bounds bounds, const char* metadata
 ) {
-  // The wait below ends on the completion event, so the subscription has to
-  // select that type.
   mln_runtime_set_event_mask(
-    runtime, MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED |
-               MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED
+    runtime, MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED
   );
 
   // #region define
@@ -74,11 +86,11 @@ mln_offline_region_id download_region(
   // #endregion tag
 
   // #region create
-  mln_offline_operation_id create_id = 0;
+  mln_operation create_operation = MLN_HANDLE_NULL;
   if (
     mln_runtime_offline_region_create_start(
       runtime, &definition, (const uint8_t*)metadata, strlen(metadata),
-      &create_id
+      &create_operation
     ) != MLN_STATUS_OK
   ) {
     return 0;
@@ -87,13 +99,15 @@ mln_offline_region_id download_region(
 
   // #region result
   mln_offline_region_snapshot region = MLN_HANDLE_NULL;
-  if (await_operation(runtime, create_id) == MLN_STATUS_OK) {
-    mln_runtime_offline_region_create_take_result(runtime, create_id, &region);
+  if (await_operation(runtime, create_operation) == MLN_STATUS_OK) {
+    mln_runtime_offline_region_create_take_result(create_operation, &region);
   }
   if (region == MLN_HANDLE_NULL) {
-    mln_runtime_offline_operation_discard(runtime, create_id);
+    mln_operation_discard_result(create_operation);
+    mln_operation_release(create_operation);
     return 0;
   }
+  mln_operation_release(create_operation);
   // #endregion result
 
   // #region region-id
@@ -103,23 +117,23 @@ mln_offline_region_id download_region(
   mln_offline_region_snapshot_destroy(region);
   // #endregion region-id
 
-  mln_offline_operation_id observe_id = 0;
+  mln_operation observe_operation = MLN_HANDLE_NULL;
   if (
     mln_runtime_offline_region_set_observed_start(
-      runtime, info.id, true, &observe_id
+      runtime, info.id, true, &observe_operation
     ) != MLN_STATUS_OK ||
-    finish_operation(runtime, observe_id) != MLN_STATUS_OK
+    finish_operation(runtime, observe_operation) != MLN_STATUS_OK
   ) {
     return 0;
   }
 
   // #region download
-  mln_offline_operation_id download_id = 0;
+  mln_operation download_operation = MLN_HANDLE_NULL;
   if (
     mln_runtime_offline_region_set_download_state_start(
-      runtime, info.id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &download_id
+      runtime, info.id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &download_operation
     ) != MLN_STATUS_OK ||
-    finish_operation(runtime, download_id) != MLN_STATUS_OK
+    finish_operation(runtime, download_operation) != MLN_STATUS_OK
   ) {
     return 0;
   }

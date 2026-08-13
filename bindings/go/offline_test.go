@@ -35,17 +35,9 @@ func testOfflineGeometryDefinition() OfflineGeometryRegionDefinition {
 	}
 }
 
-func requireDiscardOfflineOperation[T any](t *testing.T, operation *OfflineOperationHandle[T], kind OfflineOperationKind, resultKind OfflineOperationResultKind) {
+func requireReleaseOperation[T any](t *testing.T, operation *OperationHandle[T]) {
 	t.Helper()
-	if operation.ID() == 0 {
-		t.Fatal("operation ID is zero")
-	}
-	if operation.Kind() != kind || operation.ResultKind() != resultKind {
-		t.Fatalf("operation kind/result = %v/%v, want %v/%v", operation.Kind(), operation.ResultKind(), kind, resultKind)
-	}
-	if err := operation.Discard(); err != nil {
-		t.Fatalf("Discard(): %v", err)
-	}
+	operation.Release()
 }
 
 func TestOfflineRegionStartOperationsReturnTypedHandles(t *testing.T) {
@@ -65,68 +57,68 @@ func TestOfflineRegionStartOperationsReturnTypedHandles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StartCreateOfflineRegion(): %v", err)
 	}
-	requireDiscardOfflineOperation(t, create, OfflineOperationRegionCreate, OfflineOperationResultRegion)
+	requireReleaseOperation(t, create)
 
 	createGeometry, err := runtime.StartCreateOfflineRegion(testOfflineGeometryDefinition(), []byte{1, 2, 3})
 	if err != nil {
 		t.Fatalf("StartCreateOfflineRegion(geometry): %v", err)
 	}
-	requireDiscardOfflineOperation(t, createGeometry, OfflineOperationRegionCreate, OfflineOperationResultRegion)
+	requireReleaseOperation(t, createGeometry)
 
 	get, err := runtime.StartOfflineRegion(1)
 	if err != nil {
 		t.Fatalf("StartOfflineRegion(): %v", err)
 	}
-	requireDiscardOfflineOperation(t, get, OfflineOperationRegionGet, OfflineOperationResultOptionalRegion)
+	requireReleaseOperation(t, get)
 
 	list, err := runtime.StartOfflineRegions()
 	if err != nil {
 		t.Fatalf("StartOfflineRegions(): %v", err)
 	}
-	requireDiscardOfflineOperation(t, list, OfflineOperationRegionsList, OfflineOperationResultRegionList)
+	requireReleaseOperation(t, list)
 
 	update, err := runtime.StartUpdateOfflineRegionMetadata(1, []byte{4, 5, 6})
 	if err != nil {
 		t.Fatalf("StartUpdateOfflineRegionMetadata(): %v", err)
 	}
-	requireDiscardOfflineOperation(t, update, OfflineOperationRegionUpdateMetadata, OfflineOperationResultRegion)
+	requireReleaseOperation(t, update)
 
 	status, err := runtime.StartOfflineRegionStatus(1)
 	if err != nil {
 		t.Fatalf("StartOfflineRegionStatus(): %v", err)
 	}
-	requireDiscardOfflineOperation(t, status, OfflineOperationRegionGetStatus, OfflineOperationResultRegionStatus)
+	requireReleaseOperation(t, status)
 
 	observed, err := runtime.StartSetOfflineRegionObserved(1, true)
 	if err != nil {
 		t.Fatalf("StartSetOfflineRegionObserved(): %v", err)
 	}
-	requireDiscardOfflineOperation(t, observed, OfflineOperationRegionSetObserved, OfflineOperationResultNone)
+	requireReleaseOperation(t, observed)
 
 	download, err := runtime.StartSetOfflineRegionDownloadState(1, OfflineRegionDownloadInactive)
 	if err != nil {
 		t.Fatalf("StartSetOfflineRegionDownloadState(): %v", err)
 	}
-	requireDiscardOfflineOperation(t, download, OfflineOperationRegionSetDownloadState, OfflineOperationResultNone)
+	requireReleaseOperation(t, download)
 
 	invalidate, err := runtime.StartInvalidateOfflineRegion(1)
 	if err != nil {
 		t.Fatalf("StartInvalidateOfflineRegion(): %v", err)
 	}
-	requireDiscardOfflineOperation(t, invalidate, OfflineOperationRegionInvalidate, OfflineOperationResultNone)
+	requireReleaseOperation(t, invalidate)
 
 	deleteOperation, err := runtime.StartDeleteOfflineRegion(1)
 	if err != nil {
 		t.Fatalf("StartDeleteOfflineRegion(): %v", err)
 	}
-	requireDiscardOfflineOperation(t, deleteOperation, OfflineOperationRegionDelete, OfflineOperationResultNone)
+	requireReleaseOperation(t, deleteOperation)
 }
 
-func TestRuntimeOptionsEventMaskSuppressesCompletionEventsNotResults(t *testing.T) {
+func TestOfflineOperationResultDoesNotUseRuntimeEventQueue(t *testing.T) {
 	lockOSThreadForTest(t)
 
 	options := NewRuntimeOptions("", ":memory:")
-	options.EventMask = RuntimeEventMaskAll &^ RuntimeEventMaskOfflineOperationCompleted
+	options.EventMask = RuntimeEventMaskNone
 	runtime, err := NewRuntimeWithOptions(options)
 	if err != nil {
 		t.Fatalf("NewRuntimeWithOptions(): %v", err)
@@ -137,48 +129,25 @@ func TestRuntimeOptionsEventMaskSuppressesCompletionEventsNotResults(t *testing.
 		}
 	}()
 
-	if got, err := runtime.EventMask(); err != nil || got != options.EventMask {
-		t.Fatalf("EventMask() = (%#x, %v), want %#x", uint64(got), err, uint64(options.EventMask))
-	}
-
-	// An operation records its result before the mask is consulted, so the
-	// take-result call still reports it while the event stays out of the queue.
 	operation, err := runtime.StartOfflineRegions()
 	if err != nil {
 		t.Fatalf("StartOfflineRegions(): %v", err)
 	}
-	var completions int
-	took := false
-	for range make([]struct{}, 5000) {
-		if err := runtime.Pump(0); err != nil {
-			t.Fatalf("Pump(): %v", err)
-		}
-		batch, err := runtime.DrainEvents(0)
-		if err != nil {
-			t.Fatalf("DrainEvents(): %v", err)
-		}
-		for _, event := range batch.Events {
-			if event.Type == RuntimeEventOfflineOperationCompleted {
-				completions++
-			}
-		}
-		if _, err := operation.Take(); err == nil {
-			took = true
-			break
-		} else if !errors.Is(err, ErrInvalidState) {
-			t.Fatalf("Take(): %v", err)
-		}
-		time.Sleep(time.Millisecond)
+	defer operation.Release()
+	regions := waitTakeOperation(t, runtime, operation)
+	if regions == nil {
+		t.Fatal("Take() returned a nil region list")
 	}
-	if !took {
-		t.Fatal("the offline operation never reported a result")
+	batch, err := runtime.DrainEvents(0)
+	if err != nil {
+		t.Fatalf("DrainEvents(): %v", err)
 	}
-	if completions != 0 {
-		t.Fatalf("drained %d offline completion events, want none", completions)
+	if len(batch.Events) != 0 {
+		t.Fatalf("DrainEvents() returned %d events with an empty mask", len(batch.Events))
 	}
 }
 
-func waitTakeOfflineOperation[T any](t *testing.T, runtime *RuntimeHandle, operation *OfflineOperationHandle[T]) T {
+func waitTakeOperation[T any](t *testing.T, runtime *RuntimeHandle, operation *OperationHandle[T]) T {
 	t.Helper()
 	for range make([]struct{}, 5000) {
 		if err := runtime.Pump(0); err != nil {
@@ -217,12 +186,16 @@ func TestOfflineCreateAndListTakeResultsCopyNativeData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StartCreateOfflineRegion(): %v", err)
 	}
-	info := waitTakeOfflineOperation(t, runtime, create)
+	defer create.Release()
+	info := waitTakeOperation(t, runtime, create)
 	if info.ID == 0 {
 		t.Fatal("created offline region ID is zero")
 	}
-	if !errors.Is(create.Discard(), ErrInvalidArgument) {
-		t.Fatal("Discard() after Take did not report closed operation")
+	if !errors.Is(create.Discard(), ErrInvalidState) {
+		t.Fatal("Discard() after Take did not report a consumed result")
+	}
+	if status, err := create.Status(); err != nil || status != 0 {
+		t.Fatalf("Status() after Take = (%d, %v), want (0, nil)", status, err)
 	}
 	if got := info.Metadata; len(got) != len(metadata) || got[0] != metadata[0] || got[1] != metadata[1] || got[2] != metadata[2] {
 		t.Fatalf("metadata = %v, want %v", got, metadata)
@@ -239,13 +212,14 @@ func TestOfflineCreateAndListTakeResultsCopyNativeData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StartOfflineRegions(): %v", err)
 	}
-	regions := waitTakeOfflineOperation(t, runtime, list)
+	defer list.Release()
+	regions := waitTakeOperation(t, runtime, list)
 	if len(regions) == 0 {
 		t.Fatal("offline region list is empty after creating a region")
 	}
 }
 
-func TestOfflineOperationCompletedEventCopiesPayload(t *testing.T) {
+func TestOfflineOperationPollAndStatusReportCompletion(t *testing.T) {
 	stdruntime.LockOSThread()
 	defer stdruntime.UnlockOSThread()
 
@@ -263,21 +237,23 @@ func TestOfflineOperationCompletedEventCopiesPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StartOfflineRegions(): %v", err)
 	}
+	defer operation.Release()
 	for range make([]struct{}, 5000) {
 		if err := runtime.Pump(0); err != nil {
 			t.Fatalf("Pump(): %v", err)
 		}
-		batch, err := runtime.DrainEvents(0)
+		completed, err := operation.Poll()
 		if err != nil {
-			t.Fatalf("DrainEvents(): %v", err)
+			t.Fatalf("Poll(): %v", err)
 		}
-		for _, event := range batch.Events {
-			payload, ok := event.Payload.(RuntimeEventOfflineOperationCompletedPayload)
-			if !ok || payload.OperationID != operation.ID() {
-				continue
+		if completed {
+			status, err := operation.Status()
+			if err != nil || status != 0 {
+				t.Fatalf("Status() = (%d, %v), want (0, nil)", status, err)
 			}
-			if payload.OperationKind != OfflineOperationRegionsList || payload.ResultKind != OfflineOperationResultRegionList || payload.ResultStatus != 0 {
-				t.Fatalf("payload = %#v", payload)
+			diagnostic, err := operation.Diagnostic()
+			if err != nil || diagnostic != "" {
+				t.Fatalf("Diagnostic() = (%q, %v), want (empty, nil)", diagnostic, err)
 			}
 			if err := operation.Discard(); err != nil {
 				t.Fatalf("Discard(): %v", err)
@@ -286,7 +262,7 @@ func TestOfflineOperationCompletedEventCopiesPayload(t *testing.T) {
 		}
 		time.Sleep(time.Millisecond)
 	}
-	t.Fatal("offline completion event was not reported")
+	t.Fatal("offline operation did not complete")
 }
 
 func TestSetMaximumAmbientCacheSizeReportsCompletion(t *testing.T) {
@@ -307,21 +283,19 @@ func TestSetMaximumAmbientCacheSizeReportsCompletion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StartSetMaximumAmbientCacheSize(): %v", err)
 	}
+	defer operation.Release()
 	for range make([]struct{}, 5000) {
 		if err := runtime.Pump(0); err != nil {
 			t.Fatalf("Pump(): %v", err)
 		}
-		batch, err := runtime.DrainEvents(0)
+		completed, err := operation.Poll()
 		if err != nil {
-			t.Fatalf("DrainEvents(): %v", err)
+			t.Fatalf("Poll(): %v", err)
 		}
-		for _, event := range batch.Events {
-			payload, ok := event.Payload.(RuntimeEventOfflineOperationCompletedPayload)
-			if !ok || payload.OperationID != operation.ID() {
-				continue
-			}
-			if payload.OperationKind != OfflineOperationSetMaximumAmbientCacheSize || payload.ResultKind != OfflineOperationResultNone || payload.ResultStatus != 0 {
-				t.Fatalf("payload = %#v", payload)
+		if completed {
+			status, err := operation.Status()
+			if err != nil || status != 0 {
+				t.Fatalf("Status() = (%d, %v), want (0, nil)", status, err)
 			}
 			if err := operation.Discard(); err != nil {
 				t.Fatalf("Discard(): %v", err)
@@ -330,7 +304,7 @@ func TestSetMaximumAmbientCacheSizeReportsCompletion(t *testing.T) {
 		}
 		time.Sleep(time.Millisecond)
 	}
-	t.Fatal("maximum ambient cache size completion event was not reported")
+	t.Fatal("maximum ambient cache size operation did not complete")
 }
 
 func TestOfflineRegionStartOperationsValidateGoInputs(t *testing.T) {
@@ -393,23 +367,24 @@ func TestOfflineGeometryDefinitionMaterializesAndCopies(t *testing.T) {
 	}
 }
 
-func TestOfflineOperationDiscardIsIdempotentAfterSuccess(t *testing.T) {
+func TestOfflineOperationSecondDiscardFailsAfterSuccess(t *testing.T) {
 	runtime := newFakeRuntimeHandle(t)
 	defer closeFakeRuntimeHandle(t, runtime)
 
 	var calls int
-	restore := replaceOfflineOperationDiscardForTest(func(ptr nativeRuntime, id uint64) int32 {
+	restore := replaceOperationDiscardForTest(func(id uint64) int32 {
 		calls++
 		return 0
 	})
 	defer restore()
 
-	operation := newOfflineOperationHandle[struct{}](runtime, 1, OfflineOperationRegionSetObserved, OfflineOperationResultNone)
+	operation := newOperationHandle[struct{}](runtime, 1, operationRegionSetObserved, operationResultNone)
+	defer operation.Release()
 	if err := operation.Discard(); err != nil {
 		t.Fatalf("Discard(): %v", err)
 	}
-	if err := operation.Discard(); err != nil {
-		t.Fatalf("second Discard(): %v", err)
+	if err := operation.Discard(); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("second Discard() = %v, want ErrInvalidState", err)
 	}
 	if calls != 1 {
 		t.Fatalf("discard calls = %d, want 1", calls)
@@ -421,14 +396,15 @@ func TestOfflineOperationDiscardFailureLeavesHandleRetryable(t *testing.T) {
 	defer closeFakeRuntimeHandle(t, runtime)
 
 	statuses := []int32{-2, 0, 0}
-	restore := replaceOfflineOperationDiscardForTest(func(ptr nativeRuntime, id uint64) int32 {
+	restore := replaceOperationDiscardForTest(func(id uint64) int32 {
 		status := statuses[0]
 		statuses = statuses[1:]
 		return status
 	})
 	defer restore()
 
-	operation := newOfflineOperationHandle[struct{}](runtime, 1, OfflineOperationRegionSetObserved, OfflineOperationResultNone)
+	operation := newOperationHandle[struct{}](runtime, 1, operationRegionSetObserved, operationResultNone)
+	defer operation.Release()
 	if err := operation.Discard(); !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("Discard() failure = %v, want ErrInvalidState", err)
 	}
@@ -441,7 +417,7 @@ func TestOfflineOperationBlocksRuntimeCloseUntilReleased(t *testing.T) {
 	runtime := newFakeRuntimeHandle(t)
 	defer closeFakeRuntimeHandle(t, runtime)
 
-	restore := replaceOfflineOperationDiscardForTest(func(ptr nativeRuntime, id uint64) int32 {
+	restore := replaceOperationDiscardForTest(func(id uint64) int32 {
 		return 0
 	})
 	defer restore()
@@ -450,15 +426,19 @@ func TestOfflineOperationBlocksRuntimeCloseUntilReleased(t *testing.T) {
 	})
 	defer restoreRuntimeDestroy()
 
-	operation := newOfflineOperationHandle[struct{}](runtime, 1, OfflineOperationRegionSetObserved, OfflineOperationResultNone)
+	operation := newOperationHandle[struct{}](runtime, 1, operationRegionSetObserved, operationResultNone)
 	if err := runtime.Close(); !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("Runtime Close() with live offline operation = %v, want ErrInvalidState", err)
 	}
 	if err := operation.Discard(); err != nil {
 		t.Fatalf("Discard(): %v", err)
 	}
+	if err := runtime.Close(); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("Runtime Close() after Discard() = %v, want ErrInvalidState", err)
+	}
+	operation.Release()
 	if err := runtime.Close(); err != nil {
-		t.Fatalf("Runtime Close() after Discard(): %v", err)
+		t.Fatalf("Runtime Close() after Release(): %v", err)
 	}
 }
 
@@ -469,7 +449,7 @@ func TestOfflineOperationDiscardSerializesConcurrentCalls(t *testing.T) {
 	entered := make(chan struct{})
 	release := make(chan struct{})
 	var calls atomic.Int32
-	restore := replaceOfflineOperationDiscardForTest(func(ptr nativeRuntime, id uint64) int32 {
+	restore := replaceOperationDiscardForTest(func(id uint64) int32 {
 		if calls.Add(1) == 1 {
 			close(entered)
 			<-release
@@ -478,7 +458,8 @@ func TestOfflineOperationDiscardSerializesConcurrentCalls(t *testing.T) {
 	})
 	defer restore()
 
-	operation := newOfflineOperationHandle[struct{}](runtime, 1, OfflineOperationRegionSetObserved, OfflineOperationResultNone)
+	operation := newOperationHandle[struct{}](runtime, 1, operationRegionSetObserved, operationResultNone)
+	defer operation.Release()
 	firstDone := make(chan error, 1)
 	secondDone := make(chan error, 1)
 	go func() { firstDone <- operation.Discard() }()
@@ -494,15 +475,51 @@ func TestOfflineOperationDiscardSerializesConcurrentCalls(t *testing.T) {
 		t.Fatalf("second Discard() completed while first discard was in flight: %v", err)
 	case <-time.After(25 * time.Millisecond):
 	}
+
 	close(release)
 	if err := <-firstDone; err != nil {
 		t.Fatalf("first Discard(): %v", err)
 	}
-	if err := <-secondDone; err != nil {
-		t.Fatalf("second Discard(): %v", err)
+	if err := <-secondDone; !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("second Discard() = %v, want ErrInvalidState", err)
 	}
 	if calls.Load() != 1 {
 		t.Fatalf("native discard calls = %d, want 1", calls.Load())
+	}
+}
+
+func TestOperationReleaseWaitsForActiveUses(t *testing.T) {
+	runtime := newFakeRuntimeHandle(t)
+	defer closeFakeRuntimeHandle(t, runtime)
+	operation := newOperationHandle[struct{}](runtime, 1, operationRegionSetObserved, operationResultNone)
+
+	if _, err := operation.beginUse(); err != nil {
+		t.Fatalf("beginUse(): %v", err)
+	}
+	if _, err := operation.beginUse(); err != nil {
+		t.Fatalf("concurrent beginUse(): %v", err)
+	}
+	released := make(chan struct{})
+	go func() {
+		operation.Release()
+		close(released)
+	}()
+	select {
+	case <-released:
+		t.Fatal("Release() completed during an active native use")
+	case <-time.After(25 * time.Millisecond):
+	}
+	operation.endUse()
+	select {
+	case <-released:
+		t.Fatal("Release() completed while a second native use remained active")
+	case <-time.After(25 * time.Millisecond):
+	}
+	operation.endUse()
+	select {
+	case <-released:
+	case <-time.After(time.Second):
+		t.Fatal("Release() did not complete after the active use ended")
 	}
 }
 
@@ -511,13 +528,14 @@ func TestOfflineOperationTakeRejectsNoResultOperationWithoutDiscarding(t *testin
 	defer closeFakeRuntimeHandle(t, runtime)
 
 	var calls int
-	restore := replaceOfflineOperationDiscardForTest(func(ptr nativeRuntime, id uint64) int32 {
+	restore := replaceOperationDiscardForTest(func(id uint64) int32 {
 		calls++
 		return 0
 	})
 	defer restore()
 
-	operation := newOfflineOperationHandle[struct{}](runtime, 1, OfflineOperationRegionSetObserved, OfflineOperationResultNone)
+	operation := newOperationHandle[struct{}](runtime, 1, operationRegionSetObserved, operationResultNone)
+	defer operation.Release()
 	if _, err := operation.Take(); !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("Take() no-result operation = %v, want ErrInvalidState", err)
 	}
@@ -533,12 +551,13 @@ func TestOfflineOperationTakePreConsumeMismatchRemainsRetryable(t *testing.T) {
 	runtime := newFakeRuntimeHandle(t)
 	defer closeFakeRuntimeHandle(t, runtime)
 
-	restore := replaceOfflineOperationDiscardForTest(func(ptr nativeRuntime, id uint64) int32 {
+	restore := replaceOperationDiscardForTest(func(id uint64) int32 {
 		return 0
 	})
 	defer restore()
 
-	preConsume := newOfflineOperationHandle[struct{}](runtime, 2, OfflineOperationRegionSetObserved, OfflineOperationResultKind(999_999))
+	preConsume := newOperationHandle[struct{}](runtime, 2, operationRegionSetObserved, operationResultKind(255))
+	defer preConsume.Release()
 	if _, err := preConsume.Take(); !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("Take() pre-consume mismatch = %v, want ErrInvalidState", err)
 	}
@@ -547,16 +566,16 @@ func TestOfflineOperationTakePreConsumeMismatchRemainsRetryable(t *testing.T) {
 	}
 }
 
-func TestStartOfflineOperationRejectsZeroID(t *testing.T) {
+func TestStartOperationRejectsZeroHandle(t *testing.T) {
 	runtime := newFakeRuntimeHandle(t)
 	defer closeFakeRuntimeHandle(t, runtime)
 
-	operation, err := startOfflineOperationZeroIDForTest(runtime)
+	operation, err := startOperationZeroIDForTest(runtime)
 	if !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("startOfflineOperation() error = %v, want ErrInvalidState", err)
+		t.Fatalf("startOperation() error = %v, want ErrInvalidState", err)
 	}
 	if operation != nil {
-		t.Fatalf("startOfflineOperation() operation = %#v, want nil", operation)
+		t.Fatalf("startOperation() operation = %#v, want nil", operation)
 	}
 }
 
@@ -576,11 +595,11 @@ func closeFakeRuntimeHandle(t *testing.T, runtime *RuntimeHandle) {
 	}
 }
 
-func replaceOfflineOperationDiscardForTest(discard func(nativeRuntime, uint64) int32) func() {
-	previous := offlineOperationDiscard
-	offlineOperationDiscard = discard
+func replaceOperationDiscardForTest(discard func(uint64) int32) func() {
+	previous := operationDiscard
+	operationDiscard = discard
 	return func() {
-		offlineOperationDiscard = previous
+		operationDiscard = previous
 	}
 }
 

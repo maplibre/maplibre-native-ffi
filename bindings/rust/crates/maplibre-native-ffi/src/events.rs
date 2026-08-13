@@ -1,5 +1,4 @@
 use std::fmt;
-use std::marker::PhantomData;
 use std::str;
 
 use maplibre_native_ffi_core as maplibre_core;
@@ -7,10 +6,9 @@ use maplibre_native_ffi_sys as sys;
 
 use crate::{Error, Result};
 pub use maplibre_core::events::{
-    CameraTransitionFinishedEvent, OfflineOperationCompletedEvent, OfflineRegionResponseErrorEvent,
-    OfflineRegionStatus, OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent,
-    RenderFrameEvent, RenderMapEvent, RenderingStats, RuntimeEventPayload, TileActionEvent, TileId,
-    UnknownRuntimeEventPayload,
+    CameraTransitionFinishedEvent, OfflineRegionResponseErrorEvent, OfflineRegionStatus,
+    OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent,
+    RenderingStats, RuntimeEventPayload, TileActionEvent, TileId, UnknownRuntimeEventPayload,
 };
 pub(crate) use maplibre_core::{OfflineRegionDownloadState, RuntimeEventType};
 
@@ -69,38 +67,48 @@ pub struct RuntimeEvent {
     pub event_type: RuntimeEventType,
     pub source: RuntimeEventSource,
     /// Secondary event detail whose meaning `event_type` selects. Camera
-    /// change events decode as
-    /// `CameraChangeMode::from_raw(code as u32)`, offline operation-completion
-    /// events carry the operation's native status, and map loading-failure
-    /// events carry a load error ordinal whose text is in `message`.
+    /// change events decode as `CameraChangeMode::from_raw(code as u32)`, and
+    /// map loading-failure events carry a load error ordinal whose text is in
+    /// `message`.
     pub code: i32,
     pub message: Option<String>,
     pub payload: RuntimeEventPayload,
 }
 
-/// Batch of runtime events borrowed from runtime-owned storage.
+/// Owned batch of runtime events.
 ///
-/// A batch borrows the [`RuntimeHandle`](crate::RuntimeHandle) it came from, so
-/// the next drain is a compile error while the batch lives, and an event read
-/// out of a batch borrows the batch. Take [`RuntimeEventRef::to_owned`] for a
-/// value that outlives either.
-pub struct RuntimeEventBatch<'a> {
-    raw: sys::mln_runtime_event_batch,
-    _storage: PhantomData<&'a [u8]>,
+/// Native storage remains stable until this batch is dropped, including across
+/// later drains from the same runtime.
+pub struct RuntimeEventBatch {
+    handle: sys::mln_event_batch,
+    raw: sys::mln_runtime_event_batch_view,
 }
 
-impl<'a> RuntimeEventBatch<'a> {
-    /// Reports one drained batch's runtime-owned storage.
+impl RuntimeEventBatch {
+    /// Acquires the immutable view for an owned native batch.
     ///
     /// # Safety
     ///
-    /// `raw` must be a batch that `mln_runtime_drain_events` filled, whose
-    /// event and message storage stays readable for `'a`.
-    pub(crate) unsafe fn new(raw: sys::mln_runtime_event_batch) -> Self {
-        Self {
-            raw,
-            _storage: PhantomData,
+    /// `handle` must be an owned batch returned by `mln_runtime_drain_events`.
+    pub(crate) unsafe fn new(handle: sys::mln_event_batch) -> Result<Self> {
+        let mut raw = sys::mln_runtime_event_batch_view {
+            size: std::mem::size_of::<sys::mln_runtime_event_batch_view>() as u32,
+            event_size: 0,
+            events: std::ptr::null(),
+            event_count: 0,
+            messages: std::ptr::null(),
+            messages_size: 0,
+            remaining_count: 0,
+        };
+        // SAFETY: `handle` is live and `raw` is writable for this ABI version.
+        if let Err(error) =
+            maplibre_core::check(unsafe { sys::mln_event_batch_get(handle, &mut raw) })
+        {
+            // SAFETY: This function owns the handle on every path.
+            unsafe { sys::mln_event_batch_release(handle) };
+            return Err(error);
         }
+        Ok(Self { handle, raw })
     }
 
     /// Returns how many events this batch reports.
@@ -113,29 +121,16 @@ impl<'a> RuntimeEventBatch<'a> {
         self.len() == 0
     }
 
-    /// Returns how many events stayed queued after this batch. A nonzero count
-    /// means another drain reports more events.
+    /// Returns how many events stayed queued after this batch.
     pub fn remaining(&self) -> usize {
         self.raw.remaining_count
     }
 
     /// Walks this batch's events in queue order.
-    ///
-    /// Each event borrows this batch, so safe code cannot read one after the
-    /// batch is gone:
-    ///
-    /// ```compile_fail,E0505
-    /// # use maplibre_native_ffi::{RuntimeHandle, RuntimeOptions};
-    /// let mut runtime = RuntimeHandle::with_options(&RuntimeOptions::default()).unwrap();
-    /// let batch = runtime.drain_events(0).unwrap();
-    /// let events = batch.iter().collect::<Vec<_>>();
-    /// drop(batch);
-    /// let _ = events.first().map(|event| event.message_bytes());
-    /// ```
     pub fn iter(&self) -> impl Iterator<Item = RuntimeEventRef<'_>> {
         (0..self.len()).map(move |index| {
-            // SAFETY: This batch's storage stays readable while it is borrowed,
-            // and index names one of its events.
+            // SAFETY: The owned batch keeps its immutable storage live, and
+            // index names one of its events.
             RuntimeEventRef {
                 view: unsafe { maplibre_core::events::event_view(&self.raw, index) },
             }
@@ -143,7 +138,14 @@ impl<'a> RuntimeEventBatch<'a> {
     }
 }
 
-impl fmt::Debug for RuntimeEventBatch<'_> {
+impl Drop for RuntimeEventBatch {
+    fn drop(&mut self) {
+        // SAFETY: This wrapper owns exactly one native batch handle.
+        unsafe { sys::mln_event_batch_release(self.handle) };
+    }
+}
+
+impl fmt::Debug for RuntimeEventBatch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RuntimeEventBatch")
             .field("len", &self.len())
@@ -152,7 +154,7 @@ impl fmt::Debug for RuntimeEventBatch<'_> {
     }
 }
 
-/// One event of a [`RuntimeEventBatch`], read from runtime-owned storage.
+/// One event of a [`RuntimeEventBatch`], read from batch-owned storage.
 #[derive(Clone, Copy)]
 pub struct RuntimeEventRef<'a> {
     view: maplibre_core::NativeEventView<'a>,
@@ -283,9 +285,9 @@ impl SynthesizedBatch {
         self.count += 1;
     }
 
-    pub(crate) fn raw(&self) -> sys::mln_runtime_event_batch {
-        sys::mln_runtime_event_batch {
-            size: std::mem::size_of::<sys::mln_runtime_event_batch>() as u32,
+    pub(crate) fn raw(&self) -> sys::mln_runtime_event_batch_view {
+        sys::mln_runtime_event_batch_view {
+            size: std::mem::size_of::<sys::mln_runtime_event_batch_view>() as u32,
             event_size: u32::try_from(self.stride).unwrap(),
             events: self.records.as_ptr().cast(),
             event_count: self.count,
@@ -295,10 +297,15 @@ impl SynthesizedBatch {
         }
     }
 
-    pub(crate) fn batch(&self) -> RuntimeEventBatch<'_> {
-        // SAFETY: This fixture's records and arena are laid out the way a drain
-        // fills them, and they outlive the borrow the batch takes.
-        unsafe { RuntimeEventBatch::new(self.raw()) }
+    pub(crate) fn iter(&self) -> impl Iterator<Item = RuntimeEventRef<'_>> {
+        let raw = self.raw();
+        (0..self.count).map(move |index| {
+            // SAFETY: This fixture owns the event records and message arena for
+            // the iterator's lifetime, and index names one of its records.
+            RuntimeEventRef {
+                view: unsafe { maplibre_core::events::event_view(&raw, index) },
+            }
+        })
     }
 }
 
@@ -312,8 +319,7 @@ mod tests {
     // Spec coverage: BND-086.
     fn a_batch_applies_the_rust_source_policy_to_every_source_kind() {
         let mut batch = SynthesizedBatch::new();
-        let mut runtime_event =
-            SynthesizedBatch::zeroed_event(sys::MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED);
+        let mut runtime_event = SynthesizedBatch::zeroed_event(sys::MLN_RUNTIME_EVENT_MAP_IDLE);
         runtime_event.source_type = sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME;
         batch.push(runtime_event, b"");
         let mut map_event = SynthesizedBatch::zeroed_event(sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED);
@@ -327,8 +333,6 @@ mod tests {
         unknown_source.source_type = 999_003;
         unknown_source.source = 0x0300_0000_0000_0063;
         batch.push(unknown_source, b"");
-        let batch = batch.batch();
-
         let sources = batch.iter().map(|event| event.source()).collect::<Vec<_>>();
 
         assert_eq!(
@@ -371,9 +375,7 @@ mod tests {
         let mut records = SynthesizedBatch::new();
         records.push(status_event, b"");
         records.push(error_event, b"offline failed");
-        let batch = records.batch();
-
-        let events = batch.iter().collect::<Vec<_>>();
+        let events = records.iter().collect::<Vec<_>>();
 
         assert_eq!(
             events[0].event_type(),
@@ -414,8 +416,7 @@ mod tests {
                 transition_id: 0x0102_0304_0506_0708,
             };
         records.push(event, b"future payload");
-        let batch = records.batch();
-        let borrowed = batch.iter().next().unwrap();
+        let borrowed = records.iter().next().unwrap();
 
         let owned = borrowed.to_owned().unwrap();
         assert_eq!(borrowed.message_bytes(), b"future payload");
@@ -448,8 +449,7 @@ mod tests {
             SynthesizedBatch::zeroed_event(sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED),
             b"loaded",
         );
-        let batch = records.batch();
-        let events = batch.iter().collect::<Vec<_>>();
+        let events = records.iter().collect::<Vec<_>>();
 
         let error = events[0].message().unwrap_err();
         assert_eq!(error.kind(), crate::ErrorKind::InvalidArgument);

@@ -1,7 +1,7 @@
 
 /// Its only stored property is the lock-guarded `NativeHandleState`, so the box
-/// itself is safe to share. The public handles that hold a box stay
-/// non-`Sendable`.
+/// itself is safe to share. Each public handle chooses whether its API contract
+/// permits sharing.
 class NativeHandleBox<Handle: NativeHandle>: @unchecked Sendable {
   private let state: NativeHandleState<Handle>
 

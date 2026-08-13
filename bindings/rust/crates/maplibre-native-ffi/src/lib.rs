@@ -30,28 +30,27 @@ pub use camera::{
 };
 pub use custom_geometry::{CanonicalTileId, CustomGeometrySourceOptions};
 pub use events::{
-    CameraTransitionFinishedEvent, MapId, OfflineOperationCompletedEvent,
-    OfflineRegionResponseErrorEvent, OfflineRegionStatus, OfflineRegionStatusEvent,
-    OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent, RenderingStats,
-    RuntimeEvent, RuntimeEventBatch, RuntimeEventPayload, RuntimeEventRef, RuntimeEventSource,
-    TileActionEvent, TileId, UnknownRuntimeEventPayload,
+    CameraTransitionFinishedEvent, MapId, OfflineRegionResponseErrorEvent, OfflineRegionStatus,
+    OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent,
+    RenderingStats, RuntimeEvent, RuntimeEventBatch, RuntimeEventPayload, RuntimeEventRef,
+    RuntimeEventSource, TileActionEvent, TileId, UnknownRuntimeEventPayload,
 };
 pub use logging::{LogRecord, clear_log_callback, set_async_log_severity_mask, set_log_callback};
 pub use map::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, MapAttachRef,
-    MapHandle, RasterDemEncoding, SourceInfo, SourceType, StyleImage, StyleImageInfo,
-    StyleImageOptions, StyleImageTextFit, StyleLayerVisibility, StyleTransitionOptions,
-    TileJsonInfo, TileScheme, TileSourceOptions, VectorTileEncoding,
+    MapHandle, SourceInfo, SourceType, StyleImage, StyleImageInfo, StyleImageOptions,
+    StyleImageTextFit, StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo, TileScheme,
+    TileSourceOptions, VectorTileEncoding,
 };
 pub use maplibre_core::{
     AmbientCacheOperation, CameraChangeMode, ConstrainMode, Error, ErrorKind, LogEvent,
     LogSeverity, LogSeverityMask, MapDebugOptions, MapMode, MapOptions, MapTileOptions,
-    MapViewportOptions, NetworkStatus, NorthOrientation, OfflineOperationKind,
-    OfflineOperationResultKind, OfflineRegionDownloadState, OpenGLClientApi,
-    OpenGLContextOwnership, OpenGLContextProviderMask, RenderBackendMask, RenderMode, RenderResult,
-    ResourceErrorReason, ResourceKind, ResourceLoadingMethod, ResourcePriority,
-    ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, Result, RuntimeEventMask,
-    RuntimeEventType, TileLodMode, TileOperation, ViewportMode,
+    MapViewportOptions, NetworkStatus, NorthOrientation, OfflineRegionDownloadState,
+    OpenGLClientApi, OpenGLContextOwnership, OpenGLContextProviderMask, RasterDemEncoding,
+    RenderBackendMask, RenderMode, RenderResult, ResourceErrorReason, ResourceKind,
+    ResourceLoadingMethod, ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy,
+    ResourceUsage, Result, RuntimeEventMask, RuntimeEventType, TileLodMode, TileOperation,
+    ViewportMode,
 };
 pub use maplibre_native_ffi_core::handle::{NativeHandleLeak, set_leak_reporter};
 pub use projection::MapProjectionHandle;
@@ -75,8 +74,8 @@ pub use resource::{
     ResourceRequestHandle, ResourceResponse, ResourceTransformRequest,
 };
 pub use runtime::{
-    OfflineOperationHandle, OfflineRegionDefinition, OfflineRegionInfo, RuntimeHandle,
-    RuntimeOptions, WakeSource,
+    OfflineRegionDefinition, OfflineRegionInfo, OperationHandle, RuntimeHandle, RuntimeOptions,
+    WakeSource,
 };
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, ProjectedMeters, Quaternion, ScreenBox, ScreenPoint,
@@ -139,72 +138,6 @@ impl<T> std::fmt::Display for HandleOperationError<T> {
 }
 
 impl<T: std::fmt::Debug> std::error::Error for HandleOperationError<T> {}
-
-/// Error returned by offline operation result transfers.
-#[derive(Debug)]
-pub enum OfflineOperationTakeError<T> {
-    /// The native transfer failed before consuming the operation result.
-    Retryable(HandleOperationError<T>),
-    /// The native result was consumed, but copying it into Rust-owned data failed.
-    Consumed(Error),
-}
-
-impl<T> OfflineOperationTakeError<T> {
-    pub(crate) fn retryable(error: Error, handle: T) -> Self {
-        Self::Retryable(HandleOperationError::new(error, handle))
-    }
-
-    pub(crate) fn consumed(error: Error) -> Self {
-        Self::Consumed(error)
-    }
-
-    /// Returns the operation error.
-    pub fn error(&self) -> &Error {
-        match self {
-            Self::Retryable(error) => error.error(),
-            Self::Consumed(error) => error,
-        }
-    }
-
-    /// Returns the stable category for the operation error.
-    pub fn kind(&self) -> ErrorKind {
-        self.error().kind()
-    }
-
-    /// Returns the raw C status for native operation errors, when available.
-    pub fn raw_status(&self) -> Option<i32> {
-        self.error().raw_status()
-    }
-
-    /// Returns the copied diagnostic message for the operation error.
-    pub fn diagnostic(&self) -> &str {
-        self.error().diagnostic()
-    }
-
-    /// Returns the retryable error and still-live handle, if the operation was not consumed.
-    pub fn into_retryable(self) -> Option<HandleOperationError<T>> {
-        match self {
-            Self::Retryable(error) => Some(error),
-            Self::Consumed(_) => None,
-        }
-    }
-
-    /// Returns the operation error, dropping any retryable handle.
-    pub fn into_error(self) -> Error {
-        match self {
-            Self::Retryable(error) => error.into_error(),
-            Self::Consumed(error) => error,
-        }
-    }
-}
-
-impl<T> std::fmt::Display for OfflineOperationTakeError<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.error().fmt(f)
-    }
-}
-
-impl<T: std::fmt::Debug> std::error::Error for OfflineOperationTakeError<T> {}
 
 /// Returns the native C ABI contract version.
 pub fn c_version() -> u32 {

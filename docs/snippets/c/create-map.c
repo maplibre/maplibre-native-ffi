@@ -3,15 +3,27 @@
 
 #include <maplibre_native_c.h>
 
-mln_status open_runtime(const char* cache_path, mln_runtime* out_runtime) {
+mln_status open_runtime(
+  const char* cache_path, mln_runtime* out_runtime,
+  mln_notification_source* out_notifications
+) {
   // #region runtime
+  mln_status status = mln_notification_source_create(out_notifications);
+  if (status != MLN_STATUS_OK) return status;
+
   mln_runtime_options options = mln_runtime_options_default();
 
   // A filesystem path keeps cached tiles across runs of the host. The default,
   // ":memory:", discards them when the runtime is destroyed.
   options.cache_path = cache_path;
+  options.notification_source = *out_notifications;
 
-  return mln_runtime_create(&options, out_runtime);
+  status = mln_runtime_create(&options, out_runtime);
+  if (status != MLN_STATUS_OK) {
+    mln_notification_source_close(*out_notifications);
+    *out_notifications = MLN_HANDLE_NULL;
+  }
+  return status;
   // #endregion runtime
 }
 
@@ -48,9 +60,12 @@ mln_status open_static_map(
   // #endregion mode
 }
 
-void close_map(mln_runtime runtime, mln_map map) {
+void close_map(
+  mln_runtime runtime, mln_map map, mln_notification_source notifications
+) {
   // #region release
   mln_map_destroy(map);
   mln_runtime_destroy(runtime);
+  mln_notification_source_close(notifications);
   // #endregion release
 }

@@ -29,6 +29,8 @@ class DatabaseFileSource;
 namespace mln::core {
 
 struct RuntimeObject;
+class NotificationEndpoint;
+class NotificationSourceObject;
 
 // Read on the map owner thread by every map event producer, and on the mbgl
 // DatabaseFileSourceThread by every offline producer. Held by shared_ptr so a
@@ -156,8 +158,6 @@ struct WakeState {
   bool alive = true;
 };
 
-struct OfflineOperationEventState;
-
 struct QueuedRuntimeEvent {
   uint32_t type;
   uint32_t source_type;
@@ -170,8 +170,24 @@ struct QueuedRuntimeEvent {
   std::string message;
   bool has_offline_region = false;
   mln_offline_region_id offline_region_id = 0;
-  bool has_offline_operation = false;
-  mln_offline_operation_id offline_operation_id = 0;
+};
+
+struct RuntimeEventQueueState {
+  std::mutex mutex;
+  std::condition_variable drain_condition;
+  bool alive = true;
+  bool drain_active = false;
+  std::unordered_set<mln_map> event_maps;
+  std::deque<mln::core::QueuedRuntimeEvent> events;
+  std::unordered_set<mln_offline_region_id> observed_offline_regions;
+  std::shared_ptr<mln::core::NotificationSourceObject> notification_source;
+  std::shared_ptr<mln::core::NotificationEndpoint> notification_endpoint;
+};
+
+struct EventBatchObject {
+  std::vector<mln_runtime_event> events;
+  std::string messages;
+  std::size_t remaining_count = 0;
 };
 
 struct RuntimeObject {
@@ -185,24 +201,13 @@ struct RuntimeObject {
   std::shared_ptr<mbgl::DatabaseFileSource> database_source;
   std::shared_ptr<mln::core::ResourceProviderState> resource_provider_state;
   std::shared_ptr<mln::core::OfflineRegionEventState> offline_event_state;
-  std::shared_ptr<mln::core::OfflineOperationEventState>
-    offline_operation_state;
   std::shared_ptr<mln::core::ResourceTransformState> resource_transform_state;
   std::shared_ptr<mln::core::HttpHeaderTransformState>
     http_header_transform_state;
   std::shared_ptr<mln::core::WakeState> wake_state;
   std::shared_ptr<mln::core::RuntimeEventState> event_state;
+  std::shared_ptr<mln::core::RuntimeEventQueueState> event_queue;
   std::size_t live_maps = 0;
-  mutable std::mutex event_mutex;
-  std::unordered_set<mln_map> event_maps;
-  std::deque<mln::core::QueuedRuntimeEvent> events;
-  std::unordered_set<mln_offline_region_id> observed_offline_regions;
-  // Owner-thread only. A drain is the only reader and writer, and every drain
-  // is owner-thread affine, so event_mutex does not guard these three. Each
-  // keeps its capacity, so a steady-state drain allocates nothing.
-  std::vector<mln::core::QueuedRuntimeEvent> event_drain_staging;
-  std::vector<mln_runtime_event> event_batch_events;
-  std::string event_batch_messages;
 };
 
 template <>
@@ -223,12 +228,15 @@ auto acquire_wake_source(mln_runtime runtime, mln_wake_source* out_source)
 auto signal_wake_source(mln_wake_source source) -> mln_status;
 auto destroy_wake_source(mln_wake_source source) noexcept -> void;
 // Sets the wake flag for the runtime owning `state` and releases any parked
-// owner thread. Callers hold the `RunLoop` mutex or `event_mutex`; see
-// `WakeState`.
+// owner thread.
 auto signal_wake(const std::shared_ptr<WakeState>& state) noexcept -> void;
 auto drain_runtime_events(
-  mln_runtime runtime, size_t max_events, mln_runtime_event_batch* out_batch
+  mln_runtime runtime, size_t max_events, mln_event_batch* out_batch
 ) -> mln_status;
+auto get_event_batch(
+  mln_event_batch batch, mln_runtime_event_batch_view* out_view
+) -> mln_status;
+auto release_event_batch(mln_event_batch batch) noexcept -> void;
 auto set_runtime_event_mask(mln_runtime runtime, uint64_t mask) -> mln_status;
 auto get_runtime_event_mask(mln_runtime runtime, uint64_t* out_mask)
   -> mln_status;
@@ -262,43 +270,37 @@ auto invoke_resource_transform(
   std::string& out_replacement_url
 ) noexcept -> mln_status;
 auto run_ambient_cache_operation_start(
-  mln_runtime runtime, uint32_t operation,
-  mln_offline_operation_id* out_operation_id
+  mln_runtime runtime, uint32_t operation, mln_operation* out_operation
 ) -> mln_status;
 auto set_maximum_ambient_cache_size_start(
-  mln_runtime runtime, std::uint64_t size,
-  mln_offline_operation_id* out_operation_id
-) -> mln_status;
-auto offline_operation_discard(
-  mln_runtime runtime, mln_offline_operation_id operation_id
+  mln_runtime runtime, std::uint64_t size, mln_operation* out_operation
 ) -> mln_status;
 auto offline_region_create_start(
   mln_runtime runtime, const mln_offline_region_definition* definition,
-  const uint8_t* metadata, size_t metadata_size,
-  mln_offline_operation_id* out_operation_id
+  const uint8_t* metadata, size_t metadata_size, mln_operation* out_operation
 ) -> mln_status;
 auto offline_region_get_start(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation
 ) -> mln_status;
 auto offline_regions_list_start(
-  mln_runtime runtime, mln_offline_operation_id* out_operation_id
+  mln_runtime runtime, mln_operation* out_operation
 ) -> mln_status;
 auto offline_regions_merge_database_start(
   mln_runtime runtime, const char* side_database_path,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation
 ) -> mln_status;
 auto offline_region_update_metadata_start(
   mln_runtime runtime, mln_offline_region_id region_id, const uint8_t* metadata,
-  size_t metadata_size, mln_offline_operation_id* out_operation_id
+  size_t metadata_size, mln_operation* out_operation
 ) -> mln_status;
 auto offline_region_get_status_start(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation
 ) -> mln_status;
 auto offline_region_set_observed_start(
   mln_runtime runtime, mln_offline_region_id region_id, bool observed,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation
 ) -> mln_status;
 
 struct OfflineRegionDownloadStateRequest {
@@ -308,39 +310,34 @@ struct OfflineRegionDownloadStateRequest {
 
 auto offline_region_set_download_state_start(
   mln_runtime runtime, OfflineRegionDownloadStateRequest request,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation
 ) -> mln_status;
 auto offline_region_invalidate_start(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation
 ) -> mln_status;
 auto offline_region_delete_start(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_offline_operation_id* out_operation_id
+  mln_operation* out_operation
 ) -> mln_status;
 auto offline_region_create_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_snapshot* out_region
+  mln_operation operation, mln_offline_region_snapshot* out_region
 ) -> mln_status;
 auto offline_region_get_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_snapshot* out_region, bool* out_found
+  mln_operation operation, mln_offline_region_snapshot* out_region,
+  bool* out_found
 ) -> mln_status;
 auto offline_regions_list_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_list* out_regions
+  mln_operation operation, mln_offline_region_list* out_regions
 ) -> mln_status;
 auto offline_regions_merge_database_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_list* out_regions
+  mln_operation operation, mln_offline_region_list* out_regions
 ) -> mln_status;
 auto offline_region_update_metadata_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_snapshot* out_region
+  mln_operation operation, mln_offline_region_snapshot* out_region
 ) -> mln_status;
 auto offline_region_get_status_take_result(
-  mln_runtime runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_status* out_status
+  mln_operation operation, mln_offline_region_status* out_status
 ) -> mln_status;
 auto offline_region_snapshot_get(
   mln_offline_region_snapshot snapshot, mln_offline_region_info* out_info

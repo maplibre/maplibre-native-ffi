@@ -189,25 +189,25 @@ int _resourceRouteFlags(ResourceProviderRoute route) {
 }
 
 final class _ResourceProviderCallbackState extends RetainedCallbackState {
-  _ResourceProviderCallbackState(ResourceProvider provider) {
+  _ResourceProviderCallbackState(
+    ResourceProvider provider,
+    int notificationSource,
+  ) : _callback = provider.callback {
     for (final route in provider.routes) {
       _checkNativeCString(route.url);
     }
-    callback =
-        NativeCallable<
-          raw.mln_adapter_queued_resource_request_listenerFunction
-        >.listener((Pointer<Void> request) {
-          if (request == nullptr) {
-            close();
-            return;
-          }
-          final ran = runUpcall(
-            () => _invokeQueuedResourceProvider(provider.callback, request),
-          );
-          if (!ran) {
-            _dropQueuedResourceProviderRequest(request);
-          }
-        });
+    final outQueue = calloc<Uint64>();
+    try {
+      _check(
+        raw.mln_adapter_resource_request_queue_create(
+          notificationSource,
+          outQueue,
+        ),
+      );
+      queue = outQueue.value;
+    } finally {
+      calloc.free(outQueue);
+    }
     pointer = calloc<raw.mln_adapter_queued_resource_provider>();
     pointer.ref.route_count = provider.routes.length;
     pointer.ref.routes = provider.routes.isEmpty
@@ -222,26 +222,43 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
       pointer.ref.routes[index].flags = _resourceRouteFlags(route);
       pointer.ref.routes[index].url = _nativeOwnedCString(route.url);
     }
-    pointer.ref.listener = callback.nativeFunction;
+    pointer.ref.queue = queue;
   }
 
+  final ResourceProviderCallback _callback;
+  late final int queue;
   late final Pointer<raw.mln_adapter_queued_resource_provider> pointer;
-  late final NativeCallable<
-    raw.mln_adapter_queued_resource_request_listenerFunction
-  >
-  callback;
-  var _retirementQueued = false;
 
-  void retire() {
-    if (_retirementQueued) {
-      return;
+  void drain() {
+    while (true) {
+      final outRequest =
+          calloc<Pointer<raw.mln_adapter_queued_resource_request>>();
+      try {
+        _check(
+          raw.mln_adapter_resource_request_queue_acquire(queue, outRequest),
+        );
+        final request = outRequest.value.cast<Void>();
+        if (request == nullptr) {
+          return;
+        }
+        final ran = runUpcall(
+          () => _invokeQueuedResourceProvider(_callback, request),
+        );
+        if (!ran) {
+          _dropQueuedResourceProviderRequest(request);
+        }
+      } finally {
+        calloc.free(outRequest);
+      }
     }
-    _retirementQueued = true;
-    raw.mln_adapter_queued_resource_provider_retire(pointer);
   }
+
+  void retire() => closeSynchronously();
 
   @override
   void closeResources() {
+    drain();
+    raw.mln_adapter_resource_request_queue_close(queue);
     final routes = pointer.ref.routes;
     for (var index = 0; index < pointer.ref.route_count; index += 1) {
       calloc.free(routes[index].url);
@@ -250,7 +267,6 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
       calloc.free(routes);
     }
     calloc.free(pointer);
-    callback.close();
   }
 }
 

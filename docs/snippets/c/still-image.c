@@ -36,13 +36,18 @@ static still_image_state drain_still_image_events(
 ) {
   still_image_state state = STILL_IMAGE_PENDING;
 
-  mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+  mln_event_batch batch = MLN_HANDLE_NULL;
   if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
     return STILL_IMAGE_FAILED;
   }
+  mln_runtime_event_batch_view view = {0};
+  if (mln_event_batch_get(batch, &view) != MLN_STATUS_OK) {
+    mln_event_batch_release(batch);
+    return STILL_IMAGE_FAILED;
+  }
 
-  for (size_t index = 0; index < batch.event_count; index++) {
-    const char* bytes = (const char*)batch.events + index * batch.event_size;
+  for (size_t index = 0; index < view.event_count; index++) {
+    const char* bytes = (const char*)view.events + index * view.event_size;
     const mln_runtime_event* event = (const mln_runtime_event*)bytes;
     if (event->source != map) continue;
     if (event->type == MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED) {
@@ -51,9 +56,11 @@ static still_image_state drain_still_image_events(
       event->type == MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED ||
       event->type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED
     ) {
+      mln_event_batch_release(batch);
       return STILL_IMAGE_FAILED;
     }
   }
+  mln_event_batch_release(batch);
 
   return state;
 }

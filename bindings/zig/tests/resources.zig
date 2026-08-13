@@ -28,27 +28,13 @@ fn rawStatusError(raw_status: i32) maplibre.NativeStatusError!void {
 
 fn waitForOfflineOperation(
     runtime: *maplibre.RuntimeHandle,
-    operation: maplibre.OfflineOperationHandle,
-) !maplibre.OfflineOperationCompletedPayload {
-    const operation_id = try operation.operationId();
+    operation: maplibre.OperationHandle,
+) !void {
     for (0..5000) |_| {
         try runtime.pump(0);
-        // One event per drain, so an event this wait is not looking for stays
-        // queued for the wait that is. See support.waitForEvent.
-        while (true) {
-            var batch = try runtime.drainEvents(testing.allocator, 1);
-            defer batch.deinit();
-            if (batch.len() == 0) break;
-            const event = try batch.at(0);
-            const payload = switch (event.payload) {
-                .offline_operation_completed => |completed| completed,
-                else => continue,
-            };
-            if (payload.operation_id != operation_id) continue;
-            try testing.expectEqual(payload.operation_kind.toRaw(), payload.raw_operation_kind);
-            try testing.expectEqual(payload.result_kind.toRaw(), payload.raw_result_kind);
-            try rawStatusError(payload.result_status);
-            return payload;
+        if (try operation.poll()) {
+            try rawStatusError(try operation.resultStatus());
+            return;
         }
         try sleepOneMillisecond();
     }
@@ -57,6 +43,7 @@ fn waitForOfflineOperation(
 
 fn runAmbientCacheOperation(runtime: *maplibre.RuntimeHandle, operation: maplibre.AmbientCacheOperation) !void {
     const handle = try runtime.startAmbientCacheOperation(operation);
+    defer handle.release();
     _ = waitForOfflineOperation(runtime, handle) catch |err| {
         handle.discard() catch {};
         return err;
@@ -66,6 +53,7 @@ fn runAmbientCacheOperation(runtime: *maplibre.RuntimeHandle, operation: maplibr
 
 fn setMaximumAmbientCacheSize(runtime: *maplibre.RuntimeHandle, size: u64) !void {
     const handle = try runtime.startSetMaximumAmbientCacheSize(size);
+    defer handle.release();
     _ = waitForOfflineOperation(runtime, handle) catch |err| {
         handle.discard() catch {};
         return err;
@@ -80,6 +68,7 @@ fn createOfflineRegion(
     metadata: []const u8,
 ) !maplibre.OwnedOfflineRegion {
     const handle = try runtime.startCreateOfflineRegion(allocator, definition, metadata);
+    defer handle.release();
     _ = try waitForOfflineOperation(runtime, handle);
     return runtime.takeOfflineRegion(allocator, handle);
 }
@@ -90,12 +79,14 @@ fn getOfflineRegion(
     region_id: maplibre.OfflineRegionId,
 ) !?maplibre.OwnedOfflineRegion {
     const handle = try runtime.startGetOfflineRegion(region_id);
+    defer handle.release();
     _ = try waitForOfflineOperation(runtime, handle);
     return runtime.takeOptionalOfflineRegion(allocator, handle);
 }
 
 fn listOfflineRegions(runtime: *maplibre.RuntimeHandle, allocator: std.mem.Allocator) !maplibre.OfflineRegionList {
     const handle = try runtime.startListOfflineRegions();
+    defer handle.release();
     _ = try waitForOfflineOperation(runtime, handle);
     return runtime.takeOfflineRegionList(allocator, handle);
 }
@@ -106,6 +97,7 @@ fn mergeOfflineRegionsDatabase(
     side_database_path: []const u8,
 ) !maplibre.OfflineRegionList {
     const handle = try runtime.startMergeOfflineRegionsDatabase(allocator, side_database_path);
+    defer handle.release();
     _ = try waitForOfflineOperation(runtime, handle);
     return runtime.takeOfflineRegionList(allocator, handle);
 }
@@ -117,18 +109,21 @@ fn updateOfflineRegionMetadata(
     metadata: []const u8,
 ) !maplibre.OwnedOfflineRegion {
     const handle = try runtime.startUpdateOfflineRegionMetadata(region_id, metadata);
+    defer handle.release();
     _ = try waitForOfflineOperation(runtime, handle);
     return runtime.takeOfflineRegion(allocator, handle);
 }
 
 fn getOfflineRegionStatus(runtime: *maplibre.RuntimeHandle, region_id: maplibre.OfflineRegionId) !maplibre.OfflineRegionStatus {
     const handle = try runtime.startGetOfflineRegionStatus(region_id);
+    defer handle.release();
     _ = try waitForOfflineOperation(runtime, handle);
     return runtime.takeOfflineRegionStatus(handle);
 }
 
 fn setOfflineRegionObserved(runtime: *maplibre.RuntimeHandle, region_id: maplibre.OfflineRegionId, observed: bool) !void {
     const handle = try runtime.startSetOfflineRegionObserved(region_id, observed);
+    defer handle.release();
     _ = waitForOfflineOperation(runtime, handle) catch |err| {
         handle.discard() catch {};
         return err;
@@ -142,6 +137,7 @@ fn setOfflineRegionDownloadState(
     download_state: maplibre.OfflineRegionDownloadState,
 ) !void {
     const handle = try runtime.startSetOfflineRegionDownloadState(region_id, download_state);
+    defer handle.release();
     _ = waitForOfflineOperation(runtime, handle) catch |err| {
         handle.discard() catch {};
         return err;
@@ -151,6 +147,7 @@ fn setOfflineRegionDownloadState(
 
 fn invalidateOfflineRegion(runtime: *maplibre.RuntimeHandle, region_id: maplibre.OfflineRegionId) !void {
     const handle = try runtime.startInvalidateOfflineRegion(region_id);
+    defer handle.release();
     _ = waitForOfflineOperation(runtime, handle) catch |err| {
         handle.discard() catch {};
         return err;
@@ -160,6 +157,7 @@ fn invalidateOfflineRegion(runtime: *maplibre.RuntimeHandle, region_id: maplibre
 
 fn deleteOfflineRegion(runtime: *maplibre.RuntimeHandle, region_id: maplibre.OfflineRegionId) !void {
     const handle = try runtime.startDeleteOfflineRegion(region_id);
+    defer handle.release();
     _ = waitForOfflineOperation(runtime, handle) catch |err| {
         handle.discard() catch {};
         return err;
@@ -243,6 +241,33 @@ test "ambient cache operations validate cache configuration" {
     try runAmbientCacheOperation(&cached_runtime, .pack_database);
     try runAmbientCacheOperation(&cached_runtime, .invalidate);
     try runAmbientCacheOperation(&cached_runtime, .clear);
+}
+
+test "operation ready endpoints expose non-operable operation identities" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    const operation = try runtime.startAmbientCacheOperation(.pack_database);
+    defer operation.release();
+    const expected = try operation.id();
+
+    var observed = false;
+    for (0..5000) |_| {
+        try runtime.pump(0);
+        var ready = try runtime.drainReady(testing.allocator);
+        defer ready.deinit();
+        for (ready.endpoints) |endpoint| {
+            switch (endpoint.id) {
+                .operation => |operation_id| {
+                    if (operation_id == expected) observed = true;
+                },
+                else => {},
+            }
+        }
+        if (observed) break;
+        try sleepOneMillisecond();
+    }
+    try testing.expect(observed);
 }
 
 test "file URL style loads through public binding" {

@@ -14,7 +14,7 @@ const MapRegistration = struct {
 pub const RuntimeRegistry = struct {
     maps: std.ArrayList(MapRegistration),
     next_map_id: u64,
-    live_offline_operations: usize,
+    live_operations: usize,
 };
 
 const ResourceProviderState = struct {
@@ -23,6 +23,7 @@ const ResourceProviderState = struct {
 };
 
 const RuntimeState = struct {
+    notification_source: c.mln_notification_source,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     registry: ?*RuntimeRegistry,
     resource_transform: ?*ResourceTransform,
@@ -30,6 +31,7 @@ const RuntimeState = struct {
     resource_provider: ?*ResourceProviderState,
     active_leases: std.atomic.Value(usize),
     closing: bool,
+    runtime_destroyed: bool,
 };
 
 pub const RuntimeLease = struct {
@@ -58,25 +60,36 @@ const WakeSourceState = struct {
     diagnostic_store: ?*diagnostics.DiagnosticStore,
 };
 
-const OfflineOperationState = struct {
+const OperationState = struct {
     runtime: RuntimeHandle,
-    operation_id: OfflineOperationId,
-    operation_kind: OfflineOperationKind,
-    result_kind: OfflineOperationResultKind,
+    operation_id: c.mln_operation,
+    operation_kind: OperationKind,
+    active_uses: std.atomic.Value(usize),
+    closing: bool,
+    result_kind: OperationResultKind,
 };
 
-const OfflineOperationRegistrySlot = struct {
-    state: ?*OfflineOperationState,
+const OperationRegistrySlot = struct {
+    state: ?*OperationState,
     generation: u64,
 };
 
-const RequiredOfflineOperation = struct {
-    operation_id: OfflineOperationId,
-    operation_kind: OfflineOperationKind,
+const OperationLease = struct {
+    state: *OperationState,
+    native: c.mln_operation,
+
+    fn release(self: OperationLease) void {
+        _ = self.state.active_uses.fetchSub(1, .seq_cst);
+    }
 };
 
-// An offline operation is a binding concept with no C handle behind it, so the
-// operation table below carries its own generations.
+const RequiredOperation = struct {
+    lease: OperationLease,
+    operation_kind: OperationKind,
+};
+
+// The registry gives copied Zig handle values stable closed-handle detection
+// while the C operation handle owns completion and result state.
 var runtime_registry_lock = std.atomic.Value(bool).init(false);
 var runtime_handle_registry: std.AutoHashMapUnmanaged(c.mln_runtime, *RuntimeState) = .empty;
 
@@ -86,15 +99,18 @@ var resource_request_registry: std.AutoHashMapUnmanaged(c.mln_resource_request_h
 var wake_source_registry_lock = std.atomic.Value(bool).init(false);
 var wake_source_registry: std.AutoHashMapUnmanaged(c.mln_wake_source, *WakeSourceState) = .empty;
 
-var offline_operation_registry_lock = std.atomic.Value(bool).init(false);
-var offline_operation_registry: std.ArrayList(OfflineOperationRegistrySlot) = .empty;
-var offline_operation_free_list: std.ArrayList(usize) = .empty;
+var operation_registry_lock = std.atomic.Value(bool).init(false);
+var operation_registry: std.ArrayList(OperationRegistrySlot) = .empty;
+var operation_free_list: std.ArrayList(usize) = .empty;
 
 var handle_generation_counter = std.atomic.Value(u64).init(0);
 var handle_generation_seed = std.atomic.Value(u64).init(0);
 
 const OfflineRegionSnapshotDestroyFn = *const fn (c.mln_offline_region_snapshot) callconv(.c) void;
 const OfflineRegionListDestroyFn = *const fn (c.mln_offline_region_list) callconv(.c) void;
+const NotificationSourceCloseFn = *const fn (c.mln_notification_source) callconv(.c) c.mln_status;
+
+var notification_source_close_for_testing: NotificationSourceCloseFn = c.mln_notification_source_close;
 
 var offline_region_snapshot_destroy_for_testing: OfflineRegionSnapshotDestroyFn = c.mln_offline_region_snapshot_destroy;
 var offline_region_list_destroy_for_testing: OfflineRegionListDestroyFn = c.mln_offline_region_list_destroy;
@@ -158,9 +174,8 @@ pub const AmbientCacheOperation = enum {
 };
 
 pub const OfflineRegionId = i64;
-pub const OfflineOperationId = u64;
 
-pub const OfflineOperationKind = union(enum) {
+const OperationKind = enum {
     ambient_cache,
     region_create,
     region_get,
@@ -173,74 +188,14 @@ pub const OfflineOperationKind = union(enum) {
     region_invalidate,
     region_delete,
     set_maximum_ambient_cache_size,
-    unknown: u32,
-
-    pub fn fromRaw(raw: u32) OfflineOperationKind {
-        return switch (raw) {
-            c.MLN_OFFLINE_OPERATION_AMBIENT_CACHE => .ambient_cache,
-            c.MLN_OFFLINE_OPERATION_REGION_CREATE => .region_create,
-            c.MLN_OFFLINE_OPERATION_REGION_GET => .region_get,
-            c.MLN_OFFLINE_OPERATION_REGIONS_LIST => .regions_list,
-            c.MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE => .regions_merge_database,
-            c.MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA => .region_update_metadata,
-            c.MLN_OFFLINE_OPERATION_REGION_GET_STATUS => .region_get_status,
-            c.MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED => .region_set_observed,
-            c.MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE => .region_set_download_state,
-            c.MLN_OFFLINE_OPERATION_REGION_INVALIDATE => .region_invalidate,
-            c.MLN_OFFLINE_OPERATION_REGION_DELETE => .region_delete,
-            c.MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE => .set_maximum_ambient_cache_size,
-            else => .{ .unknown = raw },
-        };
-    }
-
-    pub fn toRaw(self: OfflineOperationKind) u32 {
-        return switch (self) {
-            .ambient_cache => c.MLN_OFFLINE_OPERATION_AMBIENT_CACHE,
-            .region_create => c.MLN_OFFLINE_OPERATION_REGION_CREATE,
-            .region_get => c.MLN_OFFLINE_OPERATION_REGION_GET,
-            .regions_list => c.MLN_OFFLINE_OPERATION_REGIONS_LIST,
-            .regions_merge_database => c.MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE,
-            .region_update_metadata => c.MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA,
-            .region_get_status => c.MLN_OFFLINE_OPERATION_REGION_GET_STATUS,
-            .region_set_observed => c.MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED,
-            .region_set_download_state => c.MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE,
-            .region_invalidate => c.MLN_OFFLINE_OPERATION_REGION_INVALIDATE,
-            .region_delete => c.MLN_OFFLINE_OPERATION_REGION_DELETE,
-            .set_maximum_ambient_cache_size => c.MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE,
-            .unknown => |raw| raw,
-        };
-    }
 };
 
-pub const OfflineOperationResultKind = union(enum) {
+const OperationResultKind = enum {
     none,
     region,
     optional_region,
     region_list,
     region_status,
-    unknown: u32,
-
-    pub fn fromRaw(raw: u32) OfflineOperationResultKind {
-        return switch (raw) {
-            c.MLN_OFFLINE_OPERATION_RESULT_NONE => .none,
-            c.MLN_OFFLINE_OPERATION_RESULT_REGION => .region,
-            c.MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION => .optional_region,
-            c.MLN_OFFLINE_OPERATION_RESULT_REGION_LIST => .region_list,
-            c.MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS => .region_status,
-            else => .{ .unknown = raw },
-        };
-    }
-
-    pub fn toRaw(self: OfflineOperationResultKind) u32 {
-        return switch (self) {
-            .none => c.MLN_OFFLINE_OPERATION_RESULT_NONE,
-            .region => c.MLN_OFFLINE_OPERATION_RESULT_REGION,
-            .optional_region => c.MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION,
-            .region_list => c.MLN_OFFLINE_OPERATION_RESULT_REGION_LIST,
-            .region_status => c.MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS,
-            .unknown => |raw| raw,
-        };
-    }
 };
 
 pub const OfflineTilePyramidRegionDefinition = struct {
@@ -673,8 +628,8 @@ pub const RuntimeEvent = struct {
     payload_type: RuntimeEventPayloadType,
     /// Secondary detail whose meaning `event_type` selects: a raw
     /// `CameraChangeMode` for camera change events, MapLibre Native's map load
-    /// error ordinal for `map_loading_failed`, the raw native status for
-    /// `offline_operation_completed`, and 0 for every other event type.
+    /// error ordinal for `map_loading_failed`, and 0 for every other event
+    /// type.
     code: i32,
     message: []const u8,
     payload: RuntimeEventPayload,
@@ -716,7 +671,6 @@ pub const RuntimeEventPayload = union(enum) {
     offline_region_status: OfflineRegionStatusPayload,
     offline_region_response_error: OfflineRegionResponseErrorPayload,
     offline_region_tile_count_limit: OfflineRegionTileCountLimitPayload,
-    offline_operation_completed: OfflineOperationCompletedPayload,
     camera_transition_finished: CameraTransitionFinishedPayload,
     unknown: UnknownPayload,
 
@@ -928,16 +882,6 @@ pub const OfflineRegionTileCountLimitPayload = struct {
     limit: u64,
 };
 
-pub const OfflineOperationCompletedPayload = struct {
-    operation_id: OfflineOperationId,
-    operation_kind: OfflineOperationKind,
-    raw_operation_kind: u32,
-    result_kind: OfflineOperationResultKind,
-    raw_result_kind: u32,
-    result_status: i32,
-    found: bool,
-};
-
 /// Payload for `map_camera_transition_finished` events.
 ///
 /// A camera command carrying `AnimationOptions.transition_id` reports this
@@ -981,7 +925,6 @@ pub const RuntimeEventType = union(enum) {
     offline_region_status_changed,
     offline_region_response_error,
     offline_region_tile_count_limit_exceeded,
-    offline_operation_completed,
     map_camera_transition_finished,
     unknown: u32,
 
@@ -1008,7 +951,6 @@ pub const RuntimeEventType = union(enum) {
             c.MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED => .offline_region_status_changed,
             c.MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR => .offline_region_response_error,
             c.MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED => .offline_region_tile_count_limit_exceeded,
-            c.MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED => .offline_operation_completed,
             c.MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED => .map_camera_transition_finished,
             else => .{ .unknown = raw },
         };
@@ -1045,7 +987,6 @@ pub const RuntimeEventMask = struct {
     offline_region_status_changed: bool = false,
     offline_region_response_error: bool = false,
     offline_region_tile_count_limit_exceeded: bool = false,
-    offline_operation_completed: bool = false,
     /// Bits reported by a newer native library that this binding does not name.
     unknown_bits: u64 = 0,
 
@@ -1140,97 +1081,225 @@ pub const RuntimeEventSourceType = union(enum) {
     }
 };
 
-pub const OfflineOperationHandle = enum(u128) {
+pub const NotificationEndpointKind = union(enum) {
+    runtime_events,
+    operation,
+    adapter_resource_requests,
+    adapter_log_records,
+    render_frames,
+    driver_work,
+    unknown: u32,
+
+    fn fromRaw(raw: u32) NotificationEndpointKind {
+        return switch (raw) {
+            c.MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS => .runtime_events,
+            c.MLN_NOTIFICATION_ENDPOINT_OPERATION => .operation,
+            c.MLN_NOTIFICATION_ENDPOINT_ADAPTER_RESOURCE_REQUESTS => .adapter_resource_requests,
+            c.MLN_NOTIFICATION_ENDPOINT_ADAPTER_LOG_RECORDS => .adapter_log_records,
+            c.MLN_NOTIFICATION_ENDPOINT_RENDER_FRAMES => .render_frames,
+            c.MLN_NOTIFICATION_ENDPOINT_DRIVER_WORK => .driver_work,
+            else => .{ .unknown = raw },
+        };
+    }
+};
+
+/// Stable identity for matching an operation with notification readiness.
+/// This value cannot be used to invoke the native operation API.
+pub const OperationId = enum(u64) {
+    _,
+};
+
+pub const NotificationEndpointId = union(enum) {
+    runtime_events: u64,
+    operation: OperationId,
+    adapter_resource_requests: u64,
+    adapter_log_records: u64,
+    render_frames: u64,
+    driver_work: u64,
+    unknown: u64,
+
+    fn fromRaw(kind: NotificationEndpointKind, raw: u64) NotificationEndpointId {
+        return switch (kind) {
+            .runtime_events => .{ .runtime_events = raw },
+            .operation => .{ .operation = @enumFromInt(raw) },
+            .adapter_resource_requests => .{ .adapter_resource_requests = raw },
+            .adapter_log_records => .{ .adapter_log_records = raw },
+            .render_frames => .{ .render_frames = raw },
+            .driver_work => .{ .driver_work = raw },
+            .unknown => .{ .unknown = raw },
+        };
+    }
+};
+
+pub const ReadyEndpoint = struct {
+    kind: NotificationEndpointKind,
+    id: NotificationEndpointId,
+};
+
+pub const ReadyBatch = struct {
+    allocator: std.mem.Allocator,
+    endpoints: []ReadyEndpoint,
+
+    pub fn deinit(self: *ReadyBatch) void {
+        self.allocator.free(self.endpoints);
+        self.endpoints = &.{};
+    }
+};
+
+pub const OperationHandle = enum(u128) {
     _,
 
     fn init(
         runtime: *RuntimeHandle,
-        operation_id: OfflineOperationId,
-        operation_kind: OfflineOperationKind,
-        result_kind: OfflineOperationResultKind,
-    ) status.Error!OfflineOperationHandle {
+        operation_id: c.mln_operation,
+        operation_kind: OperationKind,
+        result_kind: OperationResultKind,
+    ) status.Error!OperationHandle {
         if (operation_id == 0) return error.InvalidArgument;
-        try registerRuntimeOfflineOperation(runtime.*);
-        errdefer unregisterRuntimeOfflineOperation(runtime.*);
-
-        const operation_state = try std.heap.smp_allocator.create(OfflineOperationState);
+        try registerRuntimeOperation(runtime.*);
+        errdefer unregisterRuntimeOperation(runtime.*);
+        const operation_state = try std.heap.smp_allocator.create(OperationState);
         operation_state.* = .{
             .runtime = runtime.*,
             .operation_id = operation_id,
             .operation_kind = operation_kind,
+            .active_uses = std.atomic.Value(usize).init(0),
+            .closing = false,
             .result_kind = result_kind,
         };
         errdefer std.heap.smp_allocator.destroy(operation_state);
-        return try registerOfflineOperationState(operation_state);
+        return try registerOperationState(operation_state);
     }
 
-    pub fn operationId(self: OfflineOperationHandle) status.BindingError!OfflineOperationId {
-        lockOfflineOperationRegistry();
-        defer unlockOfflineOperationRegistry();
-        const operation_state = offlineOperationState(self) orelse return error.ClosedHandle;
-        return operation_state.operation_id;
+    /// Returns a stable, non-operable identity for matching ready endpoints.
+    pub fn id(self: OperationHandle) status.BindingError!OperationId {
+        const operation_lease = try operationLease(self);
+        defer operation_lease.release();
+        return @enumFromInt(operation_lease.native);
     }
 
     fn require(
-        self: OfflineOperationHandle,
+        self: OperationHandle,
         expected_runtime: *RuntimeHandle,
-        operation_kind: OfflineOperationKind,
-        result_kind: OfflineOperationResultKind,
-    ) status.Error!RequiredOfflineOperation {
-        lockOfflineOperationRegistry();
-        defer unlockOfflineOperationRegistry();
-        const operation_state = offlineOperationState(self) orelse return error.ClosedHandle;
-        if (operation_state.runtime != expected_runtime.*) return error.InvalidState;
-        if (!std.meta.eql(operation_state.operation_kind, operation_kind) or !std.meta.eql(operation_state.result_kind, result_kind)) {
-            return error.InvalidState;
-        }
-        return .{ .operation_id = operation_state.operation_id, .operation_kind = operation_state.operation_kind };
-    }
-
-    fn requireEither(
-        self: OfflineOperationHandle,
-        expected_runtime: *RuntimeHandle,
-        first_kind: OfflineOperationKind,
-        second_kind: OfflineOperationKind,
-        result_kind: OfflineOperationResultKind,
-    ) status.Error!RequiredOfflineOperation {
-        lockOfflineOperationRegistry();
-        defer unlockOfflineOperationRegistry();
-        const operation_state = offlineOperationState(self) orelse return error.ClosedHandle;
-        if (operation_state.runtime != expected_runtime.*) return error.InvalidState;
-        if ((!std.meta.eql(operation_state.operation_kind, first_kind) and !std.meta.eql(operation_state.operation_kind, second_kind)) or
-            !std.meta.eql(operation_state.result_kind, result_kind))
+        operation_kind: OperationKind,
+        result_kind: OperationResultKind,
+    ) status.Error!RequiredOperation {
+        const operation_lease = try operationLease(self);
+        errdefer operation_lease.release();
+        if (operation_lease.state.runtime != expected_runtime.*) return error.InvalidState;
+        if (!std.meta.eql(operation_lease.state.operation_kind, operation_kind) or
+            !std.meta.eql(operation_lease.state.result_kind, result_kind))
         {
             return error.InvalidState;
         }
-        return .{ .operation_id = operation_state.operation_id, .operation_kind = operation_state.operation_kind };
+        return .{ .lease = operation_lease, .operation_kind = operation_lease.state.operation_kind };
     }
 
-    fn consume(self: OfflineOperationHandle) void {
-        const operation_state = unregisterOfflineOperationState(self) orelse return;
-        unregisterRuntimeOfflineOperation(operation_state.runtime);
+    /// Reports whether this operation has reached a terminal disposition.
+    pub fn poll(self: OperationHandle) status.Error!bool {
+        const operation_lease = try operationLease(self);
+        defer operation_lease.release();
+        var completed = false;
+        try status.checkStatus(c.mln_operation_poll(operation_lease.native, &completed), null);
+        return completed;
+    }
+
+    /// Waits for this operation to complete within `timeout_ms`.
+    pub fn wait(self: OperationHandle, timeout_ms: i64) status.Error!bool {
+        const operation_lease = try operationLease(self);
+        defer operation_lease.release();
+        var completed = false;
+        try status.checkStatus(c.mln_operation_wait(operation_lease.native, timeout_ms, &completed), null);
+        return completed;
+    }
+
+    /// Requests cancellation of this operation. Cancellation may run while
+    /// another thread waits on the same operation.
+    pub fn cancel(self: OperationHandle) status.Error!void {
+        const operation_lease = try operationLease(self);
+        defer operation_lease.release();
+        try status.checkStatus(c.mln_operation_cancel(operation_lease.native), null);
+    }
+
+    /// Returns the terminal native status of this completed operation.
+    pub fn resultStatus(self: OperationHandle) status.Error!i32 {
+        const operation_lease = try operationLease(self);
+        defer operation_lease.release();
+        var result_status: c.mln_status = c.MLN_STATUS_NATIVE_ERROR;
+        try status.checkStatus(
+            c.mln_operation_get_status(operation_lease.native, &result_status),
+            null,
+        );
+        return result_status;
+    }
+
+    /// Copies this completed operation's diagnostic into caller-owned storage.
+    pub fn copyDiagnostic(
+        self: OperationHandle,
+        allocator: std.mem.Allocator,
+    ) status.Error!values.OwnedString {
+        const operation_lease = try operationLease(self);
+        defer operation_lease.release();
+        var required: usize = 0;
+        try status.checkStatus(
+            c.mln_operation_copy_diagnostic(operation_lease.native, null, 0, &required),
+            null,
+        );
+        const message = try allocator.alloc(u8, required);
+        errdefer allocator.free(message);
+        var copied: usize = 0;
+        try status.checkStatus(
+            c.mln_operation_copy_diagnostic(
+                operation_lease.native,
+                if (message.len == 0) null else message.ptr,
+                message.len,
+                &copied,
+            ),
+            null,
+        );
+        if (copied != message.len) return error.NativeError;
+        return .{ .allocator = allocator, .value = message };
+    }
+
+    /// Releases this operation observer and any untaken completed result.
+    /// A release begun during another native call waits for that use to finish.
+    pub fn release(self: OperationHandle) void {
+        const operation_state = beginOperationRelease(self) orelse return;
+        while (operation_state.active_uses.load(.seq_cst) != 0) {
+            std.Thread.yield() catch {};
+        }
+        finishOperationRelease(self, operation_state);
+        c.mln_operation_release(operation_state.operation_id);
+        unregisterRuntimeOperation(operation_state.runtime);
         std.heap.smp_allocator.destroy(operation_state);
     }
 
-    pub fn discard(self: OfflineOperationHandle) status.Error!void {
-        lockOfflineOperationRegistry();
-        const operation_state = offlineOperationState(self) orelse {
-            unlockOfflineOperationRegistry();
-            return;
-        };
-        const operation_id = operation_state.operation_id;
-        var runtime_handle = operation_state.runtime;
-        unlockOfflineOperationRegistry();
+    fn requireEither(
+        self: OperationHandle,
+        expected_runtime: *RuntimeHandle,
+        first_kind: OperationKind,
+        second_kind: OperationKind,
+        result_kind: OperationResultKind,
+    ) status.Error!RequiredOperation {
+        const operation_lease = try operationLease(self);
+        errdefer operation_lease.release();
+        if (operation_lease.state.runtime != expected_runtime.*) return error.InvalidState;
+        if ((!std.meta.eql(operation_lease.state.operation_kind, first_kind) and
+            !std.meta.eql(operation_lease.state.operation_kind, second_kind)) or
+            !std.meta.eql(operation_lease.state.result_kind, result_kind))
+        {
+            return error.InvalidState;
+        }
+        return .{ .lease = operation_lease, .operation_kind = operation_lease.state.operation_kind };
+    }
 
-        const runtime_lease = lease(&runtime_handle) catch |err| {
-            return err;
-        };
-        defer runtime_lease.release();
+    pub fn discard(self: OperationHandle) status.Error!void {
+        const operation_lease = try operationLease(self);
+        defer operation_lease.release();
         try status.checkStatus(
-            c.mln_runtime_offline_operation_discard(runtime_lease.native, operation_id),
-            runtime_lease.diagnostic_store,
+            c.mln_operation_discard_result(operation_lease.native),
+            null,
         );
-        self.consume();
     }
 };
 
@@ -1242,7 +1311,6 @@ pub const RuntimeEventPayloadType = union(enum) {
     offline_region_status,
     offline_region_response_error,
     offline_region_tile_count_limit,
-    offline_operation_completed,
     camera_transition_finished,
     unknown: u32,
 
@@ -1255,7 +1323,6 @@ pub const RuntimeEventPayloadType = union(enum) {
             c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS => .offline_region_status,
             c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR => .offline_region_response_error,
             c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT => .offline_region_tile_count_limit,
-            c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED => .offline_operation_completed,
             c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => .camera_transition_finished,
             else => .{ .unknown = raw },
         };
@@ -1341,6 +1408,53 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
             return error.OutOfMemory;
         };
     }
+    /// Drains and copies the endpoints currently ready on this runtime's
+    /// receiver-scoped notification source.
+    pub fn drainReady(
+        self: *RuntimeHandle,
+        allocator: std.mem.Allocator,
+    ) status.Error!ReadyBatch {
+        const runtime_lease = try lease(self);
+        defer runtime_lease.release();
+
+        var native_batch: c.mln_ready_batch = 0;
+        try status.checkStatus(
+            c.mln_notification_source_drain_ready(
+                runtime_lease.state.notification_source,
+                &native_batch,
+            ),
+            runtime_lease.diagnostic_store,
+        );
+        defer c.mln_ready_batch_release(native_batch);
+
+        var view: c.mln_ready_batch_view = std.mem.zeroes(c.mln_ready_batch_view);
+        view.size = @sizeOf(c.mln_ready_batch_view);
+        try status.checkStatus(
+            c.mln_ready_batch_get(native_batch, &view),
+            runtime_lease.diagnostic_store,
+        );
+        const endpoint_size: usize = view.endpoint_size;
+        const endpoint_bytes: []const u8 = if (view.endpoint_count == 0 or view.endpoints == null)
+            &.{}
+        else
+            @as([*]const u8, @ptrCast(view.endpoints))[0 .. view.endpoint_count * endpoint_size];
+        const endpoints = try allocator.alloc(ReadyEndpoint, view.endpoint_count);
+        errdefer allocator.free(endpoints);
+        for (endpoints, 0..) |*endpoint, index| {
+            var native_endpoint = std.mem.zeroes(c.mln_ready_endpoint);
+            const copied = @min(endpoint_size, @sizeOf(c.mln_ready_endpoint));
+            @memcpy(
+                std.mem.asBytes(&native_endpoint)[0..copied],
+                endpoint_bytes[index * endpoint_size ..][0..copied],
+            );
+            const kind = NotificationEndpointKind.fromRaw(native_endpoint.kind);
+            endpoint.* = .{
+                .kind = kind,
+                .id = NotificationEndpointId.fromRaw(kind, native_endpoint.id),
+            };
+        }
+        return .{ .allocator = allocator, .endpoints = endpoints };
+    }
 
     /// Drains this runtime's queued events into one copied batch.
     ///
@@ -1355,21 +1469,28 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         defer runtime_lease.release();
         const runtime_state = runtime_lease.state;
 
-        var native_batch = c.mln_runtime_event_batch_default();
+        var native_batch: c.mln_event_batch = 0;
         try status.checkStatus(
             c.mln_runtime_drain_events(runtime_lease.native, max_events, &native_batch),
             runtime_lease.diagnostic_store,
         );
-        const event_size: usize = native_batch.event_size;
-        const events: []const u8 = if (native_batch.event_count == 0 or native_batch.events == null)
+        defer c.mln_event_batch_release(native_batch);
+        var view: c.mln_runtime_event_batch_view = std.mem.zeroes(c.mln_runtime_event_batch_view);
+        view.size = @sizeOf(c.mln_runtime_event_batch_view);
+        try status.checkStatus(
+            c.mln_event_batch_get(native_batch, &view),
+            runtime_lease.diagnostic_store,
+        );
+        const event_size: usize = view.event_size;
+        const events: []const u8 = if (view.event_count == 0 or view.events == null)
             &.{}
         else
-            @as([*]const u8, @ptrCast(native_batch.events))[0 .. native_batch.event_count * event_size];
-        const messages: []const u8 = if (native_batch.messages_size == 0 or native_batch.messages == null)
+            @as([*]const u8, @ptrCast(view.events))[0 .. view.event_count * event_size];
+        const messages: []const u8 = if (view.messages_size == 0 or view.messages == null)
             ""
         else
-            native_batch.messages[0..native_batch.messages_size];
-        const copied = try allocator.alloc(RuntimeEvent, native_batch.event_count);
+            view.messages[0..view.messages_size];
+        const copied = try allocator.alloc(RuntimeEvent, view.event_count);
         var initialized: usize = 0;
         errdefer {
             for (copied[0..initialized]) |*event| event.deinit();
@@ -1379,7 +1500,7 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
             event.* = try eventViewAt(runtime_state, events, event_size, messages, index).toOwned(allocator);
             initialized += 1;
         }
-        return .{ .allocator = allocator, .events = copied, .remaining_count = native_batch.remaining_count };
+        return .{ .allocator = allocator, .events = copied, .remaining_count = view.remaining_count };
     }
 
     /// Selects which runtime-originated event types this runtime queues.
@@ -1412,10 +1533,10 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
 
     fn operationHandle(
         self: *RuntimeHandle,
-        operation_id: c.mln_offline_operation_id,
-        operation_kind: OfflineOperationKind,
-        result_kind: OfflineOperationResultKind,
-    ) status.Error!OfflineOperationHandle {
+        operation_id: c.mln_operation,
+        operation_kind: OperationKind,
+        result_kind: OperationResultKind,
+    ) status.Error!OperationHandle {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
         return self.operationHandleWithRuntime(runtime_lease.native, operation_id, operation_kind, result_kind);
@@ -1423,22 +1544,21 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
 
     fn operationHandleWithRuntime(
         self: *RuntimeHandle,
-        runtime: c.mln_runtime,
-        operation_id: c.mln_offline_operation_id,
-        operation_kind: OfflineOperationKind,
-        result_kind: OfflineOperationResultKind,
-    ) status.Error!OfflineOperationHandle {
-        // `runtime` must come from an active RuntimeLease that spans this call.
-        return OfflineOperationHandle.init(self, operation_id, operation_kind, result_kind) catch |err| {
-            if (operation_id != 0) _ = c.mln_runtime_offline_operation_discard(runtime, operation_id);
+        _: c.mln_runtime,
+        operation_id: c.mln_operation,
+        operation_kind: OperationKind,
+        result_kind: OperationResultKind,
+    ) status.Error!OperationHandle {
+        return OperationHandle.init(self, operation_id, operation_kind, result_kind) catch |err| {
+            if (operation_id != 0) c.mln_operation_release(operation_id);
             return err;
         };
     }
 
-    pub fn startAmbientCacheOperation(self: *RuntimeHandle, operation: AmbientCacheOperation) status.Error!OfflineOperationHandle {
+    pub fn startAmbientCacheOperation(self: *RuntimeHandle, operation: AmbientCacheOperation) status.Error!OperationHandle {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-        var operation_id: c.mln_offline_operation_id = 0;
+        var operation_id: c.mln_operation = 0;
         try status.checkStatus(
             c.mln_runtime_run_ambient_cache_operation_start(runtime_lease.native, operation.toRaw(), &operation_id),
             runtime_lease.diagnostic_store,
@@ -1448,10 +1568,10 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
 
     /// Starts a change to this runtime's maximum ambient cache size. Lowering
     /// it evicts ambient resources; offline regions are unaffected.
-    pub fn startSetMaximumAmbientCacheSize(self: *RuntimeHandle, size: u64) status.Error!OfflineOperationHandle {
+    pub fn startSetMaximumAmbientCacheSize(self: *RuntimeHandle, size: u64) status.Error!OperationHandle {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-        var operation_id: c.mln_offline_operation_id = 0;
+        var operation_id: c.mln_operation = 0;
         try status.checkStatus(
             c.mln_runtime_set_maximum_ambient_cache_size_start(runtime_lease.native, size, &operation_id),
             runtime_lease.diagnostic_store,
@@ -1464,13 +1584,13 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         allocator: std.mem.Allocator,
         definition: OfflineRegionDefinition,
         metadata: []const u8,
-    ) status.Error!OfflineOperationHandle {
+    ) status.Error!OperationHandle {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
         var temp = native_temp.TempStorage.initWithDiagnostics(allocator, runtime_lease.diagnostic_store);
         defer temp.deinit();
         const native_definition = try temp.offlineRegionDefinition(definition);
-        var operation_id: c.mln_offline_operation_id = 0;
+        var operation_id: c.mln_operation = 0;
         try status.checkStatus(
             c.mln_runtime_offline_region_create_start(
                 runtime_lease.native,
@@ -1484,10 +1604,10 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         return self.operationHandleWithRuntime(runtime_lease.native, operation_id, .region_create, .region);
     }
 
-    pub fn startGetOfflineRegion(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!OfflineOperationHandle {
+    pub fn startGetOfflineRegion(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!OperationHandle {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-        var operation_id: c.mln_offline_operation_id = 0;
+        var operation_id: c.mln_operation = 0;
         try status.checkStatus(
             c.mln_runtime_offline_region_get_start(runtime_lease.native, region_id, &operation_id),
             runtime_lease.diagnostic_store,
@@ -1495,10 +1615,10 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         return self.operationHandleWithRuntime(runtime_lease.native, operation_id, .region_get, .optional_region);
     }
 
-    pub fn startListOfflineRegions(self: *RuntimeHandle) status.Error!OfflineOperationHandle {
+    pub fn startListOfflineRegions(self: *RuntimeHandle) status.Error!OperationHandle {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-        var operation_id: c.mln_offline_operation_id = 0;
+        var operation_id: c.mln_operation = 0;
         try status.checkStatus(
             c.mln_runtime_offline_regions_list_start(runtime_lease.native, &operation_id),
             runtime_lease.diagnostic_store,
@@ -1510,12 +1630,12 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         self: *RuntimeHandle,
         allocator: std.mem.Allocator,
         side_database_path: []const u8,
-    ) status.Error!OfflineOperationHandle {
+    ) status.Error!OperationHandle {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
         const path = try nulTerminated(allocator, side_database_path, runtime_lease.diagnostic_store, "offline merge database path contains embedded NUL");
         defer allocator.free(path);
-        var operation_id: c.mln_offline_operation_id = 0;
+        var operation_id: c.mln_operation = 0;
         try status.checkStatus(
             c.mln_runtime_offline_regions_merge_database_start(runtime_lease.native, path.ptr, &operation_id),
             runtime_lease.diagnostic_store,
@@ -1527,10 +1647,10 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         self: *RuntimeHandle,
         region_id: OfflineRegionId,
         metadata: []const u8,
-    ) status.Error!OfflineOperationHandle {
+    ) status.Error!OperationHandle {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-        var operation_id: c.mln_offline_operation_id = 0;
+        var operation_id: c.mln_operation = 0;
         try status.checkStatus(
             c.mln_runtime_offline_region_update_metadata_start(
                 runtime_lease.native,
@@ -1544,10 +1664,10 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         return self.operationHandleWithRuntime(runtime_lease.native, operation_id, .region_update_metadata, .region);
     }
 
-    pub fn startGetOfflineRegionStatus(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!OfflineOperationHandle {
+    pub fn startGetOfflineRegionStatus(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!OperationHandle {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-        var operation_id: c.mln_offline_operation_id = 0;
+        var operation_id: c.mln_operation = 0;
         try status.checkStatus(
             c.mln_runtime_offline_region_get_status_start(runtime_lease.native, region_id, &operation_id),
             runtime_lease.diagnostic_store,
@@ -1555,10 +1675,10 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         return self.operationHandleWithRuntime(runtime_lease.native, operation_id, .region_get_status, .region_status);
     }
 
-    pub fn startSetOfflineRegionObserved(self: *RuntimeHandle, region_id: OfflineRegionId, observed: bool) status.Error!OfflineOperationHandle {
+    pub fn startSetOfflineRegionObserved(self: *RuntimeHandle, region_id: OfflineRegionId, observed: bool) status.Error!OperationHandle {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-        var operation_id: c.mln_offline_operation_id = 0;
+        var operation_id: c.mln_operation = 0;
         try status.checkStatus(
             c.mln_runtime_offline_region_set_observed_start(runtime_lease.native, region_id, observed, &operation_id),
             runtime_lease.diagnostic_store,
@@ -1570,10 +1690,10 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         self: *RuntimeHandle,
         region_id: OfflineRegionId,
         download_state: OfflineRegionDownloadState,
-    ) status.Error!OfflineOperationHandle {
+    ) status.Error!OperationHandle {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-        var operation_id: c.mln_offline_operation_id = 0;
+        var operation_id: c.mln_operation = 0;
         try status.checkStatus(
             c.mln_runtime_offline_region_set_download_state_start(runtime_lease.native, region_id, try download_state.toInputRaw(runtime_lease.diagnostic_store), &operation_id),
             runtime_lease.diagnostic_store,
@@ -1581,10 +1701,10 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         return self.operationHandleWithRuntime(runtime_lease.native, operation_id, .region_set_download_state, .none);
     }
 
-    pub fn startInvalidateOfflineRegion(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!OfflineOperationHandle {
+    pub fn startInvalidateOfflineRegion(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!OperationHandle {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-        var operation_id: c.mln_offline_operation_id = 0;
+        var operation_id: c.mln_operation = 0;
         try status.checkStatus(
             c.mln_runtime_offline_region_invalidate_start(runtime_lease.native, region_id, &operation_id),
             runtime_lease.diagnostic_store,
@@ -1592,10 +1712,10 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         return self.operationHandleWithRuntime(runtime_lease.native, operation_id, .region_invalidate, .none);
     }
 
-    pub fn startDeleteOfflineRegion(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!OfflineOperationHandle {
+    pub fn startDeleteOfflineRegion(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!OperationHandle {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-        var operation_id: c.mln_offline_operation_id = 0;
+        var operation_id: c.mln_operation = 0;
         try status.checkStatus(
             c.mln_runtime_offline_region_delete_start(runtime_lease.native, region_id, &operation_id),
             runtime_lease.diagnostic_store,
@@ -1606,19 +1726,19 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
     pub fn takeOfflineRegion(
         self: *RuntimeHandle,
         allocator: std.mem.Allocator,
-        operation: OfflineOperationHandle,
+        operation: OperationHandle,
     ) status.Error!OwnedOfflineRegion {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
         const required = try operation.requireEither(self, .region_create, .region_update_metadata, .region);
+        defer required.lease.release();
         var snapshot: c.mln_offline_region_snapshot = 0;
         const native_status = switch (required.operation_kind) {
-            .region_create => c.mln_runtime_offline_region_create_take_result(runtime_lease.native, required.operation_id, &snapshot),
-            .region_update_metadata => c.mln_runtime_offline_region_update_metadata_take_result(runtime_lease.native, required.operation_id, &snapshot),
+            .region_create => c.mln_runtime_offline_region_create_take_result(required.lease.native, &snapshot),
+            .region_update_metadata => c.mln_runtime_offline_region_update_metadata_take_result(required.lease.native, &snapshot),
             else => c.MLN_STATUS_INVALID_STATE,
         };
         try status.checkStatus(native_status, runtime_lease.diagnostic_store);
-        operation.consume();
         if (snapshot == 0) return error.NativeError;
         const snapshot_handle = snapshot;
         defer destroyOfflineRegionSnapshot(snapshot_handle);
@@ -1628,16 +1748,16 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
     pub fn takeOptionalOfflineRegion(
         self: *RuntimeHandle,
         allocator: std.mem.Allocator,
-        operation: OfflineOperationHandle,
+        operation: OperationHandle,
     ) status.Error!?OwnedOfflineRegion {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
         const required = try operation.require(self, .region_get, .optional_region);
+        defer required.lease.release();
         var snapshot: c.mln_offline_region_snapshot = 0;
         var found = false;
-        const native_status = c.mln_runtime_offline_region_get_take_result(runtime_lease.native, required.operation_id, &snapshot, &found);
+        const native_status = c.mln_runtime_offline_region_get_take_result(required.lease.native, &snapshot, &found);
         try status.checkStatus(native_status, runtime_lease.diagnostic_store);
-        operation.consume();
         if (!found) return null;
         if (snapshot == 0) return error.NativeError;
         const snapshot_handle = snapshot;
@@ -1648,34 +1768,34 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
     pub fn takeOfflineRegionList(
         self: *RuntimeHandle,
         allocator: std.mem.Allocator,
-        operation: OfflineOperationHandle,
+        operation: OperationHandle,
     ) status.Error!OfflineRegionList {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
         const required = try operation.requireEither(self, .regions_list, .regions_merge_database, .region_list);
+        defer required.lease.release();
         var list: c.mln_offline_region_list = 0;
         const native_status = switch (required.operation_kind) {
-            .regions_list => c.mln_runtime_offline_regions_list_take_result(runtime_lease.native, required.operation_id, &list),
-            .regions_merge_database => c.mln_runtime_offline_regions_merge_database_take_result(runtime_lease.native, required.operation_id, &list),
+            .regions_list => c.mln_runtime_offline_regions_list_take_result(required.lease.native, &list),
+            .regions_merge_database => c.mln_runtime_offline_regions_merge_database_take_result(required.lease.native, &list),
             else => c.MLN_STATUS_INVALID_STATE,
         };
         try status.checkStatus(native_status, runtime_lease.diagnostic_store);
-        operation.consume();
         if (list == 0) return error.NativeError;
         const list_handle = list;
         defer destroyOfflineRegionList(list_handle);
         return copyOfflineRegionList(allocator, list_handle);
     }
 
-    pub fn takeOfflineRegionStatus(self: *RuntimeHandle, operation: OfflineOperationHandle) status.Error!OfflineRegionStatus {
+    pub fn takeOfflineRegionStatus(self: *RuntimeHandle, operation: OperationHandle) status.Error!OfflineRegionStatus {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
         const required = try operation.require(self, .region_get_status, .region_status);
+        defer required.lease.release();
         var native_status_value: c.mln_offline_region_status = undefined;
         native_status_value.size = @sizeOf(c.mln_offline_region_status);
-        const native_status = c.mln_runtime_offline_region_get_status_take_result(runtime_lease.native, required.operation_id, &native_status_value);
+        const native_status = c.mln_runtime_offline_region_get_status_take_result(required.lease.native, &native_status_value);
         try status.checkStatus(native_status, runtime_lease.diagnostic_store);
-        operation.consume();
         return offlineStatusFromNative(native_status_value);
     }
 
@@ -1789,10 +1909,19 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
 
     pub fn close(self: *RuntimeHandle) status.Error!void {
         const runtime_close = try beginRuntimeClose(self.*) orelse return;
-        status.checkStatus(c.mln_runtime_destroy(runtime_close.native), runtime_close.diagnostic_store) catch |err| {
-            cancelRuntimeClose(runtime_close.state);
-            return err;
-        };
+        if (!runtime_close.state.runtime_destroyed) {
+            status.checkStatus(c.mln_runtime_destroy(runtime_close.native), runtime_close.diagnostic_store) catch |err| {
+                cancelRuntimeClose(runtime_close.state);
+                return err;
+            };
+            runtime_close.state.runtime_destroyed = true;
+        }
+        // Preserve the state on failure: the native runtime is already gone,
+        // but a retry must still be able to close and release its source.
+        try status.checkStatus(
+            notification_source_close_for_testing(runtime_close.state.notification_source),
+            runtime_close.diagnostic_store,
+        );
         if (runtime_close.state.resource_transform) |old| {
             runtime_close.state.resource_transform = null;
             std.heap.smp_allocator.destroy(old);
@@ -1826,16 +1955,24 @@ fn createNative(
     native_options: *c.mln_runtime_options,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
 ) status.Error!RuntimeHandle {
+    var notification_source: c.mln_notification_source = 0;
+    try status.checkStatus(
+        c.mln_notification_source_create(&notification_source),
+        diagnostic_store,
+    );
+    errdefer _ = notification_source_close_for_testing(notification_source);
+    native_options.notification_source = notification_source;
     var runtime: c.mln_runtime = 0;
     try status.checkStatus(c.mln_runtime_create(native_options, &runtime), diagnostic_store);
     errdefer _ = c.mln_runtime_destroy(runtime);
 
     const runtime_registry = try std.heap.smp_allocator.create(RuntimeRegistry);
-    runtime_registry.* = .{ .maps = .empty, .next_map_id = 1, .live_offline_operations = 0 };
+    runtime_registry.* = .{ .maps = .empty, .next_map_id = 1, .live_operations = 0 };
     errdefer std.heap.smp_allocator.destroy(runtime_registry);
 
     const runtime_state = try std.heap.smp_allocator.create(RuntimeState);
     runtime_state.* = .{
+        .notification_source = notification_source,
         .diagnostic_store = diagnostic_store,
         .registry = runtime_registry,
         .resource_transform = null,
@@ -1843,6 +1980,7 @@ fn createNative(
         .resource_provider = null,
         .active_leases = std.atomic.Value(usize).init(0),
         .closing = false,
+        .runtime_destroyed = false,
     };
     errdefer std.heap.smp_allocator.destroy(runtime_state);
 
@@ -2067,16 +2205,18 @@ fn beginRuntimeClose(handle: RuntimeHandle) status.Error!?RuntimeClose {
     defer unlockRuntimeRegistry();
 
     const runtime_state = runtime_handle_registry.get(@intFromEnum(handle)) orelse return null;
-    if (runtime_state.closing) return error.ActiveBorrow;
+    if (runtime_state.closing and !runtime_state.runtime_destroyed) return error.ActiveBorrow;
     if (runtime_state.active_leases.load(.seq_cst) != 0) return error.ActiveBorrow;
     const runtime_registry = runtime_state.registry orelse return null;
-    if (runtime_registry.maps.items.len != 0) {
-        try status.setBindingDiagnostic(runtime_state.diagnostic_store, "runtime has live maps");
-        return error.InvalidState;
-    }
-    if (runtime_registry.live_offline_operations != 0) {
-        try status.setBindingDiagnostic(runtime_state.diagnostic_store, "runtime has live offline operations");
-        return error.InvalidState;
+    if (!runtime_state.runtime_destroyed) {
+        if (runtime_registry.maps.items.len != 0) {
+            try status.setBindingDiagnostic(runtime_state.diagnostic_store, "runtime has live maps");
+            return error.InvalidState;
+        }
+        if (runtime_registry.live_operations != 0) {
+            try status.setBindingDiagnostic(runtime_state.diagnostic_store, "runtime has live operations");
+            return error.InvalidState;
+        }
     }
     const runtime: c.mln_runtime = @intFromEnum(handle);
     runtime_state.closing = true;
@@ -2105,23 +2245,23 @@ fn finishRuntimeClose(handle: RuntimeHandle) ?*RuntimeState {
     return runtime_state;
 }
 
-fn registerRuntimeOfflineOperation(handle: RuntimeHandle) status.BindingError!void {
+fn registerRuntimeOperation(handle: RuntimeHandle) status.BindingError!void {
     lockRuntimeRegistry();
     defer unlockRuntimeRegistry();
 
     const runtime_state = runtimeStateLocked(handle) orelse return error.ClosedHandle;
     if (runtime_state.closing) return error.ActiveBorrow;
     const runtime_registry = runtime_state.registry orelse return error.ClosedHandle;
-    runtime_registry.live_offline_operations += 1;
+    runtime_registry.live_operations += 1;
 }
 
-fn unregisterRuntimeOfflineOperation(handle: RuntimeHandle) void {
+fn unregisterRuntimeOperation(handle: RuntimeHandle) void {
     lockRuntimeRegistry();
     defer unlockRuntimeRegistry();
 
     const runtime_state = runtimeStateLocked(handle) orelse return;
     const runtime_registry = runtime_state.registry orelse return;
-    if (runtime_registry.live_offline_operations > 0) runtime_registry.live_offline_operations -= 1;
+    if (runtime_registry.live_operations > 0) runtime_registry.live_operations -= 1;
 }
 
 fn lockRuntimeRegistry() void {
@@ -2194,69 +2334,84 @@ fn unlockWakeSourceRegistry() void {
     wake_source_registry_lock.store(false, .seq_cst);
 }
 
-fn registerOfflineOperationState(operation_state: *OfflineOperationState) std.mem.Allocator.Error!OfflineOperationHandle {
-    lockOfflineOperationRegistry();
-    defer unlockOfflineOperationRegistry();
+fn registerOperationState(operation_state: *OperationState) std.mem.Allocator.Error!OperationHandle {
+    lockOperationRegistry();
+    defer unlockOperationRegistry();
 
-    if (offline_operation_free_list.items.len > 0) {
-        const slot_index = offline_operation_free_list.pop().?;
-        offline_operation_registry.items[slot_index].state = operation_state;
-        offline_operation_registry.items[slot_index].generation = nextHandleGeneration();
-        return offlineOperationHandle(slot_index + 1, offline_operation_registry.items[slot_index].generation);
+    if (operation_free_list.items.len > 0) {
+        const slot_index = operation_free_list.pop().?;
+        operation_registry.items[slot_index].state = operation_state;
+        operation_registry.items[slot_index].generation = nextHandleGeneration();
+        return operationHandleValue(slot_index + 1, operation_registry.items[slot_index].generation);
     }
 
     const generation = nextHandleGeneration();
-    try offline_operation_free_list.ensureTotalCapacity(std.heap.smp_allocator, offline_operation_registry.items.len + 1);
-    try offline_operation_registry.append(std.heap.smp_allocator, .{ .state = operation_state, .generation = generation });
-    return offlineOperationHandle(offline_operation_registry.items.len, generation);
+    try operation_free_list.ensureTotalCapacity(std.heap.smp_allocator, operation_registry.items.len + 1);
+    try operation_registry.append(std.heap.smp_allocator, .{ .state = operation_state, .generation = generation });
+    return operationHandleValue(operation_registry.items.len, generation);
 }
 
-fn offlineOperationHandle(index: usize, generation: u64) OfflineOperationHandle {
+fn operationHandleValue(index: usize, generation: u64) OperationHandle {
     return @enumFromInt((@as(u128, generation) << 64) | @as(u128, @intCast(index)));
 }
 
-fn offlineOperationIndex(handle: OfflineOperationHandle) ?usize {
+fn operationIndex(handle: OperationHandle) ?usize {
     const index = @intFromEnum(handle) & std.math.maxInt(u64);
     if (index == 0 or index > std.math.maxInt(usize)) return null;
     return @intCast(index);
 }
 
-fn offlineOperationGeneration(handle: OfflineOperationHandle) u64 {
+fn operationGeneration(handle: OperationHandle) u64 {
     return @intCast(@intFromEnum(handle) >> 64);
 }
 
-fn offlineOperationState(handle: OfflineOperationHandle) ?*OfflineOperationState {
-    const index = offlineOperationIndex(handle) orelse return null;
-    if (index > offline_operation_registry.items.len) return null;
-    const slot = offline_operation_registry.items[index - 1];
-    if (slot.generation != offlineOperationGeneration(handle)) return null;
+fn operationState(handle: OperationHandle) ?*OperationState {
+    const index = operationIndex(handle) orelse return null;
+    if (index > operation_registry.items.len) return null;
+    const slot = operation_registry.items[index - 1];
+    if (slot.generation != operationGeneration(handle)) return null;
     return slot.state;
 }
 
-fn unregisterOfflineOperationState(handle: OfflineOperationHandle) ?*OfflineOperationState {
-    lockOfflineOperationRegistry();
-    defer unlockOfflineOperationRegistry();
+fn operationLease(handle: OperationHandle) status.BindingError!OperationLease {
+    lockOperationRegistry();
+    defer unlockOperationRegistry();
+    const operation_state = operationState(handle) orelse return error.ClosedHandle;
+    if (operation_state.closing) return error.ClosedHandle;
+    _ = operation_state.active_uses.fetchAdd(1, .seq_cst);
+    return .{ .state = operation_state, .native = operation_state.operation_id };
+}
 
-    const index = offlineOperationIndex(handle) orelse return null;
-    if (index > offline_operation_registry.items.len) return null;
-    const slot_index = index - 1;
-    const slot = &offline_operation_registry.items[slot_index];
-    if (slot.generation != offlineOperationGeneration(handle)) return null;
-    const operation_state = slot.state orelse return null;
-    slot.state = null;
-    slot.generation = nextHandleGeneration();
-    offline_operation_free_list.appendAssumeCapacity(slot_index);
+fn beginOperationRelease(handle: OperationHandle) ?*OperationState {
+    lockOperationRegistry();
+    defer unlockOperationRegistry();
+    const operation_state = operationState(handle) orelse return null;
+    if (operation_state.closing) return null;
+    operation_state.closing = true;
     return operation_state;
 }
 
-fn lockOfflineOperationRegistry() void {
-    while (offline_operation_registry_lock.cmpxchgWeak(false, true, .seq_cst, .seq_cst) != null) {
+fn finishOperationRelease(handle: OperationHandle, operation_state: *OperationState) void {
+    lockOperationRegistry();
+    defer unlockOperationRegistry();
+    const index = operationIndex(handle) orelse unreachable;
+    const slot_index = index - 1;
+    const slot = &operation_registry.items[slot_index];
+    std.debug.assert(slot.state == operation_state);
+    std.debug.assert(slot.generation == operationGeneration(handle));
+    slot.state = null;
+    slot.generation = nextHandleGeneration();
+    operation_free_list.appendAssumeCapacity(slot_index);
+}
+
+fn lockOperationRegistry() void {
+    while (operation_registry_lock.cmpxchgWeak(false, true, .seq_cst, .seq_cst) != null) {
         std.Thread.yield() catch {};
     }
 }
 
-fn unlockOfflineOperationRegistry() void {
-    offline_operation_registry_lock.store(false, .seq_cst);
+fn unlockOperationRegistry() void {
+    operation_registry_lock.store(false, .seq_cst);
 }
 
 pub fn nextHandleGeneration() u64 {
@@ -2386,18 +2541,6 @@ fn payloadFromNative(native_event: c.mln_runtime_event, window: []const u8) Runt
             break :blk .{ .offline_region_tile_count_limit = .{
                 .region_id = payload.region_id,
                 .limit = payload.limit,
-            } };
-        },
-        c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED => blk: {
-            const payload = native_event.payload.offline_operation_completed;
-            break :blk .{ .offline_operation_completed = .{
-                .operation_id = payload.operation_id,
-                .operation_kind = OfflineOperationKind.fromRaw(payload.operation_kind),
-                .raw_operation_kind = payload.operation_kind,
-                .result_kind = OfflineOperationResultKind.fromRaw(payload.result_kind),
-                .raw_result_kind = payload.result_kind,
-                .result_status = payload.result_status,
-                .found = payload.found,
             } };
         },
         c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => .{
@@ -2617,6 +2760,15 @@ const offline_style_url_for_testing = "http://example.com/offline-style.json";
 
 var snapshot_destroy_count_for_testing: usize = 0;
 var list_destroy_count_for_testing: usize = 0;
+var notification_source_close_attempts_for_testing: usize = 0;
+
+fn failNotificationSourceCloseOnce(source: c.mln_notification_source) callconv(.c) c.mln_status {
+    notification_source_close_attempts_for_testing += 1;
+    if (notification_source_close_attempts_for_testing == 1) {
+        return c.MLN_STATUS_INVALID_STATE;
+    }
+    return c.mln_notification_source_close(source);
+}
 
 fn countingOfflineRegionSnapshotDestroy(snapshot: c.mln_offline_region_snapshot) callconv(.c) void {
     snapshot_destroy_count_for_testing += 1;
@@ -2644,29 +2796,28 @@ fn offlineTileDefinitionForTesting() OfflineRegionDefinition {
         .pixel_ratio = 2.0,
     } };
 }
-
-fn waitForOfflineOperationForTesting(runtime: *RuntimeHandle, operation: OfflineOperationHandle) !void {
-    const operation_id = try operation.operationId();
+fn waitForOfflineOperationForTesting(runtime: *RuntimeHandle, operation: OperationHandle) !void {
     for (0..5000) |_| {
         try runtime.pump(0);
-        // One event per drain, so an event this wait is not looking for stays
-        // queued rather than being dropped with the batch that carried it.
-        while (true) {
-            var batch = try runtime.drainEvents(std.testing.allocator, 1);
-            defer batch.deinit();
-            if (batch.len() == 0) break;
-            const event = try batch.at(0);
-            const payload = switch (event.payload) {
-                .offline_operation_completed => |completed| completed,
-                else => continue,
-            };
-            if (payload.operation_id != operation_id) continue;
-            try std.testing.expectEqual(@as(i32, c.MLN_STATUS_OK), payload.result_status);
+        if (try operation.poll()) {
+            try std.testing.expectEqual(@as(i32, c.MLN_STATUS_OK), try operation.resultStatus());
             return;
         }
         try std.testing.io.sleep(.fromMilliseconds(1), .awake);
     }
     return error.EventNotObserved;
+}
+
+const OperationReleaseProbe = struct {
+    operation: OperationHandle,
+    entered: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+    finished: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+};
+
+fn releaseOperationForTesting(probe: *OperationReleaseProbe) void {
+    probe.entered.store(true, .seq_cst);
+    probe.operation.release();
+    probe.finished.store(true, .seq_cst);
 }
 
 test "runtime event raw domains preserve unknown values" {
@@ -2840,29 +2991,52 @@ test "event mask conversion preserves unnamed bits" {
     try std.testing.expectEqual(raw, eventMaskToRaw(mask));
 }
 
-test "offline operation take-result failures preserve handle state" {
+test "operation release waits for active native uses" {
+    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    const operation = try runtime.operationHandle(9_999_996, .region_get_status, .region_status);
+    const operation_lease = try operationLease(operation);
+    var probe = OperationReleaseProbe{ .operation = operation };
+    const release_thread = try std.Thread.spawn(.{}, releaseOperationForTesting, .{&probe});
+    while (true) {
+        _ = operation.id() catch |err| {
+            try std.testing.expectEqual(error.ClosedHandle, err);
+            break;
+        };
+        std.Thread.yield() catch {};
+    }
+    try std.testing.expect(!probe.finished.load(.seq_cst));
+
+    operation_lease.release();
+    release_thread.join();
+    try std.testing.expect(probe.finished.load(.seq_cst));
+    try std.testing.expectError(error.ClosedHandle, operation.id());
+}
+
+test "operation take-result failures preserve handle state" {
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
     const operation = try runtime.operationHandle(9_999_999, .region_get_status, .region_status);
     try std.testing.expectError(error.InvalidArgument, runtime.takeOfflineRegionStatus(operation));
-    try std.testing.expectEqual(@as(OfflineOperationId, 9_999_999), try operation.operationId());
+    try std.testing.expectEqual(@as(OperationId, @enumFromInt(9_999_999)), try operation.id());
 
-    operation.consume();
+    operation.release();
 }
 
-test "offline operation discard failures preserve handle state" {
+test "operation discard failures preserve handle state" {
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
     const operation = try runtime.operationHandle(9_999_997, .region_get_status, .region_status);
     try std.testing.expectError(error.InvalidArgument, operation.discard());
-    try std.testing.expectEqual(@as(OfflineOperationId, 9_999_997), try operation.operationId());
+    try std.testing.expectEqual(@as(OperationId, @enumFromInt(9_999_997)), try operation.id());
 
-    operation.consume();
+    operation.release();
 }
 
-test "runtime close rejects live offline operations" {
+test "runtime close rejects live operations" {
     var diagnostic_store = diagnostics.DiagnosticStore.init(std.testing.allocator);
     defer diagnostic_store.deinit();
 
@@ -2872,11 +3046,26 @@ test "runtime close rejects live offline operations" {
 
     const operation = try runtime.operationHandle(9_999_998, .region_get_status, .region_status);
     try std.testing.expectError(error.InvalidState, runtime.close());
-    try std.testing.expectEqualStrings("runtime has live offline operations", diagnostic_store.get().?.message);
+    try std.testing.expectEqualStrings("runtime has live operations", diagnostic_store.get().?.message);
 
-    operation.consume();
+    operation.release();
     try runtime.close();
     runtime_open = false;
+}
+test "runtime close preserves notification source ownership for retry" {
+    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
+    var runtime_open = true;
+    defer if (runtime_open) runtime.close() catch @panic("runtime close failed");
+
+    notification_source_close_attempts_for_testing = 0;
+    notification_source_close_for_testing = failNotificationSourceCloseOnce;
+    defer notification_source_close_for_testing = c.mln_notification_source_close;
+
+    try std.testing.expectError(error.InvalidState, runtime.close());
+    try std.testing.expectError(error.ActiveBorrow, runtime.pump(0));
+    try runtime.close();
+    runtime_open = false;
+    try std.testing.expectEqual(@as(usize, 2), notification_source_close_attempts_for_testing);
 }
 
 test "offline region snapshot destroy runs when copied output allocation fails" {
@@ -2889,7 +3078,11 @@ test "offline region snapshot destroy runs when copied output allocation fails" 
     defer runtime.close() catch @panic("runtime close failed");
 
     const operation = try runtime.startCreateOfflineRegion(std.testing.allocator, offlineTileDefinitionForTesting(), &.{});
+    defer operation.release();
     try waitForOfflineOperationForTesting(&runtime, operation);
+    var operation_diagnostic = try operation.copyDiagnostic(std.testing.allocator);
+    defer operation_diagnostic.deinit();
+    try std.testing.expectEqualStrings("", operation_diagnostic.value);
 
     var failing_allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
     snapshot_destroy_count_for_testing = 0;
@@ -2898,7 +3091,7 @@ test "offline region snapshot destroy runs when copied output allocation fails" 
 
     try std.testing.expectError(error.OutOfMemory, runtime.takeOfflineRegion(failing_allocator.allocator(), operation));
     try std.testing.expectEqual(@as(usize, 1), snapshot_destroy_count_for_testing);
-    try std.testing.expectError(error.ClosedHandle, operation.operationId());
+    _ = try operation.id();
 }
 
 test "offline region list destroy runs when copied output allocation fails" {
@@ -2911,11 +3104,13 @@ test "offline region list destroy runs when copied output allocation fails" {
     defer runtime.close() catch @panic("runtime close failed");
 
     const create_operation = try runtime.startCreateOfflineRegion(std.testing.allocator, offlineTileDefinitionForTesting(), &.{});
+    defer create_operation.release();
     try waitForOfflineOperationForTesting(&runtime, create_operation);
     var region = try runtime.takeOfflineRegion(std.testing.allocator, create_operation);
     defer region.deinit();
 
     const list_operation = try runtime.startListOfflineRegions();
+    defer list_operation.release();
     try waitForOfflineOperationForTesting(&runtime, list_operation);
 
     var failing_allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
@@ -2925,5 +3120,5 @@ test "offline region list destroy runs when copied output allocation fails" {
 
     try std.testing.expectError(error.OutOfMemory, runtime.takeOfflineRegionList(failing_allocator.allocator(), list_operation));
     try std.testing.expectEqual(@as(usize, 1), list_destroy_count_for_testing);
-    try std.testing.expectError(error.ClosedHandle, list_operation.operationId());
+    _ = try list_operation.id();
 }

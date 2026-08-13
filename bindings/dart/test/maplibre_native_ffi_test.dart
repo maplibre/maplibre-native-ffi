@@ -1052,9 +1052,23 @@ void main() {
     final cacheSizeOperation = cacheSizeRuntime.setMaximumAmbientCacheSize(
       BigInt.zero,
     );
-    expect(cacheSizeOperation.isDiscarded, isFalse);
-    cacheSizeOperation.discard();
-    expect(cacheSizeOperation.isDiscarded, isTrue);
+    expect(cacheSizeOperation.isReleased, isFalse);
+    await _waitUntil(() {
+      cacheSizeRuntime.pump();
+      return cacheSizeOperation.poll();
+    });
+    expect(cacheSizeOperation.terminalStatus, MaplibreStatus.ok);
+    expect(cacheSizeOperation.wait(timeout: Duration.zero), isTrue);
+    expect(
+      cacheSizeOperation.wait(timeout: const Duration(milliseconds: -1)),
+      isTrue,
+    );
+    expect(cacheSizeOperation.wait(), isTrue);
+    expect(cacheSizeOperation.diagnostic, isEmpty);
+    cacheSizeOperation.discardResult();
+    expect(cacheSizeOperation.isResultConsumed, isTrue);
+    cacheSizeOperation.release();
+    expect(cacheSizeOperation.isReleased, isTrue);
     cacheSizeRuntime.close();
 
     final runtime = RuntimeHandle.create();
@@ -1191,36 +1205,38 @@ void main() {
     final offlineOperation = runtime.runAmbientCacheOperation(
       AmbientCacheOperation.clear,
     );
-    expect(offlineOperation.isDiscarded, isFalse);
+    expect(offlineOperation.isReleased, isFalse);
     expect(() => runtime.close(), throwsA(isA<InvalidStateException>()));
-    RuntimeEventOfflineOperationCompleted? offlineCompletion;
     await _waitUntil(() {
       runtime.pump();
-      for (final event in runtime.drainEvents().events) {
-        final payload = event.payload;
-        if (payload is RuntimeEventOfflineOperationCompleted &&
-            identical(payload.operation, offlineOperation)) {
-          offlineCompletion = payload;
-        }
-      }
-      return offlineCompletion != null;
+      runtime.drainEvents();
+      return offlineOperation.poll();
     });
-    expect(offlineCompletion!.operation, same(offlineOperation));
-    expect(offlineCompletion!.resultStatus, MaplibreStatus.ok);
-    expect(runtime.drainEvents().events, isEmpty);
-    offlineOperation.discard();
-    expect(offlineOperation.isDiscarded, isTrue);
+    expect(offlineOperation.terminalStatus, MaplibreStatus.ok);
+    expect(offlineOperation.wait(timeout: Duration.zero), isTrue);
+    expect(offlineOperation.wait(timeout: const Duration(seconds: 1)), isTrue);
+    expect(offlineOperation.diagnostic, isEmpty);
+    offlineOperation.discardResult();
+    expect(offlineOperation.isResultConsumed, isTrue);
+    offlineOperation.release();
+    expect(offlineOperation.isReleased, isTrue);
     final offlineListOperation = runtime.listOfflineRegions();
-    expect(offlineListOperation.isDiscarded, isFalse);
+    expect(offlineListOperation.isReleased, isFalse);
     expect(
       () => offlineListOperation.takeRegionStatus(),
       throwsA(isA<InvalidStateException>()),
     );
-    offlineListOperation.discard();
+    await _waitUntil(() {
+      runtime.pump();
+      return offlineListOperation.poll();
+    });
+    expect(offlineListOperation.takeRegionList(), isEmpty);
+    expect(offlineListOperation.isResultConsumed, isTrue);
     expect(
       () => offlineListOperation.takeRegionList(),
       throwsA(isA<InvalidStateException>()),
     );
+    offlineListOperation.release();
     final offlineCreateOperation = runtime.createOfflineRegion(
       const OfflineTilePyramidRegionDefinition(
         styleUrl: 'https://example.com/style.json',
@@ -1234,8 +1250,9 @@ void main() {
       ),
       metadata: Uint8List.fromList([1, 2, 3]),
     );
-    expect(offlineCreateOperation.isDiscarded, isFalse);
-    offlineCreateOperation.discard();
+    expect(offlineCreateOperation.isReleased, isFalse);
+    offlineCreateOperation.release();
+    expect(offlineCreateOperation.isReleased, isTrue);
 
     final map = runtime.createMap();
     expect(map.isClosed, isFalse);
@@ -1926,8 +1943,7 @@ void main() {
     final sourceType = RuntimeEventSourceType.fromRawValue(0xbeef);
     final renderMode = RenderMode.fromRawValue(42);
     final renderResult = RenderResult.fromRawValue(42);
-    final operationKind = OfflineOperationKind.fromRawValue(99);
-    final resultKind = OfflineOperationResultKind.fromRawValue(100);
+
     const unknownDefinition = UnknownOfflineRegionDefinition(101);
     final ownership = OpenGLContextOwnership.fromRawValue(102);
     final clientApi = OpenGLClientApi.fromRawValue(103);
@@ -1938,8 +1954,7 @@ void main() {
     expect(renderMode.name, 'unknown(42)');
     expect(renderResult, RenderResult.fromRawValue(42));
     expect(renderResult.name, 'unknown(42)');
-    expect(operationKind.rawValue, 99);
-    expect(resultKind.rawValue, 100);
+
     expect(unknownDefinition.rawType, 101);
     expect(ownership, OpenGLContextOwnership.fromRawValue(102));
     expect(ownership.name, 'unknown(102)');

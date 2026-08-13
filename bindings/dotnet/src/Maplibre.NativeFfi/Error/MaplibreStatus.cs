@@ -21,6 +21,9 @@ public enum MaplibreStatus
     /// <summary>A native MapLibre error or C++ exception was converted to status.</summary>
     NativeError = -5,
 
+    /// <summary>The operation reached its terminal cancelled disposition.</summary>
+    Cancelled = -6,
+
     /// <summary>The loaded C ABI version is incompatible with this binding.</summary>
     AbiMismatch = -1000,
 

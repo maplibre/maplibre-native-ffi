@@ -3877,7 +3877,7 @@ fn a_second_thread_attaches_a_session_and_renders() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
-    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     // Continuous mode, so the map publishes render updates without a
     // still-image request driving them.
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();

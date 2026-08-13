@@ -213,7 +213,7 @@ Long-lived C-owned opaque handle concepts include:
 - `MapHandle`
 - `MapProjectionHandle`
 - `RenderSessionHandle`
-- `OfflineOperationHandle`
+- `OperationHandle`
 - `ResourceRequestHandle`
 
 `Handle` means the public value owns or controls an explicitly releasable native
@@ -225,8 +225,8 @@ binding; the ownership contract does not.
 ## Handle Lifetime
 
 Public handles are for values that own or control native state across calls,
-such as runtimes, maps, render sessions, offline operations, resource requests,
-and acquired texture frames. Input values, events, diagnostics, query results,
+such as runtimes, maps, render sessions, operations, resource requests, and
+acquired texture frames. Input values, events, diagnostics, query results,
 snapshots, and native-filled structs become copied language values. Native
 snapshot, result, and list handles remain internal implementation details.
 
@@ -245,6 +245,11 @@ The native handle id stays private. A binding publishes native identity only as
 a copied identity value that supports equality and hashing and carries no
 operations. Public code MUST NOT be able to obtain an operable handle from an
 identity value, a raw integer, a public field, or an ordinary constructor.
+
+Bindings MAY expose an `OperationId` as the copied, non-operable identity used
+to match a ready endpoint to an `OperationHandle`. Raw native operation handles
+remain private. `OperationId` MUST NOT poll, wait, cancel, inspect, consume, or
+release an operation.
 
 Public release follows this operation:
 
@@ -308,6 +313,22 @@ consuming or destroying the parent.
 `MapProjectionHandle` is the exception: after creation it owns a standalone
 projection snapshot. It MUST remain valid after the source map closes and MUST
 release with `mln_map_projection_destroy()`.
+
+An `OperationHandle` is a child of its runtime. Runtime release MUST reject a
+live operation before calling native runtime destruction, including an operation
+whose result was already taken or discarded.
+
+### Operation result lifetime
+
+Typed take functions and result discard consume only the completed operation's
+result. The `OperationHandle` remains live so that public code can inspect its
+terminal status and copied diagnostic afterward. The binding closes the observer
+only through explicit close or release.
+
+A failed typed take before native result ownership transfers MUST leave the
+result available for another take or discard. A successful typed take or discard
+MUST make later result consumption fail while status and diagnostic inspection
+continue to succeed.
 
 ### Handle copying
 
@@ -723,6 +744,17 @@ The wake source follows this design:
    that where the host language can express it.
 3. Signalling after the runtime is closed succeeds and does nothing.
 
+### Notification source
+
+A runtime binding MUST create one notification source for its host receiver and
+pass that source in the native runtime options. Operations and runtime events
+use the same receiver-scoped source. A binding that drains ready endpoints MUST
+release each owned ready batch after copying its endpoint view.
+
+Runtime release MUST destroy the native runtime before closing its notification
+source. Closing the source while an endpoint remains associated leaves the
+source open, so the binding MUST preserve its live state after that failure.
+
 ### Event draining
 
 The public event API is explicit: host code pumps native runtime work, then
@@ -731,27 +763,28 @@ events that the queue held, empty when it held none.
 
 The drain follows this operation:
 
-1. Initialize the native batch struct, including its `size` field, before
-   calling C.
-2. Call the C drain function on the runtime owner thread, passing the host's
-   maximum event count. The binding's default takes the whole queue.
-3. Step through the batch by the event stride that the batch reports, rather
+1. Initialize a null native batch handle.
+2. Call the C drain function from any thread, passing the host's maximum event
+   count. The binding's default takes the whole queue.
+3. Borrow the batch view from the owned batch handle.
+4. Step through the batch by the event stride that the batch reports, rather
    than by the size of the generated event struct.
-4. Copy each event's type, source type, status code, message bytes, and typed
-   payload fields before the next drain invalidates native batch storage. A
-   lifetime-checked borrowed binding MAY expose views of these fields instead. A
-   message is the batch's arena bytes at the event's own offset and length.
-5. Read a known typed payload as the union member that the payload type names,
+5. Copy each event's type, source type, status code, message bytes, and typed
+   payload fields before releasing the batch. A lifetime-checked borrowed
+   binding MAY expose views whose lifetime is bounded by the batch. A message is
+   the batch's arena bytes at the event's own offset and length.
+6. Read a known typed payload as the union member that the payload type names,
    with no size check. Preserve an unknown event or payload domain with its raw
    value and its bytes as the batch's event stride reports them.
-6. Copy the event's source id, resolve any public map wrapper for that id
+7. Copy the event's source id, resolve any public map wrapper for that id
    through binding-owned runtime state, and expose the copied id as the event's
    source identity. Constructing a public handle from the source id stays
    outside the safe public API.
-7. Apply binding-owned state updates triggered by the event before returning the
+8. Apply binding-owned state updates triggered by the event before returning the
    copied events.
-8. Return a language-owned sequence whose elements outlive the next drain, or a
-   borrowed view whose type prevents that view from surviving the next drain.
+9. Release the owned native batch.
+10. Return a language-owned sequence, or a borrowed view whose type cannot
+    outlive the batch.
 
 ### Event subscription
 
@@ -830,8 +863,8 @@ Rendering bindings expose render sessions, frame lifetimes, and readback without
 taking ownership of caller-owned backend resources.
 
 Render session calls may run on a thread other than the one that pumps the
-runtime. Events produced by rendering are still delivered by a runtime event
-drain on the runtime owner thread.
+runtime. Events produced by rendering are delivered by a runtime event drain
+from any thread.
 
 ### Render sessions
 
@@ -977,6 +1010,7 @@ that a real native failure would expose.
 | BND-041 | A failed native destroy leaves the handle live; a later successful release destroys the native handle.                                                                                                    |
 | BND-042 | A child handle retains parent owner state, and parent release fails while child handles are live.                                                                                                         |
 | BND-043 | `MapProjectionHandle` remains usable after the source map closes and then releases successfully.                                                                                                          |
+| BND-044 | Runtime release rejects a live operation child before native destruction; after explicit operation release, runtime release succeeds.                                                                     |
 | BND-045 | A released handle's id, replayed through an internal seam after a new handle of the same kind is created, reports the binding's invalid-argument error naming it stale, and the new handle keeps working. |
 | BND-047 | A handle id of one kind passed to another kind's operation through an internal seam reports the binding's invalid-argument error, and the safe public API has no expression of that call.                 |
 | BND-049 | A handle id moved to a different native thread and called there reports the binding's wrong-thread error rather than a stale-handle or closed-handle error.                                               |
@@ -1010,22 +1044,22 @@ the other isolate, which makes its id stale rather than live.
 
 ### Runtime and events
 
-| ID      | Test                                                                                                                                                                |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-080 | `pump` drives native event processing through the public runtime API, and a later drain reports an empty batch.                                                     |
-| BND-081 | Map style loading returns the expected copied map event through a drain and identifies the correct public map identity.                                             |
-| BND-082 | Event message and payload data remain valid after the next drain.                                                                                                   |
-| BND-083 | An unknown event or payload domain preserves its raw value, and an unknown payload keeps the bytes that the batch's event stride reports.                           |
-| BND-084 | Offline operation completion returns copied result data. Native take-result status failures before result ownership transfers leave the operation handle retryable. |
-| BND-085 | Offline region observation returns copied status/error events through the public runtime event model.                                                               |
-| BND-086 | A map-originated event with no provable live public map exposes no public map handle.                                                                               |
-| BND-087 | A binding steps events by the batch's reported event stride.                                                                                                        |
-| BND-088 | A parked owner thread is released by native work and by a wake source signalled from another thread, and reports a wake rather than a timeout.                      |
-| BND-089 | A pump clears the wake flag it returned on, and a wake source stays signalable and releasable after its runtime closes.                                             |
-| BND-090 | One drain reports more than one event and preserves queue order.                                                                                                    |
-| BND-091 | The default subscription parameter delivers every event type, a narrowed one delivers neither the cleared type nor a wake for it, and an unknown bit is rejected.   |
-| BND-092 | A batch invalidates at the next drain, and the values a binding copied out of it stay readable.                                                                     |
-| BND-093 | Binding-owned cleanup that a style load drives still runs while the map's subscription leaves out the style-loaded type.                                            |
+| ID      | Test                                                                                                                                                                     |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| BND-080 | `pump` drives native event processing through the public runtime API, and a later drain reports an empty batch.                                                          |
+| BND-081 | Map style loading returns the expected copied map event through a drain and identifies the correct public map identity.                                                  |
+| BND-082 | Event message and payload data remain valid after the native batch is released because the binding copied them.                                                          |
+| BND-083 | An unknown event or payload domain preserves its raw value, and an unknown payload keeps the bytes that the batch's event stride reports.                                |
+| BND-084 | Operation result take and discard preserve status and diagnostic inspection until explicit release; a failed take before ownership transfer leaves the result retryable. |
+| BND-085 | Offline region observation returns copied status/error events through the public runtime event model.                                                                    |
+| BND-086 | A map-originated event with no provable live public map exposes no public map handle.                                                                                    |
+| BND-087 | A binding steps events by the batch's reported event stride.                                                                                                             |
+| BND-088 | A parked owner thread is released by native work and by a wake source signalled from another thread, and reports a wake rather than a timeout.                           |
+| BND-089 | A pump clears the wake flag it returned on, and a wake source stays signalable and releasable after its runtime closes.                                                  |
+| BND-090 | One drain reports more than one event and preserves queue order.                                                                                                         |
+| BND-091 | The default subscription parameter delivers every event type, a narrowed one delivers neither the cleared type nor a wake for it, and an unknown bit is rejected.        |
+| BND-092 | Two owned batches remain readable independently until release, and the values a binding copied out of them remain readable afterward.                                    |
+| BND-093 | Binding-owned cleanup that a style load drives still runs while the map's subscription leaves out the style-loaded type.                                                 |
 
 ### Map, camera, projection, style, and query
 

@@ -20,7 +20,6 @@ import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
 import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_NONE
-import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT
@@ -37,7 +36,6 @@ import org.maplibre.nativeffi.internal.c.mln_offline_region_snapshot_get
 import org.maplibre.nativeffi.internal.c.mln_offline_region_status
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_camera_transition_finished
-import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_operation_completed
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_response_error
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_status
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_tile_count_limit
@@ -57,8 +55,6 @@ import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
 import org.maplibre.nativeffi.render.RenderMode
 import org.maplibre.nativeffi.resource.ResourceErrorReason
-import org.maplibre.nativeffi.runtime.OfflineOperationKind
-import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 
 /** Copies runtime event payloads out of native event storage. */
@@ -89,8 +85,6 @@ internal object RuntimeStructs {
         offlineRegionResponseError(event.payload.offline_region_response_error)
       MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT ->
         offlineRegionTileCountLimit(event.payload.offline_region_tile_count_limit)
-      MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED ->
-        offlineOperationCompleted(event.payload.offline_operation_completed)
       MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED ->
         cameraTransitionFinished(event.payload.camera_transition_finished)
       else -> unknownPayload(event, eventSize)
@@ -165,17 +159,6 @@ internal object RuntimeStructs {
     RuntimeEventPayload.OfflineRegionTileCountLimit(
       value.region_id,
       checkedLong(value.limit, "offline tile count limit"),
-    )
-
-  private fun offlineOperationCompleted(
-    value: mln_runtime_event_offline_operation_completed
-  ): RuntimeEventPayload.OfflineOperationCompleted =
-    RuntimeEventPayload.OfflineOperationCompleted(
-      uint64BitsToLong(value.operation_id),
-      OfflineOperationKind.fromNative(value.operation_kind),
-      OfflineOperationResultKind.fromNative(value.result_kind),
-      value.result_status,
-      value.found,
     )
 
   private fun cameraTransitionFinished(

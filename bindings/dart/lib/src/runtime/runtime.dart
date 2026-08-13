@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:typed_data';
 
@@ -98,18 +99,36 @@ final class RuntimeOptions {
       RuntimeEventMask(raw.mln_runtime_options_default().event_mask);
 }
 
-/// Owner-thread runtime handle for MapLibre Native work and event draining.
+/// Runtime handle for owner-thread work and any-thread event draining.
 final class RuntimeHandle {
-  RuntimeHandle._(NativeRuntime handle)
-    : _state = NativeHandleState(handle, 'RuntimeHandle');
-
+  RuntimeHandle._(NativeRuntime handle, this._notificationSource)
+    : _state = NativeHandleState(handle, 'RuntimeHandle') {
+    _notificationListener =
+        NativeCallable<raw.mln_notification_callbackFunction>.listener((
+          Pointer<Void> _,
+        ) {
+          _notificationPending = true;
+        });
+    try {
+      _check(
+        raw.mln_notification_source_set_callback(
+          _notificationSource,
+          _notificationListener.nativeFunction,
+          nullptr,
+        ),
+      );
+    } catch (_) {
+      _notificationListener.close();
+      rethrow;
+    }
+  }
   final NativeHandleState<NativeRuntime> _state;
-
-  /// Batch struct reused by every drain, so a pump loop allocates nothing.
-  Pointer<raw.mln_runtime_event_batch> _eventBatch =
-      calloc<raw.mln_runtime_event_batch>();
+  int _notificationSource;
+  late final NativeCallable<raw.mln_notification_callbackFunction>
+  _notificationListener;
+  var _notificationPending = false;
   final _maps = <int, WeakReference<MapHandle>>{};
-  final _offlineOperations = <int, WeakReference<OfflineOperationHandle>>{};
+  final _operations = <int, WeakReference<OperationHandle>>{};
   _ResourceTransformState? _resourceTransformState;
   _HttpHeaderTransformState? _httpHeaderTransformState;
   _ResourceProviderRulesState? _resourceProviderRulesState;
@@ -128,12 +147,27 @@ final class RuntimeHandle {
     // create a runtime that the failed check leaves no way to destroy.
     ensureAbiVersion();
     return withNativeArena((arena) {
+      final outSource = arena<Uint64>();
+      outSource.value = 0;
+      _check(raw.mln_notification_source_create(outSource));
+      final source = outSource.value;
       final nativeOptions = arena<raw.mln_runtime_options>();
       nativeOptions.ref = _runtimeOptionsToNative(options, arena);
+      nativeOptions.ref.notification_source = source;
       final outRuntime = arena<Uint64>();
       outRuntime.value = 0;
-      _check(raw.mln_runtime_create(nativeOptions, outRuntime));
-      return RuntimeHandle._(NativeRuntime(outRuntime.value));
+      try {
+        _check(raw.mln_runtime_create(nativeOptions, outRuntime));
+        try {
+          return RuntimeHandle._(NativeRuntime(outRuntime.value), source);
+        } catch (_) {
+          raw.mln_runtime_destroy(outRuntime.value);
+          rethrow;
+        }
+      } catch (_) {
+        raw.mln_notification_source_close(source);
+        rethrow;
+      }
     });
   }
 
@@ -144,23 +178,28 @@ final class RuntimeHandle {
 
   /// Advances this runtime, parking the owner isolate until there is work.
   ///
-  /// The default zero [timeout] drains without parking; a null timeout parks
-  /// until the wake flag is set; a negative timeout collapses to no wait.
-  /// Native work, a queued runtime event, and [WakeSource.signal] each set the
-  /// wake flag, which this call clears before returning. Drain events with
-  /// [drainEvents] after every return.
+  /// The default zero [timeout] drains without parking. A null timeout parks
+  /// until runtime work or notification-source readiness wakes the receiver.
+  /// A negative timeout collapses to no wait.
   ///
-  /// An unread event returns this call without parking, whatever [timeout] asks
-  /// for, so a host that stopped draining before the queue emptied keeps making
-  /// progress.
+  /// A queued callback-adapter record notifies through the runtime's receiver
+  /// source. Dart listener callbacks run on the owner isolate, so an unbounded
+  /// park uses short native waits while such an adapter is installed. This
+  /// gives the listener an opportunity to run without calling C from the
+  /// notification callback.
   ///
   /// A non-null, non-zero [timeout] blocks the calling isolate's event loop for
   /// the duration of the park. Acquire a [WakeSource] with [acquireWakeSource]
   /// so another isolate can release this one.
   void pump({Duration? timeout = Duration.zero}) {
-    _check(
-      raw.mln_runtime_pump(_handle.raw, _pumpTimeoutMilliseconds(timeout)),
-    );
+    final receiverNeedsTurn =
+        _resourceProviderCallbackState != null || _notificationPending;
+    final timeoutMilliseconds = timeout == null && receiverNeedsTurn
+        ? 10
+        : _pumpTimeoutMilliseconds(timeout);
+    _check(raw.mln_runtime_pump(_handle.raw, timeoutMilliseconds));
+    _drainNotificationSource();
+    _notificationPending = false;
   }
 
   /// Acquires a wake source that releases this runtime's parked owner isolate.
@@ -190,10 +229,20 @@ final class RuntimeHandle {
     if (maxEvents < 0) {
       throwInvalidArgument('maxEvents must not be negative');
     }
-    final batch = _eventBatch;
-    batch.ref = raw.mln_runtime_event_batch_default();
-    _check(raw.mln_runtime_drain_events(handle.raw, maxEvents, batch));
-    return RuntimeEventBatch._fromNative(batch.ref, this);
+    return withNativeArena((arena) {
+      final outBatch = arena<Uint64>();
+      outBatch.value = 0;
+      _check(raw.mln_runtime_drain_events(handle.raw, maxEvents, outBatch));
+      final batch = outBatch.value;
+      final view = arena<raw.mln_runtime_event_batch_view>();
+      view.ref.size = sizeOf<raw.mln_runtime_event_batch_view>();
+      try {
+        _check(raw.mln_event_batch_get(batch, view));
+        return RuntimeEventBatch._fromNative(view.ref, this);
+      } finally {
+        raw.mln_event_batch_release(batch);
+      }
+    });
   }
 
   /// Selects which runtime-originated event types this runtime queues.
@@ -294,7 +343,7 @@ final class RuntimeHandle {
 
   /// Registers or replaces a queued Dart resource provider callback.
   void setResourceProvider(ResourceProvider provider) {
-    final state = _ResourceProviderCallbackState(provider);
+    final state = _ResourceProviderCallbackState(provider, _notificationSource);
     try {
       withNativeArena((arena) {
         final nativeProvider = arena<raw.mln_resource_provider>();
@@ -325,10 +374,49 @@ final class RuntimeHandle {
     _resourceProviderCallbackState = null;
   }
 
+  void _drainNotificationSource() {
+    final readyEndpoints = withNativeArena((arena) {
+      final outBatch = arena<Uint64>();
+      outBatch.value = 0;
+      _check(
+        raw.mln_notification_source_drain_ready(_notificationSource, outBatch),
+      );
+      final batch = outBatch.value;
+      final view = arena<raw.mln_ready_batch_view>();
+      view.ref.size = sizeOf<raw.mln_ready_batch_view>();
+      try {
+        _check(raw.mln_ready_batch_get(batch, view));
+        final endpoints = <({int kind, int id})>[];
+        final first = view.ref.endpoints.cast<Uint8>();
+        for (var index = 0; index < view.ref.endpoint_count; index += 1) {
+          final endpoint = (first + index * view.ref.endpoint_size)
+              .cast<raw.mln_ready_endpoint>()
+              .ref;
+          endpoints.add((kind: endpoint.kind, id: endpoint.id));
+        }
+        return endpoints;
+      } finally {
+        raw.mln_ready_batch_release(batch);
+      }
+    });
+    final provider = _resourceProviderCallbackState;
+    if (provider == null) {
+      return;
+    }
+    for (final endpoint in readyEndpoints) {
+      if (endpoint.kind ==
+              raw
+                  .mln_notification_endpoint_kind
+                  .MLN_NOTIFICATION_ENDPOINT_ADAPTER_RESOURCE_REQUESTS
+                  .value &&
+          endpoint.id == provider.queue) {
+        provider.drain();
+      }
+    }
+  }
+
   /// Starts an ambient cache maintenance operation.
-  OfflineOperationHandle runAmbientCacheOperation(
-    AmbientCacheOperation operation,
-  ) {
+  OperationHandle runAmbientCacheOperation(AmbientCacheOperation operation) {
     return withNativeArena((arena) {
       final outOperationId = arena<Uint64>();
       _check(
@@ -338,7 +426,7 @@ final class RuntimeHandle {
           outOperationId,
         ),
       );
-      return OfflineOperationHandle._(
+      return OperationHandle._(
         this,
         outOperationId.value,
         _OfflineOperationKind.ambientCache,
@@ -351,7 +439,7 @@ final class RuntimeHandle {
   ///
   /// MapLibre evicts ambient resources to fit the new budget, so lowering it
   /// discards cached resources. Offline regions are unaffected.
-  OfflineOperationHandle setMaximumAmbientCacheSize(BigInt size) {
+  OperationHandle setMaximumAmbientCacheSize(BigInt size) {
     return withNativeArena((arena) {
       final outOperationId = arena<Uint64>();
       _check(
@@ -361,7 +449,7 @@ final class RuntimeHandle {
           outOperationId,
         ),
       );
-      return OfflineOperationHandle._(
+      return OperationHandle._(
         this,
         outOperationId.value,
         _OfflineOperationKind.setMaximumAmbientCacheSize,
@@ -371,7 +459,7 @@ final class RuntimeHandle {
   }
 
   /// Starts creating an offline region.
-  OfflineOperationHandle createOfflineRegion(
+  OperationHandle createOfflineRegion(
     OfflineRegionDefinition definition, {
     Uint8List? metadata,
   }) {
@@ -392,7 +480,7 @@ final class RuntimeHandle {
           outOperationId,
         ),
       );
-      return OfflineOperationHandle._(
+      return OperationHandle._(
         this,
         outOperationId.value,
         _OfflineOperationKind.regionCreate,
@@ -402,23 +490,22 @@ final class RuntimeHandle {
   }
 
   /// Starts getting an offline region snapshot by ID.
-  OfflineOperationHandle getOfflineRegion(int regionId) =>
-      _startOfflineOperation(
-        _OfflineOperationKind.regionGet,
-        _OfflineOperationResultKind.optionalRegion,
-        (outOperationId) {
-          _check(
-            raw.mln_runtime_offline_region_get_start(
-              _handle.raw,
-              regionId,
-              outOperationId,
-            ),
-          );
-        },
+  OperationHandle getOfflineRegion(int regionId) => _startOfflineOperation(
+    _OfflineOperationKind.regionGet,
+    _OfflineOperationResultKind.optionalRegion,
+    (outOperationId) {
+      _check(
+        raw.mln_runtime_offline_region_get_start(
+          _handle.raw,
+          regionId,
+          outOperationId,
+        ),
       );
+    },
+  );
 
   /// Starts listing offline region snapshots.
-  OfflineOperationHandle listOfflineRegions() => _startOfflineOperation(
+  OperationHandle listOfflineRegions() => _startOfflineOperation(
     _OfflineOperationKind.regionsList,
     _OfflineOperationResultKind.regionList,
     (outOperationId) {
@@ -429,7 +516,7 @@ final class RuntimeHandle {
   );
 
   /// Starts merging offline regions from another database path.
-  OfflineOperationHandle mergeOfflineRegionDatabase(String sideDatabasePath) {
+  OperationHandle mergeOfflineRegionDatabase(String sideDatabasePath) {
     return withNativeArena((arena) {
       final nativePath = nativeUtf8CString(sideDatabasePath, arena);
       final outOperationId = arena<Uint64>();
@@ -440,7 +527,7 @@ final class RuntimeHandle {
           outOperationId,
         ),
       );
-      return OfflineOperationHandle._(
+      return OperationHandle._(
         this,
         outOperationId.value,
         _OfflineOperationKind.regionsMergeDatabase,
@@ -450,7 +537,7 @@ final class RuntimeHandle {
   }
 
   /// Starts updating opaque offline region metadata.
-  OfflineOperationHandle updateOfflineRegionMetadata(
+  OperationHandle updateOfflineRegionMetadata(
     int regionId,
     Uint8List metadata,
   ) {
@@ -466,7 +553,7 @@ final class RuntimeHandle {
           outOperationId,
         ),
       );
-      return OfflineOperationHandle._(
+      return OperationHandle._(
         this,
         outOperationId.value,
         _OfflineOperationKind.regionUpdateMetadata,
@@ -476,7 +563,7 @@ final class RuntimeHandle {
   }
 
   /// Starts getting the current offline region status.
-  OfflineOperationHandle getOfflineRegionStatus(int regionId) =>
+  OperationHandle getOfflineRegionStatus(int regionId) =>
       _startOfflineOperation(
         _OfflineOperationKind.regionGetStatus,
         _OfflineOperationResultKind.regionStatus,
@@ -492,26 +579,24 @@ final class RuntimeHandle {
       );
 
   /// Starts enabling or disabling offline region observation.
-  OfflineOperationHandle setOfflineRegionObserved(
-    int regionId,
-    bool observed,
-  ) => _startOfflineOperation(
-    _OfflineOperationKind.regionSetObserved,
-    _OfflineOperationResultKind.none,
-    (outOperationId) {
-      _check(
-        raw.mln_runtime_offline_region_set_observed_start(
-          _handle.raw,
-          regionId,
-          observed,
-          outOperationId,
-        ),
+  OperationHandle setOfflineRegionObserved(int regionId, bool observed) =>
+      _startOfflineOperation(
+        _OfflineOperationKind.regionSetObserved,
+        _OfflineOperationResultKind.none,
+        (outOperationId) {
+          _check(
+            raw.mln_runtime_offline_region_set_observed_start(
+              _handle.raw,
+              regionId,
+              observed,
+              outOperationId,
+            ),
+          );
+        },
       );
-    },
-  );
 
   /// Starts changing an offline region's download state.
-  OfflineOperationHandle setOfflineRegionDownloadState(
+  OperationHandle setOfflineRegionDownloadState(
     int regionId,
     OfflineRegionDownloadState state,
   ) => _startOfflineOperation(
@@ -530,7 +615,7 @@ final class RuntimeHandle {
   );
 
   /// Starts invalidating cached resources for an offline region.
-  OfflineOperationHandle invalidateOfflineRegion(int regionId) =>
+  OperationHandle invalidateOfflineRegion(int regionId) =>
       _startOfflineOperation(
         _OfflineOperationKind.regionInvalidate,
         _OfflineOperationResultKind.none,
@@ -546,22 +631,21 @@ final class RuntimeHandle {
       );
 
   /// Starts deleting an offline region.
-  OfflineOperationHandle deleteOfflineRegion(int regionId) =>
-      _startOfflineOperation(
-        _OfflineOperationKind.regionDelete,
-        _OfflineOperationResultKind.none,
-        (outOperationId) {
-          _check(
-            raw.mln_runtime_offline_region_delete_start(
-              _handle.raw,
-              regionId,
-              outOperationId,
-            ),
-          );
-        },
+  OperationHandle deleteOfflineRegion(int regionId) => _startOfflineOperation(
+    _OfflineOperationKind.regionDelete,
+    _OfflineOperationResultKind.none,
+    (outOperationId) {
+      _check(
+        raw.mln_runtime_offline_region_delete_start(
+          _handle.raw,
+          regionId,
+          outOperationId,
+        ),
       );
+    },
+  );
 
-  OfflineOperationHandle _startOfflineOperation(
+  OperationHandle _startOfflineOperation(
     _OfflineOperationKind kind,
     _OfflineOperationResultKind resultKind,
     void Function(Pointer<Uint64> outOperationId) start,
@@ -569,12 +653,7 @@ final class RuntimeHandle {
     return withNativeArena((arena) {
       final outOperationId = arena<Uint64>();
       start(outOperationId);
-      return OfflineOperationHandle._(
-        this,
-        outOperationId.value,
-        kind,
-        resultKind,
-      );
+      return OperationHandle._(this, outOperationId.value, kind, resultKind);
     });
   }
 
@@ -590,39 +669,42 @@ final class RuntimeHandle {
     _maps.remove(id);
   }
 
-  void _registerOfflineOperation(OfflineOperationHandle operation) {
-    _offlineOperations[operation._id] = WeakReference(operation);
+  void _registerOperation(OperationHandle operation) {
+    _operations[operation._id] = WeakReference(operation);
   }
 
-  void _unregisterOfflineOperationId(int id) {
-    _offlineOperations.remove(id);
+  void _unregisterOperationId(int id) {
+    _operations.remove(id);
   }
 
   /// Explicitly destroys this runtime.
   void close() {
-    final collectedOperationIds = _offlineOperations.entries
+    final collectedOperationIds = _operations.entries
         .where((entry) => entry.value.target == null)
         .map((entry) => entry.key)
         .toList(growable: false);
     for (final operationId in collectedOperationIds) {
-      _check(
-        raw.mln_runtime_offline_operation_discard(_handle.raw, operationId),
-      );
-      _offlineOperations.remove(operationId);
+      raw.mln_operation_release(operationId);
+      _operations.remove(operationId);
     }
-    if (_offlineOperations.isNotEmpty) {
+    if (_operations.isNotEmpty) {
       throwInvalidState(
-        'RuntimeHandle has ${_offlineOperations.length} live offline '
-        'operation(s); take or discard every result before closing',
+        'RuntimeHandle has ${_operations.length} live operation(s); '
+        'release every operation before closing',
       );
     }
     _state.close(
       (handle) => raw.mln_runtime_destroy(handle.raw),
       _c.threadLastErrorMessage,
     );
-    if (_eventBatch != nullptr) {
-      calloc.free(_eventBatch);
-      _eventBatch = nullptr;
+    _check(raw.mln_notification_source_clear_callback(_notificationSource));
+    _resourceProviderCallbackState?.retire();
+    _resourceProviderCallbackState = null;
+    final source = _notificationSource;
+    if (source != 0) {
+      _check(raw.mln_notification_source_close(source));
+      _notificationSource = 0;
+      _notificationListener.close();
     }
     _resourceTransformState?.close();
     _resourceTransformState = null;
@@ -630,8 +712,6 @@ final class RuntimeHandle {
     _httpHeaderTransformState = null;
     _resourceProviderRulesState?.close();
     _resourceProviderRulesState = null;
-    _resourceProviderCallbackState?.retire();
-    _resourceProviderCallbackState = null;
   }
 }
 
@@ -697,7 +777,7 @@ final class RuntimeEventBatch {
   }) : events = List.unmodifiable(events);
 
   factory RuntimeEventBatch._fromNative(
-    raw.mln_runtime_event_batch batch,
+    raw.mln_runtime_event_batch_view batch,
     RuntimeHandle runtime,
   ) {
     final eventSize = batch.event_size;
@@ -760,7 +840,7 @@ final class RuntimeEventMask {
   static const offlineRegionStatusChanged = RuntimeEventMask(1 << 19);
   static const offlineRegionResponseError = RuntimeEventMask(1 << 20);
   static const offlineRegionTileCountLimitExceeded = RuntimeEventMask(1 << 21);
-  static const offlineOperationCompleted = RuntimeEventMask(1 << 22);
+
   static const mapCameraTransitionFinished = RuntimeEventMask(1 << 23);
 
   static const _mapEventBits =
@@ -783,8 +863,7 @@ final class RuntimeEventMask {
       (1 << 17) |
       (1 << 18) |
       (1 << 23);
-  static const _runtimeEventBits =
-      (1 << 19) | (1 << 20) | (1 << 21) | (1 << 22);
+  static const _runtimeEventBits = (1 << 19) | (1 << 20) | (1 << 21);
 
   /// Selects every map-originated event type this binding names.
   static const allMapEvents = RuntimeEventMask(_mapEventBits);
@@ -845,7 +924,7 @@ final class RuntimeEvent {
       source: RuntimeEventSource._fromNative(value, runtime),
       code: value.code,
       payloadType: value.payload_type,
-      payload: RuntimeEventPayload._fromNative(event, eventSize, runtime),
+      payload: RuntimeEventPayload._fromNative(event, eventSize),
       message: _copyNativeString(
         (messages + value.message_offset).cast<Void>(),
         value.message_size,
@@ -880,7 +959,7 @@ final class RuntimeEvent {
 
 /// Decodes a synthesized batch through the production decoder for tests.
 RuntimeEventBatch decodeRuntimeEventBatchForTesting(
-  raw.mln_runtime_event_batch batch,
+  raw.mln_runtime_event_batch_view batch,
   RuntimeHandle runtime,
 ) => RuntimeEventBatch._fromNative(batch, runtime);
 
@@ -948,10 +1027,7 @@ final class RuntimeEventType {
     21,
     'offlineRegionTileCountLimitExceeded',
   );
-  static const offlineOperationCompleted = RuntimeEventType._(
-    22,
-    'offlineOperationCompleted',
-  );
+
   static const mapCameraTransitionFinished = RuntimeEventType._(
     23,
     'mapCameraTransitionFinished',
@@ -979,7 +1055,7 @@ final class RuntimeEventType {
     19 => offlineRegionStatusChanged,
     20 => offlineRegionResponseError,
     21 => offlineRegionTileCountLimitExceeded,
-    22 => offlineOperationCompleted,
+
     23 => mapCameraTransitionFinished,
     _ => RuntimeEventType._(rawValue, 'unknown($rawValue)'),
   };
@@ -1186,88 +1262,6 @@ final class TileOperation {
   final String name;
 }
 
-/// Offline operation kind reported by runtime events.
-final class OfflineOperationKind {
-  const OfflineOperationKind._(this.rawValue, this.name);
-
-  static const ambientCache = OfflineOperationKind._(1, 'ambientCache');
-  static const regionCreate = OfflineOperationKind._(2, 'regionCreate');
-  static const regionGet = OfflineOperationKind._(3, 'regionGet');
-  static const regionsList = OfflineOperationKind._(4, 'regionsList');
-  static const regionsMergeDatabase = OfflineOperationKind._(
-    5,
-    'regionsMergeDatabase',
-  );
-  static const regionUpdateMetadata = OfflineOperationKind._(
-    6,
-    'regionUpdateMetadata',
-  );
-  static const regionGetStatus = OfflineOperationKind._(7, 'regionGetStatus');
-  static const regionSetObserved = OfflineOperationKind._(
-    8,
-    'regionSetObserved',
-  );
-  static const regionSetDownloadState = OfflineOperationKind._(
-    9,
-    'regionSetDownloadState',
-  );
-  static const regionInvalidate = OfflineOperationKind._(
-    10,
-    'regionInvalidate',
-  );
-  static const regionDelete = OfflineOperationKind._(11, 'regionDelete');
-  static const setMaximumAmbientCacheSize = OfflineOperationKind._(
-    12,
-    'setMaximumAmbientCacheSize',
-  );
-
-  factory OfflineOperationKind.fromRawValue(int rawValue) => switch (rawValue) {
-    1 => ambientCache,
-    2 => regionCreate,
-    3 => regionGet,
-    4 => regionsList,
-    5 => regionsMergeDatabase,
-    6 => regionUpdateMetadata,
-    7 => regionGetStatus,
-    8 => regionSetObserved,
-    9 => regionSetDownloadState,
-    10 => regionInvalidate,
-    11 => regionDelete,
-    12 => setMaximumAmbientCacheSize,
-    _ => OfflineOperationKind._(rawValue, 'unknown($rawValue)'),
-  };
-
-  final int rawValue;
-  final String name;
-}
-
-/// Offline operation result kind reported by runtime events.
-final class OfflineOperationResultKind {
-  const OfflineOperationResultKind._(this.rawValue, this.name);
-
-  static const none = OfflineOperationResultKind._(0, 'none');
-  static const region = OfflineOperationResultKind._(1, 'region');
-  static const optionalRegion = OfflineOperationResultKind._(
-    2,
-    'optionalRegion',
-  );
-  static const regionList = OfflineOperationResultKind._(3, 'regionList');
-  static const regionStatus = OfflineOperationResultKind._(4, 'regionStatus');
-
-  factory OfflineOperationResultKind.fromRawValue(int rawValue) =>
-      switch (rawValue) {
-        0 => none,
-        1 => region,
-        2 => optionalRegion,
-        3 => regionList,
-        4 => regionStatus,
-        _ => OfflineOperationResultKind._(rawValue, 'unknown($rawValue)'),
-      };
-
-  final int rawValue;
-  final String name;
-}
-
 /// Typed runtime event payload copied into Dart-owned values.
 sealed class RuntimeEventPayload {
   const RuntimeEventPayload(this.rawPayloadType);
@@ -1275,7 +1269,6 @@ sealed class RuntimeEventPayload {
   factory RuntimeEventPayload._fromNative(
     Pointer<raw.mln_runtime_event> event,
     int eventSize,
-    RuntimeHandle runtime,
   ) {
     final rawPayloadType = event.ref.payload_type;
     final payload = event.ref.payload;
@@ -1291,10 +1284,8 @@ sealed class RuntimeEventPayload {
       7 => _offlineRegionTileCountLimitPayload(
         payload.offline_region_tile_count_limit,
       ),
-      8 => _offlineOperationCompletedPayload(
-        payload.offline_operation_completed,
-        runtime,
-      ),
+      // Offline operation completion is observed through the operation handle,
+      // not through the runtime event queue.
       9 => _cameraTransitionFinishedPayload(payload.camera_transition_finished),
       _ => RuntimeEventPayloadUnknown(
         rawPayloadType,
@@ -1388,34 +1379,6 @@ final class RuntimeEventOfflineRegionTileCountLimit
   final BigInt limit;
 }
 
-/// Offline operation completion event payload.
-final class RuntimeEventOfflineOperationCompleted extends RuntimeEventPayload {
-  const RuntimeEventOfflineOperationCompleted({
-    required this.operationId,
-    required this.operation,
-    required this.operationKind,
-    required this.rawOperationKind,
-    required this.resultKind,
-    required this.rawResultKind,
-    required this.resultStatus,
-    required this.rawResultStatus,
-    required this.found,
-  }) : super(8);
-
-  /// Identity of the operation that completed.
-  final int operationId;
-
-  /// Matching live operation, or null when it is no longer tracked.
-  final OfflineOperationHandle? operation;
-  final OfflineOperationKind operationKind;
-  final int rawOperationKind;
-  final OfflineOperationResultKind resultKind;
-  final int rawResultKind;
-  final MaplibreStatus resultStatus;
-  final int rawResultStatus;
-  final bool found;
-}
-
 /// Camera-transition-finished event payload.
 final class RuntimeEventCameraTransitionFinished extends RuntimeEventPayload {
   const RuntimeEventCameraTransitionFinished({required this.transitionId})
@@ -1484,21 +1447,6 @@ RuntimeEventPayload _offlineRegionTileCountLimitPayload(
 ) => RuntimeEventOfflineRegionTileCountLimit(
   regionId: value.region_id,
   limit: uint64FromNative(value.limit),
-);
-
-RuntimeEventPayload _offlineOperationCompletedPayload(
-  raw.mln_runtime_event_offline_operation_completed value,
-  RuntimeHandle runtime,
-) => RuntimeEventOfflineOperationCompleted(
-  operationId: value.operation_id,
-  operation: runtime._offlineOperations[value.operation_id]?.target,
-  operationKind: OfflineOperationKind.fromRawValue(value.operation_kind),
-  rawOperationKind: value.operation_kind,
-  resultKind: OfflineOperationResultKind.fromRawValue(value.result_kind),
-  rawResultKind: value.result_kind,
-  resultStatus: MaplibreStatus.fromNativeStatusCode(value.result_status),
-  rawResultStatus: value.result_status,
-  found: value.found,
 );
 
 RuntimeEventPayload _cameraTransitionFinishedPayload(

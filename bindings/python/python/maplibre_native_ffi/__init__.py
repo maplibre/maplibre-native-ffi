@@ -10,6 +10,7 @@ from ._global import (
     supported_render_backends,
 )
 from .errors import (
+    CancelledError,
     InvalidArgumentError,
     InvalidStateError,
     MaplibreError,
@@ -20,6 +21,7 @@ from .errors import (
     WrongThreadError,
 )
 from .map import MapHandle, MapMode, MapOptions
+from .offline import OperationHandle
 from .render import (
     FrameOpenGLTextureName,
     NativePointer,
@@ -55,6 +57,7 @@ __all__ = [
     "EXPECTED_C_ABI_VERSION",
     "CameraChangeMode",
     "CameraTransitionFinishedPayload",
+    "CancelledError",
     "FrameOpenGLTextureName",
     "InvalidArgumentError",
     "InvalidStateError",
@@ -67,6 +70,7 @@ __all__ = [
     "NativePointer",
     "NetworkStatus",
     "OpenGLContextProvider",
+    "OperationHandle",
     "RenderBackend",
     "RenderFramePayload",
     "RenderMapPayload",

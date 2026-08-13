@@ -192,16 +192,19 @@ private func makeMap(_ runtime: RuntimeHandle) throws -> MapHandle {
       #expect(native.pointee.event_mask == 0)
     }
 
-  try RuntimeOptions().nativeInput.withNativeOptions { native in
+  try RuntimeOptions().nativeInput.withNativeOptions(notificationSource: 1) {
+    native in
     #expect(
       native.pointee.event_mask == mln_runtime_options_default().event_mask
     )
+    #expect(native.pointee.notification_source == 1)
   }
   try RuntimeOptions(eventMask: .allRuntimeEvents).nativeInput
-    .withNativeOptions { native in
+    .withNativeOptions(notificationSource: 1) { native in
       #expect(
         native.pointee.event_mask == RuntimeEventMask.allRuntimeEvents.rawValue
       )
+      #expect(native.pointee.notification_source == 1)
     }
 }
 
@@ -365,13 +368,13 @@ private func makeMap(_ runtime: RuntimeHandle) throws -> MapHandle {
   try runtime.setEventMask(runtimeMask)
   let readBackRuntimeMask = try runtime.eventMask
   #expect(readBackRuntimeMask == runtimeMask)
-  #expect(readBackRuntimeMask.contains(.offlineOperationCompleted))
   #expect(!readBackRuntimeMask.contains(.offlineRegionStatusChanged))
 }
 
-/// The drain and both mask setters are owner-thread calls, and the C API says
-/// so rather than reading queue state from the wrong thread.
-@Test func drainingAndMaskingFromAnotherThreadReportWrongThread() throws {
+/// Event drains are any-thread. The mask setters remain owner-thread calls.
+@Test func drainingIsAnyThreadAndMaskingFromAnotherThreadReportsWrongThread()
+  throws
+{
   let runtime = try makeRuntime()
   defer { try? runtime.close() }
   let map = try makeMap(runtime)
@@ -379,10 +382,11 @@ private func makeMap(_ runtime: RuntimeHandle) throws -> MapHandle {
 
   let liveRuntime = try runtime.requireLiveHandle()
   let liveMap = try map.requireLiveHandle()
+  let drainFailure = failureFromAnotherThread {
+    _ = try NativeRuntime.drainEvents(liveRuntime, maxEvents: 0)
+  }
+  #expect(drainFailure == nil)
   let failures = [
-    failureFromAnotherThread {
-      _ = try NativeRuntime.drainEvents(liveRuntime, maxEvents: 0)
-    },
     failureFromAnotherThread {
       try NativeRuntime.setEventMask(liveRuntime, mask: 0)
     },
