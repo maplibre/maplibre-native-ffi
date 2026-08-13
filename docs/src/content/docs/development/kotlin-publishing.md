@@ -74,12 +74,17 @@ link requirements for that target and backend. The final application links the
 archive without acquiring a separate MapLibre Native FFI shared library or
 framework.
 
+An Android runtime KLIB cannot place JVM bytecode in its host APK. The host's
+packaging module depends on `maplibre-native-ffi-android-platform`, which
+carries the Rustls platform verifier classes, consumer keep rule, and licenses
+without a second native library.
+
 The native runtime publications are OpenGL and Vulkan for Android arm64, Android
 x64, Linux arm64, Linux x64, and macOS arm64, plus Metal for macOS arm64, iOS
 arm64, and the iOS arm64 simulator. Each published Kotlin/Native target has a
 matching runtime variant. A Linux x64 host cross-compiles the Linux arm64
-publications because Kotlin/Native does not run on Linux arm64 hosts. Publication
-compiles and links the arm64 test binary without executing it.
+publications because Kotlin/Native does not run on Linux arm64 hosts.
+Publication compiles and links the arm64 test binary without executing it.
 
 The Kotlin/Native Linux toolchain is the tightest consumer of the Linux archive.
 Its sysroot supplies glibc 2.19 and GCC 8.3, and it statically links its own

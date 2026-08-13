@@ -80,10 +80,7 @@ fun nativeTargets(backend: MaplibreRuntimeBackend): Map<String, NativeTargetConf
             listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
           ),
         )
-        put(
-          "macosArm64",
-          NativeTargetConfiguration("macos-${backend.id}.def", "macos-arm64"),
-        )
+        put("macosArm64", NativeTargetConfiguration("macos-${backend.id}.def", "macos-arm64"))
       }
 
     MaplibreRuntimeBackend.METAL ->
