@@ -211,6 +211,14 @@ depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 [tasks.build]
 description = "Configure, build, and install a native CMake preset."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+run = [
+  { task = "//:build-preset", args = ["{{usage.preset}}"] },
+  { task = "//:select-clangd-preset", args = ["{{usage.preset}}"] },
+]
+
+[tasks.build-preset]
+hide = true
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 sources = [
   ".mise/bin/sync-rustls-platform-verifier",
   "CMakeLists.txt",
@@ -239,6 +247,19 @@ run = [
   '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"',
   'cmake --install "$MISE_MONOREPO_ROOT/build/$usage_preset" --component loader',
 ]
+
+[tasks.select-clangd-preset]
+hide = true
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+run = '''
+compile_commands_dir="$MISE_MONOREPO_ROOT/build/clangd"
+compile_commands="$compile_commands_dir/compile_commands.json"
+cmake -E make_directory "$compile_commands_dir"
+compile_commands_tmp="$(mktemp "$compile_commands.XXXXXX")"
+trap 'rm -f "$compile_commands_tmp"' EXIT
+cmake -E copy "$MISE_MONOREPO_ROOT/build/$usage_preset/compile_commands.json" "$compile_commands_tmp"
+mv -f "$compile_commands_tmp" "$compile_commands"
+'''
 
 [tasks.check-cross-sdk]
 description = "Verify the SDK a cross-compilation preset builds against is available."
