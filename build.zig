@@ -349,17 +349,20 @@ pub fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
     };
 }
 
-pub fn isIosSimulator(target: std.Build.ResolvedTarget) bool {
-    return target.result.os.tag == .ios and target.result.abi == .simulator;
+pub fn isAppleMobile(target: std.Build.ResolvedTarget) bool {
+    return switch (target.result.os.tag) {
+        .ios, .tvos => true,
+        else => false,
+    };
 }
 
-pub fn isIos(target: std.Build.ResolvedTarget) bool {
-    return target.result.os.tag == .ios;
+pub fn isAppleSimulator(target: std.Build.ResolvedTarget) bool {
+    return isAppleMobile(target) and target.result.abi == .simulator;
 }
 
 pub fn testOptimize(target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) std.builtin.OptimizeMode {
-    // Zig Debug iOS tests hit Mach-O/debug-info linker limits in this dependency graph.
-    if (isIos(target) and optimize == .Debug) return .ReleaseSafe;
+    // Zig Debug Apple-mobile tests hit Mach-O/debug-info linker limits in this dependency graph.
+    if (isAppleMobile(target) and optimize == .Debug) return .ReleaseSafe;
     return optimize;
 }
 
@@ -477,14 +480,12 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
     });
     const link_dirs = &.{installPath(b, options.native_install_dir, "lib")};
     const runtime_library_dirs = &.{nativeRuntimeDir(b, options.native_install_dir, options.target)};
-    if (options.target.result.os.tag == .ios and !isIosSimulator(options.target)) {
+    if (isAppleMobile(options.target) and !isAppleSimulator(options.target)) {
         addLibraryPaths(module_, link_dirs);
         linkSystemLibraries(module_, staticIosLinkLibraries());
-        if (options.target.result.os.tag == .ios) {
-            const system_root = options.system_root orelse
-                @panic("iOS builds require -Dsystem-root=<path-to-iOS-SDK>");
-            module_.addObjectFile(.{ .cwd_relative = b.pathJoin(&.{ system_root.getPath(b), "usr", "lib", "libc++.tbd" }) });
-        }
+        const system_root = options.system_root orelse
+            @panic("iOS and tvOS device builds require -Dsystem-root=<path-to-SDK>");
+        module_.addObjectFile(.{ .cwd_relative = b.pathJoin(&.{ system_root.getPath(b), "usr", "lib", "libc++.tbd" }) });
         linkFrameworks(module_, staticIosFrameworks(options.render_backend));
     } else if (options.target.result.os.tag == .windows) {
         module_.addObjectFile(installPath(b, options.native_install_dir, "lib/maplibre-native-c.lib"));
@@ -552,9 +553,9 @@ fn addTestCompile(b: *std.Build, options: BuildOptions, root_source_file: std.Bu
             .target = options.target,
             .optimize = options.optimize,
         }),
-        .use_lld = if (isIos(options.target)) false else null,
+        .use_lld = if (isAppleMobile(options.target)) false else null,
     });
-    if (isIos(options.target)) {
+    if (isAppleMobile(options.target)) {
         tests.root_module.addCSourceFile(.{ .file = b.path("src/zig_test_support/ios_simulator_dyld_stub.m") });
     }
     linkMaplibreNativeC(b, tests.root_module, repoLinkOptions(options));
@@ -589,7 +590,7 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *s
         }
     }
     if (options.render_backend == .metal) {
-        if (options.target.result.os.tag == .ios) {
+        if (isAppleMobile(options.target)) {
             tests.root_module.addCSourceFile(.{ .file = b.path("bindings/zig/tests/metal_support_ios.m") });
             tests.root_module.linkSystemLibrary("objc", .{});
             tests.root_module.linkFramework("Foundation", .{});
@@ -608,12 +609,16 @@ pub fn addTestRunStep(
     target: std.Build.ResolvedTarget,
     simulator_runner: std.Build.LazyPath,
 ) *std.Build.Step.Run {
-    if (isIosSimulator(target)) {
+    if (isAppleSimulator(target)) {
         const run_tests = b.addSystemCommand(&.{
             "bash",
             simulator_runner.getPath(b),
         });
         run_tests.addArtifactArg(tests);
+        run_tests.setEnvironmentVariable(
+            "MLN_FFI_SIMULATOR_RUNTIME",
+            if (target.result.os.tag == .tvos) "tvOS" else "iOS",
+        );
         return run_tests;
     }
 

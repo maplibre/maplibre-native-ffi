@@ -28,8 +28,8 @@ zig build --build-file ../../build.zig \
 
 [tasks.test]
 extends = "ffi:preset"
-# The preset selects the runner: an iOS simulator preset spawns the suite on a
-# simulator, and host presets run in process.
+# The preset selects the runner: an iOS or tvOS simulator preset spawns the
+# suite on a simulator, and host presets run in process.
 run = '''
 case "$usage_preset" in
   android-x64-*)
@@ -55,8 +55,19 @@ case "$usage_preset" in
       --libc "$native_install_dir/share/maplibre-native-c/zig-libc" \
       --test-timeout 120s --summary all --verbose
     ;;
-  ios-*)
-    echo "The Zig binding tests need a runnable target; test an ios-simulator preset instead of $usage_preset." >&2
+  tvos-simulator-*)
+    native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+    mise run //:tvos-simulator:boot
+    exec zig build test --build-file ../../build.zig \
+      -Dtarget=aarch64-tvos-simulator \
+      -Dnative-install-dir="$native_install_dir" \
+      -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
+      -Dsystem-root="$(xcrun --sdk appletvsimulator --show-sdk-path)" \
+      --libc "$native_install_dir/share/maplibre-native-c/zig-libc" \
+      --test-timeout 120s --summary all --verbose
+    ;;
+  ios-* | tvos-*)
+    echo "The Zig binding tests need a runnable target; test an ios-simulator or tvos-simulator preset instead of $usage_preset." >&2
     exit 2
     ;;
 esac
