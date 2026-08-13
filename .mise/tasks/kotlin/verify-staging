@@ -199,9 +199,14 @@ def verify_metadata(root: pathlib.Path, expected_version: str | None) -> None:
             available_at = variant.get("available-at")
             if available_at is None:
                 continue
-            target = next(
-                (name for name in target_modules if variant["name"].startswith(name)),
-                None,
+            target = max(
+                (
+                    name
+                    for name in target_modules
+                    if variant["name"].startswith(name)
+                ),
+                key=len,
+                default=None,
             )
             if target is None:
                 raise SystemExit(

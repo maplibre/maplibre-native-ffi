@@ -73,8 +73,8 @@ Take one runtime module:
 - `org.maplibre.nativeffi:maplibre-native-ffi-runtime-metal`
 - `org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan`
 
-On Android, call `MaplibreAndroid.initialize(context)` before you create a
-runtime, as [Android](#android) describes.
+On Android, initialize platform services before you create a runtime, as
+[Android](#android) describes.
 
 For the snapshot channel, add the Maven snapshot repository and take the
 snapshot version of both modules. The runtime modules and Android
@@ -278,7 +278,9 @@ implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:0.2026
 Initialize the platform once before you create a runtime, passing an
 `android.content.Context`. Every binding exposes this call under its own name.
 Android HTTPS requests validate against the app's trust policy from that point
-on.
+on. Kotlin/JVM hosts call `MaplibreAndroid.initialize(context)`. Kotlin/Native
+hosts call `MaplibreAndroid.initialize(jniEnv, context)` with JNI handles from
+the host.
 
 ### iOS
 
