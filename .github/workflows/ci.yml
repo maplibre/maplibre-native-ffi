@@ -1038,6 +1038,9 @@ jobs:
       - run: mise run //bindings/zig:test android-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/python:test android-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/dart:build:mobile android-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
