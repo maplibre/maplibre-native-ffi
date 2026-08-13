@@ -56,6 +56,8 @@ prepare_native_inputs() {
         macos-arm64-metal
         ios-arm64-metal
         ios-simulator-arm64-metal
+        tvos-arm64-metal
+        tvos-simulator-arm64-metal
         windows-x64-wgl
         windows-arm64-wgl
         windows-x64-vulkan
@@ -196,6 +198,8 @@ publish_apple_leaves() {
   local metal=(
     -Pmaplibre.runtime.metal.iosArm64.installDir="$install_root/ios-arm64-metal"
     -Pmaplibre.runtime.metal.iosSimulatorArm64.installDir="$install_root/ios-simulator-arm64-metal"
+    -Pmaplibre.runtime.metal.tvosArm64.installDir="$install_root/tvos-arm64-metal"
+    -Pmaplibre.runtime.metal.tvosSimulatorArm64.installDir="$install_root/tvos-simulator-arm64-metal"
     -Pmaplibre.runtime.metal.macosArm64.installDir="$install_root/macos-arm64-metal"
     -Pmaplibre.runtime.metal.jvm.natives-macos-arm64.installDir="$install_root/macos-arm64-metal"
   )
@@ -203,7 +207,7 @@ publish_apple_leaves() {
   publish_tasks \
     :bindings:kotlin \
     "$repository" \
-    Jvm MacosArm64 IosArm64 IosSimulatorArm64 -- \
+    Jvm MacosArm64 IosArm64 IosSimulatorArm64 TvosArm64 TvosSimulatorArm64 -- \
     "$@"
 
   publish_tasks \
@@ -223,7 +227,7 @@ publish_apple_leaves() {
   publish_tasks \
     :bindings:kotlin:runtimes:metal \
     "$repository" \
-    Jvm MacosArm64 IosArm64 IosSimulatorArm64 -- \
+    Jvm MacosArm64 IosArm64 IosSimulatorArm64 TvosArm64 TvosSimulatorArm64 -- \
     "$@" \
     "${metal[@]}"
 }
@@ -244,6 +248,8 @@ publish_apple_roots() {
   local metal=(
     -Pmaplibre.runtime.metal.iosArm64.installDir="$install_root/ios-arm64-metal"
     -Pmaplibre.runtime.metal.iosSimulatorArm64.installDir="$install_root/ios-simulator-arm64-metal"
+    -Pmaplibre.runtime.metal.tvosArm64.installDir="$install_root/tvos-arm64-metal"
+    -Pmaplibre.runtime.metal.tvosSimulatorArm64.installDir="$install_root/tvos-simulator-arm64-metal"
     -Pmaplibre.runtime.metal.macosArm64.installDir="$install_root/macos-arm64-metal"
   )
 
