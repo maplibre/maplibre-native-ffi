@@ -951,6 +951,32 @@ internal object JavaCppRenderStructs {
   fun renderedQueryGeometryType(value: RenderedQueryGeometry): Int =
     RenderedQueryGeometryScope(value).use { it.geometry.type() }
 
+  fun featureStateSelectorSnapshot(value: FeatureStateSelector): FeatureStateSelectorSnapshot =
+    FeatureStateSelectorScope(value).use {
+      val fields = it.selector.fields()
+      FeatureStateSelectorSnapshot(
+        fields,
+        stringView(it.selector.source_id()),
+        if ((fields and MaplibreNativeC.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID) != 0)
+          stringView(it.selector.source_layer_id())
+        else null,
+        if ((fields and MaplibreNativeC.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID) != 0)
+          stringView(it.selector.feature_id())
+        else null,
+        if ((fields and MaplibreNativeC.MLN_FEATURE_STATE_SELECTOR_STATE_KEY) != 0)
+          stringView(it.selector.state_key())
+        else null,
+      )
+    }
+
+  data class FeatureStateSelectorSnapshot(
+    val fields: Int,
+    val sourceId: String,
+    val sourceLayerId: String?,
+    val featureId: String?,
+    val stateKey: String?,
+  )
+
   fun textureImageInfoSnapshot(
     width: Int,
     height: Int,
