@@ -908,6 +908,9 @@ jobs:
           mise run install-native-package
           tvos-simulator-arm64-metal
           build/packages/native/dist/maplibre-native-c-tvos-simulator-arm64-metal.tar.gz
+      - run: mise run //bindings/zig:test tvos-simulator-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

@@ -99,11 +99,12 @@ Requirements:
   process, runnable Android and OpenHarmony presets cross-compile and push to an
   emulator through the shared runners in `scripts/`
   (`run-android-emulator-test.sh`, `run-ohos-emulator-test.sh`, which boot the
-  emulator on demand), iOS simulator presets build a test bundle and spawn it on
-  a simulator, and Emscripten presets run in headless Chromium.
+  emulator on demand), iOS and tvOS simulator presets build a test bundle and
+  spawn it on a simulator, and Emscripten presets run in headless Chromium.
 - A preset that a binding cannot build or run MUST fail with a message that
   names what the binding supports. A device preset with no runner, such as
-  `ios-arm64-metal`, fails the same way and points at a simulator preset.
+  `ios-arm64-metal` or `tvos-arm64-metal`, fails the same way and points at a
+  simulator preset.
 - Colon-suffixed tasks cover the axes that a preset does not encode: one
   `test:<runtime>` task per runtime when a platform maps to more than one
   (`test:jvm` and `test:native` for Kotlin; a JavaScript binding adds its
