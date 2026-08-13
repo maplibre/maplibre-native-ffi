@@ -23,6 +23,8 @@ let testSourceFiles = [
   "MaplibreNativeFFITests/ProjectionTests.swift",
   "MaplibreNativeFFITests/QueryTests.swift",
   "MaplibreNativeFFITests/RenderTests.swift",
+  "MaplibreNativeFFITests/RuntimeEventTestSupport.swift",
+  "MaplibreNativeFFITests/RuntimeEventTests.swift",
   "MaplibreNativeFFITests/RuntimeTests.swift",
   "MaplibreNativeFFITests/StyleTests.swift",
   "MaplibreNativeFFITests/SupportHelperTests.swift",

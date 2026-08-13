@@ -20,15 +20,6 @@
 // the served one.
 static const char fixture_layer_id[] = "http-fixture";
 
-static mln_runtime_event empty_event(void) {
-  mln_runtime_event event = {
-    .size = sizeof(mln_runtime_event),
-    .source_type = MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-    .payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE,
-  };
-  return event;
-}
-
 // Waits for the style to load, or reports the failure the map produced instead.
 // A transport that never answers reports neither, so the timeout is the failure
 // this test catches.
@@ -41,29 +32,34 @@ static bool wait_for_style_loaded(
       return false;
     }
     while (true) {
-      mln_runtime_event event = empty_event();
-      bool has_event = false;
-      if (
-        mln_runtime_poll_event(runtime, &event, &has_event) != MLN_STATUS_OK
-      ) {
+      mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+      if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
         return false;
       }
-      if (!has_event) {
+      if (batch.event_count == 0) {
         break;
       }
-      if (event.source != map) {
-        continue;
-      }
-      if (event.type == MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) {
-        return true;
-      }
-      if (
-        event.type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED &&
-        event.message != NULL && event.message_size < capacity
-      ) {
-        memcpy(out_message, event.message, event.message_size);
-        out_message[event.message_size] = '\0';
-        return false;
+      for (size_t index = 0; index < batch.event_count; index += 1) {
+        const mln_runtime_event* event =
+          (const mln_runtime_event*)((const char*)batch.events +
+                                     (index * batch.event_size));
+        if (event->source != map) {
+          continue;
+        }
+        if (event->type == MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) {
+          return true;
+        }
+        if (
+          event->type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED &&
+          event->message_size < capacity
+        ) {
+          memcpy(
+            out_message, batch.messages + event->message_offset,
+            event->message_size
+          );
+          out_message[event->message_size] = '\0';
+          return false;
+        }
       }
     }
   }

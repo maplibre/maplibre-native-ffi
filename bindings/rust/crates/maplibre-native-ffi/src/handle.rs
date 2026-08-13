@@ -38,10 +38,6 @@ impl<T: NativeHandle> ThreadAffineNativeHandle<T> {
         })
     }
 
-    pub(crate) fn handle(&self) -> T {
-        self.state.handle()
-    }
-
     pub(crate) fn live_handle(&self) -> Option<T> {
         self.state.live_handle()
     }
@@ -138,7 +134,7 @@ mod tests {
 
         let error = handle.close().unwrap_err();
         assert_eq!(error.kind(), crate::ErrorKind::InvalidState);
-        assert_eq!(handle.handle().0, TEST_HANDLE.0);
+        assert_eq!(handle.live_handle().unwrap().0, TEST_HANDLE.0);
 
         DESTROY_STATUS.store(sys::MLN_STATUS_OK, Ordering::SeqCst);
         handle.close().unwrap();

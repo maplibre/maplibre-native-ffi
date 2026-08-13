@@ -4,20 +4,46 @@ import java.lang.foreign.Arena
 import java.lang.foreign.MemorySegment
 import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
+import org.maplibre.nativeffi.internal.c.mln_custom_geometry_source_release_callback
 import org.maplibre.nativeffi.internal.c.mln_custom_geometry_source_tile_callback
 import org.maplibre.nativeffi.internal.callback.CallbackGate
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 
-/** Owns map/style-scoped custom geometry source callback state. */
-internal class CustomGeometrySourceState(private val options: CustomGeometrySourceOptions) :
-  AutoCloseable {
+/**
+ * Owns map/style-scoped custom geometry source callback state.
+ *
+ * [onReleased] runs on the map owner thread when native stops referencing this state, which is what
+ * drops it from its map's registry and closes it.
+ */
+internal class CustomGeometrySourceState(
+  private val options: CustomGeometrySourceOptions,
+  private val onReleased: () -> Unit,
+) : AutoCloseable {
   private val arena = Arena.ofShared()
-  private val gate = CallbackGate("custom geometry callbacks") { arena.close() }
+  private val token = TOKENS.getAndIncrement()
+  private val gate =
+    CallbackGate("custom geometry callbacks") {
+      STATES.remove(token)
+      arena.close()
+    }
   private val fetchTileStub: MemorySegment = upcall("fetchTile")
   private val cancelTileStub: MemorySegment = upcall("cancelTile")
   private val descriptor =
-    NativeAccess.customGeometrySourceOptions(arena, options, fetchTileStub, cancelTileStub)
+    NativeAccess.customGeometrySourceOptions(
+      arena,
+      options,
+      fetchTileStub,
+      cancelTileStub,
+      RELEASE_STUB,
+      MemorySegment.ofAddress(token),
+    )
+
+  init {
+    STATES[token] = this
+  }
 
   fun descriptor(): MemorySegment = descriptor
 
@@ -70,5 +96,27 @@ internal class CustomGeometrySourceState(private val options: CustomGeometrySour
     private val LOOKUP = MethodHandles.lookup()
     private val LINKER = java.lang.foreign.Linker.nativeLinker()
     private val CALLBACK_DESCRIPTOR = mln_custom_geometry_source_tile_callback.descriptor()
+    private val TOKENS = AtomicLong(1)
+
+    /** The live states by token, which is the `user_data` this binding hands to native. */
+    private val STATES = ConcurrentHashMap<Long, CustomGeometrySourceState>()
+
+    /**
+     * One process-wide release stub, so releasing a state can close that state's own arena. A
+     * per-state stub would live in the arena it has to free.
+     */
+    private val RELEASE_STUB: MemorySegment =
+      mln_custom_geometry_source_release_callback.allocate(
+        { userData -> releaseState(userData.address()) },
+        Arena.global(),
+      )
+
+    private fun releaseState(token: Long) {
+      try {
+        STATES[token]?.onReleased?.invoke()
+      } catch (_: Throwable) {
+        // Native callbacks must not unwind through the C ABI.
+      }
+    }
   }
 }

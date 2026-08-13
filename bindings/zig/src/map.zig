@@ -9,9 +9,9 @@ const status = @import("status.zig");
 const values = @import("values.zig");
 
 const CustomGeometrySourceState = struct {
-    source_id: []const u8,
     fetch_tile: CustomGeometrySourceTileCallback,
     cancel_tile: ?CustomGeometrySourceTileCallback,
+    release_context: ?CustomGeometrySourceReleaseCallback,
     context: ?*anyopaque,
     active_upcalls: std.atomic.Value(usize),
 };
@@ -20,7 +20,6 @@ const MapState = struct {
     runtime_registry: *runtime_module.RuntimeRegistry,
     id_value: values.MapId,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
-    custom_geometry_sources: *std.ArrayList(*CustomGeometrySourceState),
     attached_render_sessions: std.atomic.Value(usize),
     closing: bool,
 };
@@ -71,6 +70,12 @@ pub const MapOptions = struct {
     /// false decodes every other MLT encoding and logs a tile parse warning for
     /// the FastPFOR ones.
     fast_pfor_enabled: ?bool = null,
+    /// Map-originated event types this map queues. A null takes the C API
+    /// default, which selects every type the library reports, including the types
+    /// this binding does not name. Set it to be narrow from the map's first style
+    /// load, which is the load that produces the most tile and frame events. See
+    /// `MapHandle.setEventMask`.
+    event_mask: ?runtime_module.RuntimeEventMask = null,
 };
 
 pub const CanonicalTileId = struct {
@@ -84,9 +89,18 @@ pub const CustomGeometrySourceTileCallback = *const fn (
     tile_id: CanonicalTileId,
 ) void;
 
+pub const CustomGeometrySourceReleaseCallback = *const fn (context: ?*anyopaque) void;
+
+/// Options for `MapHandle.addCustomGeometrySource`.
 pub const CustomGeometrySourceOptions = struct {
     fetch_tile: CustomGeometrySourceTileCallback,
     cancel_tile: ?CustomGeometrySourceTileCallback = null,
+    /// Invoked once with `context` after the map stops referencing this source:
+    /// on an explicit removal, on a style load that leaves a style without the
+    /// source, and on the map's own destruction. It runs on the map owner thread,
+    /// after the last tile callback returns, and never runs for an add that
+    /// failed. A host frees `context` here instead of tracking style loads.
+    release_context: ?CustomGeometrySourceReleaseCallback = null,
     context: ?*anyopaque = null,
     min_zoom: ?f64 = null,
     max_zoom: ?f64 = null,
@@ -107,7 +121,9 @@ pub const MapHandle = enum(c.mln_map) {
         if (options.scale_factor) |value| native_options.scale_factor = value;
         if (options.mode) |value| native_options.map_mode = value.toRaw();
         if (options.fast_pfor_enabled) |value| native_options.fast_pfor_enabled = value;
-
+        if (options.event_mask) |value| {
+            native_options.event_mask = runtime_module.eventMaskToRaw(value);
+        }
         const runtime_lease = try runtime_module.lease(runtime);
         defer runtime_lease.release();
 
@@ -119,16 +135,7 @@ pub const MapHandle = enum(c.mln_map) {
         );
         errdefer _ = c.mln_map_destroy(map);
 
-        const custom_geometry_sources = try std.heap.smp_allocator.create(std.ArrayList(*CustomGeometrySourceState));
-        custom_geometry_sources.* = .empty;
-        errdefer std.heap.smp_allocator.destroy(custom_geometry_sources);
-
-        const map_registration = try runtime_module.registerMap(
-            runtime,
-            map,
-            releaseDetachedCustomGeometrySourceStatesForStyleLoaded,
-            custom_geometry_sources,
-        );
+        const map_registration = try runtime_module.registerMap(runtime, map);
         errdefer runtime_module.unregisterMap(map_registration.registry, map);
 
         const map_state = try std.heap.smp_allocator.create(MapState);
@@ -136,7 +143,6 @@ pub const MapHandle = enum(c.mln_map) {
             .runtime_registry = map_registration.registry,
             .id_value = map_registration.id,
             .diagnostic_store = diagnostic_store,
-            .custom_geometry_sources = custom_geometry_sources,
             .attached_render_sessions = std.atomic.Value(usize).init(0),
             .closing = false,
         };
@@ -163,7 +169,6 @@ pub const MapHandle = enum(c.mln_map) {
         const native_map = try native(self);
         _ = allocator;
         try status.checkStatus(c.mln_map_set_style_json(native_map, stringView(json)), diagnosticStore(self));
-        clearCustomGeometrySourceStates(self);
     }
 
     /// Loads a style URL.
@@ -539,7 +544,6 @@ pub const MapHandle = enum(c.mln_map) {
             c.mln_map_remove_style_source(try native(self), try temp.stringView(source_id), &removed),
             diagnosticStore(self),
         );
-        if (removed) releaseCustomGeometrySourceState(try mapStateForHandle(self), source_id);
         return removed;
     }
 
@@ -1459,24 +1463,20 @@ pub const MapHandle = enum(c.mln_map) {
     ) status.Error!void {
         _ = try native(self);
         const map_state = try mapStateForHandle(self);
-        const owned_source_id = try std.heap.smp_allocator.dupe(u8, source_id);
-        errdefer std.heap.smp_allocator.free(owned_source_id);
 
         const source_state = try std.heap.smp_allocator.create(CustomGeometrySourceState);
         source_state.* = .{
-            .source_id = owned_source_id,
             .fetch_tile = options.fetch_tile,
             .cancel_tile = options.cancel_tile,
+            .release_context = options.release_context,
             .context = options.context,
             .active_upcalls = std.atomic.Value(usize).init(0),
         };
         errdefer std.heap.smp_allocator.destroy(source_state);
 
         try registerLiveCustomGeometrySourceState(source_state);
+        // A failed add releases nothing, so this call owns the state it built.
         errdefer unregisterLiveCustomGeometrySourceState(source_state);
-
-        try map_state.custom_geometry_sources.append(std.heap.smp_allocator, source_state);
-        errdefer _ = map_state.custom_geometry_sources.pop();
 
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
@@ -1858,6 +1858,37 @@ pub const MapHandle = enum(c.mln_map) {
         try status.checkStatus(c.mln_map_set_free_camera_options(try native(self), &raw_options), diagnosticStore(self));
     }
 
+    /// Selects which map-originated event types this map queues.
+    ///
+    /// A map reads the fields `RuntimeEventMask.all_map_events` names and
+    /// ignores the rest. An unselected type is never queued, so select every
+    /// type the host reads: render-update-available is the map's only
+    /// invalidation report, the still-image types are the only reports that a
+    /// still-image request finished, and the camera and loading types carry
+    /// transition identity and native failure text.
+    ///
+    /// Narrowing gates later events and keeps queued ones, so a host drains what
+    /// it already caused.
+    pub fn setEventMask(self: *MapHandle, mask: runtime_module.RuntimeEventMask) status.Error!void {
+        const map_state = try mapStateForHandle(self);
+        try status.checkStatus(
+            c.mln_map_set_event_mask(try native(self), runtime_module.eventMaskToRaw(mask)),
+            map_state.diagnostic_store,
+        );
+    }
+
+    /// Reports which map-originated event types this map queues. A map that has
+    /// not been narrowed reports `RuntimeEventMask.all`.
+    pub fn eventMask(self: *MapHandle) status.Error!runtime_module.RuntimeEventMask {
+        const map_state = try mapStateForHandle(self);
+        var raw: u64 = 0;
+        try status.checkStatus(
+            c.mln_map_get_event_mask(try native(self), &raw),
+            map_state.diagnostic_store,
+        );
+        return runtime_module.eventMaskFromRaw(raw);
+    }
+
     pub fn close(self: *MapHandle) status.Error!void {
         const map_close = beginMapClose(self.*) catch |err| {
             if (err == error.InvalidState) {
@@ -1872,7 +1903,6 @@ pub const MapHandle = enum(c.mln_map) {
             return err;
         };
         runtime_module.unregisterMap(map_close.runtime_registry, map_close.native);
-        freeCustomGeometrySourceStates(map_close.state);
         const map_state = finishMapClose(self.*) orelse map_close.state;
         std.heap.smp_allocator.destroy(map_state);
     }
@@ -1981,6 +2011,7 @@ fn customGeometrySourceOptionsToNative(
     var raw = c.mln_custom_geometry_source_options_default();
     raw.fetch_tile = customGeometryFetchTileTrampoline;
     raw.cancel_tile = if (options.cancel_tile != null) customGeometryCancelTileTrampoline else null;
+    raw.release_user_data = customGeometryReleaseTrampoline;
     raw.user_data = source_state;
     if (options.min_zoom) |min_zoom| {
         raw.fields |= c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
@@ -2055,60 +2086,18 @@ fn canonicalTileIdFromNative(tile_id: c.mln_canonical_tile_id) CanonicalTileId {
     return .{ .z = tile_id.z, .x = tile_id.x, .y = tile_id.y };
 }
 
-fn releaseCustomGeometrySourceState(map_state: *MapState, source_id: []const u8) void {
-    for (map_state.custom_geometry_sources.items, 0..) |source_state, index| {
-        if (std.mem.eql(u8, source_state.source_id, source_id)) {
-            _ = map_state.custom_geometry_sources.orderedRemove(index);
-            freeCustomGeometrySourceState(source_state);
-            return;
-        }
-    }
-}
-
-fn releaseDetachedCustomGeometrySourceStatesForStyleLoaded(map: c.mln_map, context: ?*anyopaque) void {
-    const custom_geometry_sources: *std.ArrayList(*CustomGeometrySourceState) = @ptrCast(@alignCast(context orelse return));
-    var index: usize = 0;
-    while (index < custom_geometry_sources.items.len) {
-        const source_state = custom_geometry_sources.items[index];
-        var source_type: u32 = c.MLN_STYLE_SOURCE_TYPE_UNKNOWN;
-        var found = false;
-        const check = c.mln_map_get_style_source_type(map, stringView(source_state.source_id), &source_type, &found);
-        if (check != c.MLN_STATUS_OK or (found and source_type == c.MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR)) {
-            index += 1;
-            continue;
-        }
-        _ = custom_geometry_sources.orderedRemove(index);
-        freeCustomGeometrySourceState(source_state);
-    }
-}
-
-fn clearCustomGeometrySourceStates(map_handle: *MapHandle) void {
-    const map_state = mapStateForHandle(map_handle) catch return;
-    clearCustomGeometrySourceStatesForState(map_state);
-}
-
-fn clearCustomGeometrySourceStatesForState(map_state: *MapState) void {
-    for (map_state.custom_geometry_sources.items) |source_state| {
-        retireLiveCustomGeometrySourceState(source_state);
-    }
-    for (map_state.custom_geometry_sources.items) |source_state| {
-        waitForCustomGeometryUpcalls(source_state);
-        std.heap.smp_allocator.free(source_state.source_id);
-        std.heap.smp_allocator.destroy(source_state);
-    }
-    map_state.custom_geometry_sources.clearRetainingCapacity();
-}
-
-fn freeCustomGeometrySourceStates(map_state: *MapState) void {
-    clearCustomGeometrySourceStatesForState(map_state);
-    map_state.custom_geometry_sources.deinit(std.heap.smp_allocator);
-    std.heap.smp_allocator.destroy(map_state.custom_geometry_sources);
+// The C API invokes this once, on the map owner thread, after it stops
+// referencing the state: on an explicit removal, when a style load leaves a
+// style without the source, and when the map is destroyed.
+fn customGeometryReleaseTrampoline(user_data: ?*anyopaque) callconv(.c) void {
+    const source_state: *CustomGeometrySourceState = @ptrCast(@alignCast(user_data orelse return));
+    freeCustomGeometrySourceState(source_state);
 }
 
 fn freeCustomGeometrySourceState(source_state: *CustomGeometrySourceState) void {
     retireLiveCustomGeometrySourceState(source_state);
     waitForCustomGeometryUpcalls(source_state);
-    std.heap.smp_allocator.free(source_state.source_id);
+    if (source_state.release_context) |release| release(source_state.context);
     std.heap.smp_allocator.destroy(source_state);
 }
 
@@ -2252,8 +2241,12 @@ pub fn unregisterRenderSession(handle: MapHandle) void {
     _ = map_state.attached_render_sessions.fetchSub(1, .seq_cst);
 }
 
-fn customGeometrySourceCountForTesting(handle: *MapHandle) status.BindingError!usize {
-    return (try mapStateForHandle(handle)).custom_geometry_sources.items.len;
+// Callback states the tile trampolines still route through. The C API's release
+// callback is what retires one, so a released state leaves this count.
+fn liveCustomGeometrySourceCountForTesting() usize {
+    std.Io.Threaded.mutexLock(&custom_geometry_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_geometry_state_registry_lock);
+    return custom_geometry_state_registry.items.len;
 }
 
 fn copyStyleIdList(
@@ -2326,8 +2319,14 @@ fn nulTerminated(
 const TestCustomGeometryCallbackState = struct {
     fetch_count: usize = 0,
     cancel_count: usize = 0,
+    release_count: usize = 0,
     last_tile: CanonicalTileId = .{ .z = 0, .x = 0, .y = 0 },
 };
+
+fn testReleaseCustomGeometryContext(context: ?*anyopaque) void {
+    const test_state: *TestCustomGeometryCallbackState = @ptrCast(@alignCast(context.?));
+    test_state.release_count += 1;
+}
 
 fn testFetchCustomGeometryTile(context: ?*anyopaque, tile_id: CanonicalTileId) void {
     const test_state: *TestCustomGeometryCallbackState = @ptrCast(@alignCast(context.?));
@@ -2344,9 +2343,9 @@ fn testCancelCustomGeometryTile(context: ?*anyopaque, tile_id: CanonicalTileId) 
 test "custom geometry trampolines route semantic tile ids" {
     var test_state = TestCustomGeometryCallbackState{};
     var source_state = CustomGeometrySourceState{
-        .source_id = "custom"[0..],
         .fetch_tile = testFetchCustomGeometryTile,
         .cancel_tile = testCancelCustomGeometryTile,
+        .release_context = null,
         .context = &test_state,
         .active_upcalls = std.atomic.Value(usize).init(0),
     };
@@ -2399,11 +2398,33 @@ fn waitForRuntimeEventForTesting(runtime: *RuntimeHandle, event_type: runtime_mo
     var attempts: usize = 0;
     while (attempts < 200) : (attempts += 1) {
         try runtime.pump(0);
-        while (try runtime.pollEvent(std.testing.allocator)) |event| {
-            var owned_event = event;
-            defer owned_event.deinit();
-            if (std.meta.eql(owned_event.event_type, event_type)) return true;
+        // One event per drain, so an event this wait is not looking for stays
+        // queued rather than being dropped with the batch that carried it.
+        while (true) {
+            var batch = try runtime.drainEvents(std.testing.allocator, 1);
+            defer batch.deinit();
+            if (batch.len() == 0) break;
+            const event = try batch.at(0);
+            if (std.meta.eql(event.event_type, event_type)) return true;
         }
+        try std.testing.io.sleep(.fromMilliseconds(10), .awake);
+    }
+    return false;
+}
+
+// A map whose mask clears style-loaded reaches a loaded style with no event to
+// wait for, so the style's own sources report the load instead.
+fn waitForStyleSourceForTesting(
+    runtime: *RuntimeHandle,
+    map: *MapHandle,
+    source_id: []const u8,
+) !bool {
+    var attempts: usize = 0;
+    while (attempts < 200) : (attempts += 1) {
+        try runtime.pump(0);
+        var batch = try runtime.drainEvents(std.testing.allocator, 0);
+        batch.deinit();
+        if (try map.styleSourceExists(std.testing.allocator, source_id)) return true;
         try std.testing.io.sleep(.fromMilliseconds(10), .awake);
     }
     return false;
@@ -2425,59 +2446,123 @@ fn testStyleJsonProvider(
     return .handle;
 }
 
-test "custom geometry source state is released on source removal" {
+// The C API releases a source's callback state once it stops referencing it, so
+// the tests below watch the live-state count rather than a style load.
+test "an explicit source removal releases the callback state" {
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMapForTesting(&runtime);
     defer map.close() catch @panic("map close failed");
 
+    const baseline = liveCustomGeometrySourceCountForTesting();
     var state = TestCustomGeometryCallbackState{};
     try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
         .fetch_tile = testFetchCustomGeometryTile,
         .context = &state,
     });
-    try std.testing.expectEqual(@as(usize, 1), try customGeometrySourceCountForTesting(&map));
+    try std.testing.expectEqual(baseline + 1, liveCustomGeometrySourceCountForTesting());
 
     try std.testing.expect(try map.removeStyleSource(std.testing.allocator, "custom"));
-    try std.testing.expectEqual(@as(usize, 0), try customGeometrySourceCountForTesting(&map));
+    try std.testing.expectEqual(baseline, liveCustomGeometrySourceCountForTesting());
 }
 
-test "custom geometry source states are released on inline style replacement" {
-    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-    var map = try createLoadedMapForTesting(&runtime);
-    defer map.close() catch @panic("map close failed");
+// A map whose mask clears style-loaded still releases the state, because the
+// release runs on the C API's own reconciliation rather than on an event this
+// binding subscribes to.
+test "a style load that drops a source releases the callback state unsubscribed" {
+    const narrowed = blk: {
+        var mask = runtime_module.RuntimeEventMask.all;
+        mask.map_style_loaded = false;
+        break :blk mask;
+    };
 
-    var state = TestCustomGeometryCallbackState{};
-    try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
-        .fetch_tile = testFetchCustomGeometryTile,
-        .context = &state,
-    });
-    try std.testing.expectEqual(@as(usize, 1), try customGeometrySourceCountForTesting(&map));
-
-    try map.setStyleJson(std.testing.allocator, test_style_json);
-    try std.testing.expectEqual(@as(usize, 0), try customGeometrySourceCountForTesting(&map));
-}
-
-test "custom geometry source states are released after style URL load detaches them" {
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     try runtime.setResourceProvider(.{ .handler = testStyleJsonProvider });
 
-    var map = try createLoadedMapForTesting(&runtime);
+    var map = try MapHandle.create(&runtime, .{ .event_mask = narrowed });
     defer map.close() catch @panic("map close failed");
+    try map.setStyleJson(std.testing.allocator, test_style_json);
+    try std.testing.expect(try waitForStyleSourceForTesting(&runtime, &map, "point"));
 
+    const baseline = liveCustomGeometrySourceCountForTesting();
+    var state = TestCustomGeometryCallbackState{};
+    try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
+        .fetch_tile = testFetchCustomGeometryTile,
+        .release_context = testReleaseCustomGeometryContext,
+        .context = &state,
+    });
+    try std.testing.expectEqual(baseline + 1, liveCustomGeometrySourceCountForTesting());
+    try std.testing.expectEqual(@as(usize, 0), state.release_count);
+    // The mask stays what the host set, because the binding adds nothing to it.
+    try std.testing.expectEqual(narrowed, try map.eventMask());
+
+    try map.setStyleUrl(std.testing.allocator, "custom://style.json");
+    var released = false;
+    for (0..200) |_| {
+        try runtime.pump(0);
+        var batch = try runtime.drainEvents(std.testing.allocator, 0);
+        defer batch.deinit();
+        for (0..batch.len()) |index| {
+            const event = try batch.at(index);
+            try std.testing.expect(!std.meta.eql(
+                event.event_type,
+                runtime_module.RuntimeEventType.map_style_loaded,
+            ));
+        }
+        if (liveCustomGeometrySourceCountForTesting() == baseline) {
+            released = true;
+            break;
+        }
+        try std.testing.io.sleep(.fromMilliseconds(10), .awake);
+    }
+    try std.testing.expect(released);
+    // The host's own release runs once, which is the signal it would otherwise
+    // have to reconstruct from style-loaded events.
+    try std.testing.expectEqual(@as(usize, 1), state.release_count);
+}
+
+test "closing a map releases its surviving source callback states" {
+    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try createLoadedMapForTesting(&runtime);
+    var map_open = true;
+    defer if (map_open) map.close() catch @panic("map close failed");
+
+    const baseline = liveCustomGeometrySourceCountForTesting();
     var state = TestCustomGeometryCallbackState{};
     try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
         .fetch_tile = testFetchCustomGeometryTile,
         .context = &state,
     });
-    try std.testing.expectEqual(@as(usize, 1), try customGeometrySourceCountForTesting(&map));
+    try std.testing.expectEqual(baseline + 1, liveCustomGeometrySourceCountForTesting());
 
-    try map.setStyleUrl(std.testing.allocator, "custom://style.json");
-    try std.testing.expectEqual(@as(usize, 1), try customGeometrySourceCountForTesting(&map));
-    try std.testing.expect(try waitForRuntimeEventForTesting(&runtime, .map_style_loaded));
-    try std.testing.expectEqual(@as(usize, 0), try customGeometrySourceCountForTesting(&map));
+    try map.close();
+    map_open = false;
+    try std.testing.expectEqual(baseline, liveCustomGeometrySourceCountForTesting());
+}
+
+// A rejected add releases nothing, so the state belongs to the failing call.
+test "a rejected custom geometry source add releases its own callback state" {
+    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try createLoadedMapForTesting(&runtime);
+    defer map.close() catch @panic("map close failed");
+
+    const baseline = liveCustomGeometrySourceCountForTesting();
+    var state = TestCustomGeometryCallbackState{};
+    try std.testing.expectError(error.InvalidArgument, map.addCustomGeometrySource(
+        std.testing.allocator,
+        "bad-zoom",
+        .{
+            .fetch_tile = testFetchCustomGeometryTile,
+            .release_context = testReleaseCustomGeometryContext,
+            .context = &state,
+            .min_zoom = -1,
+        },
+    ));
+    try std.testing.expectEqual(baseline, liveCustomGeometrySourceCountForTesting());
+    try std.testing.expectEqual(@as(usize, 0), state.release_count);
 }
 
 test "a released map id replayed after a new map is reported stale" {

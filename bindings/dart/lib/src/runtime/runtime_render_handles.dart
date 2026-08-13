@@ -755,6 +755,10 @@ extension type const ResourceRequestHandle._(NativeResourceRequest _handle) {
 /// with a raw id.
 int mapAttachRefIdForTesting(MapAttachRef ref) => ref._mapId;
 
+/// Exposes a runtime's handle id for tests that must reach the C API with a raw
+/// id.
+int runtimeHandleIdForTesting(RuntimeHandle runtime) => runtime._state.handleId;
+
 /// CPU image readback metadata for a texture session frame.
 final class TextureImageInfo {
   const TextureImageInfo._({

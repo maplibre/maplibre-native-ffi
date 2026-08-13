@@ -150,6 +150,9 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [NativeTypeName("bool")]
         public byte fast_pfor_enabled;
+
+        [NativeTypeName("uint64_t")]
+        public ulong event_mask;
     }
 
     internal partial struct mln_screen_point
@@ -384,7 +387,7 @@ namespace Maplibre.NativeFfi.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L410_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L425_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -575,5 +578,11 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_copy_style_url([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("char *")] sbyte* out_url, [NativeTypeName("size_t")] nuint url_capacity, [NativeTypeName("size_t *")] nuint* out_url_size);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_set_event_mask([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("uint64_t")] ulong mask);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_get_event_mask([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("uint64_t *")] ulong* out_mask);
     }
 }

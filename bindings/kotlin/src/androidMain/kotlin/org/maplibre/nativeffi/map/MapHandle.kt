@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi.map
 
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import org.bytedeco.javacpp.BoolPointer
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.LongPointer
@@ -38,6 +40,7 @@ import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
+import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
@@ -77,6 +80,18 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
 
   public actual fun runtime(): RuntimeHandle = runtime
 
+  public actual var eventMask: RuntimeEventMask
+    get() {
+      NativeAccess.ensureLoaded()
+      val outMask = LongArray(1)
+      Status.check(MaplibreNativeC.mln_map_get_event_mask(requireLiveHandle(), outMask))
+      return RuntimeEventMask(outMask[0])
+    }
+    set(value) {
+      NativeAccess.ensureLoaded()
+      Status.check(MaplibreNativeC.mln_map_set_event_mask(requireLiveHandle(), value.nativeValue))
+    }
+
   public actual fun setStyleUrl(url: String) {
     NativeAccess.ensureLoaded()
     optionalCString(url).use { nativeUrl ->
@@ -89,7 +104,6 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     ByteArrayViewScope(json).use { nativeJson ->
       Status.check(MaplibreNativeC.mln_map_set_style_json(requireLiveHandle(), nativeJson.view))
     }
-    clearCustomGeometrySources()
   }
 
   public actual fun loadedStyleJson(): ByteArray {
@@ -134,7 +148,6 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
         )
       )
     }
-    if (outRemoved[0]) closeCustomGeometrySource(sourceId)
     return outRemoved[0]
   }
 
@@ -314,8 +327,11 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     options: CustomGeometrySourceOptions,
   ) {
     NativeAccess.ensureLoaded()
-    val sourceState = CustomGeometrySourceState(options)
-    customGeometrySources.install(sourceId, sourceState) {
+    // The release callback captures the registry rather than this map, so a map a
+    // host leaks with a live source still reports as leaked.
+    val registry = customGeometrySources
+    val sourceState = CustomGeometrySourceState(options) { registry.remove(sourceId) }
+    registry.install(sourceId, sourceState) {
       StringViewScope(sourceId).use { nativeSourceId ->
         Status.check(
           MaplibreNativeC.mln_map_add_custom_geometry_source(
@@ -1669,7 +1685,6 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     core.closeOnce(
       destroy = { MaplibreNativeC.mln_map_destroy(handleId) },
       afterSuccess = {
-        clearCustomGeometrySources()
         runtime.unregisterMap(this)
         runtimeRetention.close()
       },
@@ -1680,12 +1695,6 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
 
   internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
     core.retainChild(childTypeName)
-
-  internal fun releaseDetachedCustomGeometrySources() {
-    customGeometrySources.releaseDetached { sourceId ->
-      styleSourceType(sourceId) == SourceType.CUSTOM_VECTOR
-    }
-  }
 
   private fun addTileSourceUrl(
     function:
@@ -1779,14 +1788,6 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
   private fun requireLiveHandle(): Long {
     core.requireLive()
     return handleId
-  }
-
-  private fun closeCustomGeometrySource(sourceId: String) {
-    customGeometrySources.remove(sourceId)
-  }
-
-  private fun clearCustomGeometrySources() {
-    customGeometrySources.clear()
   }
 }
 
@@ -2456,8 +2457,17 @@ private class CanonicalTileIdScope(value: CanonicalTileId) : AutoCloseable {
   }
 }
 
-internal class CustomGeometrySourceState(private val options: CustomGeometrySourceOptions) :
-  AutoCloseable {
+/**
+ * Owns map/style-scoped custom geometry source callback state.
+ *
+ * [onReleased] runs on the map owner thread when native stops referencing this state, which is what
+ * drops it from its map's registry and closes it.
+ */
+internal class CustomGeometrySourceState(
+  private val options: CustomGeometrySourceOptions,
+  private val onReleased: () -> Unit,
+) : AutoCloseable {
+  private val token = TOKENS.getAndIncrement()
   private val gate = CallbackGate("custom geometry callbacks", ::closeNative)
   // JavaCPP passes null for a null void* and drops the upcall if the Kotlin
   // override rejects it, so every parameter stays nullable.
@@ -2479,7 +2489,9 @@ internal class CustomGeometrySourceState(private val options: CustomGeometrySour
   init {
     descriptor.fetch_tile(fetchTile)
     descriptor.cancel_tile(cancelTile)
-    descriptor.user_data(AddressPointer(0))
+    descriptor.release_user_data(RELEASE_CALLBACK)
+    descriptor.user_data(AddressPointer(token))
+    STATES[token] = this
     var fields = 0
     options.minZoom?.let {
       fields = fields or MaplibreNativeC.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM
@@ -2547,6 +2559,7 @@ internal class CustomGeometrySourceState(private val options: CustomGeometrySour
   }
 
   private fun closeNative() {
+    STATES.remove(token)
     descriptor.close()
     fetchTile.close()
     cancelTile.close()
@@ -2558,6 +2571,28 @@ internal class CustomGeometrySourceState(private val options: CustomGeometrySour
       Integer.toUnsignedLong(tileId.x()),
       Integer.toUnsignedLong(tileId.y()),
     )
+
+  private companion object {
+    private val TOKENS = AtomicLong(1)
+
+    /** The live states by token, which is the `user_data` this binding hands to native. */
+    private val STATES = ConcurrentHashMap<Long, CustomGeometrySourceState>()
+
+    /**
+     * One process-wide release callback, so releasing a state can close that state's own callbacks.
+     * A per-state callback would be one of the callbacks it has to close.
+     */
+    private val RELEASE_CALLBACK =
+      object : MaplibreNativeC.mln_custom_geometry_source_release_callback() {
+        override fun call(userData: Pointer?) {
+          try {
+            STATES[userData?.address() ?: 0L]?.onReleased?.invoke()
+          } catch (_: Throwable) {
+            // Native callbacks must not unwind through the C ABI.
+          }
+        }
+      }
+  }
 }
 
 private class TileSourceOptionsScope(value: TileSourceOptions?) : AutoCloseable {
@@ -2928,6 +2963,7 @@ private class MapOptionsScope(value: MapOptions) : AutoCloseable {
       options.map_mode(it.nativeValue)
     }
     value.fastPforEnabled?.let { options.fast_pfor_enabled(it) }
+    options.event_mask(value.eventMask.nativeValue)
   }
 
   override fun close() {

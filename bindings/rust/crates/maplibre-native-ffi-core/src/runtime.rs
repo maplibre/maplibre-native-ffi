@@ -2,7 +2,7 @@ use std::ffi::CString;
 
 use maplibre_native_ffi_sys as sys;
 
-use crate::{NetworkStatus, Result, check, string, validate_abi_version};
+use crate::{NetworkStatus, Result, RuntimeEventMask, check, string, validate_abi_version};
 
 /// Reads MapLibre Native's process-global network status.
 pub fn network_status() -> Result<NetworkStatus> {
@@ -27,16 +27,33 @@ pub fn set_network_status_raw(raw_status: u32) -> Result<()> {
 }
 
 /// Options used when creating a runtime.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct RuntimeOptions {
     /// Filesystem root for `asset://` URLs.
     pub asset_path: Option<String>,
     /// Cache database path.
     pub cache_path: Option<String>,
+    /// Runtime-originated event types the runtime queues. Defaults to every
+    /// event type this library reports.
+    pub event_mask: RuntimeEventMask,
 }
 
-impl RuntimeOptions {}
+impl Default for RuntimeOptions {
+    fn default() -> Self {
+        // SAFETY: Default constructor takes no arguments and initializes values
+        // for this C ABI version.
+        let raw = unsafe { sys::mln_runtime_options_default() };
+        Self {
+            asset_path: None,
+            cache_path: None,
+            // Retained rather than named, so a newer native library's default
+            // keeps selecting event types this build does not define. Those
+            // reach a host as unknown event and payload domains.
+            event_mask: RuntimeEventMask::from_bits_retain(raw.event_mask),
+        }
+    }
+}
 
 /// Region descriptor used to create or inspect offline regions.
 #[derive(Debug, Clone, PartialEq)]
@@ -329,6 +346,7 @@ pub unsafe fn copy_offline_region_list(
 pub struct NativeRuntimeOptions {
     asset_path: Option<CString>,
     cache_path: Option<CString>,
+    event_mask: RuntimeEventMask,
 }
 
 impl NativeRuntimeOptions {
@@ -337,6 +355,7 @@ impl NativeRuntimeOptions {
         Ok(Self {
             asset_path: string::optional_c_string(options.asset_path.as_deref())?,
             cache_path: string::optional_c_string(options.cache_path.as_deref())?,
+            event_mask: options.event_mask,
         })
     }
 
@@ -350,6 +369,7 @@ impl NativeRuntimeOptions {
         if let Some(cache_path) = &self.cache_path {
             raw.cache_path = cache_path.as_ptr();
         }
+        raw.event_mask = self.event_mask.bits();
         raw
     }
 }
@@ -393,6 +413,7 @@ mod tests {
         let native = runtime_options_to_native(&RuntimeOptions {
             asset_path: Some("assets".into()),
             cache_path: Some("cache.db".into()),
+            ..RuntimeOptions::default()
         })
         .unwrap();
 
@@ -418,13 +439,14 @@ mod tests {
     }
 
     #[test]
-    fn runtime_options_leave_absent_fields_null_and_unflagged() {
+    fn runtime_options_leave_absent_paths_null_and_select_every_event() {
         let native = runtime_options_to_native(&RuntimeOptions::default()).unwrap();
         let raw = native.to_raw();
 
         assert_eq!(raw.flags, 0);
         assert_eq!(raw.asset_path, ptr::null());
         assert_eq!(raw.cache_path, ptr::null());
+        assert_eq!(raw.event_mask, sys::MLN_RUNTIME_EVENT_MASK_ALL);
     }
 
     #[test]

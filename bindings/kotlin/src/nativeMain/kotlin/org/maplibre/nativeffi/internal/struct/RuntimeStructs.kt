@@ -1,12 +1,13 @@
 package org.maplibre.nativeffi.internal.struct
 
+import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.pointed
+import kotlinx.cinterop.plus
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.reinterpret
@@ -25,7 +26,6 @@ import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGIO
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
-import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION
 import org.maplibre.nativeffi.internal.c.mln_offline_region_definition
 import org.maplibre.nativeffi.internal.c.mln_offline_region_info
@@ -43,7 +43,6 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_status
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_tile_count_limit
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_render_frame
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_render_map
-import org.maplibre.nativeffi.internal.c.mln_runtime_event_style_image_missing
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_tile_action
 import org.maplibre.nativeffi.internal.lifecycle.NativeOfflineRegionList
 import org.maplibre.nativeffi.internal.lifecycle.NativeOfflineRegionSnapshot
@@ -65,83 +64,58 @@ import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 /** Copies runtime event payloads out of native event storage. */
 @OptIn(ExperimentalForeignApi::class, ExperimentalUnsignedTypes::class)
 internal object RuntimeStructs {
-  fun message(event: mln_runtime_event): String =
-    MemoryUtil.copyStringView(event.message, event.message_size)
-
-  fun payload(event: mln_runtime_event): RuntimeEventPayload {
-    val payload = event.payload
-    if (payload == null) {
-      return if (event.payload_type == MLN_RUNTIME_EVENT_PAYLOAD_NONE) RuntimeEventPayload.None
-      else unknownPayload(event)
-    }
-    return when (event.payload_type) {
-      MLN_RUNTIME_EVENT_PAYLOAD_NONE -> RuntimeEventPayload.None
-      MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME ->
-        if (hasPayloadSize<mln_runtime_event_render_frame>(event)) {
-          renderFrame(payload.reinterpret<mln_runtime_event_render_frame>())
-        } else unknownPayload(event)
-      MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP ->
-        if (hasPayloadSize<mln_runtime_event_render_map>(event)) {
-          renderMap(payload.reinterpret<mln_runtime_event_render_map>())
-        } else unknownPayload(event)
-      MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING ->
-        if (hasPayloadSize<mln_runtime_event_style_image_missing>(event)) {
-          styleImageMissing(payload.reinterpret<mln_runtime_event_style_image_missing>())
-        } else unknownPayload(event)
-      MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION ->
-        if (hasPayloadSize<mln_runtime_event_tile_action>(event)) {
-          tileAction(payload.reinterpret<mln_runtime_event_tile_action>())
-        } else unknownPayload(event)
-      MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS ->
-        if (hasPayloadSize<mln_runtime_event_offline_region_status>(event)) {
-          offlineRegionStatus(payload.reinterpret<mln_runtime_event_offline_region_status>())
-        } else unknownPayload(event)
-      MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR ->
-        if (hasPayloadSize<mln_runtime_event_offline_region_response_error>(event)) {
-          offlineRegionResponseError(
-            payload.reinterpret<mln_runtime_event_offline_region_response_error>()
-          )
-        } else unknownPayload(event)
-      MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT ->
-        if (hasPayloadSize<mln_runtime_event_offline_region_tile_count_limit>(event)) {
-          offlineRegionTileCountLimit(
-            payload.reinterpret<mln_runtime_event_offline_region_tile_count_limit>()
-          )
-        } else unknownPayload(event)
-      MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED ->
-        if (hasPayloadSize<mln_runtime_event_offline_operation_completed>(event)) {
-          offlineOperationCompleted(
-            payload.reinterpret<mln_runtime_event_offline_operation_completed>()
-          )
-        } else unknownPayload(event)
-      MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED ->
-        if (hasPayloadSize<mln_runtime_event_camera_transition_finished>(event)) {
-          cameraTransitionFinished(
-            payload.reinterpret<mln_runtime_event_camera_transition_finished>()
-          )
-        } else unknownPayload(event)
-      else -> unknownPayload(event)
-    }
+  /** Copies one event's message out of the drained batch's arena. */
+  fun message(event: mln_runtime_event, messages: CPointer<ByteVar>?): String {
+    if (event.message_size == 0u) return ""
+    return MemoryUtil.copyStringView(
+      messages?.plus(event.message_offset.toLong()),
+      event.message_size.toULong(),
+    )
   }
 
-  private inline fun <reified T : kotlinx.cinterop.CVariable> hasPayloadSize(
-    event: mln_runtime_event
-  ): Boolean = event.payload_size >= sizeOf<T>().toULong()
+  /**
+   * Copies one event's payload. [eventSize] is the stride the drained batch reported, which bounds
+   * the payload window of a kind this version does not name.
+   */
+  fun payload(event: mln_runtime_event, eventSize: Long): RuntimeEventPayload =
+    when (event.payload_type) {
+      MLN_RUNTIME_EVENT_PAYLOAD_NONE -> RuntimeEventPayload.None
+      MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME -> renderFrame(event.payload.render_frame)
+      MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP -> renderMap(event.payload.render_map)
+      MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION -> tileAction(event.payload.tile_action)
+      MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS ->
+        offlineRegionStatus(event.payload.offline_region_status)
+      MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR ->
+        offlineRegionResponseError(event.payload.offline_region_response_error)
+      MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT ->
+        offlineRegionTileCountLimit(event.payload.offline_region_tile_count_limit)
+      MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED ->
+        offlineOperationCompleted(event.payload.offline_operation_completed)
+      MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED ->
+        cameraTransitionFinished(event.payload.camera_transition_finished)
+      else -> unknownPayload(event, eventSize)
+    }
 
-  private fun unknownPayload(event: mln_runtime_event): RuntimeEventPayload.Unknown =
-    RuntimeEventPayload.Unknown(
+  /**
+   * Copies the payload window of an event whose payload kind this version does not name, which is
+   * [eventSize] minus the offset of the payload inside one event record.
+   */
+  private fun unknownPayload(
+    event: mln_runtime_event,
+    eventSize: Long,
+  ): RuntimeEventPayload.Unknown {
+    val payloadOffset = event.payload.rawPtr.toLong() - event.rawPtr.toLong()
+    val extent = eventSize - payloadOffset
+    return RuntimeEventPayload.Unknown(
       event.payload_type.toInt(),
-      checkedLong(event.payload_size, "payload size"),
-      event.payload
-        ?.reinterpret<kotlinx.cinterop.ByteVar>()
-        ?.readBytes(checkedInt(event.payload_size, "payload size")) ?: ByteArray(0),
+      event.payload.ptr
+        .reinterpret<ByteVar>()
+        .readBytes(checkedInt(extent.toULong(), "payload window size")),
     )
+  }
 
-  private fun renderFrame(
-    payload: CPointer<mln_runtime_event_render_frame>
-  ): RuntimeEventPayload.RenderFrame {
-    val value = payload.pointed
-    return RuntimeEventPayload.RenderFrame(
+  private fun renderFrame(value: mln_runtime_event_render_frame): RuntimeEventPayload.RenderFrame =
+    RuntimeEventPayload.RenderFrame(
       RenderMode.fromNative(value.mode),
       value.needs_repaint,
       value.placement_changed,
@@ -153,90 +127,61 @@ internal object RuntimeStructs {
         value.stats.total_draw_call_count,
       ),
     )
-  }
 
-  private fun renderMap(
-    payload: CPointer<mln_runtime_event_render_map>
-  ): RuntimeEventPayload.RenderMap {
-    val value = payload.pointed
-    return RuntimeEventPayload.RenderMap(RenderMode.fromNative(value.mode))
-  }
+  private fun renderMap(value: mln_runtime_event_render_map): RuntimeEventPayload.RenderMap =
+    RuntimeEventPayload.RenderMap(RenderMode.fromNative(value.mode))
 
-  private fun styleImageMissing(
-    payload: CPointer<mln_runtime_event_style_image_missing>
-  ): RuntimeEventPayload.StyleImageMissing {
-    val value = payload.pointed
-    return RuntimeEventPayload.StyleImageMissing(
-      MemoryUtil.copyStringView(value.image_id, value.image_id_size)
-    )
-  }
-
-  private fun tileAction(
-    payload: CPointer<mln_runtime_event_tile_action>
-  ): RuntimeEventPayload.TileAction {
-    val value = payload.pointed
-    val tileId =
+  private fun tileAction(value: mln_runtime_event_tile_action): RuntimeEventPayload.TileAction =
+    RuntimeEventPayload.TileAction(
+      TileOperation.fromNative(value.operation),
       TileId(
         checkedLong(value.tile_id.overscaled_z.toULong(), "tile overscaled z"),
         value.tile_id.wrap,
         checkedLong(value.tile_id.canonical_z.toULong(), "tile canonical z"),
         checkedLong(value.tile_id.canonical_x.toULong(), "tile canonical x"),
         checkedLong(value.tile_id.canonical_y.toULong(), "tile canonical y"),
-      )
-    return RuntimeEventPayload.TileAction(
-      TileOperation.fromNative(value.operation),
-      tileId,
-      MemoryUtil.copyStringView(value.source_id, value.source_id_size),
+      ),
     )
-  }
 
   private fun offlineRegionStatus(
-    payload: CPointer<mln_runtime_event_offline_region_status>
-  ): RuntimeEventPayload.OfflineRegionStatusChanged {
-    val value = payload.pointed
-    return RuntimeEventPayload.OfflineRegionStatusChanged(
+    value: mln_runtime_event_offline_region_status
+  ): RuntimeEventPayload.OfflineRegionStatusChanged =
+    RuntimeEventPayload.OfflineRegionStatusChanged(
       value.region_id,
       offlineRegionStatus(value.status),
     )
-  }
 
   private fun offlineRegionResponseError(
-    payload: CPointer<mln_runtime_event_offline_region_response_error>
-  ): RuntimeEventPayload.OfflineRegionResponseError {
-    val value = payload.pointed
-    return RuntimeEventPayload.OfflineRegionResponseError(
+    value: mln_runtime_event_offline_region_response_error
+  ): RuntimeEventPayload.OfflineRegionResponseError =
+    RuntimeEventPayload.OfflineRegionResponseError(
       value.region_id,
       ResourceErrorReason.fromNative(value.reason),
     )
-  }
 
   private fun offlineRegionTileCountLimit(
-    payload: CPointer<mln_runtime_event_offline_region_tile_count_limit>
-  ): RuntimeEventPayload.OfflineRegionTileCountLimit {
-    val value = payload.pointed
-    return RuntimeEventPayload.OfflineRegionTileCountLimit(
+    value: mln_runtime_event_offline_region_tile_count_limit
+  ): RuntimeEventPayload.OfflineRegionTileCountLimit =
+    RuntimeEventPayload.OfflineRegionTileCountLimit(
       value.region_id,
       checkedLong(value.limit, "offline tile count limit"),
     )
-  }
 
   private fun offlineOperationCompleted(
-    payload: CPointer<mln_runtime_event_offline_operation_completed>
-  ): RuntimeEventPayload.OfflineOperationCompleted {
-    val value = payload.pointed
-    return RuntimeEventPayload.OfflineOperationCompleted(
+    value: mln_runtime_event_offline_operation_completed
+  ): RuntimeEventPayload.OfflineOperationCompleted =
+    RuntimeEventPayload.OfflineOperationCompleted(
       uint64BitsToLong(value.operation_id),
       OfflineOperationKind.fromNative(value.operation_kind),
       OfflineOperationResultKind.fromNative(value.result_kind),
       value.result_status,
       value.found,
     )
-  }
 
   private fun cameraTransitionFinished(
-    payload: CPointer<mln_runtime_event_camera_transition_finished>
+    value: mln_runtime_event_camera_transition_finished
   ): RuntimeEventPayload.CameraTransitionFinished =
-    RuntimeEventPayload.CameraTransitionFinished(uint64BitsToLong(payload.pointed.transition_id))
+    RuntimeEventPayload.CameraTransitionFinished(uint64BitsToLong(value.transition_id))
 
   private fun checkedInt(value: ULong, name: String): Int {
     require(value <= Int.MAX_VALUE.toULong()) { "$name exceeds Int.MAX_VALUE" }

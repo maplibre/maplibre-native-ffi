@@ -28,12 +28,14 @@ func loadProbeStyle(t *testing.T, runtime *RuntimeHandle, m *MapHandle, styleURL
 		if err := runtime.Pump(0); err != nil {
 			t.Fatalf("Pump(): %v", err)
 		}
-		event, err := runtime.PollEvent()
+		batch, err := runtime.DrainEvents(0)
 		if err != nil {
-			t.Fatalf("PollEvent(): %v", err)
+			t.Fatalf("DrainEvents(): %v", err)
 		}
-		if event != nil && event.Type == RuntimeEventMapLoadingFailed && strings.Contains(event.Message, styleURL) {
-			return
+		for _, event := range batch.Events {
+			if event.Type == RuntimeEventMapLoadingFailed && strings.Contains(event.Message, styleURL) {
+				return
+			}
 		}
 		time.Sleep(time.Millisecond)
 	}

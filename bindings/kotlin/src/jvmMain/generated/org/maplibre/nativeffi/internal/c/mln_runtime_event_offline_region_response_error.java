@@ -15,7 +15,6 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
 /**
  * {@snippet lang=c :
  * struct mln_runtime_event_offline_region_response_error {
- *     uint32_t size;
  *     mln_offline_region_id region_id;
  *     uint32_t reason;
  * }
@@ -28,8 +27,6 @@ public class mln_runtime_event_offline_region_response_error {
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        MapLibreNativeC.C_INT.withName("size"),
-        MemoryLayout.paddingLayout(4),
         MapLibreNativeC.C_LONG.withName("region_id"),
         MapLibreNativeC.C_INT.withName("reason"),
         MemoryLayout.paddingLayout(4)
@@ -40,50 +37,6 @@ public class mln_runtime_event_offline_region_response_error {
      */
     public static final GroupLayout layout() {
         return $LAYOUT;
-    }
-
-    private static final OfInt size$LAYOUT = (OfInt)$LAYOUT.select(groupElement("size"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * uint32_t size
-     * }
-     */
-    public static final OfInt size$layout() {
-        return size$LAYOUT;
-    }
-
-    private static final long size$OFFSET = $LAYOUT.byteOffset(groupElement("size"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * uint32_t size
-     * }
-     */
-    public static final long size$offset() {
-        return size$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * uint32_t size
-     * }
-     */
-    public static int size(MemorySegment struct) {
-        return struct.get(size$LAYOUT, size$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * uint32_t size
-     * }
-     */
-    public static void size(MemorySegment struct, int fieldValue) {
-        struct.set(size$LAYOUT, size$OFFSET, fieldValue);
     }
 
     private static final OfLong region_id$LAYOUT = (OfLong)$LAYOUT.select(groupElement("region_id"));

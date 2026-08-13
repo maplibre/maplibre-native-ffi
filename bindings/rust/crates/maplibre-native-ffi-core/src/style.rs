@@ -239,10 +239,14 @@ impl<'a> NativeTileUrls<'a> {
 pub type CustomGeometryTileCallbackFn =
     unsafe extern "C" fn(*mut c_void, sys::mln_canonical_tile_id);
 
+pub type CustomGeometryReleaseCallbackFn = unsafe extern "C" fn(*mut c_void);
+
 #[derive(Debug, Clone, Copy)]
 pub struct CustomGeometrySourceDescriptorFields {
     pub fetch_tile: Option<CustomGeometryTileCallbackFn>,
     pub cancel_tile: Option<CustomGeometryTileCallbackFn>,
+    /// Invoked once when the C API stops referencing `user_data`.
+    pub release_user_data: Option<CustomGeometryReleaseCallbackFn>,
     pub user_data: *mut c_void,
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
@@ -260,6 +264,7 @@ pub fn custom_geometry_source_options_to_native(
     let mut raw = unsafe { sys::mln_custom_geometry_source_options_default() };
     raw.fetch_tile = fields.fetch_tile;
     raw.cancel_tile = fields.cancel_tile;
+    raw.release_user_data = fields.release_user_data;
     raw.user_data = fields.user_data;
     if let Some(min_zoom) = fields.min_zoom {
         raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
@@ -856,10 +861,12 @@ mod tests {
         unsafe extern "C" fn fetch(_user_data: *mut c_void, _tile_id: sys::mln_canonical_tile_id) {}
         unsafe extern "C" fn cancel(_user_data: *mut c_void, _tile_id: sys::mln_canonical_tile_id) {
         }
+        unsafe extern "C" fn release(_user_data: *mut c_void) {}
 
         let raw = custom_geometry_source_options_to_native(CustomGeometrySourceDescriptorFields {
             fetch_tile: Some(fetch),
             cancel_tile: Some(cancel),
+            release_user_data: Some(release),
             user_data: 0x1234usize as *mut c_void,
             min_zoom: Some(1.0),
             max_zoom: Some(22.0),
@@ -881,6 +888,10 @@ mod tests {
         assert_eq!(
             raw.cancel_tile.map(|callback| callback as usize),
             Some(cancel as *const () as usize)
+        );
+        assert_eq!(
+            raw.release_user_data.map(|callback| callback as usize),
+            Some(release as *const () as usize)
         );
         assert_eq!(raw.user_data, 0x1234usize as *mut c_void);
         assert_eq!(

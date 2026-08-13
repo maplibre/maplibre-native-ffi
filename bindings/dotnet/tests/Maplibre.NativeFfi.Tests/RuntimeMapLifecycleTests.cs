@@ -154,7 +154,7 @@ public sealed class RuntimeMapLifecycleTests
                 Assert.Equal(createThreadId, Environment.CurrentManagedThreadId);
                 map!.RequestRepaint();
                 runtime!.Pump(TimeSpan.Zero);
-                _ = runtime.PollEvent();
+                _ = runtime.DrainEvents();
                 return Environment.CurrentManagedThreadId;
             })
         );

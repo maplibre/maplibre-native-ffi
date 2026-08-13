@@ -8,13 +8,26 @@ package callback
 
 extern void goMaplibreCustomGeometryFetchTile(void* user_data, mln_canonical_tile_id tile_id);
 extern void goMaplibreCustomGeometryCancelTile(void* user_data, mln_canonical_tile_id tile_id);
+extern void goMaplibreCustomGeometryReleaseUserData(void* user_data);
 */
 import "C"
 
 import (
 	"runtime/cgo"
 	"sync"
+	"sync/atomic"
 )
+
+// liveCustomGeometrySources counts the callback states this package holds a cgo
+// handle for. CustomGeometrySourceLiveCountForTest reads it.
+var liveCustomGeometrySources atomic.Int64
+
+// CustomGeometrySourceLiveCountForTest reports how many custom geometry callback
+// states are still alive, which is how a test observes that the C API's release
+// callback freed one.
+func CustomGeometrySourceLiveCountForTest() int64 {
+	return liveCustomGeometrySources.Load()
+}
 
 // CanonicalTileID identifies one canonical tile for custom geometry callbacks.
 type CanonicalTileID struct {
@@ -56,13 +69,16 @@ func newCustomGeometrySourceState(options CustomGeometrySourceOptions) *CustomGe
 	state := &CustomGeometrySourceState{fetchTile: options.FetchTile, cancelTile: options.CancelTile}
 	state.cond = sync.NewCond(&state.mu)
 	state.handle = cgo.NewHandle(state)
+	liveCustomGeometrySources.Add(1)
 	return state
 }
 
 // AddCustomGeometrySource installs a custom geometry source callback descriptor.
-func AddCustomGeometrySource(m uint64, sourceID string, options CustomGeometrySourceOptions) (*CustomGeometrySourceState, int32) {
+// The C API owns the state from a successful add onwards and releases it through
+// the release callback, so a caller keeps nothing.
+func AddCustomGeometrySource(m uint64, sourceID string, options CustomGeometrySourceOptions) int32 {
 	if options.FetchTile == nil {
-		return nil, int32(C.MLN_STATUS_INVALID_ARGUMENT)
+		return int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
 	state := newCustomGeometrySourceState(options)
 
@@ -77,6 +93,7 @@ func AddCustomGeometrySource(m uint64, sourceID string, options CustomGeometrySo
 		raw.cancel_tile = C.mln_custom_geometry_source_tile_callback(C.goMaplibreCustomGeometryCancelTile)
 	}
 	raw.user_data = C.mln_go_handle_to_pointer(C.uintptr_t(state.handle))
+	raw.release_user_data = C.mln_custom_geometry_source_release_callback(C.goMaplibreCustomGeometryReleaseUserData)
 	raw.min_zoom = C.double(options.MinZoom)
 	raw.max_zoom = C.double(options.MaxZoom)
 	raw.tolerance = C.double(options.Tolerance)
@@ -87,14 +104,15 @@ func AddCustomGeometrySource(m uint64, sourceID string, options CustomGeometrySo
 
 	status := int32(C.mln_map_add_custom_geometry_source(C.mln_map(m), sourceView, &raw))
 	if status != int32(C.MLN_STATUS_OK) {
-		state.Release()
-		return nil, status
+		// A failed add owes no release callback, so this call frees the state.
+		state.release()
+		return status
 	}
-	return state, int32(C.MLN_STATUS_OK)
+	return int32(C.MLN_STATUS_OK)
 }
 
-// Release frees callback state after native no longer references it.
-func (state *CustomGeometrySourceState) Release() {
+// release frees callback state after native no longer references it.
+func (state *CustomGeometrySourceState) release() {
 	if state == nil {
 		return
 	}
@@ -106,6 +124,7 @@ func (state *CustomGeometrySourceState) Release() {
 		}
 		state.mu.Unlock()
 		state.handle.Delete()
+		liveCustomGeometrySources.Add(-1)
 	})
 }
 
@@ -149,7 +168,7 @@ func canonicalTileIDFromC(tileID C.mln_canonical_tile_id) CanonicalTileID {
 
 func invokeCustomGeometryFetchForTest(callback CustomGeometryTileCallback) {
 	state := newCustomGeometrySourceState(CustomGeometrySourceOptions{FetchTile: callback})
-	defer state.Release()
+	defer state.release()
 	goMaplibreCustomGeometryFetchTile(
 		C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
 		C.mln_canonical_tile_id{z: 1, x: 2, y: 3},

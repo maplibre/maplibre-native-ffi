@@ -101,30 +101,30 @@ typedef struct transition_event_tally {
 static transition_event_tally drain_transition_events(mln_runtime runtime) {
   transition_event_tally tally = {0, 0, false, -1};
   for (;;) {
-    mln_runtime_event event = {.size = sizeof(mln_runtime_event)};
-    bool has_event = false;
+    mln_runtime_event_batch batch = mln_runtime_event_batch_default();
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_runtime_poll_event(runtime, &event, &has_event)
+      MLN_STATUS_OK, mln_runtime_drain_events(runtime, 0, &batch)
     );
-    if (!has_event) {
+    if (batch.event_count == 0) {
       return tally;
     }
-    if (event.type == MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED) {
-      TEST_ASSERT_EQUAL_UINT32(
-        MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED, event.payload_type
-      );
-      TEST_ASSERT_NOT_NULL(event.payload);
-      TEST_ASSERT_EQUAL_size_t(
-        sizeof(mln_runtime_event_camera_transition_finished), event.payload_size
-      );
-      const mln_runtime_event_camera_transition_finished* payload =
-        (const mln_runtime_event_camera_transition_finished*)event.payload;
-      tally.finished_count += 1;
-      tally.last_transition_id = payload->transition_id;
-    } else if (event.type == MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE) {
-      tally.last_did_change_code = event.code;
-      if (tally.finished_count > 0) {
-        tally.did_change_followed_finish = true;
+    for (size_t index = 0; index < batch.event_count; index += 1) {
+      const mln_runtime_event* event =
+        (const mln_runtime_event*)((const char*)batch.events +
+                                   (index * batch.event_size));
+      if (event->type == MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED) {
+        TEST_ASSERT_EQUAL_UINT32(
+          MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
+          event->payload_type
+        );
+        tally.finished_count += 1;
+        tally.last_transition_id =
+          event->payload.camera_transition_finished.transition_id;
+      } else if (event->type == MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE) {
+        tally.last_did_change_code = event->code;
+        if (tally.finished_count > 0) {
+          tally.did_change_followed_finish = true;
+        }
       }
     }
   }

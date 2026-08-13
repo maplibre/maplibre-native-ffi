@@ -43,11 +43,10 @@ impl super::MapHandle {
     pub fn set_style_json(&self, json: &[u8]) -> Result<()> {
         let map = self.inner.native()?;
         let json = maplibre_core::string::buffer_view(json);
-        // SAFETY: map is live and json is valid for the call. Style replacement completes before a
-        // successful return, so the old callback state can be released after.
-        maplibre_core::check(unsafe { sys::mln_map_set_style_json(map, json) })?;
-        self.inner.clear_custom_geometry_sources();
-        Ok(())
+        // SAFETY: map is live and json is valid for the call. Style replacement
+        // completes before a successful return, so the C API has already
+        // released the callback state of the sources this load dropped.
+        maplibre_core::check(unsafe { sys::mln_map_set_style_json(map, json) })
     }
 
     /// Copies the style document this map's style was last parsed from: the
@@ -84,9 +83,11 @@ impl super::MapHandle {
 
     /// Adds a custom geometry source to the current style.
     ///
-    /// The callback state is scoped to this map's current style and released
-    /// when the source or the style goes away. Native may invoke callbacks from
-    /// worker threads, so queue owner-thread work before calling map APIs.
+    /// The callback state is scoped to this map's current style. The C API
+    /// frees it once it stops referencing it, whether the source is removed,
+    /// dropped by a style load, or retired with the map. Native may invoke
+    /// callbacks from worker threads, so queue owner-thread work before calling
+    /// map APIs.
     pub fn add_custom_geometry_source(
         &self,
         source_id: &str,
@@ -96,15 +97,20 @@ impl super::MapHandle {
         let source_id_view = maplibre_core::string::string_view(source_id);
         let state = CustomGeometrySourceState::new(options);
         let descriptor = state.descriptor();
+        // The descriptor's release callback frees this box, so the C API owns
+        // the callback state from a successful add onwards.
+        let state = Box::into_raw(state);
         // SAFETY: map is live, source_id_view is valid for this call, and
-        // descriptor points to callback state retained by this map on success.
-        maplibre_core::check(unsafe {
+        // descriptor names callback state that lives until the release callback.
+        let status = unsafe {
             sys::mln_map_add_custom_geometry_source(map, source_id_view.raw(), &descriptor)
-        })?;
-        self.inner
-            .custom_geometry_sources
-            .borrow_mut()
-            .insert(source_id.to_owned(), state);
+        };
+        if let Err(error) = maplibre_core::check(status) {
+            // SAFETY: A rejected add releases nothing, so this box is still
+            // this call's to free.
+            drop(unsafe { Box::from_raw(state) });
+            return Err(error);
+        }
         Ok(())
     }
 
@@ -481,7 +487,6 @@ impl super::MapHandle {
     /// error when a layer still uses the source.
     pub fn remove_style_source(&self, source_id: &str) -> Result<bool> {
         let map = self.inner.native()?;
-        let source_id_key = source_id.to_owned();
         let source_id = maplibre_core::string::string_view(source_id);
         let mut removed = false;
         // SAFETY: map is live, source_id is an explicit-length view valid for
@@ -489,12 +494,6 @@ impl super::MapHandle {
         maplibre_core::check(unsafe {
             sys::mln_map_remove_style_source(map, source_id.raw(), &mut removed)
         })?;
-        if removed {
-            self.inner
-                .custom_geometry_sources
-                .borrow_mut()
-                .remove(&source_id_key);
-        }
         Ok(removed)
     }
 

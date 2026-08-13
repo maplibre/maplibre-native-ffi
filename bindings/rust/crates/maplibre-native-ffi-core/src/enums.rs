@@ -125,6 +125,54 @@ bitflags::bitflags! {
     }
 }
 
+bitflags::bitflags! {
+    /// Event types a map or a runtime queues.
+    ///
+    /// Each bit is `1 << RuntimeEventType::raw_value`, so a bit derived from a
+    /// decoded event type matches the constant that names it. A map reads the
+    /// bits in `ALL_MAP_EVENTS` and a runtime reads the bits in
+    /// `ALL_RUNTIME_EVENTS`, so both accept `ALL`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct RuntimeEventMask: u64 {
+        /// Selects no event type.
+        const NONE = sys::MLN_RUNTIME_EVENT_MASK_NONE;
+        const MAP_CAMERA_WILL_CHANGE = sys::MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE;
+        const MAP_CAMERA_IS_CHANGING = sys::MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING;
+        const MAP_CAMERA_DID_CHANGE = sys::MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE;
+        const MAP_CAMERA_TRANSITION_FINISHED =
+            sys::MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED;
+        const MAP_STYLE_LOADED = sys::MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED;
+        const MAP_LOADING_STARTED = sys::MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED;
+        const MAP_LOADING_FINISHED = sys::MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED;
+        const MAP_LOADING_FAILED = sys::MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED;
+        const MAP_IDLE = sys::MLN_RUNTIME_EVENT_MASK_MAP_IDLE;
+        const MAP_RENDER_UPDATE_AVAILABLE = sys::MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE;
+        const MAP_RENDER_ERROR = sys::MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR;
+        const MAP_STILL_IMAGE_FINISHED = sys::MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED;
+        const MAP_STILL_IMAGE_FAILED = sys::MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED;
+        const MAP_RENDER_FRAME_STARTED = sys::MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED;
+        const MAP_RENDER_FRAME_FINISHED = sys::MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED;
+        const MAP_RENDER_MAP_STARTED = sys::MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED;
+        const MAP_RENDER_MAP_FINISHED = sys::MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED;
+        const MAP_STYLE_IMAGE_MISSING = sys::MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING;
+        const MAP_TILE_ACTION = sys::MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION;
+        const OFFLINE_REGION_STATUS_CHANGED =
+            sys::MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED;
+        const OFFLINE_REGION_RESPONSE_ERROR =
+            sys::MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR;
+        const OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED =
+            sys::MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED;
+        const OFFLINE_OPERATION_COMPLETED =
+            sys::MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED;
+        /// Selects every map-originated event type this version defines.
+        const ALL_MAP_EVENTS = sys::MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS;
+        /// Selects every runtime-originated event type this version defines.
+        const ALL_RUNTIME_EVENTS = sys::MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS;
+        /// Selects every event type this version defines.
+        const ALL = sys::MLN_RUNTIME_EVENT_MASK_ALL;
+    }
+}
+
 /// Ambient cache maintenance operation for a runtime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -672,6 +720,45 @@ impl RuntimeEventType {
             }
             sys::MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED => Self::OfflineOperationCompleted,
             _ => Self::Unknown(raw),
+        }
+    }
+
+    /// Returns the native event type value, which is also the bit index this
+    /// type takes in a [`RuntimeEventMask`].
+    pub const fn raw_value(self) -> u32 {
+        match self {
+            Self::MapCameraWillChange => sys::MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE,
+            Self::MapCameraIsChanging => sys::MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING,
+            Self::MapCameraDidChange => sys::MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE,
+            Self::MapCameraTransitionFinished => {
+                sys::MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED
+            }
+            Self::MapStyleLoaded => sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED,
+            Self::MapLoadingStarted => sys::MLN_RUNTIME_EVENT_MAP_LOADING_STARTED,
+            Self::MapLoadingFinished => sys::MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED,
+            Self::MapLoadingFailed => sys::MLN_RUNTIME_EVENT_MAP_LOADING_FAILED,
+            Self::MapIdle => sys::MLN_RUNTIME_EVENT_MAP_IDLE,
+            Self::MapRenderUpdateAvailable => sys::MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE,
+            Self::MapRenderError => sys::MLN_RUNTIME_EVENT_MAP_RENDER_ERROR,
+            Self::MapStillImageFinished => sys::MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED,
+            Self::MapStillImageFailed => sys::MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED,
+            Self::MapRenderFrameStarted => sys::MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED,
+            Self::MapRenderFrameFinished => sys::MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED,
+            Self::MapRenderMapStarted => sys::MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED,
+            Self::MapRenderMapFinished => sys::MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED,
+            Self::MapStyleImageMissing => sys::MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING,
+            Self::MapTileAction => sys::MLN_RUNTIME_EVENT_MAP_TILE_ACTION,
+            Self::OfflineRegionStatusChanged => {
+                sys::MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED
+            }
+            Self::OfflineRegionResponseError => {
+                sys::MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR
+            }
+            Self::OfflineRegionTileCountLimitExceeded => {
+                sys::MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
+            }
+            Self::OfflineOperationCompleted => sys::MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED,
+            Self::Unknown(raw) => raw,
         }
     }
 }

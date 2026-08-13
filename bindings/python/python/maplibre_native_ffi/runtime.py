@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import weakref
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from enum import IntFlag
 from typing import Any
 
 from . import _native
@@ -55,6 +56,91 @@ class RuntimeEventType(UnknownIntEnum):
     OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21
     OFFLINE_OPERATION_COMPLETED = 22
     MAP_CAMERA_TRANSITION_FINISHED = 23
+
+
+class RuntimeEventMask(IntFlag):
+    """Mask of event types a map or a runtime queues.
+
+    Each bit is ``1 << RuntimeEventType``, so a host derives a bit from a type
+    it read from an event. A map or a runtime builds and queues only the types
+    its mask selects, so narrowing a mask also removes those events' wake
+    signals.
+
+    :attr:`ALL_MAP_EVENTS` covers every map-originated type and
+    :attr:`ALL_RUNTIME_EVENTS` every runtime-originated one.
+    :meth:`MapHandle.set_event_mask` reads only the map bits and
+    :meth:`RuntimeHandle.set_event_mask` only the runtime bits, so both accept
+    :attr:`ALL`, and a read-modify-write of one bit keeps the rest.
+    """
+
+    NONE = 0
+    MAP_CAMERA_WILL_CHANGE = 1 << RuntimeEventType.MAP_CAMERA_WILL_CHANGE
+    MAP_CAMERA_IS_CHANGING = 1 << RuntimeEventType.MAP_CAMERA_IS_CHANGING
+    MAP_CAMERA_DID_CHANGE = 1 << RuntimeEventType.MAP_CAMERA_DID_CHANGE
+    MAP_STYLE_LOADED = 1 << RuntimeEventType.MAP_STYLE_LOADED
+    MAP_LOADING_STARTED = 1 << RuntimeEventType.MAP_LOADING_STARTED
+    MAP_LOADING_FINISHED = 1 << RuntimeEventType.MAP_LOADING_FINISHED
+    MAP_LOADING_FAILED = 1 << RuntimeEventType.MAP_LOADING_FAILED
+    MAP_IDLE = 1 << RuntimeEventType.MAP_IDLE
+    MAP_RENDER_UPDATE_AVAILABLE = 1 << RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE
+    MAP_RENDER_ERROR = 1 << RuntimeEventType.MAP_RENDER_ERROR
+    MAP_STILL_IMAGE_FINISHED = 1 << RuntimeEventType.MAP_STILL_IMAGE_FINISHED
+    MAP_STILL_IMAGE_FAILED = 1 << RuntimeEventType.MAP_STILL_IMAGE_FAILED
+    MAP_RENDER_FRAME_STARTED = 1 << RuntimeEventType.MAP_RENDER_FRAME_STARTED
+    MAP_RENDER_FRAME_FINISHED = 1 << RuntimeEventType.MAP_RENDER_FRAME_FINISHED
+    MAP_RENDER_MAP_STARTED = 1 << RuntimeEventType.MAP_RENDER_MAP_STARTED
+    MAP_RENDER_MAP_FINISHED = 1 << RuntimeEventType.MAP_RENDER_MAP_FINISHED
+    MAP_STYLE_IMAGE_MISSING = 1 << RuntimeEventType.MAP_STYLE_IMAGE_MISSING
+    MAP_TILE_ACTION = 1 << RuntimeEventType.MAP_TILE_ACTION
+    MAP_CAMERA_TRANSITION_FINISHED = (
+        1 << RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED
+    )
+    OFFLINE_REGION_STATUS_CHANGED = 1 << RuntimeEventType.OFFLINE_REGION_STATUS_CHANGED
+    OFFLINE_REGION_RESPONSE_ERROR = 1 << RuntimeEventType.OFFLINE_REGION_RESPONSE_ERROR
+    OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = (
+        1 << RuntimeEventType.OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
+    )
+    OFFLINE_OPERATION_COMPLETED = 1 << RuntimeEventType.OFFLINE_OPERATION_COMPLETED
+    ALL_MAP_EVENTS = (
+        MAP_CAMERA_WILL_CHANGE
+        | MAP_CAMERA_IS_CHANGING
+        | MAP_CAMERA_DID_CHANGE
+        | MAP_STYLE_LOADED
+        | MAP_LOADING_STARTED
+        | MAP_LOADING_FINISHED
+        | MAP_LOADING_FAILED
+        | MAP_IDLE
+        | MAP_RENDER_UPDATE_AVAILABLE
+        | MAP_RENDER_ERROR
+        | MAP_STILL_IMAGE_FINISHED
+        | MAP_STILL_IMAGE_FAILED
+        | MAP_RENDER_FRAME_STARTED
+        | MAP_RENDER_FRAME_FINISHED
+        | MAP_RENDER_MAP_STARTED
+        | MAP_RENDER_MAP_FINISHED
+        | MAP_STYLE_IMAGE_MISSING
+        | MAP_TILE_ACTION
+        | MAP_CAMERA_TRANSITION_FINISHED
+    )
+    ALL_RUNTIME_EVENTS = (
+        OFFLINE_REGION_STATUS_CHANGED
+        | OFFLINE_REGION_RESPONSE_ERROR
+        | OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
+        | OFFLINE_OPERATION_COMPLETED
+    )
+    ALL = ALL_MAP_EVENTS | ALL_RUNTIME_EVENTS
+
+
+# The C options defaults select every type the linked library reports, which is
+# a superset of :attr:`RuntimeEventMask.ALL` when that library is newer than
+# this build. ``IntFlag`` keeps the unnamed bits, so those types stay selected
+# and reach a host as unknown event and payload domains.
+def _default_runtime_event_mask() -> RuntimeEventMask:
+    return RuntimeEventMask(_native.runtime_options_default_event_mask())
+
+
+def _default_map_event_mask() -> RuntimeEventMask:
+    return RuntimeEventMask(_native.map_options_default_event_mask())
 
 
 class CameraChangeMode(UnknownIntEnum):
@@ -144,19 +230,6 @@ class RenderMapPayload:
 
 
 @dataclass(frozen=True, slots=True)
-class StyleImageMissingPayload:
-    """Runtime style-image-missing event payload."""
-
-    image_id: str
-
-    @classmethod
-    def _from_runtime_payload(
-        cls, payload: dict[str, object]
-    ) -> StyleImageMissingPayload:
-        return cls(image_id=payload["image_id"])
-
-
-@dataclass(frozen=True, slots=True)
 class TileId:
     """Overscaled tile identity copied from a tile-action event."""
 
@@ -179,18 +252,19 @@ class TileId:
 
 @dataclass(frozen=True, slots=True)
 class TileActionPayload:
-    """Runtime tile-action event payload."""
+    """Runtime tile-action event payload.
+
+    ``RuntimeEvent.message`` carries the source ID.
+    """
 
     operation: TileOperation
     tile_id: TileId
-    source_id: str
 
     @classmethod
     def _from_runtime_payload(cls, payload: dict[str, object]) -> TileActionPayload:
         return cls(
             operation=TileOperation(payload["operation"]),
             tile_id=TileId._from_native(payload["tile_id"]),
-            source_id=payload["source_id"],
         )
 
 
@@ -213,7 +287,11 @@ class CameraTransitionFinishedPayload:
 
 @dataclass(frozen=True, slots=True)
 class UnknownRuntimeEventPayload:
-    """Forward-compatible runtime event payload bytes."""
+    """Forward-compatible runtime event payload bytes.
+
+    ``data`` is the event's whole payload window, so a payload type a later
+    library version defines arrives unchanged.
+    """
 
     raw_type: int
     data: bytes
@@ -231,6 +309,15 @@ class RuntimeEventSource:
 
     source_type: RuntimeEventSourceType
     """Kind of runtime object the event came from."""
+
+    source_id: int
+    """Native identity of the object the event came from.
+
+    The value names one object for the life of the process, so it stays
+    comparable after that object is released, and it is set even when
+    ``source_type`` is unknown or ``map_handle`` resolves to None. It is an
+    identity value only: no map can be reopened from it.
+    """
 
     map_handle: MapHandle | None = None
     """Source map, or None once the map is closed or unreferenced.
@@ -250,7 +337,14 @@ class RuntimeEvent:
     event_type: RuntimeEventType
     source: RuntimeEventSource
     code: int
+
     message: str | None
+    """Event text, which ``event_type`` names.
+
+    A style-image-missing event carries the image ID here and a tile-action
+    event the source ID. Failure events carry their native failure text.
+    """
+
     payload: RuntimeEventPayload
 
     @classmethod
@@ -265,6 +359,7 @@ class RuntimeEvent:
             event_type=RuntimeEventType(raw["event_type"]),
             source=RuntimeEventSource(
                 source_type=source_type,
+                source_id=source_id,
                 map_handle=(
                     runtime._map_for_source_id(source_id)
                     if runtime is not None and source_type == RuntimeEventSourceType.MAP
@@ -277,12 +372,54 @@ class RuntimeEvent:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class RuntimeEventBatch:
+    """Runtime events copied out of one drain.
+
+    A batch stays readable after later drains and after the maps whose events
+    it carries close, because every event is a Python-owned copy.
+    """
+
+    events: list[RuntimeEvent]
+    """Drained events in queue order."""
+
+    remaining_count: int
+    """Events still queued after this batch.
+
+    An unbounded drain leaves this at zero. A nonzero value means the
+    ``max_events`` bound ended the batch early, so another drain reports more
+    events.
+    """
+
+    @classmethod
+    def _from_native(
+        cls,
+        raw: dict[str, Any],
+        runtime: RuntimeHandle | None = None,
+    ) -> RuntimeEventBatch:
+        return cls(
+            events=[
+                RuntimeEvent._from_native(event, runtime) for event in raw["events"]
+            ],
+            remaining_count=raw["remaining_count"],
+        )
+
+
 @dataclass(slots=True)
 class RuntimeOptions:
-    """Options used when creating a runtime."""
+    """Options used when creating a runtime.
+
+    A path field left as ``None`` takes the C API default.
+    """
 
     asset_path: str | None = None
     cache_path: str | None = None
+    event_mask: RuntimeEventMask = field(default_factory=_default_runtime_event_mask)
+    """Runtime-originated event types this runtime queues from creation.
+
+    The default takes the C API creation default, which queues every type the
+    linked library reports. See :meth:`RuntimeHandle.set_event_mask`.
+    """
 
 
 class WakeSource(NativeHandleMixin):
@@ -326,6 +463,7 @@ class RuntimeHandle(NativeHandleMixin):
         self._native = _native.create_runtime(
             options.asset_path,
             options.cache_path,
+            int(options.event_mask),
         )
         self._offline_operations: weakref.WeakSet[OfflineOperationHandle] = (
             weakref.WeakSet()
@@ -366,8 +504,8 @@ class RuntimeHandle(NativeHandleMixin):
         """Advance this runtime.
 
         The call parks the owner thread when ``timeout`` allows it, then drains
-        the owner-thread task queues. Drain the queued runtime events with
-        :meth:`poll_event` afterwards.
+        the owner-thread task queues. Take the queued runtime events with
+        :meth:`drain_events` afterwards.
 
         ``timeout`` is in seconds and bounds the park: zero drains and returns,
         a positive value parks for up to that long, and ``None`` parks until a
@@ -567,16 +705,54 @@ class RuntimeHandle(NativeHandleMixin):
         """
         self._native.clear_resource_provider()
 
-    def poll_event(self) -> RuntimeEvent | None:
-        """Poll and copy one queued runtime event.
+    def drain_events(self, max_events: int = 0) -> RuntimeEventBatch:
+        """Drain and copy this runtime's queued runtime events into one batch.
+
+        ``max_events`` bounds the drain: zero drains every queued event, and a
+        positive value takes at most that many and reports the rest as
+        :attr:`RuntimeEventBatch.remaining_count`.
+
+        A drain is a queue operation: it never parks and runs no owner-thread
+        work. Call :meth:`pump` to advance the runtime, then drain what the pump
+        produced.
 
         `RuntimeEvent.source.map_handle` is None once the caller drops its last
         reference to the source map.
         """
-        event = self._native.poll_event()
-        if event is None:
-            return None
-        return RuntimeEvent._from_native(event, runtime=self)
+        if not 0 <= max_events < 2**64:
+            # PyO3 raises a bare OverflowError extracting `usize` before the
+            # binding's error conversion runs.
+            raise InvalidArgumentError(
+                f"max_events must fit in 64 unsigned bits, not {max_events}"
+            )
+        return RuntimeEventBatch._from_native(
+            self._native.drain_events(max_events), runtime=self
+        )
+
+    def set_event_mask(self, mask: RuntimeEventMask) -> None:
+        """Select which runtime-originated event types this runtime queues.
+
+        The call reads the bits in :attr:`RuntimeEventMask.ALL_RUNTIME_EVENTS`
+        and ignores the rest, so :attr:`RuntimeEventMask.ALL` selects every
+        runtime-originated type. Narrowing gates later events and keeps queued
+        ones, so a host drains what it already caused.
+
+        Region status, response error, and tile count limit events also need an
+        observed region, so this mask narrows that subscription rather than
+        replacing it. An offline operation records its result before the mask is
+        read, so an :class:`offline.OfflineOperationHandle` still reports its
+        result with the completion type unselected.
+        """
+        self._native.set_event_mask(int(mask))
+
+    @property
+    def event_mask(self) -> RuntimeEventMask:
+        """Runtime-originated event types this runtime queues.
+
+        The value is the mask last set, including bits this runtime ignores, so
+        a host reads it, changes one bit, and writes it back.
+        """
+        return RuntimeEventMask(self._native.get_event_mask())
 
     def create_map(self, options: MapOptions | None = None) -> MapHandle:
         """Create a map owned by this runtime."""
@@ -593,8 +769,6 @@ def _runtime_payload_from_native(payload: dict[str, object]) -> RuntimeEventPayl
         return RenderFramePayload._from_runtime_payload(payload)
     if kind == "render_map":
         return RenderMapPayload._from_runtime_payload(payload)
-    if kind == "style_image_missing":
-        return StyleImageMissingPayload._from_runtime_payload(payload)
     if kind == "tile_action":
         return TileActionPayload._from_runtime_payload(payload)
     if kind == "offline_region_status":
@@ -619,13 +793,14 @@ __all__ = [
     "RenderMode",
     "RenderingStats",
     "RuntimeEvent",
+    "RuntimeEventBatch",
+    "RuntimeEventMask",
     "RuntimeEventPayload",
     "RuntimeEventSource",
     "RuntimeEventSourceType",
     "RuntimeEventType",
     "RuntimeHandle",
     "RuntimeOptions",
-    "StyleImageMissingPayload",
     "TileActionPayload",
     "TileId",
     "TileOperation",
@@ -648,7 +823,6 @@ RuntimeEventPayload = (
     None
     | RenderFramePayload
     | RenderMapPayload
-    | StyleImageMissingPayload
     | TileActionPayload
     | OfflineRegionStatusChanged
     | OfflineRegionResponseError

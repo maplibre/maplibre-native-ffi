@@ -217,6 +217,7 @@ import Testing
     fetchTile: { box.fetched.append($0) },
     cancelTile: { box.cancelled.append($0) }
   )
+  defer { callbacks.release() }
   let options = NativeCustomGeometrySourceOptions(
     callbacks: callbacks,
     minZoom: 1,
@@ -254,51 +255,37 @@ import Testing
   #expect(box.cancelled == [NativeCanonicalTileID(z: 4, x: 5, y: 6)])
 }
 
+/// The C API calls the release callback on the map owner thread while a tile
+/// callback can still be running on a worker thread, so the release waits for
+/// that call rather than freeing the state under it.
 @Test func customGeometryCallbacksWaitForInFlightInvocationBeforeRelease(
 ) throws {
-  final class CallbackHolder: @unchecked Sendable {
-    private let lock = NSLock()
-    private var callbacks: NativeCustomGeometrySourceCallbacks?
-
-    init(_ callbacks: NativeCustomGeometrySourceCallbacks) {
-      self.callbacks = callbacks
-    }
-
-    func withCallbacks<Result>(_ body: (
-      NativeCustomGeometrySourceCallbacks
-    ) throws
-      -> Result) throws -> Result
-    {
-      lock.lock()
-      let callbacks = try #require(callbacks)
-      lock.unlock()
-      return try body(callbacks)
-    }
-
-    func clear() {
-      lock.lock()
-      callbacks = nil
-      lock.unlock()
-    }
-  }
-
-  final class CallbackInvocation: @unchecked Sendable {
+  // The C ABI callbacks an options struct carries, held past the struct's
+  // lifetime so a test calls them the way the C API does.
+  final class NativeCallbacks: @unchecked Sendable {
     private let fetchTile: mln_custom_geometry_source_tile_callback
+    private let releaseUserData: mln_custom_geometry_source_release_callback
     private let userDataAddress: UInt
 
     init(
-      fetchTile: @escaping mln_custom_geometry_source_tile_callback,
-      userData: UnsafeMutableRawPointer
-    ) {
-      self.fetchTile = fetchTile
-      userDataAddress = UInt(bitPattern: userData)
+      _ options: UnsafePointer<mln_custom_geometry_source_options>
+    ) throws {
+      fetchTile = try #require(options.pointee.fetch_tile)
+      releaseUserData = try #require(options.pointee.release_user_data)
+      userDataAddress =
+        try UInt(bitPattern: #require(options.pointee.user_data))
     }
 
-    func call() {
-      fetchTile(
-        UnsafeMutableRawPointer(bitPattern: userDataAddress),
-        mln_canonical_tile_id(z: 1, x: 2, y: 3)
-      )
+    private var userData: UnsafeMutableRawPointer? {
+      UnsafeMutableRawPointer(bitPattern: userDataAddress)
+    }
+
+    func fetch() {
+      fetchTile(userData, mln_canonical_tile_id(z: 1, x: 2, y: 3))
+    }
+
+    func release() {
+      releaseUserData(userData)
     }
   }
 
@@ -308,30 +295,22 @@ import Testing
   let releaseStarted = DispatchSemaphore(value: 0)
   let releaseFinished = DispatchSemaphore(value: 0)
 
-  let holder =
-    CallbackHolder(NativeCustomGeometrySourceCallbacks(fetchTile: { _ in
+  let native = try NativeCustomGeometrySourceOptions(
+    callbacks: NativeCustomGeometrySourceCallbacks(fetchTile: { _ in
       entered.signal()
       allowReturn.wait()
-    }))
-  let invocation = try holder.withCallbacks { callbacks in
-    try NativeCustomGeometrySourceOptions(callbacks: callbacks)
-      .withNativeOptions { native in
-        CallbackInvocation(
-          fetchTile: native.pointee.fetch_tile!,
-          userData: native.pointee.user_data!
-        )
-      }
-  }
+    })
+  ).withNativeOptions(NativeCallbacks.init)
 
   Thread {
-    invocation.call()
+    native.fetch()
     invocationFinished.signal()
   }.start()
   #expect(entered.wait(timeout: .now() + .seconds(5)) == .success)
 
   Thread {
     releaseStarted.signal()
-    holder.clear()
+    native.release()
     releaseFinished.signal()
   }.start()
   #expect(releaseStarted.wait(timeout: .now() + .seconds(5)) == .success)
@@ -343,73 +322,164 @@ import Testing
   #expect(releaseFinished.wait(timeout: .now() + .seconds(5)) == .success)
 }
 
-@Test func customGeometryCallbacksCanAbandonRetainedBoxForNativeLeakPath(
-) throws {
-  final class Counter: @unchecked Sendable {
-    private let lock = NSLock()
-    private var count = 0
+/// Counts the custom geometry source callback states the C API has released.
+private final class ReleaseCounter: @unchecked Sendable {
+  private let lock = NSLock()
+  private var count = 0
 
-    func increment() {
-      lock.withLock {
-        count += 1
-      }
-    }
-
-    func value() -> Int {
-      lock.withLock { count }
-    }
+  var value: Int {
+    lock.withLock { count }
   }
 
-  let counter = Counter()
-  var fetchTile: mln_custom_geometry_source_tile_callback?
-  var userData: UnsafeMutableRawPointer?
-
-  do {
-    let callbacks = NativeCustomGeometrySourceCallbacks(fetchTile: { _ in
-      counter.increment()
-    })
-    try NativeCustomGeometrySourceOptions(callbacks: callbacks)
-      .withNativeOptions { native in
-        fetchTile = native.pointee.fetch_tile
-        userData = native.pointee.user_data
-      }
-    callbacks.abandonRetainedBox()
+  func increment() {
+    lock.withLock { count += 1 }
   }
-
-  let abandonedUserData = try #require(userData)
-  let abandonedFetchTile = try #require(fetchTile)
-  defer {
-    NativeCustomGeometrySourceCallbacks
-      .releaseAbandonedRetainedBoxForTesting(abandonedUserData)
-  }
-  abandonedFetchTile(abandonedUserData, mln_canonical_tile_id(z: 1, x: 2, y: 3))
-
-  #expect(counter.value() == 1)
 }
 
-@Test func staleStyleLoadedEventDoesNotReleaseCallbacksWhileOldSourceExists(
+/// Captured by a custom geometry source's tile closure, so its deallocation
+/// reports that the C API released that source's callback state.
+private final class ReleaseSentinel: @unchecked Sendable {
+  private let counter: ReleaseCounter
+
+  init(_ counter: ReleaseCounter) {
+    self.counter = counter
+  }
+
+  deinit {
+    counter.increment()
+  }
+}
+
+/// Adds a custom geometry source whose callback state reports its own release
+/// through `counter`.
+private func addSourceReportingItsRelease(
+  to map: MapHandle,
+  sourceId: String = "custom",
+  counter: ReleaseCounter
 ) throws {
+  let sentinel = ReleaseSentinel(counter)
+  try map.addCustomGeometrySource(
+    sourceId: sourceId,
+    options: CustomGeometrySourceOptions(fetchTile: { _ in
+      withExtendedLifetime(sentinel) {}
+    })
+  )
+}
+
+/// A style load drops the sources the previous style held, and the C API
+/// releases their callback state without a map-style-loaded event, so a host
+/// that never selected that event type still gets its state freed.
+@Test func aStyleLoadReleasesADroppedCustomGeometrySource() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  try runtime.setResourceProvider { request, handle in
+    guard request.requestedUrl == "maplibre://maps/replacement" else {
+      return .passThrough
+    }
+    try? handle.complete(ResourceResponse(status: .ok, bytes: emptyStyleJSON))
+    return .handle
+  }
+  let narrowed = RuntimeEventMask.all.subtracting(.mapStyleLoaded)
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 64, height: 64, eventMask: narrowed)
+  )
+  defer { try? map.close() }
+
+  try map.setStyleJSON(emptyStyleJSON)
+  let counter = ReleaseCounter()
+  try addSourceReportingItsRelease(to: map, counter: counter)
+  #expect(counter.value == 0)
+
+  try map.setStyleURL("maplibre://maps/replacement")
+  var styleLoadedReported = false
+  let deadline = Date().addingTimeInterval(10)
+  while Date() < deadline, counter.value == 0 {
+    try runtime.pump()
+    styleLoadedReported = try styleLoadedReported || runtime.drainEvents()
+      .events.contains { $0.type == .mapStyleLoaded }
+    Thread.sleep(forTimeInterval: 0.001)
+  }
+
+  #expect(counter.value == 1)
+  #expect(!styleLoadedReported)
+  #expect(try map.eventMask == narrowed)
+  #expect(try !map.styleSourceExists("custom"))
+}
+
+/// Removing a custom geometry source releases its callback state, and does so
+/// once.
+@Test func removingACustomGeometrySourceReleasesItsCallbacks() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.close() }
   let map = try MapHandle(
     runtime: runtime,
-    options: MapOptions(width: 1, height: 1)
+    options: MapOptions(width: 64, height: 64)
   )
   defer { try? map.close() }
 
-  try map.setStyleJSON(jsonData("""
-  {"version":8,"sources":{},"layers":[]}
-  """))
-  try map.addCustomGeometrySource(
-    sourceId: "custom",
-    options: CustomGeometrySourceOptions(fetchTile: { _ in })
+  try map.setStyleJSON(emptyStyleJSON)
+  let counter = ReleaseCounter()
+  try addSourceReportingItsRelease(to: map, counter: counter)
+
+  #expect(try map.removeStyleSource("custom"))
+  #expect(counter.value == 1)
+  try map.close()
+  #expect(counter.value == 1)
+}
+
+/// Destroying a map releases the callback state of the sources it still holds.
+@Test func closingAMapReleasesItsCustomGeometrySources() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 64, height: 64)
   )
+  defer { try? map.close() }
 
-  try map.setStyleURL("https://tiles.openfreemap.org/styles/bright")
-  map.releaseCallbacksForLoadedStyleURLIfNeeded()
+  try map.setStyleJSON(emptyStyleJSON)
+  let counter = ReleaseCounter()
+  for sourceId in ["first", "second"] {
+    try addSourceReportingItsRelease(
+      to: map,
+      sourceId: sourceId,
+      counter: counter
+    )
+  }
+  #expect(counter.value == 0)
 
-  #expect(map.retainsCustomGeometrySourceCallbacks(sourceId: "custom"))
+  try map.close()
+
+  #expect(counter.value == 2)
+}
+
+/// The C API never releases the callback state of an add it rejected, so this
+/// binding frees it there itself.
+@Test func aRejectedCustomGeometrySourceAddReleasesItsCallbacks() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 64, height: 64)
+  )
+  defer { try? map.close() }
+
+  try map.setStyleJSON(emptyStyleJSON)
+  let accepted = ReleaseCounter()
+  try addSourceReportingItsRelease(to: map, counter: accepted)
+
+  let rejected = ReleaseCounter()
+  #expect(throws: MaplibreError.self) {
+    try addSourceReportingItsRelease(to: map, counter: rejected)
+  }
+
+  #expect(rejected.value == 1)
+  #expect(accepted.value == 0)
 }
 
 @Test func loadedStyleDocumentAndURLReadBackWhatWasLoaded() throws {
@@ -438,55 +508,6 @@ import Testing
   try map.setStyleURL("https://example.com/style.json")
   #expect(try map.styleURL() == "https://example.com/style.json")
   #expect(try map.loadedStyleJSON() == styleJSON)
-}
-
-@Test func staleStyleLoadedEventReleasesOnlyCallbacksForMissingSources() throws {
-  let runtime =
-    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  defer { try? runtime.close() }
-  let map = try MapHandle(
-    runtime: runtime,
-    options: MapOptions(width: 1, height: 1)
-  )
-  defer { try? map.close() }
-
-  try map.setStyleJSON(jsonData("""
-  {"version":8,"sources":{},"layers":[]}
-  """))
-  map.storeCustomGeometrySourceCallbacks(
-    NativeCustomGeometrySourceCallbacks(fetchTile: { _ in }),
-    sourceId: "missing"
-  )
-
-  try map.setStyleURL("https://tiles.openfreemap.org/styles/bright")
-  map.releaseCallbacksForLoadedStyleURLIfNeeded()
-
-  #expect(!map.retainsCustomGeometrySourceCallbacks(sourceId: "missing"))
-}
-
-@Test func staleStyleLoadedEventReleasesCallbacksForSourceTypeCollisions(
-) throws {
-  let runtime =
-    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  defer { try? runtime.close() }
-  let map = try MapHandle(
-    runtime: runtime,
-    options: MapOptions(width: 1, height: 1)
-  )
-  defer { try? map.close() }
-
-  try map.setStyleJSON(jsonData("""
-  {"version":8,"sources":{"custom":{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}},"layers":[]}
-  """))
-  map.storeCustomGeometrySourceCallbacks(
-    NativeCustomGeometrySourceCallbacks(fetchTile: { _ in }),
-    sourceId: "custom"
-  )
-
-  try map.setStyleURL("https://tiles.openfreemap.org/styles/bright")
-  map.releaseCallbacksForLoadedStyleURLIfNeeded()
-
-  #expect(!map.retainsCustomGeometrySourceCallbacks(sourceId: "custom"))
 }
 
 @Test func closedMapRejectsStyleCallsThroughSwiftHandleState() throws {

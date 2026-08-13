@@ -72,6 +72,7 @@ import org.maplibre.nativeffi.internal.c.mln_rendering_stats
 import org.maplibre.nativeffi.internal.c.mln_resource_request
 import org.maplibre.nativeffi.internal.c.mln_resource_response
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_batch
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_camera_transition_finished
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_operation_completed
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_response_error
@@ -79,7 +80,6 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_status
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_tile_count_limit
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_render_frame
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_render_map
-import org.maplibre.nativeffi.internal.c.mln_runtime_event_style_image_missing
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_tile_action
 import org.maplibre.nativeffi.internal.c.mln_runtime_options
 import org.maplibre.nativeffi.internal.c.mln_screen_box
@@ -2526,6 +2526,8 @@ internal object NativeAccess {
     value: CustomGeometrySourceOptions,
     fetchTile: MemorySegment,
     cancelTile: MemorySegment,
+    releaseUserData: MemorySegment,
+    userData: MemorySegment,
   ): MemorySegment {
     val segment = arena.allocate(CUSTOM_GEOMETRY_SOURCE_OPTIONS_SIZE)
     segment.set(
@@ -2535,10 +2537,11 @@ internal object NativeAccess {
     )
     segment.set(ValueLayout.ADDRESS, CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE_OFFSET, fetchTile)
     segment.set(ValueLayout.ADDRESS, CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE_OFFSET, cancelTile)
+    segment.set(ValueLayout.ADDRESS, CUSTOM_GEOMETRY_SOURCE_OPTIONS_USER_DATA_OFFSET, userData)
     segment.set(
       ValueLayout.ADDRESS,
-      CUSTOM_GEOMETRY_SOURCE_OPTIONS_USER_DATA_OFFSET,
-      MemorySegment.NULL,
+      CUSTOM_GEOMETRY_SOURCE_OPTIONS_RELEASE_USER_DATA_OFFSET,
+      releaseUserData,
     )
     var fields = 0
     value.minZoom?.let {
@@ -3071,31 +3074,102 @@ internal object NativeAccess {
       markTaken,
     )
 
-  internal fun pollRuntimeEvent(runtime: NativeRuntime): NativeRuntimeEvent? =
-    Arena.ofConfined().use { arena ->
-      val event = arena.allocate(RUNTIME_EVENT_SIZE)
-      event.set(ValueLayout.JAVA_INT, RUNTIME_EVENT_SIZE_OFFSET, RUNTIME_EVENT_SIZE.toInt())
-      val hasEvent = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      hasEvent.set(ValueLayout.JAVA_BOOLEAN, 0, false)
-      Status.check(runtimePollEventFunction().invokeNative(runtime, event, hasEvent) as Int)
-      if (!hasEvent.get(ValueLayout.JAVA_BOOLEAN, 0)) {
-        return@use null
-      }
-      val payloadSize = event.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_PAYLOAD_SIZE_OFFSET)
-      val payload =
-        boundedAddress(event.get(ValueLayout.ADDRESS, RUNTIME_EVENT_PAYLOAD_OFFSET), payloadSize)
-      val payloadType = event.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_PAYLOAD_TYPE_OFFSET)
-      val message = event.get(ValueLayout.ADDRESS, RUNTIME_EVENT_MESSAGE_OFFSET)
-      val messageSize = event.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_MESSAGE_SIZE_OFFSET)
-      NativeRuntimeEvent(
-        type = event.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_TYPE_OFFSET),
-        sourceType = event.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_SOURCE_TYPE_OFFSET),
-        sourceId = event.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_SOURCE_OFFSET),
-        code = event.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_CODE_OFFSET),
-        payload = runtimeEventPayload(payloadType, payload, payloadSize),
-        message = copyString(message, messageSize),
-      )
+  /** Allocates the reused batch struct that [drainRuntimeEvents] fills. */
+  internal fun allocateRuntimeEventBatch(arena: Arena): MemorySegment =
+    arena.allocate(RUNTIME_EVENT_BATCH_SIZE)
+
+  /**
+   * Drains at most [maxEvents] events into [batch], zero draining every queued event, and copies
+   * every field of every event out of the runtime-owned arena before returning.
+   */
+  internal fun drainRuntimeEvents(
+    runtime: NativeRuntime,
+    maxEvents: Long,
+    batch: MemorySegment,
+  ): NativeRuntimeEventBatch {
+    batch.set(
+      ValueLayout.JAVA_INT,
+      RUNTIME_EVENT_BATCH_SIZE_OFFSET,
+      RUNTIME_EVENT_BATCH_SIZE.toInt(),
+    )
+    Status.check(MapLibreNativeC.mln_runtime_drain_events(runtime.raw, maxEvents, batch))
+    val eventCount = batch.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_BATCH_EVENT_COUNT_OFFSET)
+    val remainingCount = batch.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_BATCH_REMAINING_OFFSET)
+    if (eventCount == 0L) {
+      return NativeRuntimeEventBatch(emptyList(), remainingCount)
     }
+    // The stride the batch reports can exceed this binding's compiled event
+    // record, so index by it rather than by mln_runtime_event.sizeof().
+    val eventSize =
+      Integer.toUnsignedLong(batch.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_BATCH_EVENT_SIZE_OFFSET))
+    val payloadExtent = eventSize - RUNTIME_EVENT_PAYLOAD_OFFSET
+    val events =
+      batch
+        .get(ValueLayout.ADDRESS, RUNTIME_EVENT_BATCH_EVENTS_OFFSET)
+        .reinterpret(eventCount * eventSize)
+    val messagesSize = batch.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_BATCH_MESSAGES_SIZE_OFFSET)
+    val messages =
+      batch.get(ValueLayout.ADDRESS, RUNTIME_EVENT_BATCH_MESSAGES_OFFSET).reinterpret(messagesSize)
+    return NativeRuntimeEventBatch(
+      List(Math.toIntExact(eventCount)) { index ->
+        val base = index * eventSize
+        val payloadType = events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_PAYLOAD_TYPE_OFFSET)
+        NativeRuntimeEvent(
+          type = events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_TYPE_OFFSET),
+          sourceType = events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_SOURCE_TYPE_OFFSET),
+          sourceId = events.get(ValueLayout.JAVA_LONG, base + RUNTIME_EVENT_SOURCE_OFFSET),
+          code = events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_CODE_OFFSET),
+          payload =
+            runtimeEventPayload(
+              payloadType,
+              events.asSlice(base + RUNTIME_EVENT_PAYLOAD_OFFSET, payloadExtent),
+            ),
+          message =
+            copyMessage(
+              messages,
+              Integer.toUnsignedLong(
+                events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_MESSAGE_OFFSET_OFFSET)
+              ),
+              Integer.toUnsignedLong(
+                events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_MESSAGE_SIZE_OFFSET)
+              ),
+            ),
+        )
+      },
+      remainingCount,
+    )
+  }
+
+  internal fun setRuntimeEventMask(runtime: NativeRuntime, mask: Long) {
+    Status.check(MapLibreNativeC.mln_runtime_set_event_mask(runtime.raw, mask))
+  }
+
+  internal fun runtimeEventMask(runtime: NativeRuntime): Long =
+    Arena.ofConfined().use { arena ->
+      val outMask = arena.allocate(ValueLayout.JAVA_LONG)
+      Status.check(MapLibreNativeC.mln_runtime_get_event_mask(runtime.raw, outMask))
+      outMask.get(ValueLayout.JAVA_LONG, 0)
+    }
+
+  internal fun setMapEventMask(map: NativeMap, mask: Long) {
+    Status.check(MapLibreNativeC.mln_map_set_event_mask(map.raw, mask))
+  }
+
+  internal fun mapEventMask(map: NativeMap): Long =
+    Arena.ofConfined().use { arena ->
+      val outMask = arena.allocate(ValueLayout.JAVA_LONG)
+      Status.check(MapLibreNativeC.mln_map_get_event_mask(map.raw, outMask))
+      outMask.get(ValueLayout.JAVA_LONG, 0)
+    }
+
+  private fun copyMessage(messages: MemorySegment, offset: Long, size: Long): String {
+    if (size == 0L) {
+      return ""
+    }
+    val bytes = ByteArray(Math.toIntExact(size))
+    MemorySegment.copy(messages, ValueLayout.JAVA_BYTE, offset, bytes, 0, bytes.size)
+    return String(bytes, StandardCharsets.UTF_8)
+  }
 
   private fun intFunction(name: String): MethodHandle = downcall(name)
 
@@ -3373,8 +3447,6 @@ internal object NativeAccess {
   private fun offlineRegionListDestroyFunction(): MethodHandle =
     downcall("mln_offline_region_list_destroy")
 
-  private fun runtimePollEventFunction(): MethodHandle = downcall("mln_runtime_poll_event")
-
   private fun addTileSourceUrl(
     functionName: String,
     map: NativeMap,
@@ -3446,12 +3518,25 @@ internal object NativeAccess {
 
   private fun runtimeLongIntOperationStartFunction(name: String): MethodHandle = downcall(name)
 
+  internal fun defaultRuntimeOptionsEventMask(): Long {
+    ensureLoaded()
+    return Arena.ofConfined().use { arena ->
+      mln_runtime_options.event_mask(MapLibreNativeC.mln_runtime_options_default(arena))
+    }
+  }
+
+  internal fun defaultMapOptionsEventMask(): Long {
+    ensureLoaded()
+    return Arena.ofConfined().use { arena ->
+      mln_map_options.event_mask(MapLibreNativeC.mln_map_options_default(arena))
+    }
+  }
+
   private fun runtimeOptions(options: RuntimeOptions, arena: Arena): MemorySegment {
     val nativeOptions = MapLibreNativeC.mln_runtime_options_default(arena)
-    var flags = mln_runtime_options.flags(nativeOptions)
     mln_runtime_options.asset_path(nativeOptions, optionalCString(arena, options.assetPath))
     mln_runtime_options.cache_path(nativeOptions, optionalCString(arena, options.cachePath))
-    mln_runtime_options.flags(nativeOptions, flags)
+    mln_runtime_options.event_mask(nativeOptions, options.eventMask.nativeValue)
     return nativeOptions
   }
 
@@ -4397,13 +4482,6 @@ internal object NativeAccess {
   private fun copyString(address: MemorySegment, byteCount: Long): String =
     String(copyBytes(address, byteCount), StandardCharsets.UTF_8)
 
-  private fun boundedAddress(address: MemorySegment, byteCount: Long): MemorySegment {
-    if (address == MemorySegment.NULL || byteCount == 0L) {
-      return MemorySegment.NULL
-    }
-    return address.reinterpret(byteCount)
-  }
-
   private fun checkedInt(value: Long): Int {
     require(value <= Int.MAX_VALUE) { "native count exceeds Int.MAX_VALUE" }
     require(value >= 0L) { "native count must be non-negative" }
@@ -4548,6 +4626,7 @@ internal object NativeAccess {
       mln_map_options.map_mode(segment, it.nativeValue)
     }
     options.fastPforEnabled?.let { mln_map_options.fast_pfor_enabled(segment, it) }
+    mln_map_options.event_mask(segment, options.eventMask.nativeValue)
     return segment
   }
 
@@ -4994,68 +5073,31 @@ internal object NativeAccess {
     return length
   }
 
-  private fun runtimeEventPayload(
+  /** Decodes one payload window, for tests that synthesize a payload this version cannot queue. */
+  internal fun runtimeEventPayloadForTesting(
     payloadType: Int,
     payload: MemorySegment,
-    payloadSize: Long,
-  ): RuntimeEventPayload =
+  ): RuntimeEventPayload = runtimeEventPayload(payloadType, payload)
+
+  private fun runtimeEventPayload(payloadType: Int, payload: MemorySegment): RuntimeEventPayload =
     when (payloadType) {
       PAYLOAD_NONE -> RuntimeEventPayload.None
-      PAYLOAD_RENDER_FRAME ->
-        if (hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_RENDER_FRAME_SIZE)) {
-          renderFramePayload(payload)
-        } else unknownPayload(payloadType, payload, payloadSize)
-      PAYLOAD_RENDER_MAP ->
-        if (hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_RENDER_MAP_SIZE)) {
-          renderMapPayload(payload)
-        } else unknownPayload(payloadType, payload, payloadSize)
-      PAYLOAD_STYLE_IMAGE_MISSING ->
-        if (hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_STYLE_IMAGE_MISSING_SIZE)) {
-          styleImageMissingPayload(payload)
-        } else unknownPayload(payloadType, payload, payloadSize)
-      PAYLOAD_TILE_ACTION ->
-        if (hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_TILE_ACTION_SIZE)) {
-          tileActionPayload(payload)
-        } else unknownPayload(payloadType, payload, payloadSize)
-      PAYLOAD_OFFLINE_REGION_STATUS ->
-        if (hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_OFFLINE_REGION_STATUS_SIZE)) {
-          offlineRegionStatusPayload(payload)
-        } else unknownPayload(payloadType, payload, payloadSize)
-      PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR ->
-        if (
-          hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR_SIZE)
-        ) {
-          offlineRegionResponseErrorPayload(payload)
-        } else unknownPayload(payloadType, payload, payloadSize)
-      PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT ->
-        if (
-          hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_SIZE)
-        ) {
-          offlineRegionTileCountLimitPayload(payload)
-        } else unknownPayload(payloadType, payload, payloadSize)
-      PAYLOAD_OFFLINE_OPERATION_COMPLETED ->
-        if (hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_SIZE)) {
-          offlineOperationCompletedPayload(payload)
-        } else unknownPayload(payloadType, payload, payloadSize)
-      PAYLOAD_CAMERA_TRANSITION_FINISHED ->
-        if (hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_CAMERA_TRANSITION_FINISHED_SIZE)) {
-          cameraTransitionFinishedPayload(payload)
-        } else unknownPayload(payloadType, payload, payloadSize)
-      else -> unknownPayload(payloadType, payload, payloadSize)
+      PAYLOAD_RENDER_FRAME -> renderFramePayload(payload)
+      PAYLOAD_RENDER_MAP -> renderMapPayload(payload)
+      PAYLOAD_TILE_ACTION -> tileActionPayload(payload)
+      PAYLOAD_OFFLINE_REGION_STATUS -> offlineRegionStatusPayload(payload)
+      PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR -> offlineRegionResponseErrorPayload(payload)
+      PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT -> offlineRegionTileCountLimitPayload(payload)
+      PAYLOAD_OFFLINE_OPERATION_COMPLETED -> offlineOperationCompletedPayload(payload)
+      PAYLOAD_CAMERA_TRANSITION_FINISHED -> cameraTransitionFinishedPayload(payload)
+      else -> unknownPayload(payloadType, payload)
     }
-
-  private fun hasPayloadSize(
-    payload: MemorySegment,
-    payloadSize: Long,
-    requiredSize: Long,
-  ): Boolean = payload != MemorySegment.NULL && payloadSize >= requiredSize
 
   private fun unknownPayload(
     payloadType: Int,
     payload: MemorySegment,
-    payloadSize: Long,
   ): RuntimeEventPayload.Unknown =
-    RuntimeEventPayload.Unknown(payloadType, payloadSize, copyBytes(payload, payloadSize))
+    RuntimeEventPayload.Unknown(payloadType, copyBytes(payload, payload.byteSize()))
 
   private fun renderFramePayload(payload: MemorySegment): RuntimeEventPayload.RenderFrame =
     RuntimeEventPayload.RenderFrame(
@@ -5078,16 +5120,6 @@ internal object NativeAccess {
       RenderMode.fromNative(payload.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_RENDER_MAP_MODE_OFFSET))
     )
 
-  private fun styleImageMissingPayload(
-    payload: MemorySegment
-  ): RuntimeEventPayload.StyleImageMissing =
-    RuntimeEventPayload.StyleImageMissing(
-      copyString(
-        payload.get(ValueLayout.ADDRESS, RUNTIME_EVENT_STYLE_IMAGE_MISSING_IMAGE_ID_OFFSET),
-        payload.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_STYLE_IMAGE_MISSING_IMAGE_ID_SIZE_OFFSET),
-      )
-    )
-
   private fun tileActionPayload(payload: MemorySegment): RuntimeEventPayload.TileAction =
     RuntimeEventPayload.TileAction(
       TileOperation.fromNative(
@@ -5107,10 +5139,6 @@ internal object NativeAccess {
         Integer.toUnsignedLong(
           payload.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_TILE_ACTION_CANONICAL_Y_OFFSET)
         ),
-      ),
-      copyString(
-        payload.get(ValueLayout.ADDRESS, RUNTIME_EVENT_TILE_ACTION_SOURCE_ID_OFFSET),
-        payload.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_TILE_ACTION_SOURCE_ID_SIZE_OFFSET),
       ),
     )
 
@@ -5444,6 +5472,8 @@ internal object NativeAccess {
     mln_custom_geometry_source_options.`clip$offset`()
   private val CUSTOM_GEOMETRY_SOURCE_OPTIONS_WRAP_OFFSET: Long =
     mln_custom_geometry_source_options.`wrap$offset`()
+  private val CUSTOM_GEOMETRY_SOURCE_OPTIONS_RELEASE_USER_DATA_OFFSET: Long =
+    mln_custom_geometry_source_options.`release_user_data$offset`()
 
   private const val FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID: Int = 1 shl 0
   private const val FEATURE_STATE_SELECTOR_FEATURE_ID: Int = 1 shl 1
@@ -5542,17 +5572,29 @@ internal object NativeAccess {
   private val STYLE_IMAGE_INFO_HAS_TEXT_FIT_HEIGHT_OFFSET: Long =
     mln_style_image_info.`has_text_fit_height$offset`()
 
-  private val RUNTIME_EVENT_SIZE: Long = mln_runtime_event.sizeof()
-  private val RUNTIME_EVENT_SIZE_OFFSET: Long = mln_runtime_event.`size$offset`()
   private val RUNTIME_EVENT_TYPE_OFFSET: Long = mln_runtime_event.`type$offset`()
   private val RUNTIME_EVENT_SOURCE_TYPE_OFFSET: Long = mln_runtime_event.`source_type$offset`()
   private val RUNTIME_EVENT_SOURCE_OFFSET: Long = mln_runtime_event.`source$offset`()
   private val RUNTIME_EVENT_CODE_OFFSET: Long = mln_runtime_event.`code$offset`()
   private val RUNTIME_EVENT_PAYLOAD_TYPE_OFFSET: Long = mln_runtime_event.`payload_type$offset`()
   private val RUNTIME_EVENT_PAYLOAD_OFFSET: Long = mln_runtime_event.`payload$offset`()
-  private val RUNTIME_EVENT_PAYLOAD_SIZE_OFFSET: Long = mln_runtime_event.`payload_size$offset`()
-  private val RUNTIME_EVENT_MESSAGE_OFFSET: Long = mln_runtime_event.`message$offset`()
+  private val RUNTIME_EVENT_MESSAGE_OFFSET_OFFSET: Long =
+    mln_runtime_event.`message_offset$offset`()
   private val RUNTIME_EVENT_MESSAGE_SIZE_OFFSET: Long = mln_runtime_event.`message_size$offset`()
+
+  private val RUNTIME_EVENT_BATCH_SIZE: Long = mln_runtime_event_batch.sizeof()
+  private val RUNTIME_EVENT_BATCH_SIZE_OFFSET: Long = mln_runtime_event_batch.`size$offset`()
+  private val RUNTIME_EVENT_BATCH_EVENT_SIZE_OFFSET: Long =
+    mln_runtime_event_batch.`event_size$offset`()
+  private val RUNTIME_EVENT_BATCH_EVENTS_OFFSET: Long = mln_runtime_event_batch.`events$offset`()
+  private val RUNTIME_EVENT_BATCH_EVENT_COUNT_OFFSET: Long =
+    mln_runtime_event_batch.`event_count$offset`()
+  private val RUNTIME_EVENT_BATCH_MESSAGES_OFFSET: Long =
+    mln_runtime_event_batch.`messages$offset`()
+  private val RUNTIME_EVENT_BATCH_MESSAGES_SIZE_OFFSET: Long =
+    mln_runtime_event_batch.`messages_size$offset`()
+  private val RUNTIME_EVENT_BATCH_REMAINING_OFFSET: Long =
+    mln_runtime_event_batch.`remaining_count$offset`()
 
   private val RESOURCE_REQUEST_REQUESTED_URL_OFFSET: Long =
     mln_resource_request.`requested_url$offset`()
@@ -5608,16 +5650,20 @@ internal object NativeAccess {
   private val RESOURCE_RESPONSE_RETRY_AFTER_OFFSET: Long =
     mln_resource_response.`retry_after_unix_ms$offset`()
 
-  private const val PAYLOAD_NONE: Int = 0
-  private const val PAYLOAD_RENDER_FRAME: Int = 1
-  private const val PAYLOAD_RENDER_MAP: Int = 2
-  private const val PAYLOAD_STYLE_IMAGE_MISSING: Int = 3
-  private const val PAYLOAD_TILE_ACTION: Int = 4
-  private const val PAYLOAD_OFFLINE_REGION_STATUS: Int = 5
-  private const val PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR: Int = 6
-  private const val PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT: Int = 7
-  private const val PAYLOAD_OFFLINE_OPERATION_COMPLETED: Int = 8
-  private const val PAYLOAD_CAMERA_TRANSITION_FINISHED: Int = 9
+  private val PAYLOAD_NONE: Int = MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_NONE()
+  private val PAYLOAD_RENDER_FRAME: Int = MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME()
+  private val PAYLOAD_RENDER_MAP: Int = MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP()
+  private val PAYLOAD_TILE_ACTION: Int = MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION()
+  private val PAYLOAD_OFFLINE_REGION_STATUS: Int =
+    MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS()
+  private val PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR: Int =
+    MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR()
+  private val PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT: Int =
+    MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT()
+  private val PAYLOAD_OFFLINE_OPERATION_COMPLETED: Int =
+    MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED()
+  private val PAYLOAD_CAMERA_TRANSITION_FINISHED: Int =
+    MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED()
 
   private val OFFLINE_REGION_STATUS_SIZE: Long = mln_offline_region_status.sizeof()
   private val OFFLINE_REGION_STATUS_SIZE_OFFSET: Long = mln_offline_region_status.`size$offset`()
@@ -5640,7 +5686,6 @@ internal object NativeAccess {
   private val OFFLINE_REGION_STATUS_COMPLETE_OFFSET: Long =
     mln_offline_region_status.`complete$offset`()
 
-  private val RUNTIME_EVENT_RENDER_FRAME_SIZE: Long = mln_runtime_event_render_frame.sizeof()
   private val RUNTIME_EVENT_RENDER_FRAME_MODE_OFFSET: Long =
     mln_runtime_event_render_frame.`mode$offset`()
   private val RUNTIME_EVENT_RENDER_FRAME_NEEDS_REPAINT_OFFSET: Long =
@@ -5659,18 +5704,9 @@ internal object NativeAccess {
     mln_runtime_event_render_frame.`stats$offset`() +
       mln_rendering_stats.`total_draw_call_count$offset`()
 
-  private val RUNTIME_EVENT_RENDER_MAP_SIZE: Long = mln_runtime_event_render_map.sizeof()
   private val RUNTIME_EVENT_RENDER_MAP_MODE_OFFSET: Long =
     mln_runtime_event_render_map.`mode$offset`()
 
-  private val RUNTIME_EVENT_STYLE_IMAGE_MISSING_SIZE: Long =
-    mln_runtime_event_style_image_missing.sizeof()
-  private val RUNTIME_EVENT_STYLE_IMAGE_MISSING_IMAGE_ID_OFFSET: Long =
-    mln_runtime_event_style_image_missing.`image_id$offset`()
-  private val RUNTIME_EVENT_STYLE_IMAGE_MISSING_IMAGE_ID_SIZE_OFFSET: Long =
-    mln_runtime_event_style_image_missing.`image_id_size$offset`()
-
-  private val RUNTIME_EVENT_TILE_ACTION_SIZE: Long = mln_runtime_event_tile_action.sizeof()
   private val RUNTIME_EVENT_TILE_ACTION_OPERATION_OFFSET: Long =
     mln_runtime_event_tile_action.`operation$offset`()
   private val RUNTIME_EVENT_TILE_ACTION_OVERSCALED_Z_OFFSET: Long =
@@ -5683,34 +5719,22 @@ internal object NativeAccess {
     mln_runtime_event_tile_action.`tile_id$offset`() + mln_tile_id.`canonical_x$offset`()
   private val RUNTIME_EVENT_TILE_ACTION_CANONICAL_Y_OFFSET: Long =
     mln_runtime_event_tile_action.`tile_id$offset`() + mln_tile_id.`canonical_y$offset`()
-  private val RUNTIME_EVENT_TILE_ACTION_SOURCE_ID_OFFSET: Long =
-    mln_runtime_event_tile_action.`source_id$offset`()
-  private val RUNTIME_EVENT_TILE_ACTION_SOURCE_ID_SIZE_OFFSET: Long =
-    mln_runtime_event_tile_action.`source_id_size$offset`()
 
-  private val RUNTIME_EVENT_OFFLINE_REGION_STATUS_SIZE: Long =
-    mln_runtime_event_offline_region_status.sizeof()
   private val RUNTIME_EVENT_OFFLINE_REGION_STATUS_REGION_ID_OFFSET: Long =
     mln_runtime_event_offline_region_status.`region_id$offset`()
   private val RUNTIME_EVENT_OFFLINE_REGION_STATUS_STATUS_OFFSET: Long =
     mln_runtime_event_offline_region_status.`status$offset`()
 
-  private val RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR_SIZE: Long =
-    mln_runtime_event_offline_region_response_error.sizeof()
   private val RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR_REGION_ID_OFFSET: Long =
     mln_runtime_event_offline_region_response_error.`region_id$offset`()
   private val RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR_REASON_OFFSET: Long =
     mln_runtime_event_offline_region_response_error.`reason$offset`()
 
-  private val RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_SIZE: Long =
-    mln_runtime_event_offline_region_tile_count_limit.sizeof()
   private val RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_REGION_ID_OFFSET: Long =
     mln_runtime_event_offline_region_tile_count_limit.`region_id$offset`()
   private val RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_LIMIT_OFFSET: Long =
     mln_runtime_event_offline_region_tile_count_limit.`limit$offset`()
 
-  private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_SIZE: Long =
-    mln_runtime_event_offline_operation_completed.sizeof()
   private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_OPERATION_ID_OFFSET: Long =
     mln_runtime_event_offline_operation_completed.`operation_id$offset`()
   private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_KIND_OFFSET: Long =
@@ -5722,8 +5746,6 @@ internal object NativeAccess {
   private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET: Long =
     mln_runtime_event_offline_operation_completed.`found$offset`()
 
-  private val RUNTIME_EVENT_CAMERA_TRANSITION_FINISHED_SIZE: Long =
-    mln_runtime_event_camera_transition_finished.sizeof()
   private val RUNTIME_EVENT_CAMERA_TRANSITION_FINISHED_TRANSITION_ID_OFFSET: Long =
     mln_runtime_event_camera_transition_finished.`transition_id$offset`()
 
@@ -5916,6 +5938,10 @@ internal object NativeAccess {
         )
       }
 
+    /**
+     * Decodes a payload window of [bytes], for tests that synthesize a payload kind this version
+     * cannot queue. The synthetic window is [bytes] alone.
+     */
     fun unknownRuntimePayload(type: Int, bytes: ByteArray): RuntimeEventPayload =
       Arena.ofConfined().use { arena ->
         val payload =
@@ -5924,7 +5950,7 @@ internal object NativeAccess {
             arena.allocate(bytes.size.toLong()).also {
               MemorySegment.copy(bytes, 0, it, ValueLayout.JAVA_BYTE, 0, bytes.size)
             }
-        runtimeEventPayload(type, payload, bytes.size.toLong())
+        runtimeEventPayload(type, payload)
       }
 
     fun ownedBufferCleanupAfterCopyFailure(): Int {
@@ -6097,6 +6123,12 @@ internal object NativeAccess {
     val code: Int,
     val payload: RuntimeEventPayload,
     val message: String,
+  )
+
+  /** Events copied out of one drained batch, plus the count the drain left queued. */
+  internal data class NativeRuntimeEventBatch(
+    val events: List<NativeRuntimeEvent>,
+    val remainingCount: Long,
   )
 
   internal class OwnedTextureFrameSegment(val segment: MemorySegment, private val arena: Arena) :

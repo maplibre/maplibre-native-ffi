@@ -24,24 +24,18 @@ static bool wants_a_frame(const mln_runtime_event* event, mln_map map) {
   if (event->source != map) return false;
   if (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE) return true;
   if (event->type != MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED) return false;
-  if (event->payload_type != MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME) {
-    return false;
-  }
-  if (event->payload_size < sizeof(mln_runtime_event_render_frame)) {
-    return false;
-  }
-  const mln_runtime_event_render_frame* frame = event->payload;
-  return frame->needs_repaint;
+  return event->payload.render_frame.needs_repaint;
 }
 
 static void drain_events(
   mln_runtime runtime, mln_map map, pump_channel* channel
 ) {
-  mln_runtime_event event = {.size = sizeof(event)};
-  bool has_event = false;
-  while (mln_runtime_poll_event(runtime, &event, &has_event) == MLN_STATUS_OK &&
-         has_event) {
-    if (wants_a_frame(&event, map)) {
+  mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+  if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) return;
+
+  for (size_t index = 0; index < batch.event_count; index++) {
+    const char* bytes = (const char*)batch.events + index * batch.event_size;
+    if (wants_a_frame((const mln_runtime_event*)bytes, map)) {
       atomic_store(&channel->render_pending, true);
     }
   }
@@ -57,6 +51,12 @@ void pump_until_stopped(
   ) {
     return;
   }
+
+  // Only a selected event wakes this thread.
+  mln_map_set_event_mask(
+    map, MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE |
+           MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED
+  );
   // #endregion acquire
 
   // #region loop

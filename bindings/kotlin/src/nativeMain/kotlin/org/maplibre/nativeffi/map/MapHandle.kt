@@ -74,6 +74,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_fly_to
 import org.maplibre.nativeffi.internal.c.mln_map_get_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_get_camera
 import org.maplibre.nativeffi.internal.c.mln_map_get_debug_options
+import org.maplibre.nativeffi.internal.c.mln_map_get_event_mask
 import org.maplibre.nativeffi.internal.c.mln_map_get_free_camera_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_image_source_coordinates
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter
@@ -127,6 +128,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_scale_by_animated
 import org.maplibre.nativeffi.internal.c.mln_map_set_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_set_custom_geometry_source_tile_data
 import org.maplibre.nativeffi.internal.c.mln_map_set_debug_options
+import org.maplibre.nativeffi.internal.c.mln_map_set_event_mask
 import org.maplibre.nativeffi.internal.c.mln_map_set_free_camera_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_data
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_url
@@ -192,6 +194,7 @@ import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
+import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
@@ -215,6 +218,18 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
   private val customGeometrySources =
     CustomGeometrySourceRegistry<CustomGeometrySourceState> { it.close() }
 
+  public actual var eventMask: RuntimeEventMask
+    get() = memScoped {
+      val outMask = alloc<ULongVar>()
+      Status.check(mln_map_get_event_mask(state.requireLive().rawHandleValue, outMask.ptr))
+      RuntimeEventMask(outMask.value.toLong())
+    }
+    set(value) {
+      Status.check(
+        mln_map_set_event_mask(state.requireLive().rawHandleValue, value.nativeValue.toULong())
+      )
+    }
+
   public actual fun setStyleUrl(url: String) {
     MemoryUtil.requireValidCString(url)
     Status.check(mln_map_set_style_url(state.requireLive().rawHandleValue, url))
@@ -228,7 +243,6 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           ByteStructs.bufferView(json, this),
         )
       )
-      clearCustomGeometrySources()
     }
   }
 
@@ -261,9 +275,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         outRemoved.ptr,
       )
     )
-    val removed = outRemoved.value
-    if (removed) closeCustomGeometrySource(sourceId)
-    removed
+    outRemoved.value
   }
 
   public actual fun styleSourceExists(sourceId: String): Boolean = memScoped {
@@ -380,8 +392,11 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     sourceId: String,
     options: CustomGeometrySourceOptions,
   ) {
-    val sourceState = CustomGeometrySourceState(options)
-    customGeometrySources.install(sourceId, sourceState) {
+    // The release callback captures the registry rather than this map, so a map a
+    // host leaks with a live source still reports as leaked.
+    val registry = customGeometrySources
+    val sourceState = CustomGeometrySourceState(options) { registry.remove(sourceId) }
+    registry.install(sourceId, sourceState) {
       memScoped {
         Status.check(
           mln_map_add_custom_geometry_source(
@@ -436,32 +451,6 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
   }
 
   internal fun customGeometrySourceCountForTesting(): Int = customGeometrySources.size
-
-  private fun closeCustomGeometrySource(sourceId: String) {
-    customGeometrySources.remove(sourceId)
-  }
-
-  private fun clearCustomGeometrySources() {
-    customGeometrySources.clear()
-  }
-
-  internal fun releaseDetachedCustomGeometrySources() {
-    memScoped {
-      customGeometrySources.releaseDetached { sourceId ->
-        val outType = alloc<UIntVar>()
-        val outFound = alloc<BooleanVar>()
-        val status =
-          mln_map_get_style_source_type(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(sourceId, this),
-            outType.ptr,
-            outFound.ptr,
-          )
-        if (status != org.maplibre.nativeffi.error.MaplibreStatus.OK.nativeCode) null
-        else outFound.value && SourceType.fromNative(outType.value) == SourceType.CUSTOM_VECTOR
-      }
-    }
-  }
 
   public actual fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
     memScoped {
@@ -1787,7 +1776,6 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
 
   public actual override fun close() {
     state.closeOnce({ handle -> mln_map_destroy(handle.rawHandleValue) }) {
-      clearCustomGeometrySources()
       runtime.unregisterMap(this)
       runtimeRetention.close()
     }
@@ -1845,6 +1833,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         nativeOptions.map_mode = it.nativeValue.toUInt()
       }
       options.fastPforEnabled?.let { nativeOptions.fast_pfor_enabled = it }
+      nativeOptions.event_mask = options.eventMask.nativeValue.toULong()
       return nativeOptions.ptr
     }
   }

@@ -9,10 +9,8 @@ import "C"
 
 import (
 	"errors"
-	"sync"
 	"unsafe"
 
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/callback"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/memory"
 )
@@ -62,16 +60,40 @@ type MapOptions struct {
 	// use FastPFOR encodings, fixed for the lifetime of the map. A map created
 	// with this false logs a tile parse warning for those tiles.
 	FastPFOREnabled bool
+	// EventMask selects the map-originated event types this map queues.
+	// NewMapOptions sets it to the native default, which selects every type.
+	// The mask applies during construction. See MapHandle.SetEventMask.
+	EventMask RuntimeEventMask
 }
 
 // Equal reports whether two descriptors hold the same field values.
 func (options MapOptions) Equal(other MapOptions) bool {
-	return options == other
+	return options.Width == other.Width &&
+		options.Height == other.Height &&
+		options.ScaleFactor == other.ScaleFactor &&
+		options.Mode == other.Mode &&
+		options.FastPFOREnabled == other.FastPFOREnabled &&
+		options.EventMask == other.EventMask
 }
 
-// NewMapOptions returns map creation options for a viewport size and scale.
+// NewMapOptions returns map creation options for a viewport size and scale. The
+// returned options select every map-originated event type.
 func NewMapOptions(width, height uint32, scaleFactor float64) MapOptions {
-	return MapOptions{Width: width, Height: height, ScaleFactor: scaleFactor, Mode: MapModeContinuous}
+	return MapOptions{
+		Width:       width,
+		Height:      height,
+		ScaleFactor: scaleFactor,
+		Mode:        MapModeContinuous,
+		EventMask:   defaultMapEventMask(),
+	}
+}
+
+// defaultMapEventMask reads the map default's own event mask. The bits are
+// retained rather than named, so a newer native library's default keeps
+// selecting event types this build does not define. Those reach a host as
+// unknown event and payload domains.
+func defaultMapEventMask() RuntimeEventMask {
+	return RuntimeEventMask(C.mln_map_options_default().event_mask)
 }
 
 // MapHandle owns map state for one RuntimeHandle.
@@ -81,9 +103,6 @@ type MapHandle struct {
 	runtimeChild *handle.Child
 	// The map's native handle, which also serves as its public identity.
 	id MapID
-
-	customGeometryMu      sync.Mutex
-	customGeometrySources map[string]*callback.CustomGeometrySourceState
 }
 
 var destroyMapHandle = func(native nativeMap) int32 {
@@ -120,6 +139,47 @@ func (m *MapHandle) ID() (MapID, error) {
 	}
 	defer release()
 	return m.id, nil
+}
+
+// SetEventMask selects which map-originated event types this map queues. It
+// accepts RuntimeEventMaskAll, reads the bits in RuntimeEventMaskAllMapEvents,
+// and returns ErrInvalidArgument for a bit outside RuntimeEventMaskAll.
+//
+// Select every event type the caller reads. Render-update-available is the map's
+// only invalidation report, the two still-image types are the only reports that
+// a still-image request finished, and loading-failed and render-error carry
+// native failure text. Narrowing gates later events and keeps queued ones, so a
+// caller drains what it already caused.
+func (m *MapHandle) SetEventMask(mask RuntimeEventMask) error {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+
+	return checkNative(func() int32 {
+		return int32(C.mln_map_set_event_mask(C.mln_map(ptr), C.uint64_t(mask)))
+	})
+}
+
+// EventMask reports which map-originated event types this map queues. A map that
+// has not been narrowed reports RuntimeEventMaskAll.
+func (m *MapHandle) EventMask() (RuntimeEventMask, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return 0, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+
+	var raw C.uint64_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_get_event_mask(C.mln_map(ptr), &raw))
+	}); err != nil {
+		return 0, err
+	}
+	return RuntimeEventMask(raw), nil
 }
 
 // RequestRepaint requests a repaint for a continuous map.
@@ -176,11 +236,7 @@ func (m *MapHandle) SetStyleJSON(json []byte) error {
 	defer m.state.KeepAlive()
 	jsonView := newCBufferView(json)
 	defer jsonView.free()
-	if err := checkNative(func() int32 { return int32(C.mln_map_set_style_json(C.mln_map(ptr), jsonView.raw())) }); err != nil {
-		return err
-	}
-	m.releaseCustomGeometrySources()
-	return nil
+	return checkNative(func() int32 { return int32(C.mln_map_set_style_json(C.mln_map(ptr), jsonView.raw())) })
 }
 
 // LoadedStyleJSON returns the style document this map's style was last parsed
@@ -948,74 +1004,11 @@ func (m *MapHandle) LatLngsForPixels(points []ScreenPoint) ([]LatLng, error) {
 	return goLatLngSlice(rawCoordinates), nil
 }
 
-func (m *MapHandle) releaseCustomGeometrySource(sourceID string) {
-	m.customGeometryMu.Lock()
-	state := m.customGeometrySources[sourceID]
-	delete(m.customGeometrySources, sourceID)
-	m.customGeometryMu.Unlock()
-	state.Release()
-}
-
-func (m *MapHandle) releaseDetachedCustomGeometrySources() {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return
-	}
-	defer release()
-	defer m.state.KeepAlive()
-
-	m.customGeometryMu.Lock()
-	sources := make(map[string]*callback.CustomGeometrySourceState, len(m.customGeometrySources))
-	for sourceID, state := range m.customGeometrySources {
-		sources[sourceID] = state
-	}
-	m.customGeometryMu.Unlock()
-
-	for sourceID, state := range sources {
-		sourceView := newCStringView(sourceID)
-		var sourceType C.uint32_t
-		var found C.bool
-		err := checkNative(func() int32 {
-			return int32(C.mln_map_get_style_source_type(C.mln_map(ptr), sourceView.raw(), &sourceType, &found))
-		})
-		sourceView.free()
-		if err != nil {
-			continue
-		}
-		if bool(found) && StyleSourceType(sourceType) == StyleSourceTypeCustomVector {
-			continue
-		}
-		m.customGeometryMu.Lock()
-		if m.customGeometrySources[sourceID] == state {
-			delete(m.customGeometrySources, sourceID)
-			m.customGeometryMu.Unlock()
-			state.Release()
-			continue
-		}
-		m.customGeometryMu.Unlock()
-	}
-}
-
-func (m *MapHandle) customGeometrySourceCountForTesting() int {
-	m.customGeometryMu.Lock()
-	defer m.customGeometryMu.Unlock()
-	return len(m.customGeometrySources)
-}
-
-func (m *MapHandle) releaseCustomGeometrySources() {
-	m.customGeometryMu.Lock()
-	states := m.customGeometrySources
-	m.customGeometrySources = nil
-	m.customGeometryMu.Unlock()
-	for _, state := range states {
-		state.Release()
-	}
-}
-
 // Close destroys this map. A successful close makes later calls no-ops. A
 // failed close leaves the native handle live so callers can retry on the owner
 // thread. Close discards this map's queued runtime events and its recorded
-// loading failure without a flush and without a terminal event.
+// loading failure without a flush and without a terminal event, and releases the
+// callback state of every custom geometry source the map still holds.
 func (m *MapHandle) Close() error {
 	if m == nil || m.state == nil {
 		return newBindingError(ErrInvalidArgument, "MapHandle is nil")
@@ -1049,7 +1042,6 @@ func (m *MapHandle) Close() error {
 		m.runtime.unregisterMap(m)
 	}
 	m.runtimeChild.Release()
-	m.releaseCustomGeometrySources()
 	return nil
 }
 

@@ -348,7 +348,7 @@ public sealed class MapCameraOptionsTests
     {
         var finished = new List<ulong>();
         var didChange = new List<CameraChangeMode>();
-        while (runtime.PollEvent() is { } runtimeEvent)
+        foreach (var runtimeEvent in runtime.DrainEvents().Events)
         {
             switch (runtimeEvent.Type)
             {

@@ -76,6 +76,23 @@ bool mln_test_egl_context_is_current(void);
 // the flag was observed.
 bool mln_test_pump_until(mln_runtime runtime, atomic_bool* flag);
 
+// Drains until a batch reports no events, and returns how many it discarded. A
+// bounded batch still empties the queue, because each drain reports what stayed
+// behind.
+size_t mln_test_drain_all(mln_runtime runtime);
+
+// The same, counting the events whose type matches.
+size_t mln_test_drain_counting(mln_runtime runtime, uint32_t type);
+
+// Drains until one event of `type` from `source` is found, copies it and its
+// message out of the batch, and discards the rest. Pass MLN_HANDLE_NULL as
+// `source` to match any source. The message is written null-terminated and
+// truncated to message_capacity. Returns whether a match was found.
+bool mln_test_drain_find(
+  mln_runtime runtime, uint32_t type, mln_map source,
+  mln_runtime_event* out_event, char* out_message, size_t message_capacity
+);
+
 // Destroys everything this thread still has tracked, render session first, then
 // map, then runtime, and reports whether it reclaimed anything. Reports through
 // its return value rather than assertions, which would longjmp out of teardown.

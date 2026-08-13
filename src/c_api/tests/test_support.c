@@ -1249,6 +1249,73 @@ bool mln_test_render_fixture_create(
   return true;
 }
 
+size_t mln_test_drain_all(mln_runtime runtime) {
+  return mln_test_drain_counting(runtime, 0);
+}
+
+size_t mln_test_drain_counting(mln_runtime runtime, uint32_t type) {
+  size_t total = 0;
+  for (;;) {
+    mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+    if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
+      return total;
+    }
+    if (batch.event_count == 0) {
+      return total;
+    }
+    for (size_t index = 0; index < batch.event_count; index += 1) {
+      const mln_runtime_event* event =
+        (const mln_runtime_event*)((const char*)batch.events +
+                                   (index * batch.event_size));
+      // Type 0 is not an event type, so it counts every event.
+      if (type == 0 || event->type == type) {
+        total += 1;
+      }
+    }
+  }
+}
+
+bool mln_test_drain_find(
+  mln_runtime runtime, uint32_t type, mln_map source,
+  mln_runtime_event* out_event, char* out_message, size_t message_capacity
+) {
+  bool found = false;
+  for (;;) {
+    mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+    if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
+      return found;
+    }
+    if (batch.event_count == 0) {
+      return found;
+    }
+    for (size_t index = 0; index < batch.event_count; index += 1) {
+      const mln_runtime_event* event =
+        (const mln_runtime_event*)((const char*)batch.events +
+                                   (index * batch.event_size));
+      if (found || event->type != type) {
+        continue;
+      }
+      if (source != MLN_HANDLE_NULL && event->source != source) {
+        continue;
+      }
+      found = true;
+      if (out_event != NULL) {
+        *out_event = *event;
+      }
+      if (out_message != NULL && message_capacity > 0) {
+        size_t copied = event->message_size;
+        if (copied > message_capacity - 1) {
+          copied = message_capacity - 1;
+        }
+        if (copied > 0) {
+          memcpy(out_message, batch.messages + event->message_offset, copied);
+        }
+        out_message[copied] = '\0';
+      }
+    }
+  }
+}
+
 bool mln_test_pump_until(mln_runtime runtime, atomic_bool* flag) {
   for (unsigned int attempt = 0; attempt < 500; attempt += 1) {
     if (atomic_load(flag)) {
@@ -1259,17 +1326,8 @@ bool mln_test_pump_until(mln_runtime runtime, atomic_bool* flag) {
     if (mln_runtime_pump(runtime, 2) != MLN_STATUS_OK) {
       return false;
     }
-    mln_runtime_event event = {
-      .size = sizeof(mln_runtime_event),
-      .source_type = MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-      .payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE,
-    };
-    bool has_event = false;
-    while (mln_runtime_poll_event(runtime, &event, &has_event) ==
-             MLN_STATUS_OK &&
-           has_event) {
-      // Drain so the queue does not grow without bound while we wait.
-    }
+    // Drain so the queue does not grow without bound while we wait.
+    mln_test_drain_all(runtime);
     if (atomic_load(flag)) {
       return true;
     }

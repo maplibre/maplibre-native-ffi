@@ -73,21 +73,41 @@ final class ResourceProvider {
 /// Runtime creation options.
 final class RuntimeOptions {
   /// Creates runtime options.
-  const RuntimeOptions({this.assetPath, this.cachePath});
+  const RuntimeOptions({
+    this.assetPath,
+    this.cachePath,
+    RuntimeEventMask? eventMask,
+  }) : _eventMask = eventMask;
 
   /// Filesystem root for `asset://` URLs.
   final String? assetPath;
 
   /// Cache database path.
   final String? cachePath;
+
+  final RuntimeEventMask? _eventMask;
+
+  /// Runtime-originated event types this runtime queues.
+  ///
+  /// Defaults to the C options default's selection, which is every event type
+  /// the loaded library reports. A bit a newer library selects and this binding
+  /// does not name is kept, and its events reach a host as unknown event and
+  /// payload domains. See [RuntimeHandle.setEventMask].
+  RuntimeEventMask get eventMask =>
+      _eventMask ??
+      RuntimeEventMask(raw.mln_runtime_options_default().event_mask);
 }
 
-/// Owner-thread runtime handle for MapLibre Native work and event polling.
+/// Owner-thread runtime handle for MapLibre Native work and event draining.
 final class RuntimeHandle {
   RuntimeHandle._(NativeRuntime handle)
     : _state = NativeHandleState(handle, 'RuntimeHandle');
 
   final NativeHandleState<NativeRuntime> _state;
+
+  /// Batch struct reused by every drain, so a pump loop allocates nothing.
+  Pointer<raw.mln_runtime_event_batch> _eventBatch =
+      calloc<raw.mln_runtime_event_batch>();
   final _maps = <int, WeakReference<MapHandle>>{};
   final _offlineOperations = <int, WeakReference<OfflineOperationHandle>>{};
   _ResourceTransformState? _resourceTransformState;
@@ -128,7 +148,11 @@ final class RuntimeHandle {
   /// until the wake flag is set; a negative timeout collapses to no wait.
   /// Native work, a queued runtime event, and [WakeSource.signal] each set the
   /// wake flag, which this call clears before returning. Drain events with
-  /// [pollEvent] after every return.
+  /// [drainEvents] after every return.
+  ///
+  /// An unread event returns this call without parking, whatever [timeout] asks
+  /// for, so a host that stopped draining before the queue emptied keeps making
+  /// progress.
   ///
   /// A non-null, non-zero [timeout] blocks the calling isolate's event loop for
   /// the duration of the park. Acquire a [WakeSource] with [acquireWakeSource]
@@ -152,32 +176,45 @@ final class RuntimeHandle {
     });
   }
 
-  /// Polls one queued runtime event and copies borrowed fields into Dart values.
-  RuntimeEvent? pollEvent() {
-    return withNativeArena((arena) {
-      final event = arena<raw.mln_runtime_event>();
-      event.ref.size = sizeOf<raw.mln_runtime_event>();
-      final hasEvent = arena<Bool>();
-      hasEvent.value = false;
-
-      _check(raw.mln_runtime_poll_event(_handle.raw, event, hasEvent));
-      if (!hasEvent.value) {
-        return null;
-      }
-
-      final copiedEvent = RuntimeEvent._fromNative(event.ref, this);
-      _handleRuntimeEvent(copiedEvent);
-      return copiedEvent;
-    });
+  /// Drains queued runtime events into one batch of Dart-owned copies.
+  ///
+  /// Events arrive in queue order. Every field, message, and payload is copied
+  /// before this returns, so a batch stays readable for as long as the host
+  /// keeps it.
+  ///
+  /// The default zero [maxEvents] drains every queued event. A positive value
+  /// drains at most that many and reports the rest in
+  /// [RuntimeEventBatch.remainingCount].
+  RuntimeEventBatch drainEvents({int maxEvents = 0}) {
+    final handle = _handle;
+    if (maxEvents < 0) {
+      throwInvalidArgument('maxEvents must not be negative');
+    }
+    final batch = _eventBatch;
+    batch.ref = raw.mln_runtime_event_batch_default();
+    _check(raw.mln_runtime_drain_events(handle.raw, maxEvents, batch));
+    return RuntimeEventBatch._fromNative(batch.ref, this);
   }
 
-  /// Polls and discards queued runtime events until the queue is empty.
-  int drainEvents() {
-    var count = 0;
-    while (pollEvent() != null) {
-      count += 1;
-    }
-    return count;
+  /// Selects which runtime-originated event types this runtime queues.
+  ///
+  /// The runtime reads the bits in [RuntimeEventMask.allRuntimeEvents] and
+  /// ignores the rest, so [RuntimeEventMask.all] selects every
+  /// runtime-originated type. Narrowing gates later events and keeps queued
+  /// ones. A bit outside [RuntimeEventMask.all] reports invalid argument.
+  void setEventMask(RuntimeEventMask mask) {
+    _check(raw.mln_runtime_set_event_mask(_handle.raw, mask.value));
+  }
+
+  /// Reports which runtime-originated event types this runtime queues.
+  ///
+  /// This reports the mask the runtime was created with or last narrowed to.
+  RuntimeEventMask get eventMask {
+    return withNativeArena((arena) {
+      final outMask = arena<Uint64>();
+      _check(raw.mln_runtime_get_event_mask(_handle.raw, outMask));
+      return RuntimeEventMask(outMask.value);
+    });
   }
 
   /// Registers exact native-owned URL rewrite rules for network resources.
@@ -557,26 +594,8 @@ final class RuntimeHandle {
     _offlineOperations[operation._id] = WeakReference(operation);
   }
 
-  void _unregisterOfflineOperation(int id) {
+  void _unregisterOfflineOperationId(int id) {
     _offlineOperations.remove(id);
-  }
-
-  void _handleRuntimeEvent(RuntimeEvent event) {
-    if (event.sourceType !=
-        raw.mln_runtime_event_source_type.MLN_RUNTIME_EVENT_SOURCE_MAP.value) {
-      return;
-    }
-    if (event.type !=
-        raw.mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_STYLE_LOADED.value) {
-      return;
-    }
-    final reference = _maps[event._sourceId];
-    final map = reference?.target;
-    if (map == null) {
-      _maps.remove(event._sourceId);
-      return;
-    }
-    map._clearCustomGeometryCallbacksAfterUrlStyleLoad();
   }
 
   /// Explicitly destroys this runtime.
@@ -601,6 +620,10 @@ final class RuntimeHandle {
       (handle) => raw.mln_runtime_destroy(handle.raw),
       _c.threadLastErrorMessage,
     );
+    if (_eventBatch != nullptr) {
+      calloc.free(_eventBatch);
+      _eventBatch = nullptr;
+    }
     _resourceTransformState?.close();
     _resourceTransformState = null;
     _httpHeaderTransformState?.close();
@@ -666,37 +689,166 @@ final class WakeSource {
   }
 }
 
+/// One batch of runtime events copied out of the native event arena.
+final class RuntimeEventBatch {
+  RuntimeEventBatch._({
+    required List<RuntimeEvent> events,
+    required this.remainingCount,
+  }) : events = List.unmodifiable(events);
+
+  factory RuntimeEventBatch._fromNative(
+    raw.mln_runtime_event_batch batch,
+    RuntimeHandle runtime,
+  ) {
+    final eventSize = batch.event_size;
+    final events = <RuntimeEvent>[];
+    final first = batch.events.cast<Uint8>();
+    for (var index = 0; index < batch.event_count; index += 1) {
+      // Events are reached by the batch's own stride, because a later C API
+      // version widens the record beyond the size this binding compiled
+      // against.
+      final event = (first + index * eventSize).cast<raw.mln_runtime_event>();
+      events.add(
+        RuntimeEvent._fromNative(event, eventSize, batch.messages, runtime),
+      );
+    }
+    return RuntimeEventBatch._(
+      events: events,
+      remainingCount: batch.remaining_count,
+    );
+  }
+
+  /// Drained events in queue order.
+  final List<RuntimeEvent> events;
+
+  /// Events still queued after this batch.
+  ///
+  /// A nonzero count means another drain reports more events, so a host that
+  /// bounds a drain learns to come back.
+  final int remainingCount;
+}
+
+/// Event types a map or a runtime queues, as one bit per [RuntimeEventType].
+///
+/// Each bit is `1 << type.rawValue`, so a host that decoded an event type
+/// computes its bit the same way these constants name it.
+final class RuntimeEventMask {
+  /// Creates a mask from raw bits.
+  const RuntimeEventMask(this.value);
+
+  /// Selects no event type.
+  static const none = RuntimeEventMask(0);
+
+  static const mapCameraWillChange = RuntimeEventMask(1 << 1);
+  static const mapCameraIsChanging = RuntimeEventMask(1 << 2);
+  static const mapCameraDidChange = RuntimeEventMask(1 << 3);
+  static const mapStyleLoaded = RuntimeEventMask(1 << 4);
+  static const mapLoadingStarted = RuntimeEventMask(1 << 5);
+  static const mapLoadingFinished = RuntimeEventMask(1 << 6);
+  static const mapLoadingFailed = RuntimeEventMask(1 << 7);
+  static const mapIdle = RuntimeEventMask(1 << 8);
+  static const mapRenderUpdateAvailable = RuntimeEventMask(1 << 9);
+  static const mapRenderError = RuntimeEventMask(1 << 10);
+  static const mapStillImageFinished = RuntimeEventMask(1 << 11);
+  static const mapStillImageFailed = RuntimeEventMask(1 << 12);
+  static const mapRenderFrameStarted = RuntimeEventMask(1 << 13);
+  static const mapRenderFrameFinished = RuntimeEventMask(1 << 14);
+  static const mapRenderMapStarted = RuntimeEventMask(1 << 15);
+  static const mapRenderMapFinished = RuntimeEventMask(1 << 16);
+  static const mapStyleImageMissing = RuntimeEventMask(1 << 17);
+  static const mapTileAction = RuntimeEventMask(1 << 18);
+  static const offlineRegionStatusChanged = RuntimeEventMask(1 << 19);
+  static const offlineRegionResponseError = RuntimeEventMask(1 << 20);
+  static const offlineRegionTileCountLimitExceeded = RuntimeEventMask(1 << 21);
+  static const offlineOperationCompleted = RuntimeEventMask(1 << 22);
+  static const mapCameraTransitionFinished = RuntimeEventMask(1 << 23);
+
+  static const _mapEventBits =
+      (1 << 1) |
+      (1 << 2) |
+      (1 << 3) |
+      (1 << 4) |
+      (1 << 5) |
+      (1 << 6) |
+      (1 << 7) |
+      (1 << 8) |
+      (1 << 9) |
+      (1 << 10) |
+      (1 << 11) |
+      (1 << 12) |
+      (1 << 13) |
+      (1 << 14) |
+      (1 << 15) |
+      (1 << 16) |
+      (1 << 17) |
+      (1 << 18) |
+      (1 << 23);
+  static const _runtimeEventBits =
+      (1 << 19) | (1 << 20) | (1 << 21) | (1 << 22);
+
+  /// Selects every map-originated event type this binding names.
+  static const allMapEvents = RuntimeEventMask(_mapEventBits);
+
+  /// Selects every runtime-originated event type this binding names.
+  static const allRuntimeEvents = RuntimeEventMask(_runtimeEventBits);
+
+  /// Selects every event type this binding names.
+  ///
+  /// Both setters accept this value: a map reads the map-originated bits and a
+  /// runtime reads the runtime-originated ones.
+  static const all = RuntimeEventMask(_mapEventBits | _runtimeEventBits);
+
+  /// Raw mask bits.
+  final int value;
+
+  /// Whether this mask selects no event type.
+  bool get isEmpty => value == 0;
+
+  /// Returns a mask holding the bits of this mask and of [other].
+  RuntimeEventMask operator |(RuntimeEventMask other) =>
+      RuntimeEventMask(value | other.value);
+
+  /// Whether this mask selects [type].
+  bool contains(RuntimeEventType type) => (value & (1 << type.rawValue)) != 0;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RuntimeEventMask && other.value == value;
+
+  @override
+  int get hashCode => value.hashCode;
+}
+
 final class RuntimeEvent {
   RuntimeEvent._({
     required this.type,
     required this.eventType,
     required this.sourceType,
     required this.source,
-    required int sourceId,
     required this.code,
     required this.payloadType,
     required this.payload,
-    required this.payloadSize,
     required this.message,
-  }) : _sourceId = sourceId;
+  });
 
   factory RuntimeEvent._fromNative(
-    raw.mln_runtime_event event,
+    Pointer<raw.mln_runtime_event> event,
+    int eventSize,
+    Pointer<Char> messages,
     RuntimeHandle runtime,
   ) {
+    final value = event.ref;
     return RuntimeEvent._(
-      type: event.type,
-      eventType: RuntimeEventType.fromRawValue(event.type),
-      sourceType: event.source_type,
-      source: RuntimeEventSource._fromNative(event, runtime),
-      sourceId: event.source,
-      code: event.code,
-      payloadType: event.payload_type,
-      payload: RuntimeEventPayload._fromNative(event, runtime),
-      payloadSize: event.payload_size,
+      type: value.type,
+      eventType: RuntimeEventType.fromRawValue(value.type),
+      sourceType: value.source_type,
+      source: RuntimeEventSource._fromNative(value, runtime),
+      code: value.code,
+      payloadType: value.payload_type,
+      payload: RuntimeEventPayload._fromNative(event, eventSize, runtime),
       message: _copyNativeString(
-        event.message.cast<Void>(),
-        event.message_size,
+        (messages + value.message_offset).cast<Void>(),
+        value.message_size,
       ),
     );
   }
@@ -713,8 +865,6 @@ final class RuntimeEvent {
   /// Typed event source, preserving unknown raw values.
   final RuntimeEventSource source;
 
-  final int _sourceId;
-
   /// Native event code.
   final int code;
 
@@ -724,18 +874,15 @@ final class RuntimeEvent {
   /// Typed event payload copied into Dart-owned values.
   final RuntimeEventPayload payload;
 
-  /// Native payload byte size.
-  final int payloadSize;
-
   /// Copied event message, when one was provided.
   final String? message;
 }
 
-/// Copies a raw runtime event through the production decoder for tests.
-RuntimeEvent copyRuntimeEventForTesting(
-  raw.mln_runtime_event event,
+/// Decodes a synthesized batch through the production decoder for tests.
+RuntimeEventBatch decodeRuntimeEventBatchForTesting(
+  raw.mln_runtime_event_batch batch,
   RuntimeHandle runtime,
-) => RuntimeEvent._fromNative(event, runtime);
+) => RuntimeEventBatch._fromNative(batch, runtime);
 
 /// Runtime event type with forward-compatible unknown values.
 final class RuntimeEventType {
@@ -905,8 +1052,15 @@ final class RuntimeEventSourceType {
 }
 
 /// Typed runtime event source copied from the native event.
+///
+/// [sourceId] is the native source identity, which names one object for the
+/// life of the process. It is an identity value, not a handle: it grants no
+/// access to the object it names, and it stays comparable against the id of a
+/// handle a host holds even after that handle is released. Every event carries
+/// it, including an event whose source type this build does not name and a
+/// map-sourced event whose id matches no live map.
 sealed class RuntimeEventSource {
-  const RuntimeEventSource(this.sourceType);
+  const RuntimeEventSource(this.sourceType, this.sourceId);
 
   factory RuntimeEventSource._fromNative(
     raw.mln_runtime_event event,
@@ -915,37 +1069,44 @@ sealed class RuntimeEventSource {
     final sourceType = RuntimeEventSourceType.fromRawValue(event.source_type);
     final sourceId = event.source;
     if (sourceType == RuntimeEventSourceType.runtime) {
-      return RuntimeRuntimeEventSource(runtime);
+      return RuntimeRuntimeEventSource(runtime, sourceId);
     }
     if (sourceType == RuntimeEventSourceType.map) {
       final map = runtime._maps[sourceId]?.target;
-      return MapRuntimeEventSource(map);
+      return MapRuntimeEventSource(map, sourceId);
     }
-    return UnknownRuntimeEventSource(sourceType);
+    return UnknownRuntimeEventSource(sourceType, sourceId);
   }
 
   final RuntimeEventSourceType sourceType;
+
+  /// Raw native source identity.
+  final int sourceId;
 }
 
 /// Runtime-scoped event source.
 final class RuntimeRuntimeEventSource extends RuntimeEventSource {
-  const RuntimeRuntimeEventSource(this.runtime)
-    : super(RuntimeEventSourceType.runtime);
+  const RuntimeRuntimeEventSource(this.runtime, int sourceId)
+    : super(RuntimeEventSourceType.runtime, sourceId);
 
   final RuntimeHandle runtime;
 }
 
 /// Map-scoped event source.
 final class MapRuntimeEventSource extends RuntimeEventSource {
-  const MapRuntimeEventSource(this.map) : super(RuntimeEventSourceType.map);
+  const MapRuntimeEventSource(this.map, int sourceId)
+    : super(RuntimeEventSourceType.map, sourceId);
 
   /// Map handle when still alive in this runtime.
+  ///
+  /// A map that closed, or that this runtime never wrapped, leaves this null
+  /// while [sourceId] still names the source map.
   final MapHandle? map;
 }
 
 /// Unknown event source type.
 final class UnknownRuntimeEventSource extends RuntimeEventSource {
-  const UnknownRuntimeEventSource(super.sourceType);
+  const UnknownRuntimeEventSource(super.sourceType, super.sourceId);
 }
 
 /// Render mode reported by render event payloads.
@@ -1109,211 +1270,56 @@ final class OfflineOperationResultKind {
 
 /// Typed runtime event payload copied into Dart-owned values.
 sealed class RuntimeEventPayload {
-  const RuntimeEventPayload(this.rawPayloadType, this.payloadSize);
+  const RuntimeEventPayload(this.rawPayloadType);
 
   factory RuntimeEventPayload._fromNative(
-    raw.mln_runtime_event event,
+    Pointer<raw.mln_runtime_event> event,
+    int eventSize,
     RuntimeHandle runtime,
   ) {
-    final rawPayloadType = event.payload_type;
-    final payloadSize = event.payload_size;
-    if (rawPayloadType == 0) {
-      return RuntimeEventPayloadNone(rawPayloadType, payloadSize);
-    }
-    if (event.payload == nullptr) {
-      return RuntimeEventPayloadUnknown(
-        rawPayloadType,
-        payloadSize,
-        Uint8List(0),
-      );
-    }
-    final payload = event.payload;
+    final rawPayloadType = event.ref.payload_type;
+    final payload = event.ref.payload;
     return switch (rawPayloadType) {
-      1 => _runtimePayloadOrUnknown(
-        event,
-        sizeOf<raw.mln_runtime_event_render_frame>(),
-        () {
-          final value = payload.cast<raw.mln_runtime_event_render_frame>().ref;
-          return RuntimeEventRenderFrame(
-            rawPayloadType: rawPayloadType,
-            payloadSize: payloadSize,
-            mode: RenderMode.fromRawValue(value.mode),
-            rawMode: value.mode,
-            needsRepaint: value.needs_repaint,
-            placementChanged: value.placement_changed,
-            stats: RenderingStats._fromNative(value.stats),
-          );
-        },
+      0 => const RuntimeEventPayloadNone(),
+      1 => _renderFramePayload(payload.render_frame),
+      2 => _renderMapPayload(payload.render_map),
+      4 => _tileActionPayload(payload.tile_action),
+      5 => _offlineRegionStatusPayload(payload.offline_region_status),
+      6 => _offlineRegionResponseErrorPayload(
+        payload.offline_region_response_error,
       ),
-      2 => _runtimePayloadOrUnknown(
-        event,
-        sizeOf<raw.mln_runtime_event_render_map>(),
-        () {
-          final value = payload.cast<raw.mln_runtime_event_render_map>().ref;
-          return RuntimeEventRenderMap(
-            rawPayloadType: rawPayloadType,
-            payloadSize: payloadSize,
-            mode: RenderMode.fromRawValue(value.mode),
-            rawMode: value.mode,
-          );
-        },
+      7 => _offlineRegionTileCountLimitPayload(
+        payload.offline_region_tile_count_limit,
       ),
-      3 => _runtimePayloadOrUnknown(
-        event,
-        sizeOf<raw.mln_runtime_event_style_image_missing>(),
-        () {
-          final value = payload
-              .cast<raw.mln_runtime_event_style_image_missing>()
-              .ref;
-          return RuntimeEventStyleImageMissing(
-            rawPayloadType: rawPayloadType,
-            payloadSize: payloadSize,
-            imageId: _copyNativeString(
-              value.image_id.cast<Void>(),
-              value.image_id_size,
-            ),
-          );
-        },
+      8 => _offlineOperationCompletedPayload(
+        payload.offline_operation_completed,
+        runtime,
       ),
-      4 => _runtimePayloadOrUnknown(
-        event,
-        sizeOf<raw.mln_runtime_event_tile_action>(),
-        () {
-          final value = payload.cast<raw.mln_runtime_event_tile_action>().ref;
-          return RuntimeEventTileAction(
-            rawPayloadType: rawPayloadType,
-            payloadSize: payloadSize,
-            operation: TileOperation.fromRawValue(value.operation),
-            rawOperation: value.operation,
-            tileId: TileId(
-              overscaledZ: value.tile_id.overscaled_z,
-              wrap: value.tile_id.wrap,
-              canonicalZ: value.tile_id.canonical_z,
-              canonicalX: value.tile_id.canonical_x,
-              canonicalY: value.tile_id.canonical_y,
-            ),
-            sourceId: _copyNativeString(
-              value.source_id.cast<Void>(),
-              value.source_id_size,
-            ),
-          );
-        },
-      ),
-      5 => _runtimePayloadOrUnknown(
-        event,
-        sizeOf<raw.mln_runtime_event_offline_region_status>(),
-        () {
-          final value = payload
-              .cast<raw.mln_runtime_event_offline_region_status>()
-              .ref;
-          return RuntimeEventOfflineRegionStatus(
-            rawPayloadType: rawPayloadType,
-            payloadSize: payloadSize,
-            regionId: value.region_id,
-            status: _offlineRegionStatusFromNative(value.status),
-          );
-        },
-      ),
-      6 => _runtimePayloadOrUnknown(
-        event,
-        sizeOf<raw.mln_runtime_event_offline_region_response_error>(),
-        () {
-          final value = payload
-              .cast<raw.mln_runtime_event_offline_region_response_error>()
-              .ref;
-          return RuntimeEventOfflineRegionResponseError(
-            rawPayloadType: rawPayloadType,
-            payloadSize: payloadSize,
-            regionId: value.region_id,
-            reason: ResourceErrorReason.fromRawValue(value.reason),
-            rawReason: value.reason,
-          );
-        },
-      ),
-      7 => _runtimePayloadOrUnknown(
-        event,
-        sizeOf<raw.mln_runtime_event_offline_region_tile_count_limit>(),
-        () {
-          final value = payload
-              .cast<raw.mln_runtime_event_offline_region_tile_count_limit>()
-              .ref;
-          return RuntimeEventOfflineRegionTileCountLimit(
-            rawPayloadType: rawPayloadType,
-            payloadSize: payloadSize,
-            regionId: value.region_id,
-            limit: uint64FromNative(value.limit),
-          );
-        },
-      ),
-      8 => _runtimePayloadOrUnknown(
-        event,
-        sizeOf<raw.mln_runtime_event_offline_operation_completed>(),
-        () {
-          final value = payload
-              .cast<raw.mln_runtime_event_offline_operation_completed>()
-              .ref;
-          return RuntimeEventOfflineOperationCompleted(
-            rawPayloadType: rawPayloadType,
-            payloadSize: payloadSize,
-            operation: runtime._offlineOperations[value.operation_id]?.target,
-            operationKind: OfflineOperationKind.fromRawValue(
-              value.operation_kind,
-            ),
-            rawOperationKind: value.operation_kind,
-            resultKind: OfflineOperationResultKind.fromRawValue(
-              value.result_kind,
-            ),
-            rawResultKind: value.result_kind,
-            resultStatus: MaplibreStatus.fromNativeStatusCode(
-              value.result_status,
-            ),
-            rawResultStatus: value.result_status,
-            found: value.found,
-          );
-        },
-      ),
-      9 => _runtimePayloadOrUnknown(
-        event,
-        sizeOf<raw.mln_runtime_event_camera_transition_finished>(),
-        () {
-          final value = payload
-              .cast<raw.mln_runtime_event_camera_transition_finished>()
-              .ref;
-          return RuntimeEventCameraTransitionFinished(
-            rawPayloadType: rawPayloadType,
-            payloadSize: payloadSize,
-            transitionId: uint64FromNative(value.transition_id),
-          );
-        },
-      ),
+      9 => _cameraTransitionFinishedPayload(payload.camera_transition_finished),
       _ => RuntimeEventPayloadUnknown(
         rawPayloadType,
-        payloadSize,
-        _copyRuntimePayloadBytes(event),
+        _copyRuntimePayloadWindow(event, eventSize),
       ),
     };
   }
 
   final int rawPayloadType;
-  final int payloadSize;
 }
 
 /// Runtime event with no payload.
 final class RuntimeEventPayloadNone extends RuntimeEventPayload {
-  const RuntimeEventPayloadNone(super.rawPayloadType, super.payloadSize);
+  const RuntimeEventPayloadNone() : super(0);
 }
 
 /// Render-frame event payload.
 final class RuntimeEventRenderFrame extends RuntimeEventPayload {
   const RuntimeEventRenderFrame({
-    required int rawPayloadType,
-    required int payloadSize,
     required this.mode,
     required this.rawMode,
     required this.needsRepaint,
     required this.placementChanged,
     required this.stats,
-  }) : super(rawPayloadType, payloadSize);
+  }) : super(1);
 
   final RenderMode mode;
   final int rawMode;
@@ -1324,53 +1330,34 @@ final class RuntimeEventRenderFrame extends RuntimeEventPayload {
 
 /// Render-map event payload.
 final class RuntimeEventRenderMap extends RuntimeEventPayload {
-  const RuntimeEventRenderMap({
-    required int rawPayloadType,
-    required int payloadSize,
-    required this.mode,
-    required this.rawMode,
-  }) : super(rawPayloadType, payloadSize);
+  const RuntimeEventRenderMap({required this.mode, required this.rawMode})
+    : super(2);
 
   final RenderMode mode;
   final int rawMode;
 }
 
-/// Style-image missing event payload.
-final class RuntimeEventStyleImageMissing extends RuntimeEventPayload {
-  const RuntimeEventStyleImageMissing({
-    required int rawPayloadType,
-    required int payloadSize,
-    required this.imageId,
-  }) : super(rawPayloadType, payloadSize);
-
-  final String? imageId;
-}
-
 /// Tile-action event payload.
+///
+/// The event message carries the source ID.
 final class RuntimeEventTileAction extends RuntimeEventPayload {
   const RuntimeEventTileAction({
-    required int rawPayloadType,
-    required int payloadSize,
     required this.operation,
     required this.rawOperation,
     required this.tileId,
-    required this.sourceId,
-  }) : super(rawPayloadType, payloadSize);
+  }) : super(4);
 
   final TileOperation operation;
   final int rawOperation;
   final TileId tileId;
-  final String? sourceId;
 }
 
 /// Offline-region status event payload.
 final class RuntimeEventOfflineRegionStatus extends RuntimeEventPayload {
   const RuntimeEventOfflineRegionStatus({
-    required int rawPayloadType,
-    required int payloadSize,
     required this.regionId,
     required this.status,
-  }) : super(rawPayloadType, payloadSize);
+  }) : super(5);
 
   final int regionId;
   final OfflineRegionStatus status;
@@ -1379,12 +1366,10 @@ final class RuntimeEventOfflineRegionStatus extends RuntimeEventPayload {
 /// Offline-region response error event payload.
 final class RuntimeEventOfflineRegionResponseError extends RuntimeEventPayload {
   const RuntimeEventOfflineRegionResponseError({
-    required int rawPayloadType,
-    required int payloadSize,
     required this.regionId,
     required this.reason,
     required this.rawReason,
-  }) : super(rawPayloadType, payloadSize);
+  }) : super(6);
 
   final int regionId;
   final ResourceErrorReason reason;
@@ -1395,11 +1380,9 @@ final class RuntimeEventOfflineRegionResponseError extends RuntimeEventPayload {
 final class RuntimeEventOfflineRegionTileCountLimit
     extends RuntimeEventPayload {
   const RuntimeEventOfflineRegionTileCountLimit({
-    required int rawPayloadType,
-    required int payloadSize,
     required this.regionId,
     required this.limit,
-  }) : super(rawPayloadType, payloadSize);
+  }) : super(7);
 
   final int regionId;
   final BigInt limit;
@@ -1408,8 +1391,7 @@ final class RuntimeEventOfflineRegionTileCountLimit
 /// Offline operation completion event payload.
 final class RuntimeEventOfflineOperationCompleted extends RuntimeEventPayload {
   const RuntimeEventOfflineOperationCompleted({
-    required int rawPayloadType,
-    required int payloadSize,
+    required this.operationId,
     required this.operation,
     required this.operationKind,
     required this.rawOperationKind,
@@ -1418,7 +1400,10 @@ final class RuntimeEventOfflineOperationCompleted extends RuntimeEventPayload {
     required this.resultStatus,
     required this.rawResultStatus,
     required this.found,
-  }) : super(rawPayloadType, payloadSize);
+  }) : super(8);
+
+  /// Identity of the operation that completed.
+  final int operationId;
 
   /// Matching live operation, or null when it is no longer tracked.
   final OfflineOperationHandle? operation;
@@ -1433,48 +1418,118 @@ final class RuntimeEventOfflineOperationCompleted extends RuntimeEventPayload {
 
 /// Camera-transition-finished event payload.
 final class RuntimeEventCameraTransitionFinished extends RuntimeEventPayload {
-  const RuntimeEventCameraTransitionFinished({
-    required int rawPayloadType,
-    required int payloadSize,
-    required this.transitionId,
-  }) : super(rawPayloadType, payloadSize);
+  const RuntimeEventCameraTransitionFinished({required this.transitionId})
+    : super(9);
 
   /// Caller-chosen transition identity across the full `uint64_t` domain.
   final BigInt transitionId;
 }
 
-/// Unknown runtime event payload copied as raw bytes.
+/// Payload of a type this binding does not name, copied as raw bytes.
 final class RuntimeEventPayloadUnknown extends RuntimeEventPayload {
-  RuntimeEventPayloadUnknown(
-    super.rawPayloadType,
-    super.payloadSize,
-    Uint8List bytes,
-  ) : bytes = Uint8List.fromList(bytes).asUnmodifiableView();
+  RuntimeEventPayloadUnknown(super.rawPayloadType, Uint8List bytes)
+    : bytes = Uint8List.fromList(bytes).asUnmodifiableView();
 
+  /// The event's fixed payload window, copied byte for byte.
   final Uint8List bytes;
 }
 
-RuntimeEventPayload _runtimePayloadOrUnknown(
-  raw.mln_runtime_event event,
-  int expectedPayloadSize,
-  RuntimeEventPayload Function() copy,
-) {
-  if (event.payload_size < expectedPayloadSize) {
-    return RuntimeEventPayloadUnknown(
-      event.payload_type,
-      event.payload_size,
-      _copyRuntimePayloadBytes(event),
-    );
-  }
-  return copy();
-}
+RuntimeEventPayload _renderFramePayload(
+  raw.mln_runtime_event_render_frame value,
+) => RuntimeEventRenderFrame(
+  mode: RenderMode.fromRawValue(value.mode),
+  rawMode: value.mode,
+  needsRepaint: value.needs_repaint,
+  placementChanged: value.placement_changed,
+  stats: RenderingStats._fromNative(value.stats),
+);
 
-Uint8List _copyRuntimePayloadBytes(raw.mln_runtime_event event) {
-  if (event.payload == nullptr || event.payload_size == 0) {
+RuntimeEventPayload _renderMapPayload(raw.mln_runtime_event_render_map value) =>
+    RuntimeEventRenderMap(
+      mode: RenderMode.fromRawValue(value.mode),
+      rawMode: value.mode,
+    );
+
+RuntimeEventPayload _tileActionPayload(
+  raw.mln_runtime_event_tile_action value,
+) => RuntimeEventTileAction(
+  operation: TileOperation.fromRawValue(value.operation),
+  rawOperation: value.operation,
+  tileId: TileId(
+    overscaledZ: value.tile_id.overscaled_z,
+    wrap: value.tile_id.wrap,
+    canonicalZ: value.tile_id.canonical_z,
+    canonicalX: value.tile_id.canonical_x,
+    canonicalY: value.tile_id.canonical_y,
+  ),
+);
+
+RuntimeEventPayload _offlineRegionStatusPayload(
+  raw.mln_runtime_event_offline_region_status value,
+) => RuntimeEventOfflineRegionStatus(
+  regionId: value.region_id,
+  status: _offlineRegionStatusFromNative(value.status),
+);
+
+RuntimeEventPayload _offlineRegionResponseErrorPayload(
+  raw.mln_runtime_event_offline_region_response_error value,
+) => RuntimeEventOfflineRegionResponseError(
+  regionId: value.region_id,
+  reason: ResourceErrorReason.fromRawValue(value.reason),
+  rawReason: value.reason,
+);
+
+RuntimeEventPayload _offlineRegionTileCountLimitPayload(
+  raw.mln_runtime_event_offline_region_tile_count_limit value,
+) => RuntimeEventOfflineRegionTileCountLimit(
+  regionId: value.region_id,
+  limit: uint64FromNative(value.limit),
+);
+
+RuntimeEventPayload _offlineOperationCompletedPayload(
+  raw.mln_runtime_event_offline_operation_completed value,
+  RuntimeHandle runtime,
+) => RuntimeEventOfflineOperationCompleted(
+  operationId: value.operation_id,
+  operation: runtime._offlineOperations[value.operation_id]?.target,
+  operationKind: OfflineOperationKind.fromRawValue(value.operation_kind),
+  rawOperationKind: value.operation_kind,
+  resultKind: OfflineOperationResultKind.fromRawValue(value.result_kind),
+  rawResultKind: value.result_kind,
+  resultStatus: MaplibreStatus.fromNativeStatusCode(value.result_status),
+  rawResultStatus: value.result_status,
+  found: value.found,
+);
+
+RuntimeEventPayload _cameraTransitionFinishedPayload(
+  raw.mln_runtime_event_camera_transition_finished value,
+) => RuntimeEventCameraTransitionFinished(
+  transitionId: uint64FromNative(value.transition_id),
+);
+
+/// Byte offset of the payload union inside one native event record.
+///
+/// `dart:ffi` has no `offsetof`. The union is the record's last member and
+/// carries the record's own alignment, so the difference of the two sizes is
+/// that offset. The C API keeps the offset stable across versions.
+final int _runtimeEventPayloadOffset =
+    sizeOf<raw.mln_runtime_event>() - sizeOf<raw.mln_runtime_event_payload>();
+
+/// Copies the payload window of an event whose payload type this binding does
+/// not name.
+///
+/// The window is the batch's event stride minus the payload's offset, so it
+/// covers every payload byte a later C API version adds.
+Uint8List _copyRuntimePayloadWindow(
+  Pointer<raw.mln_runtime_event> event,
+  int eventSize,
+) {
+  final windowSize = eventSize - _runtimeEventPayloadOffset;
+  if (windowSize <= 0) {
     return Uint8List(0);
   }
   return Uint8List.fromList(
-    event.payload.cast<Uint8>().asTypedList(event.payload_size),
+    (event.cast<Uint8>() + _runtimeEventPayloadOffset).asTypedList(windowSize),
   );
 }
 
@@ -1547,7 +1602,8 @@ final class MapOptions {
     this.scaleFactor = 1,
     this.mapMode = MapMode.continuous,
     this.fastPforEnabled = false,
-  });
+    RuntimeEventMask? eventMask,
+  }) : _eventMask = eventMask;
 
   /// Initial map width in logical pixels.
   final int width;
@@ -1568,6 +1624,17 @@ final class MapOptions {
   /// tile parse warning for the FastPFOR ones.
   final bool fastPforEnabled;
 
+  final RuntimeEventMask? _eventMask;
+
+  /// Map-originated event types this map queues during and after construction.
+  ///
+  /// Defaults to the C options default's selection, which is every event type
+  /// the loaded library reports. A bit a newer library selects and this binding
+  /// does not name is kept, and its events reach a host as unknown event and
+  /// payload domains. See [MapHandle.setEventMask].
+  RuntimeEventMask get eventMask =>
+      _eventMask ?? RuntimeEventMask(raw.mln_map_options_default().event_mask);
+
   @override
   bool operator ==(Object other) =>
       other is MapOptions &&
@@ -1575,11 +1642,18 @@ final class MapOptions {
       other.height == height &&
       other.scaleFactor == scaleFactor &&
       other.mapMode == mapMode &&
-      other.fastPforEnabled == fastPforEnabled;
+      other.fastPforEnabled == fastPforEnabled &&
+      other.eventMask == eventMask;
 
   @override
-  int get hashCode =>
-      Object.hash(width, height, scaleFactor, mapMode, fastPforEnabled);
+  int get hashCode => Object.hash(
+    width,
+    height,
+    scaleFactor,
+    mapMode,
+    fastPforEnabled,
+    eventMask,
+  );
 }
 
 /// A map's logical viewport size and pixel ratio.
@@ -1629,6 +1703,7 @@ final class MapHandle {
       nativeOptions.ref.scale_factor = options.scaleFactor;
       nativeOptions.ref.map_mode = options.mapMode.rawValue;
       nativeOptions.ref.fast_pfor_enabled = options.fastPforEnabled;
+      nativeOptions.ref.event_mask = options.eventMask.value;
       final outMap = arena<Uint64>();
       outMap.value = 0;
 
@@ -1641,8 +1716,10 @@ final class MapHandle {
 
   final RuntimeHandle _runtime;
   final NativeHandleState<NativeMap> _state;
+
+  /// Callback roots of the custom-geometry sources this map still holds, each
+  /// released by the C API's own release callback.
   final _customGeometryCallbacks = <String, _CustomGeometryCallbackState>{};
-  final _pendingUrlStyleCallbacks = <Set<_CustomGeometryCallbackState>>[];
 
   /// Whether this map has been closed by the Dart binding.
   bool get isClosed => _state.isClosed;
@@ -1661,7 +1738,6 @@ final class MapHandle {
         raw.mln_map_set_style_url(_handle.raw, nativeUrl.pointer.cast<Char>()),
       );
     });
-    _pendingUrlStyleCallbacks.add(_customGeometryCallbacks.values.toSet());
   }
 
   /// Loads inline style JSON through MapLibre Native style APIs.
@@ -1670,7 +1746,6 @@ final class MapHandle {
       final nativeJson = nativeBufferView(json, arena);
       _check(raw.mln_map_set_style_json(_handle.raw, nativeJson));
     });
-    _clearCustomGeometryCallbacks();
   }
 
   /// Returns the style document this map's style was last parsed from.
@@ -1691,6 +1766,30 @@ final class MapHandle {
   /// result is empty when no URL bytes are available.
   String getStyleUrl() {
     return _copyMapText(_handle, raw.mln_map_copy_style_url);
+  }
+
+  /// Selects which map-originated event types this map queues.
+  ///
+  /// The map reads the bits in [RuntimeEventMask.allMapEvents] and ignores the
+  /// rest, so [RuntimeEventMask.all] selects every map-originated type.
+  /// Narrowing gates later events and keeps queued ones. A bit outside
+  /// [RuntimeEventMask.all] reports invalid argument.
+  ///
+  /// Select every event type this host reads. The mask applies during map
+  /// construction.
+  void setEventMask(RuntimeEventMask mask) {
+    _check(raw.mln_map_set_event_mask(_handle.raw, mask.value));
+  }
+
+  /// Reports which map-originated event types this map queues.
+  ///
+  /// This reports the mask the map was created with or last narrowed to.
+  RuntimeEventMask get eventMask {
+    return withNativeArena((arena) {
+      final outMask = arena<Uint64>();
+      _check(raw.mln_map_get_event_mask(_handle.raw, outMask));
+      return RuntimeEventMask(outMask.value);
+    });
   }
 
   /// Requests a repaint for a continuous map.
@@ -2703,11 +2802,18 @@ final class MapHandle {
   }
 
   /// Adds a custom geometry source with queued fetch/cancel notifications.
+  ///
+  /// The C API releases the source's callback root when the source is removed,
+  /// when a style load drops it, or when this map is destroyed, so a host that
+  /// adds a source subscribes to nothing to keep it alive.
   void addCustomGeometrySource(
     String sourceId,
     CustomGeometrySourceOptions options,
   ) {
-    final callbackState = _CustomGeometryCallbackState(options);
+    final callbackState = _CustomGeometryCallbackState(
+      options,
+      () => _releaseCustomGeometryCallbacks(sourceId),
+    );
     try {
       withNativeArena((arena) {
         final nativeId = nativeStringView(sourceId, arena);
@@ -2724,7 +2830,6 @@ final class MapHandle {
           ),
         );
       });
-      _customGeometryCallbacks.remove(sourceId)?.retire();
       _customGeometryCallbacks[sourceId] = callbackState;
     } catch (_) {
       callbackState.close();
@@ -2800,7 +2905,7 @@ final class MapHandle {
 
   /// Removes one style source by ID and returns whether one was removed.
   bool removeStyleSource(String sourceId) {
-    final removed = withNativeArena((arena) {
+    return withNativeArena((arena) {
       final nativeId = nativeStringView(sourceId, arena);
       final outRemoved = arena<Bool>();
       _check(
@@ -2812,10 +2917,6 @@ final class MapHandle {
       );
       return outRemoved.value;
     });
-    if (removed) {
-      _customGeometryCallbacks.remove(sourceId)?.retire();
-    }
-    return removed;
   }
 
   /// Copies fixed style source metadata, or returns null when the source is absent.
@@ -3464,6 +3565,9 @@ final class MapHandle {
   }
 
   /// Explicitly destroys this map.
+  ///
+  /// Destroying the map releases every custom-geometry source it still holds,
+  /// which retires those sources' callback roots.
   void close() {
     final id = _state.handleId;
     _state.close(
@@ -3471,30 +3575,10 @@ final class MapHandle {
       _c.threadLastErrorMessage,
     );
     _runtime._unregisterMapId(id);
-    _clearCustomGeometryCallbacks();
   }
 
-  void _clearCustomGeometryCallbacksAfterUrlStyleLoad() {
-    if (_pendingUrlStyleCallbacks.isEmpty) {
-      return;
-    }
-    final retired = _pendingUrlStyleCallbacks.removeAt(0);
-    for (final state in retired) {
-      final entries = _customGeometryCallbacks.entries
-          .where((entry) => identical(entry.value, state))
-          .toList(growable: false);
-      for (final entry in entries) {
-        _customGeometryCallbacks.remove(entry.key);
-      }
-      state.retire();
-    }
-  }
-
-  void _clearCustomGeometryCallbacks() {
-    for (final state in _customGeometryCallbacks.values) {
-      state.retire();
-    }
-    _customGeometryCallbacks.clear();
-    _pendingUrlStyleCallbacks.clear();
+  /// Drops [sourceId]'s callback root once the C API has released it.
+  void _releaseCustomGeometryCallbacks(String sourceId) {
+    _customGeometryCallbacks.remove(sourceId);
   }
 }

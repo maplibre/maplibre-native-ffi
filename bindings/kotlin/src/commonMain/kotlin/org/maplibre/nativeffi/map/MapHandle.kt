@@ -20,6 +20,7 @@ import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
+import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
@@ -41,10 +42,20 @@ public expect class MapHandle : AutoCloseable {
   public fun runtime(): RuntimeHandle
 
   /**
+   * Map-originated event types that this map queues, [RuntimeEventMask.ALL] until a host narrows
+   * it.
+   *
+   * The setter reads the [RuntimeEventMask.ALL_MAP_EVENTS] bits and ignores the rest, so a host
+   * reads this mask, changes one bit, and writes it back. Narrowing gates later events and keeps
+   * queued ones.
+   */
+  public var eventMask: RuntimeEventMask
+
+  /**
    * Starts loading the style at [url]. The call returns once the request is queued; a load failure
    * reports only as a `MAP_LOADING_FAILED` runtime event.
    *
-   * @see org.maplibre.nativeffi.runtime.RuntimeHandle.pollEvent
+   * @see org.maplibre.nativeffi.runtime.RuntimeHandle.drainEvents
    */
   public fun setStyleUrl(url: String)
 
@@ -54,7 +65,7 @@ public expect class MapHandle : AutoCloseable {
    * Malformed JSON throws [org.maplibre.nativeffi.error.NativeErrorException] and also enqueues a
    * `MAP_LOADING_FAILED` runtime event carrying the same message.
    *
-   * @see org.maplibre.nativeffi.runtime.RuntimeHandle.pollEvent
+   * @see org.maplibre.nativeffi.runtime.RuntimeHandle.drainEvents
    */
   public fun setStyleJson(json: ByteArray)
 
@@ -90,6 +101,15 @@ public expect class MapHandle : AutoCloseable {
 
   public fun setGeoJsonSourceData(sourceId: String, data: ByteArray)
 
+  /**
+   * Adds a custom geometry source that calls [options] back for tile data.
+   *
+   * The source belongs to this map's current style. Its callback state lives until the source
+   * leaves the style, which happens when [removeStyleSource] removes it, when a style load replaces
+   * the style that held it, or when this map closes. Native reports that moment on the map owner
+   * thread, and the binding closes the source's callbacks there, waiting for any in-flight tile
+   * callback to return.
+   */
   public fun addCustomGeometrySource(sourceId: String, options: CustomGeometrySourceOptions)
 
   public fun setCustomGeometrySourceTileData(

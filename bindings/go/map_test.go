@@ -375,15 +375,14 @@ func TestMapSizeReportsCreationExtentAndPixelRatio(t *testing.T) {
 func TestMapAcceptsFastPFORDecoding(t *testing.T) {
 	lockOSThreadForTest(t)
 
-	if defaults := (MapOptions{}); defaults.FastPFOREnabled {
-		t.Fatalf("MapOptions{}.FastPFOREnabled = true; want false")
-	}
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	options := NewMapOptions(256, 256, 1)
+	if options.FastPFOREnabled {
+		t.Fatalf("NewMapOptions().FastPFOREnabled = true; want false")
+	}
 	options.FastPFOREnabled = true
 	m, err := runtime.NewMapWithOptions(options)
 	if err != nil {

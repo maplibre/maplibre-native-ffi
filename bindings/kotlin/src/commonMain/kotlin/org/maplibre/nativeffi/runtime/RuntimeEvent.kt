@@ -7,6 +7,11 @@ import org.maplibre.nativeffi.map.MapHandle
  *
  * @property type the event kind; an open domain, so handle unknown values.
  * @property sourceType which handle kind raised the event; an open domain.
+ * @property sourceId the identity of the handle that raised the event, carried for every event
+ *   including one whose [sourceType] this version does not name. Native `uint64_t` preserved as a
+ *   [Long] bit pattern; format through `toULong()`. The value names one object for the life of the
+ *   process, so a host may route or correlate on it even after the handle it names is closed. It is
+ *   an identity value only: no public API turns it back into a handle.
  * @property runtimeSource the runtime that raised the event, when it can be resolved.
  * @property mapSource the map that raised the event, resolved through a weak reference to the
  *   public wrapper and null once the host drops its own reference to that [MapHandle]. Read
@@ -18,6 +23,7 @@ import org.maplibre.nativeffi.map.MapHandle
 public data class RuntimeEvent(
   public val type: RuntimeEventType,
   public val sourceType: RuntimeEventSourceType,
+  public val sourceId: Long,
   public val runtimeSource: RuntimeHandle?,
   public val mapSource: MapHandle?,
   /**

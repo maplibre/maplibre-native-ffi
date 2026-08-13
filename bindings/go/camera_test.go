@@ -151,26 +151,28 @@ func drainCameraTransitionEvents(t *testing.T, runtime *RuntimeHandle) cameraTra
 	t.Helper()
 	var tally cameraTransitionTally
 	for {
-		event, err := runtime.PollEvent()
+		batch, err := runtime.DrainEvents(0)
 		if err != nil {
-			t.Fatalf("PollEvent(): %v", err)
+			t.Fatalf("DrainEvents(): %v", err)
 		}
-		if event == nil {
+		if len(batch.Events) == 0 {
 			return tally
 		}
-		switch event.Type {
-		case RuntimeEventMapCameraTransitionFinished:
-			if event.PayloadType != RuntimeEventPayloadCameraTransitionFinished {
-				t.Fatalf("transition-finished payload type = %v, want %v", event.PayloadType, RuntimeEventPayloadCameraTransitionFinished)
+		for _, event := range batch.Events {
+			switch event.Type {
+			case RuntimeEventMapCameraTransitionFinished:
+				if event.PayloadType != RuntimeEventPayloadCameraTransitionFinished {
+					t.Fatalf("transition-finished payload type = %v, want %v", event.PayloadType, RuntimeEventPayloadCameraTransitionFinished)
+				}
+				payload, ok := event.Payload.(RuntimeEventCameraTransitionFinishedPayload)
+				if !ok {
+					t.Fatalf("transition-finished payload type = %T, want RuntimeEventCameraTransitionFinishedPayload", event.Payload)
+				}
+				tally.finishedIDs = append(tally.finishedIDs, payload.TransitionID)
+			case RuntimeEventMapCameraDidChange:
+				tally.sawDidChange = true
+				tally.lastDidChangeCode = event.Code
 			}
-			payload, ok := event.Payload.(RuntimeEventCameraTransitionFinishedPayload)
-			if !ok {
-				t.Fatalf("transition-finished payload type = %T, want RuntimeEventCameraTransitionFinishedPayload", event.Payload)
-			}
-			tally.finishedIDs = append(tally.finishedIDs, payload.TransitionID)
-		case RuntimeEventMapCameraDidChange:
-			tally.sawDidChange = true
-			tally.lastDidChangeCode = event.Code
 		}
 	}
 }

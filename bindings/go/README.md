@@ -15,4 +15,4 @@ thread return `ErrWrongThread` with the native diagnostic when the C API reports
 that status.
 
 TODO: add a binding-owned owner-thread helper that serializes create, pump,
-event polling, operations, and close on one native owner thread.
+event draining, operations, and close on one native owner thread.

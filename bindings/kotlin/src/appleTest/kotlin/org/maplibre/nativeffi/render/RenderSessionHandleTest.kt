@@ -849,9 +849,8 @@ class RenderSessionHandleTest {
   ): Boolean {
     repeat(10_000) {
       runtime.pump(0)
-      while (true) {
-        val event = runtime.pollEvent() ?: break
-        if (event.type == eventType && event.mapSource == map) return true
+      if (runtime.drainEvents().events.any { it.type == eventType && it.mapSource == map }) {
+        return true
       }
       usleep(1_000U)
     }
@@ -879,8 +878,7 @@ class RenderSessionHandleTest {
     session: RenderSessionHandle,
   ) {
     runtime.pump(0)
-    repeat(100) {
-      val event = runtime.pollEvent() ?: return
+    for (event in runtime.drainEvents().events) {
       if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE && event.mapSource == map) {
         assertEquals(RenderResult.RENDERED, session.renderUpdate())
         return

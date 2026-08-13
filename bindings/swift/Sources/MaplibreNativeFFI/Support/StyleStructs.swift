@@ -432,42 +432,50 @@ private final class NativeCustomGeometrySourceCallbackBox: @unchecked Sendable {
   }
 }
 
-final class NativeCustomGeometrySourceCallbacks: @unchecked Sendable {
+/// A retain on one custom geometry source's tile callbacks, handed to the C
+/// API as `user_data`.
+///
+/// The C API owns the retain once it accepts the source, and gives it back by
+/// invoking the release callback exactly once, on the map owner thread, when it
+/// stops referencing the pointer. A rejected add is the one case that never
+/// releases, so the caller releases it with ``release()`` there.
+struct NativeCustomGeometrySourceCallbacks: @unchecked Sendable {
   typealias TileCallback = @Sendable (NativeCanonicalTileID) -> Void
 
-  private var retainedBox: Unmanaged<NativeCustomGeometrySourceCallbackBox>?
+  let unmanagedPointer: UnsafeMutableRawPointer
 
   init(fetchTile: @escaping TileCallback, cancelTile: TileCallback? = nil) {
-    retainedBox = Unmanaged.passRetained(
+    unmanagedPointer = Unmanaged.passRetained(
       NativeCustomGeometrySourceCallbackBox(
         fetchTile: fetchTile,
         cancelTile: cancelTile
       )
-    )
+    ).toOpaque()
   }
 
-  deinit {
-    guard let retainedBox else { return }
-    retainedBox.takeUnretainedValue().retireAndWait()
-    retainedBox.release()
+  func release() {
+    releaseCustomGeometryCallbacks(unmanagedPointer)
   }
+}
 
-  var unmanagedPointer: UnsafeMutableRawPointer {
-    retainedBox!.toOpaque()
-  }
+/// Retires the callbacks behind `userData` and drops the retain the C API held.
+///
+/// Retiring waits for the tile callbacks still running on native worker
+/// threads, so the host's closures are never entered after this returns.
+private func releaseCustomGeometryCallbacks(
+  _ userData: UnsafeMutableRawPointer
+) {
+  let box = Unmanaged<NativeCustomGeometrySourceCallbackBox>
+    .fromOpaque(userData)
+  box.takeUnretainedValue().retireAndWait()
+  box.release()
+}
 
-  func abandonRetainedBox() {
-    retainedBox = nil
-  }
-
-  static func releaseAbandonedRetainedBoxForTesting(
-    _ pointer: UnsafeMutableRawPointer
-  ) {
-    let retainedBox = Unmanaged<NativeCustomGeometrySourceCallbackBox>
-      .fromOpaque(pointer)
-    retainedBox.takeUnretainedValue().retireAndWait()
-    retainedBox.release()
-  }
+private func customGeometryReleaseUserDataCallback(
+  _ userData: UnsafeMutableRawPointer?
+) {
+  guard let userData else { return }
+  releaseCustomGeometryCallbacks(userData)
 }
 
 private func customGeometryFetchTileCallback(
@@ -525,6 +533,7 @@ struct NativeCustomGeometrySourceOptions {
     options.fetch_tile = customGeometryFetchTileCallback
     options.cancel_tile = customGeometryCancelTileCallback
     options.user_data = callbacks.unmanagedPointer
+    options.release_user_data = customGeometryReleaseUserDataCallback
     if let minZoom {
       options.fields |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM.rawValue
       options.min_zoom = minZoom

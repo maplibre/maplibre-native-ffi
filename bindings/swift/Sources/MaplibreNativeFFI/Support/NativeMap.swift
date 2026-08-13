@@ -11,6 +11,16 @@ enum NativeMap {
       }
   }
 
+  static func setEventMask(_ map: NativeMapHandle, mask: UInt64) throws {
+    try checkStatus(mln_map_set_event_mask(map.raw, mask))
+  }
+
+  static func eventMask(_ map: NativeMapHandle) throws -> UInt64 {
+    try NativeMemory.withTemporary(UInt64(0)) { mask in
+      try checkStatus(mln_map_get_event_mask(map.raw, mask))
+    }.value
+  }
+
   static func debugOptions(_ map: NativeMapHandle) throws -> UInt32 {
     try NativeMemory.withTemporary(UInt32(0)) { options in
       try checkStatus(mln_map_get_debug_options(map.raw, options))

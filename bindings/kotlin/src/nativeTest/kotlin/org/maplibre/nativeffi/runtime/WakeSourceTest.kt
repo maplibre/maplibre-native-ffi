@@ -31,11 +31,7 @@ class WakeSourceTest : org.maplibre.nativeffi.NativeTestBase() {
   private fun quiesce(runtime: RuntimeHandle) {
     repeat(100) {
       runtime.pump(0)
-      var drained = false
-      while (runtime.pollEvent() != null) {
-        drained = true
-      }
-      if (!drained) {
+      if (runtime.drainEvents().events.isEmpty()) {
         return
       }
     }
@@ -67,11 +63,8 @@ class WakeSourceTest : org.maplibre.nativeffi.NativeTestBase() {
           loadStarted.elapsedNow().inWholeMilliseconds < 5_000,
           "parks sat out their timeouts while the style load was pending",
         )
-        while (true) {
-          val event = runtime.pollEvent() ?: break
-          if (event.type == RuntimeEventType.MAP_LOADING_FAILED) {
-            loadingFailed = true
-          }
+        if (runtime.drainEvents().events.any { it.type == RuntimeEventType.MAP_LOADING_FAILED }) {
+          loadingFailed = true
         }
       }
     }

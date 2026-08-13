@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntFlag
 from typing import Any
 
@@ -124,6 +124,18 @@ class MapOptions:
     scale_factor: float | None = None
     mode: MapMode | None = None
     fast_pfor_enabled: bool | None = None
+    event_mask: RuntimeEventMask = field(
+        # The factory arrives from the deferred import at the end of this
+        # module, and it reads the C API creation default.
+        default_factory=lambda: _default_map_event_mask()
+    )
+    """Map-originated event types this map queues from creation.
+
+    The default takes the C API creation default, which queues every type the
+    linked library reports. Set it here to narrow the map from its first style
+    load, which produces the most tile and frame events. See
+    :meth:`MapHandle.set_event_mask`.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -522,6 +534,7 @@ class MapHandle(NativeHandleMixin):
             options.scale_factor,
             None if map_mode is None else map_mode.native_code,
             options.fast_pfor_enabled,
+            int(options.event_mask),
         )
         self._native_id_value = int(self._native.id())
         runtime._register_map(self)
@@ -552,6 +565,32 @@ class MapHandle(NativeHandleMixin):
     def request_still_image(self) -> None:
         """Request one still image for a static or tile map."""
         self._native.request_still_image()
+
+    def set_event_mask(self, mask: RuntimeEventMask) -> None:
+        """Select which map-originated event types this map queues.
+
+        The call reads the bits in :attr:`RuntimeEventMask.ALL_MAP_EVENTS` and
+        ignores the rest, so :attr:`RuntimeEventMask.ALL` selects every
+        map-originated type. Narrowing gates later events and keeps queued ones,
+        so a host drains what it already caused.
+
+        Select every type the host reads. Render-update is the map's only
+        invalidation report, the two still-image types are the only reports that
+        a still-image request finished, and loading-failure and render-error
+        carry native failure text. A style failure that MapLibre raises inside
+        :meth:`set_style_url` or :meth:`set_style_json` reaches the caller as an
+        exception whatever this mask selects.
+        """
+        self._native.set_event_mask(int(mask))
+
+    @property
+    def event_mask(self) -> RuntimeEventMask:
+        """Map-originated event types this map queues.
+
+        The value is the mask last set, including bits this map ignores, so a
+        host reads it, changes one bit, and writes it back.
+        """
+        return RuntimeEventMask(self._native.get_event_mask())
 
     def set_debug_options(self, options: MapDebugOptions) -> None:
         """Apply MapLibre debug overlay mask bits."""
@@ -1433,7 +1472,11 @@ class MapHandle(NativeHandleMixin):
         source_id: str,
         options: CustomGeometrySourceOptions | None = None,
     ) -> CustomGeometrySourceHandle:
-        """Add a custom geometry source and return its queued-event handle."""
+        """Add a custom geometry source and return its queued-event handle.
+
+        The handle closes when the source goes away: an explicit removal, a
+        style load that leaves a style without the source, or closing this map.
+        """
         from .style import CustomGeometrySourceHandle, CustomGeometrySourceOptions
 
         options = options or CustomGeometrySourceOptions()
@@ -1676,4 +1719,4 @@ __all__ = [
     "projected_meters_for_lat_lng",
 ]
 
-from .runtime import RuntimeHandle
+from .runtime import RuntimeEventMask, RuntimeHandle, _default_map_event_mask

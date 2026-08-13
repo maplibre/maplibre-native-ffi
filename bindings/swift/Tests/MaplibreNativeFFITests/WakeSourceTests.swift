@@ -9,22 +9,6 @@ private let parkTimeout: TimeInterval = 10
 /// machine adds to a condition-variable wake.
 private let promptReturn: TimeInterval = 5
 
-/// Pumps until the runtime is idle, so a park that follows is released by the
-/// signal the test raises.
-private func quiesce(_ runtime: RuntimeHandle) throws {
-  for _ in 0 ..< 100 {
-    try runtime.pump()
-    var drained = false
-    while try runtime.pollEvent() != nil {
-      drained = true
-    }
-    if !drained {
-      return
-    }
-  }
-  Issue.record("the runtime kept producing events while idle")
-}
-
 @Test func parkedOwnerThreadWakesForNativeWorkAndForAWakeSource() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
@@ -32,7 +16,7 @@ private func quiesce(_ runtime: RuntimeHandle) throws {
     runtime: runtime,
     options: MapOptions(width: 512, height: 512)
   )
-  try quiesce(runtime)
+  try pumpUntilQuiet(runtime)
 
   // The style is malformed, so native reports the failure from its own threads
   // and it reaches the parked owner thread.
@@ -45,17 +29,17 @@ private func quiesce(_ runtime: RuntimeHandle) throws {
       Date().timeIntervalSince(loadStarted) < promptReturn,
       "parks sat out their timeouts while loading was pending"
     )
-    while let event = try runtime.pollEvent() {
-      if event.type == .mapLoadingFailed {
-        loadingFailed = true
-      }
+    for event in try runtime.drainEvents().events
+      where event.type == .mapLoadingFailed
+    {
+      loadingFailed = true
     }
   }
   #expect(loadingFailed)
 
   // The park a cross-thread signal releases has no other work to end it.
   let source = try runtime.wakeSource()
-  try quiesce(runtime)
+  try pumpUntilQuiet(runtime)
   let signalled = DispatchSemaphore(value: 0)
   DispatchQueue.global().async {
     Thread.sleep(forTimeInterval: 0.02)
@@ -83,7 +67,7 @@ private func quiesce(_ runtime: RuntimeHandle) throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   let source = try runtime.wakeSource()
-  try quiesce(runtime)
+  try pumpUntilQuiet(runtime)
 
   try source.signal()
   let signalledStarted = Date()

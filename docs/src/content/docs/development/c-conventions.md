@@ -30,6 +30,8 @@ during this phase.
 The public C header targets C23. ABI-crossing enum types use C23
 fixed-underlying enum syntax: `int32_t` for status values and `uint32_t` for
 non-negative domains and masks unless a native ABI field requires another width.
+A mask whose bits index an open enum domain uses `uint64_t`, because the mask
+width limits how many values that domain can hold.
 
 JSON and GeoJSON cross the ABI as UTF-8 bytes, not recursive C structs. Use
 `mln_buffer_view` for borrowed input and `mln_buffer` for owned output. Keep
@@ -42,7 +44,9 @@ whether a number is an unsigned integer, signed integer, or floating point.
 
 Shape structs for future ABI stability. Option and output structs that may grow
 use `uint32_t size` fields. Default constructors populate them. Use field masks
-or presence booleans for optional values when zero is valid.
+or presence booleans for optional values when zero is valid. A runtime event
+subscription mask is required instead: an empty mask selects no event types, and
+the default constructor sets every type the library reports.
 
 Prefer scalar fields, pointers with length fields, structs, unions, and opaque
 handles in public structs—these are friendly to binding generators. Expose
@@ -209,6 +213,8 @@ own work. Park-and-wake follows these rules:
   caller must not hold across it.
 - Queue one event per host-visible outcome. An event whose handling acts on the
   latest state, such as a render update, coalesces against an unread one.
+- A subscription mask suppresses an event before its payload and message are
+  built. A suppressed event stays out of the queue and raises no wake flag.
 
 ## Status And Diagnostics
 
@@ -243,8 +249,11 @@ The C API preserves MapLibre Native's imperative, observer-driven model. C API
 calls return status for synchronous acceptance or failure; drained events report
 later native work.
 
-Prefer polled events for native-to-host notifications about map state,
-lifecycle, rendering, and errors. Use native callbacks for low-level extension
+Prefer drained events for native-to-host notifications about map state,
+lifecycle, rendering, and errors. A host selects the event types it reads with a
+subscription mask, so document the state that each type carries. Options always
+read the mask, and a bit outside the documented set of types returns
+`MLN_STATUS_INVALID_ARGUMENT`. Use native callbacks for low-level extension
 points where MapLibre needs a synchronous decision, an asynchronous request
 handle, or process-global integration such as logging.
 
@@ -252,7 +261,8 @@ Event payloads use plain data with documented lifetimes. Each event identifies
 its source kind and source handle. Queued events never outlive the source handle
 they reference: map teardown discards queued events for that map, and runtime
 teardown discards runtime-owned event streams before the runtime handle becomes
-invalid.
+invalid. A drained batch holds copies, and it stays readable until the next
+drain for its runtime.
 
 Classify each operation as one of:
 

@@ -1,14 +1,6 @@
 internal import CMaplibreNativeC
 import Foundation
 
-private final class WeakMapHandle {
-  weak var value: MapHandle?
-
-  init(_ value: MapHandle) {
-    self.value = value
-  }
-}
-
 public enum MapMode: UInt32, Sendable, Hashable {
   case continuous = 0
   case `static` = 1
@@ -31,19 +23,24 @@ public struct MapOptions: Equatable, Sendable {
   /// encodings, fixed for the lifetime of the map. A map created with this
   /// `false` logs a tile parse warning for such tiles.
   public var fastPFOREnabled: Bool
+  /// Map-originated event types this map queues, every type the library
+  /// reports unless the host narrows it. The mask applies during construction.
+  public var eventMask: RuntimeEventMask
 
   public init(
     width: UInt32,
     height: UInt32,
     scaleFactor: Double = 1.0,
     mode: MapMode = .continuous,
-    fastPFOREnabled: Bool = false
+    fastPFOREnabled: Bool = false,
+    eventMask: RuntimeEventMask = .mapOptionsDefault
   ) {
     self.width = width
     self.height = height
     self.scaleFactor = scaleFactor
     self.mode = mode
     self.fastPFOREnabled = fastPFOREnabled
+    self.eventMask = eventMask
   }
 
   var nativeInput: NativeMapOptionsInput {
@@ -52,23 +49,15 @@ public struct MapOptions: Equatable, Sendable {
       height: height,
       scaleFactor: scaleFactor,
       mapMode: mode.rawValue,
-      fastPFOREnabled: fastPFOREnabled
+      fastPFOREnabled: fastPFOREnabled,
+      eventMask: eventMask.rawValue
     )
   }
 }
 
 public final class MapHandle {
-  private static let registryLock = NSLock()
-  private nonisolated(unsafe) static var registry: [UInt64: WeakMapHandle] = [:]
-
-  private let runtime: RuntimeHandle
   private let handle: NativeHandleBox<NativeMapHandle>
   private let mapId: MapId
-  private var styleURLReplacementPending = false
-  private var customGeometrySourceCallbacks: [
-    String: NativeCustomGeometrySourceCallbacks
-  ] =
-    [:]
 
   public init(runtime: RuntimeHandle, options: MapOptions) throws {
     let native = try mapNativeFailure {
@@ -79,17 +68,8 @@ public final class MapHandle {
         )
       }
     }
-    self.runtime = runtime
     mapId = MapId(value: native.raw)
     handle = try NativeHandleBox(typeName: "MapHandle", handle: native)
-    Self.register(self)
-  }
-
-  deinit {
-    Self.unregister(mapId)
-    if !handle.isClosed {
-      abandonNativeOwnedCustomGeometrySourceCallbacks()
-    }
   }
 
   public var isClosed: Bool {
@@ -115,77 +95,42 @@ public final class MapHandle {
     return MapAttachRef(handle: handle)
   }
 
-  private static func register(_ map: MapHandle) {
-    registryLock.withLock {
-      registry[map.mapId.value] = WeakMapHandle(map)
+  /// Selects which map-originated event types this map queues.
+  ///
+  /// The call reads the bits in ``RuntimeEventMask/allMapEvents`` and ignores
+  /// the rest, so ``RuntimeEventMask/all`` selects every one of them. Narrowing
+  /// gates later events and keeps queued ones, so a host drains what it already
+  /// caused.
+  ///
+  /// Select every type the host reads: map-render-update-available is the map's
+  /// only invalidation report, the two still-image types are the only reports
+  /// that a still-image request finished, and map-loading-failed and
+  /// map-render-error carry native failure text.
+  public func setEventMask(_ mask: RuntimeEventMask) throws {
+    try mapNativeFailure {
+      try NativeMap.setEventMask(handle.requireLive(), mask: mask.rawValue)
     }
   }
 
-  private static func unregister(_ mapId: MapId) {
-    registryLock.withLock {
-      _ = registry.removeValue(forKey: mapId.value)
+  /// The mask last set. A map that has not been narrowed reports
+  /// ``RuntimeEventMask/all``. Read it, change one bit, and write it back to
+  /// leave the other bits alone.
+  public var eventMask: RuntimeEventMask {
+    get throws {
+      try mapNativeFailure {
+        try RuntimeEventMask(
+          rawValue: NativeMap.eventMask(handle.requireLive())
+        )
+      }
     }
   }
 
-  static func handleRuntimeEvent(_ event: RuntimeEvent) {
-    guard event.type == .mapStyleLoaded,
-          case let .map(source) = event.source
-    else { return }
-
-    let map = registryLock
-      .withLock { registry[source.value]?.value }
-    map?.releaseCallbacksForLoadedStyleURLIfNeeded()
-  }
-
-  private func retainCallbacksUntilPendingStyleURLLoads() {
-    styleURLReplacementPending = true
-  }
-
-  func releaseCallbacksForLoadedStyleURLIfNeeded() {
-    guard styleURLReplacementPending else { return }
-
-    for sourceId in Array(customGeometrySourceCallbacks.keys) {
-      guard (try? styleSourceType(sourceId)) != .customVector else { continue }
-      customGeometrySourceCallbacks.removeValue(forKey: sourceId)
-    }
-
-    if customGeometrySourceCallbacks.isEmpty {
-      styleURLReplacementPending = false
-    }
-  }
-
-  func storeCustomGeometrySourceCallbacks(
-    _ callbacks: NativeCustomGeometrySourceCallbacks,
-    sourceId: String
-  ) {
-    customGeometrySourceCallbacks[sourceId] = callbacks
-  }
-
-  func removeCustomGeometrySourceCallbacks(sourceId: String) {
-    _ = customGeometrySourceCallbacks.removeValue(forKey: sourceId)
-  }
-
-  func retainsCustomGeometrySourceCallbacks(sourceId: String) -> Bool {
-    customGeometrySourceCallbacks[sourceId] != nil
-  }
-
-  private func resetCallbackRetentionState() {
-    styleURLReplacementPending = false
-    customGeometrySourceCallbacks.removeAll()
-  }
-
-  private func abandonNativeOwnedCustomGeometrySourceCallbacks() {
-    for callbacks in customGeometrySourceCallbacks.values {
-      callbacks.abandonRetainedBox()
-    }
-  }
-
+  /// Destroys this map, discarding its undrained events the way the C API
+  /// discards the ones it still holds.
   public func close() throws {
     try handle.closeOnce { handle in
       try checkStatus(mln_map_destroy(handle.raw))
     }
-    Self.unregister(mapId)
-    resetCallbackRetentionState()
   }
 
   /// Loads a style URL.
@@ -199,7 +144,6 @@ public final class MapHandle {
       try NativeString.withCString(url) { url in
         try checkStatus(mln_map_set_style_url(handle.requireLive().raw, url))
       }
-      retainCallbacksUntilPendingStyleURLLoads()
     }
   }
 
@@ -217,7 +161,6 @@ public final class MapHandle {
         handle.requireLive().raw,
         arena.view(json)
       ))
-      resetCallbackRetentionState()
     }
   }
 

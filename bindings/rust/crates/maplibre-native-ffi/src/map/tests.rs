@@ -1,13 +1,14 @@
 use super::*;
 use serde_json::{Value as JsonValue, json};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use crate::events::{
-    RuntimeEventPayload, RuntimeEventSource, RuntimeEventType, empty_runtime_event,
-};
+use crate::events::{RuntimeEventPayload, RuntimeEventSource, RuntimeEventType};
 use crate::{
     BoundsConstraint, CameraChangeMode, CustomGeometrySourceOptions, EdgeInsets, ErrorKind,
-    MapMode, ResourceKind, ResourceProviderDecision, ResourceResponse, TextureImageInfo,
+    MapMode, ResourceKind, ResourceProviderDecision, ResourceResponse, RuntimeEventMask,
+    TextureImageInfo,
 };
 
 const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
@@ -588,14 +589,39 @@ fn style_source_info_copies_reconstructible_source_state() {
     );
 }
 
+/// Counts how often the C API released a custom geometry source's callback
+/// state, by living inside the source's fetch callback: the release frees the
+/// callback, which drops this probe.
+struct ReleaseProbe {
+    releases: Arc<AtomicUsize>,
+}
+
+impl Drop for ReleaseProbe {
+    fn drop(&mut self) {
+        self.releases.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+/// Builds source options whose callback state increments `releases` when the C
+/// API releases it.
+fn options_counting_releases(releases: &Arc<AtomicUsize>) -> CustomGeometrySourceOptions {
+    let probe = ReleaseProbe {
+        releases: Arc::clone(releases),
+    };
+    CustomGeometrySourceOptions::new(move |_| {
+        let _ = &probe;
+    })
+}
+
 #[test]
 // Spec coverage: BND-124.
 fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_state() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    let releases = Arc::new(AtomicUsize::new(0));
 
-    let mut custom_options = CustomGeometrySourceOptions::new(|_| {}).with_cancel_tile(|_| {});
+    let mut custom_options = options_counting_releases(&releases).with_cancel_tile(|_| {});
     custom_options.min_zoom = Some(0.0);
     custom_options.max_zoom = Some(2.0);
     custom_options.tolerance = Some(0.375);
@@ -605,7 +631,6 @@ fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_st
     custom_options.wrap = Some(false);
     map.add_custom_geometry_source("custom", custom_options)
         .unwrap();
-    assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
 
     let tile_id = CanonicalTileId::new(0, 0, 0);
     map.set_custom_geometry_source_tile_data(
@@ -621,17 +646,27 @@ fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_st
         LatLngBounds::new(LatLng::new(-1.0, -1.0), LatLng::new(1.0, 1.0)),
     )
     .unwrap();
+    assert_eq!(releases.load(Ordering::SeqCst), 0);
 
+    // An explicit removal releases the callback state once.
     assert!(map.remove_style_source("custom").unwrap());
-    assert_eq!(map.custom_geometry_source_count_for_testing(), 0);
+    assert_eq!(releases.load(Ordering::SeqCst), 1);
     assert!(!map.style_source_exists("custom").unwrap());
 
-    map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
+    // A duplicate source ID is rejected, and a rejected add releases nothing
+    // this call handed over, so the state it built is freed here instead.
+    map.add_custom_geometry_source("custom", options_counting_releases(&releases))
         .unwrap();
-    assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
+    let error = map
+        .add_custom_geometry_source("custom", options_counting_releases(&releases))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    assert_eq!(releases.load(Ordering::SeqCst), 2);
 
+    // The inline style load replaces the style before it returns, so the source
+    // it dropped is released by then.
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
-    assert_eq!(map.custom_geometry_source_count_for_testing(), 0);
+    assert_eq!(releases.load(Ordering::SeqCst), 3);
 
     map.close().unwrap();
     runtime.close().unwrap();
@@ -643,63 +678,13 @@ fn custom_geometry_source_state_is_released_on_map_close() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
-    map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
-        .unwrap();
-    assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
-
-    map.close().unwrap();
-    runtime.close().unwrap();
-}
-
-#[test]
-// Spec coverage: BND-124.
-fn custom_geometry_source_state_ignores_stale_style_loaded_events() {
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
-    map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
+    let releases = Arc::new(AtomicUsize::new(0));
+    map.add_custom_geometry_source("custom", options_counting_releases(&releases))
         .unwrap();
 
-    let mut event = empty_runtime_event();
-    event.type_ = sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED;
-    event.source_type = sys::MLN_RUNTIME_EVENT_SOURCE_MAP;
-    event.source = map.inner.handle.handle().0;
-    runtime.inner.apply_event_side_effects_for_testing(&event);
-
-    assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
     map.close().unwrap();
-    runtime.close().unwrap();
-}
 
-#[test]
-// Spec coverage: BND-124.
-fn custom_geometry_source_state_releases_detached_sources_on_style_loaded_event() {
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
-    map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
-        .unwrap();
-
-    let source_id = maplibre_native_ffi_core::string::string_view("custom");
-    let mut removed = false;
-    // SAFETY: map is live, source_id is valid for this call, and removed points
-    // to writable storage. The raw call bypasses binding cleanup to model
-    // native style replacement detaching the source.
-    let status = unsafe {
-        sys::mln_map_remove_style_source(map.inner.handle.handle(), source_id.raw(), &mut removed)
-    };
-    assert_eq!(status, sys::MLN_STATUS_OK);
-    assert!(removed);
-    assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
-
-    let mut event = empty_runtime_event();
-    event.type_ = sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED;
-    event.source_type = sys::MLN_RUNTIME_EVENT_SOURCE_MAP;
-    event.source = map.inner.handle.handle().0;
-    runtime.inner.apply_event_side_effects_for_testing(&event);
-
-    assert_eq!(map.custom_geometry_source_count_for_testing(), 0);
-    map.close().unwrap();
+    assert_eq!(releases.load(Ordering::SeqCst), 1);
     runtime.close().unwrap();
 }
 
@@ -710,19 +695,21 @@ fn custom_geometry_source_adds_to_current_style_after_url_style_request() {
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
     map.set_style_url("unsupported://style.json").unwrap();
+    let releases = Arc::new(AtomicUsize::new(0));
 
-    map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
+    map.add_custom_geometry_source("custom", options_counting_releases(&releases))
         .unwrap();
 
-    assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
+    assert!(map.style_source_exists("custom").unwrap());
+    assert_eq!(releases.load(Ordering::SeqCst), 0);
     map.close().unwrap();
     runtime.close().unwrap();
 }
 
 #[test]
-// Spec coverage: BND-124.
+// Spec coverage: BND-093 and BND-124.
 fn custom_geometry_source_state_releases_after_url_style_replacement() {
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     runtime
         .set_resource_provider(|request, handle| {
             if request.requested_url == "custom://style.json" {
@@ -735,38 +722,163 @@ fn custom_geometry_source_state_releases_after_url_style_replacement() {
         })
         .unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
-    map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
+    // The host wants no style-loaded events, and the release runs anyway.
+    map.set_event_mask(RuntimeEventMask::ALL - RuntimeEventMask::MAP_STYLE_LOADED)
         .unwrap();
-    assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
-    drain_runtime_events(&runtime);
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    let releases = Arc::new(AtomicUsize::new(0));
+    map.add_custom_geometry_source("custom", options_counting_releases(&releases))
+        .unwrap();
+    drain_runtime_events(&mut runtime);
 
     map.set_style_url("custom://style.json").unwrap();
-    wait_for_map_event(&runtime, &map, RuntimeEventType::MapStyleLoaded);
+    let mut style_loaded_events = 0;
+    for _ in 0..1000 {
+        runtime.pump(Some(Duration::ZERO)).unwrap();
+        for event in runtime.drain_events(0).unwrap().iter() {
+            if event.event_type() == RuntimeEventType::MapStyleLoaded {
+                style_loaded_events += 1;
+            }
+        }
+        if releases.load(Ordering::SeqCst) == 1 {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
 
-    assert_eq!(map.custom_geometry_source_count_for_testing(), 0);
+    assert_eq!(
+        releases.load(Ordering::SeqCst),
+        1,
+        "a style replacement should release the detached source's callback state"
+    );
+    assert_eq!(
+        style_loaded_events, 0,
+        "the release must not need an event the host left unselected"
+    );
+    assert_eq!(
+        map.event_mask().unwrap(),
+        RuntimeEventMask::ALL - RuntimeEventMask::MAP_STYLE_LOADED,
+        "the mask should report what the host set"
+    );
+
     map.close().unwrap();
     runtime.close().unwrap();
 }
 
-fn drain_runtime_events(runtime: &RuntimeHandle) {
+fn drain_runtime_events(runtime: &mut RuntimeHandle) {
     for _ in 0..20 {
         runtime.pump(Some(Duration::ZERO)).unwrap();
-        while runtime.poll_event().unwrap().is_some() {}
+        let _ = runtime.drain_events(0).unwrap();
     }
 }
 
-fn wait_for_map_event(runtime: &RuntimeHandle, map: &MapHandle, event_type: RuntimeEventType) {
-    for _ in 0..1000 {
+/// Loads a style and collects the map event types the drains report, so a mask
+/// test compares what a map delivered against what it selected.
+fn collect_style_load_event_types(
+    runtime: &mut RuntimeHandle,
+    map: &MapHandle,
+    style_json: &str,
+) -> Vec<RuntimeEventType> {
+    let mut types = Vec::new();
+    map.set_style_json(style_json.as_bytes()).unwrap();
+    for _ in 0..20 {
         runtime.pump(Some(Duration::ZERO)).unwrap();
-        while let Some(event) = runtime.poll_event().unwrap() {
-            if event.event_type == event_type && event.source == RuntimeEventSource::Map(map.id()) {
-                return;
+        for event in runtime.drain_events(0).unwrap().iter() {
+            if event.source() == RuntimeEventSource::Map(map.id()) {
+                types.push(event.event_type());
             }
         }
-        std::thread::sleep(Duration::from_millis(1));
     }
-    panic!("timed out waiting for {event_type:?}");
+    types
+}
+
+#[test]
+// Spec coverage: BND-091.
+fn a_narrowed_map_mask_delivers_the_kept_type_alone() {
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+
+    // The default options mask selects every type.
+    assert_eq!(map.event_mask().unwrap(), RuntimeEventMask::ALL);
+
+    map.set_event_mask(RuntimeEventMask::ALL - RuntimeEventMask::MAP_LOADING_STARTED)
+        .unwrap();
+
+    let types = collect_style_load_event_types(&mut runtime, &map, VALID_STYLE_JSON);
+
+    assert!(
+        types.contains(&RuntimeEventType::MapStyleLoaded),
+        "{types:?}"
+    );
+    assert!(
+        !types.contains(&RuntimeEventType::MapLoadingStarted),
+        "{types:?}"
+    );
+
+    // An empty mask leaves the map with nothing to report.
+    map.set_event_mask(RuntimeEventMask::NONE).unwrap();
+    assert!(map.event_mask().unwrap().is_empty());
+    let types = collect_style_load_event_types(&mut runtime, &map, STYLE_WITH_IDS_JSON);
+    assert!(types.is_empty(), "{types:?}");
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-060 and BND-091.
+fn a_creation_mask_narrows_a_map_from_its_first_style_load() {
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut options = MapOptions::default();
+    options.event_mask = RuntimeEventMask::ALL - RuntimeEventMask::MAP_LOADING_STARTED;
+    let map = MapHandle::with_options(&runtime, &options).unwrap();
+
+    assert_eq!(
+        map.event_mask().unwrap(),
+        RuntimeEventMask::ALL - RuntimeEventMask::MAP_LOADING_STARTED
+    );
+    let types = collect_style_load_event_types(&mut runtime, &map, VALID_STYLE_JSON);
+
+    assert!(
+        types.contains(&RuntimeEventType::MapStyleLoaded),
+        "{types:?}"
+    );
+    assert!(
+        !types.contains(&RuntimeEventType::MapLoadingStarted),
+        "{types:?}"
+    );
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-091.
+fn a_map_mask_round_trips_and_rejects_undefined_bits() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+
+    map.set_event_mask(RuntimeEventMask::ALL).unwrap();
+    assert_eq!(map.event_mask().unwrap(), RuntimeEventMask::ALL);
+
+    // Read, clear one bit, write back: every other bit survives.
+    let mut mask = map.event_mask().unwrap();
+    mask.remove(RuntimeEventMask::MAP_TILE_ACTION);
+    map.set_event_mask(mask).unwrap();
+    let read_back = map.event_mask().unwrap();
+    assert!(!read_back.contains(RuntimeEventMask::MAP_TILE_ACTION));
+    assert!(read_back.contains(RuntimeEventMask::MAP_STYLE_LOADED));
+    assert!(read_back.contains(RuntimeEventMask::OFFLINE_OPERATION_COMPLETED));
+
+    let error = map
+        .set_event_mask(RuntimeEventMask::from_bits_retain(1 << 63))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
+    assert_eq!(map.event_mask().unwrap(), read_back);
+
+    map.close().unwrap();
+    runtime.close().unwrap();
 }
 
 #[test]
@@ -975,13 +1087,13 @@ struct CameraEventTally {
 /// Tallies the camera events among the queued runtime events.
 ///
 /// The transition-finished event is queued while the camera command that ends
-/// the transition runs, so polling alone observes it.
-fn drain_camera_events(runtime: &RuntimeHandle) -> CameraEventTally {
+/// the transition runs, so one drain observes it.
+fn drain_camera_events(runtime: &mut RuntimeHandle) -> CameraEventTally {
     let mut tally = CameraEventTally::default();
-    while let Some(event) = runtime.poll_event().unwrap() {
-        match event.event_type {
+    for event in runtime.drain_events(0).unwrap().iter() {
+        match event.event_type() {
             RuntimeEventType::MapCameraTransitionFinished => {
-                let RuntimeEventPayload::CameraTransitionFinished(payload) = event.payload else {
+                let RuntimeEventPayload::CameraTransitionFinished(payload) = event.payload() else {
                     panic!("transition-finished event should carry its typed payload");
                 };
                 tally.finished_transition_ids.push(payload.transition_id);
@@ -989,7 +1101,7 @@ fn drain_camera_events(runtime: &RuntimeHandle) -> CameraEventTally {
             RuntimeEventType::MapCameraDidChange => {
                 tally
                     .did_change_modes
-                    .push(CameraChangeMode::from_raw(event.code as u32));
+                    .push(CameraChangeMode::from_raw(event.code() as u32));
                 tally.did_change_followed_finish |= !tally.finished_transition_ids.is_empty();
             }
             _ => {}
@@ -1008,7 +1120,7 @@ fn identified_ease(transition_id: u64, duration_ms: f64) -> AnimationOptions {
 #[test]
 // Spec coverage: BND-061, BND-102, and BND-087.
 fn identified_camera_transitions_report_each_terminal_outcome_once() {
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let mut options = MapOptions::new(512, 512, 1.0);
     options.mode = MapMode::Continuous;
     let map = MapHandle::with_options(&runtime, &options).unwrap();
@@ -1017,13 +1129,13 @@ fn identified_camera_transitions_report_each_terminal_outcome_once() {
     camera.zoom = Some(4.0);
     // Map construction queues its own camera events, so start from an empty
     // queue.
-    let _ = drain_camera_events(&runtime);
+    let _ = drain_camera_events(&mut runtime);
 
     // A zero-duration ease resolves inside the call, so its end is reported
     // ahead of the did-change event for the same jump.
     map.ease_to(&camera, Some(&identified_ease(0, 0.0)))
         .unwrap();
-    let tally = drain_camera_events(&runtime);
+    let tally = drain_camera_events(&mut runtime);
     assert_eq!(tally.finished_transition_ids, vec![0]);
     assert!(tally.did_change_followed_finish);
     assert_eq!(tally.did_change_modes, vec![CameraChangeMode::Immediate]);
@@ -1031,19 +1143,19 @@ fn identified_camera_transitions_report_each_terminal_outcome_once() {
     camera.zoom = Some(12.0);
     map.ease_to(&camera, Some(&identified_ease(11, 5_000.0)))
         .unwrap();
-    let tally = drain_camera_events(&runtime);
+    let tally = drain_camera_events(&mut runtime);
     assert!(tally.finished_transition_ids.is_empty());
 
     // A later camera command supersedes the running transition.
     camera.zoom = Some(13.0);
     map.ease_to(&camera, Some(&identified_ease(12, 5_000.0)))
         .unwrap();
-    let tally = drain_camera_events(&runtime);
+    let tally = drain_camera_events(&mut runtime);
     assert_eq!(tally.finished_transition_ids, vec![11]);
     assert_eq!(tally.did_change_modes, vec![CameraChangeMode::Animated]);
 
     map.cancel_transitions().unwrap();
-    let tally = drain_camera_events(&runtime);
+    let tally = drain_camera_events(&mut runtime);
     assert_eq!(tally.finished_transition_ids, vec![12]);
 
     // An absent identity keeps the transition silent, so the present zero ID
@@ -1051,7 +1163,7 @@ fn identified_camera_transitions_report_each_terminal_outcome_once() {
     camera.zoom = Some(14.0);
     map.ease_to(&camera, Some(&AnimationOptions::default()))
         .unwrap();
-    let tally = drain_camera_events(&runtime);
+    let tally = drain_camera_events(&mut runtime);
     assert!(tally.finished_transition_ids.is_empty());
 
     map.close().unwrap();

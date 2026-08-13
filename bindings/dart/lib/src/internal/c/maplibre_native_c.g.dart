@@ -695,6 +695,9 @@ external int mln_map_get_debug_options(
   ffi.Pointer<ffi.Uint32> out_options,
 );
 
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Uint64>)>()
+external int mln_map_get_event_mask(int map, ffi.Pointer<ffi.Uint64> out_mask);
+
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_free_camera_options>)>()
 external int mln_map_get_free_camera_options(
   int map,
@@ -1250,6 +1253,9 @@ external int mln_map_set_custom_geometry_source_tile_data(
 
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Uint32)>()
 external int mln_map_set_debug_options(int map, int options);
+
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Uint64)>()
+external int mln_map_set_event_mask(int map, int mask);
 
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_free_camera_options>)>()
 external int mln_map_set_free_camera_options(
@@ -1953,6 +1959,28 @@ external int mln_runtime_create(
 @ffi.Native<ffi.Int32 Function(mln_runtime)>()
 external int mln_runtime_destroy(int runtime);
 
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_runtime,
+    ffi.Size,
+    ffi.Pointer<mln_runtime_event_batch>,
+  )
+>()
+external int mln_runtime_drain_events(
+  int runtime,
+  int max_events,
+  ffi.Pointer<mln_runtime_event_batch> out_batch,
+);
+
+@ffi.Native<mln_runtime_event_batch Function()>()
+external mln_runtime_event_batch mln_runtime_event_batch_default();
+
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<ffi.Uint64>)>()
+external int mln_runtime_get_event_mask(
+  int runtime,
+  ffi.Pointer<ffi.Uint64> out_mask,
+);
+
 @ffi.Native<ffi.Int32 Function(mln_runtime, mln_offline_operation_id)>()
 external int mln_runtime_offline_operation_discard(
   int runtime,
@@ -2179,19 +2207,6 @@ external int mln_runtime_offline_regions_merge_database_take_result(
 @ffi.Native<mln_runtime_options Function()>()
 external mln_runtime_options mln_runtime_options_default();
 
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_runtime,
-    ffi.Pointer<mln_runtime_event>,
-    ffi.Pointer<ffi.Bool>,
-  )
->()
-external int mln_runtime_poll_event(
-  int runtime,
-  ffi.Pointer<mln_runtime_event> out_event,
-  ffi.Pointer<ffi.Bool> out_has_event,
-);
-
 @ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Int64)>()
 external int mln_runtime_pump(int runtime, int timeout_ms);
 
@@ -2207,6 +2222,9 @@ external int mln_runtime_run_ambient_cache_operation_start(
   int operation,
   ffi.Pointer<mln_offline_operation_id> out_operation_id,
 );
+
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Uint64)>()
+external int mln_runtime_set_event_mask(int runtime, int mask);
 
 @ffi.Native<
   ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_http_header_transform>)
@@ -3254,6 +3272,8 @@ final class mln_custom_geometry_source_options extends ffi.Struct {
   @ffi.Bool()
   external bool wrap;
 
+  external mln_custom_geometry_source_release_callback release_user_data;
+
   static ffi.Pointer<mln_custom_geometry_source_options> $allocate(
     ffi.Allocator $allocator, {
     required int size,
@@ -3268,6 +3288,7 @@ final class mln_custom_geometry_source_options extends ffi.Struct {
     required int buffer,
     required bool clip,
     required bool wrap,
+    required mln_custom_geometry_source_release_callback release_user_data,
   }) => $allocator<mln_custom_geometry_source_options>()
     ..ref.size = size
     ..ref.fields = fields
@@ -3280,9 +3301,18 @@ final class mln_custom_geometry_source_options extends ffi.Struct {
     ..ref.tile_size = tile_size
     ..ref.buffer = buffer
     ..ref.clip = clip
-    ..ref.wrap = wrap;
+    ..ref.wrap = wrap
+    ..ref.release_user_data = release_user_data;
 }
 
+typedef mln_custom_geometry_source_release_callback =
+    ffi.Pointer<
+      ffi.NativeFunction<mln_custom_geometry_source_release_callbackFunction>
+    >;
+typedef mln_custom_geometry_source_release_callbackFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> user_data);
+typedef Dartmln_custom_geometry_source_release_callbackFunction =
+    void Function(ffi.Pointer<ffi.Void> user_data);
 typedef mln_custom_geometry_source_tile_callback =
     ffi.Pointer<
       ffi.NativeFunction<mln_custom_geometry_source_tile_callbackFunction>
@@ -3798,6 +3828,9 @@ final class mln_map_options extends ffi.Struct {
   @ffi.Bool()
   external bool fast_pfor_enabled;
 
+  @ffi.Uint64()
+  external int event_mask;
+
   static ffi.Pointer<mln_map_options> $allocate(
     ffi.Allocator $allocator, {
     required int size,
@@ -3806,13 +3839,15 @@ final class mln_map_options extends ffi.Struct {
     required double scale_factor,
     required int map_mode,
     required bool fast_pfor_enabled,
+    required int event_mask,
   }) => $allocator<mln_map_options>()
     ..ref.size = size
     ..ref.width = width
     ..ref.height = height
     ..ref.scale_factor = scale_factor
     ..ref.map_mode = map_mode
-    ..ref.fast_pfor_enabled = fast_pfor_enabled;
+    ..ref.fast_pfor_enabled = fast_pfor_enabled
+    ..ref.event_mask = event_mask;
 }
 
 typedef mln_map_projection = ffi.Uint64;
@@ -4763,9 +4798,6 @@ enum mln_rendered_query_geometry_type {
 }
 
 final class mln_rendering_stats extends ffi.Struct {
-  @ffi.Uint32()
-  external int size;
-
   @ffi.Double()
   external double encoding_time;
 
@@ -4783,14 +4815,12 @@ final class mln_rendering_stats extends ffi.Struct {
 
   static ffi.Pointer<mln_rendering_stats> $allocate(
     ffi.Allocator $allocator, {
-    required int size,
     required double encoding_time,
     required double rendering_time,
     required int frame_count,
     required int draw_call_count,
     required int total_draw_call_count,
   }) => $allocator<mln_rendering_stats>()
-    ..ref.size = size
     ..ref.encoding_time = encoding_time
     ..ref.rendering_time = rendering_time
     ..ref.frame_count = frame_count
@@ -5208,9 +5238,6 @@ typedef Dartmln_runtime = int;
 
 final class mln_runtime_event extends ffi.Struct {
   @ffi.Uint32()
-  external int size;
-
-  @ffi.Uint32()
   external int type;
 
   @ffi.Uint32()
@@ -5225,61 +5252,133 @@ final class mln_runtime_event extends ffi.Struct {
   @ffi.Uint32()
   external int payload_type;
 
-  external ffi.Pointer<ffi.Void> payload;
+  @ffi.Uint32()
+  external int message_offset;
 
-  @ffi.Size()
-  external int payload_size;
-
-  external ffi.Pointer<ffi.Char> message;
-
-  @ffi.Size()
+  @ffi.Uint32()
   external int message_size;
 
-  static ffi.Pointer<mln_runtime_event> $allocate(
-    ffi.Allocator $allocator, {
-    required int size,
-    required int type,
-    required int source_type,
-    required int source,
-    required int code,
-    required int payload_type,
-    required ffi.Pointer<ffi.Void> payload,
-    required int payload_size,
-    required ffi.Pointer<ffi.Char> message,
-    required int message_size,
-  }) => $allocator<mln_runtime_event>()
-    ..ref.size = size
-    ..ref.type = type
-    ..ref.source_type = source_type
-    ..ref.source = source
-    ..ref.code = code
-    ..ref.payload_type = payload_type
-    ..ref.payload = payload
-    ..ref.payload_size = payload_size
-    ..ref.message = message
-    ..ref.message_size = message_size;
+  external mln_runtime_event_payload payload;
 }
 
-final class mln_runtime_event_camera_transition_finished extends ffi.Struct {
+final class mln_runtime_event_batch extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
+  @ffi.Uint32()
+  external int event_size;
+
+  external ffi.Pointer<mln_runtime_event> events;
+
+  @ffi.Size()
+  external int event_count;
+
+  external ffi.Pointer<ffi.Char> messages;
+
+  @ffi.Size()
+  external int messages_size;
+
+  @ffi.Size()
+  external int remaining_count;
+
+  static ffi.Pointer<mln_runtime_event_batch> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int event_size,
+    required ffi.Pointer<mln_runtime_event> events,
+    required int event_count,
+    required ffi.Pointer<ffi.Char> messages,
+    required int messages_size,
+    required int remaining_count,
+  }) => $allocator<mln_runtime_event_batch>()
+    ..ref.size = size
+    ..ref.event_size = event_size
+    ..ref.events = events
+    ..ref.event_count = event_count
+    ..ref.messages = messages
+    ..ref.messages_size = messages_size
+    ..ref.remaining_count = remaining_count;
+}
+
+final class mln_runtime_event_camera_transition_finished extends ffi.Struct {
   @ffi.Uint64()
   external int transition_id;
 
   static ffi.Pointer<mln_runtime_event_camera_transition_finished> $allocate(
     ffi.Allocator $allocator, {
-    required int size,
     required int transition_id,
-  }) => $allocator<mln_runtime_event_camera_transition_finished>()
-    ..ref.size = size
-    ..ref.transition_id = transition_id;
+  }) =>
+      $allocator<mln_runtime_event_camera_transition_finished>()
+        ..ref.transition_id = transition_id;
+}
+
+enum mln_runtime_event_mask {
+  MLN_RUNTIME_EVENT_MASK_NONE(0),
+  MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE(2),
+  MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING(4),
+  MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE(8),
+  MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED(16),
+  MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED(32),
+  MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED(64),
+  MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED(128),
+  MLN_RUNTIME_EVENT_MASK_MAP_IDLE(256),
+  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE(512),
+  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR(1024),
+  MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED(2048),
+  MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED(4096),
+  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED(8192),
+  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED(16384),
+  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED(32768),
+  MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED(65536),
+  MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING(131072),
+  MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION(262144),
+  MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED(8388608),
+  MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED(524288),
+  MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR(1048576),
+  MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED(2097152),
+  MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED(4194304),
+  MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS(8912894),
+  MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS(7864320),
+  MLN_RUNTIME_EVENT_MASK_ALL(16777214);
+
+  final int value;
+  const mln_runtime_event_mask(this.value);
+
+  static mln_runtime_event_mask fromValue(int value) => switch (value) {
+    0 => MLN_RUNTIME_EVENT_MASK_NONE,
+    2 => MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE,
+    4 => MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_IS_CHANGING,
+    8 => MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE,
+    16 => MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED,
+    32 => MLN_RUNTIME_EVENT_MASK_MAP_LOADING_STARTED,
+    64 => MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FINISHED,
+    128 => MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED,
+    256 => MLN_RUNTIME_EVENT_MASK_MAP_IDLE,
+    512 => MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE,
+    1024 => MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR,
+    2048 => MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED,
+    4096 => MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED,
+    8192 => MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_STARTED,
+    16384 => MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED,
+    32768 => MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED,
+    65536 => MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED,
+    131072 => MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING,
+    262144 => MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION,
+    8388608 => MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED,
+    524288 => MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED,
+    1048576 => MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR,
+    2097152 => MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
+    4194304 => MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED,
+    8912894 => MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS,
+    7864320 => MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS,
+    16777214 => MLN_RUNTIME_EVENT_MASK_ALL,
+    _ => throw ArgumentError(
+      'Unknown value for mln_runtime_event_mask: $value',
+    ),
+  };
 }
 
 final class mln_runtime_event_offline_operation_completed extends ffi.Struct {
-  @ffi.Uint32()
-  external int size;
-
   @mln_offline_operation_id()
   external int operation_id;
 
@@ -5297,14 +5396,12 @@ final class mln_runtime_event_offline_operation_completed extends ffi.Struct {
 
   static ffi.Pointer<mln_runtime_event_offline_operation_completed> $allocate(
     ffi.Allocator $allocator, {
-    required int size,
     required int operation_id,
     required int operation_kind,
     required int result_kind,
     required int result_status,
     required bool found,
   }) => $allocator<mln_runtime_event_offline_operation_completed>()
-    ..ref.size = size
     ..ref.operation_id = operation_id
     ..ref.operation_kind = operation_kind
     ..ref.result_kind = result_kind
@@ -5313,9 +5410,6 @@ final class mln_runtime_event_offline_operation_completed extends ffi.Struct {
 }
 
 final class mln_runtime_event_offline_region_response_error extends ffi.Struct {
-  @ffi.Uint32()
-  external int size;
-
   @mln_offline_region_id()
   external int region_id;
 
@@ -5324,19 +5418,14 @@ final class mln_runtime_event_offline_region_response_error extends ffi.Struct {
 
   static ffi.Pointer<mln_runtime_event_offline_region_response_error> $allocate(
     ffi.Allocator $allocator, {
-    required int size,
     required int region_id,
     required int reason,
   }) => $allocator<mln_runtime_event_offline_region_response_error>()
-    ..ref.size = size
     ..ref.region_id = region_id
     ..ref.reason = reason;
 }
 
 final class mln_runtime_event_offline_region_status extends ffi.Struct {
-  @ffi.Uint32()
-  external int size;
-
   @mln_offline_region_id()
   external int region_id;
 
@@ -5345,9 +5434,6 @@ final class mln_runtime_event_offline_region_status extends ffi.Struct {
 
 final class mln_runtime_event_offline_region_tile_count_limit
     extends ffi.Struct {
-  @ffi.Uint32()
-  external int size;
-
   @mln_offline_region_id()
   external int region_id;
 
@@ -5357,20 +5443,39 @@ final class mln_runtime_event_offline_region_tile_count_limit
   static ffi.Pointer<mln_runtime_event_offline_region_tile_count_limit>
   $allocate(
     ffi.Allocator $allocator, {
-    required int size,
     required int region_id,
     required int limit,
   }) => $allocator<mln_runtime_event_offline_region_tile_count_limit>()
-    ..ref.size = size
     ..ref.region_id = region_id
     ..ref.limit = limit;
+}
+
+final class mln_runtime_event_payload extends ffi.Union {
+  external mln_runtime_event_render_frame render_frame;
+
+  external mln_runtime_event_render_map render_map;
+
+  external mln_runtime_event_tile_action tile_action;
+
+  external mln_runtime_event_offline_region_status offline_region_status;
+
+  external mln_runtime_event_offline_region_response_error
+  offline_region_response_error;
+
+  external mln_runtime_event_offline_region_tile_count_limit
+  offline_region_tile_count_limit;
+
+  external mln_runtime_event_offline_operation_completed
+  offline_operation_completed;
+
+  external mln_runtime_event_camera_transition_finished
+  camera_transition_finished;
 }
 
 enum mln_runtime_event_payload_type {
   MLN_RUNTIME_EVENT_PAYLOAD_NONE(0),
   MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME(1),
   MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP(2),
-  MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING(3),
   MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION(4),
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS(5),
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR(6),
@@ -5385,7 +5490,6 @@ enum mln_runtime_event_payload_type {
     0 => MLN_RUNTIME_EVENT_PAYLOAD_NONE,
     1 => MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME,
     2 => MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP,
-    3 => MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING,
     4 => MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
     5 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS,
     6 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR,
@@ -5400,9 +5504,6 @@ enum mln_runtime_event_payload_type {
 
 final class mln_runtime_event_render_frame extends ffi.Struct {
   @ffi.Uint32()
-  external int size;
-
-  @ffi.Uint32()
   external int mode;
 
   @ffi.Bool()
@@ -5416,18 +5517,12 @@ final class mln_runtime_event_render_frame extends ffi.Struct {
 
 final class mln_runtime_event_render_map extends ffi.Struct {
   @ffi.Uint32()
-  external int size;
-
-  @ffi.Uint32()
   external int mode;
 
   static ffi.Pointer<mln_runtime_event_render_map> $allocate(
     ffi.Allocator $allocator, {
-    required int size,
     required int mode,
-  }) => $allocator<mln_runtime_event_render_map>()
-    ..ref.size = size
-    ..ref.mode = mode;
+  }) => $allocator<mln_runtime_event_render_map>()..ref.mode = mode;
 }
 
 enum mln_runtime_event_source_type {
@@ -5446,39 +5541,11 @@ enum mln_runtime_event_source_type {
   };
 }
 
-final class mln_runtime_event_style_image_missing extends ffi.Struct {
-  @ffi.Uint32()
-  external int size;
-
-  external ffi.Pointer<ffi.Char> image_id;
-
-  @ffi.Size()
-  external int image_id_size;
-
-  static ffi.Pointer<mln_runtime_event_style_image_missing> $allocate(
-    ffi.Allocator $allocator, {
-    required int size,
-    required ffi.Pointer<ffi.Char> image_id,
-    required int image_id_size,
-  }) => $allocator<mln_runtime_event_style_image_missing>()
-    ..ref.size = size
-    ..ref.image_id = image_id
-    ..ref.image_id_size = image_id_size;
-}
-
 final class mln_runtime_event_tile_action extends ffi.Struct {
-  @ffi.Uint32()
-  external int size;
-
   @ffi.Uint32()
   external int operation;
 
   external mln_tile_id tile_id;
-
-  external ffi.Pointer<ffi.Char> source_id;
-
-  @ffi.Size()
-  external int source_id_size;
 }
 
 enum mln_runtime_event_type {
@@ -5550,17 +5617,22 @@ final class mln_runtime_options extends ffi.Struct {
 
   external ffi.Pointer<ffi.Char> cache_path;
 
+  @ffi.Uint64()
+  external int event_mask;
+
   static ffi.Pointer<mln_runtime_options> $allocate(
     ffi.Allocator $allocator, {
     required int size,
     required int flags,
     required ffi.Pointer<ffi.Char> asset_path,
     required ffi.Pointer<ffi.Char> cache_path,
+    required int event_mask,
   }) => $allocator<mln_runtime_options>()
     ..ref.size = size
     ..ref.flags = flags
     ..ref.asset_path = asset_path
-    ..ref.cache_path = cache_path;
+    ..ref.cache_path = cache_path
+    ..ref.event_mask = event_mask;
 }
 
 final class mln_screen_box extends ffi.Struct {

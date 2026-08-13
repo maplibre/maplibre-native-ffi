@@ -138,6 +138,19 @@ auto mln_map_copy_style_url(
   });
 }
 
+auto mln_map_set_event_mask(mln_map map, uint64_t mask) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_set_event_mask(map, mask);
+  });
+}
+
+auto mln_map_get_event_mask(mln_map map, uint64_t* out_mask) noexcept
+  -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_get_event_mask(map, out_mask);
+  });
+}
+
 auto mln_style_id_list_count(mln_style_id_list list, size_t* out_count) noexcept
   -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {

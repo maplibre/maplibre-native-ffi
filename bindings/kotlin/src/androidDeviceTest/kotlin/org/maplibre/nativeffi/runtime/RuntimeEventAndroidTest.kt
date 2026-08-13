@@ -34,18 +34,20 @@ class RuntimeEventAndroidTest {
         )
       assertNull(orphan.mapSource)
       assertNull(orphan.runtimeSource)
+      assertEquals(mapId, orphan.sourceId)
 
       val unknown =
         runtime.copyEventForTesting(
           900,
           901,
-          0,
+          0x5AL,
           902,
           JavaCppStructs.unknownRuntimePayload(903, byteArrayOf(1, 2, 3)),
           "future event",
         )
       assertEquals(900, unknown.type.nativeValue)
       assertEquals(901, unknown.sourceType.nativeValue)
+      assertEquals(0x5AL, unknown.sourceId)
       assertNull(unknown.mapSource)
       assertNull(unknown.runtimeSource)
       assertEquals("future event", unknown.message)

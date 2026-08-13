@@ -15,11 +15,8 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
 /**
  * {@snippet lang=c :
  * struct mln_runtime_event_tile_action {
- *     uint32_t size;
  *     uint32_t operation;
  *     mln_tile_id tile_id;
- *     const char *source_id;
- *     size_t source_id_size;
  * }
  * }
  */
@@ -30,12 +27,8 @@ public class mln_runtime_event_tile_action {
     }
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
-        MapLibreNativeC.C_INT.withName("size"),
         MapLibreNativeC.C_INT.withName("operation"),
-        mln_tile_id.layout().withName("tile_id"),
-        MemoryLayout.paddingLayout(4),
-        MapLibreNativeC.C_POINTER.withName("source_id"),
-        MapLibreNativeC.C_LONG.withName("source_id_size")
+        mln_tile_id.layout().withName("tile_id")
     ).withName("mln_runtime_event_tile_action");
 
     /**
@@ -43,50 +36,6 @@ public class mln_runtime_event_tile_action {
      */
     public static final GroupLayout layout() {
         return $LAYOUT;
-    }
-
-    private static final OfInt size$LAYOUT = (OfInt)$LAYOUT.select(groupElement("size"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * uint32_t size
-     * }
-     */
-    public static final OfInt size$layout() {
-        return size$LAYOUT;
-    }
-
-    private static final long size$OFFSET = $LAYOUT.byteOffset(groupElement("size"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * uint32_t size
-     * }
-     */
-    public static final long size$offset() {
-        return size$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * uint32_t size
-     * }
-     */
-    public static int size(MemorySegment struct) {
-        return struct.get(size$LAYOUT, size$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * uint32_t size
-     * }
-     */
-    public static void size(MemorySegment struct, int fieldValue) {
-        struct.set(size$LAYOUT, size$OFFSET, fieldValue);
     }
 
     private static final OfInt operation$LAYOUT = (OfInt)$LAYOUT.select(groupElement("operation"));
@@ -175,94 +124,6 @@ public class mln_runtime_event_tile_action {
      */
     public static void tile_id(MemorySegment struct, MemorySegment fieldValue) {
         MemorySegment.copy(fieldValue, 0L, struct, tile_id$OFFSET, tile_id$LAYOUT.byteSize());
-    }
-
-    private static final AddressLayout source_id$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("source_id"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * const char *source_id
-     * }
-     */
-    public static final AddressLayout source_id$layout() {
-        return source_id$LAYOUT;
-    }
-
-    private static final long source_id$OFFSET = $LAYOUT.byteOffset(groupElement("source_id"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * const char *source_id
-     * }
-     */
-    public static final long source_id$offset() {
-        return source_id$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * const char *source_id
-     * }
-     */
-    public static MemorySegment source_id(MemorySegment struct) {
-        return struct.get(source_id$LAYOUT, source_id$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * const char *source_id
-     * }
-     */
-    public static void source_id(MemorySegment struct, MemorySegment fieldValue) {
-        struct.set(source_id$LAYOUT, source_id$OFFSET, fieldValue);
-    }
-
-    private static final OfLong source_id_size$LAYOUT = (OfLong)$LAYOUT.select(groupElement("source_id_size"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * size_t source_id_size
-     * }
-     */
-    public static final OfLong source_id_size$layout() {
-        return source_id_size$LAYOUT;
-    }
-
-    private static final long source_id_size$OFFSET = $LAYOUT.byteOffset(groupElement("source_id_size"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * size_t source_id_size
-     * }
-     */
-    public static final long source_id_size$offset() {
-        return source_id_size$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * size_t source_id_size
-     * }
-     */
-    public static long source_id_size(MemorySegment struct) {
-        return struct.get(source_id_size$LAYOUT, source_id_size$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * size_t source_id_size
-     * }
-     */
-    public static void source_id_size(MemorySegment struct, long fieldValue) {
-        struct.set(source_id_size$LAYOUT, source_id_size$OFFSET, fieldValue);
     }
 
     /**

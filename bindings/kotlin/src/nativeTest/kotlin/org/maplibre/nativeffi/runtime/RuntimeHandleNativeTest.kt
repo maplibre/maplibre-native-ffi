@@ -17,15 +17,15 @@ import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.StableRef
 import kotlinx.cinterop.alloc
-import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.asStableRef
-import kotlinx.cinterop.cstr
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.staticCFunction
+import kotlinx.cinterop.toCValues
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
 import org.maplibre.nativeffi.error.MaplibreException
@@ -33,6 +33,7 @@ import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.NativeErrorException
 import org.maplibre.nativeffi.error.WrongThreadException
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_payload
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
@@ -212,53 +213,31 @@ class RuntimeHandleNativeTest : org.maplibre.nativeffi.NativeTestBase() {
           height = 128
         },
       )
-    val mapId = map.nativeHandleId()
     map.close()
     try {
       var copiedEvent: RuntimeEvent? = null
+      val syntheticSource = SyntheticHandles.map().rawHandleValue
       memScoped {
         val event = alloc<mln_runtime_event>()
-        event.size = sizeOf<mln_runtime_event>().toUInt()
         event.type = RuntimeEventType.MAP_STYLE_LOADED.nativeValue.toUInt()
         event.source_type = RuntimeEventSourceType.MAP.nativeValue.toUInt()
-        event.source = SyntheticHandles.map().rawHandleValue
+        event.source = syntheticSource
         event.code = 0
         event.payload_type = 0U
-        event.payload = null
-        event.payload_size = 0UL
-        event.message = null
-        event.message_size = 0UL
+        event.message_offset = 0U
+        event.message_size = 0U
 
-        copiedEvent = runtime.copyEventForTesting(event)
+        copiedEvent = runtime.copyEventForTesting(event, null)
       }
       val event = assertNotNull(copiedEvent)
       assertEquals(RuntimeEventType.MAP_STYLE_LOADED, event.type)
       assertEquals(RuntimeEventSourceType.MAP, event.sourceType)
       assertNull(event.mapSource)
       assertNull(event.runtimeSource)
+      // The identity the native record carried survives a source that resolves to
+      // no live wrapper.
+      assertEquals(syntheticSource.toLong(), event.sourceId)
       assertEquals(RuntimeEventPayload.None, event.payload)
-
-      assertNull(
-        runtime.applyEventSideEffectsForTesting(
-          RuntimeEventType.MAP_STYLE_LOADED,
-          RuntimeEventSourceType.MAP,
-          mapId,
-        )
-      )
-      assertNull(
-        runtime.applyEventSideEffectsForTesting(
-          RuntimeEventType.MAP_STYLE_LOADED,
-          RuntimeEventSourceType.MAP,
-          mapId + 4096,
-        )
-      )
-      assertNull(
-        runtime.applyEventSideEffectsForTesting(
-          RuntimeEventType.MAP_STYLE_LOADED,
-          RuntimeEventSourceType.RUNTIME,
-          mapId,
-        )
-      )
     } finally {
       runtime.close()
     }
@@ -270,24 +249,27 @@ class RuntimeHandleNativeTest : org.maplibre.nativeffi.NativeTestBase() {
     var copied: RuntimeEvent? = null
     try {
       memScoped {
-        val payload = allocArray<ByteVar>(3)
+        // The message arena holds unrelated bytes ahead of this event's message,
+        // so a decode that ignored message_offset would read the wrong text.
+        val messageBytes = "padfuture event".encodeToByteArray()
+        val messages = messageBytes.toCValues().getPointer(this)
+        val event = alloc<mln_runtime_event>()
+        event.type = 900U
+        event.source_type = 901U
+        event.source = 0x5Au
+        event.code = 902
+        event.payload_type = 903U
+        event.message_offset = 3U
+        event.message_size = (messageBytes.size - 3).toUInt()
+        val payload = event.payload.ptr.reinterpret<ByteVar>()
+        for (index in 0 until payloadWindowSize) {
+          payload[index] = 0
+        }
         payload[0] = 1
         payload[1] = 2
         payload[2] = 3
-        val message = "future event"
-        val event = alloc<mln_runtime_event>()
-        event.size = sizeOf<mln_runtime_event>().toUInt()
-        event.type = 900U
-        event.source_type = 901U
-        event.source = 0uL
-        event.code = 902
-        event.payload_type = 903U
-        event.payload = payload
-        event.payload_size = 3UL
-        event.message = message.cstr.getPointer(this)
-        event.message_size = message.encodeToByteArray().size.toULong()
 
-        copied = runtime.copyEventForTesting(event)
+        copied = runtime.copyEventForTesting(event, messages)
         payload[0] = 9
       }
 
@@ -298,12 +280,19 @@ class RuntimeHandleNativeTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(901, event.sourceType.nativeValue)
       assertNull(event.runtimeSource)
       assertNull(event.mapSource)
+      // An unnamed source kind still reports the identity the record carried.
+      assertEquals(0x5AL, event.sourceId)
       assertEquals(902, event.code)
       assertEquals("future event", event.message)
       val payload = event.payload as RuntimeEventPayload.Unknown
       assertEquals(903, payload.rawPayloadType)
-      assertEquals(3L, payload.payloadSize)
-      assertContentEquals(byteArrayOf(1, 2, 3), payload.payloadBytes)
+      // The window is the whole inline union, and the copy survives the mutation
+      // above.
+      assertEquals(payloadWindowSize, payload.payloadBytes.size)
+      assertContentEquals(
+        byteArrayOf(1, 2, 3) + ByteArray(payloadWindowSize - 3),
+        payload.payloadBytes,
+      )
     } finally {
       runtime.close()
     }
@@ -318,8 +307,7 @@ class RuntimeHandleNativeTest : org.maplibre.nativeffi.NativeTestBase() {
   ): Boolean {
     repeat(10_000) {
       runtime.pump(0)
-      while (true) {
-        val event = runtime.pollEvent() ?: break
+      for (event in runtime.drainEvents().events) {
         if (event.type == eventType && event.mapSource == map) return true
         if (event.type == RuntimeEventType.MAP_LOADING_FAILED) {
           throw MaplibreException.forStatus(
@@ -341,10 +329,13 @@ class RuntimeHandleNativeTest : org.maplibre.nativeffi.NativeTestBase() {
   ): RuntimeEvent {
     repeat(10_000) {
       runtime.pump(0)
-      while (true) {
-        val event = runtime.pollEvent() ?: break
-        if (event.type == eventType && event.mapSource == map) return event
-      }
+      runtime
+        .drainEvents()
+        .events
+        .find { it.type == eventType && it.mapSource == map }
+        ?.let {
+          return it
+        }
       usleep(1_000U)
     }
     error("runtime event $eventType did not arrive")
@@ -516,6 +507,10 @@ private fun closeRuntimeOnNativeThread(raw: COpaquePointer?): COpaquePointer? {
   }
   return null
 }
+
+/** Bytes of the inline payload union that one event record carries. */
+@OptIn(ExperimentalForeignApi::class)
+private val payloadWindowSize: Int = sizeOf<mln_runtime_event_payload>().toInt()
 
 private object RuntimeHandleTestStyle {
   const val styleJson: String = "{\"version\":8,\"sources\":{},\"layers\":[]}"

@@ -23,7 +23,7 @@ class CustomGeometrySourceStateTest {
             }
           }
         )
-      )
+      ) {}
 
     state.fetchTileForTesting(CanonicalTileId(4, 5, 6))
     state.fetchTileForTesting(CanonicalTileId(7, 8, 9))

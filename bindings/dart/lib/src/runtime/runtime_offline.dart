@@ -182,7 +182,7 @@ final class OfflineOperationHandle implements Finalizable {
 
   void _markDiscarded() {
     _discarded = true;
-    _runtime._unregisterOfflineOperation(_id);
+    _runtime._unregisterOfflineOperationId(_id);
     _leakReporter.close();
   }
 
@@ -254,6 +254,7 @@ raw.mln_runtime_options _runtimeOptionsToNative(
       allocator,
     ).pointer.cast<Char>();
   }
+  result.event_mask = options.eventMask.value;
   return result;
 }
 
@@ -498,5 +499,3 @@ OfflineRegionStatus _offlineRegionStatusFromNative(
     complete: status.complete,
   );
 }
-
-/// Copied runtime event returned by [RuntimeHandle.pollEvent].

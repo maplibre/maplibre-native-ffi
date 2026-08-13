@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 
@@ -19,7 +18,6 @@ use crate::camera::{
 };
 #[cfg(test)]
 use crate::custom_geometry::CanonicalTileId;
-use crate::custom_geometry::CustomGeometrySourceState;
 use crate::events::MapId;
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error};
 use crate::options::{MapOptionsNativeExt, MapTileOptionsNativeExt, MapViewportOptionsNativeExt};
@@ -35,7 +33,8 @@ use crate::values::NativeValue;
 use crate::{
     AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, Error, ErrorKind,
     FreeCameraOptions, HandleOperationError, LatLng, LatLngBounds, MapDebugOptions, MapOptions,
-    MapProjectionHandle, MapTileOptions, MapViewportOptions, ProjectionMode, Result, ScreenPoint,
+    MapProjectionHandle, MapTileOptions, MapViewportOptions, ProjectionMode, Result,
+    RuntimeEventMask, ScreenPoint,
 };
 
 mod style;
@@ -51,7 +50,6 @@ pub(crate) struct MapState {
     handle: ThreadAffineNativeHandle<sys::mln_map>,
     runtime: RefCell<Option<Rc<RuntimeState>>>,
     id: MapId,
-    custom_geometry_sources: RefCell<HashMap<String, Box<CustomGeometrySourceState>>>,
 }
 
 impl MapState {
@@ -65,7 +63,6 @@ impl MapState {
             handle,
             runtime: RefCell::new(Some(runtime)),
             id,
-            custom_geometry_sources: RefCell::new(HashMap::new()),
         })
     }
 
@@ -80,65 +77,17 @@ impl MapState {
     }
 
     fn close(&self) -> Result<()> {
-        let native = self.handle.handle();
+        // The destroy releases the callback state of this map's custom geometry
+        // sources before it returns.
         self.handle.close()?;
-        if let Some(runtime) = self.runtime.borrow_mut().take() {
-            runtime.unregister_map(native);
-        }
-        self.clear_custom_geometry_sources();
+        self.runtime.borrow_mut().take();
         Ok(())
-    }
-
-    pub(crate) fn clear_custom_geometry_sources(&self) {
-        self.custom_geometry_sources.borrow_mut().clear();
-    }
-
-    pub(crate) fn release_detached_custom_geometry_sources(&self) {
-        let map = match self.native() {
-            Ok(map) => map,
-            Err(_) => return,
-        };
-        let source_ids = self
-            .custom_geometry_sources
-            .borrow()
-            .keys()
-            .cloned()
-            .collect::<Vec<_>>();
-        let mut detached = Vec::new();
-        for source_id in source_ids {
-            let source_id_view = maplibre_core::string::string_view(&source_id);
-            let mut source_type = 0;
-            let mut found = false;
-            // SAFETY: map is live, source_id_view is valid for this call, and
-            // output pointers refer to writable storage.
-            let status = unsafe {
-                sys::mln_map_get_style_source_type(
-                    map,
-                    source_id_view.raw(),
-                    &mut source_type,
-                    &mut found,
-                )
-            };
-            if status == sys::MLN_STATUS_OK
-                && (!found || source_type != sys::MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR)
-            {
-                detached.push(source_id);
-            }
-        }
-        if !detached.is_empty() {
-            let mut sources = self.custom_geometry_sources.borrow_mut();
-            for source_id in detached {
-                sources.remove(&source_id);
-            }
-        }
     }
 }
 
 impl Drop for MapState {
     fn drop(&mut self) {
-        if let Some(runtime) = self.runtime.borrow_mut().take() {
-            runtime.unregister_map(self.handle.handle());
-        }
+        self.runtime.borrow_mut().take();
         // A failed destroy, such as one with a render session still attached,
         // is reported through the leak channel by the handle's own `Drop`.
         let _ = self.handle.close();
@@ -172,11 +121,8 @@ impl MapHandle {
             sys::mln_map_create(runtime_ptr, &raw_options, out.as_mut_ptr())
         })?;
         let native = out.get();
-        let id = runtime.inner.register_map(native);
+        let id = MapId::new(native.0);
         let state = Rc::new(MapState::new(native, Rc::clone(&runtime.inner), id)?);
-        runtime
-            .inner
-            .register_map_state(native, Rc::downgrade(&state));
 
         Ok(Self { inner: state })
     }
@@ -184,11 +130,6 @@ impl MapHandle {
     /// Returns this map's runtime-local event source identity.
     pub fn id(&self) -> MapId {
         self.inner.id
-    }
-
-    #[cfg(test)]
-    fn custom_geometry_source_count_for_testing(&self) -> usize {
-        self.inner.custom_geometry_sources.borrow().len()
     }
 
     /// Explicitly destroys the map. A failed destroy leaves the native handle
@@ -228,6 +169,29 @@ impl MapHandle {
         let map = self.inner.native()?;
         // SAFETY: map is a live map handle owned by this wrapper.
         maplibre_core::check(unsafe { sys::mln_map_request_still_image(map) })
+    }
+
+    /// Selects which map-originated event types this map queues.
+    ///
+    /// A map reads the bits in
+    /// [`RuntimeEventMask::ALL_MAP_EVENTS`](crate::RuntimeEventMask::ALL_MAP_EVENTS),
+    /// so [`RuntimeEventMask::ALL`](crate::RuntimeEventMask::ALL) selects every
+    /// map-originated type. Narrowing gates later events and keeps queued ones.
+    /// A bit outside `ALL` is an invalid-argument error.
+    pub fn set_event_mask(&self, mask: RuntimeEventMask) -> Result<()> {
+        let map = self.inner.native()?;
+        // SAFETY: map is live. The C API validates unknown mask bits.
+        maplibre_core::check(unsafe { sys::mln_map_set_event_mask(map, mask.bits()) })
+    }
+
+    /// Reports which map-originated event types this map queues, starting from
+    /// the mask its creation options selected.
+    pub fn event_mask(&self) -> Result<RuntimeEventMask> {
+        let map = self.inner.native()?;
+        let mut raw = 0;
+        // SAFETY: map is live and out_mask points to writable u64 storage.
+        maplibre_core::check(unsafe { sys::mln_map_get_event_mask(map, &mut raw) })?;
+        Ok(RuntimeEventMask::from_bits_retain(raw))
     }
 
     /// Applies MapLibre debug overlay mask bits.

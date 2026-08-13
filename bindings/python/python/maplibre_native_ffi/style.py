@@ -379,7 +379,12 @@ class CustomGeometrySourceHandle(NativeHandleMixin):
         return self._native.dropped_event_count
 
     def poll_event(self) -> CustomGeometrySourceEvent | None:
-        """Return one queued fetch/cancel event copied into Python values."""
+        """Return one queued fetch/cancel event copied into Python values.
+
+        This queue belongs to the binding and reports one event per call.
+        :meth:`RuntimeHandle.drain_events` takes a whole C batch instead,
+        because the C API owns that queue.
+        """
         event = self._native.poll_event()
         if event is None:
             return None

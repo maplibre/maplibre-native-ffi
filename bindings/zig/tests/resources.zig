@@ -14,35 +14,6 @@ fn sleepOneMillisecond() !void {
     try testing.io.sleep(.fromMilliseconds(1), .awake);
 }
 
-fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
-    for (0..1000) |_| {
-        try runtime.pump(0);
-        while (try runtime.pollEvent(testing.allocator)) |event| {
-            var owned_event = event;
-            defer owned_event.deinit();
-            if (std.meta.eql(owned_event.event_type, event_type)) return true;
-        }
-        try sleepOneMillisecond();
-    }
-    return false;
-}
-
-fn waitForOwnedEvent(
-    runtime: *maplibre.RuntimeHandle,
-    event_type: maplibre.RuntimeEventType,
-) !maplibre.OwnedRuntimeEvent {
-    for (0..5000) |_| {
-        try runtime.pump(0);
-        while (try runtime.pollEvent(testing.allocator)) |event| {
-            var owned_event = event;
-            if (std.meta.eql(owned_event.event_type, event_type)) return owned_event;
-            owned_event.deinit();
-        }
-        try sleepOneMillisecond();
-    }
-    return error.EventNotObserved;
-}
-
 fn rawStatusError(raw_status: i32) maplibre.NativeStatusError!void {
     return switch (raw_status) {
         0 => {},
@@ -62,10 +33,14 @@ fn waitForOfflineOperation(
     const operation_id = try operation.operationId();
     for (0..5000) |_| {
         try runtime.pump(0);
-        while (try runtime.pollEvent(testing.allocator)) |event| {
-            var owned_event = event;
-            defer owned_event.deinit();
-            const payload = switch (owned_event.payload) {
+        // One event per drain, so an event this wait is not looking for stays
+        // queued for the wait that is. See support.waitForEvent.
+        while (true) {
+            var batch = try runtime.drainEvents(testing.allocator, 1);
+            defer batch.deinit();
+            if (batch.len() == 0) break;
+            const event = try batch.at(0);
+            const payload = switch (event.payload) {
                 .offline_operation_completed => |completed| completed,
                 else => continue,
             };
@@ -193,7 +168,7 @@ fn deleteOfflineRegion(runtime: *maplibre.RuntimeHandle, region_id: maplibre.Off
 }
 
 fn waitForStyleLoaded(runtime: *maplibre.RuntimeHandle) !void {
-    try testing.expect(try waitForEvent(runtime, .map_style_loaded));
+    try testing.expect(try support.waitForEvent(runtime, .map_style_loaded));
 }
 
 const TempStyle = struct {
@@ -314,7 +289,7 @@ test "missing file URL reports map loading failure through public events" {
     defer map.close() catch @panic("map close failed");
 
     try map.setStyleUrl(testing.allocator, missing_url);
-    try testing.expect(try waitForEvent(&runtime, .map_loading_failed));
+    try testing.expect(try support.waitForEvent(&runtime, .map_loading_failed));
 }
 
 const pmtiles_style_json =
@@ -575,10 +550,7 @@ test "resource transform rewrites network style URL" {
     try map.setStyleUrl(testing.allocator, original_url);
     for (0..1000) |_| {
         try runtime.pump(0);
-        while (try runtime.pollEvent(testing.allocator)) |event| {
-            var owned_event = event;
-            owned_event.deinit();
-        }
+        _ = try support.drainEvents(&runtime);
         if (replacement_state.calls.load(.seq_cst) > 0) break;
         try sleepOneMillisecond();
     }
@@ -618,10 +590,7 @@ test "failed resource transform replacement keeps previous callback" {
     try map.setStyleUrl(testing.allocator, "http://example.invalid/original-style.json");
     for (0..1000) |_| {
         try runtime.pump(0);
-        while (try runtime.pollEvent(testing.allocator)) |event| {
-            var owned_event = event;
-            owned_event.deinit();
-        }
+        _ = try support.drainEvents(&runtime);
         if (state.calls.load(.seq_cst) > 0) break;
         try sleepOneMillisecond();
     }
@@ -864,7 +833,7 @@ fn countingProvider(
 // proves the request reached the network file source.
 fn loadProbeStyle(runtime: *maplibre.RuntimeHandle, map: *maplibre.MapHandle, style_url: []const u8) !void {
     try map.setStyleUrl(testing.allocator, style_url);
-    var event = try waitForOwnedEvent(runtime, .map_loading_failed);
+    var event = try support.waitForOwnedEvent(runtime, .map_loading_failed);
     defer event.deinit();
     try testing.expect(std.mem.indexOf(u8, event.message, "\"jar\"") != null);
 }
@@ -1373,7 +1342,7 @@ test "resource provider error response fails style load" {
     defer map.close() catch @panic("map close failed");
 
     try map.setStyleUrl(testing.allocator, "custom://error-style.json");
-    try testing.expect(try waitForEvent(&runtime, .map_loading_failed));
+    try testing.expect(try support.waitForEvent(&runtime, .map_loading_failed));
 }
 
 test "offline region download errors are runtime events" {
@@ -1394,7 +1363,7 @@ test "offline region download errors are runtime events" {
     try setOfflineRegionDownloadState(&runtime, region_id, .active);
     defer setOfflineRegionDownloadState(&runtime, region_id, .inactive) catch {};
 
-    var event = try waitForOwnedEvent(&runtime, .offline_region_response_error);
+    var event = try support.waitForOwnedEvent(&runtime, .offline_region_response_error);
     defer event.deinit();
     try testing.expect(std.meta.eql(event.payload_type, maplibre.RuntimeEventPayloadType.offline_region_response_error));
     const payload = switch (event.payload) {
@@ -1464,11 +1433,12 @@ test "offline region download control emits copied status events" {
     var observed = false;
     for (0..5000) |_| {
         try runtime.pump(0);
-        while (try runtime.pollEvent(testing.allocator)) |event| {
-            var owned_event = event;
-            defer owned_event.deinit();
-            if (!std.meta.eql(owned_event.event_type, maplibre.RuntimeEventType.offline_region_status_changed)) continue;
-            const payload = owned_event.payload.offline_region_status;
+        var batch = try runtime.drainEvents(testing.allocator, 0);
+        defer batch.deinit();
+        for (0..batch.len()) |index| {
+            const event = try batch.at(index);
+            if (!std.meta.eql(event.event_type, maplibre.RuntimeEventType.offline_region_status_changed)) continue;
+            const payload = event.payload.offline_region_status;
             try testing.expectEqual(region_id, payload.region_id);
             try testing.expect(
                 std.meta.eql(payload.status.download_state, maplibre.OfflineRegionDownloadState.active) or

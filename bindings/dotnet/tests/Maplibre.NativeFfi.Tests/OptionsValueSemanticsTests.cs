@@ -217,12 +217,14 @@ public sealed class OptionsValueSemanticsTests
                     ScaleFactor = 2,
                     MapMode = MapMode.Continuous,
                     FastPforEnabled = false,
+                    EventMask = RuntimeEventMask.AllMapEvents,
                 },
             options => options.Width = 300,
             options => options.Height = 400,
             options => options.ScaleFactor = 3,
             options => options.MapMode = MapMode.Static,
-            options => options.FastPforEnabled = true
+            options => options.FastPforEnabled = true,
+            options => options.EventMask = RuntimeEventMask.All
         );
     }
 
@@ -231,9 +233,16 @@ public sealed class OptionsValueSemanticsTests
     public void RuntimeOptionsComparesByPropertyValue()
     {
         AssertValueSemantics(
-            () => new RuntimeOptions { AssetPath = "assets", CachePath = "cache" },
+            () =>
+                new RuntimeOptions
+                {
+                    AssetPath = "assets",
+                    CachePath = "cache",
+                    EventMask = RuntimeEventMask.AllRuntimeEvents,
+                },
             options => options.AssetPath = "other-assets",
-            options => options.CachePath = "other-cache"
+            options => options.CachePath = "other-cache",
+            options => options.EventMask = RuntimeEventMask.All
         );
     }
 

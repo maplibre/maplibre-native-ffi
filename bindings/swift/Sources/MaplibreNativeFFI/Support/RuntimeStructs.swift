@@ -3,13 +3,16 @@ internal import CMaplibreNativeC
 struct NativeRuntimeOptionsInput: Equatable {
   var assetPath: String?
   var cachePath: String?
+  var eventMask: UInt64
 
   init(
     assetPath: String? = nil,
-    cachePath: String? = nil
+    cachePath: String? = nil,
+    eventMask: UInt64
   ) {
     self.assetPath = assetPath
     self.cachePath = cachePath
+    self.eventMask = eventMask
   }
 
   func withNativeOptions<Result>(
@@ -20,6 +23,7 @@ struct NativeRuntimeOptionsInput: Equatable {
         var options = mln_runtime_options_default()
         options.asset_path = assetPath
         options.cache_path = cachePath
+        options.event_mask = eventMask
         return try withUnsafePointer(to: &options, body)
       }
     }
@@ -91,15 +95,10 @@ struct NativeTileId: Equatable {
 struct NativeTileActionEvent: Equatable {
   let operation: UInt32
   let tileId: NativeTileId
-  let sourceId: String
 
-  init(_ raw: mln_runtime_event_tile_action) throws {
+  init(_ raw: mln_runtime_event_tile_action) {
     operation = raw.operation
     tileId = NativeTileId(raw.tile_id)
-    sourceId = try NativeString.copyUTF8(
-      data: raw.source_id,
-      size: raw.source_id_size
-    )
   }
 }
 
@@ -177,14 +176,15 @@ enum NativeRuntimeEventPayload: Equatable {
   case none
   case renderFrame(NativeRenderFrameEvent)
   case renderMap(NativeRenderMapEvent)
-  case styleImageMissing(String)
   case tileAction(NativeTileActionEvent)
   case offlineRegionStatus(NativeOfflineRegionStatusEvent)
   case offlineRegionResponseError(NativeOfflineRegionResponseErrorEvent)
   case offlineRegionTileCountLimit(NativeOfflineRegionTileCountLimitEvent)
   case offlineOperationCompleted(NativeOfflineOperationCompletedEvent)
   case cameraTransitionFinished(NativeCameraTransitionFinishedEvent)
-  case unknown(type: UInt32, byteCount: Int)
+  /// A payload kind this binding does not name, carrying the payload union's
+  /// fixed byte window copied out of the batch.
+  case unknown(type: UInt32, bytes: [UInt8])
 }
 
 struct NativeRuntimeEvent: Equatable {
@@ -194,100 +194,137 @@ struct NativeRuntimeEvent: Equatable {
   let code: Int32
   let message: String
   let payload: NativeRuntimeEventPayload
+}
 
-  init(_ raw: mln_runtime_event) throws {
-    type = raw.type
-    sourceType = raw.source_type
-    sourceId = raw.source
-    code = raw.code
-    message = try NativeString.copyUTF8(
-      data: raw.message,
-      size: raw.message_size
-    )
-    payload = try Self.copyPayload(raw)
+/// One drained batch of runtime events, copied out of the arena the C API lends
+/// until the next drain.
+struct NativeRuntimeEventBatch: Equatable {
+  let events: [NativeRuntimeEvent]
+  let remainingCount: Int
+
+  init(copying raw: mln_runtime_event_batch) throws {
+    events = try Self.copyEvents(raw)
+    remainingCount = raw.remaining_count
   }
 
-  private static func copyPayload(_ raw: mln_runtime_event) throws
-    -> NativeRuntimeEventPayload
+  private static func copyEvents(_ raw: mln_runtime_event_batch) throws
+    -> [NativeRuntimeEvent]
   {
+    guard raw.event_count > 0 else { return [] }
+    guard let events = raw.events else {
+      throw NativeStatusFailure
+        .swiftNativeError("runtime event batch has no event array")
+    }
+    // The batch reports the record stride, which a later C API version widens
+    // by adding a payload member. Stepping by this binding's own event size
+    // would misread every event behind the first one.
+    let stride = Int(raw.event_size)
+    let base = UnsafeRawPointer(events)
+    return try (0 ..< raw.event_count).map { index in
+      try copyEvent(
+        at: base.advanced(by: index * stride),
+        stride: stride,
+        messages: raw.messages
+      )
+    }
+  }
+
+  private static func copyEvent(
+    at record: UnsafeRawPointer,
+    stride: Int,
+    messages: UnsafePointer<CChar>?
+  ) throws -> NativeRuntimeEvent {
+    let raw = record.load(as: mln_runtime_event.self)
+    return try NativeRuntimeEvent(
+      type: raw.type,
+      sourceType: raw.source_type,
+      sourceId: raw.source,
+      code: raw.code,
+      message: copyMessage(raw, messages: messages),
+      payload: copyPayload(raw, at: record, stride: stride)
+    )
+  }
+
+  private static func copyMessage(
+    _ raw: mln_runtime_event,
+    messages: UnsafePointer<CChar>?
+  ) throws -> String {
+    guard raw.message_size > 0 else { return "" }
+    guard let messages else {
+      throw NativeStatusFailure
+        .swiftNativeError("runtime event batch has no message arena")
+    }
+    return try NativeString.copyUTF8(
+      data: messages.advanced(by: Int(raw.message_offset)),
+      size: Int(raw.message_size)
+    )
+  }
+
+  private static func copyPayload(
+    _ raw: mln_runtime_event,
+    at record: UnsafeRawPointer,
+    stride: Int
+  ) throws -> NativeRuntimeEventPayload {
     switch raw.payload_type {
     case MLN_RUNTIME_EVENT_PAYLOAD_NONE.rawValue:
       return .none
     case MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME.rawValue:
-      return try withPayload(raw, as: mln_runtime_event_render_frame.self) {
-        .renderFrame(NativeRenderFrameEvent($0))
-      }
+      return .renderFrame(NativeRenderFrameEvent(raw.payload.render_frame))
     case MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP.rawValue:
-      return try withPayload(raw, as: mln_runtime_event_render_map.self) {
-        .renderMap(NativeRenderMapEvent($0))
-      }
-    case MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING.rawValue:
-      return try withPayload(
-        raw,
-        as: mln_runtime_event_style_image_missing.self
-      ) {
-        try .styleImageMissing(NativeString.copyUTF8(
-          data: $0.image_id,
-          size: $0.image_id_size
-        ))
-      }
+      return .renderMap(NativeRenderMapEvent(raw.payload.render_map))
     case MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION.rawValue:
-      return try withPayload(raw, as: mln_runtime_event_tile_action.self) {
-        try .tileAction(NativeTileActionEvent($0))
-      }
+      return .tileAction(NativeTileActionEvent(raw.payload.tile_action))
     case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS.rawValue:
-      return try withPayload(
-        raw,
-        as: mln_runtime_event_offline_region_status.self
-      ) {
-        .offlineRegionStatus(NativeOfflineRegionStatusEvent($0))
-      }
+      return .offlineRegionStatus(
+        NativeOfflineRegionStatusEvent(raw.payload.offline_region_status)
+      )
     case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR.rawValue:
-      return try withPayload(
-        raw,
-        as: mln_runtime_event_offline_region_response_error.self
-      ) {
-        .offlineRegionResponseError(NativeOfflineRegionResponseErrorEvent($0))
-      }
+      return .offlineRegionResponseError(
+        NativeOfflineRegionResponseErrorEvent(
+          raw.payload.offline_region_response_error
+        )
+      )
     case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT.rawValue:
-      return try withPayload(
-        raw,
-        as: mln_runtime_event_offline_region_tile_count_limit.self
-      ) {
-        .offlineRegionTileCountLimit(NativeOfflineRegionTileCountLimitEvent($0))
-      }
+      return .offlineRegionTileCountLimit(
+        NativeOfflineRegionTileCountLimitEvent(
+          raw.payload.offline_region_tile_count_limit
+        )
+      )
     case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED.rawValue:
-      return try withPayload(
-        raw,
-        as: mln_runtime_event_offline_operation_completed.self
-      ) {
-        .offlineOperationCompleted(NativeOfflineOperationCompletedEvent($0))
-      }
+      return .offlineOperationCompleted(
+        NativeOfflineOperationCompletedEvent(
+          raw.payload.offline_operation_completed
+        )
+      )
     case MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED.rawValue:
-      return try withPayload(
-        raw,
-        as: mln_runtime_event_camera_transition_finished.self
-      ) {
-        .cameraTransitionFinished(NativeCameraTransitionFinishedEvent($0))
-      }
+      return .cameraTransitionFinished(
+        NativeCameraTransitionFinishedEvent(
+          raw.payload.camera_transition_finished
+        )
+      )
     default:
-      return .unknown(type: raw.payload_type, byteCount: raw.payload_size)
+      return try .unknown(
+        type: raw.payload_type,
+        bytes: copyUnknownPayload(at: record, stride: stride)
+      )
     }
   }
 
-  private static func withPayload<Payload, Result>(
-    _ raw: mln_runtime_event,
-    as _: Payload.Type,
-    _ body: (Payload) throws -> Result
-  ) throws -> Result {
-    guard raw.payload_size >= MemoryLayout<Payload>.size,
-          let payload = raw.payload
+  /// Copies the payload window of a payload kind this binding does not name, so
+  /// a host forwards it unchanged. The window is the record stride minus the
+  /// payload's offset, an offset the C API keeps across versions.
+  private static func copyUnknownPayload(
+    at record: UnsafeRawPointer,
+    stride: Int
+  ) throws -> [UInt8] {
+    guard let offset = MemoryLayout<mln_runtime_event>.offset(of: \.payload)
     else {
-      throw NativeStatusFailure(
-        rawStatus: 0,
-        diagnostic: "runtime event payload is missing or too small"
-      )
+      throw NativeStatusFailure
+        .swiftNativeError("runtime event payload has no fixed offset")
     }
-    return try body(payload.assumingMemoryBound(to: Payload.self).pointee)
+    return Array(UnsafeRawBufferPointer(
+      start: record.advanced(by: offset),
+      count: max(stride - offset, 0)
+    ))
   }
 }

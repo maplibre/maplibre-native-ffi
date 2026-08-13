@@ -1,6 +1,8 @@
 use maplibre_native_ffi_sys as sys;
 
-use crate::enums::{ConstrainMode, MapMode, NorthOrientation, TileLodMode, ViewportMode};
+use crate::enums::{
+    ConstrainMode, MapMode, NorthOrientation, RuntimeEventMask, TileLodMode, ViewportMode,
+};
 use crate::error::Result;
 use crate::values::{EdgeInsets, edge_insets_from_native, edge_insets_to_native};
 
@@ -21,6 +23,9 @@ pub struct MapOptions {
     /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
     /// encodings. Fixed for the lifetime of the map.
     pub fast_pfor_enabled: bool,
+    /// Map-originated event types the map queues during and after construction.
+    /// Defaults to every event type that this library reports.
+    pub event_mask: RuntimeEventMask,
 }
 
 impl MapOptions {
@@ -42,6 +47,7 @@ impl MapOptions {
         raw.scale_factor = self.scale_factor;
         raw.map_mode = self.mode.raw_for_set()?;
         raw.fast_pfor_enabled = self.fast_pfor_enabled;
+        raw.event_mask = self.event_mask.bits();
         Ok(raw)
     }
 }
@@ -57,6 +63,10 @@ impl Default for MapOptions {
             scale_factor: raw.scale_factor,
             mode: MapMode::from_raw(raw.map_mode),
             fast_pfor_enabled: raw.fast_pfor_enabled,
+            // Retained rather than named, so a newer native library's default
+            // keeps selecting event types this build does not define. Those
+            // reach a host as unknown event and payload domains.
+            event_mask: RuntimeEventMask::from_bits_retain(raw.event_mask),
         }
     }
 }

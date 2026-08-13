@@ -16,9 +16,10 @@ const TransitionTally = struct {
 /// them reported.
 fn drainedCameraEvents(runtime: *maplibre.RuntimeHandle) !TransitionTally {
     var tally = TransitionTally{};
-    while (try runtime.pollEvent(testing.allocator)) |polled| {
-        var event = polled;
-        defer event.deinit();
+    var batch = try runtime.drainEvents(testing.allocator, 0);
+    defer batch.deinit();
+    for (0..batch.len()) |index| {
+        const event = try batch.at(index);
         switch (event.event_type) {
             .map_camera_transition_finished => {
                 try testing.expect(std.meta.eql(

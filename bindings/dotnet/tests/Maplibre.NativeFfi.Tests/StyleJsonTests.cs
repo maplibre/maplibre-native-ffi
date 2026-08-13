@@ -184,8 +184,8 @@ public sealed class StyleJsonTests
         Assert.Equal(RuntimeEventSourceType.Map, runtimeEvent.SourceType);
         Assert.Same(map, runtimeEvent.MapSource);
         Assert.Null(runtimeEvent.RuntimeSource);
+        Assert.NotEqual(0UL, runtimeEvent.RawSource);
         Assert.Same(RuntimeEventPayload.None.Instance, runtimeEvent.Payload);
-        Assert.Same(map, runtimeEvent.MapSource);
     }
 
     [BindingSpecTest("BND-105")]

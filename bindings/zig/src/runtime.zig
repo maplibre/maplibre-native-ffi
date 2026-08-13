@@ -6,13 +6,9 @@ const native_temp = @import("native_temp.zig");
 const status = @import("status.zig");
 const values = @import("values.zig");
 
-pub const MapStyleLoadedHandler = *const fn (map: c.mln_map, context: ?*anyopaque) void;
-
 const MapRegistration = struct {
     native: c.mln_map,
     id: values.MapId,
-    style_loaded_handler: MapStyleLoadedHandler,
-    style_loaded_context: ?*anyopaque,
 };
 
 pub const RuntimeRegistry = struct {
@@ -103,9 +99,14 @@ const OfflineRegionListDestroyFn = *const fn (c.mln_offline_region_list) callcon
 var offline_region_snapshot_destroy_for_testing: OfflineRegionSnapshotDestroyFn = c.mln_offline_region_snapshot_destroy;
 var offline_region_list_destroy_for_testing: OfflineRegionListDestroyFn = c.mln_offline_region_list_destroy;
 
+/// Runtime creation options. A null field takes the C API default.
 pub const RuntimeOptions = struct {
     asset_path: ?[]const u8 = null,
     cache_path: ?[]const u8 = null,
+    /// Runtime-originated event types this runtime queues. A null takes the C
+    /// API default, which selects every type the library reports, including the
+    /// types this binding does not name. See `RuntimeHandle.setEventMask`.
+    event_mask: ?RuntimeEventMask = null,
 };
 
 pub const NetworkStatus = union(enum) {
@@ -591,19 +592,83 @@ pub const WakeSourceHandle = enum(c.mln_wake_source) {
     }
 };
 
-const RuntimeEvent = struct {
-    event_type: RuntimeEventType,
-    source_type: RuntimeEventSourceType,
-    source_id: ?values.MapId,
-    payload_type: RuntimeEventPayloadType,
-    code: i32,
+/// One drained batch of copied runtime events.
+///
+/// The batch owns its events and remains valid after another drain or after the
+/// runtime closes. Call `deinit` when finished with it.
+pub const EventBatch = struct {
+    allocator: std.mem.Allocator,
+    events: []RuntimeEvent,
+    remaining_count: usize,
+
+    /// Releases every event and the batch storage.
+    pub fn deinit(self: *EventBatch) void {
+        for (self.events) |*event| event.deinit();
+        self.allocator.free(self.events);
+        self.events = &.{};
+        self.remaining_count = 0;
+    }
+
+    /// Number of events this batch reports.
+    pub fn len(self: EventBatch) usize {
+        return self.events.len;
+    }
+
+    /// Events still queued for this runtime after this batch.
+    pub fn remaining(self: EventBatch) usize {
+        return self.remaining_count;
+    }
+
+    /// Reads the event at `index` in queue order.
+    pub fn at(self: EventBatch, index: usize) status.Error!*const RuntimeEvent {
+        if (index >= self.events.len) return error.InvalidArgument;
+        return &self.events[index];
+    }
 };
 
-/// One polled runtime event, copied into storage this value owns.
-pub const OwnedRuntimeEvent = struct {
+const RuntimeEventView = struct {
+    event_type: RuntimeEventType,
+    source_type: RuntimeEventSourceType,
+    /// Native identity of the object this event came from.
+    source: RuntimeEventSourceId,
+    source_id: ?values.MapId,
+    payload_type: RuntimeEventPayloadType,
+    /// Secondary detail whose meaning `event_type` selects.
+    code: i32,
+    /// Borrowed from the batch's message arena.
+    message: []const u8,
+    payload: RuntimeEventPayload,
+
+    /// Copies this event into storage the returned value owns.
+    fn toOwned(self: RuntimeEventView, allocator: std.mem.Allocator) status.Error!RuntimeEvent {
+        const message = try allocator.dupe(u8, self.message);
+        errdefer allocator.free(message);
+        return .{
+            .allocator = allocator,
+            .event_type = self.event_type,
+            .source_type = self.source_type,
+            .source = self.source,
+            .source_id = self.source_id,
+            .payload_type = self.payload_type,
+            .code = self.code,
+            .message = message,
+            .payload = try ownedPayload(allocator, self.payload),
+        };
+    }
+};
+
+/// One drained runtime event, copied into storage this value owns.
+pub const RuntimeEvent = struct {
     allocator: std.mem.Allocator,
     event_type: RuntimeEventType,
     source_type: RuntimeEventSourceType,
+    /// Native identity of the object this event came from, which `source_type`
+    /// names. Every event carries it, including an event whose source type or
+    /// source map this binding cannot resolve.
+    source: RuntimeEventSourceId,
+    /// Map this event came from, for a map-sourced event whose map is still
+    /// open. Runtime-sourced events and maps this binding no longer tracks
+    /// report null; `source` still names the object either way.
     source_id: ?values.MapId,
     payload_type: RuntimeEventPayloadType,
     /// Secondary detail whose meaning `event_type` selects: a raw
@@ -614,7 +679,24 @@ pub const OwnedRuntimeEvent = struct {
     message: []const u8,
     payload: RuntimeEventPayload,
 
-    pub fn deinit(self: *OwnedRuntimeEvent) void {
+    /// Copies this event into storage the returned value owns.
+    pub fn clone(self: RuntimeEvent, allocator: std.mem.Allocator) status.Error!RuntimeEvent {
+        const message = try allocator.dupe(u8, self.message);
+        errdefer allocator.free(message);
+        return .{
+            .allocator = allocator,
+            .event_type = self.event_type,
+            .source_type = self.source_type,
+            .source = self.source,
+            .source_id = self.source_id,
+            .payload_type = self.payload_type,
+            .code = self.code,
+            .message = message,
+            .payload = try ownedPayload(allocator, self.payload),
+        };
+    }
+
+    pub fn deinit(self: *RuntimeEvent) void {
         self.payload.deinit(self.allocator);
         self.allocator.free(self.message);
         self.message = "";
@@ -622,11 +704,14 @@ pub const OwnedRuntimeEvent = struct {
     }
 };
 
+/// Typed event payload the event's `payload_type` selects.
+///
+/// Every member is a value except the bytes of an `unknown` payload, which the
+/// containing event owns.
 pub const RuntimeEventPayload = union(enum) {
     none,
     render_frame: RenderFramePayload,
     render_map: RenderMapPayload,
-    style_image_missing: StyleImageMissingPayload,
     tile_action: TileActionPayload,
     offline_region_status: OfflineRegionStatusPayload,
     offline_region_response_error: OfflineRegionResponseErrorPayload,
@@ -635,10 +720,8 @@ pub const RuntimeEventPayload = union(enum) {
     camera_transition_finished: CameraTransitionFinishedPayload,
     unknown: UnknownPayload,
 
-    pub fn deinit(self: *RuntimeEventPayload, allocator: std.mem.Allocator) void {
+    fn deinit(self: *RuntimeEventPayload, allocator: std.mem.Allocator) void {
         switch (self.*) {
-            .style_image_missing => |payload| allocator.free(payload.image_id),
-            .tile_action => |payload| allocator.free(payload.source_id),
             .unknown => |payload| allocator.free(payload.bytes),
             else => {},
         }
@@ -699,10 +782,6 @@ pub const RenderMapPayload = struct {
     mode: RenderMode,
 };
 
-pub const StyleImageMissingPayload = struct {
-    image_id: []const u8,
-};
-
 pub const TileOperation = union(enum) {
     requested_from_cache,
     requested_from_network,
@@ -739,10 +818,11 @@ pub const TileId = struct {
     canonical_y: u32,
 };
 
+/// Payload for `map_tile_action` events. The event message carries the source
+/// ID.
 pub const TileActionPayload = struct {
     operation: TileOperation,
     tile_id: TileId,
-    source_id: []const u8,
 };
 
 pub const OfflineRegionDownloadState = union(enum) {
@@ -871,6 +951,9 @@ pub const CameraTransitionFinishedPayload = struct {
     transition_id: u64,
 };
 
+/// Payload of a type this binding does not name, kept as the event's fixed
+/// payload window: the batch's event size less the payload's offset in the
+/// event.
 pub const UnknownPayload = struct {
     payload_type: u32,
     bytes: []const u8,
@@ -930,6 +1013,117 @@ pub const RuntimeEventType = union(enum) {
             else => .{ .unknown = raw },
         };
     }
+};
+
+/// Event types a map or a runtime queues.
+///
+/// Each field names the `RuntimeEventType` tag it selects, so a host reads a
+/// mask, sets one field, and writes it back. A map reads the fields
+/// `all_map_events` names and ignores the rest; a runtime reads the fields
+/// `all_runtime_events` names and ignores the rest. So both setters accept
+/// `all`.
+pub const RuntimeEventMask = struct {
+    map_camera_will_change: bool = false,
+    map_camera_is_changing: bool = false,
+    map_camera_did_change: bool = false,
+    map_style_loaded: bool = false,
+    map_loading_started: bool = false,
+    map_loading_finished: bool = false,
+    map_loading_failed: bool = false,
+    map_idle: bool = false,
+    map_render_update_available: bool = false,
+    map_render_error: bool = false,
+    map_still_image_finished: bool = false,
+    map_still_image_failed: bool = false,
+    map_render_frame_started: bool = false,
+    map_render_frame_finished: bool = false,
+    map_render_map_started: bool = false,
+    map_render_map_finished: bool = false,
+    map_style_image_missing: bool = false,
+    map_tile_action: bool = false,
+    map_camera_transition_finished: bool = false,
+    offline_region_status_changed: bool = false,
+    offline_region_response_error: bool = false,
+    offline_region_tile_count_limit_exceeded: bool = false,
+    offline_operation_completed: bool = false,
+    /// Bits reported by a newer native library that this binding does not name.
+    unknown_bits: u64 = 0,
+
+    /// Selects no event type.
+    pub const none = RuntimeEventMask{};
+    /// Selects every map-originated event type this binding names.
+    pub const all_map_events = fromRaw(c.MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS);
+    /// Selects every runtime-originated event type this binding names.
+    pub const all_runtime_events = fromRaw(c.MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS);
+    /// Selects every event type this binding names.
+    pub const all = fromRaw(c.MLN_RUNTIME_EVENT_MASK_ALL);
+
+    /// Returns the mask selecting every type either mask selects.
+    pub fn unionWith(self: RuntimeEventMask, other: RuntimeEventMask) RuntimeEventMask {
+        return fromRaw(self.toRaw() | other.toRaw());
+    }
+
+    /// Reports whether this mask selects `event_type`.
+    pub fn contains(self: RuntimeEventMask, event_type: RuntimeEventType) bool {
+        switch (event_type) {
+            .unknown => |raw| return raw < 64 and self.toRaw() & (@as(u64, 1) << @intCast(raw)) != 0,
+            inline else => |_, tag| return @field(self, @tagName(tag)),
+        }
+    }
+
+    /// Reports whether this mask selects no event type.
+    pub fn isEmpty(self: RuntimeEventMask) bool {
+        return self.toRaw() == 0;
+    }
+
+    fn toRaw(self: RuntimeEventMask) u64 {
+        @setEvalBranchQuota(4000);
+        var raw = self.unknown_bits;
+        inline for (@typeInfo(RuntimeEventMask).@"struct".fields) |field| {
+            if (field.type == bool) {
+                if (@field(self, field.name)) raw |= maskBitForField(field.name);
+            }
+        }
+        return raw;
+    }
+
+    fn fromRaw(raw: u64) RuntimeEventMask {
+        @setEvalBranchQuota(4000);
+        var mask = RuntimeEventMask{};
+        mask.unknown_bits = raw & ~@as(u64, c.MLN_RUNTIME_EVENT_MASK_ALL);
+        inline for (@typeInfo(RuntimeEventMask).@"struct".fields) |field| {
+            if (field.type == bool) {
+                if (raw & maskBitForField(field.name) != 0) {
+                    @field(mask, field.name) = true;
+                }
+            }
+        }
+        return mask;
+    }
+
+    // Each bit comes from the generated constant its field is named after, so
+    // the mask cannot drift from the event type enum.
+    fn maskBitForField(comptime field_name: []const u8) u64 {
+        const upper_name = comptime blk: {
+            var buffer: [field_name.len]u8 = undefined;
+            for (field_name, 0..) |character, index| {
+                buffer[index] = std.ascii.toUpper(character);
+            }
+            break :blk buffer;
+        };
+        return @field(c, "MLN_RUNTIME_EVENT_MASK_" ++ upper_name);
+    }
+};
+
+/// Identity of the object a runtime event came from, as native reported it.
+///
+/// The value names one object for the life of the process, so comparing two
+/// events' identities is meaningful even after the object it names is closed.
+/// It is an identity only: this binding builds no handle from it.
+pub const RuntimeEventSourceId = enum(u64) {
+    /// What an event with no source reports.
+    none = 0,
+    _,
 };
 
 pub const RuntimeEventSourceType = union(enum) {
@@ -1044,7 +1238,6 @@ pub const RuntimeEventPayloadType = union(enum) {
     none,
     render_frame,
     render_map,
-    style_image_missing,
     tile_action,
     offline_region_status,
     offline_region_response_error,
@@ -1058,7 +1251,6 @@ pub const RuntimeEventPayloadType = union(enum) {
             c.MLN_RUNTIME_EVENT_PAYLOAD_NONE => .none,
             c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME => .render_frame,
             c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP => .render_map,
-            c.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING => .style_image_missing,
             c.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION => .tile_action,
             c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS => .offline_region_status,
             c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR => .offline_region_response_error,
@@ -1092,13 +1284,14 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
             cache_path = try nulTerminated(allocator, value, diagnostic_store, "runtime cache_path contains embedded NUL");
             native_options.cache_path = cache_path.?.ptr;
         }
+        if (options.event_mask) |value| native_options.event_mask = value.toRaw();
 
         return createNative(&native_options, diagnostic_store);
     }
 
     /// Advances this runtime: parks the owner thread when `timeout_ms` allows
     /// it, then drains the owner-thread task queues. Drain the resulting
-    /// runtime events with `pollEvent` afterwards.
+    /// runtime events with `drainEvents` afterwards.
     ///
     /// `timeout_ms` bounds the park: zero drains and returns, a positive value
     /// parks for at most that many milliseconds, and null parks until a wake
@@ -1106,7 +1299,9 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
     /// they queue owner-thread work, so pass a bounded timeout to cap the wait.
     ///
     /// A non-zero timeout blocks the calling thread. Call it outside any lock
-    /// that a thread signalling a wake source takes.
+    /// that a thread signalling a wake source takes. An undrained event never
+    /// parks the owner thread, so a host that pumps and drains in a loop keeps
+    /// draining.
     pub fn pump(self: *RuntimeHandle, timeout_ms: ?u64) status.Error!void {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
@@ -1147,25 +1342,72 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         };
     }
 
-    /// Polls and copies the next queued runtime event, returning null when the
-    /// queue is empty. The caller owns the returned event and deinits it.
+    /// Drains this runtime's queued events into one copied batch.
     ///
-    /// Polling a map-style-loaded event also releases the map's detached custom
-    /// geometry sources, so drain the queue to keep dropped sources from
-    /// lingering.
-    pub fn pollEvent(self: *RuntimeHandle, allocator: std.mem.Allocator) status.Error!?OwnedRuntimeEvent {
+    /// `max_events` bounds the drain: zero drains every queued event, and a
+    /// positive value drains at most that many and leaves the rest for the next
+    /// drain, which `EventBatch.remaining` reports.
+    ///
+    /// Narrowing a subscription gates later events and keeps queued ones, so a
+    /// batch still reports the events a host already caused.
+    pub fn drainEvents(self: *RuntimeHandle, allocator: std.mem.Allocator, max_events: usize) status.Error!EventBatch {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-        var native_event = emptyNativeEvent();
-        var has_event = false;
+        const runtime_state = runtime_lease.state;
+
+        var native_batch = c.mln_runtime_event_batch_default();
         try status.checkStatus(
-            c.mln_runtime_poll_event(runtime_lease.native, &native_event, &has_event),
+            c.mln_runtime_drain_events(runtime_lease.native, max_events, &native_batch),
             runtime_lease.diagnostic_store,
         );
-        if (!has_event) return null;
+        const event_size: usize = native_batch.event_size;
+        const events: []const u8 = if (native_batch.event_count == 0 or native_batch.events == null)
+            &.{}
+        else
+            @as([*]const u8, @ptrCast(native_batch.events))[0 .. native_batch.event_count * event_size];
+        const messages: []const u8 = if (native_batch.messages_size == 0 or native_batch.messages == null)
+            ""
+        else
+            native_batch.messages[0..native_batch.messages_size];
+        const copied = try allocator.alloc(RuntimeEvent, native_batch.event_count);
+        var initialized: usize = 0;
+        errdefer {
+            for (copied[0..initialized]) |*event| event.deinit();
+            allocator.free(copied);
+        }
+        for (copied, 0..) |*event, index| {
+            event.* = try eventViewAt(runtime_state, events, event_size, messages, index).toOwned(allocator);
+            initialized += 1;
+        }
+        return .{ .allocator = allocator, .events = copied, .remaining_count = native_batch.remaining_count };
+    }
 
-        applyEventSideEffects(self, native_event);
-        return try copyRuntimeEventOwned(self, allocator, native_event);
+    /// Selects which runtime-originated event types this runtime queues.
+    ///
+    /// A runtime reads the fields `RuntimeEventMask.all_runtime_events` names
+    /// and ignores the rest. Narrowing gates later events and keeps queued ones,
+    /// so a host drains what it already caused. Offline region events also
+    /// require the region to be observed.
+    pub fn setEventMask(self: *RuntimeHandle, mask: RuntimeEventMask) status.Error!void {
+        const runtime_lease = try lease(self);
+        defer runtime_lease.release();
+        try status.checkStatus(
+            c.mln_runtime_set_event_mask(runtime_lease.native, mask.toRaw()),
+            runtime_lease.diagnostic_store,
+        );
+    }
+
+    /// Reports which runtime-originated event types this runtime queues. A
+    /// runtime that has not been narrowed reports `RuntimeEventMask.all`.
+    pub fn eventMask(self: *RuntimeHandle) status.Error!RuntimeEventMask {
+        const runtime_lease = try lease(self);
+        defer runtime_lease.release();
+        var raw: u64 = 0;
+        try status.checkStatus(
+            c.mln_runtime_get_event_mask(runtime_lease.native, &raw),
+            runtime_lease.diagnostic_store,
+        );
+        return RuntimeEventMask.fromRaw(raw);
     }
 
     fn operationHandle(
@@ -1607,24 +1849,43 @@ fn createNative(
     return try registerRuntimeState(runtime, runtime_state);
 }
 
-fn copyRuntimeEventOwned(
-    handle: *RuntimeHandle,
-    allocator: std.mem.Allocator,
-    native_event: c.mln_runtime_event,
-) status.Error!OwnedRuntimeEvent {
-    const event = runtimeEventFromNative(handle, native_event);
-    const message = try copyOptionalBytes(allocator, native_event.message, native_event.message_size);
-    errdefer allocator.free(message);
+// Events index by the batch's stride, which a later C API version may widen
+// past this binding's compiled event size, so the fixed prefix is copied out
+// rather than read through a pointer cast.
+fn nativeEventAt(events: []const u8, event_size: usize, offset: usize) c.mln_runtime_event {
+    var native_event = std.mem.zeroes(c.mln_runtime_event);
+    const copied = @min(event_size, @sizeOf(c.mln_runtime_event));
+    @memcpy(std.mem.asBytes(&native_event)[0..copied], events[offset..][0..copied]);
+    return native_event;
+}
+
+fn eventViewAt(
+    runtime_state: ?*RuntimeState,
+    events: []const u8,
+    event_size: usize,
+    messages: []const u8,
+    index: usize,
+) RuntimeEventView {
+    const offset = index * event_size;
+    const native_event = nativeEventAt(events, event_size, offset);
     return .{
-        .allocator = allocator,
-        .event_type = event.event_type,
-        .source_type = event.source_type,
-        .source_id = event.source_id,
-        .payload_type = event.payload_type,
-        .code = event.code,
-        .message = message,
-        .payload = try copyPayload(allocator, native_event),
+        .event_type = RuntimeEventType.fromRaw(native_event.type),
+        .source_type = RuntimeEventSourceType.fromRaw(native_event.source_type),
+        .source = @enumFromInt(native_event.source),
+        .source_id = mapIdForNativeSource(runtime_state, native_event.source_type, native_event.source),
+        .payload_type = RuntimeEventPayloadType.fromRaw(native_event.payload_type),
+        .code = native_event.code,
+        .message = messages[native_event.message_offset..][0..native_event.message_size],
+        .payload = payloadFromNative(native_event, payloadWindow(events, event_size, offset)),
     };
+}
+
+// The payload window is the batch's event size less the payload's offset in the
+// event, which is what a payload type this binding does not name reports.
+fn payloadWindow(events: []const u8, event_size: usize, offset: usize) []const u8 {
+    const payload_offset = @offsetOf(c.mln_runtime_event, "payload");
+    if (event_size <= payload_offset) return "";
+    return events[offset + payload_offset ..][0 .. event_size - payload_offset];
 }
 
 fn destroyOfflineRegionSnapshot(snapshot: c.mln_offline_region_snapshot) void {
@@ -1635,46 +1896,21 @@ fn destroyOfflineRegionList(list: c.mln_offline_region_list) void {
     offline_region_list_destroy_for_testing(list);
 }
 
-fn runtimeEventFromNative(handle: *RuntimeHandle, native_event: c.mln_runtime_event) RuntimeEvent {
-    return .{
-        .event_type = RuntimeEventType.fromRaw(native_event.type),
-        .source_type = RuntimeEventSourceType.fromRaw(native_event.source_type),
-        .source_id = mapIdForNativeSource(handle, native_event.source_type, native_event.source),
-        .payload_type = RuntimeEventPayloadType.fromRaw(native_event.payload_type),
-        .code = native_event.code,
-    };
-}
-
-fn applyEventSideEffects(handle: *RuntimeHandle, native_event: c.mln_runtime_event) void {
-    if (native_event.type != c.MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) return;
-    if (native_event.source_type != c.MLN_RUNTIME_EVENT_SOURCE_MAP) return;
-    if (native_event.source == 0) return;
-    const registration = mapRegistrationForNativeSource(handle.*, native_event.source) orelse return;
-    registration.style_loaded_handler(registration.native, registration.style_loaded_context);
-}
-
-fn mapRegistrationForNativeSource(handle: RuntimeHandle, source: c.mln_map) ?MapRegistration {
-    lockRuntimeRegistry();
-    defer unlockRuntimeRegistry();
-
-    const runtime_state = runtimeStateLocked(handle) orelse return null;
-    const runtime_registry = runtime_state.registry orelse return null;
-    for (runtime_registry.maps.items) |registration| {
-        if (registration.native == source) return registration;
-    }
-    return null;
-}
-
 // A map handle names one map for the life of the process, so a registration
 // matches on handle equality.
-fn mapIdForNativeSource(handle: *RuntimeHandle, source_type: u32, source: u64) ?values.MapId {
+fn mapIdForNativeSource(
+    runtime_state: ?*RuntimeState,
+    source_type: u32,
+    source: u64,
+) ?values.MapId {
     if (source_type != c.MLN_RUNTIME_EVENT_SOURCE_MAP) return null;
     if (source == 0) return null;
+    const state = runtime_state orelse return null;
+
     lockRuntimeRegistry();
     defer unlockRuntimeRegistry();
 
-    const runtime_state = runtimeStateLocked(handle.*) orelse return null;
-    const runtime_registry = runtime_state.registry orelse return null;
+    const runtime_registry = state.registry orelse return null;
     for (runtime_registry.maps.items) |registration| {
         if (registration.native == source) return registration.id;
     }
@@ -2107,11 +2343,13 @@ fn resourceResponseToNative(
     };
 }
 
-fn copyPayload(allocator: std.mem.Allocator, native_event: c.mln_runtime_event) status.Error!RuntimeEventPayload {
+// The payload union sits at a fixed offset in the event and every member is a
+// value, so a payload needs no size gate and no alignment check.
+fn payloadFromNative(native_event: c.mln_runtime_event, window: []const u8) RuntimeEventPayload {
     return switch (native_event.payload_type) {
         c.MLN_RUNTIME_EVENT_PAYLOAD_NONE => .none,
         c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME => blk: {
-            const payload = try payloadAs(c.mln_runtime_event_render_frame, native_event.payload, native_event.payload_size);
+            const payload = native_event.payload.render_frame;
             break :blk .{ .render_frame = .{
                 .mode = RenderMode.fromRaw(payload.mode),
                 .needs_repaint = payload.needs_repaint,
@@ -2119,36 +2357,39 @@ fn copyPayload(allocator: std.mem.Allocator, native_event: c.mln_runtime_event) 
                 .stats = renderingStatsFromNative(payload.stats),
             } };
         },
-        c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP => blk: {
-            const payload = try payloadAs(c.mln_runtime_event_render_map, native_event.payload, native_event.payload_size);
-            break :blk .{ .render_map = .{ .mode = RenderMode.fromRaw(payload.mode) } };
-        },
-        c.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING => blk: {
-            const payload = try payloadAs(c.mln_runtime_event_style_image_missing, native_event.payload, native_event.payload_size);
-            break :blk .{ .style_image_missing = .{ .image_id = try copyOptionalBytes(allocator, payload.image_id, payload.image_id_size) } };
+        c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP => .{
+            .render_map = .{ .mode = RenderMode.fromRaw(native_event.payload.render_map.mode) },
         },
         c.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION => blk: {
-            const payload = try payloadAs(c.mln_runtime_event_tile_action, native_event.payload, native_event.payload_size);
+            const payload = native_event.payload.tile_action;
             break :blk .{ .tile_action = .{
                 .operation = TileOperation.fromRaw(payload.operation),
                 .tile_id = tileIdFromNative(payload.tile_id),
-                .source_id = try copyOptionalBytes(allocator, payload.source_id, payload.source_id_size),
             } };
         },
         c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS => blk: {
-            const payload = try payloadAs(c.mln_runtime_event_offline_region_status, native_event.payload, native_event.payload_size);
-            break :blk .{ .offline_region_status = .{ .region_id = payload.region_id, .status = offlineStatusFromNative(payload.status) } };
+            const payload = native_event.payload.offline_region_status;
+            break :blk .{ .offline_region_status = .{
+                .region_id = payload.region_id,
+                .status = offlineStatusFromNative(payload.status),
+            } };
         },
         c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR => blk: {
-            const payload = try payloadAs(c.mln_runtime_event_offline_region_response_error, native_event.payload, native_event.payload_size);
-            break :blk .{ .offline_region_response_error = .{ .region_id = payload.region_id, .reason = ResourceErrorReason.fromRaw(payload.reason) } };
+            const payload = native_event.payload.offline_region_response_error;
+            break :blk .{ .offline_region_response_error = .{
+                .region_id = payload.region_id,
+                .reason = ResourceErrorReason.fromRaw(payload.reason),
+            } };
         },
         c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT => blk: {
-            const payload = try payloadAs(c.mln_runtime_event_offline_region_tile_count_limit, native_event.payload, native_event.payload_size);
-            break :blk .{ .offline_region_tile_count_limit = .{ .region_id = payload.region_id, .limit = payload.limit } };
+            const payload = native_event.payload.offline_region_tile_count_limit;
+            break :blk .{ .offline_region_tile_count_limit = .{
+                .region_id = payload.region_id,
+                .limit = payload.limit,
+            } };
         },
         c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED => blk: {
-            const payload = try payloadAs(c.mln_runtime_event_offline_operation_completed, native_event.payload, native_event.payload_size);
+            const payload = native_event.payload.offline_operation_completed;
             break :blk .{ .offline_operation_completed = .{
                 .operation_id = payload.operation_id,
                 .operation_kind = OfflineOperationKind.fromRaw(payload.operation_kind),
@@ -2159,35 +2400,34 @@ fn copyPayload(allocator: std.mem.Allocator, native_event: c.mln_runtime_event) 
                 .found = payload.found,
             } };
         },
-        c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => blk: {
-            const payload = try payloadAs(c.mln_runtime_event_camera_transition_finished, native_event.payload, native_event.payload_size);
-            break :blk .{ .camera_transition_finished = .{ .transition_id = payload.transition_id } };
+        c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => .{
+            .camera_transition_finished = .{
+                .transition_id = native_event.payload.camera_transition_finished.transition_id,
+            },
         },
         else => .{ .unknown = .{
             .payload_type = native_event.payload_type,
-            .bytes = try copyOptionalOpaqueBytes(allocator, native_event.payload, native_event.payload_size),
+            .bytes = window,
         } },
     };
 }
 
-fn payloadAs(comptime T: type, payload: ?*const anyopaque, size: usize) status.Error!*const T {
-    if (size < @sizeOf(T)) return error.NativeError;
-    const raw = payload orelse return error.NativeError;
-    if (@intFromPtr(raw) % @alignOf(T) != 0) return error.NativeError;
-    const typed: *const T = @ptrCast(@alignCast(raw));
-    if (typed.size < @sizeOf(T)) return error.NativeError;
-    return typed;
+fn ownedPayload(
+    allocator: std.mem.Allocator,
+    payload: RuntimeEventPayload,
+) std.mem.Allocator.Error!RuntimeEventPayload {
+    return switch (payload) {
+        .unknown => |unknown| .{ .unknown = .{
+            .payload_type = unknown.payload_type,
+            .bytes = try allocator.dupe(u8, unknown.bytes),
+        } },
+        else => payload,
+    };
 }
 
 fn copyOptionalBytes(allocator: std.mem.Allocator, data: ?[*]const u8, size: usize) status.Error![]const u8 {
     if (size == 0) return allocator.dupe(u8, "");
     const bytes = data orelse return error.NativeError;
-    return allocator.dupe(u8, bytes[0..size]);
-}
-
-fn copyOptionalOpaqueBytes(allocator: std.mem.Allocator, data: ?*const anyopaque, size: usize) status.Error![]const u8 {
-    if (size == 0) return allocator.dupe(u8, "");
-    const bytes: [*]const u8 = @ptrCast(data orelse return error.NativeError);
     return allocator.dupe(u8, bytes[0..size]);
 }
 
@@ -2316,10 +2556,15 @@ fn copyOfflineRegionDefinition(
     };
 }
 
-pub fn native(handle: *RuntimeHandle) status.BindingError!c.mln_runtime {
-    const runtime_state = runtimeState(handle.*) orelse return error.ClosedHandle;
-    if (runtime_state.closing) return error.ActiveBorrow;
-    return (runtime_state.native orelse return error.ClosedHandle);
+/// Encodes an event mask for the C ABI. The map handle installs its own mask, so
+/// this seam is package-internal rather than part of the public surface.
+pub fn eventMaskToRaw(mask: RuntimeEventMask) u64 {
+    return mask.toRaw();
+}
+
+/// Decodes an event mask the C ABI reported. See `eventMaskToRaw`.
+pub fn eventMaskFromRaw(raw: u64) RuntimeEventMask {
+    return RuntimeEventMask.fromRaw(raw);
 }
 
 pub fn diagnosticStore(handle: *RuntimeHandle) ?*diagnostics.DiagnosticStore {
@@ -2330,8 +2575,6 @@ pub fn diagnosticStore(handle: *RuntimeHandle) ?*diagnostics.DiagnosticStore {
 pub fn registerMap(
     runtime: *RuntimeHandle,
     map: c.mln_map,
-    style_loaded_handler: MapStyleLoadedHandler,
-    style_loaded_context: ?*anyopaque,
 ) status.Error!RegisteredMap {
     lockRuntimeRegistry();
     defer unlockRuntimeRegistry();
@@ -2341,12 +2584,7 @@ pub fn registerMap(
     const runtime_registry = runtime_state.registry orelse return error.ClosedHandle;
     const id = values.MapId{ .value = runtime_registry.next_map_id };
     runtime_registry.next_map_id += 1;
-    try runtime_registry.maps.append(std.heap.smp_allocator, .{
-        .native = map,
-        .id = id,
-        .style_loaded_handler = style_loaded_handler,
-        .style_loaded_context = style_loaded_context,
-    });
+    try runtime_registry.maps.append(std.heap.smp_allocator, .{ .native = map, .id = id });
     return .{ .registry = runtime_registry, .id = id };
 }
 
@@ -2360,21 +2598,6 @@ pub fn unregisterMap(runtime_registry: *RuntimeRegistry, map: c.mln_map) void {
             return;
         }
     }
-}
-
-fn emptyNativeEvent() c.mln_runtime_event {
-    return .{
-        .size = @sizeOf(c.mln_runtime_event),
-        .type = 0,
-        .source_type = c.MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-        .source = 0,
-        .code = 0,
-        .payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_NONE,
-        .payload = null,
-        .payload_size = 0,
-        .message = null,
-        .message_size = 0,
-    };
 }
 
 fn nulTerminated(
@@ -2426,10 +2649,14 @@ fn waitForOfflineOperationForTesting(runtime: *RuntimeHandle, operation: Offline
     const operation_id = try operation.operationId();
     for (0..5000) |_| {
         try runtime.pump(0);
-        while (try runtime.pollEvent(std.testing.allocator)) |event| {
-            var owned_event = event;
-            defer owned_event.deinit();
-            const payload = switch (owned_event.payload) {
+        // One event per drain, so an event this wait is not looking for stays
+        // queued rather than being dropped with the batch that carried it.
+        while (true) {
+            var batch = try runtime.drainEvents(std.testing.allocator, 1);
+            defer batch.deinit();
+            if (batch.len() == 0) break;
+            const event = try batch.at(0);
+            const payload = switch (event.payload) {
                 .offline_operation_completed => |completed| completed,
                 else => continue,
             };
@@ -2453,104 +2680,164 @@ test "runtime event raw domains preserve unknown values" {
     try std.testing.expect(std.meta.eql(ResourceErrorReason.fromRaw(0xf00d), ResourceErrorReason{ .unknown = 0xf00d }));
 }
 
-test "runtime event payload copying owns borrowed bytes" {
-    const source_id = try std.testing.allocator.dupe(u8, "composite-source");
-    defer std.testing.allocator.free(source_id);
-    var native_payload = c.mln_runtime_event_tile_action{
-        .size = @sizeOf(c.mln_runtime_event_tile_action),
+// A stride wider than this binding's compiled event size is what a later C API
+// version reports, so the synthetic batch below uses one.
+const testing_event_size = @sizeOf(c.mln_runtime_event) + 8;
+const testing_messages = "composite-source";
+
+fn writeTestingEvent(events: []u8, index: usize, native_event: c.mln_runtime_event) void {
+    const offset = index * testing_event_size;
+    @memcpy(events[offset..][0..@sizeOf(c.mln_runtime_event)], std.mem.asBytes(&native_event));
+}
+
+fn testingEventView(events: []const u8, index: usize) RuntimeEventView {
+    return eventViewAt(null, events, testing_event_size, testing_messages, index);
+}
+
+test "drained events decode the payload union at the reported stride" {
+    var events = [_]u8{0} ** (3 * testing_event_size);
+
+    var tile_action = std.mem.zeroes(c.mln_runtime_event);
+    tile_action.type = c.MLN_RUNTIME_EVENT_MAP_TILE_ACTION;
+    tile_action.source_type = c.MLN_RUNTIME_EVENT_SOURCE_MAP;
+    tile_action.payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION;
+    tile_action.message_size = testing_messages.len;
+    tile_action.payload.tile_action = .{
         .operation = c.MLN_TILE_OPERATION_LOAD_FROM_NETWORK,
         .tile_id = .{ .overscaled_z = 3, .wrap = -1, .canonical_z = 2, .canonical_x = 1, .canonical_y = 0 },
-        .source_id = source_id.ptr,
-        .source_id_size = source_id.len,
     };
-    const native_event = c.mln_runtime_event{
-        .size = @sizeOf(c.mln_runtime_event),
-        .type = c.MLN_RUNTIME_EVENT_MAP_TILE_ACTION,
-        .source_type = c.MLN_RUNTIME_EVENT_SOURCE_MAP,
-        .source = 0,
-        .code = 0,
-        .payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
-        .payload = &native_payload,
-        .payload_size = @sizeOf(c.mln_runtime_event_tile_action),
-        .message = null,
-        .message_size = 0,
+    writeTestingEvent(&events, 0, tile_action);
+
+    var render_frame = std.mem.zeroes(c.mln_runtime_event);
+    render_frame.type = c.MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED;
+    render_frame.source_type = c.MLN_RUNTIME_EVENT_SOURCE_MAP;
+    render_frame.payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME;
+    render_frame.payload.render_frame = .{
+        .mode = c.MLN_RENDER_MODE_FULL,
+        .needs_repaint = true,
+        .placement_changed = false,
+        .stats = .{
+            .encoding_time = 0.5,
+            .rendering_time = 0.25,
+            .frame_count = 7,
+            .draw_call_count = 11,
+            .total_draw_call_count = 13,
+        },
     };
+    writeTestingEvent(&events, 1, render_frame);
 
-    var payload = try copyPayload(std.testing.allocator, native_event);
-    defer payload.deinit(std.testing.allocator);
+    var transition = std.mem.zeroes(c.mln_runtime_event);
+    transition.type = c.MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED;
+    transition.source_type = c.MLN_RUNTIME_EVENT_SOURCE_MAP;
+    transition.code = c.MLN_CAMERA_CHANGE_MODE_ANIMATED;
+    transition.payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED;
+    transition.payload.camera_transition_finished = .{ .transition_id = 4242 };
+    writeTestingEvent(&events, 2, transition);
 
-    const tile_action = payload.tile_action;
-    @memset(source_id, 'x');
-    try std.testing.expect(std.meta.eql(tile_action.operation, TileOperation.load_from_network));
-    try std.testing.expectEqual(@as(u32, 3), tile_action.tile_id.overscaled_z);
-    try std.testing.expectEqual(@as(i32, -1), tile_action.tile_id.wrap);
-    try std.testing.expectEqualSlices(u8, "composite-source", tile_action.source_id);
+    const first = testingEventView(&events, 0);
+    try std.testing.expect(std.meta.eql(first.event_type, RuntimeEventType.map_tile_action));
+    try std.testing.expect(std.meta.eql(first.payload.tile_action.operation, TileOperation.load_from_network));
+    try std.testing.expectEqual(@as(u32, 3), first.payload.tile_action.tile_id.overscaled_z);
+    try std.testing.expectEqual(@as(i32, -1), first.payload.tile_action.tile_id.wrap);
+    try std.testing.expectEqualStrings("composite-source", first.message);
+
+    const second = testingEventView(&events, 1);
+    try std.testing.expect(std.meta.eql(second.payload.render_frame.mode, RenderMode.full));
+    try std.testing.expect(second.payload.render_frame.needs_repaint);
+    try std.testing.expectEqual(@as(i64, 7), second.payload.render_frame.stats.frame_count);
+    try std.testing.expectEqualStrings("", second.message);
+
+    // A decoder stepping by its own compiled size would read this event's
+    // payload eight bytes early.
+    const third = testingEventView(&events, 2);
+    try std.testing.expect(std.meta.eql(
+        third.event_type,
+        RuntimeEventType.map_camera_transition_finished,
+    ));
+    try std.testing.expect(std.meta.eql(CameraChangeMode.fromRaw(third.code), CameraChangeMode.animated));
+    try std.testing.expectEqual(@as(u64, 4242), third.payload.camera_transition_finished.transition_id);
 }
 
-test "runtime event unknown payload copies raw bytes" {
-    var raw = [_]u8{ 0xde, 0xad, 0xbe, 0xef };
-    const native_event = c.mln_runtime_event{
-        .size = @sizeOf(c.mln_runtime_event),
-        .type = 0xffff,
-        .source_type = c.MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-        .source = 0,
-        .code = 0,
-        .payload_type = 0xfeed,
-        .payload = &raw,
-        .payload_size = raw.len,
-        .message = null,
-        .message_size = 0,
-    };
+test "an unknown drained event preserves its raw domains and payload window" {
+    var events = [_]u8{0} ** testing_event_size;
 
-    var payload = try copyPayload(std.testing.allocator, native_event);
-    defer payload.deinit(std.testing.allocator);
+    var unknown = std.mem.zeroes(c.mln_runtime_event);
+    unknown.type = 0xffff;
+    unknown.source_type = 0xbeef;
+    unknown.source = 0x5eed_1234;
+    unknown.payload_type = 0xfeed;
+    writeTestingEvent(&events, 0, unknown);
+    const payload_offset = @offsetOf(c.mln_runtime_event, "payload");
+    const window_size = testing_event_size - payload_offset;
+    @memset(events[payload_offset..], 0xa5);
 
-    @memset(&raw, 0);
-    try std.testing.expectEqual(@as(u32, 0xfeed), payload.unknown.payload_type);
-    try std.testing.expectEqualSlices(u8, &[_]u8{ 0xde, 0xad, 0xbe, 0xef }, payload.unknown.bytes);
+    const view = testingEventView(&events, 0);
+    try std.testing.expect(std.meta.eql(view.event_type, RuntimeEventType{ .unknown = 0xffff }));
+    try std.testing.expect(std.meta.eql(view.source_type, RuntimeEventSourceType{ .unknown = 0xbeef }));
+    // A source type this build cannot name still names its source.
+    try std.testing.expectEqual(@as(u64, 0x5eed_1234), @intFromEnum(view.source));
+    try std.testing.expect(std.meta.eql(view.payload_type, RuntimeEventPayloadType{ .unknown = 0xfeed }));
+    try std.testing.expectEqual(@as(u32, 0xfeed), view.payload.unknown.payload_type);
+    try std.testing.expectEqual(window_size, view.payload.unknown.bytes.len);
+
+    // The view borrows the window; the copy owns it.
+    var owned = try view.toOwned(std.testing.allocator);
+    defer owned.deinit();
+    @memset(events[payload_offset..], 0);
+    try std.testing.expectEqualSlices(u8, &[_]u8{0xa5} ** window_size, owned.payload.unknown.bytes);
+    try std.testing.expectEqualSlices(u8, &[_]u8{0} ** window_size, view.payload.unknown.bytes);
 }
 
-test "runtime event payload copying rejects malformed borrowed payloads" {
-    const null_payload_event = c.mln_runtime_event{
-        .size = @sizeOf(c.mln_runtime_event),
-        .type = c.MLN_RUNTIME_EVENT_MAP_TILE_ACTION,
-        .source_type = c.MLN_RUNTIME_EVENT_SOURCE_MAP,
-        .source = 0,
-        .code = 0,
-        .payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
-        .payload = null,
-        .payload_size = @sizeOf(c.mln_runtime_event_tile_action),
-        .message = null,
-        .message_size = 0,
-    };
-    try std.testing.expectError(error.NativeError, copyPayload(std.testing.allocator, null_payload_event));
+test "a map event whose map this binding does not track still names its source" {
+    var events = [_]u8{0} ** testing_event_size;
 
-    var undersized_payload = c.mln_runtime_event_tile_action{
-        .size = @sizeOf(c.mln_runtime_event_tile_action) - 1,
-        .operation = c.MLN_TILE_OPERATION_LOAD_FROM_NETWORK,
-        .tile_id = .{ .overscaled_z = 0, .wrap = 0, .canonical_z = 0, .canonical_x = 0, .canonical_y = 0 },
-        .source_id = null,
-        .source_id_size = 0,
-    };
-    var undersized_event = null_payload_event;
-    undersized_event.payload = &undersized_payload;
-    try std.testing.expectError(error.NativeError, copyPayload(std.testing.allocator, undersized_event));
+    var orphaned = std.mem.zeroes(c.mln_runtime_event);
+    orphaned.type = c.MLN_RUNTIME_EVENT_MAP_LOADING_FAILED;
+    orphaned.source_type = c.MLN_RUNTIME_EVENT_SOURCE_MAP;
+    orphaned.source = 0xfeed_face;
+    writeTestingEvent(&events, 0, orphaned);
 
-    const AlignedPayload = extern struct {
-        size: u32,
-        value: u32,
-    };
-    const alignment = @alignOf(AlignedPayload);
-    try std.testing.expect(alignment > 1);
-    var misaligned_storage: [@sizeOf(AlignedPayload) + alignment]u8 align(1) = undefined;
-    const base_address = @intFromPtr(&misaligned_storage[0]);
-    var misaligned_offset: usize = 0;
-    while ((base_address + misaligned_offset) % alignment == 0) : (misaligned_offset += 1) {}
-    try std.testing.expect(misaligned_offset < alignment);
+    const view = testingEventView(&events, 0);
+    try std.testing.expect(std.meta.eql(view.source_type, RuntimeEventSourceType.map));
+    try std.testing.expectEqual(@as(?values.MapId, null), view.source_id);
+    try std.testing.expectEqual(@as(u64, 0xfeed_face), @intFromEnum(view.source));
+
+    // The copy keeps the identity the borrow reported.
+    var owned = try view.toOwned(std.testing.allocator);
+    defer owned.deinit();
+    try std.testing.expectEqual(view.source, owned.source);
+}
+
+test "raw event masks reject bits outside the mask enum" {
+    var store = diagnostics.DiagnosticStore.init(std.testing.allocator);
+    defer store.deinit();
+
+    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, &store);
+    defer runtime.close() catch @panic("runtime close failed");
+    const native_runtime: c.mln_runtime = @intFromEnum(runtime);
+
+    // The binding can retain an unnamed bit reported by a newer library, but
+    // this native library still rejects bits it does not support.
     try std.testing.expectError(
-        error.NativeError,
-        payloadAs(AlignedPayload, @ptrCast(&misaligned_storage[misaligned_offset]), @sizeOf(AlignedPayload)),
+        error.InvalidArgument,
+        status.checkStatus(
+            c.mln_runtime_set_event_mask(native_runtime, @as(u64, 1) << 63),
+            &store,
+        ),
     );
+    const diagnostic = store.get().?;
+    try std.testing.expectEqual(@as(?i32, c.MLN_STATUS_INVALID_ARGUMENT), diagnostic.raw_status);
+    try std.testing.expect(diagnostic.message.len > 0);
+}
+
+test "event mask conversion preserves unnamed bits" {
+    const unnamed = @as(u64, 1) << 63;
+    const raw = unnamed | @as(u64, c.MLN_RUNTIME_EVENT_MASK_MAP_IDLE);
+    const mask = eventMaskFromRaw(raw);
+
+    try std.testing.expect(mask.map_idle);
+    try std.testing.expect(mask.contains(.{ .unknown = 63 }));
+    try std.testing.expectEqual(raw, eventMaskToRaw(mask));
 }
 
 test "offline operation take-result failures preserve handle state" {

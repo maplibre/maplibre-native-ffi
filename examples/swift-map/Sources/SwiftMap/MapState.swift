@@ -59,6 +59,9 @@ final class MapState {
       )
     )
     createdMap = map
+    // The two event types the runtime loop reads. A map queues no event of an
+    // unselected type, so this runs before the style load.
+    try map.setEventMask([.mapRenderUpdateAvailable, .mapRenderFrameFinished])
     try map.setStyleURL("https://tiles.openfreemap.org/styles/bright")
     try map.jump(to: CameraOptions(
       center: LatLng(latitude: 37.7749, longitude: -122.4194),
@@ -110,10 +113,12 @@ final class MapState {
     try runtime.wakeSource()
   }
 
-  /// Drains runtime events, reporting whether the map wants another frame.
+  /// Drains one batch of runtime events, reporting whether the map wants
+  /// another frame.
   func drainEvents() throws -> Bool {
     var renderPending = false
-    while let event = try runtime.pollEvent() {
+    // One drain takes every event the pump produced.
+    for event in try runtime.drainEvents().events {
       guard map.isSource(of: event) else { continue }
       switch event.type {
       case .mapRenderUpdateAvailable:

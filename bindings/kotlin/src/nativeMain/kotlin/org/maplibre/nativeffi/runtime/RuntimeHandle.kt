@@ -2,12 +2,16 @@ package org.maplibre.nativeffi.runtime
 
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.ref.WeakReference
+import kotlinx.cinterop.Arena
 import kotlinx.cinterop.BooleanVar
+import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
+import kotlinx.cinterop.interpretCPointer
 import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.toLong
@@ -20,7 +24,10 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_provider
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_transform
 import org.maplibre.nativeffi.internal.c.mln_runtime_create
 import org.maplibre.nativeffi.internal.c.mln_runtime_destroy
+import org.maplibre.nativeffi.internal.c.mln_runtime_drain_events
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_batch
+import org.maplibre.nativeffi.internal.c.mln_runtime_get_event_mask
 import org.maplibre.nativeffi.internal.c.mln_runtime_offline_operation_discard
 import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_create_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_create_take_result
@@ -40,9 +47,9 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_merge_datab
 import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_merge_database_take_result
 import org.maplibre.nativeffi.internal.c.mln_runtime_options
 import org.maplibre.nativeffi.internal.c.mln_runtime_options_default
-import org.maplibre.nativeffi.internal.c.mln_runtime_poll_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_pump
 import org.maplibre.nativeffi.internal.c.mln_runtime_run_ambient_cache_operation_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_set_event_mask
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_http_header_transform
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_maximum_ambient_cache_size_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_resource_provider
@@ -81,6 +88,9 @@ internal constructor(
 ) : AutoCloseable {
   private val state = HandleState("RuntimeHandle", handle)
   private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
+  // One batch struct per handle, reused by every drain and freed by close().
+  private val batchArena = Arena()
+  private val batch = batchArena.alloc<mln_runtime_event_batch>()
   private var resourceTransformState: ResourceTransformState? = null
   private var httpHeaderTransformState: HttpHeaderTransformState? = null
   private var resourceProviderState: ResourceProviderState? = null
@@ -597,26 +607,49 @@ internal constructor(
     previous?.close()
   }
 
-  public actual fun pollEvent(): RuntimeEvent? = memScoped {
-    val event = alloc<mln_runtime_event>()
-    event.size = sizeOf<mln_runtime_event>().toUInt()
-    val hasEvent = alloc<BooleanVar>()
-    hasEvent.value = false
-    Status.check(
-      mln_runtime_poll_event(state.requireLive().rawHandleValue, event.ptr, hasEvent.ptr)
-    )
-    if (!hasEvent.value) {
-      return@memScoped null
+  public actual fun drainEvents(maxEvents: Int): RuntimeEventBatch {
+    Status.requireArgument(maxEvents >= 0) { "maxEvents must be non-negative" }
+    val runtime = state.requireLive().rawHandleValue
+    batch.size = sizeOf<mln_runtime_event_batch>().toUInt()
+    Status.check(mln_runtime_drain_events(runtime, maxEvents.toULong(), batch.ptr))
+    val eventCount = batch.event_count
+    require(eventCount <= Int.MAX_VALUE.toULong()) { "event count exceeds Int.MAX_VALUE" }
+    val remainingCount = batch.remaining_count
+    require(remainingCount <= Long.MAX_VALUE.toULong()) { "remaining count exceeds Long.MAX_VALUE" }
+    if (eventCount == 0uL) {
+      return RuntimeEventBatch(emptyList(), remainingCount.toLong())
     }
-
-    runtimeEvent(event)
+    // The stride the batch reports can exceed sizeOf<mln_runtime_event>(), so
+    // step through the array by it rather than indexing the typed array.
+    val eventSize = batch.event_size.toLong()
+    val base = batch.events!!.rawValue
+    val messages = batch.messages
+    val copied =
+      List(eventCount.toInt()) { index ->
+        val event = interpretCPointer<mln_runtime_event>(base + index * eventSize)!!.pointed
+        copyEvent(event, messages, eventSize)
+      }
+    return RuntimeEventBatch(copied, remainingCount.toLong())
   }
+
+  public actual var eventMask: RuntimeEventMask
+    get() = memScoped {
+      val outMask = alloc<ULongVar>()
+      Status.check(mln_runtime_get_event_mask(state.requireLive().rawHandleValue, outMask.ptr))
+      RuntimeEventMask(outMask.value.toLong())
+    }
+    set(value) {
+      Status.check(
+        mln_runtime_set_event_mask(state.requireLive().rawHandleValue, value.nativeValue.toULong())
+      )
+    }
 
   public actual override fun close() {
     resourceProviderState?.checkCanClose()
     resourceTransformState?.checkCanClose()
     httpHeaderTransformState?.checkCanClose()
     state.closeOnce({ runtime -> destroyer(runtime.rawHandleValue) }) {
+      batchArena.clear()
       resourceProviderState?.close()
       resourceTransformState?.close()
       httpHeaderTransformState?.close()
@@ -640,43 +673,35 @@ internal constructor(
 
   internal fun resourceTransformStateForTesting(): ResourceTransformState? = resourceTransformState
 
-  internal fun copyEventForTesting(event: mln_runtime_event): RuntimeEvent = runtimeEvent(event)
+  internal fun copyEventForTesting(
+    event: mln_runtime_event,
+    messages: CPointer<ByteVar>?,
+    eventSize: Long = sizeOf<mln_runtime_event>(),
+  ): RuntimeEvent = copyEvent(event, messages, eventSize)
 
-  internal fun applyEventSideEffectsForTesting(
-    eventType: RuntimeEventType,
-    sourceType: RuntimeEventSourceType,
-    sourceId: Long,
-  ): MapHandle? = applyEventSideEffects(eventType, sourceType, sourceId)
-
-  private fun runtimeEvent(event: mln_runtime_event): RuntimeEvent {
-    val eventType = RuntimeEventType.fromNative(event.type)
+  /** Copies one event of a drained batch out of runtime-owned storage. */
+  private fun copyEvent(
+    event: mln_runtime_event,
+    messages: CPointer<ByteVar>?,
+    eventSize: Long,
+  ): RuntimeEvent {
     val sourceType = RuntimeEventSourceType.fromNative(event.source_type)
     val sourceId = event.source.toLong()
-    val mapSource = applyEventSideEffects(eventType, sourceType, sourceId)
     return RuntimeEvent(
-      eventType,
+      RuntimeEventType.fromNative(event.type),
       sourceType,
+      sourceId,
       if (sourceType == RuntimeEventSourceType.RUNTIME) this else null,
-      mapSource,
+      mapFor(sourceType, sourceId),
       event.code,
-      RuntimeStructs.payload(event),
-      RuntimeStructs.message(event),
+      RuntimeStructs.payload(event, eventSize),
+      RuntimeStructs.message(event, messages),
     )
   }
 
-  private fun applyEventSideEffects(
-    eventType: RuntimeEventType,
-    sourceType: RuntimeEventSourceType,
-    sourceId: Long,
-  ): MapHandle? {
-    val mapSource =
-      if (sourceType == RuntimeEventSourceType.MAP && sourceId != 0L) liveMaps[sourceId]?.value
-      else null
-    if (eventType == RuntimeEventType.MAP_STYLE_LOADED) {
-      mapSource?.releaseDetachedCustomGeometrySources()
-    }
-    return mapSource
-  }
+  private fun mapFor(sourceType: RuntimeEventSourceType, sourceId: Long): MapHandle? =
+    if (sourceType == RuntimeEventSourceType.MAP && sourceId != 0L) liveMaps[sourceId]?.value
+    else null
 
   internal fun registerMap(map: MapHandle) {
     liveMaps[map.nativeHandleId()] = WeakReference(map)
@@ -708,6 +733,7 @@ internal constructor(
       mln_runtime_options_default().place(nativeOptions.ptr)
       options.assetPath?.let { nativeOptions.asset_path = MemoryUtil.cString(this, it) }
       options.cachePath?.let { nativeOptions.cache_path = MemoryUtil.cString(this, it) }
+      nativeOptions.event_mask = options.eventMask.nativeValue.toULong()
 
       val outRuntime = alloc<ULongVar>()
       outRuntime.value = 0uL

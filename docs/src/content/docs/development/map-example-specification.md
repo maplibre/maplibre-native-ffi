@@ -177,8 +177,8 @@ loop**.
   viewport, the graphics API context and presentation resources, the compositor,
   and the render session for the session's whole lifetime. It attaches the
   session, renders through it, resizes it, and closes it.
-- The runtime loop thread owns the runtime, the map, `pump`, `poll_event`, and
-  every map mutation. It never calls a render-session function.
+- The runtime loop thread owns the runtime, the map, `pump`, the event drain,
+  and every map mutation. It never calls a render-session function.
 - Each loop MUST run on a native thread whose identity is stable for the life of
   the loop. Host mechanisms that may move a logical task between native threads,
   such as thread pools, green threads, and coroutine dispatchers without thread
@@ -378,7 +378,7 @@ draws, and the runtime loop pumps. The runtime loop owns its own thread, so it
 passes a positive `timeout_ms` and takes its cadence from the runtime's own work
 rather than from the display. `pump` parks the thread for up to that bound,
 which is what lets the runtime loop idle while the map is quiet instead of
-polling.
+spinning.
 
 #### Render loop iteration
 
@@ -407,13 +407,13 @@ sequenceDiagram
 `finishFrame()` runs every iteration: swapchain or surface upkeep, resize
 handling, and present hooks as required by the host graphics API.
 
-A render loop iteration MUST NOT call `pump` or `poll_event`.
+A render loop iteration MUST NOT call `pump` or drain events.
 
 #### Runtime loop iteration
 
 1. Apply every queued camera command.
 2. Call `pump` exactly once, with a positive `timeout_ms`.
-3. Drain runtime events until the queue is empty, updating the render request.
+3. Drain the runtime's events once, updating the render request from the batch.
 
 ```mermaid
 sequenceDiagram
@@ -478,8 +478,8 @@ Requirements:
 - The render request MUST be published and observed through the host language's
   atomic or synchronized mechanism. An unsynchronized field is not sufficient.
 - The runtime loop MUST call `pump` once per iteration while it is running.
-- The runtime loop MUST drain runtime events each iteration and set the render
-  request when:
+- The runtime loop MUST drain runtime events once per iteration and set the
+  render request when:
   - `map_render_update_available` targets this map (new map content to draw), or
   - `map_render_frame_finished` targets this map and `needs_repaint` is true
     (continuous mode needs another frame, for example ongoing camera
@@ -492,10 +492,10 @@ Requirements:
   other than a rendered frame. Consuming afterwards would discard a request the
   runtime loop published during the render call, and that frame would never be
   drawn.
-- `map_render_frame_finished` and `map_idle` are delivered by the runtime loop's
-  next `pump` after the render loop rendered. An example MUST NOT treat either
-  as a synchronous result of the `render_update` it follows, and MUST NOT block
-  a render loop iteration waiting for one.
+- `map_render_frame_finished` is delivered by the runtime loop's next `pump`
+  after the render loop rendered. An example MUST NOT treat it as a synchronous
+  result of the `render_update` it follows, and MUST NOT block a render loop
+  iteration waiting for it.
 - After a session resize, the map applies its logical size on the runtime loop's
   next `pump`, so `render_update` reports a pending size until then. The render
   loop MUST keep pacing and retry rather than treating it as a failure.
@@ -538,6 +538,8 @@ map-specific setup.
 
 - Create runtime with `:memory:` cache.
 - Create map with current viewport extent and continuous mode.
+- The example MUST select every event type it reads before it loads the style. A
+  map queues an event only while its subscription selects that type.
 - Load [style URL](#style).
 - Apply [initial camera](#initial-camera).
 - Attach a render target by dispatching on active graphics API and selected
@@ -545,7 +547,8 @@ map-specific setup.
 
 #### Event drain
 
-- Drain all pending runtime events each runtime loop iteration.
+- Drain the runtime's events once per runtime loop iteration, and read every
+  event the batch reports.
 - Set the render request when either:
   - `map_render_update_available` targets this map, or
   - `map_render_frame_finished` targets this map and `needs_repaint` is true.

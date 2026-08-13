@@ -9,7 +9,7 @@ use maplibre_native_ffi_sys as sys;
 use pyo3::buffer::PyBuffer;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDict, PyList};
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::ffi::{c_char, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
@@ -128,8 +128,6 @@ struct LogReceiver {
 #[pyclass(name = "_MapHandle")]
 struct MapHandle {
     state: Mutex<maplibre_core::handle::NativeHandleState<sys::mln_map>>,
-    custom_geometry_sources: Mutex<HashMap<String, Box<PyCustomGeometrySourceState>>>,
-    retired_custom_geometry_sources: Mutex<Vec<Box<PyCustomGeometrySourceState>>>,
 }
 
 #[pyclass(name = "_MapProjectionHandle")]
@@ -424,33 +422,6 @@ impl Drop for RuntimeHandle {
     }
 }
 
-impl Drop for MapHandle {
-    fn drop(&mut self) {
-        let native_live = self
-            .state
-            .lock()
-            .map(|state| !state.is_closed())
-            .unwrap_or(true);
-        if !native_live {
-            return;
-        }
-        let mut active = self
-            .custom_geometry_sources
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        for (_, state) in active.drain() {
-            Box::leak(state);
-        }
-        let mut retired = self
-            .retired_custom_geometry_sources
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        for state in retired.drain(..) {
-            Box::leak(state);
-        }
-    }
-}
-
 impl PyLogCallbackState {
     fn new(max_queued_records: usize, consume: bool) -> Arc<Self> {
         Arc::new(Self {
@@ -480,43 +451,6 @@ impl MapHandle {
         self.state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
-
-    fn clear_custom_geometry_sources(&self) {
-        for (_, state) in self
-            .custom_geometry_sources
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .drain()
-        {
-            state.shared.close();
-        }
-        for state in self
-            .retired_custom_geometry_sources
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .drain(..)
-        {
-            state.shared.close();
-        }
-    }
-
-    fn retire_custom_geometry_sources(&self) {
-        let mut active = self
-            .custom_geometry_sources
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if active.is_empty() {
-            return;
-        }
-        let mut retired = self
-            .retired_custom_geometry_sources
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        for (_, state) in active.drain() {
-            state.shared.close();
-            retired.push(state);
-        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -749,6 +683,7 @@ impl PyCustomGeometrySourceState {
                 cancel_tile: self
                     .has_cancel_tile
                     .then_some(custom_geometry_cancel_tile_trampoline as _),
+                release_user_data: Some(custom_geometry_release_trampoline),
                 user_data: ptr::from_ref(self).cast_mut().cast::<c_void>(),
                 min_zoom: self.min_zoom,
                 max_zoom: self.max_zoom,
@@ -766,6 +701,22 @@ impl Drop for PyCustomGeometrySourceState {
     fn drop(&mut self) {
         self.shared.close();
     }
+}
+
+/// Takes back the callback state the C API stopped referencing.
+///
+/// The C API calls this once on the map owner thread, whether the source was
+/// removed explicitly, dropped by a style load, or retired with the map, so the
+/// binding never watches style loads to find its own detached sources.
+unsafe extern "C" fn custom_geometry_release_trampoline(user_data: *mut c_void) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let Some(state) = ptr::NonNull::new(user_data.cast::<PyCustomGeometrySourceState>()) else {
+            return;
+        };
+        // SAFETY: user_data is the Box this binding leaked into a successful
+        // mln_map_add_custom_geometry_source, and the C API releases it once.
+        drop(unsafe { Box::from_raw(state.as_ptr()) });
+    }));
 }
 
 unsafe extern "C" fn custom_geometry_fetch_tile_trampoline(
@@ -1393,26 +1344,45 @@ impl RuntimeHandle {
         Ok(())
     }
 
-    fn poll_event(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+    fn drain_events(&self, py: Python<'_>, max_events: usize) -> PyResult<Py<PyAny>> {
         let state = self.state_for_operation()?;
-        let mut event = maplibre_core::events::empty_runtime_event();
-        let mut has_event = false;
+        // SAFETY: The default constructor takes no arguments and fills in the
+        // size field for this C ABI version.
+        let mut batch = unsafe { sys::mln_runtime_event_batch_default() };
         // SAFETY: The C API validates that the pointer is a live runtime handle.
-        // event has the correct size field and has_event points to writable
-        // storage for one bool.
+        // batch carries this header's size field and is writable for one batch.
         maplibre_core::check(unsafe {
-            sys::mln_runtime_poll_event(state.handle(), &mut event, &mut has_event)
+            sys::mln_runtime_drain_events(state.handle(), max_events, &mut batch)
         })
         .map_err(map_error)?;
-        if !has_event {
-            return Ok(None);
-        }
 
-        // SAFETY: event and its payload/text pointers stay valid until the next
-        // poll, which the still-held state mutex prevents.
-        let copied = unsafe { maplibre_core::events::runtime_event_from_native(&event) }
+        // SAFETY: The batch borrows runtime-owned storage that stays readable
+        // until the next drain for this runtime, which the still-held state
+        // mutex prevents. The decoder walks it by the reported event_size and
+        // every event is copied before the borrow ends here.
+        let mut copied = Vec::with_capacity(batch.event_count);
+        for event in unsafe { maplibre_core::events::drain_batch(&batch) } {
+            copied.push(event.map_err(map_error)?);
+        }
+        event_batch_to_py(py, copied, batch.remaining_count)
+    }
+
+    fn set_event_mask(&self, mask: u64) -> PyResult<()> {
+        let state = self.state_for_operation()?;
+        // SAFETY: The C API validates the runtime handle, owner-thread
+        // affinity, and the mask bits.
+        maplibre_core::check(unsafe { sys::mln_runtime_set_event_mask(state.handle(), mask) })
+            .map_err(map_error)
+    }
+
+    fn get_event_mask(&self) -> PyResult<u64> {
+        let state = self.state_for_operation()?;
+        let mut mask = 0u64;
+        // SAFETY: The C API validates the runtime handle and owner-thread
+        // affinity, and mask points to writable storage for one u64.
+        maplibre_core::check(unsafe { sys::mln_runtime_get_event_mask(state.handle(), &mut mask) })
             .map_err(map_error)?;
-        event_to_py(py, copied).map(Some)
+        Ok(mask)
     }
 
     #[getter]
@@ -1428,7 +1398,6 @@ impl MapHandle {
         // SAFETY: state owns an mln_map handle created by mln_map_create and
         // pairs it with the matching status-returning destroy function.
         unsafe { state.close_status(sys::mln_map_destroy) }.map_err(map_error)?;
-        self.clear_custom_geometry_sources();
         Ok(())
     }
 
@@ -1461,6 +1430,24 @@ impl MapHandle {
         // that the call occurs on the map owner thread.
         maplibre_core::check(unsafe { sys::mln_map_dump_debug_logs(state.handle()) })
             .map_err(map_error)
+    }
+
+    fn set_event_mask(&self, mask: u64) -> PyResult<()> {
+        let state = self.state();
+        // SAFETY: The C API validates the map pointer, owner-thread affinity,
+        // and the mask bits.
+        maplibre_core::check(unsafe { sys::mln_map_set_event_mask(state.handle(), mask) })
+            .map_err(map_error)
+    }
+
+    fn get_event_mask(&self) -> PyResult<u64> {
+        let state = self.state();
+        let mut mask = 0u64;
+        // SAFETY: The C API validates the map pointer and owner-thread affinity,
+        // and mask points to writable storage for one u64.
+        maplibre_core::check(unsafe { sys::mln_map_get_event_mask(state.handle(), &mut mask) })
+            .map_err(map_error)?;
+        Ok(mask)
     }
 
     fn set_debug_options(&self, options: u32) -> PyResult<()> {
@@ -1618,10 +1605,6 @@ impl MapHandle {
         // url is a null-terminated C string whose storage lives for this call.
         maplibre_core::check(unsafe { sys::mln_map_set_style_url(state.handle(), url.as_ptr()) })
             .map_err(map_error)?;
-        // URL style replacement completes asynchronously, so keep custom
-        // geometry callback state alive until map teardown and only close the
-        // public queues.
-        self.retire_custom_geometry_sources();
         Ok(())
     }
 
@@ -1632,7 +1615,6 @@ impl MapHandle {
         // json is a null-terminated C string whose storage lives for this call.
         maplibre_core::check(unsafe { sys::mln_map_set_style_json(state.handle(), json) })
             .map_err(map_error)?;
-        self.clear_custom_geometry_sources();
         Ok(())
     }
 
@@ -2514,7 +2496,6 @@ impl MapHandle {
 
     fn remove_style_source(&self, source_id: String) -> PyResult<bool> {
         let state = self.state();
-        let source_key = source_id.clone();
         let source_id = maplibre_core::string::string_view(&source_id);
         let mut removed = false;
         // SAFETY: The C API validates the map pointer, source ID view, and out pointer.
@@ -2522,12 +2503,6 @@ impl MapHandle {
             sys::mln_map_remove_style_source(state.handle(), source_id.raw(), &mut removed)
         })
         .map_err(map_error)?;
-        if removed {
-            self.custom_geometry_sources
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .remove(&source_key);
-        }
         Ok(removed)
     }
 
@@ -3531,11 +3506,15 @@ impl MapHandle {
             has_cancel_tile,
         );
         let descriptor = state.descriptor();
+        let handle = CustomGeometrySourceHandle {
+            shared: Arc::clone(&state.shared),
+        };
         let source_id_view = maplibre_core::string::string_view(&source_id);
         let map_state = self.state();
         // SAFETY: map_state owns or has released the map pointer. The C API
         // validates that it is live. source_id_view and descriptor are valid for
-        // this call, and state is retained by this map after successful attach.
+        // this call, and descriptor's release callback takes the leaked state
+        // back once the C API stops referencing it.
         maplibre_core::check(unsafe {
             sys::mln_map_add_custom_geometry_source(
                 map_state.handle(),
@@ -3544,13 +3523,9 @@ impl MapHandle {
             )
         })
         .map_err(map_error)?;
-        let handle = CustomGeometrySourceHandle {
-            shared: Arc::clone(&state.shared),
-        };
-        self.custom_geometry_sources
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .insert(source_id, state);
+        // A rejected add owes no release, so the state only leaves this box
+        // after the C API accepted it.
+        Box::leak(state);
         Ok(handle)
     }
 
@@ -4937,6 +4912,21 @@ unsafe extern "C" fn http_header_transform_trampoline(
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
+fn event_batch_to_py(
+    py: Python<'_>,
+    events: Vec<maplibre_core::CopiedRuntimeEvent>,
+    remaining_count: usize,
+) -> PyResult<Py<PyAny>> {
+    let list = PyList::empty(py);
+    for event in events {
+        list.append(event_to_py(py, event)?)?;
+    }
+    let dict = PyDict::new(py);
+    dict.set_item("events", list)?;
+    dict.set_item("remaining_count", remaining_count)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn event_to_py(py: Python<'_>, event: maplibre_core::CopiedRuntimeEvent) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("event_type", event_type_raw(event.event_type))?;
@@ -4965,15 +4955,10 @@ fn payload_to_py(py: Python<'_>, payload: RuntimeEventPayload) -> PyResult<Py<Py
             dict.set_item("kind", "render_map")?;
             dict.set_item("mode", render_mode_raw(payload.mode))?;
         }
-        RuntimeEventPayload::StyleImageMissing(payload) => {
-            dict.set_item("kind", "style_image_missing")?;
-            dict.set_item("image_id", payload.image_id)?;
-        }
         RuntimeEventPayload::TileAction(payload) => {
             dict.set_item("kind", "tile_action")?;
             dict.set_item("operation", tile_operation_raw(payload.operation))?;
             dict.set_item("tile_id", tile_id_to_py(py, &payload.tile_id)?)?;
-            dict.set_item("source_id", payload.source_id)?;
         }
         RuntimeEventPayload::OfflineRegionStatus(payload) => {
             dict.set_item("kind", "offline_region_status")?;
@@ -7064,78 +7049,84 @@ fn create_runtime_with_abi_version_for_test(
     cache_path: Option<String>,
 ) -> PyResult<RuntimeHandle> {
     maplibre_core::validate_abi_version_value(actual_abi_version).map_err(map_error)?;
-    create_runtime(asset_path, cache_path)
+    create_runtime(
+        asset_path,
+        cache_path,
+        maplibre_core::RuntimeEventMask::ALL.bits(),
+    )
 }
 
-/// Test helper that exercises private runtime event payload wire conversion.
-#[pyfunction]
-fn runtime_event_payload_wire_shapes_for_test(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    fn event_to_test_py(py: Python<'_>, raw: &sys::mln_runtime_event) -> PyResult<Py<PyAny>> {
-        // SAFETY: The raw event and its payload pointers are built in this
-        // function and remain live for the duration of the copy.
-        let event =
-            unsafe { maplibre_core::events::runtime_event_from_native(raw) }.map_err(map_error)?;
-        event_to_py(py, event)
+/// Field values for one event of a synthetic batch built by a test helper.
+struct SyntheticEvent {
+    type_: u32,
+    source_type: u32,
+    source: u64,
+    code: i32,
+    payload_type: u32,
+    payload: sys::mln_runtime_event_payload,
+    message: &'static str,
+}
+
+/// Returns a payload union whose bytes are zero, which is what the C API writes
+/// for an event that carries no payload.
+fn zeroed_event_payload() -> sys::mln_runtime_event_payload {
+    // SAFETY: Every union member is a POD struct with no niche, so an all-zero
+    // bit pattern is a valid value of the union.
+    unsafe { std::mem::zeroed() }
+}
+
+/// Returns a payload union whose leading bytes are `bytes`, standing in for a
+/// payload type a later library version defines.
+fn opaque_event_payload(bytes: &[u8]) -> sys::mln_runtime_event_payload {
+    let mut payload = zeroed_event_payload();
+    let len = bytes
+        .len()
+        .min(std::mem::size_of::<sys::mln_runtime_event_payload>());
+    // SAFETY: len is at most the size of the union, payload is a live writable
+    // union, and union bytes have no validity requirement.
+    unsafe {
+        ptr::copy_nonoverlapping(bytes.as_ptr(), (&raw mut payload).cast::<u8>(), len);
     }
+    payload
+}
 
-    let out = PyDict::new(py);
+/// Builds the event array and message arena of a synthetic batch.
+fn synthetic_event_storage(specs: &[SyntheticEvent]) -> (Vec<sys::mln_runtime_event>, Vec<u8>) {
+    let mut events = Vec::with_capacity(specs.len());
+    let mut messages = Vec::new();
+    for spec in specs {
+        let (message_offset, message_size) = if spec.message.is_empty() {
+            (0, 0)
+        } else {
+            let offset = messages.len() as u32;
+            messages.extend_from_slice(spec.message.as_bytes());
+            messages.push(0);
+            (offset, spec.message.len() as u32)
+        };
+        events.push(sys::mln_runtime_event {
+            type_: spec.type_,
+            source_type: spec.source_type,
+            source: spec.source,
+            code: spec.code,
+            payload_type: spec.payload_type,
+            message_offset,
+            message_size,
+            payload: spec.payload,
+        });
+    }
+    (events, messages)
+}
 
-    let render_frame_payload = sys::mln_runtime_event_render_frame {
-        size: std::mem::size_of::<sys::mln_runtime_event_render_frame>() as u32,
-        mode: sys::MLN_RENDER_MODE_FULL,
-        needs_repaint: true,
-        placement_changed: false,
-        stats: sys::mln_rendering_stats {
-            size: std::mem::size_of::<sys::mln_rendering_stats>() as u32,
-            encoding_time: 1.25,
-            rendering_time: 2.5,
-            frame_count: 3,
-            draw_call_count: 4,
-            total_draw_call_count: 5,
-        },
-    };
-    let render_frame = sys::mln_runtime_event {
-        size: std::mem::size_of::<sys::mln_runtime_event>() as u32,
-        type_: sys::MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED,
-        source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
-        source: 0,
-        code: 0,
-        payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME,
-        payload: ptr::addr_of!(render_frame_payload).cast(),
-        payload_size: std::mem::size_of_val(&render_frame_payload),
-        message: ptr::null(),
-        message_size: 0,
-    };
-    out.set_item("render_frame", event_to_test_py(py, &render_frame)?)?;
-
-    let source_id = b"source-a";
-    let tile_action_payload = sys::mln_runtime_event_tile_action {
-        size: std::mem::size_of::<sys::mln_runtime_event_tile_action>() as u32,
-        operation: sys::MLN_TILE_OPERATION_LOAD_FROM_NETWORK,
-        tile_id: sys::mln_tile_id {
-            overscaled_z: 6,
-            wrap: -1,
-            canonical_z: 5,
-            canonical_x: 12,
-            canonical_y: 34,
-        },
-        source_id: source_id.as_ptr().cast(),
-        source_id_size: source_id.len(),
-    };
-    let tile_action = sys::mln_runtime_event {
-        size: std::mem::size_of::<sys::mln_runtime_event>() as u32,
-        type_: sys::MLN_RUNTIME_EVENT_MAP_TILE_ACTION,
-        source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
-        source: 0,
-        code: 0,
-        payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
-        payload: ptr::addr_of!(tile_action_payload).cast(),
-        payload_size: std::mem::size_of_val(&tile_action_payload),
-        message: ptr::null(),
-        message_size: 0,
-    };
-    out.set_item("tile_action", event_to_test_py(py, &tile_action)?)?;
-
+/// Decodes a synthetic batch that covers every payload shape plus an event whose
+/// type, source type, and payload type this version does not define.
+///
+/// A live runtime never queues the unknown event, and the offline payloads it
+/// queues need a populated cache database, so this is how the Python suite
+/// reaches the whole wire contract. The backing array and arena are overwritten
+/// before the wire batch is returned, so the values it carries prove the decode
+/// copied them.
+#[pyfunction]
+fn synthetic_runtime_event_batch_for_test(py: Python<'_>) -> PyResult<Py<PyAny>> {
     let mut status = empty_offline_region_status();
     status.download_state = sys::MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE;
     status.completed_resource_count = 7;
@@ -7145,63 +7136,149 @@ fn runtime_event_payload_wire_shapes_for_test(py: Python<'_>) -> PyResult<Py<PyA
     status.completed_tile_size = 11;
     status.required_resource_count = 12;
     status.required_resource_count_is_precise = true;
-    status.complete = false;
-    let offline_status_payload = sys::mln_runtime_event_offline_region_status {
-        size: std::mem::size_of::<sys::mln_runtime_event_offline_region_status>() as u32,
-        region_id: 42,
-        status,
+
+    let specs = [
+        SyntheticEvent {
+            type_: sys::MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED,
+            source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
+            source: 0,
+            code: 0,
+            payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME,
+            payload: sys::mln_runtime_event_payload {
+                render_frame: sys::mln_runtime_event_render_frame {
+                    mode: sys::MLN_RENDER_MODE_FULL,
+                    needs_repaint: true,
+                    placement_changed: false,
+                    stats: sys::mln_rendering_stats {
+                        encoding_time: 1.25,
+                        rendering_time: 2.5,
+                        frame_count: 3,
+                        draw_call_count: 4,
+                        total_draw_call_count: 5,
+                    },
+                },
+            },
+            message: "",
+        },
+        SyntheticEvent {
+            type_: sys::MLN_RUNTIME_EVENT_MAP_TILE_ACTION,
+            source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
+            // A map handle id that names no live map, so the decode has to carry
+            // the raw identity through with nothing to resolve it against.
+            source: 0x0100_0000_0000_0007,
+            code: 0,
+            payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
+            payload: sys::mln_runtime_event_payload {
+                tile_action: sys::mln_runtime_event_tile_action {
+                    operation: sys::MLN_TILE_OPERATION_LOAD_FROM_NETWORK,
+                    tile_id: sys::mln_tile_id {
+                        overscaled_z: 6,
+                        wrap: -1,
+                        canonical_z: 5,
+                        canonical_x: 12,
+                        canonical_y: 34,
+                    },
+                },
+            },
+            message: "source-a",
+        },
+        SyntheticEvent {
+            type_: sys::MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING,
+            source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
+            source: 0,
+            code: 0,
+            payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_NONE,
+            payload: zeroed_event_payload(),
+            message: "missing-image",
+        },
+        SyntheticEvent {
+            type_: sys::MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED,
+            source_type: sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
+            source: 0,
+            code: 0,
+            payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS,
+            payload: sys::mln_runtime_event_payload {
+                offline_region_status: sys::mln_runtime_event_offline_region_status {
+                    region_id: 42,
+                    status,
+                },
+            },
+            message: "",
+        },
+        SyntheticEvent {
+            type_: sys::MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
+            source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
+            source: 0,
+            code: 0,
+            payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
+            payload: sys::mln_runtime_event_payload {
+                camera_transition_finished: sys::mln_runtime_event_camera_transition_finished {
+                    transition_id: 909,
+                },
+            },
+            message: "",
+        },
+        SyntheticEvent {
+            type_: 999_001,
+            source_type: 999_003,
+            // A source identity of a kind this version does not name.
+            source: 0x0200_0000_0000_002a,
+            code: -7,
+            payload_type: 999_002,
+            payload: opaque_event_payload(&[1, 2, 3, 4]),
+            message: "future payload",
+        },
+    ];
+
+    let (mut events, mut messages) = synthetic_event_storage(&specs);
+    let batch = sys::mln_runtime_event_batch {
+        size: std::mem::size_of::<sys::mln_runtime_event_batch>() as u32,
+        event_size: std::mem::size_of::<sys::mln_runtime_event>() as u32,
+        events: events.as_ptr(),
+        event_count: events.len(),
+        messages: messages.as_ptr().cast(),
+        messages_size: messages.len(),
+        // A bounded drain would report a rest, so carry one through the wire.
+        remaining_count: 3,
     };
-    let offline_status = sys::mln_runtime_event {
-        size: std::mem::size_of::<sys::mln_runtime_event>() as u32,
-        type_: sys::MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED,
-        source_type: sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
+
+    // SAFETY: batch names the array and arena built above, which outlive this
+    // call, and its event_size is the stride of that array.
+    let mut copied = Vec::with_capacity(batch.event_count);
+    for event in unsafe { maplibre_core::events::drain_batch(&batch) } {
+        copied.push(event.map_err(map_error)?);
+    }
+
+    events.fill(sys::mln_runtime_event {
+        type_: 0,
+        source_type: 0,
         source: 0,
         code: 0,
-        payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS,
-        payload: ptr::addr_of!(offline_status_payload).cast(),
-        payload_size: std::mem::size_of_val(&offline_status_payload),
-        message: ptr::null(),
+        payload_type: 0,
+        message_offset: 0,
         message_size: 0,
-    };
-    out.set_item(
-        "offline_region_status",
-        event_to_test_py(py, &offline_status)?,
-    )?;
-
-    Ok(out.into_any().unbind())
+        payload: opaque_event_payload(&[0xFF; 8]),
+    });
+    messages.fill(b'x');
+    event_batch_to_py(py, copied, batch.remaining_count)
 }
 
-/// Copies a camera transition-finished event whose native payload reports
-/// `missing_payload_bytes` fewer bytes than the payload struct holds. Live
-/// transitions always report the full size, so this is the only way to reach
-/// the payload-size validation.
+/// Reports the event stride a drain of `runtime` names and the stride this
+/// extension compiled against, so the Python suite can assert the decode steps
+/// by the batch's own value.
 #[pyfunction]
-fn camera_transition_finished_event_for_test(
-    py: Python<'_>,
-    transition_id: u64,
-    missing_payload_bytes: usize,
-) -> PyResult<Py<PyAny>> {
-    let payload = sys::mln_runtime_event_camera_transition_finished {
-        size: std::mem::size_of::<sys::mln_runtime_event_camera_transition_finished>() as u32,
-        transition_id,
-    };
-    let event = sys::mln_runtime_event {
-        size: std::mem::size_of::<sys::mln_runtime_event>() as u32,
-        type_: sys::MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
-        source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
-        source: 0,
-        code: 0,
-        payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
-        payload: ptr::addr_of!(payload).cast(),
-        payload_size: std::mem::size_of_val(&payload).saturating_sub(missing_payload_bytes),
-        message: ptr::null(),
-        message_size: 0,
-    };
-    // SAFETY: The raw event and its payload are built in this function and
-    // remain live for the duration of the copy.
-    let copied =
-        unsafe { maplibre_core::events::runtime_event_from_native(&event) }.map_err(map_error)?;
-    event_to_py(py, copied)
+fn runtime_event_stride_for_test(runtime: &RuntimeHandle) -> PyResult<(u32, u32)> {
+    let state = runtime.state_for_operation()?;
+    // SAFETY: The default constructor takes no arguments and fills in size.
+    let mut batch = unsafe { sys::mln_runtime_event_batch_default() };
+    // SAFETY: The C API validates the runtime handle and owner-thread affinity,
+    // and batch carries this header's size field.
+    maplibre_core::check(unsafe { sys::mln_runtime_drain_events(state.handle(), 0, &mut batch) })
+        .map_err(map_error)?;
+    Ok((
+        batch.event_size,
+        std::mem::size_of::<sys::mln_runtime_event>() as u32,
+    ))
 }
 
 /// Probes the required byte length, then copies the layer text into a `String`.
@@ -7261,11 +7338,32 @@ fn owned_buffer_to_py(py: Python<'_>, buffer: sys::mln_buffer) -> PyResult<Py<Py
     Ok(PyBytes::new(py, &bytes).unbind())
 }
 
+/// Returns the raw event mask a runtime selects by default.
+///
+/// The value carries every bit the linked library's creation default selects,
+/// including bits this build does not name, so the Python layer keeps them
+/// rather than substituting its own constant.
+#[pyfunction]
+fn runtime_options_default_event_mask() -> u64 {
+    maplibre_core::RuntimeOptions::default().event_mask.bits()
+}
+
+/// Returns the raw event mask a map selects by default.
+///
+/// The value carries every bit the linked library's creation default selects,
+/// including bits this build does not name, so the Python layer keeps them
+/// rather than substituting its own constant.
+#[pyfunction]
+fn map_options_default_event_mask() -> u64 {
+    maplibre_core::MapOptions::default().event_mask.bits()
+}
+
 /// Creates a runtime handle on the current thread.
 #[pyfunction]
 fn create_runtime(
     asset_path: Option<String>,
     cache_path: Option<String>,
+    event_mask: u64,
 ) -> PyResult<RuntimeHandle> {
     maplibre_core::validate_abi_version().map_err(map_error)?;
     let mut options = maplibre_core::RuntimeOptions::default();
@@ -7277,7 +7375,10 @@ fn create_runtime(
     }
     let native_options =
         maplibre_core::runtime::runtime_options_to_native(&options).map_err(map_error)?;
-    let raw_options = native_options.to_raw();
+    let mut raw_options = native_options.to_raw();
+    // The Python layer always selects a mask, defaulting to every type. The C
+    // API validates the bits.
+    raw_options.event_mask = event_mask;
     let mut out = maplibre_core::ptr::OutHandle::<sys::mln_runtime>::new();
     // SAFETY: raw_options points to a materialized mln_runtime_options whose
     // backing strings live for this call, and out is a null-initialized
@@ -7308,6 +7409,7 @@ fn create_map(
     scale_factor: Option<f64>,
     map_mode: Option<u32>,
     fast_pfor_enabled: Option<bool>,
+    event_mask: u64,
 ) -> PyResult<MapHandle> {
     // Default() reads mln_map_options_default(), so an unset argument keeps the
     // C creation default.
@@ -7327,7 +7429,11 @@ fn create_map(
     if let Some(fast_pfor_enabled) = fast_pfor_enabled {
         options.fast_pfor_enabled = fast_pfor_enabled;
     }
-    let raw_options = maplibre_core::options::map_options_to_native(&options).map_err(map_error)?;
+    let mut raw_options =
+        maplibre_core::options::map_options_to_native(&options).map_err(map_error)?;
+    // The Python layer always selects a mask, defaulting to every type. The C
+    // API validates the bits.
+    raw_options.event_mask = event_mask;
     let runtime_state = runtime.state_for_operation()?;
     let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map>::new();
     // SAFETY: runtime_state owns a runtime pointer that passed the binding
@@ -7344,8 +7450,6 @@ fn create_map(
         .map_err(map_error)?;
     Ok(MapHandle {
         state: Mutex::new(state),
-        custom_geometry_sources: Mutex::new(HashMap::new()),
-        retired_custom_geometry_sources: Mutex::new(Vec::new()),
     })
 }
 
@@ -7818,13 +7922,15 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     module.add_function(wrap_pyfunction!(
-        runtime_event_payload_wire_shapes_for_test,
+        synthetic_runtime_event_batch_for_test,
         module
     )?)?;
+    module.add_function(wrap_pyfunction!(runtime_event_stride_for_test, module)?)?;
     module.add_function(wrap_pyfunction!(
-        camera_transition_finished_event_for_test,
+        runtime_options_default_event_mask,
         module
     )?)?;
+    module.add_function(wrap_pyfunction!(map_options_default_event_mask, module)?)?;
     module.add_function(wrap_pyfunction!(create_runtime, module)?)?;
     module.add_function(wrap_pyfunction!(create_map, module)?)?;
     module.add_function(wrap_pyfunction!(attach_metal_surface, module)?)?;

@@ -103,7 +103,7 @@ func TestCustomGeometryReleaseWaitsForActiveCallback(t *testing.T) {
 	<-entered
 
 	go func() {
-		state.Release()
+		state.release()
 		close(released)
 	}()
 
@@ -115,5 +115,5 @@ func TestCustomGeometryReleaseWaitsForActiveCallback(t *testing.T) {
 
 	close(unblock)
 	<-released
-	state.Release()
+	state.release()
 }

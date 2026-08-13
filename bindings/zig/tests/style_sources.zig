@@ -4,31 +4,10 @@ const testing = std.testing;
 const maplibre = @import("maplibre_native_ffi");
 const support = @import("support.zig");
 
-fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
-    for (0..1000) |_| {
-        try runtime.pump(0);
-        while (try runtime.pollEvent(testing.allocator)) |event| {
-            var owned_event = event;
-            defer owned_event.deinit();
-            if (std.meta.eql(owned_event.event_type, event_type)) return true;
-        }
-        try std.Thread.yield();
-    }
-    return false;
-}
-
-fn createLoadedMap(runtime: *maplibre.RuntimeHandle) !maplibre.MapHandle {
-    var map = try maplibre.MapHandle.create(runtime, .{});
-    errdefer map.close() catch {};
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try waitForEvent(runtime, .map_style_loaded));
-    return map;
-}
-
 test "style source JSON buffers expose type info and copied attribution" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try createLoadedMap(&runtime);
+    var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
     try map.addStyleSourceJson(testing.allocator, "empty-json", "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}");
@@ -58,7 +37,7 @@ test "style source JSON buffers expose type info and copied attribution" {
 test "style source removal reports state and copies missing results" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try createLoadedMap(&runtime);
+    var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
     try map.addGeoJsonSourceData(testing.allocator, "remove-me", "{\"type\":\"FeatureCollection\",\"features\":[]}", null);
@@ -74,7 +53,7 @@ test "style source removal reports state and copies missing results" {
 test "tile source helpers expose copied reconstructible source information" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try createLoadedMap(&runtime);
+    var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
     const vector_tiles = [_][]const u8{
@@ -171,7 +150,7 @@ test "tile source helpers expose copied reconstructible source information" {
 test "image source helpers add update and copy coordinates" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try createLoadedMap(&runtime);
+    var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
     const coordinates = [4]maplibre.LatLng{
@@ -223,7 +202,7 @@ test "image source helpers add update and copy coordinates" {
 test "style source JSON buffers reject invalid source data and pass explicit-length IDs" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try createLoadedMap(&runtime);
+    var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
     try testing.expectError(
@@ -240,6 +219,7 @@ test "style source JSON buffers reject invalid source data and pass explicit-len
 const CustomGeometryState = struct {
     fetch_count: usize = 0,
     cancel_count: usize = 0,
+    release_count: usize = 0,
     last_tile: maplibre.CanonicalTileId = .{ .z = 0, .x = 0, .y = 0 },
 };
 
@@ -255,10 +235,15 @@ fn cancelCustomGeometryTile(context: ?*anyopaque, tile_id: maplibre.CanonicalTil
     state.last_tile = tile_id;
 }
 
+fn releaseCustomGeometryContext(context: ?*anyopaque) void {
+    const state: *CustomGeometryState = @ptrCast(@alignCast(context.?));
+    state.release_count += 1;
+}
+
 test "custom geometry source helpers add sources and accept tile updates" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try createLoadedMap(&runtime);
+    var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
     var state = CustomGeometryState{};
@@ -305,4 +290,38 @@ test "custom geometry source helpers add sources and accept tile updates" {
         ),
     );
     try testing.expectError(error.InvalidArgument, map.invalidateCustomGeometrySourceTile(testing.allocator, "point", tile_id));
+}
+
+// A host owns the context its callbacks read, and the release callback is the
+// only report that the map stopped referencing it.
+test "a custom geometry source releases its context once per lifetime end" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try support.createLoadedMap(&runtime);
+    var map_open = true;
+    defer if (map_open) map.close() catch @panic("map close failed");
+
+    var removed = CustomGeometryState{};
+    try map.addCustomGeometrySource(testing.allocator, "removed", .{
+        .fetch_tile = fetchCustomGeometryTile,
+        .release_context = releaseCustomGeometryContext,
+        .context = &removed,
+    });
+    var retained = CustomGeometryState{};
+    try map.addCustomGeometrySource(testing.allocator, "retained", .{
+        .fetch_tile = fetchCustomGeometryTile,
+        .release_context = releaseCustomGeometryContext,
+        .context = &retained,
+    });
+
+    try testing.expect(try map.removeStyleSource(testing.allocator, "removed"));
+    try testing.expectEqual(@as(usize, 1), removed.release_count);
+    try testing.expectEqual(@as(usize, 0), retained.release_count);
+
+    // The map is what still holds the second source, so its destruction is what
+    // releases that context.
+    try map.close();
+    map_open = false;
+    try testing.expectEqual(@as(usize, 1), removed.release_count);
+    try testing.expectEqual(@as(usize, 1), retained.release_count);
 }

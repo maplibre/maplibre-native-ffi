@@ -37,6 +37,7 @@ pub const MapState = struct {
         };
         errdefer map.close() catch {};
 
+        try selectEvents(&map, diagnostic_store);
         try loadStyle(allocator, &map, diagnostic_store);
         try setCamera(&map, diagnostic_store);
 
@@ -150,7 +151,8 @@ pub fn applyCameraCommand(
     }
 }
 
-/// Drains runtime events, reporting whether the map wants another frame.
+/// Drains one batch of runtime events, reporting whether the map wants another
+/// frame.
 pub fn drainEvents(
     allocator: std.mem.Allocator,
     runtime: *maplibre.RuntimeHandle,
@@ -158,9 +160,10 @@ pub fn drainEvents(
 ) !bool {
     const map_id = try map.id();
     var render_update_available = false;
-    while (try runtime.pollEvent(allocator)) |event_value| {
-        var event = event_value;
-        defer event.deinit();
+    var batch = try runtime.drainEvents(allocator, 0);
+    defer batch.deinit();
+    for (0..batch.len()) |index| {
+        const event = try batch.at(index);
         if (event.source_type != .map or event.source_id == null or !std.meta.eql(event.source_id.?, map_id)) continue;
         switch (event.event_type) {
             .map_render_update_available => render_update_available = true,
@@ -199,6 +202,22 @@ fn clamp(value: f64, min: f64, max: f64) f64 {
     if (value < min) return min;
     if (value > max) return max;
     return value;
+}
+
+/// Selects the two event types the runtime loop reads. The map queues no other
+/// type once this returns, and it runs before the style load, because a map
+/// keeps the events it has already queued.
+fn selectEvents(
+    map: *maplibre.MapHandle,
+    diagnostic_store: *const maplibre.DiagnosticStore,
+) !void {
+    map.setEventMask(.{
+        .map_render_update_available = true,
+        .map_render_frame_finished = true,
+    }) catch |err| {
+        diagnostics.logError("event mask select failed", err, diagnostic_store);
+        return types.AppError.EventMaskFailed;
+    };
 }
 
 fn loadStyle(

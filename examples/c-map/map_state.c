@@ -146,6 +146,21 @@ static app_error apply_camera_command(mln_map map, camera_command command) {
   return APP_ERROR_CAMERA_COMMAND_FAILED;
 }
 
+/// Selects the two event types the runtime loop reads. The map queues no other
+/// type once this returns, and it runs before the style load, because a map
+/// keeps the events it has already queued.
+static app_error select_events(mln_map map) {
+  const mln_status status = mln_map_set_event_mask(
+    map, MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE |
+           MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED
+  );
+  if (status != MLN_STATUS_OK) {
+    diagnostics_log_status("event mask select failed", status);
+    return APP_ERROR_EVENT_MASK_FAILED;
+  }
+  return APP_OK;
+}
+
 static app_error load_style(mln_map map) {
   const mln_status status =
     mln_map_set_style_url(map, "https://tiles.openfreemap.org/styles/bright");
@@ -199,7 +214,10 @@ app_error map_state_init(map_state* out_state, viewport initial_viewport) {
     return APP_ERROR_MAP_CREATE_FAILED;
   }
 
-  app_error error = load_style(out_state->map);
+  app_error error = select_events(out_state->map);
+  if (error == APP_OK) {
+    error = load_style(out_state->map);
+  }
   if (error == APP_OK) {
     error = set_camera(out_state->map);
   }
@@ -237,39 +255,36 @@ app_error map_state_apply_commands(
 
 app_error map_state_drain_events(map_state* state, bool* out_render_update) {
   *out_render_update = false;
-  while (true) {
-    mln_runtime_event event = {.size = sizeof(event)};
-    bool has_event = false;
-    const mln_status status =
-      mln_runtime_poll_event(state->runtime, &event, &has_event);
-    if (status != MLN_STATUS_OK) {
-      diagnostics_log_status("event poll failed", status);
-      return APP_ERROR_EVENT_POLL_FAILED;
-    }
-    if (!has_event) {
-      return APP_OK;
-    }
+  // One drain takes every event the pump produced. The batch borrows runtime
+  // storage, and this loop keeps nothing from it.
+  mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+  const mln_status status = mln_runtime_drain_events(state->runtime, 0, &batch);
+  if (status != MLN_STATUS_OK) {
+    diagnostics_log_status("event drain failed", status);
+    return APP_ERROR_EVENT_DRAIN_FAILED;
+  }
+  for (size_t index = 0; index < batch.event_count; index += 1) {
+    // Step by the batch's stride: a newer runtime reports a wider event.
+    const char* bytes = (const char*)batch.events + index * batch.event_size;
+    const mln_runtime_event* event = (const mln_runtime_event*)bytes;
     if (
-      event.source_type != MLN_RUNTIME_EVENT_SOURCE_MAP ||
-      event.source != state->map
+      event->source_type != MLN_RUNTIME_EVENT_SOURCE_MAP ||
+      event->source != state->map
     ) {
       continue;
     }
-    switch (event.type) {
+    switch (event->type) {
       case MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE:
         *out_render_update = true;
         break;
       case MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED:
-        if (
-          event.payload_type == MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME &&
-          event.payload_size >= sizeof(mln_runtime_event_render_frame)
-        ) {
-          const mln_runtime_event_render_frame* frame = event.payload;
-          *out_render_update = *out_render_update || frame->needs_repaint;
+        if (event->payload.render_frame.needs_repaint) {
+          *out_render_update = true;
         }
         break;
       default:
         break;
     }
   }
+  return APP_OK;
 }

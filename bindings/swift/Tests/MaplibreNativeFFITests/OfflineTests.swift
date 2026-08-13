@@ -123,22 +123,26 @@ import Testing
   let operationId = try runtime.setMaximumAmbientCacheSizeStart(8 << 20)
   #expect(operationId != 0)
 
-  for _ in 0 ..< 5000 {
-    try runtime.pump()
-    while let event = try runtime.pollEvent() {
-      guard case let .offlineOperationCompleted(completed) = event.payload,
-            completed.operationId == operationId
-      else { continue }
-      // MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE; the public API
-      // carries operation kinds as raw C values.
-      #expect(completed.operationKind == 12)
-      #expect(completed.resultStatus == 0)
-      try runtime.discardOfflineOperation(operationId)
-      return
+  let event = try pumpUntilEvent(
+    runtime,
+    waitingFor: "the cache size operation to complete"
+  ) { event in
+    guard case let .offlineOperationCompleted(completed) = event.payload else {
+      return false
     }
-    Thread.sleep(forTimeInterval: 0.001)
+    return completed.operationId == operationId
   }
-  Issue.record("timed out waiting for the cache size operation to complete")
+  guard case let .offlineOperationCompleted(completed) = try #require(event)
+    .payload
+  else {
+    Issue.record("the completion event lost its payload")
+    return
+  }
+  // MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE; the public API
+  // carries operation kinds as raw C values.
+  #expect(completed.operationKind == 12)
+  #expect(completed.resultStatus == 0)
+  try runtime.discardOfflineOperation(operationId)
 }
 
 @Test func closedRuntimeRejectsOfflineCallsThroughSwiftHandleState() throws {

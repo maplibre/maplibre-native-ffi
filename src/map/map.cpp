@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -975,6 +976,7 @@ auto effective_custom_geometry_source_options(
   result.fetch_tile = options.fetch_tile;
   result.cancel_tile = options.cancel_tile;
   result.user_data = options.user_data;
+  result.release_user_data = options.release_user_data;
   if (
     has_custom_geometry_source_option(
       options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM
@@ -1070,6 +1072,126 @@ auto to_native_custom_geometry_source_options(
   };
   return result;
 }
+
+// Holds the release callback owed for each tracked custom geometry source. A
+// host cannot see when a style load drops a source, so this layer tracks it.
+//
+// Every mutation runs on the map owner thread, which is the only thread that
+// adds or removes sources and the only thread mbgl reports style loads on.
+class CustomGeometrySourceRegistry final {
+ public:
+  CustomGeometrySourceRegistry() = default;
+
+  // Runs when the owning map is destroyed, after the mbgl::Map that could still
+  // call into the source is gone.
+  ~CustomGeometrySourceRegistry() { release_all(); }
+
+  CustomGeometrySourceRegistry(const CustomGeometrySourceRegistry&) = delete;
+  CustomGeometrySourceRegistry(CustomGeometrySourceRegistry&&) = delete;
+  auto operator=(const CustomGeometrySourceRegistry&)
+    -> CustomGeometrySourceRegistry& = delete;
+  auto operator=(CustomGeometrySourceRegistry&&)
+    -> CustomGeometrySourceRegistry& = delete;
+
+  // A source with no release callback is not tracked.
+  auto add(
+    const std::string& source_id,
+    mln_custom_geometry_source_release_callback release, void* user_data
+  ) -> void {
+    // An entry already under this ID belongs to a source that the style dropped
+    // before reconciliation ran, so it still owes its release. Invoke it here
+    // rather than letting the assignment below drop it, which keeps
+    // exactly-once independent of when the style-loaded observer reconciles.
+    if (const auto stale = entries_.find(source_id); stale != entries_.end()) {
+      const auto owed = stale->second;
+      entries_.erase(stale);
+      invoke(owed);
+    }
+    if (release == nullptr) {
+      return;
+    }
+    // The caller tracks before the style takes the source, so a throw here
+    // leaves nothing committed and the caller still owns user_data. A failed
+    // add owes no release.
+    entries_.insert_or_assign(source_id, Entry{release, user_data});
+  }
+
+  // Drops an entry without releasing it, for a source the style then rejected.
+  // The caller still owns user_data on that path.
+  auto untrack(const std::string& source_id) noexcept -> void {
+    entries_.erase(source_id);
+  }
+
+  // The observer that reports style loads has no route to a style, so the
+  // registry keeps the map it belongs to. destroy_map() clears it before the
+  // map is destroyed.
+  auto attach(mbgl::Map& map) noexcept -> void { map_ = &map; }
+
+  auto detach() noexcept -> void { map_ = nullptr; }
+
+  auto release(const std::string& source_id) -> void {
+    const auto entry = entries_.find(source_id);
+    if (entry == entries_.end()) {
+      return;
+    }
+    const auto owed = entry->second;
+    entries_.erase(entry);
+    invoke(owed);
+  }
+
+  // Releases every tracked source the current style no longer holds. A style
+  // document cannot declare a custom geometry source, so a source of another
+  // type under a tracked ID means the tracked source is gone.
+  auto reconcile() -> void {
+    if (map_ == nullptr || entries_.empty()) {
+      return;
+    }
+    auto& style = map_->getStyle();
+    auto owed = std::vector<Entry>{};
+    for (auto entry = entries_.begin(); entry != entries_.end();) {
+      auto* source = style.getSource(entry->first);
+      if (
+        source != nullptr &&
+        source->as<mbgl::style::CustomGeometrySource>() != nullptr
+      ) {
+        ++entry;
+        continue;
+      }
+      owed.push_back(entry->second);
+      entry = entries_.erase(entry);
+    }
+    for (const auto& release : owed) {
+      invoke(release);
+    }
+  }
+
+  auto release_all() -> void {
+    auto owed = std::move(entries_);
+    entries_.clear();
+    for (const auto& entry : owed) {
+      invoke(entry.second);
+    }
+  }
+
+ private:
+  struct Entry {
+    mln_custom_geometry_source_release_callback release = nullptr;
+    void* user_data = nullptr;
+  };
+
+  static auto invoke(const Entry& entry) noexcept -> void {
+    try {
+      entry.release(entry.user_data);
+    } catch (const std::exception& exception) {
+      mln::core::set_thread_error(exception);
+    } catch (...) {
+      mln::core::set_thread_error("custom geometry source release threw");
+    }
+  }
+
+  std::unordered_map<std::string, Entry> entries_;
+  mbgl::Map* map_ = nullptr;
+};
 
 auto validate_canonical_tile_id(mln_canonical_tile_id tile_id) -> mln_status {
   if (tile_id.z > 32U) {
@@ -1512,13 +1634,6 @@ auto create_style_string_list(
   return MLN_STATUS_OK;
 }
 
-template <typename Payload>
-auto payload_bytes(const Payload& payload) -> std::vector<std::byte> {
-  auto result = std::vector<std::byte>(sizeof(Payload));
-  std::memcpy(result.data(), &payload, sizeof(Payload));
-  return result;
-}
-
 auto to_c_camera_change_mode(mbgl::MapObserver::CameraChangeMode mode)
   -> int32_t {
   switch (mode) {
@@ -1545,7 +1660,6 @@ auto to_c_render_mode(mbgl::MapObserver::RenderMode mode) -> uint32_t {
 auto to_c_rendering_stats(const mbgl::gfx::RenderingStats& stats)
   -> mln_rendering_stats {
   return mln_rendering_stats{
-    .size = sizeof(mln_rendering_stats),
     .encoding_time = stats.encodingTime,
     .rendering_time = stats.renderingTime,
     .frame_count = stats.numFrames,
@@ -1555,29 +1669,23 @@ auto to_c_rendering_stats(const mbgl::gfx::RenderingStats& stats)
 }
 
 auto render_frame_payload(const mbgl::MapObserver::RenderFrameStatus& status)
-  -> mln_runtime_event_render_frame {
-  return mln_runtime_event_render_frame{
-    .size = sizeof(mln_runtime_event_render_frame),
+  -> mln_runtime_event_payload {
+  auto payload = mln::core::zeroed_event_payload();
+  payload.render_frame = mln_runtime_event_render_frame{
     .mode = to_c_render_mode(status.mode),
     .needs_repaint = status.needsRepaint,
     .placement_changed = status.placementChanged,
     .stats = to_c_rendering_stats(status.renderingStats)
   };
+  return payload;
 }
 
 auto render_map_payload(mbgl::MapObserver::RenderMode mode)
-  -> mln_runtime_event_render_map {
-  return mln_runtime_event_render_map{
-    .size = sizeof(mln_runtime_event_render_map), .mode = to_c_render_mode(mode)
-  };
-}
-
-auto style_image_missing_payload() -> mln_runtime_event_style_image_missing {
-  return mln_runtime_event_style_image_missing{
-    .size = sizeof(mln_runtime_event_style_image_missing),
-    .image_id = nullptr,
-    .image_id_size = 0
-  };
+  -> mln_runtime_event_payload {
+  auto payload = mln::core::zeroed_event_payload();
+  payload.render_map =
+    mln_runtime_event_render_map{.mode = to_c_render_mode(mode)};
+  return payload;
 }
 
 auto to_c_tile_operation(mbgl::TileOperation operation) -> uint32_t {
@@ -1616,89 +1724,147 @@ auto to_c_tile_id(const mbgl::OverscaledTileID& tile_id) -> mln_tile_id {
 
 auto tile_action_payload(
   mbgl::TileOperation operation, const mbgl::OverscaledTileID& tile_id
-) -> mln_runtime_event_tile_action {
-  return mln_runtime_event_tile_action{
-    .size = sizeof(mln_runtime_event_tile_action),
+) -> mln_runtime_event_payload {
+  auto payload = mln::core::zeroed_event_payload();
+  payload.tile_action = mln_runtime_event_tile_action{
     .operation = to_c_tile_operation(operation),
-    .tile_id = to_c_tile_id(tile_id),
-    .source_id = nullptr,
-    .source_id_size = 0
+    .tile_id = to_c_tile_id(tile_id)
   };
+  return payload;
 }
 
+// Every callback tests the map's subscription mask before it builds anything,
+// so an unselected event allocates no payload, message, or queue node.
 class HeadlessObserver final : public mbgl::MapObserver {
  public:
-  HeadlessObserver(mln_runtime runtime, mln_map map)
-      : runtime_(runtime), map_(map) {}
+  HeadlessObserver(
+    mln_runtime runtime, mln_map map,
+    std::shared_ptr<mln::core::MapEventState> event_state,
+    std::shared_ptr<CustomGeometrySourceRegistry> custom_geometry_sources
+  )
+      : runtime_(runtime),
+        map_(map),
+        event_state_(std::move(event_state)),
+        custom_geometry_sources_(std::move(custom_geometry_sources)) {}
 
   void onCameraWillChange(CameraChangeMode mode) override {
+    if (!selected(MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE)) {
+      return;
+    }
     push(
       MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE, to_c_camera_change_mode(mode)
     );
   }
 
   void onCameraIsChanging() override {
+    if (!selected(MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING)) {
+      return;
+    }
     push(MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING);
   }
 
   void onCameraDidChange(CameraChangeMode mode) override {
+    if (!selected(MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE)) {
+      return;
+    }
     push(
       MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE, to_c_camera_change_mode(mode)
     );
   }
 
   void onWillStartLoadingMap() override {
+    if (!selected(MLN_RUNTIME_EVENT_MAP_LOADING_STARTED)) {
+      return;
+    }
     push(MLN_RUNTIME_EVENT_MAP_LOADING_STARTED);
   }
 
   void onDidFinishLoadingMap() override {
+    if (!selected(MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED)) {
+      return;
+    }
     push(MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED);
   }
 
+  // The failure text is map state that both style setters read, so it is
+  // recorded whatever the mask selects.
   void onDidFailLoadingMap(
     mbgl::MapLoadError error, const std::string& message
   ) override {
+    event_state_->style_load_failure = message;
+    event_state_->style_load_failed = true;
+    if (!selected(MLN_RUNTIME_EVENT_MAP_LOADING_FAILED)) {
+      return;
+    }
     push(
       MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, static_cast<int32_t>(error),
       message.c_str()
     );
   }
 
+  // A style load can drop custom geometry sources that the previous style held.
+  // The release callbacks that owes are map state rather than an event, so the
+  // reconciliation runs whatever the mask selects.
   void onDidFinishLoadingStyle() override {
-    push(MLN_RUNTIME_EVENT_MAP_STYLE_LOADED);
+    // The event is queued before the reconciliation, and the registry is held
+    // by a local share across it, because reconcile() runs host release
+    // callbacks. Nothing may touch this observer or its members after host code
+    // runs: a callback that destroys its map destroys this observer with it.
+    if (selected(MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)) {
+      push(MLN_RUNTIME_EVENT_MAP_STYLE_LOADED);
+    }
+    const auto sources = custom_geometry_sources_;
+    sources->reconcile();
   }
 
   void onWillStartRenderingFrame() override {
+    if (!selected(MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED)) {
+      return;
+    }
     push(MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED);
   }
 
   void onDidFinishRenderingFrame(const RenderFrameStatus& status) override {
+    if (!selected(MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED)) {
+      return;
+    }
     push_payload(
       MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED,
-      MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME,
-      payload_bytes(render_frame_payload(status))
+      MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME, render_frame_payload(status)
     );
   }
 
   void onWillStartRenderingMap() override {
+    if (!selected(MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED)) {
+      return;
+    }
     push(MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED);
   }
 
   void onDidFinishRenderingMap(RenderMode mode) override {
+    if (!selected(MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED)) {
+      return;
+    }
     push_payload(
       MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED,
-      MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP,
-      payload_bytes(render_map_payload(mode))
+      MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP, render_map_payload(mode)
     );
   }
 
-  void onDidBecomeIdle() override { push(MLN_RUNTIME_EVENT_MAP_IDLE); }
+  void onDidBecomeIdle() override {
+    if (!selected(MLN_RUNTIME_EVENT_MAP_IDLE)) {
+      return;
+    }
+    push(MLN_RUNTIME_EVENT_MAP_IDLE);
+  }
 
   void onStyleImageMissing(const std::string& image_id) override {
+    if (!selected(MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING)) {
+      return;
+    }
     push_payload(
-      MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING,
-      MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING,
-      payload_bytes(style_image_missing_payload()), 0, image_id
+      MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING, MLN_RUNTIME_EVENT_PAYLOAD_NONE,
+      mln::core::zeroed_event_payload(), 0, image_id
     );
   }
 
@@ -1706,13 +1872,21 @@ class HeadlessObserver final : public mbgl::MapObserver {
     mbgl::TileOperation operation, const mbgl::OverscaledTileID& tile_id,
     const std::string& source_id
   ) override {
+    if (!selected(MLN_RUNTIME_EVENT_MAP_TILE_ACTION)) {
+      return;
+    }
     push_payload(
       MLN_RUNTIME_EVENT_MAP_TILE_ACTION, MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
-      payload_bytes(tile_action_payload(operation, tile_id)), 0, source_id
+      tile_action_payload(operation, tile_id), 0, source_id
     );
   }
 
+  // The mask test precedes the try block, so a suppressed render error never
+  // formats the exception text.
   void onRenderError(std::exception_ptr error) override {
+    if (!selected(MLN_RUNTIME_EVENT_MAP_RENDER_ERROR)) {
+      return;
+    }
     try {
       if (error) {
         std::rethrow_exception(error);
@@ -1726,23 +1900,29 @@ class HeadlessObserver final : public mbgl::MapObserver {
   }
 
  private:
+  [[nodiscard]] auto selected(uint32_t type) const noexcept -> bool {
+    return mln::core::event_selected(event_state_->mask, type);
+  }
+
   auto push(uint32_t type, int32_t code = 0, const char* message = nullptr)
     -> void {
     mln::core::push_runtime_map_event(runtime_, map_, type, code, message);
   }
 
   auto push_payload(
-    uint32_t type, uint32_t payload_type, std::vector<std::byte> payload,
-    int32_t code = 0, std::string message = {}
+    uint32_t type, uint32_t payload_type,
+    const mln_runtime_event_payload& payload, int32_t code = 0,
+    std::string message = {}
   ) -> void {
     mln::core::push_runtime_map_event_payload(
-      runtime_, map_, type, payload_type, std::move(payload), code,
-      std::move(message)
+      runtime_, map_, type, payload_type, payload, code, std::move(message)
     );
   }
 
   mln_runtime runtime_;
   mln_map map_;
+  std::shared_ptr<mln::core::MapEventState> event_state_;
+  std::shared_ptr<CustomGeometrySourceRegistry> custom_geometry_sources_;
 };
 
 // Delivers mbgl::RendererObserver callbacks on the map's run loop instead of on
@@ -1905,11 +2085,13 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
   // pool's own identity. The run loop comes in by reference because mbgl calls
   // setObserver() from the map constructor; it outlives the map.
   HeadlessFrontend(
-    mln_runtime runtime, mln_map map, mbgl::util::RunLoop& run_loop
+    mln_runtime runtime, mln_map map, mbgl::util::RunLoop& run_loop,
+    std::shared_ptr<mln::core::MapEventState> event_state
   )
       : runtime_(runtime),
         map_(map),
         run_loop_(run_loop),
+        event_state_(std::move(event_state)),
         thread_pool_(
           mbgl::Scheduler::GetBackground(), mbgl::util::SimpleIdentity{}
         ) {}
@@ -1925,9 +2107,20 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
       std::make_unique<ForwardingRendererObserver>(run_loop_, observer);
   }
 
+  // The latest update is render state that a session reads whatever the mask
+  // selects, so it is stored first. Pushing outside the update lock keeps
+  // `latest_update_mutex_` off the handle table and `event_mutex`; only the map
+  // owner thread reaches this, so nothing can interleave in between.
   void update(std::shared_ptr<mbgl::UpdateParameters> update) override {
-    const std::scoped_lock lock(latest_update_mutex_);
-    latest_update_ = std::move(update);
+    {
+      const std::scoped_lock lock(latest_update_mutex_);
+      latest_update_ = std::move(update);
+    }
+    if (!mln::core::event_selected(
+          event_state_->mask, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
+        )) {
+      return;
+    }
     mln::core::push_runtime_map_event(
       runtime_, map_, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
     );
@@ -1969,6 +2162,7 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
   mln_runtime runtime_;
   mln_map map_;
   mbgl::util::RunLoop& run_loop_;
+  std::shared_ptr<mln::core::MapEventState> event_state_;
   std::unique_ptr<ForwardingRendererObserver> observer_;
   mbgl::TaggedScheduler thread_pool_;
   mutable std::mutex latest_update_mutex_;
@@ -1982,6 +2176,17 @@ auto validate_map_options(const mln_map_options* options) -> mln_status {
 
   if (options->size < sizeof(mln_map_options)) {
     mln::core::set_thread_error("mln_map_options.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  // Validated here as well as in the setter, so a mask this library cannot
+  // honour is rejected wherever it arrives.
+  constexpr auto known_mask_bits =
+    static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL);
+  if ((options->event_mask & ~known_mask_bits) != 0U) {
+    mln::core::set_thread_error(
+      "mln_map_options.event_mask contains unknown bits"
+    );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
@@ -2758,31 +2963,41 @@ auto from_native_camera(const mbgl::CameraOptions& camera)
 }
 
 auto camera_transition_finished_payload(uint64_t transition_id)
-  -> mln_runtime_event_camera_transition_finished {
-  return mln_runtime_event_camera_transition_finished{
-    .size = sizeof(mln_runtime_event_camera_transition_finished),
-    .transition_id = transition_id
-  };
+  -> mln_runtime_event_payload {
+  auto payload = mln::core::zeroed_event_payload();
+  payload.camera_transition_finished =
+    mln_runtime_event_camera_transition_finished{
+      .transition_id = transition_id
+    };
+  return payload;
 }
 
 // MapLibre Native owns the returned AnimationOptions for the lifetime of the
 // transition, and invokes transitionFinishFn on the map owner thread. The push
 // discards events for a destroyed map, so a transition outliving the map
-// enqueues nothing.
+// enqueues nothing. The lambda holds the event state by value, so it reads a
+// live mask cell at completion time even for a map that is already gone.
 auto to_native_animation(
-  mln_runtime runtime, mln_map map, const mln_animation_options* animation
+  mln_runtime runtime, mln_map map,
+  const std::shared_ptr<mln::core::MapEventState>& event_state,
+  const mln_animation_options* animation
 ) -> mbgl::AnimationOptions {
   auto result = mbgl::AnimationOptions{};
   if (animation == nullptr) {
     return result;
   }
   if ((animation->fields & MLN_ANIMATION_OPTION_TRANSITION_ID) != 0U) {
-    result.transitionFinishFn = [runtime, map,
+    result.transitionFinishFn = [runtime, map, event_state,
                                  transition_id = animation->transition_id] {
+      if (!mln::core::event_selected(
+            event_state->mask, MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED
+          )) {
+        return;
+      }
       mln::core::push_runtime_map_event_payload(
         runtime, map, MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
         MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
-        payload_bytes(camera_transition_finished_payload(transition_id))
+        camera_transition_finished_payload(transition_id)
       );
     };
   }
@@ -3181,6 +3396,12 @@ struct MapObject {
   uint32_t map_mode = MLN_MAP_MODE_CONTINUOUS;
   double scale_factor = default_scale_factor;
   bool still_image_request_pending = false;
+  // Declared first so reverse-order destruction runs the release callbacks it
+  // still owes after the mbgl::Map that could still reach a source is gone.
+  std::shared_ptr<CustomGeometrySourceRegistry> custom_geometry_sources;
+  // Declared before `observer` so reverse-order destruction retires the
+  // observer, which holds its own reference, before this member is destroyed.
+  std::shared_ptr<MapEventState> event_state;
   std::unique_ptr<HeadlessObserver> observer;
   std::unique_ptr<HeadlessFrontend> frontend;
   std::unique_ptr<mbgl::Map> map;
@@ -3245,8 +3466,15 @@ auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
   if (live == nullptr) {
     return;
   }
+  // Clearing the pending flag is map state that the next request reads, so it
+  // happens whatever the mask selects.
   live->still_image_request_pending = false;
   if (error) {
+    if (!event_selected(
+          live->event_state->mask, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED
+        )) {
+      return;
+    }
     const auto message = exception_message(error);
     push_runtime_map_event(
       live->runtime, map, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED, 0,
@@ -3255,6 +3483,11 @@ auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
     return;
   }
 
+  if (!event_selected(
+        live->event_state->mask, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED
+      )) {
+    return;
+  }
   push_runtime_map_event(
     live->runtime, map, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED
   );
@@ -3321,7 +3554,8 @@ auto map_options_default() noexcept -> mln_map_options {
     .height = default_map_height,
     .scale_factor = default_scale_factor,
     .map_mode = MLN_MAP_MODE_CONTINUOUS,
-    .fast_pfor_enabled = false
+    .fast_pfor_enabled = false,
+    .event_mask = MLN_RUNTIME_EVENT_MASK_ALL
   };
 }
 
@@ -3473,7 +3707,8 @@ auto custom_geometry_source_options_default() noexcept
     .tile_size = mbgl::util::tileSize_I,
     .buffer = 128,
     .clip = false,
-    .wrap = false
+    .wrap = false,
+    .release_user_data = nullptr
   };
 }
 
@@ -3594,18 +3829,34 @@ auto create_map(
 
   const auto effective = options == nullptr ? map_options_default() : *options;
   auto owned_map = std::make_shared<MapObject>();
+  // Every allocation this function owns happens before the handle is published,
+  // so a throw here cannot leave a registered map the caller has no handle to
+  // destroy.
+  auto event_state = std::make_shared<MapEventState>();
+  auto source_registry = std::make_shared<CustomGeometrySourceRegistry>();
   // Publish the handle first, so the observer and frontend capture an id that
   // already resolves.
   const auto handle = handle_table<MapObject>().insert(owned_map);
-  register_runtime_map_events(runtime, handle);
   owned_map->runtime = runtime;
   owned_map->owner_thread = std::this_thread::get_id();
   owned_map->map_mode = effective.map_mode;
   owned_map->scale_factor = effective.scale_factor;
+  owned_map->event_state = std::move(event_state);
+  owned_map->custom_geometry_sources = std::move(source_registry);
+  owned_map->event_state->mask.store(
+    effective.event_mask, std::memory_order_relaxed
+  );
   try {
-    owned_map->observer = std::make_unique<HeadlessObserver>(runtime, handle);
+    // Registering allocates, so it belongs inside the scope that unpublishes
+    // the handle on failure. Nothing before this point queues an event, and the
+    // observer and frontend below are the first producers that need it.
+    register_runtime_map_events(runtime, handle);
+    owned_map->observer = std::make_unique<HeadlessObserver>(
+      runtime, handle, owned_map->event_state,
+      owned_map->custom_geometry_sources
+    );
     owned_map->frontend = std::make_unique<HeadlessFrontend>(
-      runtime, handle, runtime_run_loop(live_runtime)
+      runtime, handle, runtime_run_loop(live_runtime), owned_map->event_state
     );
 
     auto map_options = mbgl::MapOptions{};
@@ -3617,6 +3868,7 @@ auto create_map(
       *owned_map->frontend, *owned_map->observer, map_options,
       resource_options_for_runtime(runtime)
     );
+    owned_map->custom_geometry_sources->attach(*owned_map->map);
 
     owned_map->commands = std::make_unique<MapCommands>(*owned_map->map);
     owned_map->command_mailbox =
@@ -3656,7 +3908,11 @@ auto destroy_map(mln_map map) -> mln_status {
     runtime = live->runtime;
     owned_map = table.remove_locked(map);
   }
-  // Both cross-thread channels close before the map is torn down.
+  // Both cross-thread channels close before the map is destroyed. The registry
+  // clears its map at the same point, so nothing reconciles against a map
+  // that is being destroyed; the releases it still owes run from its own
+  // destructor once the map is gone.
+  owned_map->custom_geometry_sources->detach();
   owned_map->frontend->close_renderer_observer();
   owned_map->command_mailbox->close();
   // Runs outside the registry lock: it can block on in-flight background work.
@@ -3820,12 +4076,14 @@ auto map_set_style_url(mln_map map, const char* url) -> mln_status {
     set_thread_error("url must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  clear_runtime_map_loading_failure(live->runtime, map);
+  // A style that fails to parse inside this call reaches
+  // HeadlessObserver::onDidFailLoadingMap on this stack, so the flag below is
+  // owner-thread state that needs no lock and no queued event.
+  live->event_state->style_load_failed = false;
+  live->event_state->style_load_failure.clear();
   live->map->getStyle().loadURL(url);
-  if (runtime_map_loading_failed(live->runtime, map)) {
-    set_thread_error(
-      runtime_map_loading_failure_message(live->runtime, map).c_str()
-    );
+  if (live->event_state->style_load_failed) {
+    set_thread_error(live->event_state->style_load_failure.c_str());
     return MLN_STATUS_NATIVE_ERROR;
   }
   return MLN_STATUS_OK;
@@ -3841,22 +4099,29 @@ auto map_set_style_json(mln_map map, mln_buffer_view json) -> mln_status {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   try {
-    clear_runtime_map_loading_failure(live->runtime, map);
+    live->event_state->style_load_failed = false;
+    live->event_state->style_load_failure.clear();
     live->map->getStyle().loadJSON(
       std::string{reinterpret_cast<const char*>(json.data), json.size}
     );
   } catch (const std::exception& exception) {
+    // The diagnostic is this call's own status text, so it is set whatever the
+    // mask selects; only the event is gated.
     set_thread_error(exception.what());
-    push_runtime_map_event(
-      live->runtime, map, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, 0,
-      exception.what()
-    );
+    if (
+      event_selected(
+        live->event_state->mask, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED
+      )
+    ) {
+      push_runtime_map_event(
+        live->runtime, map, MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, 0,
+        exception.what()
+      );
+    }
     return MLN_STATUS_NATIVE_ERROR;
   }
-  if (runtime_map_loading_failed(live->runtime, map)) {
-    set_thread_error(
-      runtime_map_loading_failure_message(live->runtime, map).c_str()
-    );
+  if (live->event_state->style_load_failed) {
+    set_thread_error(live->event_state->style_load_failure.c_str());
     return MLN_STATUS_NATIVE_ERROR;
   }
   return MLN_STATUS_OK;
@@ -3892,6 +4157,36 @@ auto map_copy_style_url(
     live->map->getStyle().getURL(), out_url, url_capacity, out_url_size,
     "url_capacity"
   );
+}
+
+auto map_set_event_mask(mln_map map, uint64_t mask) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if ((mask & ~static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL)) != 0U) {
+    set_thread_error("mask contains unknown bits");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  // The whole value is stored, including the runtime-event bits this map's
+  // producers never test, so a getter reports what a host wrote.
+  live->event_state->mask.store(mask, std::memory_order_relaxed);
+  return MLN_STATUS_OK;
+}
+
+auto map_get_event_mask(mln_map map, uint64_t* out_mask) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (out_mask == nullptr) {
+    set_thread_error("out_mask must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  *out_mask = live->event_state->mask.load(std::memory_order_relaxed);
+  return MLN_STATUS_OK;
 }
 
 auto style_id_list_count(mln_style_id_list list, size_t* out_count)
@@ -4054,6 +4349,10 @@ auto map_remove_style_source(
     set_thread_error("source is used by a layer");
     return MLN_STATUS_INVALID_STATE;
   }
+  // The detached source is dropped before the release runs, so the style no
+  // longer holds the callbacks that read the host's state.
+  removed.reset();
+  live->custom_geometry_sources->release(id);
   *out_removed = true;
   return MLN_STATUS_OK;
 }
@@ -4847,11 +5146,29 @@ auto map_add_custom_geometry_source(
   }
 
   const auto effective = effective_custom_geometry_source_options(*options);
-  style.addSource(
-    std::make_unique<mbgl::style::CustomGeometrySource>(
-      id, to_native_custom_geometry_source_options(effective)
-    )
+  // Tracked before the style takes the source, so the two cannot disagree. A
+  // throw while tracking leaves no source in the style, and a style that
+  // rejects the source untracks it again; either way the add failed and the
+  // caller still owns user_data. Tracking afterwards would leave a live source
+  // whose release never runs.
+  live->custom_geometry_sources->add(
+    id, effective.release_user_data, effective.user_data
   );
+  try {
+    style.addSource(
+      std::make_unique<mbgl::style::CustomGeometrySource>(
+        id, to_native_custom_geometry_source_options(effective)
+      )
+    );
+  } catch (...) {
+    // Mirrors add()'s own early return: a source with no release callback was
+    // never tracked, so there is nothing to untrack and no entry of another
+    // source's to erase.
+    if (effective.release_user_data != nullptr) {
+      live->custom_geometry_sources->untrack(id);
+    }
+    throw;
+  }
   return MLN_STATUS_OK;
 }
 
@@ -6618,7 +6935,7 @@ auto map_ease_to(
 
   live->map->easeTo(
     to_native_camera(*camera),
-    to_native_animation(live->runtime, map, animation)
+    to_native_animation(live->runtime, map, live->event_state, animation)
   );
   return MLN_STATUS_OK;
 }
@@ -6643,7 +6960,7 @@ auto map_fly_to(
 
   live->map->flyTo(
     to_native_camera(*camera),
-    to_native_animation(live->runtime, map, animation)
+    to_native_animation(live->runtime, map, live->event_state, animation)
   );
   return MLN_STATUS_OK;
 }
@@ -7267,7 +7584,7 @@ auto map_move_by_animated(
 
   live->map->moveBy(
     mbgl::ScreenCoordinate{delta_x, delta_y},
-    to_native_animation(live->runtime, map, animation)
+    to_native_animation(live->runtime, map, live->event_state, animation)
   );
   return MLN_STATUS_OK;
 }
@@ -7304,7 +7621,8 @@ auto map_scale_by_animated(
   }
 
   live->map->scaleBy(
-    scale, native_anchor, to_native_animation(live->runtime, map, animation)
+    scale, native_anchor,
+    to_native_animation(live->runtime, map, live->event_state, animation)
   );
   return MLN_STATUS_OK;
 }
@@ -7338,7 +7656,7 @@ auto map_rotate_by_animated(
 
   live->map->rotateBy(
     screen_point(first), screen_point(second),
-    to_native_animation(live->runtime, map, animation)
+    to_native_animation(live->runtime, map, live->event_state, animation)
   );
   return MLN_STATUS_OK;
 }
@@ -7364,7 +7682,9 @@ auto map_pitch_by_animated(
     return animation_status;
   }
 
-  live->map->pitchBy(pitch, to_native_animation(live->runtime, map, animation));
+  live->map->pitchBy(
+    pitch, to_native_animation(live->runtime, map, live->event_state, animation)
+  );
   return MLN_STATUS_OK;
 }
 

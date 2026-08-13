@@ -40,6 +40,7 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
             var descriptor = NativeMethods.mln_custom_geometry_source_options_default();
             descriptor.fetch_tile = &FetchTile;
             descriptor.cancel_tile = &CancelTile;
+            descriptor.release_user_data = &ReleaseUserData;
             descriptor.user_data = (void*)GCHandle.ToIntPtr(handle);
             if (options.MinimumZoom is { } minimumZoom)
             {
@@ -120,6 +121,16 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
     {
         var state = FromUserData(userData);
         state?.InvokeCancel(FromNative(tileId));
+    }
+
+    // The C API invokes this once, on the map owner thread, after MapLibre stops referencing this
+    // state, so the stubs go with the source whether it was removed, dropped by a style load, or
+    // retired with the map.
+    [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    private static void ReleaseUserData(void* userData)
+    {
+        var state = FromUserData(userData);
+        state?.Dispose();
     }
 
     private static CustomGeometrySourceState? FromUserData(void* userData)

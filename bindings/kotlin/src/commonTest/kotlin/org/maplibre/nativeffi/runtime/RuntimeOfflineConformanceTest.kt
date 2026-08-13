@@ -15,7 +15,7 @@ import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
 
 class RuntimeOfflineConformanceTest {
-  private val deferredEvents = ArrayDeque<RuntimeEvent>()
+  private val drained = mutableListOf<RuntimeEvent>()
 
   @Test
   fun offlineRegionApisCreateObserveAndCopyPublicEvents() {
@@ -58,8 +58,9 @@ class RuntimeOfflineConformanceTest {
       assertEquals(runtime, observed.runtimeSource)
       assertNull(observed.mapSource)
       assertObservedOfflineRegionStatusPayload(created.id, observed.payload)
+      // A drained value stays readable after the next drain ends the batch window.
       val copiedMessage = observed.message
-      runtime.pollEvent()
+      runtime.drainEvents()
       assertEquals(copiedMessage, observed.message)
 
       completeVoidOperation(runtime, runtime.startSetOfflineRegionObserved(created.id, false))
@@ -80,16 +81,10 @@ class RuntimeOfflineConformanceTest {
     operation: OfflineOperationHandle<*>,
   ): RuntimeEventPayload.OfflineOperationCompleted {
     repeat(10_000) {
-      runtime.pump(0)
-      while (true) {
-        val event = pollEvent(runtime) ?: break
+      drain(runtime)
+      for (event in drained) {
         val completed = event.payload as? RuntimeEventPayload.OfflineOperationCompleted
-        if (completed == null) {
-          deferredEvents.addLast(event)
-          continue
-        }
-        if (completed.operationId != operation.id) {
-          deferredEvents.addLast(event)
+        if (completed == null || completed.operationId != operation.id) {
           continue
         }
         assertEquals(operation.kind, completed.operationKind)
@@ -135,9 +130,8 @@ class RuntimeOfflineConformanceTest {
     regionId: Long,
   ): RuntimeEvent {
     repeat(10_000) {
-      runtime.pump(0)
-      while (true) {
-        val event = pollEvent(runtime) ?: break
+      drain(runtime)
+      for (event in drained) {
         when (val payload = event.payload) {
           is RuntimeEventPayload.OfflineRegionStatusChanged ->
             if (payload.regionId == regionId) return event
@@ -153,8 +147,15 @@ class RuntimeOfflineConformanceTest {
     error("offline region observation event did not arrive for region $regionId")
   }
 
-  private fun pollEvent(runtime: RuntimeHandle): RuntimeEvent? =
-    if (deferredEvents.isNotEmpty()) deferredEvents.removeFirst() else runtime.pollEvent()
+  /**
+   * Pumps once and keeps every event this test has drained. One offline step drains the events of
+   * the steps before it, so the waiters below scan what the whole test has seen rather than one
+   * batch.
+   */
+  private fun drain(runtime: RuntimeHandle) {
+    runtime.pump(0)
+    drained += runtime.drainEvents().events
+  }
 
   private fun assertObservedOfflineRegionStatusPayload(
     regionId: Long,

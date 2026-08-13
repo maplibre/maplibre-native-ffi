@@ -314,6 +314,9 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [NativeTypeName("bool")]
         public byte wrap;
+
+        [NativeTypeName("mln_custom_geometry_source_release_callback")]
+        public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
     }
 
     internal unsafe partial struct mln_premultiplied_rgba8_image

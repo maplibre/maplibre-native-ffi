@@ -36,15 +36,15 @@ pub use enums::{
     OpenGLContextOwnership, OpenGLContextProviderMask, RasterDemEncoding, RenderBackendMask,
     RenderMode, RenderResult, ResourceErrorReason, ResourceKind, ResourceLoadingMethod,
     ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage,
-    RuntimeEventType, SourceType, StyleImageTextFit, StyleLayerVisibility, TileLodMode,
-    TileOperation, TileScheme, VectorTileEncoding, ViewportMode,
+    RuntimeEventMask, RuntimeEventType, SourceType, StyleImageTextFit, StyleLayerVisibility,
+    TileLodMode, TileOperation, TileScheme, VectorTileEncoding, ViewportMode,
 };
 pub use error::{Error, ErrorKind, Result, check};
 pub use events::{
-    CameraTransitionFinishedEvent, CopiedRuntimeEvent, OfflineOperationCompletedEvent,
-    OfflineRegionResponseErrorEvent, OfflineRegionStatus, OfflineRegionStatusEvent,
-    OfflineRegionTileCountLimitEvent, RawRuntimeEventSource, RenderFrameEvent, RenderMapEvent,
-    RenderingStats, RuntimeEventPayload, StyleImageMissingEvent, TileActionEvent, TileId,
+    CameraTransitionFinishedEvent, CopiedRuntimeEvent, NativeEventView, NativeEventViews,
+    OfflineOperationCompletedEvent, OfflineRegionResponseErrorEvent, OfflineRegionStatus,
+    OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent, RawRuntimeEventSource,
+    RenderFrameEvent, RenderMapEvent, RenderingStats, RuntimeEventPayload, TileActionEvent, TileId,
     UnknownRuntimeEventPayload,
 };
 pub use logging::LogRecord;

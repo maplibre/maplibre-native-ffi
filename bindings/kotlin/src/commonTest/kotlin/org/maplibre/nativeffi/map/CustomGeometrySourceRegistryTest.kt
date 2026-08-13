@@ -20,42 +20,16 @@ class CustomGeometrySourceRegistryTest {
   }
 
   @Test
-  fun sourceDetachmentReleasesCallbackState() {
+  fun clearingReleasesEveryRemainingCallbackState() {
     val released = mutableListOf<String>()
     val registry = registry(released)
-    registry.install("attached", State("attached")) {}
-    registry.install("detached", State("detached")) {}
+    registry.install("first", State("first")) {}
+    registry.install("second", State("second")) {}
 
-    registry.releaseDetached { sourceId -> sourceId == "attached" }
-
-    assertEquals(1, registry.size)
-    assertEquals(listOf("detached"), released)
-  }
-
-  @Test
-  fun staleStyleLoadedEventPreservesReusedSourceId() {
-    val released = mutableListOf<String>()
-    val registry = registry(released)
-    registry.install("source", State("old")) {}
     registry.clear()
-    registry.install("source", State("new")) {}
 
-    registry.releaseDetached { true }
-
-    assertEquals(1, registry.size)
-    assertEquals(listOf("old"), released)
-  }
-
-  @Test
-  fun failedAttachmentQueryPreservesCallbackState() {
-    val released = mutableListOf<String>()
-    val registry = registry(released)
-    registry.install("source", State("existing")) {}
-
-    registry.releaseDetached { null }
-
-    assertEquals(1, registry.size)
-    assertEquals(emptyList(), released)
+    assertEquals(0, registry.size)
+    assertEquals(listOf("first", "second"), released)
   }
 
   private fun registry(released: MutableList<String>): CustomGeometrySourceRegistry<State> =

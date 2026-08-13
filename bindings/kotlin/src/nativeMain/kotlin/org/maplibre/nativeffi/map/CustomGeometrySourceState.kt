@@ -25,10 +25,17 @@ import org.maplibre.nativeffi.internal.callback.CallbackGate
 import org.maplibre.nativeffi.internal.struct.StyleStructs
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 
-/** Owns map/style-scoped custom geometry source callback state. */
+/**
+ * Owns map/style-scoped custom geometry source callback state.
+ *
+ * [onReleased] runs on the map owner thread when native stops referencing this state, which is what
+ * drops it from its map's registry and closes it.
+ */
 @OptIn(ExperimentalForeignApi::class)
-internal class CustomGeometrySourceState(private val options: CustomGeometrySourceOptions) :
-  AutoCloseable {
+internal class CustomGeometrySourceState(
+  private val options: CustomGeometrySourceOptions,
+  private val onReleased: () -> Unit,
+) : AutoCloseable {
   private val selfRef = StableRef.create(this)
   private val descriptor = nativeHeap.alloc<mln_custom_geometry_source_options>()
   private val gate = CallbackGate("custom geometry callbacks") { closeNative() }
@@ -37,6 +44,7 @@ internal class CustomGeometrySourceState(private val options: CustomGeometrySour
     mln_custom_geometry_source_options_default().place(descriptor.ptr)
     descriptor.fetch_tile = staticCFunction(::customGeometryFetchTile)
     descriptor.cancel_tile = staticCFunction(::customGeometryCancelTile)
+    descriptor.release_user_data = staticCFunction(::customGeometryReleaseUserData)
     descriptor.user_data = selfRef.asCPointer()
     writeFields(descriptor)
   }
@@ -52,6 +60,11 @@ internal class CustomGeometrySourceState(private val options: CustomGeometrySour
     } finally {
       lease.close()
     }
+  }
+
+  /** Runs when native stops referencing this state, on the map owner thread. */
+  internal fun released() {
+    onReleased()
   }
 
   internal fun cancel(tileId: CValue<mln_canonical_tile_id>) {
@@ -121,4 +134,13 @@ private fun customGeometryCancelTile(
   tileId: CValue<mln_canonical_tile_id>,
 ) {
   userData?.asStableRef<CustomGeometrySourceState>()?.get()?.cancel(tileId)
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun customGeometryReleaseUserData(userData: COpaquePointer?) {
+  try {
+    userData?.asStableRef<CustomGeometrySourceState>()?.get()?.released()
+  } catch (_: Throwable) {
+    // Native callbacks must not unwind through the C ABI.
+  }
 }

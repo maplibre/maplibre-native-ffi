@@ -482,7 +482,7 @@ value.
 
 Outputs backed by native storage follow this operation:
 
-1. Acquire the native buffer, snapshot, result, list, or event.
+1. Acquire the native buffer, snapshot, result, list, or event batch.
 2. Copy public data into language-owned values before the native borrow window
    ends.
 3. Preserve unknown event and payload domains as raw values with copied payload
@@ -490,9 +490,13 @@ Outputs backed by native storage follow this operation:
 4. Release native buffer, snapshot, result, and list handles exactly once after
    copying, including failure paths.
 
-Runtime event polling returns values independent of the next native poll.
-Map-originated events identify a live source map when identity can be proven. If
-lookup misses, they carry no public map handle or only copied source metadata.
+A binding SHOULD copy a drained event batch into language-owned values. A
+binding MAY instead expose a borrowed view when its type system prevents the
+view from outliving the runtime borrow and prevents another drain while the view
+is live. Such a binding MUST provide an explicit operation that copies an event
+into an owned value. Map-originated events identify a live source map when
+identity can be proven. If lookup misses, they carry no public map handle or
+only copied source metadata.
 
 ### Style source metadata
 
@@ -683,8 +687,8 @@ The helper follows this design:
    handles.
 2. It runs submitted operations by calling the ordinary low-level binding
    methods on that owner thread.
-3. It serializes submitted operations with event polling and close on that owner
-   thread.
+3. It serializes submitted operations with event draining and close on that
+   owner thread.
 4. It returns the ordinary binding result or error shape, including copied
    native diagnostics.
 5. Closing rejects new submissions, releases thread-affine handles on the owner
@@ -719,29 +723,66 @@ The wake source follows this design:
    that where the host language can express it.
 3. Signalling after the runtime is closed succeeds and does nothing.
 
-### Event polling
+### Event draining
 
 The public event API is explicit: host code pumps native runtime work, then
-polls one queued runtime event. Polling returns one copied event or empty.
+drains the queued runtime events. One drain returns the ordered sequence of
+events that the queue held, empty when it held none.
 
-Event polling follows this operation:
+The drain follows this operation:
 
-1. Initialize the native event struct and `has_event` out parameter before
+1. Initialize the native batch struct, including its `size` field, before
    calling C.
-2. Call the C poll function on the runtime owner thread.
-3. If no event is available, return the language's empty result.
-4. Copy the event type, source type, status code, message bytes, payload bytes,
-   and typed payload fields before another poll can invalidate native event
-   storage.
-5. Decode known typed payloads only after validating their native size. Preserve
-   unknown event and payload domains with their raw values and copied payload
-   bytes.
+2. Call the C drain function on the runtime owner thread, passing the host's
+   maximum event count. The binding's default takes the whole queue.
+3. Step through the batch by the event stride that the batch reports, rather
+   than by the size of the generated event struct.
+4. Copy each event's type, source type, status code, message bytes, and typed
+   payload fields before the next drain invalidates native batch storage. A
+   lifetime-checked borrowed binding MAY expose views of these fields instead. A
+   message is the batch's arena bytes at the event's own offset and length.
+5. Read a known typed payload as the union member that the payload type names,
+   with no size check. Preserve an unknown event or payload domain with its raw
+   value and its bytes as the batch's event stride reports them.
 6. Copy the event's source id, resolve any public map wrapper for that id
    through binding-owned runtime state, and expose the copied id as the event's
    source identity. Constructing a public handle from the source id stays
    outside the safe public API.
 7. Apply binding-owned state updates triggered by the event before returning the
-   copied event.
+   copied events.
+8. Return a language-owned sequence whose elements outlive the next drain, or a
+   borrowed view whose type prevents that view from surviving the next drain.
+
+### Event subscription
+
+A map and a runtime each carry a subscription: the event types it queues. An
+unselected event is never built, never queued, and raises no wake.
+
+The subscription follows this design:
+
+1. A binding exposes the subscription as a set of event types: a host names
+   types, combines them, and tests membership without computing a bit itself. It
+   uses the language's own set-of-enum idiom, such as an option set or a flags
+   type, and it derives the value for a type the binding does not name.
+2. Map options and runtime options carry a subscription, and the map and runtime
+   each expose a getter and a setter for it. A binding MUST use the language's
+   ordinary default-value idiom. A nullable or absent options field MAY mean
+   that the native default applies, but it MUST remain distinct from an explicit
+   empty subscription. The default selects every event type the C API reports,
+   including types the binding does not name.
+3. A subscription value that a host derived for an unreported type reaches C
+   unchanged, and the binding surfaces the resulting invalid-argument status
+   through its own error idiom.
+4. A binding MUST install the host's subscription unchanged. It MUST NOT add a
+   type the host left out to drive its own bookkeeping, and it MUST NOT hide a
+   queued event from a host.
+5. Where a binding needs a native signal for its own state, it MUST use the
+   dedicated C mechanism, as
+   `mln_custom_geometry_source_options.release_user_data` provides for source
+   callback state. Binding-owned state that such a mechanism maintains keeps
+   working for every subscription.
+6. Documentation for a subscription setter names the event types that carry
+   state a host reaches no other way.
 
 ### Attaching a render session
 
@@ -789,8 +830,8 @@ Rendering bindings expose render sessions, frame lifetimes, and readback without
 taking ownership of caller-owned backend resources.
 
 Render session calls may run on a thread other than the one that pumps the
-runtime. Events produced by rendering are still delivered by runtime event
-polling on the runtime owner thread.
+runtime. Events produced by rendering are still delivered by a runtime event
+drain on the runtime owner thread.
 
 ### Render sessions
 
@@ -971,23 +1012,27 @@ the other isolate, which makes its id stale rather than live.
 
 | ID      | Test                                                                                                                                                                |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-080 | `pump` drives native event processing through the public runtime API, and repeated event polling reaches an empty queue.                                            |
-| BND-081 | Map style loading returns the expected copied map event through polling and identifies the correct public map identity.                                             |
-| BND-082 | Event message and payload data remain valid after the next event poll.                                                                                              |
-| BND-083 | Unknown event or payload domains preserve raw values and copied bytes when the C API exposes those bytes.                                                           |
+| BND-080 | `pump` drives native event processing through the public runtime API, and a later drain reports an empty batch.                                                     |
+| BND-081 | Map style loading returns the expected copied map event through a drain and identifies the correct public map identity.                                             |
+| BND-082 | Event message and payload data remain valid after the next drain.                                                                                                   |
+| BND-083 | An unknown event or payload domain preserves its raw value, and an unknown payload keeps the bytes that the batch's event stride reports.                           |
 | BND-084 | Offline operation completion returns copied result data. Native take-result status failures before result ownership transfers leave the operation handle retryable. |
 | BND-085 | Offline region observation returns copied status/error events through the public runtime event model.                                                               |
 | BND-086 | A map-originated event with no provable live public map exposes no public map handle.                                                                               |
-| BND-087 | Known typed event payloads validate native payload size before reading payload fields.                                                                              |
+| BND-087 | A binding steps events by the batch's reported event stride.                                                                                                        |
 | BND-088 | A parked owner thread is released by native work and by a wake source signalled from another thread, and reports a wake rather than a timeout.                      |
 | BND-089 | A pump clears the wake flag it returned on, and a wake source stays signalable and releasable after its runtime closes.                                             |
+| BND-090 | One drain reports more than one event and preserves queue order.                                                                                                    |
+| BND-091 | The default subscription parameter delivers every event type, a narrowed one delivers neither the cleared type nor a wake for it, and an unknown bit is rejected.   |
+| BND-092 | A batch invalidates at the next drain, and the values a binding copied out of it stay readable.                                                                     |
+| BND-093 | Binding-owned cleanup that a style load drives still runs while the map's subscription leaves out the style-loaded type.                                            |
 
 ### Map, camera, projection, style, and query
 
 | ID      | Test                                                                                                                                                                                                    |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | BND-100 | Map creation applies public map options, extent, and mode, then releases through the runtime parent relationship.                                                                                       |
-| BND-101 | Style URL and style JSON loading succeed through public map APIs and return copied style-loaded events through polling.                                                                                 |
+| BND-101 | Style URL and style JSON loading succeed through public map APIs and return copied style-loaded events through a drain.                                                                                 |
 | BND-102 | Camera set/get, animated camera commands, transition cancellation, and gesture-in-progress bracketing produce the expected native camera state and statuses.                                            |
 | BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance.                                                                     |
 | BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.                                                                          |
@@ -1121,6 +1166,6 @@ through BND-066 and BND-067.
 
 When the subproject ships an owner-thread execution adapter, include:
 
-| ID      | Test                                                                       |
-| ------- | -------------------------------------------------------------------------- |
-| BND-192 | The adapter confines create, pump, event polling, and close to one thread. |
+| ID      | Test                                                                        |
+| ------- | --------------------------------------------------------------------------- |
+| BND-192 | The adapter confines create, pump, event draining, and close to one thread. |

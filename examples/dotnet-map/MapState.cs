@@ -37,6 +37,11 @@ internal sealed class MapState : IDisposable
                     Height = viewport.LogicalHeight,
                     ScaleFactor = viewport.ScaleFactor,
                     MapMode = MapMode.Continuous,
+                    // The two event types the runtime loop reads. A map queues no event of an
+                    // unselected type, from its first style load on.
+                    EventMask =
+                        RuntimeEventMask.MapRenderUpdateAvailable
+                        | RuntimeEventMask.MapRenderFrameFinished,
                 }
             );
             map.SetStyleUrl(StyleUrl);
@@ -100,7 +105,8 @@ internal sealed class MapState : IDisposable
     private bool DrainEvents()
     {
         var renderUpdateAvailable = false;
-        while (runtime.PollEvent() is { } runtimeEvent)
+        // One drain takes every event the pump produced.
+        foreach (var runtimeEvent in runtime.DrainEvents().Events)
         {
             if (!ReferenceEquals(runtimeEvent.MapSource, Map))
             {

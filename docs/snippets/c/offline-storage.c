@@ -13,19 +13,19 @@ static mln_status await_operation(
   for (;;) {
     mln_runtime_pump(runtime, 100);
 
-    mln_runtime_event event = {.size = sizeof(event)};
-    bool has_event = false;
-    while (mln_runtime_poll_event(runtime, &event, &has_event) ==
-             MLN_STATUS_OK &&
-           has_event) {
-      if (
-        event.payload_type !=
-        MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED
-      ) {
+    mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+    if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
+      return MLN_STATUS_NATIVE_ERROR;
+    }
+
+    for (size_t index = 0; index < batch.event_count; index++) {
+      const char* bytes = (const char*)batch.events + index * batch.event_size;
+      const mln_runtime_event* event = (const mln_runtime_event*)bytes;
+      if (event->type != MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED) {
         continue;
       }
       const mln_runtime_event_offline_operation_completed* completed =
-        event.payload;
+        &event->payload.offline_operation_completed;
       if (completed->operation_id == operation_id) {
         return (mln_status)completed->result_status;
       }
@@ -45,6 +45,12 @@ static mln_status finish_operation(
 // Deletes every stored region whose metadata differs from keep_metadata, and
 // returns how many it deleted.
 size_t delete_other_regions(mln_runtime runtime, const char* keep_metadata) {
+  // The wait below ends on the completion event, so the subscription has to
+  // select that type.
+  mln_runtime_set_event_mask(
+    runtime, MLN_RUNTIME_EVENT_MASK_OFFLINE_OPERATION_COMPLETED
+  );
+
   // #region list
   mln_offline_operation_id list_id = 0;
   if (

@@ -36,16 +36,20 @@ static still_image_state drain_still_image_events(
 ) {
   still_image_state state = STILL_IMAGE_PENDING;
 
-  mln_runtime_event event = {.size = sizeof(event)};
-  bool has_event = false;
-  while (mln_runtime_poll_event(runtime, &event, &has_event) == MLN_STATUS_OK &&
-         has_event) {
-    if (event.source != map) continue;
-    if (event.type == MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED) {
+  mln_runtime_event_batch batch = mln_runtime_event_batch_default();
+  if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
+    return STILL_IMAGE_FAILED;
+  }
+
+  for (size_t index = 0; index < batch.event_count; index++) {
+    const char* bytes = (const char*)batch.events + index * batch.event_size;
+    const mln_runtime_event* event = (const mln_runtime_event*)bytes;
+    if (event->source != map) continue;
+    if (event->type == MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED) {
       state = STILL_IMAGE_FINISHED;
     } else if (
-      event.type == MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED ||
-      event.type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED
+      event->type == MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED ||
+      event->type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED
     ) {
       return STILL_IMAGE_FAILED;
     }
@@ -117,6 +121,14 @@ uint8_t* render_still_image(
 
   mln_map map = MLN_HANDLE_NULL;
   if (mln_map_create(runtime, &options, &map) != MLN_STATUS_OK) return NULL;
+
+  // A render session draws the map's latest update whatever the subscription
+  // selects.
+  mln_map_set_event_mask(
+    map, MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED |
+           MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED |
+           MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED
+  );
   // #endregion create
 
   uint8_t* pixels = NULL;

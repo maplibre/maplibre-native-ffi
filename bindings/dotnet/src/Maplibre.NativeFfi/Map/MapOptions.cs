@@ -1,11 +1,14 @@
 using Maplibre.NativeFfi.Internal.C;
+using Maplibre.NativeFfi.Internal.Loader;
+using Maplibre.NativeFfi.Runtime;
 
 namespace Maplibre.NativeFfi.Map;
 
 /// <summary>Map creation options.</summary>
 /// <remarks>
 /// Compares and hashes by property value; keep an instance unmodified while it is a key in a
-/// hash-based collection.
+/// hash-based collection. Constructing an instance reads <see cref="EventMask" /> from the native
+/// library, so a host that loads the library from an exact path does that first.
 /// </remarks>
 public sealed record MapOptions
 {
@@ -39,6 +42,22 @@ public sealed record MapOptions
     /// </summary>
     public bool? FastPforEnabled { get; set; }
 
+    /// <summary>
+    /// Map-originated event types this map queues, every event type this library reports
+    /// by default. The mask applies during construction. See
+    /// <see cref="MapHandle.SetEventMask" />.
+    /// </summary>
+    public RuntimeEventMask EventMask { get; set; } = DefaultEventMask();
+
+    // Read from the C default rather than named, so a newer native library's default keeps
+    // selecting event types this build does not declare. Those reach a host as unknown event
+    // and payload domains.
+    private static RuntimeEventMask DefaultEventMask()
+    {
+        NativeLibraryLoader.EnsureLoaded();
+        return (RuntimeEventMask)NativeMethods.mln_map_options_default().event_mask;
+    }
+
     internal mln_map_options ToNative()
     {
         var options = NativeMethods.mln_map_options_default();
@@ -62,6 +81,7 @@ public sealed record MapOptions
         {
             options.fast_pfor_enabled = fastPforEnabled ? (byte)1 : (byte)0;
         }
+        options.event_mask = (ulong)EventMask;
         return options;
     }
 }

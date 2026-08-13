@@ -293,6 +293,9 @@ typedef void (*mln_custom_geometry_source_tile_callback)(
   void* user_data, mln_canonical_tile_id tile_id
 );
 
+/** Releases a custom geometry source's callback context. */
+typedef void (*mln_custom_geometry_source_release_callback)(void* user_data);
+
 /** Options for custom geometry sources. */
 typedef struct mln_custom_geometry_source_options {
   uint32_t size;
@@ -310,6 +313,21 @@ typedef struct mln_custom_geometry_source_options {
   uint32_t buffer;
   bool clip;
   bool wrap;
+  /**
+   * Optional. Invoked once when this API stops referencing user_data.
+   *
+   * The call runs on the map owner thread when the source is removed
+   * explicitly, when a style load replaces the style that held the source, or
+   * when the map is destroyed. It runs at most once, and it does not run when
+   * adding the source failed. A host frees its callback state here. Null means
+   * the host needs no release.
+   *
+   * This callback must not destroy its map, because a release that a style load
+   * drives runs inside MapLibre's style-load dispatch. Free callback state and
+   * return. A host that wants to destroy the map does so from its own call
+   * after the pump that reported the load returns.
+   */
+  mln_custom_geometry_source_release_callback release_user_data;
 } mln_custom_geometry_source_options;
 
 /** Caller-owned premultiplied RGBA8 image pixels. */
@@ -953,6 +971,10 @@ MLN_API mln_status mln_map_add_raster_dem_source_tiles(
  *
  * Custom geometry sources belong to the current style. Replacing the style
  * drops sources that were added to the previous style.
+ *
+ * A host that owns callback state frees it in options.release_user_data, which
+ * this API invokes once after it stops referencing user_data. See
+ * mln_custom_geometry_source_options.release_user_data.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

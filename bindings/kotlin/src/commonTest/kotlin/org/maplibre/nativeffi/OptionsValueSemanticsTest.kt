@@ -30,6 +30,7 @@ import org.maplibre.nativeffi.map.ViewportOptions
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
+import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageStretch
@@ -250,6 +251,7 @@ class OptionsValueSemanticsTest {
           scaleFactor = 2.0
           mapMode = MapMode(0)
           fastPforEnabled = false
+          eventMask = RuntimeEventMask.ALL
         }
       },
       copyOf = { it.copy() },
@@ -260,6 +262,7 @@ class OptionsValueSemanticsTest {
           { scaleFactor = 3.0 },
           { mapMode = MapMode(1) },
           { fastPforEnabled = true },
+          { eventMask = RuntimeEventMask.ALL_MAP_EVENTS },
         ),
     )
   }
@@ -271,10 +274,16 @@ class OptionsValueSemanticsTest {
         RuntimeOptions().apply {
           assetPath = "assets"
           cachePath = "cache"
+          eventMask = RuntimeEventMask.ALL
         }
       },
       copyOf = { it.copy() },
-      mutators = listOf({ assetPath = "other-assets" }, { cachePath = "other-cache" }),
+      mutators =
+        listOf(
+          { assetPath = "other-assets" },
+          { cachePath = "other-cache" },
+          { eventMask = RuntimeEventMask.NONE },
+        ),
     )
   }
 
