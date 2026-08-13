@@ -786,6 +786,9 @@ jobs:
       - run: mise run //bindings/swift:build ios-arm64-metal
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/zig:build ios-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/swift-map:build:ios
         env:
           MISE_TASK_SKIP: "//:build"
@@ -877,6 +880,9 @@ jobs:
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/swift:build tvos-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/zig:build tvos-arm64-metal
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Upload native artifact

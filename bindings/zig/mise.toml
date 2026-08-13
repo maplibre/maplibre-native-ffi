@@ -45,25 +45,21 @@ case "$usage_preset" in
     exit 2
     ;;
   ios-simulator-*)
-    native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+    source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"
     mise run //:ios-simulator:boot
     exec zig build test --build-file ../../build.zig \
-      -Dtarget=aarch64-ios-simulator \
-      -Dnative-install-dir="$native_install_dir" \
+      -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
       -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
-      -Dsystem-root="$(xcrun --sdk iphonesimulator --show-sdk-path)" \
-      --libc "$native_install_dir/share/maplibre-native-c/zig-libc" \
+      ${zig_cross_args[@]+"${zig_cross_args[@]}"} \
       --test-timeout 120s --summary all --verbose
     ;;
   tvos-simulator-*)
-    native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+    source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"
     mise run //:tvos-simulator:boot
     exec zig build test --build-file ../../build.zig \
-      -Dtarget=aarch64-tvos-simulator \
-      -Dnative-install-dir="$native_install_dir" \
+      -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
       -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
-      -Dsystem-root="$(xcrun --sdk appletvsimulator --show-sdk-path)" \
-      --libc "$native_install_dir/share/maplibre-native-c/zig-libc" \
+      ${zig_cross_args[@]+"${zig_cross_args[@]}"} \
       --test-timeout 120s --summary all --verbose
     ;;
   ios-* | tvos-*)
