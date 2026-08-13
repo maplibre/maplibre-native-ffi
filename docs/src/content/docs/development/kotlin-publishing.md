@@ -216,6 +216,13 @@ publishing prevents two commits from interleaving those uploads. Both snapshot
 and tagged release jobs reuse the CI-produced native archives and the same
 staged repository; they do not rebuild MapLibre Native.
 
+The main CI workflow runs the same staging and verification on every pull
+request and on `main`, using the native artifacts from the same run, so a change
+that breaks the publish pipeline fails before merge. Snapshot publication reuses
+the verified repository that the CI run on `main` uploaded, and adds only
+signing and the Central Portal upload. Tagged releases stage again at their
+release version, through the same workflow.
+
 The initial snapshot workflow validates:
 
 - Maven and Gradle module metadata for every publication;

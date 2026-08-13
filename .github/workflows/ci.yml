@@ -1604,6 +1604,42 @@ jobs:
           mise run //:kotlin:verify-android-multi-abi
           build/packages/native/android-multi-input
 
+  kotlin-maven:
+    name: Kotlin Maven
+    permissions:
+      actions: read
+      contents: read
+    if: >-
+      github.event_name != 'pull_request'
+      || github.base_ref == 'main'
+      || github.event.pull_request.draft == false
+    needs:
+      - target-linux-x64-egl
+      - target-linux-x64-vulkan
+      - target-linux-arm64-egl
+      - target-linux-arm64-vulkan
+      - target-macos-arm64-metal
+      - target-macos-arm64-vulkan
+      - target-macos-arm64-egl
+      - target-ios-arm64-metal
+      - target-ios-simulator-arm64-metal
+      - target-tvos-arm64-metal
+      - target-tvos-simulator-arm64-metal
+      - target-android-arm64-egl
+      - target-android-arm64-vulkan
+      - target-android-x64-egl
+      - target-android-x64-vulkan
+      - target-windows-x64-wgl
+      - target-windows-x64-vulkan
+      - target-windows-arm64-wgl
+      - target-windows-arm64-vulkan
+    uses: ./.github/workflows/_kotlin-maven.yml
+    with:
+      publish: false
+      run_id: ${{ github.run_id }}
+      sha: ${{ github.sha }}
+      version: 0.1.0-SNAPSHOT
+
   required:
     name: ci-required
     runs-on: ubuntu-slim
@@ -1643,6 +1679,7 @@ jobs:
       - target-windows-arm64-wgl
       - target-windows-arm64-vulkan
       - android-multi
+      - kotlin-maven
     steps:
       - name: Fail if required jobs failed
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}

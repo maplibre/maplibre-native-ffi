@@ -389,6 +389,9 @@ jobs:
     with:
       run_id: ${{ needs.plan.outputs.run_id }}
       sha: ${{ needs.plan.outputs.sha }}
+      # The CI run already staged and verified this commit at the snapshot
+      # version, so this publish reuses its verified repository.
+      verified_run_id: ${{ needs.plan.outputs.run_id }}
       version: ${{ needs.plan.outputs.kotlin_version }}
     secrets: inherit
 
