@@ -863,7 +863,6 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: tvos-arm64-metal
-          gradle: false
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run build tvos-arm64-metal
@@ -874,6 +873,9 @@ jobs:
           mise run install-native-package
           tvos-arm64-metal
           build/packages/native/dist/maplibre-native-c-tvos-arm64-metal.tar.gz
+      - run: mise run //bindings/kotlin:ios-build tvos-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/swift:build tvos-arm64-metal
         env:
           MISE_TASK_SKIP: "//:build"
@@ -900,7 +902,6 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: tvos-simulator-arm64-metal
-          gradle: false
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test tvos-simulator-arm64-metal
@@ -911,6 +912,9 @@ jobs:
           mise run install-native-package
           tvos-simulator-arm64-metal
           build/packages/native/dist/maplibre-native-c-tvos-simulator-arm64-metal.tar.gz
+      - run: mise run //bindings/kotlin:test tvos-simulator-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/swift:test tvos-simulator-arm64-metal
         env:
           MISE_TASK_SKIP: "//:build"

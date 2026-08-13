@@ -106,11 +106,15 @@ def command_support(command: str) -> list[tuple[str, str]]:
     if kind == "bindings" and name == "kotlin":
         if action == "android-build":
             return [("bindings-kotlin-android", "build-only")]
+        if action == "ios-build":
+            return [("bindings-kotlin-native", "build-only")]
         if action == "test":
+            preset = command.rsplit(" ", 1)[-1]
+            if preset.startswith(("ios-simulator-", "tvos-simulator-")):
+                return [("bindings-kotlin-native", "tested")]
             # The test task runs the JVM suite on every host preset and adds
             # the Kotlin/Native suite where the binding declares a target.
             rows = [("bindings-kotlin-jvm", "tested")]
-            preset = command.rsplit(" ", 1)[-1]
             if preset.startswith(("linux-x64-", "macos-arm64-")):
                 rows.append(("bindings-kotlin-native", "tested"))
             return rows

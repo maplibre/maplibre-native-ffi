@@ -27,6 +27,8 @@ API_BEARING_MODULES = {
     "maplibre-native-ffi-androidnativex64",
     "maplibre-native-ffi-iosarm64",
     "maplibre-native-ffi-iossimulatorarm64",
+    "maplibre-native-ffi-tvosarm64",
+    "maplibre-native-ffi-tvossimulatorarm64",
     "maplibre-native-ffi-jvm",
     "maplibre-native-ffi-linuxarm64",
     "maplibre-native-ffi-linuxx64",
@@ -40,6 +42,8 @@ ROOT_TARGET_MODULES = {
         "androidNativeX64": "maplibre-native-ffi-androidnativex64",
         "iosArm64": "maplibre-native-ffi-iosarm64",
         "iosSimulatorArm64": "maplibre-native-ffi-iossimulatorarm64",
+        "tvosArm64": "maplibre-native-ffi-tvosarm64",
+        "tvosSimulatorArm64": "maplibre-native-ffi-tvossimulatorarm64",
         "jvm": "maplibre-native-ffi-jvm",
         "linuxArm64": "maplibre-native-ffi-linuxarm64",
         "linuxX64": "maplibre-native-ffi-linuxx64",
@@ -66,6 +70,8 @@ ROOT_TARGET_MODULES = {
     "maplibre-native-ffi-runtime-metal": {
         "iosArm64": "maplibre-native-ffi-runtime-metal-iosarm64",
         "iosSimulatorArm64": "maplibre-native-ffi-runtime-metal-iossimulatorarm64",
+        "tvosArm64": "maplibre-native-ffi-runtime-metal-tvosarm64",
+        "tvosSimulatorArm64": "maplibre-native-ffi-runtime-metal-tvossimulatorarm64",
         "jvm": "maplibre-native-ffi-runtime-metal-jvm",
         "macosArm64": "maplibre-native-ffi-runtime-metal-macosarm64",
     },
@@ -451,6 +457,11 @@ def verify_native(root: pathlib.Path) -> None:
         "maplibre-native-ffi-runtime-metal-iossimulatorarm64": (
             "metal",
             "ios-simulator-arm64",
+        ),
+        "maplibre-native-ffi-runtime-metal-tvosarm64": ("metal", "tvos-arm64"),
+        "maplibre-native-ffi-runtime-metal-tvossimulatorarm64": (
+            "metal",
+            "tvos-simulator-arm64",
         ),
     }
     for module, (backend, target) in modules.items():
