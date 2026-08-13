@@ -169,9 +169,16 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
                 f"mise run //bindings/dart:build:mobile {preset}",
             ]
         )
+    elif target_platform == "tvos":
+        commands.extend(
+            [
+                f"mise run //bindings/swift:build {preset}",
+            ]
+        )
     elif target_platform == "tvos-simulator":
         commands.extend(
             [
+                f"mise run //bindings/swift:test {preset}",
                 f"mise run //bindings/zig:test {preset}",
             ]
         )
