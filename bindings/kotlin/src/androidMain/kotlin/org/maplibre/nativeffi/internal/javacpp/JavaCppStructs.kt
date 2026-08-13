@@ -10,6 +10,7 @@ import org.maplibre.nativeffi.map.TileOptions
 import org.maplibre.nativeffi.map.ViewportOptions
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
+import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.render.JavaCppRenderStructs
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
@@ -46,6 +47,11 @@ internal object JavaCppStructs {
 
   fun renderedQueryGeometryType(value: RenderedQueryGeometry): Int =
     JavaCppRenderStructs.renderedQueryGeometryType(value)
+
+  fun featureStateSelectorSnapshot(
+    value: FeatureStateSelector
+  ): JavaCppRenderStructs.FeatureStateSelectorSnapshot =
+    JavaCppRenderStructs.featureStateSelectorSnapshot(value)
 
   fun ownedBufferCleanupAfterCopyFailure(): Int {
     var destroys = 0
