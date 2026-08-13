@@ -237,6 +237,15 @@ outputs = { auto = true }
 run = [
   { task = "//:check-cross-sdk", args = ["{{usage.preset}}"] },
   '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"',
+  '''
+  compile_commands_dir="$MISE_MONOREPO_ROOT/build/clangd"
+  compile_commands="$compile_commands_dir/compile_commands.json"
+  compile_commands_tmp="$compile_commands.tmp"
+  cmake -E make_directory "$compile_commands_dir"
+  cmake -E copy "$MISE_MONOREPO_ROOT/build/$usage_preset/compile_commands.json" "$compile_commands_tmp"
+  cmake -E rm -f "$compile_commands"
+  cmake -E rename "$compile_commands_tmp" "$compile_commands"
+  ''',
   'cmake --install "$MISE_MONOREPO_ROOT/build/$usage_preset" --component loader',
 ]
 

@@ -67,6 +67,10 @@ Native targets and render backends are defined in `CMakePresets.json`. Gradle
 selects the Android presets when building platform packages; OpenHarmony and
 host workflows use the presets directly.
 
+Clangd uses the compilation database from the last preset built through
+`mise run build`; rebuild the matching preset before trusting target-specific
+diagnostics.
+
 The Android, Emscripten, and OpenHarmony SDKs are opt-in, each behind the mise
 configuration environment named after its presets. A build for one of those
 targets reads `ANDROID_HOME`, `EMSDK`, or `OHOS_SDK_NATIVE` from the
