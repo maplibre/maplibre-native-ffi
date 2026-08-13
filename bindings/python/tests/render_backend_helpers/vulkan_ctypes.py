@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-# The vulkan package depends on CFFI, which does not publish Android wheels.
-# This adapter exposes the subset of its API that the render fixtures need.
+# Android tests use this ctypes subset because the vulkan package requires CFFI.
+# Keep its constants and layouts synchronized with the canonical Vulkan header:
+# https://github.com/KhronosGroup/Vulkan-Headers/blob/main/include/vulkan/vulkan_core.h
 import ctypes
 from collections.abc import Callable
 from typing import Any
