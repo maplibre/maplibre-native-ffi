@@ -14,8 +14,7 @@ function(mln_ffi_configure_renderer target)
       ${PROJECT_SOURCE_DIR}/src/render/metal/metal_texture_backend.mm
       ${PROJECT_SOURCE_DIR}/src/render/metal/metal_surface_session.mm)
 
-  if(CMAKE_SYSTEM_NAME STREQUAL "iOS"
-     AND CMAKE_OSX_SYSROOT MATCHES "[iI][pP]hone[Ss]imulator")
+  if(CMAKE_OSX_SYSROOT MATCHES "[Ss]imulator")
     list(APPEND MLN_FFI_METAL_SOURCES
          ${PROJECT_SOURCE_DIR}/src/render/metal/ios_simulator_metal_symbols.m)
   endif()

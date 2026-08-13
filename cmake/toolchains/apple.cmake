@@ -25,6 +25,17 @@ elseif(MLN_FFI_XTOOL_SYSROOT_NAME MATCHES "iphoneos")
   set(MLN_FFI_XTOOL_TRIPLE "arm64-apple-ios${CMAKE_OSX_DEPLOYMENT_TARGET}")
   set(MLN_FFI_XTOOL_SYSROOT
       "${MLN_FFI_XTOOL_SDK_BUNDLE}/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk")
+elseif(MLN_FFI_XTOOL_SYSROOT_NAME MATCHES "appletvsimulator")
+  set(CMAKE_SYSTEM_NAME tvOS)
+  set(MLN_FFI_XTOOL_TRIPLE
+      "arm64-apple-tvos${CMAKE_OSX_DEPLOYMENT_TARGET}-simulator")
+  set(MLN_FFI_XTOOL_SYSROOT
+      "${MLN_FFI_XTOOL_SDK_BUNDLE}/Developer/Platforms/AppleTVSimulator.platform/Developer/SDKs/AppleTVSimulator.sdk")
+elseif(MLN_FFI_XTOOL_SYSROOT_NAME MATCHES "appletvos")
+  set(CMAKE_SYSTEM_NAME tvOS)
+  set(MLN_FFI_XTOOL_TRIPLE "arm64-apple-tvos${CMAKE_OSX_DEPLOYMENT_TARGET}")
+  set(MLN_FFI_XTOOL_SYSROOT
+      "${MLN_FFI_XTOOL_SDK_BUNDLE}/Developer/Platforms/AppleTVOS.platform/Developer/SDKs/AppleTVOS.sdk")
 elseif(MLN_FFI_XTOOL_SYSROOT_NAME MATCHES "macosx")
   set(CMAKE_SYSTEM_NAME Darwin)
   set(MLN_FFI_XTOOL_TRIPLE "arm64-apple-macosx${CMAKE_OSX_DEPLOYMENT_TARGET}")

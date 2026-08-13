@@ -271,14 +271,14 @@ NSString* HTTPFileSource::Impl::getUserAgent() const {
                                          @(mbgl::version::revision)]];
 
   NSString* systemName = @"Darwin";
-#if TARGET_OS_IPHONE
+#if TARGET_OS_TV
+  systemName = @"tvOS";
+#elif TARGET_OS_IPHONE
   systemName = @"iOS";
 #elif TARGET_OS_MAC
   systemName = @"macOS";
 #elif TARGET_OS_WATCH
   systemName = @"watchOS";
-#elif TARGET_OS_TV
-  systemName = @"tvOS";
 #endif
 #if TARGET_OS_SIMULATOR
   systemName = [systemName stringByAppendingString:@" Simulator"];

@@ -10,15 +10,24 @@ function(mln_ffi_configure_apple_toolchain_defaults)
   endif()
 
   if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$")
       # Match MapLibre Native's vendored CMake, which currently forces this
-      # value through maplibre-tile-spec even for iOS builds.
+      # value through maplibre-tile-spec even for iOS builds. tvOS shares the
+      # same numeric floor.
       set(CMAKE_OSX_DEPLOYMENT_TARGET "14.3"
-          CACHE STRING "Minimum iOS deployment target" FORCE)
+          CACHE STRING "Minimum ${CMAKE_SYSTEM_NAME} deployment target" FORCE)
     elseif(NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET})
       set(CMAKE_OSX_DEPLOYMENT_TARGET "14.3"
           CACHE STRING "Minimum macOS deployment target" FORCE)
     endif()
+  endif()
+endfunction()
+
+function(mln_ffi_apple_is_simulator out_var)
+  if(CMAKE_OSX_SYSROOT MATCHES "[Ss]imulator")
+    set(${out_var} TRUE PARENT_SCOPE)
+  else()
+    set(${out_var} FALSE PARENT_SCOPE)
   endif()
 endfunction()
 
@@ -40,28 +49,58 @@ function(mln_ffi_configure_platform_dependencies target)
     PROPERTIES
       MLN_FFI_DEFAULT_LOGGING_STDERR TRUE MLN_FFI_DEFAULT_THREAD_LOCAL TRUE
       MLN_FFI_SHARED_SUPPORTED TRUE)
-  if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+
+  mln_ffi_apple_is_simulator(MLN_FFI_APPLE_SIMULATOR)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set_target_properties(
       ${target}
       PROPERTIES
-        MLN_FFI_TARGET_PLATFORM ios-arm64 MLN_FFI_ZIG_TARGET aarch64-ios)
-    if(CMAKE_OSX_SYSROOT MATCHES "[iI][pP]hone[Ss]imulator")
+        MLN_FFI_TARGET_PLATFORM macos-arm64 MLN_FFI_ZIG_TARGET aarch64-macos
+        MLN_FFI_TEST_SUPPORTED TRUE)
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    if(MLN_FFI_APPLE_SIMULATOR)
       set_target_properties(
         ${target}
         PROPERTIES
           MLN_FFI_TARGET_PLATFORM ios-simulator-arm64 MLN_FFI_ZIG_TARGET
           aarch64-ios-simulator MLN_FFI_TEST_SUPPORTED TRUE)
     else()
-      set_target_properties(${target} PROPERTIES MLN_FFI_TEST_SUPPORTED FALSE)
+      set_target_properties(
+        ${target}
+        PROPERTIES
+          MLN_FFI_TARGET_PLATFORM ios-arm64 MLN_FFI_ZIG_TARGET aarch64-ios
+          MLN_FFI_TEST_SUPPORTED FALSE)
+    endif()
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "tvOS")
+    if(MLN_FFI_APPLE_SIMULATOR)
+      set_target_properties(
+        ${target}
+        PROPERTIES
+          MLN_FFI_TARGET_PLATFORM tvos-simulator-arm64 MLN_FFI_ZIG_TARGET
+          aarch64-tvos-simulator MLN_FFI_TEST_SUPPORTED TRUE)
+    else()
+      set_target_properties(
+        ${target}
+        PROPERTIES
+          MLN_FFI_TARGET_PLATFORM tvos-arm64 MLN_FFI_ZIG_TARGET aarch64-tvos
+          MLN_FFI_TEST_SUPPORTED FALSE)
     endif()
   else()
-    set_target_properties(
-      ${target}
-      PROPERTIES
-        MLN_FFI_TARGET_PLATFORM macos-arm64 MLN_FFI_ZIG_TARGET aarch64-macos
-        MLN_FFI_TEST_SUPPORTED TRUE)
+    message(FATAL_ERROR "Unsupported Apple platform: ${CMAKE_SYSTEM_NAME}")
   endif()
-  if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(MLN_FFI_APPLE_SDK "${CMAKE_OSX_SYSROOT}")
+    if(NOT MLN_FFI_APPLE_SDK)
+      set(MLN_FFI_APPLE_SDK macosx)
+    endif()
+    if(NOT IS_ABSOLUTE "${MLN_FFI_APPLE_SDK}")
+      execute_process(
+        COMMAND xcrun --sdk "${MLN_FFI_APPLE_SDK}" --show-sdk-path
+        OUTPUT_VARIABLE MLN_FFI_APPLE_SDK OUTPUT_STRIP_TRAILING_WHITESPACE
+        COMMAND_ERROR_IS_FATAL ANY)
+    endif()
+  else()
     set(MLN_FFI_ZIG_LIBC_SYSROOT "${CMAKE_OSX_SYSROOT}")
     if(NOT IS_ABSOLUTE "${MLN_FFI_ZIG_LIBC_SYSROOT}")
       execute_process(
@@ -77,17 +116,6 @@ function(mln_ffi_configure_platform_dependencies target)
         MLN_FFI_ZIG_LIBC_INCLUDE_DIR "${MLN_FFI_ZIG_LIBC_SYSROOT}/usr/include"
         MLN_FFI_ZIG_LIBC_CRT_DIR "")
     set(MLN_FFI_APPLE_SDK "${MLN_FFI_ZIG_LIBC_SYSROOT}")
-  else()
-    set(MLN_FFI_APPLE_SDK "${CMAKE_OSX_SYSROOT}")
-    if(NOT MLN_FFI_APPLE_SDK)
-      set(MLN_FFI_APPLE_SDK macosx)
-    endif()
-    if(NOT IS_ABSOLUTE "${MLN_FFI_APPLE_SDK}")
-      execute_process(
-        COMMAND xcrun --sdk "${MLN_FFI_APPLE_SDK}" --show-sdk-path
-        OUTPUT_VARIABLE MLN_FFI_APPLE_SDK OUTPUT_STRIP_TRAILING_WHITESPACE
-        COMMAND_ERROR_IS_FATAL ANY)
-    endif()
   endif()
 
   find_program(MLN_FFI_LIBTOOL NAMES libtool REQUIRED)
@@ -127,7 +155,7 @@ function(mln_ffi_configure_platform target)
     ${target}
     PRIVATE mbgl-vendor-metal-cpp MLN_FFI::PlatformDependencies)
 
-  if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set_target_properties(
       ${target}
       PROPERTIES
