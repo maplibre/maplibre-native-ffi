@@ -239,9 +239,9 @@ class RenderSessionScheduler final : public mbgl::Scheduler {
   // Drops queued work without running it, for detach.
   auto discard() -> void;
 
-  // Requests a host frame when foreign-thread work makes an idle queue
-  // nonempty. Cleared before detach so late worker results are discarded.
-  auto set_wake(std::function<void()> wake) -> void;
+  // Requests a host frame when work makes an idle queue nonempty. Cleared
+  // before detach so late worker results are discarded.
+  auto set_repaint_request(std::function<void()> repaint_request) -> void;
 
  private:
   // Reopens the queue and wakes pending work if drain() exits through an
@@ -262,7 +262,7 @@ class RenderSessionScheduler final : public mbgl::Scheduler {
 
   std::mutex mutex_;
   std::vector<std::function<void()>> queue_;
-  std::function<void()> wake_;
+  std::function<void()> repaint_request_;
   bool draining_ = false;
   mapbox::base::WeakPtrFactory<mbgl::Scheduler> weak_factory_{this};
   // Do not add members here, see `WeakPtrFactory`

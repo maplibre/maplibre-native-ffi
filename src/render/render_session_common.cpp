@@ -884,17 +884,17 @@ auto register_render_session(std::shared_ptr<mln_render_session_object> session)
 }
 
 void RenderSessionScheduler::schedule(std::function<void()>&& task) {
-  auto wake = std::function<void()>{};
+  auto request_repaint = std::function<void()>{};
   {
     const auto lock = std::scoped_lock{mutex_};
     const auto was_empty = queue_.empty();
     queue_.push_back(std::move(task));
     if (was_empty && !draining_) {
-      wake = wake_;
+      request_repaint = repaint_request_;
     }
   }
-  if (wake) {
-    wake();
+  if (request_repaint) {
+    request_repaint();
   }
 }
 
@@ -934,18 +934,18 @@ auto RenderSessionScheduler::drain() -> void {
 }
 
 RenderSessionScheduler::DrainGuard::~DrainGuard() {
-  auto wake = std::function<void()>{};
+  auto request_repaint = std::function<void()>{};
   {
     const auto lock = std::scoped_lock{scheduler_.mutex_};
     if (scheduler_.draining_) {
       scheduler_.draining_ = false;
       if (!scheduler_.queue_.empty()) {
-        wake = scheduler_.wake_;
+        request_repaint = scheduler_.repaint_request_;
       }
     }
   }
-  if (wake) {
-    wake();
+  if (request_repaint) {
+    request_repaint();
   }
 }
 
@@ -955,9 +955,11 @@ auto RenderSessionScheduler::discard() -> void {
   batch.swap(queue_);
 }
 
-auto RenderSessionScheduler::set_wake(std::function<void()> wake) -> void {
+auto RenderSessionScheduler::set_repaint_request(
+  std::function<void()> repaint_request
+) -> void {
   const auto lock = std::scoped_lock{mutex_};
-  wake_ = std::move(wake);
+  repaint_request_ = std::move(repaint_request);
 }
 
 // Only the attaching thread destroys a session, so the borrowed object stays
@@ -1023,10 +1025,10 @@ auto attach_render_session(
   if (attach_status != MLN_STATUS_OK) {
     return attach_status;
   }
-  session->scheduler.set_wake([map]() {
-    static_cast<void>(map_post_trigger_repaint(map));
-  });
   try {
+    session->scheduler.set_repaint_request([map]() {
+      static_cast<void>(map_post_trigger_repaint(map));
+    });
     // Set before priming: renderer_backend() dispatches on kind.
     session->kind = kind;
     // Create the backend's graphics context on the thread that will drive the
@@ -1042,7 +1044,7 @@ auto attach_render_session(
     const auto size_status =
       map_post_set_size(map, session->width, session->height);
     if (size_status != MLN_STATUS_OK) {
-      session->scheduler.set_wake({});
+      session->scheduler.set_repaint_request({});
       static_cast<void>(map_detach_render_target_session(map, handle));
       return size_status;
     }
@@ -1050,7 +1052,7 @@ auto attach_render_session(
 
     *out_session = register_render_session(std::move(session));
   } catch (...) {
-    session->scheduler.set_wake({});
+    session->scheduler.set_repaint_request({});
     static_cast<void>(map_detach_render_target_session(map, handle));
     throw;
   }
@@ -1372,7 +1374,7 @@ auto render_session_detach(mln_render_session session) -> mln_status {
     return MLN_STATUS_INVALID_STATE;
   }
 
-  live->scheduler.set_wake({});
+  live->scheduler.set_repaint_request({});
 
   // Tear the renderer down before releasing the map's slot. The renderer holds
   // the map's forwarding observer, which the map's frontend owns; releasing the
