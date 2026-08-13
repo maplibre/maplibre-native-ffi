@@ -13,42 +13,14 @@ if [[ ! -x "$test_executable" ]]; then
   exit 2
 fi
 
-runtime=${MLN_FFI_SIMULATOR_RUNTIME:-iOS}
-case "$runtime" in
-  iOS)
-    device_filter=' iPhone '
-    boot_task=ios-simulator:boot
-    ;;
-  tvOS)
-    device_filter='Apple TV'
-    boot_task=tvos-simulator:boot
-    ;;
-  *)
-    echo "Unknown simulator runtime: $runtime" >&2
-    exit 2
-    ;;
-esac
-
-device=$(
-  xcrun simctl list devices available "$runtime" |
-    awk -v filter="$device_filter" '
-      index($0, filter) && /Booted/ {
-        if (match($0, /[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/)) {
-          print substr($0, RSTART, RLENGTH)
-          exit
-        }
-      }
-    '
-)
-if [[ -z "$device" ]]; then
-  echo "No booted $runtime simulator device found. Run 'mise run //:$boot_task' first." >&2
-  exit 2
-fi
-
 if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then
   echo "Invalid timeout: $timeout_seconds" >&2
   exit 2
 fi
+
+script_dir=$(cd "$(dirname "$0")" && pwd)
+runtime=${MLN_FFI_SIMULATOR_RUNTIME:-iOS}
+device=$("$script_dir/apple-simulator.sh" find-booted "$runtime")
 
 # simctl hands the spawned process the variables named SIMCTL_CHILD_<NAME>, with
 # the prefix removed, so the fixture directory travels under that spelling. The
